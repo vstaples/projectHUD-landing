@@ -1,5 +1,5 @@
-// VERSION: 20260402-165500
-console.log('%c[mw-core] v20260402-165500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-170000
+console.log('%c[mw-core] v20260402-170000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1237,7 +1237,6 @@ window._mwLoadUserView = async function() {
       let _knownInstSteps  = {};  // instanceId → current_step_name snapshot for submitter
       // Seed instance step snapshot from current requests
       (window._myRequests||[]).forEach(r => { _knownInstSteps[r.id] = r._raw?.current_step_name || ''; });
-      let _instStepsSeeded = Object.keys(_knownInstSteps).length > 0;
       let _pollCount = 0;
       console.log('%c[Poll] Started — watching workflow_requests + workflow_action_items every 15s | resId: ' + (_myResource?.id||'?'),
         'background:#1a3a1a;color:#4ade80;padding:2px 6px;font-weight:600');
@@ -1261,18 +1260,15 @@ window._mwLoadUserView = async function() {
           const newReviews  = (freshReviews||[]).filter(r => !_knownReviewIds.has(r.id));
           // Detect step changes on submitter's own instances
           const stepChanged = (freshInsts||[]).filter(inst => {
-            const prev = _knownInstSteps[inst.id];
-            return prev !== undefined && prev !== inst.current_step_name;
-          });
-          if (freshInsts) {
-            if (!_instStepsSeeded) {
-              // First poll — seed without flagging as changed
-              freshInsts.forEach(inst => { _knownInstSteps[inst.id] = inst.current_step_name; });
-              _instStepsSeeded = true;
-            } else {
-              freshInsts.forEach(inst => { _knownInstSteps[inst.id] = inst.current_step_name; });
+            if (!Object.prototype.hasOwnProperty.call(_knownInstSteps, inst.id)) {
+              // New instance — seed without flagging as changed
+              _knownInstSteps[inst.id] = inst.current_step_name;
+              return false;
             }
-          }
+            const changed = _knownInstSteps[inst.id] !== inst.current_step_name;
+            _knownInstSteps[inst.id] = inst.current_step_name;
+            return changed;
+          });
           const totalOpen = (freshActions?.length||0) + (freshReviews?.length||0);
           const totalNew  = newActions.length + newReviews.length + stepChanged.length;
           console.log(`[Poll #${_pollCount}] ${totalOpen} open items | ${totalNew} new`

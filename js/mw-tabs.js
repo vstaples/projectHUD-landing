@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-165000
+// VERSION: 20260402-170500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-165000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-170500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -2845,15 +2845,14 @@ window.myrDevPurge = async function() {
   };
 
   try {
-    await Promise.all([
-      supa('workflow_requests',   `firm_id=eq.${firmId}`),
-      supa('workflow_instances',  `firm_id=eq.${firmId}&workflow_type=eq.doc-review`),
-      supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Review request:*`),
-      supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Approve request:*`),
-      supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%9C%93 Approved:*`),
-      supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%86%BA Changes requested:*`),
-      supa('coc_events',          `firm_id=eq.${firmId}&event_type=like.request.*`),
-    ]);
+    // Delete in dependency order — child rows before parent rows
+    await supa('workflow_requests',     `firm_id=eq.${firmId}`);
+    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Review request:*`);
+    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Approve request:*`);
+    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%9C%93 Approved:*`);
+    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%86%BA Changes requested:*`);
+    await supa('coc_events',            `firm_id=eq.${firmId}&event_type=like.request.*`);
+    await supa('workflow_instances',    `firm_id=eq.${firmId}&workflow_type=eq.doc-review`);
 
     // Reset local state
     window._myRequests     = [];
