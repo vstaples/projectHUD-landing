@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-164000
+// VERSION: 20260402-165000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-164000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-165000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -929,16 +929,11 @@ window.loadUserRequests = async function() {
             ? Math.min(currentIdx + 1, stepLabels.length - 1)
             : 1;
 
-        // Derive active step index purely from current_step_name in DB.
-        // The cocDoneCount refinement was removed — it counted request.approved events as
-        // step completions, which incorrectly advanced Review to green when only one of
-        // multiple reviewers had acted. current_step_name is gated in _rrpSubmit and only
-        // advances to 'Approve' when ALL reviewers are resolved.
+        // current_step_name is the ACTIVE step (what's happening now), not the completed one.
+        // Steps before it are done; it is active; steps after are pending.
         const activeIdx = isComplete
           ? stepLabels.length
-          : currentIdx >= 0
-            ? Math.min(currentIdx + 1, stepLabels.length - 1)
-            : 1;
+          : currentIdx >= 0 ? currentIdx : 1;
         const steps = stepLabels.map((label, i) => ({
           label,
           done:   i < activeIdx,
@@ -1176,14 +1171,25 @@ function renderMyRequestsActive() {
 
   // Snapshot which request IDs are currently expanded before wiping innerHTML
   const expandedIds = new Set();
+  const cocOpenIds  = new Set();
   el.querySelectorAll('.myr-ar-body.open').forEach(body => {
-    // body id is myr-ar-body-{i} — find matching req id via sibling head data
     const card = body.closest('.myr-active-req');
     if (card) {
       const withdrawBtn = card.querySelector('[onclick*="myrWithdrawRequest"]');
       if (withdrawBtn) {
         const m = (withdrawBtn.getAttribute('onclick')||'').match(/myrWithdrawRequest\('([^']+)'\)/);
         if (m) expandedIds.add(m[1]);
+      }
+    }
+  });
+  el.querySelectorAll('.myr-coc-events.open').forEach(cocEl => {
+    // CoC panel id is myr-coc-{i} — find req id from sibling withdraw button
+    const card = cocEl.closest('.myr-active-req');
+    if (card) {
+      const withdrawBtn = card.querySelector('[onclick*="myrWithdrawRequest"]');
+      if (withdrawBtn) {
+        const m = (withdrawBtn.getAttribute('onclick')||'').match(/myrWithdrawRequest\('([^']+)'\)/);
+        if (m) cocOpenIds.add(m[1]);
       }
     }
   });
@@ -1417,10 +1423,10 @@ function renderMyRequestsActive() {
         })()}
         <div class="myr-coc-panel">
           <div class="myr-coc-label" onclick="myrToggleCoc('myr-coc-${i}','${req.id}',this)">
-            <span>&#9656; Chain of Custody</span>
+            <span>${cocOpenIds.has(req.id) ? '&#9662; Chain of Custody' : '&#9656; Chain of Custody'}</span>
             <span style="color:rgba(0,210,255,.4)">${instCoc.length > 0 ? instCoc.length + ' event' + (instCoc.length!==1?'s':'') : 'Load'}</span>
           </div>
-          <div class="myr-coc-events" id="myr-coc-${i}">${cocRows}</div>
+          <div class="myr-coc-events${cocOpenIds.has(req.id) ? ' open' : ''}" id="myr-coc-${i}">${cocRows}</div>
         </div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
           <button onclick="myrWithdrawRequest('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;cursor:pointer;letter-spacing:.06em">Withdraw</button>

@@ -1,5 +1,5 @@
-// VERSION: 20260402-163000
-console.log('%c[mw-core] v20260402-163000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260402-165000
+console.log('%c[mw-core] v20260402-165000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1234,6 +1234,10 @@ window._mwLoadUserView = async function() {
     if (!window._actionItemPollTimer) {
       let _knownActionIds  = new Set((myActionItems||[]).map(a => a.id));
       let _knownReviewIds  = new Set((myPendingReviews||[]).map(r => r.id));
+      let _knownInstSteps  = {};  // instanceId → current_step_name snapshot for submitter
+      // Seed instance step snapshot from current requests
+      (window._myRequests||[]).forEach(r => { _knownInstSteps[r.id] = r._raw?.current_step_name || ''; });
+      let _instStepsSeeded = Object.keys(_knownInstSteps).length > 0;
       let _pollCount = 0;
       console.log('%c[Poll] Started — watching workflow_requests + workflow_action_items every 15s | resId: ' + (_myResource?.id||'?'),
         'background:#1a3a1a;color:#4ade80;padding:2px 6px;font-weight:600');
@@ -1242,21 +1246,38 @@ window._mwLoadUserView = async function() {
         if (!_myResource?.id) { console.warn('[Poll] _myResource not ready — skipping'); return; }
         _pollCount++;
         try {
-          const [freshActions, freshReviews] = await Promise.all([
+          const [freshActions, freshReviews, freshInsts] = await Promise.all([
             API.get(
               `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,title&limit=50`
             ).catch(e => { console.warn('[Poll] action_items fetch error:', e.message); return null; }),
             API.get(
               `workflow_requests?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,role&limit=50`
             ).catch(e => { console.warn('[Poll] workflow_requests fetch error:', e.message); return null; }),
+            API.get(
+              `workflow_instances?submitted_by_resource_id=eq.${_myResource.id}&status=in.(in_progress,complete)&select=id,current_step_name&limit=50`
+            ).catch(() => null),
           ]);
           const newActions  = (freshActions||[]).filter(a => !_knownActionIds.has(a.id));
           const newReviews  = (freshReviews||[]).filter(r => !_knownReviewIds.has(r.id));
-          const totalOpen   = (freshActions?.length||0) + (freshReviews?.length||0);
-          const totalNew    = newActions.length + newReviews.length;
+          // Detect step changes on submitter's own instances
+          const stepChanged = (freshInsts||[]).filter(inst => {
+            const prev = _knownInstSteps[inst.id];
+            return prev !== undefined && prev !== inst.current_step_name;
+          });
+          if (freshInsts) {
+            if (!_instStepsSeeded) {
+              // First poll — seed without flagging as changed
+              freshInsts.forEach(inst => { _knownInstSteps[inst.id] = inst.current_step_name; });
+              _instStepsSeeded = true;
+            } else {
+              freshInsts.forEach(inst => { _knownInstSteps[inst.id] = inst.current_step_name; });
+            }
+          }
+          const totalOpen = (freshActions?.length||0) + (freshReviews?.length||0);
           console.log(`[Poll #${_pollCount}] ${totalOpen} open items | ${totalNew} new`
             + (newActions.length ? ' | actions: ' + newActions.map(a=>a.title?.slice(0,30)).join(', ') : '')
-            + (newReviews.length ? ' | reviews: ' + newReviews.map(r=>r.role).join(', ') : ''));
+            + (newReviews.length ? ' | reviews: ' + newReviews.map(r=>r.role).join(', ') : '')
+            + (stepChanged.length ? ' | step changes: ' + stepChanged.map(i=>i.current_step_name).join(', ') : ''));
           if (totalNew) {
             newActions.forEach(a => _knownActionIds.add(a.id));
             newReviews.forEach(r => _knownReviewIds.add(r.id));
@@ -1265,7 +1286,7 @@ window._mwLoadUserView = async function() {
               console.log('%c[Poll] Reloading My Work','background:#1a3a1a;color:#4ade80;padding:2px 6px');
               window._mwLoadUserView && window._mwLoadUserView();
             } else if (activeTab === 'requests') {
-              console.log('[Poll] New items — refreshing My Requests');
+              console.log('[Poll] Step/item change — refreshing My Requests');
               window._requestsLoaded = false;
               window.loadUserRequests && window.loadUserRequests();
             } else {
