@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-121400
+// VERSION: 20260402-121500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260402-121400','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260402-121500','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -791,9 +791,9 @@ window.loadUserRequests = async function() {
         position: absolute; bottom: calc(100% + 8px); left: 50%;
         transform: translateX(-50%);
         background: #0a1628; border: 1px solid rgba(239,159,39,.3);
-        padding: 5px 9px; min-width: 140px; max-width: 200px;
+        padding: 8px 10px; min-width: 160px; max-width: 240px;
         font-family: var(--font-head); font-size: 11px; line-height: 1.5;
-        color: #C8DFF0; white-space: nowrap; z-index: 200;
+        color: #C8DFF0; white-space: normal; z-index: 200;
         pointer-events: none; transition: opacity .15s;
       }
       .myr-pt-tip::after {
