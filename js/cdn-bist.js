@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AZ','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-BA','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1703,7 +1703,8 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
   } else if (type === 'step_route_back') {
     var fromCard = document.getElementById('bck-n-'+ev.fromStepId);
     var toCard   = ev.toStepId ? document.getElementById('bck-n-'+ev.toStepId) : null;
-    console.log('[arc] route_back fromId:', ev.fromStepId, 'toId:', ev.toStepId, 'toSeq:', ev.toSeq, 'fromCard:', !!fromCard, 'toCard:', !!toCard);
+    var allCards = Array.from(document.querySelectorAll('[id^="bck-n-"]')).map(function(e){return e.id;});
+    console.log('[arc] fromId:', ev.fromStepId, 'toId:', ev.toStepId, 'fromCard:', !!fromCard, 'toCard:', !!toCard, 'allCards:', allCards);
     if (fromCard && toCard) {
       _bckDrawRejectArc(ev.fromStepId, ev.toStepId);
     } else if (fromCard) {
