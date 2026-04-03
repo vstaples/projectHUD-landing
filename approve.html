@@ -419,22 +419,33 @@ textarea.error {border-color:rgba(255,71,87,0.5)}
       <div class="conf-outcome" id="conf-outcome"></div>
       <div class="conf-detail" id="conf-detail"></div>
       <div class="conf-ref" id="conf-ref"></div>
+      <div id="dbg-log" style="margin-top:20px;text-align:left;font-family:Arial,sans-serif;
+           font-size:11px;color:rgba(255,255,255,.4);line-height:1.7;max-height:120px;
+           overflow-y:auto;padding:8px;background:rgba(0,0,0,.3);display:none"></div>
     </div>
 
   </div>
 </div>
 
 <div class="footer">
-  CadenceHUD · ProjectHUD · Secure Workflow Response · This link is single-use and will expire after submission
+  CadenceHUD · ProjectHUD · Secure Workflow Response · v20260403-B
 </div>
 
 <script>
 const SUPA_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
 
+console.log('%c[approve.html] v20260403-B','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+
 let _token     = null;
 let _tokenRec  = null;
 let _selected  = null; // { id, label, requiresReset }
+
+function dbgLog(msg) {
+  console.log('[approve.html]', msg);
+  const el = document.getElementById('dbg-log');
+  if (el) { el.style.display = 'block'; el.innerHTML += msg + '<br>'; }
+}
 
 // ── Parse token from URL ──────────────────────────────────────────────────
 function getParam(name) {
@@ -486,7 +497,7 @@ async function loadToken(token) {
     }
 
     // Check already used
-    console.log('[approve.html] token status — used_at:', rec.used_at, 'submitted_at:', rec.submitted_at, 'outcome:', rec.outcome);
+    dbgLog('token used_at=' + rec.used_at + ' submitted_at=' + rec.submitted_at + ' outcome=' + rec.outcome);
     if (rec.used_at || rec.submitted_at) {
       const usedDate = new Date(rec.used_at || rec.submitted_at).toLocaleString('en-US',
         {weekday:'short', month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
@@ -762,11 +773,12 @@ async function submitResponse() {
       }
     } else if (_tokenRec?.instance_id && _selected.requiresReset) {
       // Changes requested / rejected — route back to submitter
-      console.log('[approve.html] Changes requested path — instance:', _tokenRec.instance_id, 'outcome:', _selected.id);
+      dbgLog('Changes requested path — instance=' + _tokenRec.instance_id + ' outcome=' + _selected.id);
       try {
         const now3 = new Date().toISOString();
-        // 1. Reset workflow_instance back to Review
-        await fetch(
+        // 1. Reset workflow_instance to Submit step
+        dbgLog('Patching instance to Submit...');
+        const patchRes = await fetch(
           `${SUPA_URL}/rest/v1/workflow_instances?id=eq.${_tokenRec.instance_id}`,
           {
             method: 'PATCH',
@@ -783,6 +795,7 @@ async function submitResponse() {
             }),
           }
         );
+        dbgLog('Instance PATCH done — step=Submit');
         // 2. Close all reviewer workflow_requests rows — submitter must resubmit fresh
         //    They will be re-created when the submitter resubmits via the Resubmit Panel.
         await fetch(
@@ -861,7 +874,7 @@ async function submitResponse() {
         const changerName = _tokenRec.assignee_name || _tokenRec.recipient_name || 'Approver';
         const notifyUrl = `${SUPA_URL}/functions/v1/notify-step-activated`;
 
-        console.log('[approve.html] re-notifying', reviewers.length, 'reviewer(s):', reviewers.map(r=>r.name||r.email).join(', '));
+        dbgLog('re-notifying ' + reviewers.length + ' reviewer(s): ' + reviewers.map(r=>r.name||r.email).join(', '));
         for (const reviewer of reviewers) {
           if (!reviewer.email) { console.warn('[approve.html] reviewer missing email, skipping:', reviewer.name); continue; }
           // Create workflow_action_item for reviewer
@@ -926,7 +939,7 @@ async function submitResponse() {
           const instData = instRes ? await instRes.json().catch(() => []) : [];
           submitterResId = instData?.[0]?.submitted_by_resource_id || null;
           submitterName  = instData?.[0]?.submitted_by_name || '';
-          console.log('[approve.html] submitter lookup:', submitterResId, submitterName);
+          dbgLog('submitter lookup: resId=' + submitterResId + ' name=' + submitterName);
 
           // Fallback: use actor_resource_id from the request.submitted CoC event
           if (!submitterResId) {
@@ -937,7 +950,7 @@ async function submitResponse() {
             const subCocRows = subCocRes ? await subCocRes.json().catch(() => []) : [];
             submitterResId = subCocRows?.[0]?.actor_resource_id || null;
             submitterName  = subCocRows?.[0]?.actor_name || submitterName;
-            console.log('[approve.html] submitter fallback CoC:', submitterResId, submitterName);
+            dbgLog('submitter fallback CoC: resId=' + submitterResId + ' name=' + submitterName);
           }
 
           if (submitterResId) {
@@ -960,7 +973,7 @@ async function submitResponse() {
               }),
             });
             const postData = await postRes.json().catch(() => null);
-            console.log('[approve.html] submitter action item created:', postRes.status, postData?.[0]?.id);
+            dbgLog('submitter action item: status=' + postRes.status + ' id=' + (postData?.[0]?.id||postData?.id||'?'));
           } else {
             console.warn('[approve.html] could not find submitter resource ID — action item not created');
           }
