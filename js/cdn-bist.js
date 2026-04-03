@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-P','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-R','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1303,8 +1303,8 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-cedot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:4px}
 .bck-ceb{flex:1}
 .bck-cet{font-size:12px;font-weight:500;letter-spacing:.03em}
-.bck-ced{font-size:12px;color:rgba(255,255,255,.22);line-height:1.5;margin-top:1px}
-.bck-cts{font-size:12px;font-family:monospace;color:rgba(255,255,255,.1);margin-top:1px}
+.bck-ced{font-size:12px;color:rgba(255,255,255,.65);line-height:1.5;margin-top:1px}
+.bck-cts{font-size:12px;font-family:monospace;color:rgba(0,210,255,.45);margin-top:1px}
 .bck-coam{background:linear-gradient(180deg,#0e0902,#0a0701);border-top:2px solid #1e1408;padding:5px 0 4px;flex-shrink:0}
 .bck-efrow{display:flex;padding:0 10px;margin-right:300px}
 .bck-ef{flex:1;padding:3px 7px;border-right:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;gap:2px}
@@ -1315,7 +1315,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-efbar{height:2px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden}
 .bck-effill{height:100%;border-radius:1px;transition:width .5s ease}
 .bck-efsub{font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.45)}
-.bck-radio{background:#040b17;border-top:1px solid rgba(0,210,255,.08);flex-shrink:0}
+.bck-radio{background:#040b17;border-top:1px solid rgba(0,210,255,.08);flex-shrink:0;position:relative}.bck-radio-handle{position:absolute;top:-4px;left:0;right:300px;height:8px;cursor:ns-resize;z-index:20;display:flex;align-items:center;justify-content:center}.bck-radio-handle::after{content:"";display:block;width:40px;height:3px;border-radius:2px;background:rgba(0,210,255,.35);transition:background .15s}.bck-radio-handle:hover::after{background:rgba(0,210,255,.75)}
 .bck-rh{display:flex;align-items:center;gap:10px;padding:4px 14px;border-bottom:1px solid rgba(255,255,255,.04);margin-right:300px}
 .bck-rt{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(0,210,255,.35)}
 .bck-rdot{width:5px;height:5px;border-radius:50%;background:rgba(0,210,255,.15)}
@@ -1394,7 +1394,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
     <div class="bck-ef"><div class="bck-eflbl">CoC events</div><div class="bck-efval" id="bck-ef4">0</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef4b" style="width:0%;background:#c47d18"></div></div><div class="bck-efsub">written</div></div>
     <div class="bck-ef"><div class="bck-eflbl">Elapsed</div><div class="bck-efval cyan" id="bck-ef5">00:00</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef5b" style="width:0%;background:#00D2FF"></div></div><div class="bck-efsub">mm:ss</div></div>
   </div></div>
-  <div class="bck-radio"><div class="bck-rh"><div class="bck-rdot" id="bck-rdot"></div><span class="bck-rt">Crew / Tower / Ground Communications</span></div><div class="bck-rf" id="bck-rf"><div style="padding:6px 14px;font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.25)">— Radio silence —</div></div></div>
+  <div class="bck-radio"><div class="bck-radio-handle" id="bck-radio-handle"></div><div class="bck-rh"><div class="bck-rdot" id="bck-rdot"></div><span class="bck-rt">Crew / Tower / Ground Communications</span></div><div class="bck-rf" id="bck-rf"><div style="padding:6px 14px;font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.25)">— Radio silence —</div></div></div>
   <div class="bck-ped">
     <div class="bck-ring" id="bck-ring"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="2.5"/><circle cx="16" cy="16" r="12" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-dasharray="75.4" id="bck-ringc" stroke-dashoffset="75.4" stroke-linecap="round" style="transition:stroke-dashoffset .5s ease"/></svg><div class="bck-ringc" id="bck-ringv">0%</div></div>
     <div class="bck-tts" id="bck-tts">${tPills}</div>
@@ -1418,6 +1418,41 @@ var _bckStartMs = null;
 
 function _bckEl(id) { return document.getElementById(id); }
 function _bckSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function _bckInitRadioResize() {
+  var handle = _bckEl('bck-radio-handle');
+  var radio  = handle && handle.closest('.bck-radio');
+  var feed   = _bckEl('bck-rf');
+  if (!handle || !radio || !feed) return;
+
+  var startY = 0, startH = 0;
+
+  function onMove(e) {
+    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    var delta   = startY - clientY;  // dragging up = bigger
+    var newH    = Math.max(48, Math.min(300, startH + delta));
+    feed.style.height = newH + 'px';
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup',   onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend',  onUp);
+  }
+  handle.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    startY = e.clientY;
+    startH = feed.offsetHeight || 90;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  });
+  handle.addEventListener('touchstart', function(e) {
+    startY = e.touches[0].clientY;
+    startH = feed.offsetHeight || 90;
+    document.addEventListener('touchmove', onMove, {passive:false});
+    document.addEventListener('touchend',  onUp);
+  }, {passive:true});
+}
 
 function _bistCkInit(tests) {
   // Stars
@@ -1454,6 +1489,7 @@ function _bistCkInit(tests) {
   _bckPosZones();
   // Recalc zone positions after layout settles
   setTimeout(_bckPosZones, 50);
+  setTimeout(_bckInitRadioResize, 100);
   // Init EFIS
   _bckEl('bck-ef0').textContent = '0/' + tests.length;
   _bckCocCount = 0; _bckSC = 0; _bckASC = 0; _bckRWC = 0; _bckPassC = 0;
