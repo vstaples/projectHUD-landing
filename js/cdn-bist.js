@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-M','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-N','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1758,7 +1758,7 @@ function _bistCkReplay() {
       'display:flex;align-items:center;justify-content:space-between;flex-shrink:0">',
       '<div style="font-size:13px;font-weight:600;letter-spacing:.08em;',
         'color:rgba(0,210,255,.9);text-transform:uppercase">&#9654; Flight Recorder Replay</div>',
-      '<button onclick="document.getElementById('bck-replay-panel').remove();_bckReplayStop()"',
+      '<button onclick="_bckRpClose()"' +
         ' style="background:none;border:none;color:rgba(255,255,255,.4);',
         'font-size:16px;cursor:pointer;padding:0 4px">&#10005;</button>',
     '</div>',
