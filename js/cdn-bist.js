@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-C','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-D','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1100,25 +1100,34 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     };
   });
 
-  // ── Render cockpit overlay ────────────────────────────────────────────────
-  const ov = document.createElement('div');
-  ov.id = 'bist-cockpit-overlay';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box';
+  // ── Render cockpit natively into s9-sim-panel ───────────────────────────
+  // No overlay/modal — fills the Simulator pane directly.
+  const simPanel = document.getElementById('s9-sim-panel');
+  const ov = simPanel || document.createElement('div');
+  if (!simPanel) {
+    ov.id = 'bist-cockpit-overlay';
+    document.documentElement.appendChild(ov);
+  }
+  ov.innerHTML = '';
+  ov.style.cssText = (simPanel ? 'display:flex;flex:1;flex-direction:column;overflow:hidden' : 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column');
 
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'width:100%;max-width:900px;max-height:calc(100vh - 40px);overflow:hidden;border-radius:10px;display:flex;flex-direction:column';
-  ov.appendChild(wrap);
+  // Inject cockpit HTML directly — no wrapping modal div
+  ov.innerHTML = _bistCockpitHTML(tmplName, version, TESTS);
 
-  // Inject cockpit HTML
-  wrap.innerHTML = _bistCockpitHTML(tmplName, version, TESTS);
-  document.documentElement.appendChild(ov);
-
-  // Close on backdrop click
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-
-  // Expose close / proceed / override on the cockpit
-  window._bistCockpitClose   = () => ov.remove();
-  window._bistCockpitProceed = () => { ov.remove(); onProceed?.(); };
+  // Expose close / proceed / override
+  window._bistCockpitClose   = () => {
+    if (simPanel) {
+      // Restore the simulator panel UI
+      if (typeof _s9RenderSimPanel === 'function') _s9RenderSimPanel(simPanel);
+    } else {
+      ov.remove();
+    }
+  };
+  window._bistCockpitProceed = () => {
+    if (simPanel && typeof _s9RenderSimPanel === 'function') _s9RenderSimPanel(simPanel);
+    else ov.remove();
+    onProceed?.();
+  };
   window._bistCockpitOverride = async () => {
     const reason = prompt('Override reason (required — permanently recorded in Chain of Custody):');
     if (!reason?.trim()) return;
@@ -1211,7 +1220,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
   ).join('');
 
   return `<style>
-.bck{font-family:Arial,sans-serif;background:#02070f;border-radius:10px;overflow:hidden;border:1px solid rgba(0,180,255,.1);display:flex;flex-direction:column;position:relative;flex:1;min-height:0}
+.bck{font-family:Arial,sans-serif;background:#02070f;overflow:hidden;border:none;display:flex;flex-direction:column;position:relative;flex:1;min-height:0;width:100%;height:100%}
 .bck-gl{background:#110c04;height:26px;border-bottom:2px solid #1e1408;display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:10;position:relative}
 .bck-gld{width:8px;height:8px;border-radius:50%;background:#1a1208;transition:all .45s}
 .bck-gld.on{background:#4ade80;box-shadow:0 0 8px 2px rgba(74,222,128,.6)}
