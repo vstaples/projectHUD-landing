@@ -1,5 +1,5 @@
-// VERSION: 20260403-240000
-console.log('%c[mw-events] v20260403-240000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260403-250000
+console.log('%c[mw-events] v20260403-250000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -452,7 +452,10 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
 
   // Parse submission details from CoC event notes
   let submittedDetails = {};
-  const submitEvent = cocEvents.find(e => e.event_type === 'request.submitted');
+  // Use MOST RECENT request.submitted event — captures resubmitted documents
+  const submitEvent = cocEvents
+    .filter(e => e.event_type === 'request.submitted')
+    .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
   if (submitEvent) {
     try { submittedDetails = JSON.parse(submitEvent.event_notes || '{}'); } catch(_) {}
   }
@@ -662,11 +665,15 @@ window.openResubmitPanel = async function openResubmitPanel(item) {
     } catch(e) { console.warn('[ResubmitPanel] fetch failed:', e); }
   }
 
-  // Get original submission details
+  // Get most recent submission details (captures reviewer list from original submit,
+  // but prior docs from the most recent resubmission)
   let submittedDetails = {};
-  const submitEvent = cocEvents.find(e => e.event_type === 'request.submitted');
-  if (submitEvent) {
-    try { submittedDetails = JSON.parse(submitEvent.event_notes || '{}'); } catch(_) {}
+  // For reviewer list: use the FIRST submitted event (has the full reviewer/approver config)
+  const firstSubmitEvent = cocEvents
+    .filter(e => e.event_type === 'request.submitted')
+    .sort((a,b) => new Date(a.occurred_at||a.created_at) - new Date(b.occurred_at||b.created_at))[0];
+  if (firstSubmitEvent) {
+    try { submittedDetails = JSON.parse(firstSubmitEvent.event_notes || '{}'); } catch(_) {}
   }
 
   // Get the changes_requested event for context
@@ -1055,7 +1062,8 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
 
       // Only notify submitter when changes are requested — that requires their action.
       // Approvals are visible via step color + CoC; no queue item needed.
-      if (!approved && inst?.submitted_by_resource_id && inst.submitted_by_resource_id !== resId) {
+      // Note: do NOT guard on resId !== submitted_by — submitter may also be a reviewer.
+      if (!approved && inst?.submitted_by_resource_id) {
         await API.post('workflow_action_items', {
           id:                crypto.randomUUID(),
           firm_id:           _mwFirmId(),
