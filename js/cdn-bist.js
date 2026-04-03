@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AW','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AX','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -198,8 +198,10 @@ async function runBistScript(scriptId, onProgress) {
         const routeStep = routeSeq ? stepBySeq[routeSeq] : null;
         // If routing backward, signal arc draw
         if (routeSeq && routeSeq < seq) {
+          // Find the BIST script step whose step_seq matches routeSeq
+          const targetBistStep = spec.steps.find(s => s.params?.step_seq === routeSeq);
           onProgress?.({ type:'step_route_back', fromStepId: stp.id, toSeq: routeSeq,
-            toStepId: routeStep?.id || null });
+            toStepId: targetBistStep?.id || null });
         }
         // Write step_completed
         await API.post('workflow_step_instances', {
@@ -1697,10 +1699,9 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
       setTimeout(function(){ _bckDrawRejectArc(_paf, ev.stepId); }, 60);
     }
   } else if (type === 'step_route_back') {
-    // Draw rejection arc from fromStep card to toStep card
     var fromCard = document.getElementById('bck-n-'+ev.fromStepId);
     var toCard   = ev.toStepId ? document.getElementById('bck-n-'+ev.toStepId) : null;
-    console.log('[arc] route_back from', ev.fromStepId, 'to', ev.toStepId, 'fromCard:', !!fromCard, 'toCard:', !!toCard);
+    console.log('[arc] route_back fromId:', ev.fromStepId, 'toId:', ev.toStepId, 'toSeq:', ev.toSeq, 'fromCard:', !!fromCard, 'toCard:', !!toCard);
     if (fromCard && toCard) {
       _bckDrawRejectArc(ev.fromStepId, ev.toStepId);
     } else if (fromCard) {
