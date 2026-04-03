@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-B','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-C','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -440,7 +440,7 @@ async function showGateDialog(templateId, version, onProceed) {
   }
 
   await render(await runGateCheck(templateId, version));
-  document.body.appendChild(overlay);
+  document.documentElement.appendChild(overlay);
 }
 
 function bistProceed() {
@@ -1111,7 +1111,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
 
   // Inject cockpit HTML
   wrap.innerHTML = _bistCockpitHTML(tmplName, version, TESTS);
-  document.body.appendChild(ov);
+  document.documentElement.appendChild(ov);
 
   // Close on backdrop click
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CadenceHUD · S9.3</title>
+<title>CadenceHUD · S9.4</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -923,7 +923,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
     </div>
 
     <!-- Simulator panel — owns this DOM node, never touched by switchTab -->
-    <div id="s9-sim-panel" style="display:none;flex:1;overflow:hidden;position:relative"></div>
+    <div id="s9-sim-panel" style="display:none;flex:1;position:relative"></div>
 
     <!-- Content — owned by cdn-core-state switchTab renderer -->
     <div class="cad-content" id="cad-content">
@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.3 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.4 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
