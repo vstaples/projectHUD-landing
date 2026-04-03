@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CadenceHUD · S9.8</title>
+<title>CadenceHUD · S9.9</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.8 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.8 — Library · Simulator · Instances','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1214,6 +1214,8 @@ function _s9RenderSimPanel(el) {
     '</div>';
 
   if (hasSource && tmpl && tmpl.id) {
+    // Preserve aborted state set by cdn-bist.js close handler
+    if (window._bckCockpitClosed) window._bckAborted = true;
     _s9LoadSimScripts(tmpl.id, tmpl.version || '0.0.0');
   }
 }
@@ -1232,6 +1234,7 @@ function _s9EscHtml(s) {
 }
 
 async function _s9LoadSimScripts(templateId, version) {
+  // Don't reset _bckAborted here — it's reset on launch by cdn-bist.js
   try {
     // Use API.get() — handles JWT auth, avoids 401 from raw fetch with anon key
     // Use bare FIRM_ID_CAD global set by cdn-core-state.js
@@ -1312,6 +1315,11 @@ async function _s9LoadSimScripts(templateId, version) {
     var allPass = scripts.every(function(s) {
       return runs.find(function(r) { return r.script_id === s.id && r.status === 'passed'; });
     });
+    if (window._bckAborted) {
+      var gateEl = document.getElementById('s9-sim-gate');
+      if (gateEl) { gateEl.textContent = '⚠ Aborted — reopen Simulator to refresh'; gateEl.style.color = 'rgba(226,75,74,.8)'; }
+      return;
+    }
     var gateEl = document.getElementById('s9-sim-gate');
     if (gateEl) {
       if (!runs.length) {
@@ -1515,7 +1523,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-documents.js?v=20260403-S9"></script>
 <script src="/js/cdn-dag-viewer.js?v=20260403-S9"></script>
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
-<script src="/js/cdn-bist.js?v=20260404-AT"></script>
+<script src="/js/cdn-bist.js?v=20260404-AU"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>

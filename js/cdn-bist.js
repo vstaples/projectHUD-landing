@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AT','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AU','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1060,6 +1060,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   document.getElementById('bist-gate-overlay')?.remove();
   document.getElementById('bist-cockpit-overlay')?.remove();
   window._bckCockpitClosed = false;  // reset for this run
+  window._bckAborted = false;
   // Update simulator gate text immediately
   var _gateEl = document.getElementById('s9-sim-gate');
   if (_gateEl) {
@@ -1141,6 +1142,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   const _restoreSimPanel = () => {
     // Reset freeze state so the run loop exits cleanly
     window._bckCockpitClosed = true;
+    window._bckAborted = true;
     window._bckFrozen = false;
     _bistCkStopClock();
     window._bistCkRunning = false;
