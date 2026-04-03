@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AY','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AZ','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -196,12 +196,14 @@ async function runBistScript(scriptId, onProgress) {
         const actor = _bistResolveActor(stp.params?.actor);
         const routeSeq  = stp.params?.route_to_seq;
         const routeStep = routeSeq ? stepBySeq[routeSeq] : null;
-        // If routing backward, signal arc draw
+        // Only draw rejection arc if target card already exists (step was previously visited)
         if (routeSeq && routeSeq < seq) {
           const targetBistStep = spec.steps.find(s => s.params?.step_seq === routeSeq);
-          console.log('[arc-check] stp.id:', stp.id, 'seq:', seq, 'routeSeq:', routeSeq, 'target:', targetBistStep?.id);
-          onProgress?.({ type:'step_route_back', fromStepId: stp.id, toSeq: routeSeq,
-            toStepId: targetBistStep?.id || null });
+          const targetCardExists = targetBistStep && !!document.getElementById('bck-n-'+targetBistStep.id);
+          if (targetCardExists) {
+            onProgress?.({ type:'step_route_back', fromStepId: stp.id, toSeq: routeSeq,
+              toStepId: targetBistStep.id });
+          }
         }
         // Write step_completed
         await API.post('workflow_step_instances', {
