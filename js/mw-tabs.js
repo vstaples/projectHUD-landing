@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-300000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-320000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -19,7 +19,7 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
   try {
     // Generate external response token for approval-type steps
     let approveUrl = null, rejectUrl = null;
-    const _externalTypes = ['approval','signoff','external','confirmation'];
+    const _externalTypes = ['approval','signoff','external','confirmation','review'];
     if (_externalTypes.includes(stepType) && instanceId) {
       try {
         const rawToken   = crypto.randomUUID();
@@ -55,6 +55,7 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
 
     const _notifyUrl = `${_mwSupaURL()}/functions/v1/notify-step-activated`;
     const _notifyKey = _mwSupaKey();
+    console.log('[notify] approveUrl:', approveUrl, 'stepType:', stepType, 'has_action_buttons:', !!(approveUrl));
     const res = await fetch(_notifyUrl, {
       method:  'POST',
       headers: {
@@ -77,7 +78,7 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
         step_instructions:  body       || null,
         approve_url:        approveUrl,
         reject_url:         rejectUrl,
-        has_action_buttons: !!(approveUrl && rejectUrl),
+        has_action_buttons: !!(approveUrl),
         outcomes:           [],
       }),
     });
