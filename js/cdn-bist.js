@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AE','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AG','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1208,6 +1208,9 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   var rb = _bckEl('bck-replay-btn'); if (rb) rb.style.display = 'inline-block';
   var fb = _bckEl('bck-freeze-btn'); if (fb) fb.style.display = 'inline-block';
 
+  // If cockpit was closed mid-run, do not show cert or update release gate
+  if (window._bckCockpitClosed) return;
+
   const allPass = allResults.length > 0 && allResults.every(r => r.status === 'passed');
   const elapsed = Math.round((Date.now() - startMs) / 1000);
 
@@ -2014,18 +2017,27 @@ function _bistCkReplay() {
     var de2 = _bckEl('bck-dend');  if (de2) de2.className = 'bck-de';
     var lsvg2 = _bckEl('bck-lsvg'); if (lsvg2) lsvg2.innerHTML = '';
 
-    var trigEntry = null, endEntry = null, nodeStates = {};
+    var trigEntry = null, endEntry = null;
+    var nodeOrder = [];   // ordered list of stepIds (first appearance)
+    console.log('[replay] idx:', idx, 'total log:', log.length, 'kinds:', log.slice(0,idx+1).map(function(e){return e.kind;}).join(','));
+    var nodeStates = {};  // latest state per stepId
     for (var rk = 0; rk <= idx; rk++) {
       var re = log[rk];
-      if (re.kind === 'begintest') { nodeStates = {}; trigEntry = null; endEntry = null; }
-      if (re.kind === 'trigger')   trigEntry = re;
-      if (re.kind === 'endnode')   endEntry  = re;
-      if (re.kind === 'node')      nodeStates[re.stepId] = re;
+      if (re.kind === 'begintest') {
+        nodeOrder = []; nodeStates = {}; trigEntry = null; endEntry = null;
+      }
+      if (re.kind === 'trigger') trigEntry = re;
+      if (re.kind === 'endnode') endEntry  = re;
+      if (re.kind === 'node') {
+        if (!nodeStates[re.stepId]) nodeOrder.push(re.stepId);
+        nodeStates[re.stepId] = re;
+      }
     }
     if (trigEntry) { var dt3=_bckEl('bck-dtrig'); if(dt3) dt3.className='bck-dt on'; }
     if (endEntry)  { var de3=_bckEl('bck-dend');  if(de3) de3.className='bck-de dn'; }
 
-    Object.keys(nodeStates).forEach(function(stepId) {
+    console.log('[replay] nodeOrder:', nodeOrder.length, 'nodeStates:', Object.keys(nodeStates).length);
+    nodeOrder.forEach(function(stepId) {
       var n = nodeStates[stepId];
       var nm = (n.nodeName||'Step').split('\n');
       var card = document.createElement('div');
