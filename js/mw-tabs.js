@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-240000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1321,11 +1321,15 @@ function renderMyRequestsActive() {
     // Build step nodes with tooltips
     // When current_step_name is 'Submit', the ball is back with the submitter.
     // CoC overrides are bypassed — DB step is authoritative in this state.
-    const isAwaitingResubmit = (req._raw?.current_step_name || '') === 'Submit' &&
-      !instanceComplete;
+    // Derive awaiting-resubmit from CoC events — not DB field (avoids race conditions).
+    // If the most recent lifecycle event is request.changes_requested, ball is with submitter.
+    const lastLifecycleEv = instCoc
+      .filter(e => ['request.submitted','request.approved','request.changes_requested'].includes(e.event_type))
+      .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
+    const isAwaitingResubmit = !instanceComplete &&
+      lastLifecycleEv?.event_type === 'request.changes_requested';
     if (isAwaitingResubmit) {
-      console.log('[MyRequests] isAwaitingResubmit=true for', req.id?.slice(0,8), '— current_step_name:', req._raw?.current_step_name);
-      // Clear the debounce timestamp so future cycles can re-trigger if needed
+      console.log('[MyRequests] isAwaitingResubmit=true (CoC-derived) for', req.id?.slice(0,8));
       if (window._myrSubmitRefetchTs) delete window._myrSubmitRefetchTs[req.id];
     }
     // For the Review step: override done/active from CoC approval count vs assigned reviewers.
