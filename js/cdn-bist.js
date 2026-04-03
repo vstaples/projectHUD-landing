@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-R','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-T','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1249,7 +1249,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-hcm{position:absolute;top:64%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px}
 .bck-hw{width:28px;height:1px;background:rgba(0,210,255,.28)}
 .bck-hd{width:5px;height:5px;border-radius:50%;border:1px solid rgba(0,210,255,.42)}
-.bck-hr{position:absolute;right:295px;top:16%;font-size:12px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;text-align:right;white-space:pre}
+.bck-hr{position:absolute;right:310px;top:10%;font-size:12px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;text-align:right;white-space:pre}
 .bck-hl{position:absolute;left:8%;top:16%;font-size:12px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;white-space:pre}
 .bck-pf{position:absolute;inset:0;background:rgba(2,7,15,.92);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 60px}
 .bck-pftitle{font-size:12px;letter-spacing:.2em;color:rgba(0,210,255,.5);text-transform:uppercase;margin-bottom:12px}
@@ -1274,15 +1274,15 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-dt.dn{border-color:rgba(74,222,128,.55);background:rgba(0,15,5,.7);box-shadow:0 0 10px rgba(74,222,128,.3)}
 .bck-de{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.1);background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .35s}
 .bck-de.dn{border-color:rgba(74,222,128,.6);box-shadow:0 0 12px rgba(74,222,128,.35)}
-.bck-nc{width:88px;flex-shrink:0;border-radius:4px;border:1.5px solid rgba(255,255,255,.07);background:rgba(0,4,12,.82);backdrop-filter:blur(4px);transition:all .35s;overflow:hidden}
+.bck-nc{width:120px;flex-shrink:0;border-radius:4px;border:1.5px solid rgba(255,255,255,.07);background:rgba(0,4,12,.82);backdrop-filter:blur(4px);transition:all .35s;overflow:hidden}
 .bck-nc.ac{border-color:#EF9F27;background:rgba(12,8,0,.9);box-shadow:0 0 16px rgba(239,159,39,.35)}
 .bck-nc.dn{border-color:rgba(74,222,128,.45);background:rgba(0,10,4,.87);box-shadow:0 0 8px rgba(74,222,128,.18)}
 .bck-nc.rs{border-color:rgba(239,159,39,.35);background:rgba(12,6,0,.87)}
 .bck-nct{display:flex;align-items:center;gap:4px;padding:3px 5px 3px;border-bottom:1px solid rgba(255,255,255,.04)}
-.bck-nav{width:14px;height:14px;border-radius:50%;background:rgba(239,159,39,.18);border:1px solid rgba(239,159,39,.3);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(239,159,39,.8);font-weight:700;flex-shrink:0}
-.bck-nan{font-size:12px;color:rgba(255,255,255,.28);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bck-nav{width:18px;height:18px;border-radius:50%;background:rgba(239,159,39,.18);border:1px solid rgba(239,159,39,.3);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(239,159,39,.8);font-weight:700;flex-shrink:0}
+.bck-nan{font-size:12px;color:rgba(255,255,255,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bck-nb{padding:4px 5px}
-.bck-ntitle{font-size:12px;font-weight:500;color:rgba(255,255,255,.78);line-height:1.3;min-height:20px}
+.bck-ntitle{font-size:12px;font-weight:500;color:rgba(255,255,255,.9);line-height:1.3;min-height:24px}
 .bck-nst{display:flex;align-items:center;gap:3px;margin-top:2px}
 .bck-nsdot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
 .bck-nstxt{font-size:12px}
@@ -1291,7 +1291,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-cw.ac{background:rgba(239,159,39,.4);animation:bckPw .9s ease-in-out infinite}
 @keyframes bckPw{0%,100%{opacity:.4}50%{opacity:1}}
 .bck-lz{position:absolute;left:52px;right:52px;z-index:5;pointer-events:none;overflow:visible}
-.bck-coc{position:absolute;right:0;top:26px;bottom:56px;width:300px;background:rgba(2,5,12,.97);border-left:1px solid rgba(0,210,255,.12);border-top:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;z-index:11}
+.bck-coc{position:absolute;right:0;top:26px;bottom:0;width:300px;background:rgba(2,5,12,.97);border-left:1px solid rgba(0,210,255,.12);border-top:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;z-index:15}
 .bck-coch{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .bck-coct{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:rgba(0,210,255,.8)}
 .bck-cocc{font-size:12px;font-family:monospace;color:rgba(0,210,255,.9)}
@@ -1343,15 +1343,15 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-txts{font-size:12px;font-family:monospace;color:rgba(255,255,255,.15);white-space:nowrap;flex-shrink:0;margin-top:3px}
 .bck-ped{background:#060401;border-top:1px solid rgba(255,255,255,.04);padding:7px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0}
 .bck-tts{display:flex;gap:3px;flex:1}
-.bck-tt{flex:1;padding:4px 5px;border-radius:3px;border:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.015);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:3px}
+.bck-tt{flex:1;padding:5px 7px;border-radius:3px;border:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.015);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px}
 .bck-tt:hover{background:rgba(255,255,255,.04)}
 .bck-tt.bck-ta{background:rgba(0,210,255,.05);border-color:rgba(0,210,255,.2)}
-.bck-tn{font-size:12px;font-family:monospace;color:rgba(255,255,255,.2);background:rgba(255,255,255,.05);width:12px;height:12px;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.bck-tnm{font-size:12px;color:rgba(255,255,255,.38);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bck-td{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.07);flex-shrink:0;transition:all .3s}
-.bck-td.run{background:#00D2FF;box-shadow:0 0 5px #00D2FF;animation:bckBk .7s ease-in-out infinite}
-.bck-td.pass{background:#4ade80;box-shadow:0 0 4px #4ade80}
-.bck-td.fail{background:#E24B4A;box-shadow:0 0 4px #E24B4A}
+.bck-tn{font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.5);background:rgba(255,255,255,.07);width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.bck-tnm{font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.75);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bck-td{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.12);flex-shrink:0;transition:all .3s}
+.bck-td.run{background:#00D2FF;box-shadow:0 0 7px #00D2FF;animation:bckBk .7s ease-in-out infinite}
+.bck-td.pass{background:#4ade80;box-shadow:0 0 6px #4ade80}
+.bck-td.fail{background:#E24B4A;box-shadow:0 0 6px #E24B4A}
 .bck-ring{position:relative;width:32px;height:32px;flex-shrink:0}
 .bck-ring svg{position:absolute;top:0;left:0;transform:rotate(-90deg)}
 .bck-ringc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-family:monospace;font-weight:500;color:#e8d4a0}
@@ -1384,8 +1384,9 @@ function _bistCockpitHTML(tmplName, version, tests) {
       <div class="bck-de" id="bck-dend"><svg width="4" height="4" viewBox="0 0 4 4"><rect width="4" height="4" fill="rgba(255,255,255,.3)"/></svg></div>
     </div></div>
     <div class="bck-lz" id="bck-lz"><svg id="bck-lsvg" style="width:100%;overflow:visible;display:block" height="60"></svg></div>
-    <div class="bck-coc"><div class="bck-coch"><span class="bck-coct">Chain of Custody</span><span class="bck-cocc" id="bck-cocc">0 events</span></div><div class="bck-cocf" id="bck-cocf"><div style="padding:14px 10px;text-align:center;font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.3);line-height:1.9">Awaiting<br>simulation launch</div></div></div>
+
   </div>
+  <div class="bck-coc"><div class="bck-coch"><span class="bck-coct">Chain of Custody</span><span class="bck-cocc" id="bck-cocc">0 events</span></div><div class="bck-cocf" id="bck-cocf"><div style="padding:14px 10px;text-align:center;font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.3);line-height:1.9">Awaiting<br>simulation launch</div></div></div>
   <div class="bck-coam"><div class="bck-efrow">
     <div class="bck-ef"><div class="bck-eflbl">Test suite</div><div class="bck-efval cyan" id="bck-ef0">0/0</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef0b" style="width:0%;background:#00D2FF"></div></div><div class="bck-efsub" id="bck-ef0s">ready</div></div>
     <div class="bck-ef"><div class="bck-eflbl">Steps fired</div><div class="bck-efval" id="bck-ef1">0</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef1b" style="width:0%;background:#4ade80"></div></div><div class="bck-efsub">actions</div></div>
@@ -1399,8 +1400,8 @@ function _bistCockpitHTML(tmplName, version, tests) {
     <div class="bck-ring" id="bck-ring"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="2.5"/><circle cx="16" cy="16" r="12" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-dasharray="75.4" id="bck-ringc" stroke-dashoffset="75.4" stroke-linecap="round" style="transition:stroke-dashoffset .5s ease"/></svg><div class="bck-ringc" id="bck-ringv">0%</div></div>
     <div class="bck-tts" id="bck-tts">${tPills}</div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-      <button style="font-size:12px;font-family:Arial,sans-serif;padding:5px 12px;border-radius:3px;border:1px solid rgba(0,210,255,.2);background:none;color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.04em;display:none" onclick="_bistCkReplay()" id="bck-replay-btn">&#9654; REPLAY</button>
-      <button style="font-size:12px;font-family:Arial,sans-serif;padding:5px 12px;border-radius:3px;border:1px solid rgba(239,159,39,.3);background:none;color:rgba(239,159,39,.7);cursor:pointer;letter-spacing:.04em;display:none" onclick="_bckToggleFreeze()" id="bck-freeze-btn">&#10074;&#10074; FREEZE</button>
+      <button style="font-size:12px;font-family:Arial,sans-serif;padding:5px 12px;border-radius:3px;border:1px solid rgba(0,210,255,.2);background:none;color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.04em" onclick="_bistCkReplay()" id="bck-replay-btn">&#9654; REPLAY</button>
+      <button style="font-size:12px;font-family:Arial,sans-serif;padding:5px 12px;border-radius:3px;border:1px solid rgba(239,159,39,.3);background:none;color:rgba(239,159,39,.7);cursor:pointer;letter-spacing:.04em" onclick="_bckToggleFreeze()" id="bck-freeze-btn">&#10074;&#10074; FREEZE</button>
       <button style="font-size:12px;font-family:Arial,sans-serif;padding:5px 12px;border-radius:3px;border:1px solid rgba(226,75,74,.3);background:none;color:rgba(226,75,74,.6);cursor:pointer;letter-spacing:.04em" onclick="_bistCockpitClose()">CLOSE</button>
       <div id="bck-foot-btns"></div>
     </div>
