@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-150000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-160000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1281,10 +1281,13 @@ window._mwLoadUserView = async function() {
             const activeTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
             // Step changes always reload both My Work and My Requests —
             // the submitter needs their queue and their request card updated together.
+            // 2s delay lets approve.html's DB writes fully commit before we read.
             if (stepChanged.length) {
-              window._mwLoadUserView && window._mwLoadUserView();
-              window._requestsLoaded = false;
-              window.loadUserRequests && window.loadUserRequests();
+              setTimeout(() => {
+                window._mwLoadUserView && window._mwLoadUserView();
+                window._requestsLoaded = false;
+                window.loadUserRequests && window.loadUserRequests();
+              }, 2000);
             } else if (activeTab === 'work') {
               window._mwLoadUserView && window._mwLoadUserView();
             } else if (activeTab === 'requests') {
