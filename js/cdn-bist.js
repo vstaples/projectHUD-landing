@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AR','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AS','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1790,8 +1790,8 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
         '<div class="bck-nst" id="bck-nst-'+stepId+'">'+
           '<div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div>'+
           '<span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span>'+
+          '<span style="margin-left:auto;font-size:12px;font-family:Arial,sans-serif;font-weight:700;color:rgba(255,180,60,.85)">'+seqLabel+'</span>'+
         '</div>'+
-        '<div style="text-align:right;font-size:12px;font-family:Arial,sans-serif;font-weight:600;color:rgba(255,180,60,.8);padding:0 5px 3px">'+seqLabel+'</div>'+
       '</div>';
     if (nodes.children.length > 0) {
       var cw = document.createElement('div'); cw.className = 'bck-cw'; nodes.appendChild(cw);
@@ -2181,8 +2181,8 @@ function _bckRpRender(idx) {
           '<div class="bck-nst" id="bck-nst-'+stepId+'">'+
             '<div class="bck-nsdot" style="background:'+n.col+'"></div>'+
             '<span class="bck-nstxt" style="color:'+n.col+'">'+_bistEscHtml(n.label)+'</span>'+
+            '<span style="margin-left:auto;font-size:12px;font-family:Arial,sans-serif;font-weight:700;color:rgba(255,180,60,.85)">'+rSeqLabel+'</span>'+
           '</div>'+
-          '<div style="text-align:right;font-size:12px;font-family:Arial,sans-serif;font-weight:600;color:rgba(255,180,60,.8);padding:0 5px 3px">'+rSeqLabel+'</div>'+
         '</div>';
       if (nodesEl2.children.length > 0) {
         var cw = document.createElement('div'); cw.className = 'bck-cw dn'; nodesEl2.appendChild(cw);
