@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-240000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-250000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1309,10 +1309,10 @@ window._mwLoadUserView = async function() {
               window.loadUserRequests && window.loadUserRequests();
               window._mwWorkStale = true;
             } else if (activeTab === 'work') {
-              // User is on work tab — force immediate rebuild.
-              // Reset _viewLoaded so _mwLoadUserView re-fetches fresh data.
-              if (window._viewLoaded) window._viewLoaded['user'] = false;
-              window._mwLoadUserView && window._mwLoadUserView();
+              // User is on work tab — mark stale so rebuild fires on next interaction.
+              // Do NOT call _mwLoadUserView — it triggers compass.html tab restoration
+              // which can switch the user away from My Requests.
+              window._mwWorkStale = true;
             } else {
               // Any other tab — mark both stale.
               window._mwWorkStale = true;
