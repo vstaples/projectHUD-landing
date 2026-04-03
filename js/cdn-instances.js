@@ -2273,3 +2273,4 @@ async function _reloadInstance(instId) {
   if (detailEl && _selectedInstance) renderInstanceDetail(detailEl, _selectedInstance);
   setTimeout(_populateReworkBadges, 50);
 }
+
