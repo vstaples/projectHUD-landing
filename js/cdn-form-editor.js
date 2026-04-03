@@ -1,4 +1,5 @@
 // cdn-form-editor.js — Cadence: Form Library tab
+console.log('%c[cdn-form-editor] v20260403-A','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // VERSION: 20260401-230000
 console.log('%c[cdn-form-editor] v20260401-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
@@ -3764,6 +3765,38 @@ function _formRenameCurrent(newName) {
   if (listEl) listEl.innerHTML = _renderFormList();
 }
 
+async function _formToggleCompassVisible(checked) {
+  if (!_selectedForm?.id) return;
+  const chk    = document.getElementById('form-compass-visible-chk');
+  const status = document.getElementById('form-compass-visible-status');
+  if (chk) chk.disabled = true;
+  try {
+    await API.patch(`workflow_form_definitions?id=eq.${_selectedForm.id}`, {
+      compass_visible: checked,
+    });
+    _selectedForm.compass_visible = checked;
+    // Write CoC event
+    _formCoCWrite(
+      checked ? 'form.compass_published' : 'form.compass_unpublished',
+      _selectedForm.id,
+      {
+        note:    checked ? 'Published to Compass Browse library' : 'Removed from Compass Browse library',
+        version: _selectedForm.version || '0.1.0',
+      }
+    );
+    if (status) {
+      status.textContent = checked ? '● Live in Browse' : '○ Not in Browse';
+      status.style.color = checked ? 'var(--green)' : 'var(--muted)';
+    }
+    cadToast(checked ? 'Published to Compass Browse' : 'Removed from Compass Browse', 'success');
+  } catch(e) {
+    cadToast('Failed: ' + e.message, 'error');
+    if (chk) chk.checked = !checked;
+  } finally {
+    if (chk) chk.disabled = false;
+  }
+}
+
 async function _formSave() {
   if (!_selectedForm) return;
   _selectedForm.fields  = JSON.parse(JSON.stringify(_formFields));
@@ -3831,21 +3864,30 @@ async function _formSave() {
         }
       } catch(e) { console.warn('[formSave] PDF upload failed:', e.message); }
     }
+    // Auto-publish to Compass on first release; preserve existing value thereafter
+    const _wasReleased = _selectedForm._prevState === 'released';
+    const _nowReleased = (_selectedForm.state || 'draft') === 'released';
+    const _compassVal  = (_nowReleased && !_wasReleased)
+      ? true
+      : (_selectedForm.compass_visible || false);
+
     await API.patch(`workflow_form_definitions?id=eq.${_selectedForm.id}`, {
-      source_name:   _selectedForm.source_name,
-      fields:        _selectedForm.fields,
-      routing:       _selectedForm.routing,
-      state:         _selectedForm.state         || 'draft',
-      version:       _selectedForm.version       || '0.1.0',
-      category_id:   _selectedForm.category_id   || null,
-      superseded_by: _selectedForm.superseded_by || null,
-      review_note:   _selectedForm.review_note   || null,
+      source_name:     _selectedForm.source_name,
+      fields:          _selectedForm.fields,
+      routing:         _selectedForm.routing,
+      state:           _selectedForm.state         || 'draft',
+      version:         _selectedForm.version       || '0.1.0',
+      category_id:     _selectedForm.category_id   || null,
+      superseded_by:   _selectedForm.superseded_by || null,
+      review_note:     _selectedForm.review_note   || null,
       pending_reviewer_ids: _selectedForm.pending_reviewer_ids || [],
-      reviewed_by:   _selectedForm.reviewed_by   || [],
-      approved_by:   _selectedForm.approved_by   || null,
-      released_at:   _selectedForm.released_at   || null,
-      archived_at:   _selectedForm.archived_at   || null,
+      reviewed_by:     _selectedForm.reviewed_by   || [],
+      approved_by:     _selectedForm.approved_by   || null,
+      released_at:     _selectedForm.released_at   || null,
+      archived_at:     _selectedForm.archived_at   || null,
+      compass_visible: _compassVal,
     }).catch(e => { console.error('[formSave] PATCH failed:', e.message); cadToast('Save failed: ' + e.message, 'error'); });
+    if (_nowReleased && !_wasReleased) _selectedForm.compass_visible = true;
     cadToast('Form saved', 'success');
     _formDirty = false; _formUpdateSaveBtn();
     _formRefreshCoCIfOpen();
