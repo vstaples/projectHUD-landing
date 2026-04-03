@@ -1,5 +1,5 @@
-// VERSION: 20260403-210000
-console.log('%c[mw-events] v20260403-210000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260403-220000
+console.log('%c[mw-events] v20260403-220000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -195,75 +195,49 @@ document.addEventListener('click', function(ev) {
     if (!item) return;
     const status = actionBtn.dataset.wiStatus;
     if (item.type==='action') {
-      // ── Check if this action item is a review/approve request ──────────────
-      // Route via workflow_requests table (dedicated) — no title-prefix heuristic.
-      // Falls back to title-prefix for any legacy rows during migration cutover.
-      const isLegacyReview  = item.instanceId && (item.title||'').startsWith('Review request:');
-      const isLegacyApprove = item.instanceId && (item.title||'').startsWith('Approve request:');
+      const _title = item.title || '';
 
-      if (item.instanceId && (isLegacyReview || isLegacyApprove)) {
-        // Legacy path — action item is still in workflow_action_items
-        const parentInst = (window._wfInstances||[]).find(i => i.id === item.instanceId);
-        if (parentInst?.status === 'cancelled') {
-          compassToast('This request was withdrawn by the submitter.', 3000);
-          API.patch(`workflow_action_items?id=eq.${item.id}`, { status: 'resolved' })
-            .then(() => { _viewLoaded['user'] = false; _mwLoadUserView(); })
-            .catch(() => {});
-          return;
-        }
-        openRequestReviewPanel(item, isLegacyApprove);
-        return;
-      }
-
-      // ── New path: item is a workflow_requests row ──────────────────────────
-      if (item.instanceId && item._wrRole) {
-        // _wrRole is set by mw-core.js when building workItems from workflow_requests
-        const parentInst = (window._wfInstances||[]).find(i => i.id === item.instanceId);
-        if (parentInst?.status === 'cancelled') {
-          compassToast('This request was withdrawn by the submitter.', 3000);
-          API.patch(`workflow_requests?id=eq.${item.id}`, { status: 'cancelled' })
-            .then(() => { _viewLoaded['user'] = false; _mwLoadUserView(); })
-            .catch(() => {});
-          return;
-        }
-        openRequestReviewPanel(item, item._wrRole === 'approver');
-        return;
-      }
-      // ── Changes requested / re-review items → open resubmit panel ──────
-      if (item.instanceId && (
-        (item.title||'').startsWith('↺ Changes requested:') ||
-        (item.title||'').startsWith('↺ Re-review requested:')
-      )) {
+      // ── Resubmit items — check FIRST before any role routing ────────────
+      // Use includes() + instance check to avoid Unicode encoding mismatches.
+      if (item.instanceId && (_title.includes('Changes requested:') || _title.includes('Re-review requested:'))) {
         openResubmitPanel(item);
         return;
       }
-      // ── Informational items (Approved, Partial approval) → just dismiss ─
-      if (item.instanceId && (
-        (item.title||'').startsWith('✓ Approved:') ||
-        (item.title||'').startsWith('ℹ Partial approval:')
-      )) {
-        // These are read-only notifications — resolve them on click
+
+      // ── Informational items → dismiss on click ───────────────────────────
+      if (item.instanceId && (_title.includes('Approved:') || _title.includes('Partial approval:'))) {
         API.patch(`workflow_action_items?id=eq.${item.id}`, { status:'resolved', updated_at: new Date().toISOString() })
           .then(() => { _viewLoaded['user'] = false; _mwLoadUserView(); })
           .catch(() => {});
         compassToast('Notification dismissed.');
         return;
       }
-      // ↺ Changes requested / Re-review → resubmit panel
-      if (item.instanceId && (
-        (item.title||'').startsWith('↺ Changes requested:') ||
-        (item.title||'').startsWith('↺ Re-review requested:')
-      )) { openResubmitPanel(item); return; }
-      // ✓ Approved / ℹ Partial → informational, dismiss on click
-      if (item.instanceId && (
-        (item.title||'').startsWith('✓ Approved:') ||
-        (item.title||'').startsWith('ℹ Partial approval:')
-      )) {
-        API.patch(`workflow_action_items?id=eq.${item.id}`,
-          { status:'resolved', updated_at: new Date().toISOString() })
-          .then(() => { _viewLoaded['user'] = false; _mwLoadUserView(); })
-          .catch(() => {});
-        compassToast('Notification dismissed.');
+
+      // ── Legacy review/approve items ──────────────────────────────────────
+      const isLegacyReview  = item.instanceId && _title.startsWith('Review request:');
+      const isLegacyApprove = item.instanceId && _title.startsWith('Approve request:');
+      if (item.instanceId && (isLegacyReview || isLegacyApprove)) {
+        const parentInst = (window._wfInstances||[]).find(i => i.id === item.instanceId);
+        if (parentInst?.status === 'cancelled') {
+          compassToast('This request was withdrawn by the submitter.', 3000);
+          API.patch(`workflow_action_items?id=eq.${item.id}`, { status: 'resolved' })
+            .then(() => { _viewLoaded['user'] = false; _mwLoadUserView(); }).catch(() => {});
+          return;
+        }
+        openRequestReviewPanel(item, isLegacyApprove);
+        return;
+      }
+
+      // ── workflow_requests rows (reviewer/approver) ───────────────────────
+      if (item.instanceId && item._wrRole) {
+        const parentInst = (window._wfInstances||[]).find(i => i.id === item.instanceId);
+        if (parentInst?.status === 'cancelled') {
+          compassToast('This request was withdrawn by the submitter.', 3000);
+          API.patch(`workflow_requests?id=eq.${item.id}`, { status: 'cancelled' })
+            .then(() => { _viewLoaded['user'] = false; _mwLoadUserView(); }).catch(() => {});
+          return;
+        }
+        openRequestReviewPanel(item, item._wrRole === 'approver');
         return;
       }
       const _ns = negGetState(item.id).state;
