@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-G','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-H','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1230,7 +1230,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-ann{font-size:9px;letter-spacing:.18em;color:rgba(255,180,60,.55);text-transform:uppercase;transition:all .4s}
 .bck-ann.go{color:rgba(74,222,128,.8);text-shadow:0 0 8px rgba(74,222,128,.4)}
 .bck-ann.fail{color:rgba(226,75,74,.8)}
-.bck-ws{position:relative;height:240px;overflow:hidden;flex-shrink:0}
+.bck-ws{position:relative;flex:1;min-height:0;overflow:hidden}
 .bck-sky{position:absolute;inset:0;background:linear-gradient(180deg,#000308 0%,#000d2a 35%,#001845 55%,#012060 70%,#1a3d72 82%,#3a6090 100%)}
 .bck-stars{position:absolute;inset:0;pointer-events:none}
 .bck-earth{position:absolute;left:0;right:0;bottom:0;height:36%;background:linear-gradient(180deg,#1a3060 0%,#0d1f45 18%,#060f22 40%,#030810 70%,#020508 100%);overflow:hidden}
@@ -1289,11 +1289,11 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-cw.ac{background:rgba(239,159,39,.4);animation:bckPw .9s ease-in-out infinite}
 @keyframes bckPw{0%,100%{opacity:.4}50%{opacity:1}}
 .bck-lz{position:absolute;left:52px;right:52px;z-index:5;pointer-events:none;overflow:visible}
-.bck-coc{position:absolute;right:0;top:26px;width:195px;background:rgba(2,5,12,.93);border-left:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;z-index:9}
+.bck-coc{position:absolute;right:0;top:0;bottom:0;width:195px;background:rgba(2,5,12,.93);border-left:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;z-index:9}
 .bck-coch{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .bck-coct{font-size:7px;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,.22)}
 .bck-cocc{font-size:9px;font-family:monospace;color:rgba(0,210,255,.4)}
-.bck-cocf{overflow-y:auto;display:flex;flex-direction:column;height:196px}
+.bck-cocf{overflow-y:auto;display:flex;flex-direction:column;flex:1;min-height:0}
 .bck-cocf::-webkit-scrollbar{width:2px}
 .bck-cocf::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
 .bck-ce{display:flex;gap:6px;padding:4px 10px;border-bottom:1px solid rgba(255,255,255,.025);animation:bckCi .18s ease-out}
@@ -1319,7 +1319,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-rdot{width:5px;height:5px;border-radius:50%;background:rgba(0,210,255,.15)}
 .bck-rdot.live{background:#00D2FF;box-shadow:0 0 5px #00D2FF;animation:bckBk .8s ease-in-out infinite}
 @keyframes bckBk{0%,100%{opacity:1}50%{opacity:.25}}
-.bck-rf{height:68px;overflow-y:auto;padding:4px 14px;display:flex;flex-direction:column-reverse}
+.bck-rf{height:90px;overflow-y:auto;padding:4px 14px;display:flex;flex-direction:column-reverse}
 .bck-rf::-webkit-scrollbar{width:2px}
 .bck-rf::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
 .bck-tx{display:flex;align-items:flex-start;gap:8px;padding:2px 0;animation:bckTxi .2s ease-out}
@@ -1447,6 +1447,8 @@ function _bistCkInit(tests) {
   });
   // Position DAG and loop zones
   _bckPosZones();
+  // Recalc zone positions after layout settles
+  setTimeout(_bckPosZones, 50);
   // Init EFIS
   _bckEl('bck-ef0').textContent = '0/' + tests.length;
   _bckCocCount = 0; _bckSC = 0; _bckASC = 0; _bckRWC = 0; _bckPassC = 0;
@@ -1459,7 +1461,7 @@ function _bistCkInit(tests) {
 
 function _bckPosZones() {
   var ws = _bckEl('bck-ws'); if (!ws) return;
-  var h = ws.offsetHeight || 240, hp = 0.64, nH = 78;
+  var h = ws.getBoundingClientRect().height || ws.offsetHeight || 400, hp = 0.64, nH = 78;
   var dz = _bckEl('bck-dag');
   if (dz) dz.style.cssText = 'position:absolute;left:52px;right:52px;z-index:6;display:flex;justify-content:center;top:'+Math.round(h*hp-nH+6)+'px';
   var lz = _bckEl('bck-lz');
