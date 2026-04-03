@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-V','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-W','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1592,6 +1592,7 @@ function _bistCkEndTest(ti, status) {
 }
 
 function _bistCkOnProgress(ti, test, ev, tmplSteps) {
+  if (_bckFrozen) return;  // FREEZE active — suppress visual updates
   var type = ev.type;
   if (type === 'instance_created') {
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt on';
@@ -1807,7 +1808,7 @@ function _bistCkReplay() {
   if (_bckReplayTimer) { clearInterval(_bckReplayTimer); _bckReplayTimer = null; }
 
   // Inject replay panel into the windshield area, above the existing CoC + instruments
-  var bck = document.querySelector('.bck');
+  var bck = document.querySelector('.bck-ws');
   if (!bck) return;
 
   // Add replay overlay inside .bck above everything
@@ -1824,52 +1825,38 @@ function _bistCkReplay() {
 
   var total = _bckSimLog.length;
 
-  panel.innerHTML = [
-    // Compact event ticker — single line showing current event
-    '<div id="bck-rp-event" style="padding:5px 16px;border-bottom:1px solid rgba(255,255,255,.05);',
-      'display:flex;align-items:center;gap:10px;min-height:32px">',
-      '<div style="font-size:12px;color:rgba(255,255,255,.3);font-style:italic">',
-        'Use arrows or drag scrubber to inspect events</div>',
-    '</div>',
-    // Scrubber row
-    '<div style="padding:5px 16px 2px;display:flex;align-items:center;gap:10px">',
-      '<span style="font-size:12px;font-family:Arial,sans-serif;color:rgba(0,210,255,.7);',
-        'white-space:nowrap">&#9654; REPLAY</span>',
-      '<input type="range" id="bck-rp-scrub" min="0" max="'+(total-1)+'" value="0"',
-        ' oninput="_bckRpScrub(this.value)"',
-        ' style="flex:1;height:4px;cursor:pointer;accent-color:#00D2FF">',
-      '<span id="bck-rp-pos" style="font-size:12px;font-family:Arial,sans-serif;',
-        'color:rgba(255,255,255,.4);white-space:nowrap">1/'+total+'</span>',
-      '<span id="bck-rp-ts" style="font-size:12px;font-family:monospace;',
-        'color:rgba(255,255,255,.3);white-space:nowrap"></span>',
-    '</div>',
-    // Transport controls row
-    '<div style="padding:4px 16px 8px;display:flex;align-items:center;gap:6px">',
-      _bckRpBtn('&#171;',  '_bckRpGo(0)',             'First'),
-      _bckRpBtn('&#8249;', '_bckRpStep(-1)',           'Back'),
-      '<button id="bck-rp-play" onclick="_bckRpTogglePlay()"',
-        ' style="width:32px;height:32px;border-radius:50%;',
-        'border:2px solid rgba(0,210,255,.5);background:rgba(0,210,255,.1);',
-        'color:#00D2FF;font-size:16px;cursor:pointer">&#9654;</button>',
-      _bckRpBtn('&#8250;', '_bckRpStep(1)',            'Forward'),
-      _bckRpBtn('&#187;',  '_bckRpGo('+(total-1)+')', 'Last'),
-      '<div style="width:1px;height:24px;background:rgba(255,255,255,.08);margin:0 4px"></div>',
-      '<select id="bck-rp-speed" onchange="_bckRpSpeedChange(this.value)"',
-        ' style="font-size:12px;font-family:Arial,sans-serif;background:rgba(0,0,0,.5);',
-        'border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);',
-        'padding:2px 5px;border-radius:3px;cursor:pointer">',
-        '<option value="1000">Slow</option>',
-        '<option value="500" selected>Normal</option>',
-        '<option value="200">Fast</option>',
-        '<option value="50">Max</option>',
-      '</select>',
-      '<div style="flex:1"></div>',
-      '<button onclick="_bckRpClose()"',
-        ' style="font-size:12px;font-family:Arial,sans-serif;padding:4px 10px;',
-        'border-radius:3px;border:1px solid rgba(226,75,74,.3);background:none;',
-        'color:rgba(226,75,74,.6);cursor:pointer">&#10005; Close</button>',
-    '</div>',
-  ].join('');
+  // Single-row layout: event ticker | scrubber | transport | speed | close
+  var F = 'font-family:Arial,sans-serif;font-size:12px;';
+  panel.innerHTML =
+    // Row 1: event ticker
+    '<div id="bck-rp-event" style="' + F + 'padding:4px 12px;border-bottom:1px solid rgba(255,255,255,.06);' +
+      'display:flex;align-items:center;gap:8px;min-height:28px;color:rgba(255,255,255,.35);font-style:italic">' +
+      'Use arrows or scrubber to inspect' +
+    '</div>' +
+    // Row 2: all controls in one row
+    '<div style="padding:5px 10px;display:flex;align-items:center;gap:6px">' +
+      _bckRpBtn('&#171;',  '_bckRpGo(0)',             'First') +
+      _bckRpBtn('&#8249;', '_bckRpStep(-1)',           'Back') +
+      '<button id="bck-rp-play" onclick="_bckRpTogglePlay()"' +
+        ' style="width:28px;height:28px;border-radius:50%;flex-shrink:0;' +
+        'border:2px solid rgba(0,210,255,.5);background:rgba(0,210,255,.1);' +
+        'color:#00D2FF;font-size:14px;cursor:pointer">&#9654;</button>' +
+      _bckRpBtn('&#8250;', '_bckRpStep(1)',  'Forward') +
+      _bckRpBtn('&#187;',  '_bckRpGo('+(total-1)+')', 'Last') +
+      '<input type="range" id="bck-rp-scrub" min="0" max="'+(total-1)+'" value="0"' +
+        ' oninput="_bckRpScrub(this.value)"' +
+        ' style="flex:1;height:4px;cursor:pointer;accent-color:#00D2FF;margin:0 4px">' +
+      '<span id="bck-rp-pos" style="' + F + 'color:rgba(255,255,255,.4);white-space:nowrap;min-width:32px">1/'+ total +'</span>' +
+      '<span id="bck-rp-ts" style="' + F + 'font-family:monospace;color:rgba(255,255,255,.3);white-space:nowrap;margin-right:4px"></span>' +
+      '<select id="bck-rp-speed" onchange="_bckRpSpeedChange(this.value)"' +
+        ' style="' + F + 'background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);' +
+        'color:rgba(255,255,255,.6);padding:2px 4px;border-radius:3px;cursor:pointer">' +
+        '<option value="1000">Slow</option><option value="500" selected>Normal</option>' +
+        '<option value="200">Fast</option><option value="50">Max</option>' +
+      '</select>' +
+      '<button onclick="_bckRpClose()" style="' + F + 'padding:3px 8px;border-radius:3px;' +
+        'border:1px solid rgba(226,75,74,.3);background:none;color:rgba(226,75,74,.6);cursor:pointer;white-space:nowrap">&#10005;</button>' +
+    '</div>';
 
   bck.appendChild(panel);
   _bckRpRender(0);
