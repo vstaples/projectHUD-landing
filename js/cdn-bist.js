@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AI','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AK','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1060,6 +1060,12 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   document.getElementById('bist-gate-overlay')?.remove();
   document.getElementById('bist-cockpit-overlay')?.remove();
   window._bckCockpitClosed = false;  // reset for this run
+  // Update simulator gate text immediately
+  var _gateEl = document.getElementById('s9-sim-gate');
+  if (_gateEl) {
+    _gateEl.textContent = '▶ Simulation in progress…';
+    _gateEl.style.color = 'rgba(0,210,255,.7)';
+  }
 
   // Load scripts + template metadata
   const [scripts, tmplArr] = await Promise.all([
@@ -1767,7 +1773,8 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
     var actor  = test.actors[stepIdx] || '?';
     var nm     = (test.nodes[stepIdx] || 'Step').split('\n');
     var card = document.createElement('div'); card.className = 'bck-nc'; card.id = nodeId;
-    card.innerHTML = '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(actor)+'</div><div class="bck-nan">'+_bistEscHtml(aname)+'</div></div><div class="bck-nb"><div class="bck-ntitle">'+_bistEscHtml(nm[0])+(nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+'</div><div class="bck-nst" id="bck-nst-'+stepId+'"><div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div><span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span></div></div>';
+    var seqNum = stepIdx != null ? stepIdx + 1 : '';
+    card.innerHTML = '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(actor)+'</div><div class="bck-nan">'+_bistEscHtml(aname)+'</div><div style="font-size:11px;font-family:monospace;color:rgba(255,255,255,.25);margin-left:auto">'+seqNum+'</div></div><div class="bck-nb"><div class="bck-ntitle">'+_bistEscHtml(nm[0])+(nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+'</div><div class="bck-nst" id="bck-nst-'+stepId+'"><div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div><span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span></div></div>';
     if (nodes.children.length > 0) {
       var cw = document.createElement('div'); cw.className = 'bck-cw'; nodes.appendChild(cw);
     }
@@ -2025,51 +2032,6 @@ function _bistCkReplay() {
 }
 
 
-  // Restore DAG node states up to idx
-  var nodesEl2 = _bckEl('bck-nodes');
-  if (nodesEl2) {
-    nodesEl2.innerHTML = '';
-    var dt2 = _bckEl('bck-dtrig'); if (dt2) dt2.className = 'bck-dt';
-    var de2 = _bckEl('bck-dend');  if (de2) de2.className = 'bck-de';
-    var lsvg2 = _bckEl('bck-lsvg'); if (lsvg2) lsvg2.innerHTML = '';
-
-    var trigEntry = null, endEntry = null;
-    var nodeOrder = [];   // ordered list of stepIds (first appearance)
-    var nodeStates = {};  // latest state per stepId
-    for (var rk = 0; rk <= idx; rk++) {
-      var re = log[rk];
-      if (re.kind === 'begintest') {
-        nodeOrder = []; nodeStates = {}; trigEntry = null; endEntry = null;
-      }
-      if (re.kind === 'trigger') trigEntry = re;
-      if (re.kind === 'endnode') endEntry  = re;
-      if (re.kind === 'node') {
-        if (!nodeStates[re.stepId]) nodeOrder.push(re.stepId);
-        nodeStates[re.stepId] = re;
-      }
-    }
-    if (trigEntry) { var dt3=_bckEl('bck-dtrig'); if(dt3) dt3.className='bck-dt on'; }
-    if (endEntry)  { var de3=_bckEl('bck-dend');  if(de3) de3.className='bck-de dn'; }
-
-    nodeOrder.forEach(function(stepId) {
-      var n = nodeStates[stepId];
-      var nm = (n.nodeName||'Step').split('\n');
-      var card = document.createElement('div');
-      card.className = n.cls; card.id = 'bck-n-'+stepId;
-      card.innerHTML =
-        '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(n.actor)+'</div>'+
-        '<div class="bck-nan">'+_bistEscHtml(n.aname)+'</div></div>'+
-        '<div class="bck-nb"><div class="bck-ntitle">'+_bistEscHtml(nm[0])+
-        (nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+
-        '</div><div class="bck-nst" id="bck-nst-'+stepId+'">'+
-        '<div class="bck-nsdot" style="background:'+n.col+'"></div>'+
-        '<span class="bck-nstxt" style="color:'+n.col+'">'+_bistEscHtml(n.label)+'</span></div></div>';
-      if (nodesEl2.children.length > 0) {
-        var cw = document.createElement('div'); cw.className = 'bck-cw dn'; nodesEl2.appendChild(cw);
-      }
-      nodesEl2.appendChild(card);
-    });
-  }
 
 function _bckRpBtn(glyph, action, title) {
   return '<button onclick="'+action+'" title="'+title+'"'+
@@ -2159,6 +2121,50 @@ function _bckRpRender(idx) {
         radioFeed.insertBefore(tx, radioFeed.firstChild);
       });
     }
+  }
+
+  // ── Rebuild DAG node states up to idx ──────────────────────────────────
+  var nodesEl2 = _bckEl('bck-nodes');
+  if (nodesEl2) {
+    nodesEl2.innerHTML = '';
+    var dt2 = _bckEl('bck-dtrig'); if (dt2) dt2.className = 'bck-dt';
+    var de2 = _bckEl('bck-dend');  if (de2) de2.className = 'bck-de';
+    var lsvg2 = _bckEl('bck-lsvg'); if (lsvg2) lsvg2.innerHTML = '';
+
+    var rTrig = null, rEnd = null;
+    var rOrder = [], rStates = {};
+    for (var rk = 0; rk <= idx; rk++) {
+      var re = log[rk];
+      if (re.kind === 'begintest') { rOrder = []; rStates = {}; rTrig = null; rEnd = null; }
+      if (re.kind === 'trigger')   rTrig = re;
+      if (re.kind === 'endnode')   rEnd  = re;
+      if (re.kind === 'node') {
+        if (!rStates[re.stepId]) rOrder.push(re.stepId);
+        rStates[re.stepId] = re;
+      }
+    }
+    if (rTrig) { var dt3=_bckEl('bck-dtrig'); if(dt3) dt3.className='bck-dt on'; }
+    if (rEnd)  { var de3=_bckEl('bck-dend');  if(de3) de3.className='bck-de dn'; }
+
+    rOrder.forEach(function(stepId) {
+      var n = rStates[stepId];
+      var nm = (n.nodeName||'Step').split('\n');
+      var seqLabel = n.stepIdx != null ? ' <span style="font-size:11px;opacity:.5;float:right">'+n.stepIdx+'</span>' : '';
+      var card = document.createElement('div');
+      card.className = n.cls; card.id = 'bck-n-'+stepId;
+      card.innerHTML =
+        '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(n.actor)+'</div>'+
+        '<div class="bck-nan">'+_bistEscHtml(n.aname)+'</div></div>'+
+        '<div class="bck-nb"><div class="bck-ntitle">'+_bistEscHtml(nm[0])+seqLabel+
+        (nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+
+        '</div><div class="bck-nst" id="bck-nst-'+stepId+'">'+
+        '<div class="bck-nsdot" style="background:'+n.col+'"></div>'+
+        '<span class="bck-nstxt" style="color:'+n.col+'">'+_bistEscHtml(n.label)+'</span></div></div>';
+      if (nodesEl2.children.length > 0) {
+        var cw = document.createElement('div'); cw.className = 'bck-cw dn'; nodesEl2.appendChild(cw);
+      }
+      nodesEl2.appendChild(card);
+    });
   }
 }
 
