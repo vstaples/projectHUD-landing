@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-220000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -951,6 +951,7 @@ window.loadUserRequests = async function() {
         `&select=id,title,status,current_step_name,workflow_type,submitted_by_name,created_at,attachments`
       ).catch(e => { console.warn('[MyRequests] fetch error:', e.message); return []; });
       console.log('[MyRequests] query returned', (rows||[]).length, 'rows');
+      (rows||[]).forEach(r => console.log('[MyRequests] row:', r.id?.slice(0,8), 'status:', r.status, 'step:', r.current_step_name));
 
       // Step label maps — mirrors stepPreviews in myrOpenWorkflowForm
       const _STEP_LABELS = {
