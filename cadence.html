@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CadenceHUD · S9.6</title>
+<title>CadenceHUD · S9.7</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -923,7 +923,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
     </div>
 
     <!-- Simulator panel — owns this DOM node, never touched by switchTab -->
-    <div id="s9-sim-panel" style="display:none;flex:1;position:relative"></div>
+    <div id="s9-sim-panel" style="display:none;flex:1;position:relative;height:100%;overflow:hidden"></div>
 
     <!-- Content — owned by cdn-core-state switchTab renderer -->
     <div class="cad-content" id="cad-content">
@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.6 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.7 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1114,11 +1114,11 @@ function _s9RenderSimPanel(el) {
   var F14 = FA + 'font-size:14px;';
 
   el.innerHTML =
-    '<div style="position:absolute;inset:0;display:flex;overflow:hidden;height:100%">' +
+    '<div style="display:flex;flex:1;width:100%;height:100%;overflow:hidden">' +
 
       // Left rail
       '<div style="width:240px;flex-shrink:0;border-right:1px solid var(--border);' +
-        'display:flex;flex-direction:column;background:var(--bg1)">' +
+        'display:flex;flex-direction:column;background:var(--bg1);height:100%">' +
         '<div style="padding:12px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0">' +
           '<div style="' + F13 + 'font-weight:600;letter-spacing:.06em;' +
             'text-transform:uppercase;color:var(--text)">Simulator</div>' +
@@ -1154,8 +1154,9 @@ function _s9RenderSimPanel(el) {
       '</div>' +
 
       // Right panel
-      '<div id="s9-sim-right" style="flex:1;align-self:stretch;display:flex;flex-direction:column;' +
-        'align-items:center;justify-content:center;gap:16px;padding:32px;background:var(--bg2)">' +
+      '<div id="s9-sim-right" style="flex:1;display:flex;flex-direction:column;' +
+        'align-items:center;justify-content:center;gap:16px;padding:32px;' +
+        'background:var(--bg2);height:100%;overflow:hidden">' +
 
         (hasSource
           ? '<div style="text-align:center;max-width:440px">' +
