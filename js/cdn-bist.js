@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AK','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AM','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1064,7 +1064,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   var _gateEl = document.getElementById('s9-sim-gate');
   if (_gateEl) {
     _gateEl.textContent = '▶ Simulation in progress…';
-    _gateEl.style.color = 'rgba(0,210,255,.7)';
+    _gateEl.style.color = 'rgba(239,159,39,.9)';
   }
 
   // Load scripts + template metadata
@@ -1145,18 +1145,19 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     _bistCkStopClock();
     window._bistCkRunning = false;
     // Patch any in-flight bist_run to aborted
-    if (window._bckCurrentRunId) {
-      API.patch('bist_runs?id=eq.'+window._bckCurrentRunId,
+    var _abortedRunId = window._bckCurrentRunId;
+    window._bckCurrentRunId = null;
+    if (_abortedRunId) {
+      API.patch('bist_runs?id=eq.'+_abortedRunId,
         {status:'aborted', duration_ms: Date.now() - (window._bckStartMs||Date.now())}
       ).catch(function(){});
-      window._bckCurrentRunId = null;
     }
     if (simPanel && typeof _s9RenderSimPanel === 'function') {
       _s9RenderSimPanel(simPanel);
       // Refresh gate status after abort
       var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
       if (tmpl && tmpl.id && typeof _s9LoadSimScripts === 'function') {
-        setTimeout(function(){ _s9LoadSimScripts(tmpl.id, tmpl.version||'0.0.0'); }, 500);
+        setTimeout(function(){ _s9LoadSimScripts(tmpl.id, tmpl.version||'0.0.0'); }, 1500);
       }
     } else if (!simPanel) {
       ov.remove();
@@ -1468,7 +1469,8 @@ function _bistCockpitHTML(tmplName, version, tests) {
 // ── Cockpit state ─────────────────────────────────────────────────────────────
 var _bckCocCount = 0;
 var _bckSimLog = [];
-var _bckLastDoneId = null;  // [{ts, type, detail, color}] — replay feed
+var _bckLastDoneId = null;
+var _bckCurrentTestIdx = 0;  // [{ts, type, detail, color}] — replay feed
 var _bckSC = 0, _bckASC = 0, _bckRWC = 0, _bckPassC = 0;
 var _bckClockTimer = null;
 var _bckElTimer = null;
@@ -1589,7 +1591,7 @@ function _bckPosZones() {
   var ws = _bckEl('bck-ws'); if (!ws) return;
   var h = ws.getBoundingClientRect().height || ws.offsetHeight || 400, hp = 0.64, nH = 78;
   var dz = _bckEl('bck-dag');
-  if (dz) dz.style.cssText = 'position:absolute;left:52px;right:52px;z-index:6;display:flex;justify-content:center;top:'+Math.round(h*hp-nH+6)+'px';
+  if (dz) dz.style.cssText = 'position:absolute;left:52px;right:52px;z-index:6;display:flex;justify-content:center;top:'+Math.round(h*hp-nH-4)+'px';
   var lz = _bckEl('bck-lz');
   var lT = Math.round(h*hp)+3;
   if (lz) lz.style.cssText = 'position:absolute;left:52px;right:52px;z-index:5;pointer-events:none;top:'+lT+'px;height:'+(h-lT)+'px;overflow:visible';
@@ -1645,6 +1647,7 @@ function _bistCkBeginTest(ti, name) {
   var lsvg = _bckEl('bck-lsvg'); if (lsvg) lsvg.innerHTML = '';
   _bckSimLog.push({ts:Date.now(),kind:'begintest',testIdx:ti,name:name});
   _bckLastDoneId = null;
+  _bckCurrentTestIdx = ti;
 }
 
 function _bistCkEndTest(ti, status) {
@@ -1747,9 +1750,8 @@ function _bckDrawRejectArc(fromStepId, toStepId) {
   arrow.setAttribute('opacity', '0.75');
 
   // Animate the dash
-  var anim = document.createElementNS('http://www.w3.org/2000/svg','animateTransform');
+  var anim = document.createElementNS('http://www.w3.org/2000/svg','animate');
   anim.setAttribute('attributeName','stroke-dashoffset');
-  anim.setAttribute('attributeType','XML');
   anim.setAttribute('from','0'); anim.setAttribute('to','-14');
   anim.setAttribute('dur','0.6s'); anim.setAttribute('repeatCount','indefinite');
   el.appendChild(anim);
@@ -1773,8 +1775,20 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
     var actor  = test.actors[stepIdx] || '?';
     var nm     = (test.nodes[stepIdx] || 'Step').split('\n');
     var card = document.createElement('div'); card.className = 'bck-nc'; card.id = nodeId;
-    var seqNum = stepIdx != null ? stepIdx + 1 : '';
-    card.innerHTML = '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(actor)+'</div><div class="bck-nan">'+_bistEscHtml(aname)+'</div><div style="font-size:11px;font-family:monospace;color:rgba(255,255,255,.25);margin-left:auto">'+seqNum+'</div></div><div class="bck-nb"><div class="bck-ntitle">'+_bistEscHtml(nm[0])+(nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+'</div><div class="bck-nst" id="bck-nst-'+stepId+'"><div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div><span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span></div></div>';
+    var seqLabel = (_bckCurrentTestIdx+1)+'.'+(stepIdx+1);
+    card.innerHTML =
+      '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(actor)+'</div>'+
+      '<div class="bck-nan">'+_bistEscHtml(aname)+'</div></div>'+
+      '<div class="bck-nb">'+
+        '<div class="bck-ntitle">'+_bistEscHtml(nm[0])+
+        (nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+
+        '</div>'+
+        '<div class="bck-nst" id="bck-nst-'+stepId+'">'+
+          '<div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div>'+
+          '<span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span>'+
+          '<span style="font-size:11px;font-family:monospace;color:rgba(255,255,255,.2);margin-left:auto">'+seqLabel+'</span>'+
+        '</div>'+
+      '</div>';
     if (nodes.children.length > 0) {
       var cw = document.createElement('div'); cw.className = 'bck-cw'; nodes.appendChild(cw);
     }
@@ -1789,6 +1803,7 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
   nst.innerHTML = '<div class="bck-nsdot" style="background:'+col+'"></div><span class="bck-nstxt" style="color:'+col+'">'+_bistEscHtml(lbl2)+'</span>';
   // Log node state for replay
   _bckSimLog.push({ts: Date.now(), kind:'node', stepId:stepId, stepIdx:stepIdx,
+    testIdx:_bckCurrentTestIdx,
     state:state, label:lbl2, col:col, cls:cls[state]||'bck-nc',
     actor:test.actors[stepIdx]||'?', aname:test.anames[stepIdx]||'',
     nodeName:(test.nodes[stepIdx]||'Step')});
@@ -2149,17 +2164,22 @@ function _bckRpRender(idx) {
     rOrder.forEach(function(stepId) {
       var n = rStates[stepId];
       var nm = (n.nodeName||'Step').split('\n');
-      var seqLabel = n.stepIdx != null ? ' <span style="font-size:11px;opacity:.5;float:right">'+n.stepIdx+'</span>' : '';
+      var rSeqLabel = ((n.testIdx!=null?n.testIdx+1:'?')+'.'+((n.stepIdx!=null?n.stepIdx+1:'?')));
       var card = document.createElement('div');
       card.className = n.cls; card.id = 'bck-n-'+stepId;
       card.innerHTML =
         '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(n.actor)+'</div>'+
         '<div class="bck-nan">'+_bistEscHtml(n.aname)+'</div></div>'+
-        '<div class="bck-nb"><div class="bck-ntitle">'+_bistEscHtml(nm[0])+seqLabel+
-        (nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+
-        '</div><div class="bck-nst" id="bck-nst-'+stepId+'">'+
-        '<div class="bck-nsdot" style="background:'+n.col+'"></div>'+
-        '<span class="bck-nstxt" style="color:'+n.col+'">'+_bistEscHtml(n.label)+'</span></div></div>';
+        '<div class="bck-nb">'+
+          '<div class="bck-ntitle">'+_bistEscHtml(nm[0])+
+          (nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+
+          '</div>'+
+          '<div class="bck-nst" id="bck-nst-'+stepId+'">'+
+            '<div class="bck-nsdot" style="background:'+n.col+'"></div>'+
+            '<span class="bck-nstxt" style="color:'+n.col+'">'+_bistEscHtml(n.label)+'</span>'+
+            '<span style="font-size:11px;font-family:monospace;color:rgba(255,255,255,.25);margin-left:auto">'+rSeqLabel+'</span>'+
+          '</div>'+
+        '</div>';
       if (nodesEl2.children.length > 0) {
         var cw = document.createElement('div'); cw.className = 'bck-cw dn'; nodesEl2.appendChild(cw);
       }
