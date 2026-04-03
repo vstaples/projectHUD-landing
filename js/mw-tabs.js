@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-210000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-220000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1038,17 +1038,18 @@ window.loadUserRequests = async function() {
     myrSwitchView(_myrActiveSubTab);
   }
 
-  // One-shot re-fetch: if a ↺ Changes requested item exists for an instance
-  // still showing current_step_name != 'Submit', approve.html's PATCH may not
-  // have committed yet. Re-fetch once only — guard prevents repeat firing.
-  window._myrPendingSubmitCheck = window._myrPendingSubmitCheck || new Set();
+  // Re-fetch if a ↺ Changes requested action item exists for an instance
+  // that still shows current_step_name != 'Submit'.
+  // Debounced per instance — max once per 30s to prevent hammering.
+  window._myrSubmitRefetchTs = window._myrSubmitRefetchTs || {};
   (async () => {
     try {
       if (!resolvedResId) return;
+      const now30 = Date.now();
       const needsCheck = (window._myRequests||[]).filter(r =>
         r.status !== 'completed' && r.status !== 'rejected' &&
         r._raw?.current_step_name !== 'Submit' &&
-        !window._myrPendingSubmitCheck.has(r.id)
+        (!window._myrSubmitRefetchTs[r.id] || now30 - window._myrSubmitRefetchTs[r.id] > 30000)
       );
       if (!needsCheck.length) return;
       const ids = needsCheck.map(r => r.id);
@@ -1059,8 +1060,8 @@ window.loadUserRequests = async function() {
         .filter(a => ids.includes(a.instance_id))
         .map(a => a.instance_id);
       if (!matchedIds.length) return;
-      // Mark as handled BEFORE scheduling so re-entrant calls don't double-fire
-      matchedIds.forEach(id => window._myrPendingSubmitCheck.add(id));
+      // Stamp timestamp BEFORE scheduling
+      matchedIds.forEach(id => { window._myrSubmitRefetchTs[id] = now30; });
       setTimeout(() => {
         window._myRequestCoc   = {};
         window._requestsLoaded = false;
@@ -1323,8 +1324,8 @@ function renderMyRequestsActive() {
       !instanceComplete;
     if (isAwaitingResubmit) {
       console.log('[MyRequests] isAwaitingResubmit=true for', req.id?.slice(0,8), '— current_step_name:', req._raw?.current_step_name);
-      // Clear the one-shot guard now that Submit is confirmed — allows future cycles
-      if (window._myrPendingSubmitCheck) window._myrPendingSubmitCheck.delete(req.id);
+      // Clear the debounce timestamp so future cycles can re-trigger if needed
+      if (window._myrSubmitRefetchTs) delete window._myrSubmitRefetchTs[req.id];
     }
     // For the Review step: override done/active from CoC approval count vs assigned reviewers.
     // This is the ground truth — independent of current_step_name or polling timing.
