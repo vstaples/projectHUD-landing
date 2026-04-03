@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-250000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-260000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -951,7 +951,6 @@ window.loadUserRequests = async function() {
         `&select=id,title,status,current_step_name,workflow_type,submitted_by_name,created_at,attachments`
       ).catch(e => { console.warn('[MyRequests] fetch error:', e.message); return []; });
       console.log('[MyRequests] query returned', (rows||[]).length, 'rows');
-      (rows||[]).forEach(r => console.log('[MyRequests] row:', r.id?.slice(0,8), 'status:', r.status, 'step:', r.current_step_name));
 
       // Step label maps — mirrors stepPreviews in myrOpenWorkflowForm
       const _STEP_LABELS = {
@@ -1047,11 +1046,17 @@ window.loadUserRequests = async function() {
     try {
       if (!resolvedResId) return;
       const now30 = Date.now();
-      const needsCheck = (window._myRequests||[]).filter(r =>
-        r.status !== 'completed' && r.status !== 'rejected' &&
-        r._raw?.current_step_name !== 'Submit' &&
-        (!window._myrSubmitRefetchTs[r.id] || now30 - window._myrSubmitRefetchTs[r.id] > 30000)
-      );
+      const needsCheck = (window._myRequests||[]).filter(r => {
+        if (r.status === 'completed' || r.status === 'rejected') return false;
+        if (window._myrSubmitRefetchTs[r.id] && now30 - window._myrSubmitRefetchTs[r.id] <= 30000) return false;
+        // Skip if CoC already shows changes_requested as most recent event — already confirmed
+        const rCoc = (window._myRequestCoc||{})[r.id] || [];
+        const lastEv = rCoc
+          .filter(e => ['request.submitted','request.approved','request.changes_requested'].includes(e.event_type))
+          .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
+        if (lastEv?.event_type === 'request.changes_requested') return false;
+        return true;
+      });
       if (!needsCheck.length) return;
       const ids = needsCheck.map(r => r.id);
       const changesItems = await API.get(
@@ -1333,7 +1338,9 @@ function renderMyRequestsActive() {
       lastLifecycleEv?.event_type === 'request.changes_requested';
     if (isAwaitingResubmit) {
       console.log('[MyRequests] isAwaitingResubmit=true (CoC-derived) for', req.id?.slice(0,8));
-      if (window._myrSubmitRefetchTs) delete window._myrSubmitRefetchTs[req.id];
+    } else if (window._myrSubmitRefetchTs?.[req.id]) {
+      // Instance is no longer awaiting resubmit — clear debounce so future cycles work
+      delete window._myrSubmitRefetchTs[req.id];
     }
     // For the Review step: override done/active from CoC approval count vs assigned reviewers.
     // This is the ground truth — independent of current_step_name or polling timing.
