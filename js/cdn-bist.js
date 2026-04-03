@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-BA','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-BB','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1655,6 +1655,7 @@ function _bistCkBeginTest(ti, name) {
   var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt';
   var de = _bckEl('bck-dend'); if (de) de.className = 'bck-de';
   var lsvg = _bckEl('bck-lsvg'); if (lsvg) lsvg.innerHTML = '';
+  var arcSvg = document.getElementById('bck-arc-svg'); if (arcSvg) arcSvg.innerHTML = '';
   _bckSimLog.push({ts:Date.now(),kind:'begintest',testIdx:ti,name:name});
   _bckLastDoneId = null;
   _bckCurrentTestIdx = ti;
@@ -1703,8 +1704,7 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
   } else if (type === 'step_route_back') {
     var fromCard = document.getElementById('bck-n-'+ev.fromStepId);
     var toCard   = ev.toStepId ? document.getElementById('bck-n-'+ev.toStepId) : null;
-    var allCards = Array.from(document.querySelectorAll('[id^="bck-n-"]')).map(function(e){return e.id;});
-    console.log('[arc] fromId:', ev.fromStepId, 'toId:', ev.toStepId, 'fromCard:', !!fromCard, 'toCard:', !!toCard, 'allCards:', allCards);
+
     if (fromCard && toCard) {
       _bckDrawRejectArc(ev.fromStepId, ev.toStepId);
     } else if (fromCard) {
@@ -1738,64 +1738,65 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
 }
 
 function _bckDrawRejectArc(fromStepId, toStepId) {
-  var svg  = _bckEl('bck-lsvg');
-  var lz   = _bckEl('bck-lz');
+  var ws   = _bckEl('bck-ws');
   var from = document.getElementById('bck-n-'+fromStepId);
   var to   = document.getElementById('bck-n-'+toStepId);
-  if (!svg || !lz || !from || !to) return;
-  var lzRect = lz.getBoundingClientRect();
+  if (!ws || !from || !to) return;
 
-  var lzRect   = lz.getBoundingClientRect();
+  // Remove old arc SVG overlay if present, create fresh one over bck-ws
+  var arcSvgId = 'bck-arc-svg';
+  var arcSvg = document.getElementById(arcSvgId);
+  if (!arcSvg) {
+    arcSvg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    arcSvg.id = arcSvgId;
+    arcSvg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:10;overflow:visible';
+    ws.appendChild(arcSvg);
+  }
+
+  var wsRect   = ws.getBoundingClientRect();
   var fromRect = from.getBoundingClientRect();
   var toRect   = to.getBoundingClientRect();
 
-  // Arc runs from bottom-center of "from" node to bottom-center of "to" node
-  // x1 = rejected node (right), x2 = reset target (left)
-  // Use fromRect bottom, toRect bottom as anchor points
-  var x1 = fromRect.left + fromRect.width/2 - lzRect.left;
-  var x2 = toRect.left   + toRect.width/2   - lzRect.left;
-  var y1 = fromRect.bottom - lzRect.top;
-  var y2 = toRect.bottom  - lzRect.top;
-  var depth = Math.max(20, Math.abs(x1-x2) * 0.18);
-  var mx = (x1+x2)/2, my = Math.max(y1,y2) + depth;
+  // Anchor points: bottom-center of each card, relative to bck-ws
+  var x1 = fromRect.left + fromRect.width/2  - wsRect.left;
+  var y1 = fromRect.bottom                   - wsRect.top;
+  var x2 = toRect.left   + toRect.width/2    - wsRect.left;
+  var y2 = toRect.bottom                     - wsRect.top;
 
-  var path = 'M '+x1+' '+y1+' Q '+mx+' '+my+' '+x2+' '+y2;
+  // Arc drops below card bottoms
+  var drop = 24 + Math.abs(x1-x2) * 0.08;
+  var mx = (x1+x2)/2;
+  var my = Math.max(y1,y2) + drop;
 
-  var el = document.createElementNS('http://www.w3.org/2000/svg','path');
-  el.setAttribute('d', path);
-  el.setAttribute('fill', 'none');
-  el.setAttribute('stroke', '#E24B4A');
-  el.setAttribute('stroke-width', '2');
-  el.setAttribute('stroke-dasharray', '5 3');
-  el.setAttribute('opacity', '0.85');
+  var path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d', 'M '+x1+' '+y1+' Q '+mx+' '+my+' '+x2+' '+y2);
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke','#E24B4A');
+  path.setAttribute('stroke-width','2');
+  path.setAttribute('stroke-dasharray','5 3');
+  path.setAttribute('opacity','0.85');
 
-  // Arrowhead pointing into x2,y2 from the bezier tangent
-  var angle = Math.atan2(y2 - my, x2 - mx);
-  var ah = 8;
-  var ax1 = x2 - ah*Math.cos(angle-0.4);
-  var ay1 = y2 - ah*Math.sin(angle-0.4);
-  var ax2 = x2 - ah*Math.cos(angle+0.4);
-  var ay2 = y2 - ah*Math.sin(angle+0.4);
-  var arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
-  arrow.setAttribute('points', x2+','+y2+' '+ax1+','+ay1+' '+ax2+','+ay2);
-  arrow.setAttribute('fill', '#E24B4A');
-  arrow.setAttribute('opacity', '0.85');
-
-  // Animate the dash
+  // Animated dash
   var anim = document.createElementNS('http://www.w3.org/2000/svg','animate');
   anim.setAttribute('attributeName','stroke-dashoffset');
-  anim.setAttribute('from','0'); anim.setAttribute('to','-14');
-  anim.setAttribute('dur','0.6s'); anim.setAttribute('repeatCount','indefinite');
-  el.appendChild(anim);
+  anim.setAttribute('from','0'); anim.setAttribute('to','-16');
+  anim.setAttribute('dur','0.7s'); anim.setAttribute('repeatCount','indefinite');
+  path.appendChild(anim);
 
-  svg.appendChild(el);
-  svg.appendChild(arrow);
+  // Arrowhead into (x2,y2) along tangent from (mx,my)
+  var angle = Math.atan2(y2-my, x2-mx);
+  var ah = 9;
+  var arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  arrow.setAttribute('points',
+    x2+','+y2+' '+
+    (x2-ah*Math.cos(angle-0.4))+','+(y2-ah*Math.sin(angle-0.4))+' '+
+    (x2-ah*Math.cos(angle+0.4))+','+(y2-ah*Math.sin(angle+0.4))
+  );
+  arrow.setAttribute('fill','#E24B4A');
+  arrow.setAttribute('opacity','0.85');
 
-  // Size svg height to fit
-  var h = Math.ceil(depth) + 16;
-  svg.setAttribute('height', h);
-  if (lz) lz.style.height = h + 'px';
-  if (lz) lz.style.overflow = 'visible';
+  arcSvg.appendChild(path);
+  arcSvg.appendChild(arrow);
 }
 
 function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
@@ -2181,6 +2182,7 @@ function _bckRpRender(idx) {
     var dt2 = _bckEl('bck-dtrig'); if (dt2) dt2.className = 'bck-dt';
     var de2 = _bckEl('bck-dend');  if (de2) de2.className = 'bck-de';
     var lsvg2 = _bckEl('bck-lsvg'); if (lsvg2) lsvg2.innerHTML = '';
+    var arcSvg2 = document.getElementById('bck-arc-svg'); if (arcSvg2) arcSvg2.innerHTML = '';
 
     var rTrig = null, rEnd = null;
     var rOrder = [], rStates = {};
