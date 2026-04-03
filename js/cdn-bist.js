@@ -1682,7 +1682,10 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     var ef1b = _bckEl('bck-ef1b'); if (ef1b) ef1b.style.width = Math.min(100,_bckSC*4)+'%';
     // If node already exists, this is a reset — draw rejection arc
     if (_bckLastDoneId && document.getElementById('bck-n-'+ev.stepId)) {
+      console.log('[arc trigger] reset detected, from:', _bckLastDoneId, 'to:', ev.stepId);
       setTimeout(function(from,to){_bckDrawRejectArc(from,to);}  .bind(null,_bckLastDoneId,ev.stepId), 80);
+    } else {
+      console.log('[arc] no reset: lastDone=', _bckLastDoneId, 'cardExists=', !!document.getElementById('bck-n-'+ev.stepId));
     }
     // Activate node in DAG
     _bistCkSetNode(ev.stepId, idx, test, 'active', 'In progress', tmplSteps);
@@ -1714,7 +1717,10 @@ function _bckDrawRejectArc(fromStepId, toStepId) {
   var lz   = _bckEl('bck-lz');
   var from = document.getElementById('bck-n-'+fromStepId);
   var to   = document.getElementById('bck-n-'+toStepId);
-  if (!svg || !lz || !from || !to) return;
+  console.log('[arc]', fromStepId, '->', toStepId, 'svg:', !!svg, 'lz:', !!lz, 'from:', !!from, 'to:', !!to);
+  if (!svg || !lz || !from || !to) { console.warn('[arc] ABORT — missing element'); return; }
+  var lzRect = lz.getBoundingClientRect();
+  console.log('[arc] lzRect:', lzRect.width, lzRect.height, 'top:', lzRect.top);
 
   var lzRect   = lz.getBoundingClientRect();
   var fromRect = from.getBoundingClientRect();
