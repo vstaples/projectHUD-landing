@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-250000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-260000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1297,8 +1297,13 @@ window._mwLoadUserView = async function() {
               // Refresh My Requests after step change.
               // 2s delay lets approve.html writes commit. Also clear CoC cache
               // so render uses fresh current_step_name, not stale cached CoC.
+              const _changedIds = stepChanged.map(i => i.id);
               setTimeout(() => {
-                window._myRequestCoc   = {};
+                // Only clear CoC cache for changed instances — not the entire cache.
+                // Clearing the full cache breaks the re-fetch debounce loop guard.
+                if (window._myRequestCoc) {
+                  _changedIds.forEach(id => { delete window._myRequestCoc[id]; });
+                }
                 window._requestsLoaded = false;
                 window.loadUserRequests && window.loadUserRequests();
               }, 2000);

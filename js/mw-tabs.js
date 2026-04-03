@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-330000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-340000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1135,7 +1135,9 @@ window.loadUserRequests = async function() {
             r.steps?.[0]?.active !== true; // Submit not already showing as active
         });
         if (needsStepRebuild) {
-          // Rebuild steps array with correct CoC-derived activeIdx
+          // Rebuild steps array with correct CoC-derived activeIdx.
+          // Do NOT clear _myRequestCoc here — the fresh CoC data we just fetched
+          // is what drives the rebuild. Clearing it would break the debounce guard.
           window._requestsLoaded = false;
           window.loadUserRequests && window.loadUserRequests();
         } else {
@@ -1360,9 +1362,7 @@ function renderMyRequestsActive() {
       .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
     const isAwaitingResubmit = !instanceComplete &&
       lastLifecycleEv?.event_type === 'request.changes_requested';
-    if (isAwaitingResubmit) {
-      console.log('[MyRequests] isAwaitingResubmit=true (CoC-derived) for', req.id?.slice(0,8));
-    } else if (window._myrSubmitRefetchTs?.[req.id]) {
+    if (!isAwaitingResubmit && window._myrSubmitRefetchTs?.[req.id]) {
       // Instance is no longer awaiting resubmit — clear debounce so future cycles work
       delete window._myrSubmitRefetchTs[req.id];
     }
