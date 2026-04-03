@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-260000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-270000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -987,9 +987,18 @@ window.loadUserRequests = async function() {
 
         // current_step_name is the ACTIVE step (what's happening now), not the completed one.
         // Steps before it are done; it is active; steps after are pending.
+        // Exception: if CoC shows changes_requested as most recent event, force Submit active.
+        const _rCoc = (window._myRequestCoc||{})[r.id] || [];
+        const _lastLifecycle = _rCoc
+          .filter(e => ['request.submitted','request.approved','request.changes_requested'].includes(e.event_type))
+          .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
+        const _cocAwaitingResubmit = !isComplete &&
+          _lastLifecycle?.event_type === 'request.changes_requested';
         const activeIdx = isComplete
           ? stepLabels.length
-          : currentIdx >= 0 ? currentIdx : 1;
+          : _cocAwaitingResubmit
+            ? 0  // Force Submit as active step
+            : currentIdx >= 0 ? currentIdx : 1;
         const steps = stepLabels.map((label, i) => ({
           label,
           done:   i < activeIdx,
