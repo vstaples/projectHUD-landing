@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-T','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-U','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1249,7 +1249,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-hcm{position:absolute;top:64%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px}
 .bck-hw{width:28px;height:1px;background:rgba(0,210,255,.28)}
 .bck-hd{width:5px;height:5px;border-radius:50%;border:1px solid rgba(0,210,255,.42)}
-.bck-hr{position:absolute;right:310px;top:10%;font-size:12px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;text-align:right;white-space:pre}
+.bck-hr{position:absolute;right:315px;top:10%;font-size:12px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;text-align:right;white-space:pre}
 .bck-hl{position:absolute;left:8%;top:16%;font-size:12px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;white-space:pre}
 .bck-pf{position:absolute;inset:0;background:rgba(2,7,15,.92);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 60px}
 .bck-pftitle{font-size:12px;letter-spacing:.2em;color:rgba(0,210,255,.5);text-transform:uppercase;margin-bottom:12px}
@@ -1291,7 +1291,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-cw.ac{background:rgba(239,159,39,.4);animation:bckPw .9s ease-in-out infinite}
 @keyframes bckPw{0%,100%{opacity:.4}50%{opacity:1}}
 .bck-lz{position:absolute;left:52px;right:52px;z-index:5;pointer-events:none;overflow:visible}
-.bck-coc{position:absolute;right:0;top:26px;bottom:0;width:300px;background:rgba(2,5,12,.97);border-left:1px solid rgba(0,210,255,.12);border-top:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;z-index:15}
+.bck-coc{position:absolute;right:0;top:26px;bottom:54px;width:300px;background:rgba(2,5,12,.97);border-left:1px solid rgba(0,210,255,.12);border-top:1px solid rgba(0,210,255,.08);border-bottom:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;z-index:15}
 .bck-coch{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .bck-coct{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:rgba(0,210,255,.8)}
 .bck-cocc{font-size:12px;font-family:monospace;color:rgba(0,210,255,.9)}
@@ -1306,7 +1306,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-ced{font-size:12px;color:rgba(255,255,255,.65);line-height:1.5;margin-top:1px}
 .bck-cts{font-size:12px;font-family:monospace;color:rgba(0,210,255,.45);margin-top:1px}
 .bck-coam{background:linear-gradient(180deg,#0e0902,#0a0701);border-top:2px solid #1e1408;padding:5px 0 4px;flex-shrink:0}
-.bck-efrow{display:flex;padding:0 10px;margin-right:300px}
+.bck-efrow{display:flex;padding:0 10px;margin-right:304px}
 .bck-ef{flex:1;padding:3px 7px;border-right:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;gap:2px}
 .bck-ef:last-child{border-right:none}
 .bck-eflbl{font-size:12px;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,160,50,.75)}
@@ -1316,12 +1316,12 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-effill{height:100%;border-radius:1px;transition:width .5s ease}
 .bck-efsub{font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.45)}
 .bck-radio{background:#040b17;border-top:1px solid rgba(0,210,255,.08);flex-shrink:0;position:relative}.bck-radio-handle{position:absolute;top:-4px;left:0;right:300px;height:8px;cursor:ns-resize;z-index:20;display:flex;align-items:center;justify-content:center}.bck-radio-handle::after{content:"";display:block;width:40px;height:3px;border-radius:2px;background:rgba(0,210,255,.35);transition:background .15s}.bck-radio-handle:hover::after{background:rgba(0,210,255,.75)}
-.bck-rh{display:flex;align-items:center;gap:10px;padding:4px 14px;border-bottom:1px solid rgba(255,255,255,.04);margin-right:300px}
+.bck-rh{display:flex;align-items:center;gap:10px;padding:4px 14px;border-bottom:1px solid rgba(255,255,255,.04);margin-right:304px}
 .bck-rt{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(0,210,255,.35)}
 .bck-rdot{width:5px;height:5px;border-radius:50%;background:rgba(0,210,255,.15)}
 .bck-rdot.live{background:#00D2FF;box-shadow:0 0 5px #00D2FF;animation:bckBk .8s ease-in-out infinite}
 @keyframes bckBk{0%,100%{opacity:1}50%{opacity:.25}}
-.bck-rf{height:90px;overflow-y:auto;padding:4px 14px;display:flex;flex-direction:column-reverse;margin-right:300px}
+.bck-rf{height:90px;overflow-y:auto;padding:4px 14px;display:flex;flex-direction:column-reverse;margin-right:304px}
 .bck-rf::-webkit-scrollbar{width:2px}
 .bck-rf::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
 .bck-tx{display:flex;align-items:flex-start;gap:8px;padding:2px 0;animation:bckTxi .2s ease-out}
