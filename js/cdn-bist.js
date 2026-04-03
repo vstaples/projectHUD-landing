@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AU','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AV','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -196,6 +196,11 @@ async function runBistScript(scriptId, onProgress) {
         const actor = _bistResolveActor(stp.params?.actor);
         const routeSeq  = stp.params?.route_to_seq;
         const routeStep = routeSeq ? stepBySeq[routeSeq] : null;
+        // If routing backward, signal arc draw
+        if (routeSeq && routeSeq < seq) {
+          onProgress?.({ type:'step_route_back', fromStepId: stp.id, toSeq: routeSeq,
+            toStepId: routeStep?.id || null });
+        }
         // Write step_completed
         await API.post('workflow_step_instances', {
           instance_id: instId, firm_id: FIRM_ID_CAD,
@@ -1649,6 +1654,7 @@ function _bistCkBeginTest(ti, name) {
   _bckSimLog.push({ts:Date.now(),kind:'begintest',testIdx:ti,name:name});
   _bckLastDoneId = null;
   _bckCurrentTestIdx = ti;
+  window._bckPendingArcFrom = null;
 }
 
 function _bistCkEndTest(ti, status) {
@@ -1681,14 +1687,27 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     var ef1 = _bckEl('bck-ef1'); if (ef1) ef1.textContent = _bckSC;
     var ef1b = _bckEl('bck-ef1b'); if (ef1b) ef1b.style.width = Math.min(100,_bckSC*4)+'%';
     // If node already exists, this is a reset — draw rejection arc
-    if (_bckLastDoneId && document.getElementById('bck-n-'+ev.stepId)) {
-      console.log('[arc trigger] reset detected, from:', _bckLastDoneId, 'to:', ev.stepId);
-      setTimeout(function(from,to){_bckDrawRejectArc(from,to);}  .bind(null,_bckLastDoneId,ev.stepId), 80);
-    } else {
-      console.log('[arc] no reset: lastDone=', _bckLastDoneId, 'cardExists=', !!document.getElementById('bck-n-'+ev.stepId));
-    }
+
     // Activate node in DAG
     _bistCkSetNode(ev.stepId, idx, test, 'active', 'In progress', tmplSteps);
+    // Draw pending arc to this newly created card
+    if (window._bckPendingArcFrom) {
+      var _paf = window._bckPendingArcFrom;
+      window._bckPendingArcFrom = null;
+      setTimeout(function(){ _bckDrawRejectArc(_paf, ev.stepId); }, 60);
+    }
+  } else if (type === 'step_route_back') {
+    // Draw rejection arc from fromStep card to toStep card
+    var fromCard = document.getElementById('bck-n-'+ev.fromStepId);
+    var toCard   = ev.toStepId ? document.getElementById('bck-n-'+ev.toStepId) : null;
+    console.log('[arc] route_back from', ev.fromStepId, 'to', ev.toStepId, 'fromCard:', !!fromCard, 'toCard:', !!toCard);
+    if (fromCard && toCard) {
+      _bckDrawRejectArc(ev.fromStepId, ev.toStepId);
+    } else if (fromCard) {
+      // toCard may not be rendered yet — it's the target step's first card
+      // Draw arc from fromCard to the next card created
+      window._bckPendingArcFrom = ev.fromStepId;
+    }
   } else if (type === 'step_pass') {
     var idx = ev.stepIdx || 0;
     _bistCkSetNode(ev.stepId, idx, test, 'done', ev.outcome || 'Done', tmplSteps);
@@ -1717,10 +1736,8 @@ function _bckDrawRejectArc(fromStepId, toStepId) {
   var lz   = _bckEl('bck-lz');
   var from = document.getElementById('bck-n-'+fromStepId);
   var to   = document.getElementById('bck-n-'+toStepId);
-  console.log('[arc]', fromStepId, '->', toStepId, 'svg:', !!svg, 'lz:', !!lz, 'from:', !!from, 'to:', !!to);
-  if (!svg || !lz || !from || !to) { console.warn('[arc] ABORT — missing element'); return; }
+  if (!svg || !lz || !from || !to) return;
   var lzRect = lz.getBoundingClientRect();
-  console.log('[arc] lzRect:', lzRect.width, lzRect.height, 'top:', lzRect.top);
 
   var lzRect   = lz.getBoundingClientRect();
   var fromRect = from.getBoundingClientRect();

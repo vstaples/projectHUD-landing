@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CadenceHUD · S9.9</title>
+<title>CadenceHUD · S9.10</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -89,7 +89,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
   border-bottom:1px solid var(--border);
   display:flex;align-items:stretch;padding:0 20px;gap:0;
 }
-.subnav-item{
+.subnav-item{color:rgba(255,255,255,.55);
   font-size:14px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-family:Arial,sans-serif;
   color:var(--text);padding:0 16px;
   border-bottom:2px solid transparent;margin-bottom:-1px;
@@ -608,12 +608,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 
 /* Per-tab accent colours */
 .subnav-item.s9-lib.active  {color:#7F77DD;border-bottom-color:#7F77DD}
-.subnav-item.s9-sim.active  {color:#4A9ECC;border-bottom-color:#4A9ECC}
-.subnav-item.s9-inst.active {color:#378ADD;border-bottom-color:#378ADD}
+.subnav-item.s9-sim.active  {color:#7F77DD;border-bottom-color:#7F77DD}
+.subnav-item.s9-inst.active {color:#7F77DD;border-bottom-color:#7F77DD}
 
 .subnav-item.s9-lib.active .s9-badge-lib   {background:rgba(127,119,221,.18);color:#7F77DD}
-.subnav-item.s9-sim.active .s9-badge-sim   {background:rgba(74,158,204,.15);color:#4A9ECC}
-.subnav-item.s9-inst.active .s9-badge-inst {background:rgba(55,138,221,.15);color:#378ADD}
+.subnav-item.s9-sim.active .s9-badge-sim   {background:rgba(127,119,221,.18);color:#7F77DD}
+.subnav-item.s9-inst.active .s9-badge-inst {background:rgba(127,119,221,.18);color:#7F77DD}
 
 /* Library filter pills — right-aligned in subnav */
 .s9-lib-filters{
@@ -723,8 +723,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 /* Tab accent overrides */
 .subnav-item.active.s9-lib{color:#7c4dff;border-bottom-color:#7c4dff}
 .subnav-item.active.s9-lib .subnav-badge{background:rgba(124,77,255,.15);color:#7c4dff}
-.subnav-item.active.s9-sim{color:#4A9ECC;border-bottom-color:#4A9ECC}
-.subnav-item.active.s9-sim .subnav-badge{background:rgba(74,158,204,.15);color:#4A9ECC}
+.subnav-item.active.s9-sim{color:#7F77DD;border-bottom-color:#7F77DD}
+.subnav-item.active.s9-sim .subnav-badge{background:rgba(127,119,221,.18);color:#7F77DD}
 .subnav-item.active.s9-inst{color:var(--accent);border-bottom-color:var(--accent)}
 .subnav-item.active.s9-inst .subnav-badge{background:rgba(79,142,247,.15);color:var(--accent)}
 
@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.8 — Library · Simulator · Instances','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.10 — Library · Simulator · Instances','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1523,7 +1523,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-documents.js?v=20260403-S9"></script>
 <script src="/js/cdn-dag-viewer.js?v=20260403-S9"></script>
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
-<script src="/js/cdn-bist.js?v=20260404-AU"></script>
+<script src="/js/cdn-bist.js?v=20260404-AV"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
