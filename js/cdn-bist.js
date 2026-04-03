@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-K','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-L','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1240,7 +1240,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-hband{position:absolute;left:0;right:0;top:64%;height:3px;background:linear-gradient(90deg,transparent,rgba(180,220,255,.08) 15%,rgba(220,240,255,.3) 40%,rgba(255,255,255,.42) 50%,rgba(220,240,255,.3) 60%,rgba(180,220,255,.08) 85%,transparent)}
 .bck-wfl{position:absolute;left:0;top:0;bottom:0;width:52px;background:linear-gradient(90deg,#0d0903 30%,transparent);z-index:8;pointer-events:none}
 .bck-wfr{position:absolute;right:0;top:0;bottom:0;width:52px;background:linear-gradient(270deg,#0d0903 30%,transparent);z-index:8;pointer-events:none}
-.bck-wfp{position:absolute;left:50%;top:0;bottom:0;width:9px;background:#0b0703;transform:translateX(-50%);z-index:8;border-left:1px solid #1a1208;border-right:1px solid #1a1208}
+
 .bck-wft{position:absolute;top:0;left:0;right:0;height:18px;background:linear-gradient(180deg,#0d0903,transparent);z-index:8;pointer-events:none}
 .bck-wfb{position:absolute;bottom:0;left:0;right:0;height:16px;background:linear-gradient(0deg,#02070f,transparent);z-index:8;pointer-events:none}
 .bck-hud{position:absolute;inset:0;pointer-events:none;z-index:7}
@@ -1371,7 +1371,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
   </div>
   <div class="bck-ws" id="bck-ws">
     <div class="bck-sky"><div class="bck-stars" id="bck-stars"></div><div class="bck-earth"><div class="bck-eglow"></div><div class="bck-cities" id="bck-cities"></div></div><div class="bck-hband"></div></div>
-    <div class="bck-wfl"></div><div class="bck-wfr"></div><div class="bck-wfp"></div><div class="bck-wft"></div><div class="bck-wfb"></div>
+    <div class="bck-wfl"></div><div class="bck-wfr"></div><div class="bck-wft"></div><div class="bck-wfb"></div>
     <div class="bck-hud"><div class="bck-hhl"></div><div class="bck-hcm"><div class="bck-hw"></div><div class="bck-hd"></div><div class="bck-hw"></div></div>
       <div class="bck-hr" id="bck-hr">ALT  28,400\nCAS  280 KT\nHDG  270°</div>
       <div class="bck-hl" id="bck-hl">MODE NORM\nA/P  OFF\nSIM  READY</div>
