@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AA','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AD','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -95,6 +95,7 @@ function _bistAssert(assert, state) {
 // Freeze-aware wait — polls every 200ms while _bckFrozen is true
 async function _bckFreezeWait() {
   while (window._bckFrozen) {
+    if (window._bckCockpitClosed) return;
     await new Promise(r => setTimeout(r, 200));
   }
 }
@@ -1057,6 +1058,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   // Close any existing gate overlay
   document.getElementById('bist-gate-overlay')?.remove();
   document.getElementById('bist-cockpit-overlay')?.remove();
+  window._bckCockpitClosed = false;  // reset for this run
 
   // Load scripts + template metadata
   const [scripts, tmplArr] = await Promise.all([
@@ -1130,6 +1132,11 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   ov.innerHTML = _bistCockpitHTML(tmplName, version, TESTS);
 
   const _restoreSimPanel = () => {
+    // Reset freeze state so the run loop exits cleanly
+    window._bckCockpitClosed = true;
+    window._bckFrozen = false;
+    _bistCkStopClock();
+    window._bistCkRunning = false;
     if (simPanel && typeof _s9RenderSimPanel === 'function') {
       _s9RenderSimPanel(simPanel);
     } else if (!simPanel) {
@@ -1170,6 +1177,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
 
     // ── FREEZE: spin-wait between scripts until resumed ──────────────────────
     while (_bckFrozen) {
+      if (window._bckCockpitClosed) break;
       await new Promise(r => setTimeout(r, 200));
       if (!document.getElementById('s9-sim-right') && !document.getElementById('s9-sim-panel')) break;
     }
@@ -1189,6 +1197,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     // ── FREEZE: also pause between scripts after completion ──────────────────
     await new Promise(r => setTimeout(r, 400));
     while (_bckFrozen) {
+      if (window._bckCockpitClosed) break;
       await new Promise(r => setTimeout(r, 200));
       if (!document.getElementById('s9-sim-right') && !document.getElementById('s9-sim-panel')) break;
     }
@@ -1199,7 +1208,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   var rb = _bckEl('bck-replay-btn'); if (rb) rb.style.display = 'inline-block';
   var fb = _bckEl('bck-freeze-btn'); if (fb) fb.style.display = 'inline-block';
 
-  const allPass = allResults.every(r => r.status === 'passed');
+  const allPass = allResults.length > 0 && allResults.every(r => r.status === 'passed');
   const elapsed = Math.round((Date.now() - startMs) / 1000);
 
   if (allPass) {
@@ -1443,7 +1452,17 @@ var _bckFrozenAt = null;
 var _bckStartMs = null;
 
 function _bckEl(id) { return document.getElementById(id); }
-function _bckSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function _bckSleep(ms) {
+  return new Promise(function(resolve) {
+    setTimeout(function check() {
+      if (window._bckFrozen) {
+        setTimeout(check, 100);  // poll while frozen
+      } else {
+        resolve();
+      }
+    }, ms);
+  });
+}
 
 function _bckInitRadioResize() {
   var handle = _bckEl('bck-radio-handle');
@@ -1600,6 +1619,7 @@ function _bistCkBeginTest(ti, name) {
   var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt';
   var de = _bckEl('bck-dend'); if (de) de.className = 'bck-de';
   var lsvg = _bckEl('bck-lsvg'); if (lsvg) lsvg.innerHTML = '';
+  _bckSimLog.push({ts:Date.now(),kind:'begintest',testIdx:ti,name:name});
 }
 
 function _bistCkEndTest(ti, status) {
@@ -1623,6 +1643,7 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt on';
     _bistCkAddCoc('#00D2FF','instance_launched','Template: '+_bistEscHtml(test.name));
     _bistCkRadio('crew','T'+(ti+1)+' ready. '+_bistEscHtml(test.name));
+    _bckSimLog.push({ts:Date.now(),kind:'trigger',testIdx:ti,state:'on'});
   } else if (type === 'step_start') {
     var idx = ev.stepIdx || 0;
     _bckSC++;
@@ -1645,6 +1666,7 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
   } else if (type === 'complete') {
     var de = _bckEl('bck-dend'); if (de) de.className = 'bck-de dn';
     _bistCkAddCoc('#4ade80','instance_completed','All steps complete · '+_bistEscHtml(test.name));
+    _bckSimLog.push({ts:Date.now(),kind:'endnode',testIdx:ti,state:'dn'});
   } else if (type === 'error') {
     _bistCkAddCoc('#E24B4A','error', _bistEscHtml(ev.message||'Unknown error'));
     _bistCkRadio('reject','TOWER: Error — '+_bistEscHtml((ev.message||'').slice(0,80)));
@@ -1674,6 +1696,11 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
   var col = {done:'#4ade80', active:'#EF9F27', reset:'#EF9F27'}[state] || '#888';
   var lbl2 = {done:label, active:'Active', reset:'Reset → '+label}[state] || label;
   nst.innerHTML = '<div class="bck-nsdot" style="background:'+col+'"></div><span class="bck-nstxt" style="color:'+col+'">'+_bistEscHtml(lbl2)+'</span>';
+  // Log node state for replay
+  _bckSimLog.push({ts: Date.now(), kind:'node', stepId:stepId, stepIdx:stepIdx,
+    state:state, label:lbl2, col:col, cls:cls[state]||'bck-nc',
+    actor:test.actors[stepIdx]||'?', aname:test.anames[stepIdx]||'',
+    nodeName:(test.nodes[stepIdx]||'Step')});
 }
 
 function _bistCkAddCoc(color, type, detail) {
@@ -1804,6 +1831,7 @@ function _bistCkShowCert(tmplName, version, results, elapsed, certId, onProceed)
 
 // ── Replay scrubber state ────────────────────────────────────────────────────
 window._bckFrozen = false;
+window._bckCockpitClosed = false;
 
 function _bckToggleFreeze() {
   window._bckFrozen = !window._bckFrozen;
@@ -1817,6 +1845,9 @@ function _bckToggleFreeze() {
     _bckFrozenAt = Date.now();
     if (_bckElTimer) { clearInterval(_bckElTimer); _bckElTimer = null; }
     if (_bckClockTimer) { clearInterval(_bckClockTimer); _bckClockTimer = null; }
+    // Glareshield annunciator
+    var ann = _bckEl('bck-ann');
+    if (ann) { ann.dataset.preFreeze = ann.textContent; ann.textContent = 'SIMULATION FROZEN'; ann.className = 'bck-ann'; }
   } else {
     btn.innerHTML = '&#10074;&#10074; FREEZE';
     btn.style.color = 'rgba(239,159,39,.7)';
@@ -1835,6 +1866,9 @@ function _bckToggleFreeze() {
         if (el) el.textContent = new Date().toTimeString().slice(0,8);
       }, 1000);
     }
+    // Restore annunciator
+    var ann = _bckEl('bck-ann');
+    if (ann && ann.dataset.preFreeze) { ann.textContent = ann.dataset.preFreeze; delete ann.dataset.preFreeze; }
   }
 }
 
@@ -1905,6 +1939,46 @@ function _bistCkReplay() {
   bck.appendChild(panel);
   _bckRpRender(_bckSimLog.length - 1);
 }
+
+
+  // Restore DAG node states up to idx
+  var nodesEl2 = _bckEl('bck-nodes');
+  if (nodesEl2) {
+    nodesEl2.innerHTML = '';
+    var dt2 = _bckEl('bck-dtrig'); if (dt2) dt2.className = 'bck-dt';
+    var de2 = _bckEl('bck-dend');  if (de2) de2.className = 'bck-de';
+    var lsvg2 = _bckEl('bck-lsvg'); if (lsvg2) lsvg2.innerHTML = '';
+
+    var trigEntry = null, endEntry = null, nodeStates = {};
+    for (var rk = 0; rk <= idx; rk++) {
+      var re = log[rk];
+      if (re.kind === 'begintest') { nodeStates = {}; trigEntry = null; endEntry = null; }
+      if (re.kind === 'trigger')   trigEntry = re;
+      if (re.kind === 'endnode')   endEntry  = re;
+      if (re.kind === 'node')      nodeStates[re.stepId] = re;
+    }
+    if (trigEntry) { var dt3=_bckEl('bck-dtrig'); if(dt3) dt3.className='bck-dt on'; }
+    if (endEntry)  { var de3=_bckEl('bck-dend');  if(de3) de3.className='bck-de dn'; }
+
+    Object.keys(nodeStates).forEach(function(stepId) {
+      var n = nodeStates[stepId];
+      var nm = (n.nodeName||'Step').split('\n');
+      var card = document.createElement('div');
+      card.className = n.cls; card.id = 'bck-n-'+stepId;
+      card.innerHTML =
+        '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(n.actor)+'</div>'+
+        '<div class="bck-nan">'+_bistEscHtml(n.aname)+'</div></div>'+
+        '<div class="bck-nb"><div class="bck-ntitle">'+_bistEscHtml(nm[0])+
+        (nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+
+        '</div><div class="bck-nst" id="bck-nst-'+stepId+'">'+
+        '<div class="bck-nsdot" style="background:'+n.col+'"></div>'+
+        '<span class="bck-nstxt" style="color:'+n.col+'">'+_bistEscHtml(n.label)+'</span></div></div>';
+      if (nodesEl2.children.length > 0) {
+        var cw = document.createElement('div'); cw.className = 'bck-cw dn'; nodesEl2.appendChild(cw);
+      }
+      nodesEl2.appendChild(card);
+    });
+  }
 
 function _bckRpBtn(glyph, action, title) {
   return '<button onclick="'+action+'" title="'+title+'"'+
