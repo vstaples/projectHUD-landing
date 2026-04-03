@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-BB','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-BC','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -194,14 +194,17 @@ async function runBistScript(scriptId, onProgress) {
         const step  = stepBySeq[seq];
         if (!step) throw new Error(`No step at sequence ${seq}`);
         const actor = _bistResolveActor(stp.params?.actor);
-        const routeSeq  = stp.params?.route_to_seq;
+        const routeSeq  = stp.params?.route_to_seq != null ? Number(stp.params.route_to_seq) : null;
         const routeStep = routeSeq ? stepBySeq[routeSeq] : null;
-        // Only draw rejection arc if target card already exists (step was previously visited)
-        if (routeSeq && routeSeq < seq) {
-          const targetBistStep = spec.steps.find(s => s.params?.step_seq === routeSeq);
-          const targetCardExists = targetBistStep && !!document.getElementById('bck-n-'+targetBistStep.id);
+        const seqNum    = Number(seq);
+        console.log('[route] stp.id:', stp.id, 'seq:', seqNum, 'routeSeq:', routeSeq);
+        if (routeSeq && routeSeq < seqNum) {
+          const targetBistStep = spec.steps.find(s => Number(s.params?.step_seq) === routeSeq);
+          const targetCardId = targetBistStep ? 'bck-n-'+targetBistStep.id : null;
+          const targetCardExists = targetCardId && !!document.getElementById(targetCardId);
+          console.log('[route-back] from:', stp.id, 'to:', targetBistStep?.id, 'cardExists:', targetCardExists, 'cardId:', targetCardId);
           if (targetCardExists) {
-            onProgress?.({ type:'step_route_back', fromStepId: stp.id, toSeq: routeSeq,
+            onProgress?.({ type:'step_route_back', fromStepId: stp.id,
               toStepId: targetBistStep.id });
           }
         }
@@ -1655,6 +1658,7 @@ function _bistCkBeginTest(ti, name) {
   var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt';
   var de = _bckEl('bck-dend'); if (de) de.className = 'bck-de';
   var lsvg = _bckEl('bck-lsvg'); if (lsvg) lsvg.innerHTML = '';
+  window._bckArcs = []; _bckStopArcLoop();
   var arcSvg = document.getElementById('bck-arc-svg'); if (arcSvg) arcSvg.innerHTML = '';
   _bckSimLog.push({ts:Date.now(),kind:'begintest',testIdx:ti,name:name});
   _bckLastDoneId = null;
@@ -1706,11 +1710,10 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     var toCard   = ev.toStepId ? document.getElementById('bck-n-'+ev.toStepId) : null;
 
     if (fromCard && toCard) {
-      _bckDrawRejectArc(ev.fromStepId, ev.toStepId);
-    } else if (fromCard) {
-      // toCard may not be rendered yet — it's the target step's first card
-      // Draw arc from fromCard to the next card created
-      window._bckPendingArcFrom = ev.fromStepId;
+      // Register arc for live tracking
+      if (!window._bckArcs) window._bckArcs = [];
+      window._bckArcs.push({from: ev.fromStepId, to: ev.toStepId});
+      _bckStartArcLoop();
     }
   } else if (type === 'step_pass') {
     var idx = ev.stepIdx || 0;
@@ -1738,65 +1741,76 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
 }
 
 function _bckDrawRejectArc(fromStepId, toStepId) {
-  var ws   = _bckEl('bck-ws');
-  var from = document.getElementById('bck-n-'+fromStepId);
-  var to   = document.getElementById('bck-n-'+toStepId);
-  if (!ws || !from || !to) return;
+  if (!window._bckArcs) window._bckArcs = [];
+  window._bckArcs.push({from: fromStepId, to: toStepId});
+  _bckStartArcLoop();
+}
 
-  // Remove old arc SVG overlay if present, create fresh one over bck-ws
-  var arcSvgId = 'bck-arc-svg';
-  var arcSvg = document.getElementById(arcSvgId);
+var _bckArcRaf = null;
+
+function _bckStartArcLoop() {
+  if (_bckArcRaf) return;
+  function loop() {
+    _bckRedrawArcs();
+    _bckArcRaf = requestAnimationFrame(loop);
+  }
+  _bckArcRaf = requestAnimationFrame(loop);
+}
+
+function _bckStopArcLoop() {
+  if (_bckArcRaf) { cancelAnimationFrame(_bckArcRaf); _bckArcRaf = null; }
+}
+
+function _bckRedrawArcs() {
+  var ws = _bckEl('bck-ws');
+  if (!ws || !window._bckArcs || !window._bckArcs.length) return;
+
+  var arcSvg = document.getElementById('bck-arc-svg');
   if (!arcSvg) {
     arcSvg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-    arcSvg.id = arcSvgId;
+    arcSvg.id = 'bck-arc-svg';
     arcSvg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:10;overflow:visible';
     ws.appendChild(arcSvg);
   }
 
-  var wsRect   = ws.getBoundingClientRect();
-  var fromRect = from.getBoundingClientRect();
-  var toRect   = to.getBoundingClientRect();
+  arcSvg.innerHTML = '';
+  var wsRect = ws.getBoundingClientRect();
 
-  // Anchor points: bottom-center of each card, relative to bck-ws
-  var x1 = fromRect.left + fromRect.width/2  - wsRect.left;
-  var y1 = fromRect.bottom                   - wsRect.top;
-  var x2 = toRect.left   + toRect.width/2    - wsRect.left;
-  var y2 = toRect.bottom                     - wsRect.top;
+  window._bckArcs.forEach(function(arc) {
+    var fromEl = document.getElementById('bck-n-'+arc.from);
+    var toEl   = document.getElementById('bck-n-'+arc.to);
+    if (!fromEl || !toEl) return;
 
-  // Arc drops below card bottoms
-  var drop = 24 + Math.abs(x1-x2) * 0.08;
-  var mx = (x1+x2)/2;
-  var my = Math.max(y1,y2) + drop;
+    var fR = fromEl.getBoundingClientRect();
+    var tR = toEl.getBoundingClientRect();
 
-  var path = document.createElementNS('http://www.w3.org/2000/svg','path');
-  path.setAttribute('d', 'M '+x1+' '+y1+' Q '+mx+' '+my+' '+x2+' '+y2);
-  path.setAttribute('fill','none');
-  path.setAttribute('stroke','#E24B4A');
-  path.setAttribute('stroke-width','2');
-  path.setAttribute('stroke-dasharray','5 3');
-  path.setAttribute('opacity','0.85');
+    var x1 = fR.left + fR.width/2  - wsRect.left;
+    var y1 = fR.bottom              - wsRect.top;
+    var x2 = tR.left + tR.width/2  - wsRect.left;
+    var y2 = tR.bottom              - wsRect.top;
+    var drop = 18 + Math.abs(x1-x2) * 0.06;
+    var mx = (x1+x2)/2, my = Math.max(y1,y2) + drop;
 
-  // Animated dash
-  var anim = document.createElementNS('http://www.w3.org/2000/svg','animate');
-  anim.setAttribute('attributeName','stroke-dashoffset');
-  anim.setAttribute('from','0'); anim.setAttribute('to','-16');
-  anim.setAttribute('dur','0.7s'); anim.setAttribute('repeatCount','indefinite');
-  path.appendChild(anim);
+    var path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d','M '+x1+' '+y1+' Q '+mx+' '+my+' '+x2+' '+y2);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke','#E24B4A');
+    path.setAttribute('stroke-width','2');
+    path.setAttribute('stroke-dasharray','5 3');
+    path.setAttribute('opacity','0.85');
+    arcSvg.appendChild(path);
 
-  // Arrowhead into (x2,y2) along tangent from (mx,my)
-  var angle = Math.atan2(y2-my, x2-mx);
-  var ah = 9;
-  var arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
-  arrow.setAttribute('points',
-    x2+','+y2+' '+
-    (x2-ah*Math.cos(angle-0.4))+','+(y2-ah*Math.sin(angle-0.4))+' '+
-    (x2-ah*Math.cos(angle+0.4))+','+(y2-ah*Math.sin(angle+0.4))
-  );
-  arrow.setAttribute('fill','#E24B4A');
-  arrow.setAttribute('opacity','0.85');
-
-  arcSvg.appendChild(path);
-  arcSvg.appendChild(arrow);
+    var angle = Math.atan2(y2-my, x2-mx);
+    var ah = 9;
+    var arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    arrow.setAttribute('points',
+      x2+','+y2+' '+
+      (x2-ah*Math.cos(angle-0.4))+','+(y2-ah*Math.sin(angle-0.4))+' '+
+      (x2-ah*Math.cos(angle+0.4))+','+(y2-ah*Math.sin(angle+0.4)));
+    arrow.setAttribute('fill','#E24B4A');
+    arrow.setAttribute('opacity','0.85');
+    arcSvg.appendChild(arrow);
+  });
 }
 
 function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
