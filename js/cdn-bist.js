@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AG','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AI','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -122,6 +122,7 @@ async function runBistScript(scriptId, onProgress) {
     run_at:           new Date().toISOString(),
   });
   const runId      = runRows?.[0]?.id;
+  window._bckCurrentRunId = runId;
   let   instId     = null;
   let   stepsPassed = 0;
 
@@ -1137,8 +1138,20 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     window._bckFrozen = false;
     _bistCkStopClock();
     window._bistCkRunning = false;
+    // Patch any in-flight bist_run to aborted
+    if (window._bckCurrentRunId) {
+      API.patch('bist_runs?id=eq.'+window._bckCurrentRunId,
+        {status:'aborted', duration_ms: Date.now() - (window._bckStartMs||Date.now())}
+      ).catch(function(){});
+      window._bckCurrentRunId = null;
+    }
     if (simPanel && typeof _s9RenderSimPanel === 'function') {
       _s9RenderSimPanel(simPanel);
+      // Refresh gate status after abort
+      var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+      if (tmpl && tmpl.id && typeof _s9LoadSimScripts === 'function') {
+        setTimeout(function(){ _s9LoadSimScripts(tmpl.id, tmpl.version||'0.0.0'); }, 500);
+      }
     } else if (!simPanel) {
       ov.remove();
     }
@@ -1186,6 +1199,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     const t = TESTS[ti];
     _bistCkBeginTest(ti, t.name);
 
+    window._bckCurrentRunId = null;
     const result = await runBistScript(t.id, (ev) => {
       if (!document.getElementById('s9-sim-right') && !document.getElementById('s9-sim-panel') && !document.getElementById('bist-cockpit-overlay')) return;
       _bistCkOnProgress(ti, t, ev, tmplSteps);
@@ -1642,8 +1656,10 @@ function _bistCkEndTest(ti, status) {
 }
 
 function _bistCkOnProgress(ti, test, ev, tmplSteps) {
-  if (window._bckFrozen) return;  // FREEZE active — suppress visual updates
   var type = ev.type;
+  // FREEZE: allow node card creation (step_start) through so DAG stays visible,
+  // but block CoC writes and radio messages
+  if (window._bckFrozen && type !== 'step_start') return;
   if (type === 'instance_created') {
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt on';
     _bistCkAddCoc('#00D2FF','instance_launched','Template: '+_bistEscHtml(test.name));
@@ -2019,7 +2035,6 @@ function _bistCkReplay() {
 
     var trigEntry = null, endEntry = null;
     var nodeOrder = [];   // ordered list of stepIds (first appearance)
-    console.log('[replay] idx:', idx, 'total log:', log.length, 'kinds:', log.slice(0,idx+1).map(function(e){return e.kind;}).join(','));
     var nodeStates = {};  // latest state per stepId
     for (var rk = 0; rk <= idx; rk++) {
       var re = log[rk];
@@ -2036,7 +2051,6 @@ function _bistCkReplay() {
     if (trigEntry) { var dt3=_bckEl('bck-dtrig'); if(dt3) dt3.className='bck-dt on'; }
     if (endEntry)  { var de3=_bckEl('bck-dend');  if(de3) de3.className='bck-de dn'; }
 
-    console.log('[replay] nodeOrder:', nodeOrder.length, 'nodeStates:', Object.keys(nodeStates).length);
     nodeOrder.forEach(function(stepId) {
       var n = nodeStates[stepId];
       var nm = (n.nodeName||'Step').split('\n');
