@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CadenceHUD · S9.2</title>
+<title>CadenceHUD · S9.3</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -654,7 +654,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 
 /* Type badges shown on list items (workflow=purple, form=teal) */
 .s9-type-badge{
-  font-size:10px;padding:1px 6px;border-radius:3px;
+  font-size:12px;padding:1px 6px;border-radius:3px;
   font-family:Arial,sans-serif;letter-spacing:.03em;
   display:inline-flex;align-items:center;gap:3px;
   flex-shrink:0;
@@ -682,7 +682,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
   color:#2ab889;display:flex;align-items:center;gap:5px;
   font-family:Arial,sans-serif;
 }
-.s9-sim-source-type{font-size:10px;opacity:.65}
+.s9-sim-source-type{font-family:Arial,sans-serif;font-size:12px;opacity:.7}
 .s9-sim-switch-btn{
   font-size:11px;color:var(--text2);background:none;border:none;
   cursor:pointer;padding:0;text-decoration:underline;
@@ -690,7 +690,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 }
 .s9-sim-switch-btn:hover{color:var(--text)}
 .s9-sim-gate-status{
-  margin-left:auto;font-size:11px;
+  margin-left:auto;font-family:Arial,sans-serif;font-size:12px;
   display:flex;align-items:center;gap:5px;
 }
 .s9-gate-pass{color:var(--green)}
@@ -737,7 +737,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 }
 .s9-lib-filters.visible{display:flex}
 .s9-filter-pill{
-  font-size:12px;font-weight:500;letter-spacing:.04em;font-family:Arial,sans-serif;
+  font-family:Arial,sans-serif;font-size:12px;font-weight:500;letter-spacing:.04em;
   padding:3px 12px;border-radius:12px;cursor:pointer;
   border:1px solid var(--border);color:var(--text2);background:transparent;
   transition:all .15s;
@@ -752,7 +752,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 
 /* Type badge used in list items on Library tab */
 .s9-type-badge{
-  font-size:10px;padding:1px 6px;border-radius:3px;letter-spacing:.04em;
+  font-size:12px;padding:1px 6px;border-radius:3px;letter-spacing:.04em;
   font-family:Arial,sans-serif;font-weight:600;flex-shrink:0;
 }
 .s9-type-wf{background:rgba(124,77,255,.15);color:#a585ff}
@@ -776,7 +776,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
   background:var(--surf2);border:1px solid var(--border);border-radius:5px;
   padding:8px 14px;font-size:12px;color:var(--text1);
 }
-.s9-sim-source-label{color:var(--muted);font-size:11px}
+.s9-sim-source-label{font-family:Arial,sans-serif;color:var(--muted);font-size:12px}
 .s9-launch-btn{
   font-size:13px;font-weight:600;letter-spacing:.06em;font-family:Arial,sans-serif;
   padding:9px 22px;border-radius:5px;border:none;cursor:pointer;
@@ -796,12 +796,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 }
 .s9-sim-metric:last-child{border-right:none}
 .s9-sm-val{font-size:18px;font-weight:600;font-family:Arial,sans-serif;color:var(--text)}
-.s9-sm-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.s9-sm-lbl{font-family:Arial,sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 
 /* Script list in Simulator left rail */
 .s9-script-item{
   padding:7px 10px;border-radius:4px;border:1px solid var(--border);
-  font-size:12px;color:var(--text2);cursor:pointer;
+  font-family:Arial,sans-serif;font-size:12px;color:var(--text2);cursor:pointer;
   display:flex;align-items:center;gap:8px;margin-bottom:4px;
   transition:all .15s;
 }
@@ -814,7 +814,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 /* Release gate indicator in Simulator */
 .s9-gate-badge{
   display:inline-flex;align-items:center;gap:5px;
-  font-size:11px;padding:3px 10px;border-radius:12px;
+  font-size:12px;padding:3px 10px;border-radius:12px;
   font-weight:500;font-family:Arial,sans-serif;
 }
 .s9-gate-pass{background:rgba(42,157,64,.12);border:1px solid rgba(42,157,64,.3);color:var(--green)}
@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.2 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.3 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1108,116 +1108,103 @@ function _s9RouteSim() {
 function _s9RenderSimPanel(el) {
   var hasSource = !!_s9SimSourceName;
   var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+  var FA = 'font-family:Arial,sans-serif;';
+  var F12 = FA + 'font-size:12px;';
+  var F13 = FA + 'font-size:13px;';
+  var F14 = FA + 'font-size:14px;';
 
   el.innerHTML =
     '<div style="position:absolute;inset:0;display:flex;overflow:hidden">' +
 
-      // Left rail: test scripts
+      // Left rail
       '<div style="width:240px;flex-shrink:0;border-right:1px solid var(--border);' +
         'display:flex;flex-direction:column;background:var(--bg1)">' +
         '<div style="padding:12px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0">' +
-          '<div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;' +
-            'color:var(--text);font-family:Arial,sans-serif">Simulator</div>' +
+          '<div style="' + F13 + 'font-weight:600;letter-spacing:.06em;' +
+            'text-transform:uppercase;color:var(--text)">Simulator</div>' +
           (hasSource
-            ? '<div style="font-size:11px;color:var(--muted);margin-top:3px;font-family:Arial,sans-serif">' +
+            ? '<div style="' + F12 + 'color:var(--muted);margin-top:3px">' +
                 (_s9SimSourceType === 'form' ? 'Form' : 'Workflow') + ' · ' +
                 _s9EscHtml(_s9SimSourceName) +
-                (_s9SimSourceVer ? ' <span style="font-family:monospace;font-size:10px">v' + _s9EscHtml(_s9SimSourceVer) + '</span>' : '') +
+                (_s9SimSourceVer
+                  ? ' <span style="' + FA + 'font-size:12px">v' + _s9EscHtml(_s9SimSourceVer) + '</span>'
+                  : '') +
               '</div>'
-            : '<div style="font-size:11px;color:var(--muted);margin-top:3px">No source selected</div>'
+            : '<div style="' + F12 + 'color:var(--muted);margin-top:3px">No source selected</div>'
           ) +
         '</div>' +
 
-        '<div style="flex:1;overflow-y:auto;padding:10px 10px 0">' +
-          '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;' +
+        '<div style="flex:1;overflow-y:auto;padding:10px">' +
+          '<div style="' + F12 + 'text-transform:uppercase;letter-spacing:.08em;' +
             'color:var(--muted);margin-bottom:6px">Test scripts</div>' +
           '<div id="s9-sim-scripts-list">' +
-            (hasSource && tmpl
-              ? '<div style="font-size:11px;color:var(--muted);font-family:Arial,sans-serif;padding:8px 0">' +
-                  'Loading scripts…</div>'
-              : '<div style="font-size:11px;color:var(--muted);font-family:Arial,sans-serif;padding:8px 0">' +
-                  'Select a source to view scripts</div>'
-            ) +
+            '<div style="' + F12 + 'color:var(--muted);padding:6px 0">' +
+              (hasSource && tmpl ? 'Loading scripts…' : 'Select a source to view scripts') +
+            '</div>' +
           '</div>' +
-
           (hasSource && tmpl
-            ? '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">' +
-                '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:5px">Release gate</div>' +
-                '<div id="s9-sim-gate" style="font-size:11px;color:var(--amber);' +
-                  'display:flex;align-items:center;gap:5px;font-family:Arial,sans-serif">' +
-                  '○ Checking…</div>' +
+            ? '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">' +
+                '<div style="' + F12 + 'text-transform:uppercase;letter-spacing:.08em;' +
+                  'color:var(--muted);margin-bottom:5px">Release gate</div>' +
+                '<div id="s9-sim-gate" style="' + F12 + 'color:var(--amber);' +
+                  'display:flex;align-items:center;gap:5px">○ Checking…</div>' +
               '</div>'
-            : ''
-          ) +
+            : '') +
         '</div>' +
       '</div>' +
 
-      // Right: launch area
+      // Right panel
       '<div style="flex:1;display:flex;flex-direction:column;align-items:center;' +
         'justify-content:center;gap:16px;padding:32px;background:var(--bg2)">' +
 
         (hasSource
-          ? // Source loaded — show metrics + launch button
-            '<div style="text-align:center;max-width:420px">' +
-              '<div style="font-size:13px;font-weight:600;color:var(--text);' +
-                'font-family:Arial,sans-serif;margin-bottom:4px">' +
+          ? '<div style="text-align:center;max-width:440px">' +
+              '<div style="' + F14 + 'font-weight:600;color:var(--text);margin-bottom:4px">' +
                 _s9EscHtml(_s9SimSourceName) + '</div>' +
-              '<div style="font-size:11px;color:var(--muted);font-family:Arial,sans-serif;margin-bottom:20px">' +
-                (_s9SimSourceType === 'form' ? 'Form lifecycle simulator' : 'Workflow flight simulator') + ' · ' +
+              '<div style="' + F12 + 'color:var(--muted);margin-bottom:20px">' +
+                (_s9SimSourceType === 'form' ? 'Form lifecycle simulator' : 'Workflow flight simulator') +
+                ' · ' +
                 (_s9SimSourceVer ? 'v' + _s9EscHtml(_s9SimSourceVer) : 'current draft') +
               '</div>' +
 
-              '<div id="s9-sim-metrics" style="display:flex;gap:8px;margin-bottom:20px;justify-content:center">' +
-                '<div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;' +
-                  'padding:10px 16px;text-align:center;min-width:72px">' +
-                  '<div style="font-size:18px;font-weight:600;font-family:Arial,sans-serif;color:var(--text)" id="s9-metric-tests">—</div>' +
-                  '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:2px">Tests</div>' +
-                '</div>' +
-                '<div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;' +
-                  'padding:10px 16px;text-align:center;min-width:72px">' +
-                  '<div style="font-size:18px;font-weight:600;font-family:Arial,sans-serif;color:var(--text)" id="s9-metric-steps">—</div>' +
-                  '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:2px">Steps</div>' +
-                '</div>' +
-                '<div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;' +
-                  'padding:10px 16px;text-align:center;min-width:72px">' +
-                  '<div style="font-size:18px;font-weight:600;font-family:Arial,sans-serif;color:var(--text)" id="s9-metric-last">—</div>' +
-                  '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:2px">Last run</div>' +
-                '</div>' +
+              '<div style="display:flex;gap:8px;margin-bottom:22px;justify-content:center">' +
+                _s9MetricCard('s9-metric-tests', '—', 'Tests') +
+                _s9MetricCard('s9-metric-steps', '—', 'Steps') +
+                _s9MetricCard('s9-metric-last',  '—', 'Last run') +
               '</div>' +
 
-              '<button onclick="_s9LaunchSimulator()" style="font-size:13px;font-weight:600;' +
+              '<button onclick="_s9LaunchSimulator()" style="' + F13 + 'font-weight:600;' +
                 'padding:10px 28px;border-radius:5px;border:none;cursor:pointer;' +
                 'background:#1D9E75;color:#fff;display:inline-flex;align-items:center;gap:8px;' +
-                'letter-spacing:.06em;font-family:Arial,sans-serif;transition:background .15s"' +
-                ' onmouseover="this.style.background=\'#23b88a\'" onmouseout="this.style.background=\'#1D9E75\'">' +
+                'letter-spacing:.04em"' +
+                ' onmouseover="this.style.background='#23b88a'"' +
+                ' onmouseout="this.style.background='#1D9E75'">' +
                 '▶ Launch flight simulator' +
               '</button>' +
-              '<div style="font-size:11px;color:var(--muted);margin-top:10px;font-family:Arial,sans-serif">' +
+              '<div style="' + F12 + 'color:var(--muted);margin-top:10px">' +
                 'Runs all test scripts · generates validation certificate' +
               '</div>' +
-
-              '<button onclick="_s9Switch(\'library\')" style="margin-top:8px;font-size:11px;' +
+              '<button onclick="_s9Switch('library')" style="margin-top:8px;' + F12 +
                 'padding:5px 12px;border-radius:3px;border:1px solid var(--border);' +
-                'background:none;color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">' +
+                'background:none;color:var(--muted);cursor:pointer">' +
                 'Switch source' +
               '</button>' +
             '</div>'
 
-          : // No source — prompt user
-            '<div style="text-align:center;max-width:360px">' +
+          : '<div style="text-align:center;max-width:360px">' +
               '<div style="width:52px;height:52px;border-radius:50%;margin:0 auto 14px;' +
                 'background:rgba(29,158,117,.1);border:1px solid rgba(29,158,117,.2);' +
-                'display:flex;align-items:center;justify-content:center;font-size:22px">▶</div>' +
-              '<div style="font-size:15px;font-weight:600;color:var(--text);' +
-                'font-family:Arial,sans-serif;margin-bottom:6px">Source-agnostic simulator</div>' +
-              '<div style="font-size:12px;color:var(--muted);line-height:1.7;font-family:Arial,sans-serif">' +
+                'display:flex;align-items:center;justify-content:center;' + FA + 'font-size:22px">▶</div>' +
+              '<div style="' + F14 + 'font-weight:600;color:var(--text);margin-bottom:8px">' +
+                'Source-agnostic simulator</div>' +
+              '<div style="' + F12 + 'color:var(--muted);line-height:1.7">' +
                 'Open any workflow or form in the Library,<br>then click ' +
                 '<strong style="color:var(--text)">▶ Simulate</strong> to run its test suite<br>' +
                 'in the flight simulator cockpit.' +
               '</div>' +
-              '<button onclick="_s9Switch(\'library\')" style="margin-top:18px;font-size:12px;' +
+              '<button onclick="_s9Switch('library')" style="margin-top:18px;' + F12 +
                 'padding:8px 20px;border-radius:5px;border:1px solid var(--border2);' +
-                'background:none;color:var(--text1);cursor:pointer;font-family:Arial,sans-serif">' +
+                'background:none;color:var(--text1);cursor:pointer">' +
                 'Go to Library' +
               '</button>' +
             '</div>'
@@ -1226,10 +1213,17 @@ function _s9RenderSimPanel(el) {
       '</div>' +
     '</div>';
 
-  // Async: load scripts and gate status if source is set
   if (hasSource && tmpl && tmpl.id) {
     _s9LoadSimScripts(tmpl.id, tmpl.version || '0.0.0');
   }
+}
+
+function _s9MetricCard(id, val, lbl) {
+  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;' +
+    'padding:10px 16px;text-align:center;min-width:72px">' +
+    '<div style="font-family:Arial,sans-serif;font-size:20px;font-weight:600;color:var(--text)" id="' + id + '">' + val + '</div>' +
+    '<div style="font-family:Arial,sans-serif;font-size:12px;color:var(--muted);margin-top:2px">' + lbl + '</div>' +
+    '</div>';
 }
 
 function _s9EscHtml(s) {
@@ -1239,99 +1233,103 @@ function _s9EscHtml(s) {
 
 async function _s9LoadSimScripts(templateId, version) {
   try {
-    var supaUrl = (typeof _mwSupaURL === 'function') ? _mwSupaURL()
-      : 'https://dvbetgdzksatcgdfftbs.supabase.co';
-    var supaKey = (typeof _mwSupaKey === 'function') ? _mwSupaKey()
-      : window.SUPA_KEY || '';
-    var firmId  = (typeof _mwFirmId === 'function') ? _mwFirmId()
-      : (window.FIRM_ID_CAD || window.FIRM_ID || '');
+    // Use API.get() — handles JWT auth, avoids 401 from raw fetch with anon key
+    // Use bare FIRM_ID_CAD global set by cdn-core-state.js
+    var firmId = (typeof FIRM_ID_CAD !== 'undefined' && FIRM_ID_CAD)
+      ? FIRM_ID_CAD
+      : ((typeof _mwFirmId === 'function') ? _mwFirmId() : '');
 
-    // Fetch scripts
-    var res = await fetch(
-      supaUrl + '/rest/v1/bist_test_scripts?firm_id=eq.' + firmId +
-        '&template_id=eq.' + templateId + '&order=created_at.asc',
-      { headers: { 'apikey': supaKey, 'Authorization': 'Bearer ' + supaKey } }
-    );
-    var scripts = await res.json();
+    if (!firmId) {
+      console.warn('[S9 Simulator] FIRM_ID_CAD not ready yet');
+      var listEl = document.getElementById('s9-sim-scripts-list');
+      if (listEl) listEl.innerHTML =
+        '<div style="font-family:Arial,sans-serif;font-size:12px;color:var(--muted);padding:6px 0">' +
+        'Loading… (waiting for auth)</div>';
+      return;
+    }
 
-    // Update script list
+    var scripts = await API.get(
+      'bist_test_scripts?firm_id=eq.' + firmId +
+      '&template_id=eq.' + templateId + '&order=created_at.asc'
+    ).catch(function() { return []; });
+
+    // Array.isArray guard — API may return error object on policy failure
+    if (!Array.isArray(scripts)) scripts = [];
+
     var listEl = document.getElementById('s9-sim-scripts-list');
     if (listEl) {
-      if (!scripts || !scripts.length) {
-        listEl.innerHTML = '<div style="font-size:11px;color:var(--muted);font-family:Arial,sans-serif;' +
-          'padding:8px 0;line-height:1.6">No test scripts found.<br>' +
-          '<span style="color:var(--text3)">Add scripts to bist_test_scripts<br>to enable the Simulator.</span></div>';
+      if (!scripts.length) {
+        listEl.innerHTML =
+          '<div style="font-family:Arial,sans-serif;font-size:12px;color:var(--muted);' +
+          'padding:6px 0;line-height:1.7">No test scripts found.<br>' +
+          '<span style="color:var(--text3)">Add scripts to <code>bist_test_scripts</code>' +
+          ' to enable the Simulator.</span></div>';
       } else {
         listEl.innerHTML = scripts.map(function(s) {
-          return '<div style="padding:6px 8px;border-radius:4px;border:1px solid var(--border);' +
-            'margin-bottom:4px;font-size:11px;color:var(--text2);font-family:Arial,sans-serif;' +
-            'display:flex;align-items:center;gap:7px">' +
-            '<div style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--border2)"></div>' +
+          return '<div style="padding:7px 9px;border-radius:4px;border:1px solid var(--border);' +
+            'margin-bottom:4px;font-family:Arial,sans-serif;font-size:12px;color:var(--text2);' +
+            'display:flex;align-items:center;gap:8px">' +
+            '<div style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--muted)"></div>' +
             _s9EscHtml(s.name) + '</div>';
         }).join('');
       }
 
-      // Update metrics
       var testsEl = document.getElementById('s9-metric-tests');
-      if (testsEl) testsEl.textContent = scripts ? scripts.length : 0;
+      if (testsEl) testsEl.textContent = scripts.length || '0';
 
-      // Count total steps across all scripts
       var stepCount = 0;
-      (scripts || []).forEach(function(s) {
+      scripts.forEach(function(s) {
         try {
           var spec = typeof s.script === 'string' ? JSON.parse(s.script) : s.script;
           stepCount += (spec && spec.steps) ? spec.steps.length : 0;
-        } catch(_) {}
+        } catch(_e) {}
       });
       var stepsEl = document.getElementById('s9-metric-steps');
       if (stepsEl) stepsEl.textContent = stepCount || '—';
     }
 
-    // Fetch last run
-    if (scripts && scripts.length) {
-      var ids = scripts.map(function(s) { return s.id; }).join(',');
-      var runRes = await fetch(
-        supaUrl + '/rest/v1/bist_runs?firm_id=eq.' + firmId +
-          '&script_id=in.(' + ids + ')&template_version=eq.' + encodeURIComponent(version) +
-          '&order=run_at.desc&limit=1',
-        { headers: { 'apikey': supaKey, 'Authorization': 'Bearer ' + supaKey } }
-      );
-      var runs = await runRes.json();
-      var lastRun = runs && runs[0];
-      var lastEl = document.getElementById('s9-metric-last');
-      if (lastEl) {
-        if (lastRun) {
-          var d = new Date(lastRun.run_at);
-          lastEl.textContent = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-          lastEl.style.color = lastRun.status === 'passed' ? 'var(--green)' : 'var(--red)';
-        } else {
-          lastEl.textContent = 'Never';
-        }
-      }
+    if (!scripts.length) return;
 
-      // Gate status
-      var allPass = runs && runs.length >= scripts.length &&
-        scripts.every(function(s) {
-          return runs.find(function(r) { return r.script_id === s.id && r.status === 'passed'; });
-        });
-      var gateEl = document.getElementById('s9-sim-gate');
-      if (gateEl) {
-        if (!runs || !runs.length) {
-          gateEl.innerHTML = '○ Not yet run against v' + _s9EscHtml(version);
-          gateEl.style.color = 'var(--amber)';
-        } else if (allPass) {
-          gateEl.innerHTML = '✓ All tests passing — cleared for release';
-          gateEl.style.color = 'var(--green)';
-        } else {
-          gateEl.innerHTML = '✕ Tests failing — fix before release';
-          gateEl.style.color = 'var(--red)';
-        }
+    var ids = scripts.map(function(s) { return s.id; }).join(',');
+    var runs = await API.get(
+      'bist_runs?firm_id=eq.' + firmId +
+      '&script_id=in.(' + ids + ')' +
+      '&template_version=eq.' + encodeURIComponent(version) +
+      '&order=run_at.desc&limit=20'
+    ).catch(function() { return []; });
+
+    if (!Array.isArray(runs)) runs = [];
+
+    var lastEl = document.getElementById('s9-metric-last');
+    if (lastEl && runs.length) {
+      lastEl.textContent = new Date(runs[0].run_at)
+        .toLocaleDateString('en-US', {month:'short', day:'numeric'});
+      lastEl.style.color = runs[0].status === 'passed' ? 'var(--green)' : 'var(--red)';
+    } else if (lastEl) {
+      lastEl.textContent = 'Never';
+    }
+
+    var allPass = scripts.every(function(s) {
+      return runs.find(function(r) { return r.script_id === s.id && r.status === 'passed'; });
+    });
+    var gateEl = document.getElementById('s9-sim-gate');
+    if (gateEl) {
+      if (!runs.length) {
+        gateEl.textContent = '○ Not yet run against v' + version;
+        gateEl.style.color = 'var(--amber)';
+      } else if (allPass) {
+        gateEl.textContent = '✓ All tests passing — cleared for release';
+        gateEl.style.color = 'var(--green)';
+      } else {
+        gateEl.textContent = '✕ Tests failing — fix before release';
+        gateEl.style.color = 'var(--red)';
       }
     }
   } catch(e) {
     console.warn('[S9 Simulator] Failed to load scripts:', e);
   }
 }
+
 
 function _s9LaunchSimulator() {
   var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
@@ -1364,7 +1362,7 @@ function _s9UpdateSimSourceBar() {
       '<div class="s9-sim-gate-status" id="s9-gate-status"></div>';
   } else {
     bar.innerHTML =
-      '<span style="font-size:11px;color:var(--text2);font-family:Arial,sans-serif">' +
+      '<span style="font-family:Arial,sans-serif;font-size:12px;color:var(--text2)">' +
         'No source selected — open a Library item and click ' +
         '<strong style="color:var(--text)">▶ Simulate</strong> to begin' +
       '</span>';
