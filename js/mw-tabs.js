@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-270000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-300000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -49,7 +49,7 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
         }).catch(()=>{});
         const base = (window.location.origin || 'https://projecthud.com') + '/approve.html';
         approveUrl = `${base}?token=${rawToken}`;
-        rejectUrl  = `${base}?token=${rawToken}&outcome=reject`;
+        rejectUrl  = null; // Single button — approve.html shows all options
       } catch(_) {}
     }
 
@@ -1122,22 +1122,36 @@ window.loadUserRequests = async function() {
         freshCoc[e.entity_id].push(e);
       });
       window._myRequestCoc = freshCoc;
-      // Only render from CoC poll if loadUserRequests isn't running
-      // and preserve expand state by merging DOM into persistent set first
       if (!window._requestsReloading) {
-        // Snapshot current DOM state into persistent sets before render wipes it
-        const _ae = document.getElementById('myr-active-content');
-        if (_ae) {
-          _ae.querySelectorAll('.myr-ar-body.open').forEach(b => {
-            const rid = b.closest('.myr-active-req')?.dataset.reqId;
-            if (rid) _myrExpandedIds.add(rid);
-          });
-          _ae.querySelectorAll('.myr-coc-events.open').forEach(c => {
-            const rid = c.closest('.myr-active-req')?.dataset.reqId;
-            if (rid) _myrCocOpenIds.add(rid);
-          });
+        // Check if any instance has changes_requested as most recent event.
+        // If so, reload loadUserRequests so steps array is rebuilt with correct activeIdx.
+        const needsStepRebuild = (window._myRequests||[]).some(r => {
+          const rCoc = (freshCoc||{})[r.id] || [];
+          const last = rCoc
+            .filter(e => ['request.submitted','request.approved','request.changes_requested'].includes(e.event_type))
+            .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
+          return last?.event_type === 'request.changes_requested' &&
+            r.steps?.[0]?.active !== true; // Submit not already showing as active
+        });
+        if (needsStepRebuild) {
+          // Rebuild steps array with correct CoC-derived activeIdx
+          window._requestsLoaded = false;
+          window.loadUserRequests && window.loadUserRequests();
+        } else {
+          // Normal CoC update — just re-render in place
+          const _ae = document.getElementById('myr-active-content');
+          if (_ae) {
+            _ae.querySelectorAll('.myr-ar-body.open').forEach(b => {
+              const rid = b.closest('.myr-active-req')?.dataset.reqId;
+              if (rid) _myrExpandedIds.add(rid);
+            });
+            _ae.querySelectorAll('.myr-coc-events.open').forEach(c => {
+              const rid = c.closest('.myr-active-req')?.dataset.reqId;
+              if (rid) _myrCocOpenIds.add(rid);
+            });
+          }
+          renderMyRequestsActive();
         }
-        renderMyRequestsActive();
       }
     }).catch(() => {});
   } else {
@@ -1678,9 +1692,12 @@ function renderMyRequestsActive() {
               const lifecycleEvts = instCoc.filter(e => e.event_type !== 'request.context_added');
               const commentEvts   = instCoc.filter(e => {
                 if (e.event_type === 'request.context_added') return true;
-                // Also show approval/review comments if they have content
-                if (e.event_type === 'request.approved' || e.event_type === 'request.changes_requested') {
-                  try { return !!(JSON.parse(e.event_notes||'{}').comments); } catch(_) { return false; }
+                // Include any lifecycle event that has a non-empty note or comments field
+                if (['request.approved','request.changes_requested','request.submitted'].includes(e.event_type)) {
+                  try {
+                    const p = JSON.parse(e.event_notes||'{}');
+                    return !!(p.comments || p.note);
+                  } catch(_) { return false; }
                 }
                 return false;
               });
@@ -1764,8 +1781,9 @@ function renderMyRequestsActive() {
                         ${initials(e.actor_name)}
                       </div>
                       <div style="flex:1;min-width:0">
-                        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+                        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px;flex-wrap:wrap">
                           <span style="font-family:var(--font-head);font-size:12px;font-weight:600;color:#F0F6FF">${_esc(e.actor_name||'Unknown')}</span>
+                          ${(() => { const _ac = e.event_type==='request.approved'?'Approved':e.event_type==='request.changes_requested'?'Changes Requested':e.event_type==='request.submitted'?'Submitted':''; const _cc = e.event_type==='request.approved'?'#1D9E75':e.event_type==='request.changes_requested'?'#E24B4A':'rgba(0,210,255,.8)'; return _ac?`<span style="font-family:var(--font-head);font-size:11px;color:${_cc};font-weight:600">${_ac}</span>`:'' })()}
                           <span style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.5)">${_esc(t)}</span>
                         </div>
                         <div style="font-family:var(--font-head);font-size:12px;color:rgba(240,246,255,.65);

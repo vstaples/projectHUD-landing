@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-240000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -566,13 +566,15 @@ window._mwLoadUserView = async function() {
       if (!filtered.length) return `<div style="padding:18px 13px;text-align:center;
         font-family:var(--font-mono);font-size:12px;color:var(--text3)">No items match filters</div>`;
       return filtered.map(w => {
+        const _wTitle = w.title || '';
+        const _isResubmit = w.instanceId && (_wTitle.includes('Changes requested:') || _wTitle.includes('Re-review requested:'));
         const tc = w._isWrRow
-          ? (w._wrRole==='approver'
-              ? {c:'var(--compass-amber)',bg:'rgba(239,159,39,.1)',lbl:'Request'}
-              : {c:'var(--compass-amber)',bg:'rgba(239,159,39,.1)',lbl:'Request'})
+          ? {c:'var(--compass-amber)',bg:'rgba(239,159,39,.1)',lbl:'Request'}
+          : _isResubmit
+            ? {c:'var(--compass-amber)',bg:'rgba(239,159,39,.1)',lbl:'Request'}
           : w.type==='task'
-            ?{c:'var(--compass-cyan)',bg:'rgba(0,210,255,.08)',lbl:'Task'}
-            :{c:'var(--compass-green)',bg:'rgba(29,158,117,.08)',lbl:'Action'};
+            ? {c:'var(--compass-cyan)',bg:'rgba(0,210,255,.08)',lbl:'Task'}
+            : {c:'var(--compass-green)',bg:'rgba(29,158,117,.08)',lbl:'Action'};
         const badge=`<div style="display:inline-flex;align-items:center;padding:1px 7px;
           border:1px solid ${tc.c};background:${tc.bg};border-radius:3px;
           font-family:var(--font-mono);font-size:11px;font-weight:600;color:${tc.c};

@@ -1,5 +1,5 @@
-// VERSION: 20260403-230000
-console.log('%c[mw-events] v20260403-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260403-240000
+console.log('%c[mw-events] v20260403-240000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -276,10 +276,15 @@ document.addEventListener('click', function(ev) {
     wiRow.classList.add('wi-selected');
     const item = _wiItems.find(w => w.id === wiRow.dataset.wiId);
     if (!item) return;
-    // Intercept row click for resubmit items — don't open the drawer
     const _t = item.title || '';
+    // Resubmit items → resubmit panel
     if (item.instanceId && (_t.includes('Changes requested:') || _t.includes('Re-review requested:'))) {
       openResubmitPanel(item);
+      return;
+    }
+    // workflow_requests rows (reviewer/approver) → review panel
+    if (item._isWrRow && item.instanceId) {
+      openRequestReviewPanel(item, item._wrRole === 'approver');
       return;
     }
     openWorkItemDrawer(item);
@@ -470,15 +475,20 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
           {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
         const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
         const dotColor  = e.event_type==='request.submitted'?'#00D2FF':
+                          e.event_type==='request.approved'?'#1D9E75':
                           e.event_type==='request.completed'?'#1D9E75':
+                          e.event_type==='request.changes_requested'?'#E24B4A':
                           (e.event_type||'').includes('reject')?'#E24B4A':'#EF9F27';
+        const typeColor = e.event_type==='request.approved'?'#1D9E75':
+                          e.event_type==='request.changes_requested'?'#E24B4A':
+                          e.event_type==='request.submitted'?'rgba(0,210,255,.85)':'rgba(255,255,255,.6)';
         let notes = '';
         try { const p = JSON.parse(e.event_notes||'{}'); notes = p.comments||p.note||''; } catch(_){}
         return `<div style="display:grid;grid-template-columns:7px 130px 1fr auto;
                             gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);
                             font-family:var(--font-head);font-size:11px;align-items:start">
           <div style="width:7px;height:7px;border-radius:50%;background:${dotColor};margin-top:3px;flex-shrink:0"></div>
-          <div style="color:rgba(0,210,255,.85);font-weight:600;text-transform:capitalize">${esc(typeLabel)}</div>
+          <div style="color:${typeColor};font-weight:600;text-transform:capitalize">${esc(typeLabel)}</div>
           <div style="color:rgba(255,255,255,.5)">${esc(e.actor_name||'System')}${notes?` <span style="color:rgba(255,255,255,.28);font-style:italic">— ${esc(notes)}</span>`:''}
           </div>
           <div style="color:rgba(255,255,255,.25);white-space:nowrap;text-align:right">${esc(t)}</div>
@@ -1122,11 +1132,21 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       } catch(_) {}
     }
 
-    // Refresh work queue — mark stale so it reloads next time user visits.
-    // Do NOT call _mwLoadUserView() here — it switches tabs and collapses cards.
-    window._mwWorkStale = true;
-    // If user is currently on requests tab, silently refresh it.
+    // Close the review panel immediately
+    document.getElementById('req-review-panel')?.remove();
+    compassToast(approved
+      ? `✓ Approved — submitter notified.`
+      : `↺ Changes requested — submitter notified.`
+    );
+
+    // Refresh work queue — if on work tab rebuild now; otherwise mark stale.
     const _rrpActiveTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
+    if (_rrpActiveTab === 'work') {
+      _viewLoaded['user'] = false;
+      window._mwLoadUserView && window._mwLoadUserView();
+    } else {
+      window._mwWorkStale = true;
+    }
     if (_rrpActiveTab === 'requests') {
       window._requestsLoaded = false;
       window.loadUserRequests && window.loadUserRequests();
