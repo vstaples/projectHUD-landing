@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-J','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-K','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1156,12 +1156,12 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
 
   const allResults = [];
   for (let ti = 0; ti < TESTS.length; ti++) {
-    if (!document.getElementById('bist-cockpit-overlay')) break; // closed
+    if (!document.getElementById('s9-sim-right') && !document.getElementById('s9-sim-panel') && !document.getElementById('bist-cockpit-overlay')) break; // closed
     const t = TESTS[ti];
     _bistCkBeginTest(ti, t.name);
 
     const result = await runBistScript(t.id, (ev) => {
-      if (!document.getElementById('bist-cockpit-overlay')) return;
+      if (!document.getElementById('s9-sim-right') && !document.getElementById('s9-sim-panel') && !document.getElementById('bist-cockpit-overlay')) return;
       _bistCkOnProgress(ti, t, ev, tmplSteps);
     });
 
@@ -1248,7 +1248,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-hcm{position:absolute;top:64%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px}
 .bck-hw{width:28px;height:1px;background:rgba(0,210,255,.28)}
 .bck-hd{width:5px;height:5px;border-radius:50%;border:1px solid rgba(0,210,255,.42)}
-.bck-hr{position:absolute;right:8%;top:16%;font-size:12px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;text-align:right;white-space:pre}
+.bck-hr{position:absolute;right:295px;top:16%;font-size:12px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;text-align:right;white-space:pre}
 .bck-hl{position:absolute;left:8%;top:16%;font-size:12px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;white-space:pre}
 .bck-pf{position:absolute;inset:0;background:rgba(2,7,15,.92);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 60px}
 .bck-pftitle{font-size:12px;letter-spacing:.2em;color:rgba(0,210,255,.5);text-transform:uppercase;margin-bottom:12px}
@@ -1290,7 +1290,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-cw.ac{background:rgba(239,159,39,.4);animation:bckPw .9s ease-in-out infinite}
 @keyframes bckPw{0%,100%{opacity:.4}50%{opacity:1}}
 .bck-lz{position:absolute;left:52px;right:52px;z-index:5;pointer-events:none;overflow:visible}
-.bck-coc{position:absolute;right:0;top:0;bottom:0;width:195px;background:rgba(2,5,12,.93);border-left:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;z-index:9}
+.bck-coc{position:absolute;right:0;top:0;bottom:0;width:280px;background:rgba(2,5,12,.95);border-left:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;z-index:9}
 .bck-coch{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .bck-coct{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:rgba(0,210,255,.8)}
 .bck-cocc{font-size:12px;font-family:monospace;color:rgba(0,210,255,.9)}
@@ -1308,12 +1308,12 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-efrow{display:flex;padding:0 10px}
 .bck-ef{flex:1;padding:3px 7px;border-right:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;gap:2px}
 .bck-ef:last-child{border-right:none}
-.bck-eflbl{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,160,50,.28)}
+.bck-eflbl{font-size:12px;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,160,50,.75)}
 .bck-efval{font-size:16px;font-family:monospace;font-weight:500;letter-spacing:.04em;color:#e8d4a0;line-height:1.1;transition:color .3s}
 .bck-efval.cyan{color:#00D2FF}.bck-efval.green{color:#4ade80}
 .bck-efbar{height:2px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden}
 .bck-effill{height:100%;border-radius:1px;transition:width .5s ease}
-.bck-efsub{font-size:12px;color:rgba(255,255,255,.15);font-family:monospace}
+.bck-efsub{font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.45)}
 .bck-radio{background:#040b17;border-top:1px solid rgba(0,210,255,.08);flex-shrink:0}
 .bck-rh{display:flex;align-items:center;gap:10px;padding:4px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
 .bck-rt{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(0,210,255,.35)}
@@ -1707,7 +1707,7 @@ function _bistCkShowCert(tmplName, version, results, elapsed, certId, onProceed)
     +'</div>'
     +'<div style="padding:10px 28px 16px;background:#fdfaf4;border-top:1px solid rgba(180,140,60,.15);position:relative;z-index:1">'
       +'<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">'
-        +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid rgba(80,60,20,.3);margin-bottom:4px;height:22px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px"><span style="font-size:13px;font-family:Georgia,serif;color:rgba(30,20,8,.45);font-style:italic">'+_bistEscHtml((_resources_cad&&_resources_cad.find(function(r){return r.id===_myResourceId;}))||{name:'Team Member'}).name+'</span></div><div style="font-size:12px;color:rgba(80,60,20,.45)">Submitting Principal · '+_bistEscHtml(dateStr)+'</div></div>'
+        +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid rgba(80,60,20,.3);margin-bottom:4px;height:22px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px"><span style="font-size:13px;font-family:Georgia,serif;color:rgba(30,20,8,.45);font-style:italic">'+_bistEscHtml((_resources_cad&&_resources_cad.find(function(r){return r.id===_myResourceId;})?.name)||'Team Member')+'</span></div><div style="font-size:12px;color:rgba(80,60,20,.45)">Submitting Principal · '+_bistEscHtml(dateStr)+'</div></div>'
         +'<div style="width:74px;height:74px;position:relative;flex-shrink:0"><div style="width:74px;height:74px;border-radius:50%;border:3px solid rgba(180,30,30,.75);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transform:rotate(-18deg);background:rgba(180,30,30,.04);position:relative"><div style="position:absolute;inset:3px;border-radius:50%;border:1px dashed rgba(180,30,30,.3)"></div><div style="font-size:12px;letter-spacing:.06em;color:rgba(180,30,30,.8);text-transform:uppercase;font-weight:700">Validated</div><div style="font-size:15px;font-weight:900;color:rgba(180,30,30,.85);line-height:1">PASS</div><div style="font-size:12px;font-weight:700;color:rgba(180,30,30,.7)">Certified</div><div style="font-size:12px;font-family:monospace;color:rgba(180,30,30,.55)">'+now.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'})+'</div></div></div>'
         +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid rgba(80,60,20,.3);margin-bottom:4px;height:22px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px"><span style="font-size:12px;font-family:monospace;color:rgba(30,20,8,.3)">'+_bistEscHtml(certId)+'</span></div><div style="font-size:12px;color:rgba(80,60,20,.45)">System validation · '+_bistEscHtml(timeStr)+'</div></div>'
       +'</div>'
