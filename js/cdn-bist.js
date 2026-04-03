@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AN','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AO','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1156,10 +1156,11 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     }
     if (simPanel && typeof _s9RenderSimPanel === 'function') {
       _s9RenderSimPanel(simPanel);
-      // Refresh gate status after abort
+      // Refresh gate — runs after _s9RenderSimPanel has rebuilt the DOM
       var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
       if (tmpl && tmpl.id && typeof _s9LoadSimScripts === 'function') {
-        setTimeout(function(){ _s9LoadSimScripts(tmpl.id, tmpl.version||'0.0.0'); }, 1500);
+        // 800ms: enough for abort patch to write to DB, after DOM is rebuilt
+        setTimeout(function(){ _s9LoadSimScripts(tmpl.id, tmpl.version||'0.0.0'); }, 800);
       }
     } else if (!simPanel) {
       ov.remove();
@@ -1789,7 +1790,7 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
         '<div class="bck-nst" id="bck-nst-'+stepId+'">'+
           '<div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div>'+
           '<span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span>'+
-          '<span style="font-size:11px;font-family:monospace;color:rgba(255,255,255,.2);margin-left:auto">'+seqLabel+'</span>'+
+          '<span style="font-size:12px;font-family:Arial,sans-serif;font-weight:600;color:rgba(255,180,60,.7);margin-left:auto">'+seqLabel+'</span>'+
         '</div>'+
       '</div>';
     if (nodes.children.length > 0) {
@@ -2180,7 +2181,7 @@ function _bckRpRender(idx) {
           '<div class="bck-nst" id="bck-nst-'+stepId+'">'+
             '<div class="bck-nsdot" style="background:'+n.col+'"></div>'+
             '<span class="bck-nstxt" style="color:'+n.col+'">'+_bistEscHtml(n.label)+'</span>'+
-            '<span style="font-size:11px;font-family:monospace;color:rgba(255,255,255,.25);margin-left:auto">'+rSeqLabel+'</span>'+
+            '<span style="font-size:12px;font-family:Arial,sans-serif;font-weight:600;color:rgba(255,180,60,.7);margin-left:auto">'+rSeqLabel+'</span>'+
           '</div>'+
         '</div>';
       if (nodesEl2.children.length > 0) {
