@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-180000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-190000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1033,6 +1033,31 @@ window.loadUserRequests = async function() {
   window._requestsReloading = false;
   renderMyRequestsActive();
   renderMyRequestsHistory();
+
+  // If a ↺ Changes requested action item exists for an instance that still shows
+  // current_step_name != 'Submit', approve.html's PATCH may not have committed yet.
+  // Re-fetch once after 3s to pick it up.
+  (async () => {
+    try {
+      const pendingReset = (window._myRequests||[]).some(r =>
+        r.status !== 'completed' && r.status !== 'rejected' &&
+        r._raw?.current_step_name !== 'Submit'
+      );
+      if (!pendingReset) return;
+      // Check if a ↺ Changes requested action item exists for any of our instances
+      if (!resolvedResId) return;
+      const changesItems = await API.get(
+        `workflow_action_items?owner_resource_id=eq.${resolvedResId}&status=eq.open&title=like.%E2%86%BA Changes requested:*&select=id,instance_id&limit=10`
+      ).catch(() => []);
+      if (!(changesItems||[]).length) return;
+      // A changes-requested item exists but step hasn't updated — re-fetch in 3s
+      setTimeout(async () => {
+        window._myRequestCoc   = {};
+        window._requestsLoaded = false;
+        window.loadUserRequests && window.loadUserRequests();
+      }, 3000);
+    } catch(_) {}
+  })();
 
   // Fetch reviewer names for each active request (for tooltip on Review step)
   const activeReqs = (window._myRequests||[]).filter(r => r.status !== 'completed' && r.status !== 'rejected');

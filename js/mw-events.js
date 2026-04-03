@@ -1,5 +1,5 @@
-// VERSION: 20260403-180000
-console.log('%c[mw-events] v20260403-180000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260403-190000
+console.log('%c[mw-events] v20260403-190000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -964,8 +964,7 @@ window._rsbSubmit = async function(actionItemId, instanceId) {
     // 8. Close panel and refresh
     document.getElementById('req-resubmit-panel')?.remove();
     window._rsbFiles = [];
-    _viewLoaded['user'] = false;
-    _mwLoadUserView();
+    window._mwWorkStale = true;
     window._requestsLoaded = false;
     window.loadUserRequests && window.loadUserRequests();
     compassToast(`↺ Resubmitted — ${ctx.reviewers?.length||0} reviewer(s) notified.`);
@@ -1136,9 +1135,15 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       } catch(_) {}
     }
 
-    // Refresh My Work to remove resolved item
-    _viewLoaded['user'] = false;
-    _mwLoadUserView();
+    // Refresh work queue — mark stale so it reloads next time user visits.
+    // Do NOT call _mwLoadUserView() here — it switches tabs and collapses cards.
+    window._mwWorkStale = true;
+    // If user is currently on requests tab, silently refresh it.
+    const _rrpActiveTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
+    if (_rrpActiveTab === 'requests') {
+      window._requestsLoaded = false;
+      window.loadUserRequests && window.loadUserRequests();
+    }
 
   } catch(e) {
     console.error('[ReviewPanel] submit failed:', e);
