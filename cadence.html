@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CadenceHUD — Workflow Engine · S8.3</title>
+<title>CadenceHUD · S9.0</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -598,7 +598,112 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.2)}
 
-/* Loading */
+/* ═══════════════════════════════════════════════════════════════════
+   S9.0 — Three-tab restructure: Library · Simulator · Instances
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Subnav layout: items left, filter pills right */
+.cad-subnav{display:flex;align-items:stretch}
+.s9-subnav-spacer{flex:1}
+
+/* Per-tab accent colours */
+.subnav-item.s9-lib.active  {color:#7F77DD;border-bottom-color:#7F77DD}
+.subnav-item.s9-sim.active  {color:#1D9E75;border-bottom-color:#1D9E75}
+.subnav-item.s9-inst.active {color:#378ADD;border-bottom-color:#378ADD}
+
+.subnav-item.s9-lib.active .s9-badge-lib   {background:rgba(127,119,221,.18);color:#7F77DD}
+.subnav-item.s9-sim.active .s9-badge-sim   {background:rgba(29,158,117,.15);color:#1D9E75}
+.subnav-item.s9-inst.active .s9-badge-inst {background:rgba(55,138,221,.15);color:#378ADD}
+
+/* Library filter pills — right-aligned in subnav */
+.s9-lib-filters{
+  display:none;           /* hidden until Library tab is active */
+  align-items:center;
+  gap:5px;
+  padding:0 16px;
+  border-left:1px solid var(--border);
+}
+.s9-lib-filters.visible{display:flex}
+
+.s9-filter-pill{
+  font-size:11px;padding:3px 10px;border-radius:12px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--text2);cursor:pointer;
+  display:flex;align-items:center;gap:4px;
+  transition:all .14s;white-space:nowrap;font-family:Arial,sans-serif;
+}
+.s9-filter-pill:hover{border-color:var(--border2);color:var(--text)}
+.s9-filter-pill.active{
+  background:rgba(127,119,221,.12);
+  border-color:rgba(127,119,221,.45);
+  color:#9f9ae8;
+}
+.s9-filter-pill.s9-fp-wf.active{
+  background:rgba(127,119,221,.12);border-color:rgba(127,119,221,.4);color:#9f9ae8;
+}
+.s9-filter-pill.s9-fp-fm.active{
+  background:rgba(29,158,117,.1);border-color:rgba(29,158,117,.35);color:#2ab889;
+}
+
+/* Type indicator dots in filter pills */
+.s9-type-dot{
+  width:6px;height:6px;border-radius:50%;flex-shrink:0;
+}
+.s9-dot-wf{background:#7F77DD}
+.s9-dot-fm{background:#1D9E75}
+
+/* Type badges shown on list items (workflow=purple, form=teal) */
+.s9-type-badge{
+  font-size:10px;padding:1px 6px;border-radius:3px;
+  font-family:Arial,sans-serif;letter-spacing:.03em;
+  display:inline-flex;align-items:center;gap:3px;
+  flex-shrink:0;
+}
+.s9-type-badge.wf{
+  background:rgba(127,119,221,.15);color:#9f9ae8;
+  border:1px solid rgba(127,119,221,.25);
+}
+.s9-type-badge.fm{
+  background:rgba(29,158,117,.12);color:#2ab889;
+  border:1px solid rgba(29,158,117,.22);
+}
+
+/* Simulator tab — source badge strip below subnav */
+.s9-sim-source-bar{
+  height:36px;flex-shrink:0;
+  background:var(--bg1);
+  border-bottom:1px solid var(--border);
+  display:none;align-items:center;gap:12px;padding:0 20px;
+}
+.s9-sim-source-bar.visible{display:flex}
+.s9-sim-source-badge{
+  font-size:11px;padding:3px 10px;border-radius:12px;
+  background:rgba(29,158,117,.1);border:1px solid rgba(29,158,117,.25);
+  color:#2ab889;display:flex;align-items:center;gap:5px;
+  font-family:Arial,sans-serif;
+}
+.s9-sim-source-type{font-size:10px;opacity:.65}
+.s9-sim-switch-btn{
+  font-size:11px;color:var(--text2);background:none;border:none;
+  cursor:pointer;padding:0;text-decoration:underline;
+  font-family:Arial,sans-serif;
+}
+.s9-sim-switch-btn:hover{color:var(--text)}
+.s9-sim-gate-status{
+  margin-left:auto;font-size:11px;
+  display:flex;align-items:center;gap:5px;
+}
+.s9-gate-pass{color:var(--green)}
+.s9-gate-warn{color:var(--amber)}
+
+/* Instances tab — type badge column in instance list */
+.inst-type-col{
+  width:72px;flex-shrink:0;
+}
+
+/* Topbar: show settings gear on Library tab */
+.s9-topbar-lib-visible{display:inline-flex !important}
+
 .loading-pulse{
   display:flex;align-items:center;justify-content:center;
   padding:40px;color:var(--muted);font-size:12px;gap:8px;
@@ -610,6 +715,111 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 }
 @keyframes pulse{0%,100%{opacity:.3;transform:scale(.9)}50%{opacity:1;transform:scale(1.1)}}
 @keyframes critPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(1.6)}}
+
+/* ── S9: Three-tab restructure ─────────────────────────────────────────────
+   Library (purple) · Simulator (teal) · Instances (blue)
+   Sub-filter pill row lives below subnav on Library tab only.           */
+
+/* Tab accent overrides */
+.subnav-item.active.s9-lib{color:#7c4dff;border-bottom-color:#7c4dff}
+.subnav-item.active.s9-lib .subnav-badge{background:rgba(124,77,255,.15);color:#7c4dff}
+.subnav-item.active.s9-sim{color:#1D9E75;border-bottom-color:#1D9E75}
+.subnav-item.active.s9-sim .subnav-badge{background:rgba(29,158,117,.15);color:#1D9E75}
+.subnav-item.active.s9-inst{color:var(--accent);border-bottom-color:var(--accent)}
+.subnav-item.active.s9-inst .subnav-badge{background:rgba(79,142,247,.15);color:var(--accent)}
+
+/* Library sub-filter pill row */
+.s9-lib-filters{
+  height:34px;flex-shrink:0;
+  background:var(--bg1);
+  border-bottom:1px solid var(--border);
+  display:none;align-items:center;padding:0 20px;gap:6px;
+}
+.s9-lib-filters.visible{display:flex}
+.s9-filter-pill{
+  font-size:12px;font-weight:500;letter-spacing:.04em;font-family:Arial,sans-serif;
+  padding:3px 12px;border-radius:12px;cursor:pointer;
+  border:1px solid var(--border);color:var(--text2);background:transparent;
+  transition:all .15s;
+}
+.s9-filter-pill:hover{border-color:var(--border2);color:var(--text1)}
+.s9-filter-pill.active-wf{
+  background:rgba(124,77,255,.12);border-color:rgba(124,77,255,.35);color:#a585ff;
+}
+.s9-filter-pill.active-fm{
+  background:rgba(29,158,117,.1);border-color:rgba(29,158,117,.3);color:#3fd4a8;
+}
+
+/* Type badge used in list items on Library tab */
+.s9-type-badge{
+  font-size:10px;padding:1px 6px;border-radius:3px;letter-spacing:.04em;
+  font-family:Arial,sans-serif;font-weight:600;flex-shrink:0;
+}
+.s9-type-wf{background:rgba(124,77,255,.15);color:#a585ff}
+.s9-type-fm{background:rgba(29,158,117,.12);color:#3fd4a8}
+
+/* Simulator tab — placeholder panel when no source loaded */
+.s9-sim-empty{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:14px;padding:40px;
+}
+.s9-sim-icon{
+  width:52px;height:52px;border-radius:50%;
+  background:rgba(29,158,117,.1);border:1px solid rgba(29,158,117,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;
+}
+.s9-sim-title{font-size:15px;font-weight:600;color:var(--text);font-family:Arial,sans-serif}
+.s9-sim-sub{font-size:12px;color:var(--muted);text-align:center;line-height:1.7;max-width:360px}
+.s9-sim-source{
+  display:flex;align-items:center;gap:8px;
+  background:var(--surf2);border:1px solid var(--border);border-radius:5px;
+  padding:8px 14px;font-size:12px;color:var(--text1);
+}
+.s9-sim-source-label{color:var(--muted);font-size:11px}
+.s9-launch-btn{
+  font-size:13px;font-weight:600;letter-spacing:.06em;font-family:Arial,sans-serif;
+  padding:9px 22px;border-radius:5px;border:none;cursor:pointer;
+  background:#1D9E75;color:#fff;display:flex;align-items:center;gap:8px;
+  transition:all .15s;
+}
+.s9-launch-btn:hover{background:#23b88a}
+
+/* Simulator metrics bar */
+.s9-sim-metrics{
+  display:flex;gap:0;border:1px solid var(--border);border-radius:5px;
+  overflow:hidden;background:var(--surf2);
+}
+.s9-sim-metric{
+  flex:1;padding:10px 14px;border-right:1px solid var(--border);
+  display:flex;flex-direction:column;gap:2px;
+}
+.s9-sim-metric:last-child{border-right:none}
+.s9-sm-val{font-size:18px;font-weight:600;font-family:Arial,sans-serif;color:var(--text)}
+.s9-sm-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+
+/* Script list in Simulator left rail */
+.s9-script-item{
+  padding:7px 10px;border-radius:4px;border:1px solid var(--border);
+  font-size:12px;color:var(--text2);cursor:pointer;
+  display:flex;align-items:center;gap:8px;margin-bottom:4px;
+  transition:all .15s;
+}
+.s9-script-item:hover{background:var(--surf2);border-color:var(--border2)}
+.s9-script-item.s9-active{background:rgba(29,158,117,.08);border-color:rgba(29,158,117,.3);color:var(--text)}
+.s9-script-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--border2)}
+.s9-script-item.s9-pass .s9-script-dot{background:var(--green)}
+.s9-script-item.s9-active .s9-script-dot{background:#1D9E75}
+
+/* Release gate indicator in Simulator */
+.s9-gate-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;padding:3px 10px;border-radius:12px;
+  font-weight:500;font-family:Arial,sans-serif;
+}
+.s9-gate-pass{background:rgba(42,157,64,.12);border:1px solid rgba(42,157,64,.3);color:var(--green)}
+.s9-gate-warn{background:rgba(212,144,31,.1);border:1px solid rgba(212,144,31,.3);color:var(--amber)}
+.s9-gate-fail{background:rgba(192,64,74,.1);border:1px solid rgba(192,64,74,.3);color:var(--red)}
 
 </style>
 </head>
@@ -626,30 +836,90 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
       <div class="cad-topbar-actions">
         <a href="/projects.html" class="btn btn-ghost btn-sm"
           style="text-decoration:none">← Dashboard</a>
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('instances')">◎ Instances</button>
-        <button class="btn btn-cad btn-sm" onclick="openNewTemplateModal()">+ New Template</button>
+        <button class="btn btn-ghost btn-sm" id="topbar-settings-btn"
+          onclick="_cadOpenLibrarySettings()" style="display:none"
+          title="Triggers &amp; form settings">⚙ Settings</button>
+        <button class="btn btn-cad btn-sm" id="topbar-new-btn"
+          onclick="_cadNewFromTopbar()">+ New</button>
       </div>
     </div>
 
-    <!-- Sub-nav -->
-    <div class="cad-subnav">
-      <div class="subnav-item active" id="tab-templates" onclick="switchTab('templates')">
-        ⬡ Templates
-        <span class="subnav-badge" id="tmpl-count" style="display:none">0</span>
+    <!-- Sub-nav — three-tab restructure (S9.0) -->
+    <div class="cad-subnav" id="cad-subnav-main">
+
+      <!-- LIBRARY — merges Templates + Form Library -->
+      <div class="subnav-item s9-lib active" id="s9-tab-library"
+           onclick="_s9Switch('library')">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
+             stroke="currentColor" stroke-width="1.4" style="flex-shrink:0">
+          <rect x="1" y="1" width="4.5" height="5.5" rx=".8"/>
+          <rect x="7.5" y="1" width="4.5" height="5.5" rx=".8"/>
+          <rect x="1" y="8.5" width="4.5" height="3.5" rx=".8"/>
+          <rect x="7.5" y="8.5" width="4.5" height="3.5" rx=".8"/>
+        </svg>
+        Library
+        <span class="subnav-badge s9-badge-lib" id="s9-lib-count" style="display:none">0</span>
       </div>
-      <div class="subnav-item" id="tab-instances" onclick="switchTab('instances')">
-        ◎ Instances
-        <span class="subnav-badge" id="inst-count" style="display:none">0</span>
+
+      <!-- SIMULATOR — BIST flight cockpit, source-agnostic -->
+      <div class="subnav-item s9-sim" id="s9-tab-simulator"
+           onclick="_s9Switch('simulator')">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
+             stroke="currentColor" stroke-width="1.4" style="flex-shrink:0">
+          <circle cx="6.5" cy="6.5" r="5.2"/>
+          <polygon points="4.8,3.8 10,6.5 4.8,9.2" fill="currentColor" stroke="none"/>
+        </svg>
+        Simulator
+        <span class="subnav-badge s9-badge-sim" id="s9-sim-count" style="display:none">0</span>
       </div>
-      <div class="subnav-item" id="tab-forms" onclick="switchTab('forms')">
-        📄 Form Library
+
+      <!-- INSTANCES — unified live + historical execution view -->
+      <div class="subnav-item s9-inst" id="s9-tab-instances"
+           onclick="_s9Switch('instances')">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
+             stroke="currentColor" stroke-width="1.4" style="flex-shrink:0">
+          <path d="M1.5 3.5h10M1.5 6.5h7M1.5 9.5h5"/>
+          <circle cx="10" cy="9" r="2.4"/>
+          <path d="M10 7.8v1.2l.7.7" stroke-linecap="round" stroke-width="1.2"/>
+        </svg>
+        Instances
+        <span class="subnav-badge s9-badge-inst" id="inst-count" style="display:none">0</span>
       </div>
-      <div class="subnav-item" id="tab-triggers" onclick="switchTab('triggers')">
-        ⚡ Triggers
+
+      <!-- Spacer + Library sub-filter pills (visible only on Library tab) -->
+      <div class="s9-subnav-spacer"></div>
+      <div class="s9-lib-filters" id="s9-lib-filters">
+        <button class="s9-filter-pill s9-fp-all active" id="s9-fp-all"
+                onclick="_s9LibFilter('all')">All</button>
+        <button class="s9-filter-pill s9-fp-wf" id="s9-fp-wf"
+                onclick="_s9LibFilter('workflows')">
+          <span class="s9-type-dot s9-dot-wf"></span>Workflows
+        </button>
+        <button class="s9-filter-pill s9-fp-fm" id="s9-fp-fm"
+                onclick="_s9LibFilter('forms')">
+          <span class="s9-type-dot s9-dot-fm"></span>Forms
+        </button>
+        <button class="s9-filter-pill" id="s9-fp-rel"
+                onclick="_s9LibFilter('released')">Released</button>
+        <button class="s9-filter-pill" id="s9-fp-draft"
+                onclick="_s9LibFilter('draft')">Draft</button>
       </div>
-      <div class="subnav-item" id="tab-form-settings" onclick="switchTab('form-settings')">
-        ⚙ Form Settings
-      </div>
+
+      <!-- Hidden legacy tab IDs kept so cdn-*.js badge writes still work -->
+      <span id="tab-templates"  style="display:none"></span>
+      <span id="tab-forms"      style="display:none"></span>
+      <span id="tab-triggers"   style="display:none"></span>
+      <span id="tab-form-settings" style="display:none"></span>
+      <span id="tmpl-count"     style="display:none"></span>
+
+    </div>
+
+    <!-- Library type sub-bar — shown below subnav when Library is active -->
+    <!-- (filter pills are inline above; this row reserved for future breadcrumb) -->
+
+    <!-- Simulator source bar — shown when Simulator tab is active -->
+    <div class="s9-sim-source-bar" id="s9-sim-source-bar">
+      <!-- populated by _s9UpdateSimSourceBar() -->
     </div>
 
     <!-- Content -->
@@ -715,36 +985,270 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
      Timestamp formatting: use fmtTs()/fmtTsShort() from cdn-coc.js.
 -->
 <script>
-if (typeof _stopElapsedTimer === "undefined") window._stopElapsedTimer = function() {};
-if (typeof _startElapsedTimer === "undefined") window._startElapsedTimer = function() {};
-// Stub — replaced once cdn-form-editor.js loads
-if (typeof window.renderFormsTab === "undefined") {
-  window.renderFormsTab = function(el) {
-    // cdn-form-editor not yet loaded — retry after short delay
-    setTimeout(() => { if (typeof window.renderFormsTab === 'function') window.renderFormsTab(el); }, 200);
-  };
+// ═══════════════════════════════════════════════════════════════════
+// S9.0 — Three-tab controller: Library · Simulator · Instances
+// console badge: orange, version 20260403-S9
+// ═══════════════════════════════════════════════════════════════════
+console.log('%c[cadence] S9.0 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+
+// ── State ──────────────────────────────────────────────────────────
+var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
+var _s9LibSubFilter    = 'all';              // 'all' | 'workflows' | 'forms' | 'released' | 'draft'
+var _s9LastLibSubtype  = 'workflows';        // last explicit wf/fm selection — drives + New routing
+var _s9SimSourceType   = null;               // null | 'workflow' | 'form'
+var _s9SimSourceName   = null;
+var _s9SimSourceVer    = null;
+
+// ── Tab switching ──────────────────────────────────────────────────
+function _s9Switch(tab) {
+  _s9ActiveTab = tab;
+
+  // Clear all active states
+  ['s9-tab-library','s9-tab-simulator','s9-tab-instances'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.className = el.className.replace(/\bactive\b/g, '').trim();
+    }
+  });
+
+  // Set active tab
+  var tabId = {library:'s9-tab-library', simulator:'s9-tab-simulator', instances:'s9-tab-instances'}[tab];
+  if (tabId) {
+    var el = document.getElementById(tabId);
+    if (el) el.className += ' active';
+  }
+
+  // Filter pills — show only on Library tab
+  var fp = document.getElementById('s9-lib-filters');
+  if (fp) fp.className = tab === 'library' ? 's9-lib-filters visible' : 's9-lib-filters';
+
+  // Simulator source bar
+  var sb = document.querySelector('.s9-sim-source-bar');
+  if (sb) sb.className = tab === 'simulator' ? 's9-sim-source-bar visible' : 's9-sim-source-bar';
+
+  // Topbar settings gear — visible on Library tab only
+  var gear = document.getElementById('topbar-settings-btn');
+  if (gear) gear.style.display = tab === 'library' ? 'inline-flex' : 'none';
+
+  // Topbar + New label
+  var newBtn = document.getElementById('topbar-new-btn');
+  if (newBtn) {
+    var labels = {library:'+ New', simulator:'', instances:''};
+    newBtn.textContent = labels[tab] || '+ New';
+    newBtn.style.display = tab === 'library' ? 'inline-flex' : 'none';
+  }
+
+  // Route to the underlying engine tab
+  if (tab === 'library') {
+    _s9RouteLibrary();
+  } else if (tab === 'simulator') {
+    _s9RouteSim();
+  } else if (tab === 'instances') {
+    if (typeof switchTab === 'function') switchTab('instances');
+  }
 }
+
+// ── Library routing ────────────────────────────────────────────────
+// Library shows workflows and/or forms depending on active filter.
+// The underlying engine uses switchTab('templates') for workflows
+// and switchTab('forms') for forms. When "All" is active we default
+// to templates (the richer editor) and the form cards are surfaced
+// via a secondary inject into the list column header below the
+// workflow items. This is deferred to a future sprint; for now
+// "All" routes to templates with a form-count callout.
+function _s9RouteLibrary() {
+  var f = _s9LibSubFilter;
+  if (f === 'forms') {
+    if (typeof switchTab === 'function') switchTab('forms');
+    _s9LastLibSubtype = 'forms';
+  } else {
+    // 'all', 'workflows', 'released', 'draft' — all served from templates engine
+    if (typeof switchTab === 'function') switchTab('templates');
+    if (f === 'workflows') _s9LastLibSubtype = 'workflows';
+  }
+}
+
+// ── Simulator routing ──────────────────────────────────────────────
+function _s9RouteSim() {
+  // Land on BIST tab if the engine knows it, otherwise templates
+  // (cdn-bist.js registers switchTab('bist') in some builds)
+  if (typeof switchTab === 'function') {
+    try { switchTab('bist'); } catch(e) { switchTab('templates'); }
+  }
+  _s9UpdateSimSourceBar();
+}
+
+function _s9UpdateSimSourceBar() {
+  var bar = document.querySelector('.s9-sim-source-bar');
+  if (!bar) return;
+  if (_s9SimSourceName) {
+    bar.innerHTML =
+      '<div class="s9-sim-source-badge">' +
+        '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.3">' +
+          (_s9SimSourceType === 'form'
+            ? '<rect x="1" y="1" width="9" height="9" rx="1.2"/><line x1="3" y1="4" x2="8" y2="4"/><line x1="3" y1="6" x2="6" y2="6"/>'
+            : '<path d="M1 3h9M1 5.5h9M1 8h5.5"/><circle cx="8.5" cy="8" r="2"/><path d="M8.5 6.8v1.2l.6.6" stroke-linecap="round" stroke-width="1.1"/>') +
+        '</svg>' +
+        '<span class="s9-sim-source-type">' + (_s9SimSourceType === 'form' ? 'Form' : 'Workflow') + ' ·</span>' +
+        ' ' + _s9SimSourceName + (_s9SimSourceVer ? ' ' + _s9SimSourceVer : '') +
+      '</div>' +
+      '<button class="s9-sim-switch-btn" onclick="_s9SimSwitchSource()">Switch source</button>' +
+      '<div class="s9-sim-gate-status" id="s9-gate-status"></div>';
+  } else {
+    bar.innerHTML =
+      '<span style="font-size:11px;color:var(--text2);font-family:Arial,sans-serif">' +
+        'No source selected — open a Library item and click ' +
+        '<strong style="color:var(--text)">▶ Simulate</strong> to begin' +
+      '</span>';
+  }
+}
+
+function _s9SimSwitchSource() {
+  // Navigate to Library so user can pick a different item
+  _s9Switch('library');
+}
+
+// ── Library sub-filter ─────────────────────────────────────────────
+function _s9LibFilter(filter) {
+  _s9LibSubFilter = filter;
+
+  // Update pill active state
+  var pillMap = {all:'s9-fp-all', workflows:'s9-fp-wf', forms:'s9-fp-fm',
+                 released:'s9-fp-rel', draft:'s9-fp-draft'};
+  Object.keys(pillMap).forEach(function(k) {
+    var el = document.getElementById(pillMap[k]);
+    if (el) {
+      if (k === filter) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    }
+  });
+
+  // Re-route the underlying tab
+  _s9RouteLibrary();
+}
+
+// ── Topbar + New ───────────────────────────────────────────────────
+function _cadNewFromTopbar() {
+  if (_s9LibSubFilter === 'forms') {
+    // Open form creation if the function exists
+    if (typeof openNewFormModal === 'function') openNewFormModal();
+    else if (typeof switchTab === 'function') switchTab('forms');
+  } else {
+    if (typeof openNewTemplateModal === 'function') openNewTemplateModal();
+  }
+}
+
+// ── Topbar ⚙ Settings ─────────────────────────────────────────────
+function _cadOpenLibrarySettings() {
+  // Cycle between triggers and form-settings, opening whichever is relevant
+  if (_s9LibSubFilter === 'forms') {
+    if (typeof switchTab === 'function') switchTab('form-settings');
+  } else {
+    if (typeof switchTab === 'function') switchTab('triggers');
+  }
+}
+
+// ── Legacy switchTab shim ──────────────────────────────────────────
+// cdn-*.js modules call switchTab('templates'), switchTab('instances'),
+// switchTab('bist') etc. We intercept these to keep the S9 tab bar
+// in sync, then let the real switchTab (from cdn-core-state.js) run.
+(function _installS9Shim() {
+  var _deadline = Date.now() + 8000;
+  function _tryShim() {
+    if (typeof switchTab !== 'function') {
+      if (Date.now() < _deadline) setTimeout(_tryShim, 120);
+      return;
+    }
+    var _realSwitch = switchTab;
+    window.switchTab = function(tab) {
+      // Mirror legacy calls into S9 tab bar state
+      if (tab === 'instances') {
+        // Sync S9 tab indicator without re-routing (avoid infinite loop)
+        _s9ActiveTab = 'instances';
+        ['s9-tab-library','s9-tab-simulator','s9-tab-instances'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) el.className = el.className.replace(/\bactive\b/g,'').trim();
+        });
+        var el = document.getElementById('s9-tab-instances');
+        if (el) el.className += ' active';
+        var fp = document.getElementById('s9-lib-filters');
+        if (fp) fp.className = 's9-lib-filters';
+        var gear = document.getElementById('topbar-settings-btn');
+        if (gear) gear.style.display = 'none';
+        var newBtn = document.getElementById('topbar-new-btn');
+        if (newBtn) newBtn.style.display = 'none';
+      } else if (tab === 'templates' || tab === 'forms') {
+        _s9ActiveTab = 'library';
+      } else if (tab === 'bist') {
+        _s9ActiveTab = 'simulator';
+      }
+      return _realSwitch(tab);
+    };
+  }
+  _tryShim();
+})();
+
+// ── Simulator source registration ──────────────────────────────────
+// Any Library card's ▶ button calls this to register the source and
+// navigate to the Simulator tab. cdn-bist.js can call it too.
+window._s9RegisterSimSource = function(type, name, ver) {
+  _s9SimSourceType = type;
+  _s9SimSourceName = name;
+  _s9SimSourceVer  = ver || null;
+  _s9Switch('simulator');
+};
+
+// ── Library item count badge rollup ───────────────────────────────
+// Whenever tmpl-count or form counts update, roll up into s9-lib-count
+function _s9UpdateLibCount() {
+  var tmpl = parseInt((document.getElementById('tmpl-count') || {}).textContent || '0', 10) || 0;
+  var el = document.getElementById('s9-lib-count');
+  if (!el) return;
+  if (tmpl > 0) { el.textContent = tmpl; el.style.display = ''; }
+  else { el.style.display = 'none'; }
+}
+// Poll briefly on load then rely on MutationObserver
+var _s9CountObs = new MutationObserver(_s9UpdateLibCount);
+document.addEventListener('DOMContentLoaded', function() {
+  var tc = document.getElementById('tmpl-count');
+  if (tc) _s9CountObs.observe(tc, {childList:true, characterData:true, subtree:true});
+  _s9UpdateLibCount();
+});
+
+// ── Initialise on DOMContentLoaded ────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  // Set the source bar DOM (it's empty until a source is registered)
+  _s9UpdateSimSourceBar();
+  // Start on Library tab — sync filter pills and topbar
+  _s9Switch('library');
+  // Mark initial filter pill active
+  var fp = document.getElementById('s9-fp-all');
+  if (fp) fp.classList.add('active');
+});
 </script>
-<script src="/js/cdn-core-state.js?v=20260401229002"></script>
-<script src="/js/cdn-utils.js?v=20260401229002"></script>
-<script src="/js/cdn-form-editor.js?v=20260401229002"></script>
-<script src="/js/cdn-form-settings.js?v=20260401229002"></script>
-<script src="/js/cdn-assignee.js?v=20260401229002"></script>
-<script src="/js/cdn-outcomes.js?v=20260401229002"></script>
-<script src="/js/cdn-documents.js?v=20260401229002"></script>
-<script src="/js/cdn-dag-viewer.js?v=20260401229002"></script>
-<script src="/js/cdn-template-editor.js?v=20260401229002"></script>
-<script src="/js/cdn-bist.js?v=20260401229002"></script>
-<script src="/js/cdn-coc.js?v=20260401229002"></script>
-<script src="/js/cdn-meeting.js?v=20260401229002"></script>
-<script src="/js/cdn-scrubber.js?v=20260401229002"></script>
-<script src="/js/cdn-tooltips.js?v=20260401229002"></script>
-<script src="/js/cdn-comments.js?v=20260401229002"></script>
-<script src="/js/cdn-intel.js?v=20260401229002"></script>
-<script src="/js/cdn-events.js?v=20260401229002"></script>
-<script src="/js/cdn-instance-dag.js?v=20260401229002"></script>
-<script src="/js/cdn-instances.js?v=20260401229002"></script>
-    <script src="/js/cdn-form-runtime.js?v=20260401229002"></script>
+<script src="/js/cdn-core-state.js?v=20260403-S9"></script>
+<script src="/js/cdn-utils.js?v=20260403-S9"></script>
+<script src="/js/cdn-form-editor.js?v=20260403-S9"></script>
+<script src="/js/cdn-form-settings.js?v=20260403-S9"></script>
+<script src="/js/cdn-assignee.js?v=20260403-S9"></script>
+<script src="/js/cdn-outcomes.js?v=20260403-S9"></script>
+<script src="/js/cdn-documents.js?v=20260403-S9"></script>
+<script src="/js/cdn-dag-viewer.js?v=20260403-S9"></script>
+<script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
+<script src="/js/cdn-bist.js?v=20260403-S9"></script>
+<script src="/js/cdn-coc.js?v=20260403-S9"></script>
+<script src="/js/cdn-meeting.js?v=20260403-S9"></script>
+<script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
+<script src="/js/cdn-tooltips.js?v=20260403-S9"></script>
+<script src="/js/cdn-comments.js?v=20260403-S9"></script>
+<script src="/js/cdn-intel.js?v=20260403-S9"></script>
+<script src="/js/cdn-events.js?v=20260403-S9"></script>
+<script src="/js/cdn-instance-dag.js?v=20260403-S9"></script>
+<script src="/js/cdn-instances.js?v=20260403-S9"></script>
+<script src="/js/cdn-form-runtime.js?v=20260403-S9"></script>
 
 <script>
 // ── Bootstrap CURRENT_USER from JWT + resources table ─────────────────────────

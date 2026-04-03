@@ -105,7 +105,7 @@ async function runBistScript(scriptId, onProgress) {
   const runRows = await API.post('bist_runs', {
     firm_id:          FIRM_ID_CAD,
     script_id:        scriptId,
-    template_version: spec.template_version || _selectedTmpl?.version || '?',
+    template_version: _selectedTmpl?.version || spec.template_version || '?',  // always current version
     status:           'running',
     steps_passed:     0,
     steps_failed:     0,
@@ -406,11 +406,21 @@ async function showGateDialog(templateId, version, onProceed) {
               style="padding:7px 16px;background:var(--cad);color:#fff;border:none;
                 border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">
               ▶ Run all tests
+            </button>
+            <button onclick="_bistLaunchCockpit('${templateId}','${version}',window._bistOnProceed)"
+              style="padding:7px 14px;background:rgba(29,158,117,.15);color:#1D9E75;border:1px solid rgba(29,158,117,.3);
+                border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">
+              ▶ Launch Simulator
             </button>` : ''}
           ${tier === 3 ? `
             <div style="flex:1;font-size:11px;color:var(--green)">
               ✓ All tests passing — ready to release
             </div>
+            <button onclick="_bistLaunchCockpit('${templateId}','${version}',window._bistOnProceed)"
+              style="padding:7px 14px;background:rgba(29,158,117,.15);color:#1D9E75;border:1px solid rgba(29,158,117,.3);
+                border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">
+              ▶ View certification
+            </button>
             <button id="bist-proceed-btn" onclick="bistProceed()"
               style="padding:7px 16px;background:var(--green);color:#fff;border:none;
                 border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">
@@ -974,6 +984,11 @@ async function runSingleTest(scriptId) {
 }
 
 async function runAllTests() {
+  // Route through cockpit if a template is selected
+  if (_selectedTmpl?.id) {
+    _bistLaunchCockpit(_selectedTmpl.id, _selectedTmpl.version || '0.0.0', null);
+    return;
+  }
   const btn = document.getElementById('bist-run-all-btn');
   if (btn) { btn.textContent = 'Running…'; btn.disabled = true; }
 
@@ -1017,4 +1032,675 @@ async function runAllTests() {
     _cocCommittedRows = [];
     _refreshCoCIfOpen();
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BIST Cockpit Engine — v20260403-B
+// Replaces showGateDialog as the live visual renderer for BIST runs.
+// Called by:  _bistLaunchCockpit(templateId, version, onProceed)
+// Feeds:      runBistScript() onProgress callbacks → cockpit node/CoC/radio state
+// Writes:     bist_runs records (via runBistScript), workflow_template_coc cert
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function _bistLaunchCockpit(templateId, version, onProceed) {
+  // Close any existing gate overlay
+  document.getElementById('bist-gate-overlay')?.remove();
+  document.getElementById('bist-cockpit-overlay')?.remove();
+
+  // Load scripts + template metadata
+  const [scripts, tmplArr] = await Promise.all([
+    API.get(`bist_test_scripts?firm_id=eq.${FIRM_ID_CAD}&template_id=eq.${templateId}&order=created_at.asc`).catch(()=>[]),
+    API.get(`workflow_templates?id=eq.${templateId}&select=id,name,version,status`).catch(()=>[]),
+  ]);
+  const tmpl = tmplArr?.[0] || _selectedTmpl || { name:'Template', version };
+  const tmplName = tmpl.name || 'Template';
+
+  if (!scripts?.length) {
+    cadToast('No test scripts found for this template. Add scripts to bist_test_scripts to use the Simulator.', 'error');
+    return;
+  }
+
+  // ── Build TESTS array from live scripts ──────────────────────────────────
+  const tmplSteps = await API.get(
+    `workflow_template_steps?template_id=eq.${templateId}&order=sequence_order.asc`
+  ).catch(()=>[]) || [];
+
+  const TESTS = scripts.map(script => {
+    const spec = typeof script.script === 'string' ? JSON.parse(script.script) : script.script;
+    const nodes = [];
+    const actors = [];
+    const anames = [];
+
+    (spec.steps || []).forEach(stp => {
+      if (stp.action === 'launch_instance') {
+        nodes.push('Instance\nLaunch');
+        actors.push('SYS');
+        anames.push('System');
+      } else if (stp.action === 'complete_step') {
+        const seq = stp.params?.step_seq;
+        const tmplStep = tmplSteps.find(s => s.sequence_order === seq);
+        const nm = tmplStep ? tmplStep.name : `Step ${seq||'?'}`;
+        const actorKey = stp.params?.actor || 'actor_1';
+        const actor = _bistResolveActor(actorKey);
+        const initials = (actor.userName || '?').split(' ').map(w=>w[0]).join('').slice(0,3).toUpperCase();
+        nodes.push(nm);
+        actors.push(initials);
+        anames.push(actor.userName || actorKey);
+      }
+    });
+
+    return {
+      id:       script.id,
+      name:     script.name,
+      spec,
+      nodes:    nodes.length ? nodes : ['Run'],
+      actors:   actors.length ? actors : ['?'],
+      anames:   anames.length ? anames : ['Unknown'],
+    };
+  });
+
+  // ── Render cockpit overlay ────────────────────────────────────────────────
+  const ov = document.createElement('div');
+  ov.id = 'bist-cockpit-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box';
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'width:100%;max-width:900px;max-height:calc(100vh - 40px);overflow:hidden;border-radius:10px;display:flex;flex-direction:column';
+  ov.appendChild(wrap);
+
+  // Inject cockpit HTML
+  wrap.innerHTML = _bistCockpitHTML(tmplName, version, TESTS);
+  document.body.appendChild(ov);
+
+  // Close on backdrop click
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+
+  // Expose close / proceed / override on the cockpit
+  window._bistCockpitClose   = () => ov.remove();
+  window._bistCockpitProceed = () => { ov.remove(); onProceed?.(); };
+  window._bistCockpitOverride = async () => {
+    const reason = prompt('Override reason (required — permanently recorded in Chain of Custody):');
+    if (!reason?.trim()) return;
+    const authorName = _resources_cad?.find(r => r.id === _myResourceId)?.name || 'Team Member';
+    await API.post('workflow_template_coc', {
+      firm_id: FIRM_ID_CAD, template_id: templateId,
+      event_type: 'bist_override', changed_by: _myResourceId || null,
+      changed_by_name: authorName,
+      note: `Released without passing tests — ${reason}`,
+      version_at: version, created_at: new Date().toISOString(),
+    }).catch(()=>{});
+    ov.remove();
+    onProceed?.();
+  };
+
+  // Init cockpit scene
+  _bistCkInit(TESTS);
+
+  // Start preflight then auto-launch if we have scripts
+  await _bistCkPreflight(tmplName, version, scripts.length, tmplSteps.length);
+
+  // Run all tests feeding cockpit
+  window._bistCkRunning = true;
+  const startMs = Date.now();
+  _bistCkStartClock(startMs);
+
+  const allResults = [];
+  for (let ti = 0; ti < TESTS.length; ti++) {
+    if (!document.getElementById('bist-cockpit-overlay')) break; // closed
+    const t = TESTS[ti];
+    _bistCkBeginTest(ti, t.name);
+
+    const result = await runBistScript(t.id, (ev) => {
+      if (!document.getElementById('bist-cockpit-overlay')) return;
+      _bistCkOnProgress(ti, t, ev, tmplSteps);
+    });
+
+    _bistCkEndTest(ti, result.status);
+    allResults.push({ name: t.name, status: result.status, runId: result.runId, reason: result.reason });
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  window._bistCkRunning = false;
+  _bistCkStopClock();
+
+  const allPass = allResults.every(r => r.status === 'passed');
+  const elapsed = Math.round((Date.now() - startMs) / 1000);
+
+  if (allPass) {
+    _bistCkAnnounce('ALL TESTS PASSED — CLEARED FOR RELEASE', true);
+    _bistCkRadio('ground', '✓ Flight recorder archived.');
+    await new Promise(r => setTimeout(r, 700));
+    _bistCkRadio('ground', '✓ Validation certificate archived.');
+    await new Promise(r => setTimeout(r, 700));
+    _bistCkRadio('ground', '✓ Chain of Custody archived.');
+    await new Promise(r => setTimeout(r, 700));
+    _bistCkRadio('ground', `Mission complete — ${tmplName} v${version} certified.`);
+
+    // Write cert CoC entry
+    const authorName = _resources_cad?.find(r => r.id === _myResourceId)?.name || 'Team Member';
+    const certId = 'CERT-' + new Date().toISOString().replace(/[-:T]/g,'').slice(0,14) + '-' + Math.floor(Math.random()*9000+1000);
+    await API.post('workflow_template_coc', {
+      firm_id: FIRM_ID_CAD, template_id: templateId,
+      event_type: 'bist_certified',
+      changed_by: _myResourceId || null,
+      changed_by_name: authorName,
+      field_name: `BIST Suite — ${TESTS.length} tests`,
+      note: `All ${TESTS.length} validation tests passed — ${certId}`,
+      version_at: version, created_at: new Date().toISOString(),
+    }).catch(()=>{});
+
+    await new Promise(r => setTimeout(r, 800));
+    _bistCkShowCert(tmplName, version, allResults, elapsed, certId, onProceed);
+  } else {
+    const failCount = allResults.filter(r => r.status !== 'passed').length;
+    _bistCkAnnounce(`${failCount} TEST${failCount > 1 ? 'S' : ''} FAILED — CANNOT RELEASE`, false);
+    _bistCkRadio('reject', `TOWER: ${failCount} test${failCount > 1 ? 's' : ''} failed. Release blocked. Review failures and re-run.`);
+    _bistCkShowFooter(false, onProceed);
+  }
+}
+
+// ── Cockpit HTML skeleton ────────────────────────────────────────────────────
+function _bistCockpitHTML(tmplName, version, tests) {
+  const tPills = tests.map((t, i) =>
+    `<div class="bck-tt ${i===0?'bck-ta':''}" id="bck-tt${i}" onclick="_bistCkSelTest(${i})">
+      <div class="bck-tn">T${i+1}</div>
+      <div class="bck-tnm">${_bistEscHtml(t.name)}</div>
+      <div class="bck-td" id="bck-td${i}"></div>
+    </div>`
+  ).join('');
+
+  return `<style>
+.bck{font-family:Arial,sans-serif;background:#02070f;border-radius:10px;overflow:hidden;border:1px solid rgba(0,180,255,.1);display:flex;flex-direction:column;position:relative;flex:1;min-height:0}
+.bck-gl{background:#110c04;height:26px;border-bottom:2px solid #1e1408;display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:10;position:relative}
+.bck-gld{width:8px;height:8px;border-radius:50%;background:#1a1208;transition:all .45s}
+.bck-gld.on{background:#4ade80;box-shadow:0 0 8px 2px rgba(74,222,128,.6)}
+.bck-gld.am{background:#EF9F27;box-shadow:0 0 8px 2px rgba(239,159,39,.6)}
+.bck-gl-lbl{font-size:8px;letter-spacing:.12em;color:rgba(255,180,60,.28);text-transform:uppercase}
+.bck-gs{flex:1}
+.bck-ann{font-size:9px;letter-spacing:.18em;color:rgba(255,180,60,.55);text-transform:uppercase;transition:all .4s}
+.bck-ann.go{color:rgba(74,222,128,.8);text-shadow:0 0 8px rgba(74,222,128,.4)}
+.bck-ann.fail{color:rgba(226,75,74,.8)}
+.bck-ws{position:relative;height:240px;overflow:hidden;flex-shrink:0}
+.bck-sky{position:absolute;inset:0;background:linear-gradient(180deg,#000308 0%,#000d2a 35%,#001845 55%,#012060 70%,#1a3d72 82%,#3a6090 100%)}
+.bck-stars{position:absolute;inset:0;pointer-events:none}
+.bck-earth{position:absolute;left:0;right:0;bottom:0;height:36%;background:linear-gradient(180deg,#1a3060 0%,#0d1f45 18%,#060f22 40%,#030810 70%,#020508 100%);overflow:hidden}
+.bck-eglow{position:absolute;bottom:0;left:0;right:0;height:70%;background:radial-gradient(ellipse 90% 50% at 50% 100%,rgba(160,100,15,.4) 0%,rgba(80,50,8,.18) 40%,transparent 80%)}
+.bck-cities{position:absolute;inset:0}
+.bck-hband{position:absolute;left:0;right:0;top:64%;height:3px;background:linear-gradient(90deg,transparent,rgba(180,220,255,.08) 15%,rgba(220,240,255,.3) 40%,rgba(255,255,255,.42) 50%,rgba(220,240,255,.3) 60%,rgba(180,220,255,.08) 85%,transparent)}
+.bck-wfl{position:absolute;left:0;top:0;bottom:0;width:52px;background:linear-gradient(90deg,#0d0903 30%,transparent);z-index:8;pointer-events:none}
+.bck-wfr{position:absolute;right:0;top:0;bottom:0;width:52px;background:linear-gradient(270deg,#0d0903 30%,transparent);z-index:8;pointer-events:none}
+.bck-wfp{position:absolute;left:50%;top:0;bottom:0;width:9px;background:#0b0703;transform:translateX(-50%);z-index:8;border-left:1px solid #1a1208;border-right:1px solid #1a1208}
+.bck-wft{position:absolute;top:0;left:0;right:0;height:18px;background:linear-gradient(180deg,#0d0903,transparent);z-index:8;pointer-events:none}
+.bck-wfb{position:absolute;bottom:0;left:0;right:0;height:16px;background:linear-gradient(0deg,#02070f,transparent);z-index:8;pointer-events:none}
+.bck-hud{position:absolute;inset:0;pointer-events:none;z-index:7}
+.bck-hhl{position:absolute;top:64%;left:6%;right:6%;height:1px;background:rgba(0,210,255,.12)}
+.bck-hcm{position:absolute;top:64%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px}
+.bck-hw{width:28px;height:1px;background:rgba(0,210,255,.28)}
+.bck-hd{width:5px;height:5px;border-radius:50%;border:1px solid rgba(0,210,255,.42)}
+.bck-hr{position:absolute;right:8%;top:16%;font-size:8px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;text-align:right;white-space:pre}
+.bck-hl{position:absolute;left:8%;top:16%;font-size:8px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;white-space:pre}
+.bck-pf{position:absolute;inset:0;background:rgba(2,7,15,.92);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 60px}
+.bck-pftitle{font-size:9px;letter-spacing:.2em;color:rgba(0,210,255,.5);text-transform:uppercase;margin-bottom:12px}
+.bck-pfchecks{width:100%;max-width:420px;display:flex;flex-direction:column;gap:4px}
+.bck-pfrow{display:flex;align-items:center;gap:10px;padding:4px 12px;border-radius:3px;border:1px solid rgba(255,255,255,.04);background:rgba(255,255,255,.02);opacity:0;transition:all .3s}
+.bck-pfrow.show{opacity:1}
+.bck-pfrow.ok{border-color:rgba(74,222,128,.2);background:rgba(74,222,128,.04)}
+.bck-pfind{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:rgba(255,255,255,.1);transition:all .3s}
+.bck-pfind.chk{background:#EF9F27;box-shadow:0 0 6px rgba(239,159,39,.5);animation:bckPfp .6s ease-in-out infinite}
+.bck-pfind.ok{background:#4ade80;box-shadow:0 0 5px rgba(74,222,128,.5);animation:none}
+@keyframes bckPfp{0%,100%{opacity:1}50%{opacity:.4}}
+.bck-pflbl{font-size:9px;color:rgba(255,255,255,.6);flex:1}
+.bck-pfsub{font-size:7px;color:rgba(255,255,255,.28);margin-top:1px}
+.bck-pfres{font-size:8px;font-family:monospace;color:rgba(255,255,255,.25);text-align:right;min-width:76px}
+.bck-pfres.ok{color:rgba(74,222,128,.7)}
+.bck-pfgo{margin-top:14px;font-size:10px;letter-spacing:.12em;color:rgba(0,210,255,.6);text-transform:uppercase;opacity:0;transition:opacity .5s}
+.bck-pfgo.show{opacity:1}
+.bck-dag{position:absolute;left:52px;right:52px;z-index:6;display:flex;justify-content:center}
+.bck-dagrow{display:flex;align-items:center;gap:0}
+.bck-dt{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.12);background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .35s}
+.bck-dt.on{border-color:#EF9F27;background:rgba(20,12,0,.75);box-shadow:0 0 14px rgba(239,159,39,.45)}
+.bck-dt.dn{border-color:rgba(74,222,128,.55);background:rgba(0,15,5,.7);box-shadow:0 0 10px rgba(74,222,128,.3)}
+.bck-de{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.1);background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .35s}
+.bck-de.dn{border-color:rgba(74,222,128,.6);box-shadow:0 0 12px rgba(74,222,128,.35)}
+.bck-nc{width:88px;flex-shrink:0;border-radius:4px;border:1.5px solid rgba(255,255,255,.07);background:rgba(0,4,12,.82);backdrop-filter:blur(4px);transition:all .35s;overflow:hidden}
+.bck-nc.ac{border-color:#EF9F27;background:rgba(12,8,0,.9);box-shadow:0 0 16px rgba(239,159,39,.35)}
+.bck-nc.dn{border-color:rgba(74,222,128,.45);background:rgba(0,10,4,.87);box-shadow:0 0 8px rgba(74,222,128,.18)}
+.bck-nc.rs{border-color:rgba(239,159,39,.35);background:rgba(12,6,0,.87)}
+.bck-nct{display:flex;align-items:center;gap:4px;padding:3px 5px 3px;border-bottom:1px solid rgba(255,255,255,.04)}
+.bck-nav{width:11px;height:11px;border-radius:50%;background:rgba(239,159,39,.18);border:1px solid rgba(239,159,39,.3);display:flex;align-items:center;justify-content:center;font-size:6px;color:rgba(239,159,39,.8);font-weight:700;flex-shrink:0}
+.bck-nan{font-size:7px;color:rgba(255,255,255,.28);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bck-nb{padding:4px 5px}
+.bck-ntitle{font-size:8px;font-weight:500;color:rgba(255,255,255,.78);line-height:1.3;min-height:20px}
+.bck-nst{display:flex;align-items:center;gap:3px;margin-top:2px}
+.bck-nsdot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.bck-nstxt{font-size:7px}
+.bck-cw{height:1.5px;background:rgba(255,255,255,.07);flex-shrink:0;transition:background .4s;width:12px}
+.bck-cw.dn{background:rgba(74,222,128,.32)}
+.bck-cw.ac{background:rgba(239,159,39,.4);animation:bckPw .9s ease-in-out infinite}
+@keyframes bckPw{0%,100%{opacity:.4}50%{opacity:1}}
+.bck-lz{position:absolute;left:52px;right:52px;z-index:5;pointer-events:none;overflow:visible}
+.bck-coc{position:absolute;right:0;top:26px;width:195px;background:rgba(2,5,12,.93);border-left:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;z-index:9}
+.bck-coch{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.bck-coct{font-size:7px;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,.22)}
+.bck-cocc{font-size:9px;font-family:monospace;color:rgba(0,210,255,.4)}
+.bck-cocf{overflow-y:auto;display:flex;flex-direction:column;height:196px}
+.bck-cocf::-webkit-scrollbar{width:2px}
+.bck-cocf::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
+.bck-ce{display:flex;gap:6px;padding:4px 10px;border-bottom:1px solid rgba(255,255,255,.025);animation:bckCi .18s ease-out}
+@keyframes bckCi{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.bck-cedot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.bck-ceb{flex:1}
+.bck-cet{font-size:8px;font-weight:500;letter-spacing:.03em}
+.bck-ced{font-size:7px;color:rgba(255,255,255,.22);line-height:1.5;margin-top:1px}
+.bck-cts{font-size:6px;font-family:monospace;color:rgba(255,255,255,.1);margin-top:1px}
+.bck-coam{background:linear-gradient(180deg,#0e0902,#0a0701);border-top:2px solid #1e1408;padding:5px 0 4px;flex-shrink:0}
+.bck-efrow{display:flex;padding:0 10px}
+.bck-ef{flex:1;padding:3px 7px;border-right:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;gap:2px}
+.bck-ef:last-child{border-right:none}
+.bck-eflbl{font-size:7px;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,160,50,.28)}
+.bck-efval{font-size:16px;font-family:monospace;font-weight:500;letter-spacing:.04em;color:#e8d4a0;line-height:1.1;transition:color .3s}
+.bck-efval.cyan{color:#00D2FF}.bck-efval.green{color:#4ade80}
+.bck-efbar{height:2px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden}
+.bck-effill{height:100%;border-radius:1px;transition:width .5s ease}
+.bck-efsub{font-size:7px;color:rgba(255,255,255,.15);font-family:monospace}
+.bck-radio{background:#040b17;border-top:1px solid rgba(0,210,255,.08);flex-shrink:0}
+.bck-rh{display:flex;align-items:center;gap:10px;padding:4px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.bck-rt{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:rgba(0,210,255,.35)}
+.bck-rdot{width:5px;height:5px;border-radius:50%;background:rgba(0,210,255,.15)}
+.bck-rdot.live{background:#00D2FF;box-shadow:0 0 5px #00D2FF;animation:bckBk .8s ease-in-out infinite}
+@keyframes bckBk{0%,100%{opacity:1}50%{opacity:.25}}
+.bck-rf{height:68px;overflow-y:auto;padding:4px 14px;display:flex;flex-direction:column-reverse}
+.bck-rf::-webkit-scrollbar{width:2px}
+.bck-rf::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
+.bck-tx{display:flex;align-items:flex-start;gap:8px;padding:2px 0;animation:bckTxi .2s ease-out}
+@keyframes bckTxi{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:translateX(0)}}
+.bck-tx.tower{flex-direction:row}
+.bck-tx.crew{flex-direction:row-reverse}
+.bck-tx.ground{flex-direction:row}
+.bck-tx.reject{flex-direction:row}
+.bck-txcs{font-size:8px;font-weight:700;letter-spacing:.06em;white-space:nowrap;flex-shrink:0;margin-top:1px}
+.bck-txbub{max-width:74%;padding:3px 7px;border-radius:3px;font-size:9px;line-height:1.5}
+.bck-tx.crew .bck-txbub{background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15);color:rgba(220,240,255,.75);border-radius:4px 0 4px 4px;text-align:right}
+.bck-tx.tower .bck-txbub{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.12);color:rgba(200,240,210,.75);border-radius:0 4px 4px 4px}
+.bck-tx.tower .bck-txcs{color:rgba(74,222,128,.6)}
+.bck-tx.crew .bck-txcs{color:rgba(0,210,255,.6)}
+.bck-tx.reject .bck-txbub{background:rgba(226,75,74,.06);border-color:rgba(226,75,74,.2);color:rgba(255,200,200,.75)}
+.bck-tx.reject .bck-txcs{color:rgba(226,75,74,.6)}
+.bck-tx.ground .bck-txbub{background:rgba(180,140,60,.06);border:1px solid rgba(180,140,60,.2);color:rgba(240,220,160,.8);border-radius:0 4px 4px 4px}
+.bck-tx.ground .bck-txcs{color:rgba(200,170,80,.7)}
+.bck-txts{font-size:7px;font-family:monospace;color:rgba(255,255,255,.15);white-space:nowrap;flex-shrink:0;margin-top:3px}
+.bck-ped{background:#060401;border-top:1px solid rgba(255,255,255,.04);padding:7px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.bck-tts{display:flex;gap:3px;flex:1}
+.bck-tt{flex:1;padding:4px 5px;border-radius:3px;border:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.015);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:3px}
+.bck-tt:hover{background:rgba(255,255,255,.04)}
+.bck-tt.bck-ta{background:rgba(0,210,255,.05);border-color:rgba(0,210,255,.2)}
+.bck-tn{font-size:7px;font-family:monospace;color:rgba(255,255,255,.2);background:rgba(255,255,255,.05);width:12px;height:12px;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.bck-tnm{font-size:8px;color:rgba(255,255,255,.38);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bck-td{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.07);flex-shrink:0;transition:all .3s}
+.bck-td.run{background:#00D2FF;box-shadow:0 0 5px #00D2FF;animation:bckBk .7s ease-in-out infinite}
+.bck-td.pass{background:#4ade80;box-shadow:0 0 4px #4ade80}
+.bck-td.fail{background:#E24B4A;box-shadow:0 0 4px #E24B4A}
+.bck-ring{position:relative;width:32px;height:32px;flex-shrink:0}
+.bck-ring svg{position:absolute;top:0;left:0;transform:rotate(-90deg)}
+.bck-ringc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-family:monospace;font-weight:500;color:#e8d4a0}
+.bck-closebtn{position:absolute;top:3px;right:10px;background:none;border:none;color:rgba(255,160,50,.35);cursor:pointer;font-size:14px;padding:2px 6px;z-index:20;line-height:1}
+.bck-closebtn:hover{color:rgba(255,160,50,.7)}
+</style>
+<div class="bck">
+  <div class="bck-gl">
+    <div class="bck-gld" id="bck-g1"></div><span class="bck-gl-lbl">Scripts</span>
+    <div class="bck-gld" id="bck-g2"></div><span class="bck-gl-lbl">Steps</span>
+    <div class="bck-gld" id="bck-g3"></div><span class="bck-gl-lbl">Actors</span>
+    <div class="bck-gld" id="bck-g4"></div><span class="bck-gl-lbl">Cleared</span>
+    <div class="bck-gs"></div>
+    <span class="bck-ann" id="bck-ann">FLIGHT SIMULATOR · ${_bistEscHtml(tmplName.toUpperCase())} · v${_bistEscHtml(version)}</span>
+    <div class="bck-gs"></div>
+    <span style="font-size:7px;font-family:monospace;color:rgba(255,160,50,.3)" id="bck-clock">--:--:--</span>
+    <button class="bck-closebtn" onclick="_bistCockpitClose()">✕</button>
+  </div>
+  <div class="bck-ws" id="bck-ws">
+    <div class="bck-sky"><div class="bck-stars" id="bck-stars"></div><div class="bck-earth"><div class="bck-eglow"></div><div class="bck-cities" id="bck-cities"></div></div><div class="bck-hband"></div></div>
+    <div class="bck-wfl"></div><div class="bck-wfr"></div><div class="bck-wfp"></div><div class="bck-wft"></div><div class="bck-wfb"></div>
+    <div class="bck-hud"><div class="bck-hhl"></div><div class="bck-hcm"><div class="bck-hw"></div><div class="bck-hd"></div><div class="bck-hw"></div></div>
+      <div class="bck-hr" id="bck-hr">ALT  28,400\nCAS  280 KT\nHDG  270°</div>
+      <div class="bck-hl" id="bck-hl">MODE NORM\nA/P  OFF\nSIM  READY</div>
+    </div>
+    <div class="bck-pf" id="bck-pf"><div class="bck-pftitle">Pre-flight validation sequence</div><div class="bck-pfchecks" id="bck-pfchecks"></div><div class="bck-pfgo" id="bck-pfgo">All systems nominal — initiating simulation</div></div>
+    <div class="bck-dag" id="bck-dag"><div class="bck-dagrow" id="bck-dagrow">
+      <div class="bck-dt" id="bck-dtrig"><svg width="6" height="6" viewBox="0 0 6 6"><polygon points="0,0 6,3 0,6" fill="rgba(255,255,255,.35)"/></svg></div>
+      <div id="bck-nodes" style="display:flex;align-items:center;gap:0"></div>
+      <div class="bck-de" id="bck-dend"><svg width="4" height="4" viewBox="0 0 4 4"><rect width="4" height="4" fill="rgba(255,255,255,.3)"/></svg></div>
+    </div></div>
+    <div class="bck-lz" id="bck-lz"><svg id="bck-lsvg" style="width:100%;overflow:visible;display:block" height="60"></svg></div>
+    <div class="bck-coc"><div class="bck-coch"><span class="bck-coct">Chain of Custody</span><span class="bck-cocc" id="bck-cocc">0 events</span></div><div class="bck-cocf" id="bck-cocf"><div style="padding:14px 10px;text-align:center;font-size:8px;color:rgba(255,255,255,.15);line-height:1.9">Awaiting<br>simulation launch</div></div></div>
+  </div>
+  <div class="bck-coam"><div class="bck-efrow">
+    <div class="bck-ef"><div class="bck-eflbl">Test suite</div><div class="bck-efval cyan" id="bck-ef0">0/0</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef0b" style="width:0%;background:#00D2FF"></div></div><div class="bck-efsub" id="bck-ef0s">ready</div></div>
+    <div class="bck-ef"><div class="bck-eflbl">Steps fired</div><div class="bck-efval" id="bck-ef1">0</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef1b" style="width:0%;background:#4ade80"></div></div><div class="bck-efsub">actions</div></div>
+    <div class="bck-ef"><div class="bck-eflbl">Assertions</div><div class="bck-efval" id="bck-ef2">0</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef2b" style="width:0%;background:#EF9F27"></div></div><div class="bck-efsub">checked</div></div>
+    <div class="bck-ef"><div class="bck-eflbl">Rework loops</div><div class="bck-efval" id="bck-ef3">0</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef3b" style="width:0%;background:#E24B4A"></div></div><div class="bck-efsub">resets</div></div>
+    <div class="bck-ef"><div class="bck-eflbl">CoC events</div><div class="bck-efval" id="bck-ef4">0</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef4b" style="width:0%;background:#c47d18"></div></div><div class="bck-efsub">written</div></div>
+    <div class="bck-ef"><div class="bck-eflbl">Elapsed</div><div class="bck-efval cyan" id="bck-ef5">00:00</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef5b" style="width:0%;background:#00D2FF"></div></div><div class="bck-efsub">mm:ss</div></div>
+  </div></div>
+  <div class="bck-radio"><div class="bck-rh"><div class="bck-rdot" id="bck-rdot"></div><span class="bck-rt">Crew / Tower / Ground Communications</span></div><div class="bck-rf" id="bck-rf"><div style="padding:6px 14px;font-size:8px;color:rgba(255,255,255,.15);font-family:monospace">— Radio silence —</div></div></div>
+  <div class="bck-ped">
+    <div class="bck-ring" id="bck-ring"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="2.5"/><circle cx="16" cy="16" r="12" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-dasharray="75.4" id="bck-ringc" stroke-dashoffset="75.4" stroke-linecap="round" style="transition:stroke-dashoffset .5s ease"/></svg><div class="bck-ringc" id="bck-ringv">0%</div></div>
+    <div class="bck-tts" id="bck-tts">${tPills}</div>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <button style="font-size:9px;padding:5px 9px;border-radius:3px;border:1px solid rgba(226,75,74,.22);background:none;color:rgba(226,75,74,.38);cursor:pointer;letter-spacing:.06em" onclick="_bistCockpitClose()">CLOSE</button>
+      <div id="bck-foot-btns"></div>
+    </div>
+  </div>
+</div>`;
+}
+
+// ── Cockpit state ─────────────────────────────────────────────────────────────
+var _bckCocCount = 0;
+var _bckSC = 0, _bckASC = 0, _bckRWC = 0, _bckPassC = 0;
+var _bckClockTimer = null;
+var _bckElTimer = null;
+var _bckStartMs = null;
+
+function _bckEl(id) { return document.getElementById(id); }
+function _bckSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function _bistCkInit(tests) {
+  // Stars
+  var stars = _bckEl('bck-stars');
+  if (stars) {
+    var h = '';
+    for (var i = 0; i < 90; i++) {
+      var x = (Math.random()*100).toFixed(1), y = (Math.random()*100).toFixed(1);
+      var sz = Math.random() < .12 ? 1.5 : Math.random() < .3 ? 1 : .5;
+      var op = (.12 + Math.random()*.5).toFixed(2);
+      h += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:rgba(210,225,255,'+op+')"></div>';
+    }
+    stars.innerHTML = h;
+  }
+  // City dots
+  var cities = _bckEl('bck-cities');
+  if (cities) {
+    var ch = '';
+    var cols = ['rgba(255,185,55,.45)','rgba(90,175,255,.38)','rgba(255,255,190,.3)','rgba(255,120,50,.25)'];
+    for (var i = 0; i < 180; i++) {
+      var x = (Math.random()*100).toFixed(1), y = (10+Math.random()*85).toFixed(1);
+      var sz = Math.random() < .08 ? 2 : 1;
+      ch += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+cols[Math.floor(Math.random()*cols.length)]+'"></div>';
+    }
+    cities.innerHTML = ch;
+  }
+  // Glareshield lights
+  ['bck-g1','bck-g2','bck-g3','bck-g4'].forEach(function(id, i) {
+    setTimeout(function() {
+      var el = _bckEl(id); if (el) { el.className = 'bck-gld am'; setTimeout(function() { if (el) el.className = 'bck-gld on'; }, 350); }
+    }, 250 + i*200);
+  });
+  // Position DAG and loop zones
+  _bckPosZones();
+  // Init EFIS
+  _bckEl('bck-ef0').textContent = '0/' + tests.length;
+  _bckCocCount = 0; _bckSC = 0; _bckASC = 0; _bckRWC = 0; _bckPassC = 0;
+  // Clock
+  _bckClockTimer = setInterval(function() {
+    var el = _bckEl('bck-clock');
+    if (el) el.textContent = new Date().toTimeString().slice(0,8);
+  }, 1000);
+}
+
+function _bckPosZones() {
+  var ws = _bckEl('bck-ws'); if (!ws) return;
+  var h = ws.offsetHeight || 240, hp = 0.64, nH = 78;
+  var dz = _bckEl('bck-dag');
+  if (dz) dz.style.cssText = 'position:absolute;left:52px;right:52px;z-index:6;display:flex;justify-content:center;top:'+Math.round(h*hp-nH+6)+'px';
+  var lz = _bckEl('bck-lz');
+  var lT = Math.round(h*hp)+3;
+  if (lz) lz.style.cssText = 'position:absolute;left:52px;right:52px;z-index:5;pointer-events:none;top:'+lT+'px;height:'+(h-lT)+'px;overflow:visible';
+}
+
+async function _bistCkPreflight(tmplName, version, scriptCount, stepCount) {
+  var checks = [
+    { lbl:'Test script registry', sub:'Locating '+scriptCount+' registered test scripts', res: scriptCount+' scripts found', dur:700 },
+    { lbl:'Template step integrity', sub:'Verifying '+stepCount+'-step workflow structure', res: stepCount+' steps verified', dur:650 },
+    { lbl:'Actor identity resolution', sub:'Resolving actors from resources table', res:'Actors resolved', dur:680 },
+    { lbl:'Outcome routing map', sub:'Validating named outcomes and reset paths', res:'All outcomes valid', dur:620 },
+    { lbl:'CoC write permissions', sub:'Confirming workflow_step_instances insert access', res:'Write access confirmed', dur:600 },
+    { lbl:'Reset cascade logic', sub:'Checking step_reset chain integrity', res:'Cascade logic nominal', dur:580 },
+    { lbl:'Assertion engine', sub:'Loading verification checks across all test scripts', res:'Assertions armed', dur:560 },
+    { lbl:'Cleanup procedures', sub:'Confirming post-run instance purge protocols', res:'Cleanup procedures armed', dur:520 },
+  ];
+  var pf = _bckEl('bck-pf'); if (!pf) return;
+  var checks_el = _bckEl('bck-pfchecks'); if (!checks_el) return;
+  checks_el.innerHTML = '';
+  pf.style.display = 'flex';
+  for (var i = 0; i < checks.length; i++) {
+    var c = checks[i];
+    var row = document.createElement('div'); row.className = 'bck-pfrow';
+    row.innerHTML = '<div class="bck-pfind chk" id="bck-pfi'+i+'"></div><div style="flex:1"><div class="bck-pflbl">'+_bistEscHtml(c.lbl)+'</div><div class="bck-pfsub">'+_bistEscHtml(c.sub)+'</div></div><div class="bck-pfres" id="bck-pfr'+i+'">checking…</div>';
+    checks_el.appendChild(row);
+    await _bckSleep(60); row.classList.add('show');
+    await _bckSleep(c.dur);
+    row.classList.add('ok');
+    var ind = _bckEl('bck-pfi'+i); if (ind) ind.className = 'bck-pfind ok';
+    var res = _bckEl('bck-pfr'+i); if (res) { res.className = 'bck-pfres ok'; res.textContent = c.res; }
+    await _bckSleep(80);
+  }
+  var go = _bckEl('bck-pfgo'); if (go) go.classList.add('show');
+  await _bckSleep(1400);
+  if (pf) pf.style.display = 'none';
+}
+
+function _bistCkSelTest(ti) {
+  document.querySelectorAll('.bck-tt').forEach(function(el, j) {
+    el.className = 'bck-tt' + (j===ti?' bck-ta':'');
+  });
+}
+
+function _bistCkBeginTest(ti, name) {
+  _bistCkSelTest(ti);
+  var td = _bckEl('bck-td'+ti); if (td) td.className = 'bck-td run';
+  var ann = _bckEl('bck-ann');
+  if (ann) { ann.textContent = 'T'+(ti+1)+' EXECUTING — '+name.toUpperCase(); ann.className = 'bck-ann'; }
+  // Reset DAG for this test
+  var nodes = _bckEl('bck-nodes'); if (nodes) nodes.innerHTML = '';
+  var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt';
+  var de = _bckEl('bck-dend'); if (de) de.className = 'bck-de';
+  var lsvg = _bckEl('bck-lsvg'); if (lsvg) lsvg.innerHTML = '';
+}
+
+function _bistCkEndTest(ti, status) {
+  var td = _bckEl('bck-td'+ti);
+  if (td) td.className = 'bck-td ' + (status === 'passed' ? 'pass' : 'fail');
+  if (status === 'passed') {
+    _bckPassC++;
+    var p = Math.round(_bckPassC / (document.querySelectorAll('.bck-td').length) * 100);
+    var rc = _bckEl('bck-ringc'); if (rc) rc.style.strokeDashoffset = 75.4 - (p/100*75.4);
+    var rv = _bckEl('bck-ringv'); if (rv) rv.textContent = p+'%';
+    var ef0 = _bckEl('bck-ef0'); if (ef0) ef0.textContent = _bckPassC+'/'+document.querySelectorAll('.bck-td').length;
+    var ef0b = _bckEl('bck-ef0b'); if (ef0b) ef0b.style.width = p+'%';
+    var ef0s = _bckEl('bck-ef0s'); if (ef0s) ef0s.textContent = _bckPassC === document.querySelectorAll('.bck-td').length ? 'all passing' : 'in progress';
+  }
+}
+
+function _bistCkOnProgress(ti, test, ev, tmplSteps) {
+  var type = ev.type;
+  if (type === 'instance_created') {
+    var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt on';
+    _bistCkAddCoc('#00D2FF','instance_launched','Template: '+_bistEscHtml(test.name));
+    _bistCkRadio('crew','T'+(ti+1)+' ready. '+_bistEscHtml(test.name));
+  } else if (type === 'step_start') {
+    var idx = ev.stepIdx || 0;
+    _bckSC++;
+    var ef1 = _bckEl('bck-ef1'); if (ef1) ef1.textContent = _bckSC;
+    var ef1b = _bckEl('bck-ef1b'); if (ef1b) ef1b.style.width = Math.min(100,_bckSC*4)+'%';
+    // Activate node in DAG
+    _bistCkSetNode(ev.stepId, idx, test, 'active', 'In progress', tmplSteps);
+  } else if (type === 'step_pass') {
+    var idx = ev.stepIdx || 0;
+    _bistCkSetNode(ev.stepId, idx, test, 'done', ev.outcome || 'Done', tmplSteps);
+    var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt dn';
+    _bistCkAddCoc('#4ade80','step_completed', _bistEscHtml(ev.stepName||'Step')+' · '+_bistEscHtml(ev.outcome||'Done'));
+    _bistCkRadio('tower',_bistEscHtml(ev.stepName||'Step')+' completed — '+_bistEscHtml(ev.outcome||'Done'));
+  } else if (type === 'step_fail') {
+    _bistCkAddCoc('#E24B4A','step_failed', _bistEscHtml(ev.reason||'Assertion failed'));
+    _bistCkRadio('reject','TOWER: Step failed — '+_bistEscHtml((ev.reason||'').slice(0,80)));
+    _bckRWC++;
+    var ef3 = _bckEl('bck-ef3'); if (ef3) ef3.textContent = _bckRWC;
+    var ef3b = _bckEl('bck-ef3b'); if (ef3b) ef3b.style.width = Math.min(100,_bckRWC*12)+'%';
+  } else if (type === 'complete') {
+    var de = _bckEl('bck-dend'); if (de) de.className = 'bck-de dn';
+    _bistCkAddCoc('#4ade80','instance_completed','All steps complete · '+_bistEscHtml(test.name));
+  } else if (type === 'error') {
+    _bistCkAddCoc('#E24B4A','error', _bistEscHtml(ev.message||'Unknown error'));
+    _bistCkRadio('reject','TOWER: Error — '+_bistEscHtml((ev.message||'').slice(0,80)));
+  }
+}
+
+function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
+  var nodes = _bckEl('bck-nodes'); if (!nodes) return;
+  var nodeId = 'bck-n-'+stepId;
+  var existing = document.getElementById(nodeId);
+  if (!existing) {
+    // Build the node
+    var aname = test.anames[stepIdx] || 'Actor';
+    var actor  = test.actors[stepIdx] || '?';
+    var nm     = (test.nodes[stepIdx] || 'Step').split('\n');
+    var card = document.createElement('div'); card.className = 'bck-nc'; card.id = nodeId;
+    card.innerHTML = '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(actor)+'</div><div class="bck-nan">'+_bistEscHtml(aname)+'</div></div><div class="bck-nb"><div class="bck-ntitle">'+_bistEscHtml(nm[0])+(nm[1]?'<br><span style="opacity:.5;font-size:7px">'+_bistEscHtml(nm[1])+'</span>':'')+'</div><div class="bck-nst" id="bck-nst-'+stepId+'"><div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div><span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span></div></div>';
+    if (nodes.children.length > 0) {
+      var cw = document.createElement('div'); cw.className = 'bck-cw'; nodes.appendChild(cw);
+    }
+    nodes.appendChild(card);
+  }
+  var el = document.getElementById(nodeId); if (!el) return;
+  var cls = {idle:'bck-nc', active:'bck-nc ac', done:'bck-nc dn', reset:'bck-nc rs'};
+  el.className = cls[state] || 'bck-nc';
+  var nst = document.getElementById('bck-nst-'+stepId); if (!nst) return;
+  var col = {done:'#4ade80', active:'#EF9F27', reset:'#EF9F27'}[state] || '#888';
+  var lbl2 = {done:label, active:'Active', reset:'Reset → '+label}[state] || label;
+  nst.innerHTML = '<div class="bck-nsdot" style="background:'+col+'"></div><span class="bck-nstxt" style="color:'+col+'">'+_bistEscHtml(lbl2)+'</span>';
+}
+
+function _bistCkAddCoc(color, type, detail) {
+  var feed = _bckEl('bck-cocf'); if (!feed) return;
+  if (_bckCocCount === 0) feed.innerHTML = '';
+  _bckCocCount++;
+  var ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var ev = document.createElement('div'); ev.className = 'bck-ce';
+  ev.innerHTML = '<div class="bck-cedot" style="background:'+color+'"></div><div class="bck-ceb"><div class="bck-cet" style="color:'+color+'">'+type+'</div><div class="bck-ced">'+detail+'</div><div class="bck-cts">'+ts+'</div></div>';
+  feed.insertBefore(ev, feed.firstChild);
+  var cc = _bckEl('bck-cocc'); if (cc) cc.textContent = _bckCocCount+' event'+(_bckCocCount!==1?'s':'');
+  var ef4 = _bckEl('bck-ef4'); if (ef4) ef4.textContent = _bckCocCount;
+  var ef4b = _bckEl('bck-ef4b'); if (ef4b) ef4b.style.width = Math.min(100,Math.round(_bckCocCount/50*100))+'%';
+  var hl = _bckEl('bck-hl'); if (hl) hl.textContent = 'MODE NORM\nA/P  ENGAGED\nSIM  RUN';
+}
+
+function _bistCkRadio(side, msg) {
+  var feed = _bckEl('bck-rf'); if (!feed) return;
+  var first = feed.querySelector('div[style]'); if (first) first.remove();
+  var ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var isRej = side==='reject', isTow = side==='tower'||isRej, isGnd = side==='ground';
+  var tx = document.createElement('div');
+  tx.className = 'bck-tx '+(isGnd?'ground':isRej?'reject tower':isTow?'tower':'crew');
+  var cs = document.createElement('span'); cs.className = 'bck-txcs';
+  cs.textContent = isGnd?'GROUND':isRej?'TOWER':isTow?'TOWER':'CREW';
+  var bub = document.createElement('div'); bub.className = 'bck-txbub'; bub.textContent = msg;
+  var stamp = document.createElement('span'); stamp.className = 'bck-txts'; stamp.textContent = ts;
+  if (isTow||isGnd) { tx.appendChild(cs); tx.appendChild(bub); tx.appendChild(stamp); }
+  else { tx.appendChild(stamp); tx.appendChild(bub); tx.appendChild(cs); }
+  feed.insertBefore(tx, feed.firstChild);
+  var rd = _bckEl('bck-rdot'); if (rd) { rd.className = 'bck-rdot live'; setTimeout(function(){if(rd)rd.className='bck-rdot';},1200); }
+}
+
+function _bistCkAnnounce(msg, success) {
+  var ann = _bckEl('bck-ann');
+  if (ann) { ann.textContent = msg; ann.className = 'bck-ann '+(success?'go':'fail'); }
+}
+
+function _bistCkStartClock(startMs) {
+  _bckStartMs = startMs;
+  _bckElTimer = setInterval(function() {
+    if (!_bckStartMs) return;
+    var s = Math.floor((Date.now()-_bckStartMs)/1000);
+    var ef5 = _bckEl('bck-ef5'); if (ef5) ef5.textContent = String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+    var ef5b = _bckEl('bck-ef5b'); if (ef5b) ef5b.style.width = Math.min(100,Math.round(s/120*100))+'%';
+  }, 1000);
+}
+
+function _bistCkStopClock() {
+  if (_bckElTimer) { clearInterval(_bckElTimer); _bckElTimer = null; }
+  if (_bckClockTimer) { clearInterval(_bckClockTimer); _bckClockTimer = null; }
+}
+
+function _bistCkShowFooter(allPass, onProceed) {
+  var fb = _bckEl('bck-foot-btns'); if (!fb) return;
+  if (allPass) {
+    fb.innerHTML = '<button style="font-size:10px;font-weight:700;padding:6px 14px;border-radius:3px;border:none;cursor:pointer;background:#2a9d40;color:#fff;letter-spacing:.08em;margin-right:4px" onclick="_bistCockpitProceed()">Release</button>'
+      + '<button style="font-size:9px;padding:6px 10px;border-radius:3px;border:1px solid rgba(212,144,31,.3);background:none;color:rgba(212,144,31,.7);cursor:pointer" onclick="_bistCockpitOverride()">Override…</button>';
+  } else {
+    fb.innerHTML = '<button style="font-size:9px;padding:6px 10px;border-radius:3px;border:1px solid rgba(212,144,31,.3);background:none;color:rgba(212,144,31,.7);cursor:pointer" onclick="_bistCockpitOverride()">Override…</button>';
+  }
+}
+
+function _bistCkShowCert(tmplName, version, results, elapsed, certId, onProceed) {
+  _bistCkShowFooter(true, onProceed);
+  // Build cert overlay inside the cockpit overlay
+  var ov = document.getElementById('bist-cockpit-overlay'); if (!ov) return;
+  var certDiv = document.createElement('div');
+  certDiv.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,.78);z-index:100;display:flex;align-items:center;justify-content:center;animation:bckFadeIn .4s ease-out';
+  if (!document.getElementById('bck-fadein-style')) {
+    var s = document.createElement('style'); s.id='bck-fadein-style';
+    s.textContent='@keyframes bckFadeIn{from{opacity:0}to{opacity:1}}@keyframes bckCertIn{from{opacity:0;transform:scale(.92) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}';
+    document.head.appendChild(s);
+  }
+  var elStr = Math.floor(elapsed/60)+'m '+String(elapsed%60).padStart(2,'0')+'s';
+  var now = new Date();
+  var dateStr = now.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  var timeStr = now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var testRows = results.map(function(r,i){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(180,140,60,.08)">'
+      +'<span style="color:'+(r.status==='passed'?'#1a6b2a':'#c0404a')+';font-size:11px;font-weight:700;flex-shrink:0">'+(r.status==='passed'?'✓':'✕')+'</span>'
+      +'<span style="font-size:10px;color:#2a1e08;flex:1">T'+(i+1)+' — '+_bistEscHtml(r.name)+'</span>'
+      +'<span style="font-size:9px;color:'+(r.status==='passed'?'#1a6b2a':'#c0404a')+';font-weight:600;letter-spacing:.06em">'+(r.status==='passed'?'PASSED':'FAILED')+'</span>'
+    +'</div>';
+  }).join('');
+  var passed = results.filter(function(r){return r.status==='passed';}).length;
+  certDiv.innerHTML = '<div style="background:#fdfaf4;border-radius:4px;width:480px;max-width:95%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6);position:relative;animation:bckCertIn .5s cubic-bezier(.2,.8,.3,1)">'
+    +'<div style="position:absolute;inset:8px;border:1.5px solid rgba(180,140,60,.35);border-radius:2px;pointer-events:none;z-index:0"></div>'
+    +'<div style="background:linear-gradient(135deg,#1a0e2e,#0d1a3a);padding:18px 28px 14px;text-align:center;position:relative;z-index:1">'
+      +'<div style="font-size:9px;letter-spacing:.25em;color:rgba(200,180,120,.6);text-transform:uppercase;margin-bottom:4px">CadenceHUD · ProjectHUD Platform</div>'
+      +'<div style="font-size:18px;font-weight:700;color:#e8d4a0;letter-spacing:.06em">VALIDATION CERTIFICATE</div>'
+      +'<div style="font-size:9px;color:rgba(200,180,120,.5);letter-spacing:.12em;text-transform:uppercase;margin-top:3px">Built-In Self Test · Flight Simulation Record</div>'
+    +'</div>'
+    +'<div style="height:2px;background:linear-gradient(90deg,transparent,rgba(180,140,60,.5) 30%,rgba(210,170,80,.8) 50%,rgba(180,140,60,.5) 70%,transparent)"></div>'
+    +'<div style="padding:16px 28px 12px;background:#fdfaf4;position:relative;z-index:1">'
+      +'<div style="font-size:10px;letter-spacing:.18em;color:rgba(80,60,20,.5);text-transform:uppercase;text-align:center">This certifies that</div>'
+      +'<div style="font-size:17px;font-weight:700;color:#1a1208;text-align:center;margin-top:2px">'+_bistEscHtml(tmplName)+'</div>'
+      +'<div style="font-size:9px;color:rgba(80,60,20,.5);font-family:monospace;text-align:center;margin-top:2px">v'+_bistEscHtml(version)+'</div>'
+      +'<div style="font-size:10px;color:rgba(80,60,20,.5);text-align:center;margin:6px 0 10px;font-style:italic">has successfully completed all required validation tests and is certified for release</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0">'
+        +'<div style="background:rgba(180,140,60,.06);border:1px solid rgba(180,140,60,.18);border-radius:3px;padding:6px 10px;text-align:center"><div style="font-size:18px;font-weight:700;color:'+(passed===results.length?'#1a6b2a':'#c0404a')+';font-family:monospace">'+passed+'/'+results.length+'</div><div style="font-size:8px;letter-spacing:.1em;color:rgba(80,60,20,.5);text-transform:uppercase;margin-top:2px">Tests passed</div></div>'
+        +'<div style="background:rgba(180,140,60,.06);border:1px solid rgba(180,140,60,.18);border-radius:3px;padding:6px 10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#1a1208;font-family:monospace">'+elStr+'</div><div style="font-size:8px;letter-spacing:.1em;color:rgba(80,60,20,.5);text-transform:uppercase;margin-top:2px">Duration</div></div>'
+      +'</div>'
+      +'<div style="border-top:1px solid rgba(180,140,60,.2);padding-top:8px;margin-top:8px">'+testRows+'</div>'
+      +'<div style="font-size:8px;color:rgba(80,60,20,.4);font-family:monospace;margin-top:8px">ID: '+_bistEscHtml(certId)+'</div>'
+    +'</div>'
+    +'<div style="padding:10px 28px 16px;background:#fdfaf4;border-top:1px solid rgba(180,140,60,.15);position:relative;z-index:1">'
+      +'<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">'
+        +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid rgba(80,60,20,.3);margin-bottom:4px;height:22px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px"><span style="font-size:13px;font-family:Georgia,serif;color:rgba(30,20,8,.45);font-style:italic">'+_bistEscHtml((_resources_cad&&_resources_cad.find(function(r){return r.id===_myResourceId;}))||{name:'Team Member'}).name+'</span></div><div style="font-size:8px;color:rgba(80,60,20,.45)">Submitting Principal · '+_bistEscHtml(dateStr)+'</div></div>'
+        +'<div style="width:74px;height:74px;position:relative;flex-shrink:0"><div style="width:74px;height:74px;border-radius:50%;border:3px solid rgba(180,30,30,.75);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transform:rotate(-18deg);background:rgba(180,30,30,.04);position:relative"><div style="position:absolute;inset:3px;border-radius:50%;border:1px dashed rgba(180,30,30,.3)"></div><div style="font-size:7px;letter-spacing:.1em;color:rgba(180,30,30,.8);text-transform:uppercase;font-weight:700">Validated</div><div style="font-size:15px;font-weight:900;color:rgba(180,30,30,.85);line-height:1">PASS</div><div style="font-size:8px;font-weight:700;color:rgba(180,30,30,.7)">Certified</div><div style="font-size:7px;font-family:monospace;color:rgba(180,30,30,.55)">'+now.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'})+'</div></div></div>'
+        +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid rgba(80,60,20,.3);margin-bottom:4px;height:22px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px"><span style="font-size:10px;font-family:monospace;color:rgba(30,20,8,.3)">'+_bistEscHtml(certId)+'</span></div><div style="font-size:8px;color:rgba(80,60,20,.45)">System validation · '+_bistEscHtml(timeStr)+'</div></div>'
+      +'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:10px">'
+        +(onProceed ? '<button onclick="_bistCockpitProceed()" style="flex:1;padding:8px;background:#2a9d40;color:#fff;border:none;border-radius:3px;font-size:11px;font-weight:600;letter-spacing:.08em;cursor:pointer">Release v'+_bistEscHtml(version)+'</button>' : '')
+        +'<button onclick="this.closest(\'div[style*=\\\"position:absolute\\\"]\').remove()" style="flex:1;padding:8px;background:rgba(180,140,60,.1);border:1px solid rgba(180,140,60,.3);border-radius:3px;font-size:10px;font-weight:600;letter-spacing:.1em;color:#6b4a0a;cursor:pointer">Close</button>'
+      +'</div>'
+    +'</div>'
+  +'</div>';
+  certDiv.addEventListener('click', function(e){ if(e.target===certDiv) certDiv.remove(); });
+  ov.appendChild(certDiv);
+}
+
+function _bistEscHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }

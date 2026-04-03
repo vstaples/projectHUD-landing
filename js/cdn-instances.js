@@ -1,4 +1,5 @@
-// cdn-instances.js — Cadence: instance list, detail, launch, step lifecycle
+// cdn-instances.js
+console.log('%c[cdn-instances] v20260403-S9','background:#185FA5;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px'); — Cadence: instance list, detail, launch, step lifecycle
 // Largest module — instance list render, detail panel, step transitions
 // LOAD ORDER: 17th (last — depends on all others)
 
@@ -420,10 +421,13 @@ function renderInstancesTab(el) {
                     ${escHtml(inst.title||tmpl?.name||'Untitled')}
                   </div>
 
-                  <!-- Status + template -->
+                  <!-- Status + template + S9 type badge -->
                   <div style="font-size:10px;color:var(--muted);display:flex;gap:6px;align-items:center;margin-bottom:3px">
                     <span style="color:${color};font-weight:600;font-size:10px;
                       letter-spacing:.08em;text-transform:uppercase">${statusLabel[inst.status]||inst.status}</span>
+                    ${inst.source_type==='form'
+                      ? '<span style=\"font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(29,158,117,.12);color:#3fd4a8;font-weight:600;letter-spacing:.04em;flex-shrink:0\">FM</span>'
+                      : '<span style=\"font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(124,77,255,.15);color:#a585ff;font-weight:600;letter-spacing:.04em;flex-shrink:0\">WF</span>'}
                     <span>${escHtml(tmpl?.name||'—')}</span>
                   </div>
 
@@ -2269,4 +2273,3 @@ async function _reloadInstance(instId) {
   if (detailEl && _selectedInstance) renderInstanceDetail(detailEl, _selectedInstance);
   setTimeout(_populateReworkBadges, 50);
 }
-
