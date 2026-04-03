@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-350000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-370000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -783,2480 +783,403 @@ window.loadUserConcerns = async function() {
   }
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// MY REQUESTS — CadenceHUD-backed engine  v20260403-400000
+// Browse  = live query: workflow_templates + workflow_form_definitions (compass_visible=true)
+// Active  = live query: workflow_instances submitted by this user
+// History = completed instances
+// Instance view = full-screen overlay mounting CadenceHUD instance renderer
+// ══════════════════════════════════════════════════════════════════════════════
 
-// ── My Requests — loadUserRequests ───────────────────────
-// Fetches real workflow_instances submitted by this user and maps them
-// to the _myRequests shape expected by renderMyRequestsActive/History.
+// ── State ─────────────────────────────────────────────────────────────────────
+window._myrTemplates   = [];
+window._myrFormDefs    = [];
+window._myrInstances   = [];
+window._myrLoadRunning = false;
+window._myrLoadPending = false;
+
+// ── Entry point ───────────────────────────────────────────────────────────────
 window.loadUserRequests = async function() {
+  if (window._myrLoadRunning) {
+    window._myrLoadPending = true;
+    return;
+  }
+  window._myrLoadRunning = true;
+  window._myrLoadPending = false;
   window._requestsLoaded = true;
   try {
+    const resId  = _myResource?.id;
+    const firmId = _mwFirmId();
+    const [wfTmpls, formDefs, instances] = await Promise.all([
+      API.get(`workflow_templates?compass_visible=eq.true&status=eq.released&firm_id=eq.${firmId}&order=name.asc&select=id,name,description,status,version,trigger_type`).catch(() => []),
+      API.get(`workflow_form_definitions?compass_visible=eq.true&state=eq.released&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id`).catch(() => []),
+      resId ? API.get(`workflow_instances?submitted_by_resource_id=eq.${resId}&order=created_at.desc&limit=100&select=id,title,status,current_step_name,workflow_type,template_id,created_at,updated_at`).catch(() => []) : [],
+    ]);
+    window._myrTemplates = wfTmpls  || [];
+    window._myrFormDefs  = formDefs || [];
+    window._myrInstances = instances || [];
+    _myrRenderAll();
+  } catch(e) {
+    console.error('[loadUserRequests] failed:', e.message);
+  } finally {
+    window._myrLoadRunning = false;
+    if (window._myrLoadPending) {
+      window._myrLoadPending = false;
+      setTimeout(() => window.loadUserRequests && window.loadUserRequests(), 300);
+    }
+  }
+};
 
-  // Inject supplemental styles once
-  if (!document.getElementById('myr-ext-styles')) {
-    const s = document.createElement('style');
-    s.id = 'myr-ext-styles';
-    s.textContent = `
-      /* Active request card — raised, accented */
-      .myr-active-req {
-        border: 1px solid rgba(0,210,255,.18);
-        border-left: 3px solid rgba(0,210,255,.5);
-        margin-bottom: 10px;
-        overflow: hidden;
-        background: rgba(0,210,255,.03);
-        box-shadow: 0 2px 8px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
-        transition: border-color .15s, box-shadow .15s;
-        max-width: 900px;
-      }
-      .myr-active-req:hover {
-        border-color: rgba(0,210,255,.35);
-        border-left-color: rgba(0,210,255,.8);
-        box-shadow: 0 3px 12px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
-      }
-      .myr-ar-head {
-        display: flex; align-items: center; gap: 8px;
-        padding: 10px 14px;
-        border-bottom: 1px solid rgba(255,255,255,.05);
-        cursor: pointer; transition: background .12s;
-      }
-      .myr-ar-head:hover { background: rgba(255,255,255,.03); }
-      .myr-ar-body { padding: 10px 14px; display: none; }
-      .myr-ar-body.open { display: block; }
-      /* Step progress */
-      .myr-pt-steps {
-        display: flex; gap: 0; position: relative;
-        margin: 6px 0 12px;
-      }
-      .myr-pt-steps::before {
-        content: ''; position: absolute; top: 9px; left: 0; right: 0;
-        height: 1px; background: rgba(255,255,255,.08); z-index: 0;
-      }
-      .myr-pt-step {
-        display: flex; flex-direction: column; align-items: center;
-        gap: 5px; flex: 1; position: relative; z-index: 1;
-      }
-      .myr-pt-dot {
-        width: 20px; height: 20px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 10px; font-weight: 700; flex-shrink: 0;
-      }
-      .myr-ptd-done   { background: #1D9E75; color: #fff; box-shadow: 0 0 0 3px rgba(29,158,117,.2); }
-      .myr-ptd-active { background: #EF9F27; color: #060a10; animation: myrActivePulse 1.5s infinite; box-shadow: 0 0 0 3px rgba(239,159,39,.25); }
-      @keyframes myrActivePulse { 0%,100%{opacity:1} 50%{opacity:.65} }
-      .myr-ptd-pending { background: rgba(255,255,255,.06); color: rgba(255,255,255,.3); border: 1px solid rgba(255,255,255,.12); }
-      .myr-pt-name {
-        font-size: 11px; color: rgba(255,255,255,.35);
-        text-align: center; letter-spacing: .03em; line-height: 1.3; max-width: 72px;
-      }
-      .myr-pt-name.done   { color: #1D9E75; }
-      .myr-pt-name.active { color: #EF9F27; font-weight: 600; }
-      /* Step tooltip — only visible on hover */
-      .myr-pt-tip {
-        visibility: hidden; opacity: 0;
-        position: absolute; top: calc(100% + 6px); left: 50%;
-        transform: translateX(-50%);
-        background: #0a1628; border: 1px solid rgba(239,159,39,.3);
-        padding: 8px 10px; min-width: 160px; max-width: 240px;
-        font-family: var(--font-head); font-size: 11px; line-height: 1.6;
-        color: #C8DFF0; white-space: normal; z-index: 200;
-        pointer-events: none; transition: opacity .15s;
-      }
-      .myr-pt-tip::after {
-        content: ''; position: absolute; bottom: 100%; left: 50%;
-        transform: translateX(-50%);
-        border: 5px solid transparent; border-bottom-color: rgba(239,159,39,.3);
-      }
-      .myr-pt-step:hover .myr-pt-tip { visibility: visible; opacity: 1; }
-      /* CoC panel */
-      .myr-coc-panel {
-        margin-top: 10px;
-        border-top: 1px solid rgba(255,255,255,.06);
-        padding-top: 8px;
-      }
-      .myr-coc-label {
-        font-family: var(--font-head); font-size: 13px; letter-spacing: .05em;
-        text-transform: uppercase; color: rgba(255,255,255,.6); margin-bottom: 6px;
-        display: flex; align-items: center; justify-content: space-between;
-        cursor: pointer; padding: 2px 0;
-      }
-      .myr-coc-label:hover { color: rgba(0,210,255,.7); }
-      .myr-coc-events { display: none; }
-      .myr-coc-events.open { display: block; }
-      .myr-coc-row {
-        display: grid;
-        grid-template-columns: 7px auto 1fr;
-        gap: 8px; padding: 6px 0;
-        border-bottom: 1px solid rgba(255,255,255,.04);
-        align-items: start;
-      }
-      .myr-coc-row:last-child { border-bottom: none; }
-      .myr-coc-dot {
-        width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
-      }
-      .myr-coc-time {
-        font-family: var(--font-head); font-size: 12px;
-        color: #e89b30; white-space: nowrap;
-        padding-top: 2px; flex-shrink: 0; min-width: 110px;
-      }
-      .myr-coc-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-      .myr-coc-event-type {
-        font-family: var(--font-head); font-size: 12px; font-weight: 600;
-        color: rgba(0,210,255,.9); letter-spacing: .03em; text-transform: capitalize;
-      }
-      .myr-coc-actor {
-        font-family: var(--font-head); font-size: 12px;
-        color: rgba(255,255,255,.75);
-      }
-      .myr-coc-note {
-        font-family: var(--font-head); font-size: 12px;
-        color: rgba(255,255,255,.6);
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      }
-      /* History rows */
-      .myr-hist-row {
-        display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-        border-bottom: 1px solid rgba(255,255,255,.04);
-        font-family: var(--font-head); font-size: 12px; cursor: pointer; transition: .12s;
-      }
-      .myr-hist-row:hover { background: rgba(255,255,255,.02); }
-      .myr-hist-outcome { font-size: 11px; padding: 2px 8px; border: 1px solid; letter-spacing: .04em; }
-    `;
-    document.head.appendChild(s);
+function _myrRenderAll() {
+  _myrRenderBrowse();
+  _myrRenderActive();
+  _myrRenderHistory();
+  _myrUpdateRequestBadges();
+}
+
+// ── BROWSE ────────────────────────────────────────────────────────────────────
+function _myrRenderBrowse() {
+  const el = document.getElementById('myr-catalog-content');
+  if (!el) return;
+  const tmpls = window._myrTemplates || [];
+  const forms = window._myrFormDefs  || [];
+  const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  if (!tmpls.length && !forms.length) {
+    el.innerHTML = `<div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.3);padding:40px 0;text-align:center">No published workflows yet.<br><span style="font-size:11px;color:rgba(255,255,255,.2)">Release and publish templates in CadenceHUD to populate this library.</span></div>`;
+    return;
   }
 
-  renderMyRequestsCatalog();
+  let html = '';
 
-  // _myResource is a compass.html scoped let — not on window.
-  // Wait for it to be populated by loadBaseData() if not ready yet.
-  if (!_myResource?.id) {
-    console.log('[MyRequests] _myResource not ready, waiting...');
-    let waited = 0;
-    await new Promise(resolve => {
-      const poll = setInterval(() => {
-        waited += 100;
-        if (_myResource?.id || waited >= 3000) {
-          clearInterval(poll);
-          resolve();
-        }
-      }, 100);
+  if (tmpls.length) {
+    html += `<div class="myr-cat-label"><div class="myr-cat-line"></div>WORKFLOWS<div class="myr-cat-line"></div></div><div class="wf-catalog-grid">`;
+    tmpls.forEach(t => {
+      html += `<div class="wf-card" onclick="myrLaunchRequest('workflow','${t.id}')">
+        <div class="wf-card-top">
+          <div class="wf-icon" style="background:rgba(0,210,255,.1);color:#00D2FF">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7l3.5 3.5L12 4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+          </div>
+          <div class="wf-card-title">${esc(t.name)}</div>
+        </div>
+        <div class="wf-card-desc">${esc(t.description||'')}</div>
+        <div class="wf-card-meta"><span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">v${esc(t.version||'1.0.0')}</span></div>
+        <button class="wf-card-submit" onclick="event.stopPropagation();myrLaunchRequest('workflow','${t.id}')">Submit &#8594;</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (forms.length) {
+    html += `<div class="myr-cat-label"><div class="myr-cat-line"></div>FORMS<div class="myr-cat-line"></div></div><div class="wf-catalog-grid">`;
+    forms.forEach(f => {
+      html += `<div class="wf-card" onclick="myrLaunchRequest('form','${f.id}')">
+        <div class="wf-card-top">
+          <div class="wf-icon" style="background:rgba(29,158,117,.1);color:#1D9E75">
+            <svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="1" width="10" height="12" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="4.5" y1="5" x2="9.5" y2="5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="7.5" x2="9.5" y2="7.5" stroke="currentColor" stroke-width="1"/></svg>
+          </div>
+          <div class="wf-card-title">${esc(f.source_name||'Form')}</div>
+        </div>
+        <div class="wf-card-desc">Fill and submit for review and approval.</div>
+        <div class="wf-card-meta"><span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">v${esc(f.version||'0.1.0')}</span></div>
+        <button class="wf-card-submit" onclick="event.stopPropagation();myrLaunchRequest('form','${f.id}')">Open &#8594;</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ── ACTIVE ────────────────────────────────────────────────────────────────────
+function _myrRenderActive() {
+  const el = document.getElementById('myr-active-content');
+  if (!el) return;
+  const active = (window._myrInstances||[]).filter(i => i.status !== 'complete' && i.status !== 'cancelled');
+  const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  if (!active.length) {
+    el.innerHTML = `<div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.3);padding:32px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
+    return;
+  }
+  el.innerHTML = active.map(inst => {
+    const stepColor = inst.current_step_name==='Approve'?'#EF9F27':inst.current_step_name==='Review'?'#00D2FF':inst.current_step_name==='Complete'?'#4ade80':'rgba(255,255,255,.4)';
+    const age = inst.created_at ? Math.floor((Date.now()-new Date(inst.created_at))/86400000) : null;
+    return `<div onclick="myrOpenInstance('${inst.id}')" style="padding:12px 14px;border:1px solid rgba(255,255,255,.07);border-radius:4px;margin-bottom:8px;cursor:pointer;background:rgba(255,255,255,.02);transition:background .12s" onmouseover="this.style.background='rgba(0,210,255,.04)'" onmouseout="this.style.background='rgba(255,255,255,.02)'">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:600;color:#F0F6FF">${esc(inst.title)}</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">${age!==null?age+'d ago':''}</div>
+      </div>
+      <span style="font-family:var(--font-mono);font-size:11px;color:${stepColor};letter-spacing:.06em">${esc(inst.current_step_name||inst.status||'—')}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── HISTORY ───────────────────────────────────────────────────────────────────
+function _myrRenderHistory() {
+  const el = document.getElementById('myr-history-content');
+  if (!el) return;
+  const done = (window._myrInstances||[]).filter(i => i.status==='complete'||i.status==='cancelled');
+  const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  if (!done.length) {
+    el.innerHTML = `<div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.3);padding:32px 0;text-align:center">No completed requests yet.</div>`;
+    return;
+  }
+  el.innerHTML = done.map(inst => {
+    const color = inst.status==='complete'?'#4ade80':'rgba(255,255,255,.3)';
+    return `<div onclick="myrOpenInstance('${inst.id}')" style="padding:10px 14px;border:1px solid rgba(255,255,255,.06);border-radius:4px;margin-bottom:6px;cursor:pointer;background:rgba(255,255,255,.01)" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background='rgba(255,255,255,.01)'">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.6)">${esc(inst.title)}</div>
+        <span style="font-family:var(--font-mono);font-size:10px;color:${color};text-transform:uppercase;letter-spacing:.06em">${esc(inst.status)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── LAUNCH ────────────────────────────────────────────────────────────────────
+window.myrLaunchRequest = async function(type, templateId) {
+  if (type === 'form') {
+    compassToast('Form submission coming soon — build in progress.', 3000);
+    return;
+  }
+  const tmpl = (window._myrTemplates||[]).find(t => t.id === templateId);
+  if (!tmpl) { compassToast('Template not found.', 2500); return; }
+
+  const resId   = _myResource?.id   || null;
+  const resName = _myResource?.name || 'Unknown';
+  const firmId  = _mwFirmId();
+  const now     = new Date().toISOString();
+
+  const confirmed = await _myrLaunchModal(tmpl);
+  if (!confirmed) return;
+
+  try {
+    const rows = await API.post('workflow_instances', {
+      firm_id:                  firmId,
+      template_id:              templateId,
+      title:                    `${tmpl.name} — ${resName}`,
+      status:                   'in_progress',
+      launched_by:              _myResource?.user_id || null,
+      launched_at:              now,
+      submitted_by_resource_id: resId,
+      submitted_by_name:        resName,
+      current_step_name:        null,
+      created_at:               now,
+    });
+    if (!rows?.[0]?.id) throw new Error('Instance creation failed');
+    const instanceId = rows[0].id;
+
+    await API.post('workflow_step_instances', {
+      instance_id: instanceId, firm_id: firmId,
+      step_type: 'trigger', step_name: 'Instance launched', status: 'complete',
+      event_type: 'instance_launched',
+      event_notes: `Submitted via Compass by ${resName}`,
+      actor_resource_id: resId, actor_name: resName, created_at: now,
+    });
+
+    const steps = await API.get(`workflow_template_steps?template_id=eq.${templateId}&order=sequence_order.asc&select=*`).catch(() => []);
+    const firstStep = (steps||[]).find(s => s.step_type !== 'trigger');
+    if (firstStep) {
+      await API.post('workflow_step_instances', {
+        instance_id: instanceId, firm_id: firmId,
+        event_type: 'step_activated', template_step_id: firstStep.id,
+        step_type: firstStep.step_type||'action', step_name: firstStep.name||null,
+        actor_name: 'System', created_at: new Date(Date.now()+1).toISOString(),
+      });
+      if (typeof _notifyStepActivated === 'function') {
+        _notifyStepActivated(instanceId, firstStep, rows[0]).catch(() => {});
+      }
+    }
+
+    compassToast(`✓ ${tmpl.name} submitted`);
+    window._pollNow && window._pollNow();
+    await loadUserRequests();
+    myrOpenInstance(instanceId);
+
+  } catch(e) {
+    console.error('[myrLaunchRequest] failed:', e);
+    compassToast('Launch failed — ' + (e.message||'check console'), 4000);
+  }
+};
+
+function _myrLaunchModal(tmpl) {
+  return new Promise(resolve => {
+    const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:800;display:flex;align-items:center;justify-content:center';
+    overlay.innerHTML = `<div style="background:#0d1b2e;border:1px solid rgba(0,210,255,.25);width:420px;border-radius:4px;padding:24px">
+      <div style="font-family:var(--font-head);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#00D2FF;margin-bottom:8px">Submit Request</div>
+      <div style="font-family:var(--font-head);font-size:16px;font-weight:700;color:#F0F6FF;margin-bottom:8px">${esc(tmpl.name)}</div>
+      <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.5);margin-bottom:20px;line-height:1.6">${esc(tmpl.description||'')}</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="_myrModalCancel" style="font-family:var(--font-head);font-size:11px;padding:6px 16px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer">Cancel</button>
+        <button id="_myrModalConfirm" style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 20px;background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer">Submit &#8594;</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#_myrModalConfirm').onclick = () => { overlay.remove(); resolve(true);  };
+    overlay.querySelector('#_myrModalCancel').onclick  = () => { overlay.remove(); resolve(false); };
+    overlay.addEventListener('click', e => { if (e.target===overlay) { overlay.remove(); resolve(false); } });
+  });
+}
+
+// ── INSTANCE OVERLAY ──────────────────────────────────────────────────────────
+// Loads cdn-instances.js + dependencies on first call (once), then renders
+// the standard CadenceHUD instance detail view into a full-screen overlay.
+
+var _myrCdnLoaded = false;
+
+async function _myrEnsureCdn() {
+  if (_myrCdnLoaded) return;
+  // Load CadenceHUD rendering scripts in correct order
+  const CDN_V = '20260401229002';
+  const scripts = [
+    `/js/cdn-core-state.js?v=${CDN_V}`,
+    `/js/cdn-utils.js?v=${CDN_V}`,
+    `/js/cdn-coc.js?v=${CDN_V}`,
+    `/js/cdn-dag-viewer.js?v=${CDN_V}`,
+    `/js/cdn-assignee.js?v=${CDN_V}`,
+    `/js/cdn-outcomes.js?v=${CDN_V}`,
+    `/js/cdn-scrubber.js?v=${CDN_V}`,
+    `/js/cdn-comments.js?v=${CDN_V}`,
+    `/js/cdn-instance-dag.js?v=${CDN_V}`,
+    `/js/cdn-instances.js?v=${CDN_V}`,
+  ];
+  for (const src of scripts) {
+    // Skip if already loaded
+    if (document.querySelector(`script[src="${src}"]`)) continue;
+    await new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = src;
+      el.onload  = resolve;
+      el.onerror = () => { console.warn('[myrEnsureCdn] failed to load', src); resolve(); };
+      document.head.appendChild(el);
     });
   }
+  _myrCdnLoaded = true;
+  // Seed required CadenceHUD globals if not already set
+  if (typeof FIRM_ID_CAD === 'undefined') window.FIRM_ID_CAD = _mwFirmId();
+  if (typeof SUPA_URL    === 'undefined') window.SUPA_URL    = typeof _mwSupaURL    === 'function' ? _mwSupaURL()    : '';
+  if (typeof SUPA_KEY    === 'undefined') window.SUPA_KEY    = typeof _mwSupaKey    === 'function' ? _mwSupaKey()    : '';
+  if (!window._instances)  window._instances  = [];
+  if (!window._templates)  window._templates  = [];
+  if (!window._myResourceId && _myResource?.id) window._myResourceId = _myResource.id;
+  if (!window._myUserId     && _myResource?.user_id) window._myUserId = _myResource.user_id;
+  console.log('[myrEnsureCdn] CadenceHUD rendering scripts ready');
+}
 
-  const resolvedResId = _myResource?.id;
-  console.log('[MyRequests] loadUserRequests firing | resId:', resolvedResId || 'STILL UNDEFINED');
-  window._requestsReloading = true;
-  if (resolvedResId) {
-    try {
-      const rows = await API.get(
-        `workflow_instances?submitted_by_resource_id=eq.${resolvedResId}` +
-        `&order=created_at.desc&limit=100` +
-        `&select=id,title,status,current_step_name,workflow_type,submitted_by_name,created_at,attachments`
-      ).catch(e => { console.warn('[MyRequests] fetch error:', e.message); return []; });
-      console.log('[MyRequests] query returned', (rows||[]).length, 'rows');
+window.myrOpenInstance = async function(instanceId) {
+  document.getElementById('myr-instance-overlay')?.remove();
 
-      // Step label maps — mirrors stepPreviews in myrOpenWorkflowForm
-      const _STEP_LABELS = {
-        'resource-alloc':    ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
-        'pto-request':       ['Submit','PM review','Approved → cal blocked + team notified'],
-        'capacity-concern':  ['Submit','PM review','Decision → queue adjusted'],
-        'doc-review':        ['Submit','Review','Approve'],
-        'change-request':    ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
-        'issue-escalation':  ['Submit','PM review','Resolution plan','Resolved → CoC event'],
-        'expense':           ['Submit','PM review','Finance approval','Processed'],
-        'training':          ['Submit','PM review','Budget check','Mgmt approval','Confirmed'],
-        'new-project':       ['Submit','Initial scoping','Resourcing plan','Budget review','Exec approval','Kickoff','Schedule','Active'],
-        'project-closure':   ['Submit','Final CoC summary','Lessons learned','Financial reconcile','Exec sign-off','Archived'],
-      };
+  // Build overlay shell immediately so user sees feedback
+  const overlay = document.createElement('div');
+  overlay.id = 'myr-instance-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg0,#0a1628);z-index:700;display:flex;flex-direction:column;overflow:hidden';
+  overlay.innerHTML = `
+    <div id="myr-inst-header" style="display:flex;align-items:center;gap:12px;padding:10px 16px;
+      border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;background:var(--bg1,#0d1b2e)">
+      <button onclick="myrCloseInstance()"
+        style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;
+        border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);cursor:pointer;letter-spacing:.06em">
+        ← Back to Requests
+      </button>
+      <div id="myr-inst-title" style="font-family:var(--font-head);font-size:13px;font-weight:600;color:#F0F6FF">
+        Loading…
+      </div>
+    </div>
+    <div id="myr-inst-body" style="flex:1;overflow:hidden;position:relative">
+      <div style="display:flex;align-items:center;justify-content:center;height:100%;
+        font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)">
+        Loading instance…
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
 
-      window._myRequests = (rows || []).map(r => {
-        const wfType    = r.workflow_type || 'unknown';
-        const stepLabels = _STEP_LABELS[wfType] || ['Submit','Review','Complete'];
-        const currentStep = r.current_step_name || '';
-        const isComplete  = r.status === 'complete' || r.status === 'completed';
+  try {
+    // Ensure CadenceHUD rendering scripts are loaded
+    await _myrEnsureCdn();
 
-        // Primary: derive active step from current_step_name (always available from DB)
-        const currentIdx = stepLabels.findIndex(s =>
-          s.toLowerCase().replace(/\s+/g,'').includes(
-            (currentStep||'').toLowerCase().replace(/\s+/g,'').slice(0,5)
-          )
-        );
-        // currentIdx is the COMPLETED step; active = one after it
-        const dbActiveIdx = isComplete
-          ? stepLabels.length
-          : currentIdx >= 0
-            ? Math.min(currentIdx + 1, stepLabels.length - 1)
-            : 1;
+    // Fetch instance, template steps, and CoC in parallel
+    const [instRows, stepInstRows] = await Promise.all([
+      API.get(`workflow_instances?id=eq.${instanceId}&select=*&limit=1`).catch(() => []),
+      API.get(`workflow_step_instances?instance_id=eq.${instanceId}&order=created_at.asc,id.asc`).catch(() => []),
+    ]);
+    const inst = instRows?.[0];
+    if (!inst) throw new Error('Instance not found');
 
-        // current_step_name is the ACTIVE step (what's happening now), not the completed one.
-        // Steps before it are done; it is active; steps after are pending.
-        // Exception: if CoC shows changes_requested as most recent event, force Submit active.
-        const _rCoc = (window._myRequestCoc||{})[r.id] || [];
-        const _lastLifecycle = _rCoc
-          .filter(e => ['request.submitted','request.approved','request.changes_requested'].includes(e.event_type))
-          .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
-        const _cocAwaitingResubmit = !isComplete &&
-          _lastLifecycle?.event_type === 'request.changes_requested';
-        const activeIdx = isComplete
-          ? stepLabels.length
-          : _cocAwaitingResubmit
-            ? 0  // Force Submit as active step
-            : currentIdx >= 0 ? currentIdx : 1;
-        const steps = stepLabels.map((label, i) => ({
-          label,
-          done:   i < activeIdx,
-          active: !isComplete && i === activeIdx,
-        }));
+    // Fetch template steps
+    const tmplSteps = inst.template_id
+      ? await API.get(`workflow_template_steps?template_id=eq.${inst.template_id}&order=sequence_order.asc&select=*`).catch(() => [])
+      : [];
 
-        // Map instance status to display status
-        const statusMap = {
-          'pending':     'awaiting',
-          'in_progress': 'in_progress',
-          'active':      'in_progress',
-          'complete':    'completed',   // DB canonical value
-          'completed':   'completed',   // legacy / optimistic value
-          'cancelled':   'rejected',
-          'withdrawn':   'rejected',
-          'rejected':    'rejected',
-          'overridden':  'rejected',
-        };
+    // Fetch template record
+    const tmplRows = inst.template_id
+      ? await API.get(`workflow_templates?id=eq.${inst.template_id}&select=*&limit=1`).catch(() => [])
+      : [];
 
-        return {
-          id:          r.id,
-          title:       r.title || 'Untitled request',
-          status:      statusMap[r.status] || 'in_progress',
-          workflow:    wfType.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
-          submitted:   r.created_at ? new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
-          steps,
-          cocNote:     '',
-          attachments: r.attachments || [],
-          _reviewerNames: (window._myRequestReviewers||{})[r.id] || [],
-          _raw:        r,
-        };
-      });
-    } catch(e) {
-      console.warn('[MyRequests] loadUserRequests fetch failed:', e);
-      window._myRequests = [];
+    // Hydrate CadenceHUD globals minimally so renderInstanceDetail works
+    inst._tmplSteps  = tmplSteps  || [];
+    inst._stepInsts  = stepInstRows || [];
+    inst._selectedStep = null;
+
+    // Inject into _instances and _templates if not already present
+    if (!window._instances.find(i => i.id === inst.id)) window._instances.push(inst);
+    else { const idx = window._instances.findIndex(i => i.id === inst.id); window._instances[idx] = inst; }
+
+    if (tmplRows?.[0] && !window._templates.find(t => t.id === tmplRows[0].id)) {
+      tmplRows[0].steps = tmplSteps || [];
+      window._templates.push(tmplRows[0]);
     }
-  } else {
-    window._myRequests = [];
-  }
 
-  window._requestsReloading = false;
-  renderMyRequestsActive();
-  renderMyRequestsHistory();
-  // Restore sub-tab — reload must not reset to BROWSE
-  if (_myrActiveSubTab && _myrActiveSubTab !== 'browse') {
-    myrSwitchView(_myrActiveSubTab);
-  }
+    window._selectedInstance = inst;
 
-  // Re-fetch if a ↺ Changes requested action item exists for an instance
-  // that still shows current_step_name != 'Submit'.
-  // Debounced per instance — max once per 30s to prevent hammering.
-  window._myrSubmitRefetchTs = window._myrSubmitRefetchTs || {};
-  (async () => {
-    try {
-      if (!resolvedResId) return;
-      const now30 = Date.now();
-      const needsCheck = (window._myRequests||[]).filter(r => {
-        if (r.status === 'completed' || r.status === 'rejected') return false;
-        if (window._myrSubmitRefetchTs[r.id] && now30 - window._myrSubmitRefetchTs[r.id] <= 30000) return false;
-        // Skip if CoC already shows changes_requested as most recent event — already confirmed
-        const rCoc = (window._myRequestCoc||{})[r.id] || [];
-        const lastEv = rCoc
-          .filter(e => ['request.submitted','request.approved','request.changes_requested'].includes(e.event_type))
-          .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
-        if (lastEv?.event_type === 'request.changes_requested') return false;
-        return true;
-      });
-      if (!needsCheck.length) return;
-      const ids = needsCheck.map(r => r.id);
-      const changesItems = await API.get(
-        `workflow_action_items?owner_resource_id=eq.${resolvedResId}&status=eq.open&title=like.%E2%86%BA Changes requested:*&select=id,instance_id&limit=10`
-      ).catch(() => []);
-      const matchedIds = (changesItems||[])
-        .filter(a => ids.includes(a.instance_id))
-        .map(a => a.instance_id);
-      if (!matchedIds.length) return;
-      // Stamp timestamp BEFORE scheduling
-      matchedIds.forEach(id => { window._myrSubmitRefetchTs[id] = now30; });
-      setTimeout(() => {
-        window._myRequestCoc   = {};
-        window._requestsLoaded = false;
-        window.loadUserRequests && window.loadUserRequests();
-      }, 3000);
-    } catch(_) {}
-  })();
+    // Update header title
+    const titleEl = document.getElementById('myr-inst-title');
+    if (titleEl) titleEl.textContent = inst.title || 'Request';
 
-  // Fetch reviewer names for each active request (for tooltip on Review step)
-  const activeReqs = (window._myRequests||[]).filter(r => r.status !== 'completed' && r.status !== 'rejected');
-  if (activeReqs.length) {
-    const ids = activeReqs.map(r => r.id).join(',');
-    // Use workflow_requests — fetch ALL reviewer rows (open + resolved) so tooltip always
-    // shows every assigned reviewer regardless of whether they've acted yet
-    API.get(`workflow_requests?instance_id=in.(${ids})&role=eq.reviewer&select=instance_id,owner_name,status&limit=200`)
-      .then(rows => {
-        window._myRequestReviewers = window._myRequestReviewers || {};
-        (rows||[]).forEach(a => {
-          if (!window._myRequestReviewers[a.instance_id])
-            window._myRequestReviewers[a.instance_id] = [];
-          if (a.owner_name && !window._myRequestReviewers[a.instance_id].includes(a.owner_name))
-            window._myRequestReviewers[a.instance_id].push(a.owner_name);
-        });
-        // Apply to request objects
-        (window._myRequests||[]).forEach(r => {
-          r._reviewerNames = window._myRequestReviewers[r.id] || [];
-        });
-        renderMyRequestsActive();
-      }).catch(() => {});
-  }
-
-  // Pre-fetch CoC — preserve existing cache so step progress renders correctly while fetch is in-flight
-  const allIds = (window._myRequests||[]).map(r => r.id).filter(Boolean);
-  window._myRequestCoc = window._myRequestCoc || {};
-  if (allIds.length) {
-    API.get(
-      `coc_events?entity_id=in.(${allIds.join(',')})&order=occurred_at.asc&select=*`
-    ).then(rows => {
-      // Rebuild cache from fresh fetch — replace rather than merge to pick up new events
-      const freshCoc = {};
-      (rows||[]).forEach(e => {
-        if (!freshCoc[e.entity_id]) freshCoc[e.entity_id] = [];
-        freshCoc[e.entity_id].push(e);
-      });
-      window._myRequestCoc = freshCoc;
-      if (!window._requestsReloading) {
-        // Check if any instance has changes_requested as most recent event.
-        // If so, reload loadUserRequests so steps array is rebuilt with correct activeIdx.
-        const needsStepRebuild = (window._myRequests||[]).some(r => {
-          const rCoc = (freshCoc||{})[r.id] || [];
-          const last = rCoc
-            .filter(e => ['request.submitted','request.approved','request.changes_requested'].includes(e.event_type))
-            .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
-          return last?.event_type === 'request.changes_requested' &&
-            r.steps?.[0]?.active !== true; // Submit not already showing as active
-        });
-        if (needsStepRebuild) {
-          // Rebuild steps array with correct CoC-derived activeIdx.
-          // Do NOT clear _myRequestCoc here — the fresh CoC data we just fetched
-          // is what drives the rebuild. Clearing it would break the debounce guard.
-          window._requestsLoaded = false;
-          window.loadUserRequests && window.loadUserRequests();
-        } else {
-          // Normal CoC update — just re-render in place
-          const _ae = document.getElementById('myr-active-content');
-          if (_ae) {
-            _ae.querySelectorAll('.myr-ar-body.open').forEach(b => {
-              const rid = b.closest('.myr-active-req')?.dataset.reqId;
-              if (rid) _myrExpandedIds.add(rid);
-            });
-            _ae.querySelectorAll('.myr-coc-events.open').forEach(c => {
-              const rid = c.closest('.myr-active-req')?.dataset.reqId;
-              if (rid) _myrCocOpenIds.add(rid);
-            });
-          }
-          renderMyRequestsActive();
-        }
+    // Mount CadenceHUD instance detail into overlay body
+    const bodyEl = document.getElementById('myr-inst-body');
+    if (bodyEl && typeof renderInstanceDetail === 'function') {
+      renderInstanceDetail(bodyEl, inst);
+      // Start live event detection for this instance
+      if (typeof _startExternalEventDetection === 'function') {
+        _startExternalEventDetection(inst.id);
       }
-    }).catch(() => {});
-  } else {
-    renderMyRequestsActive();
-  }
+      if (typeof _startElapsedTimer === 'function') {
+        _startElapsedTimer(inst);
+      }
+    } else if (bodyEl) {
+      bodyEl.innerHTML = `<div style="padding:40px;font-family:var(--font-head);font-size:12px;
+        color:rgba(255,255,255,.4)">Instance renderer not available — ensure cdn-instances.js is loaded.</div>`;
+    }
 
-  // Update badges
-  const activeCount = (window._myRequests||[]).filter(r=>r.status!=='completed'&&r.status!=='rejected').length;
-  const badge = document.getElementById('ust-requests-badge');
-  if (badge) {
-    badge.textContent = activeCount > 0 ? activeCount + ' active' : '';
-    badge.style.display = activeCount > 0 ? 'inline' : 'none';
+    // myrCloseInstance() is called by the back button — defined below
+
+
+  } catch(e) {
+    console.error('[myrOpenInstance] failed:', e);
+    const bodyEl = document.getElementById('myr-inst-body');
+    if (bodyEl) bodyEl.innerHTML = `<div style="padding:40px;font-family:var(--font-head);
+      font-size:12px;color:#E24B4A">Failed to load: ${e.message}</div>`;
   }
+};
+
+window.myrCloseInstance = function() {
+  if (typeof _stopExternalEventDetection === 'function') _stopExternalEventDetection();
+  if (typeof _stopElapsedTimer          === 'function') _stopElapsedTimer();
+  document.getElementById('myr-instance-overlay')?.remove();
+};
+
+// ── Badge update ──────────────────────────────────────────────────────────────
+function _myrUpdateRequestBadges() {
+  const insts       = window._myrInstances || [];
+  const activeCount = insts.filter(i => i.status!=='complete' && i.status!=='cancelled').length;
   const activeBadge = document.getElementById('myr-active-badge');
   if (activeBadge) {
     activeBadge.textContent = activeCount > 0 ? activeCount : '';
     activeBadge.style.display = activeCount > 0 ? 'inline' : 'none';
   }
-
-  // ── Live CoC refresh — polls open CoC panels every 10s while on requests tab ──
-  // Clears itself when user leaves the requests tab (see uSwitchTab in mw-tabs.js).
-  if (!window._myrCocPollTimer) {
-    window._myrCocPollTimer = setInterval(async () => {
-      if ((typeof _uActiveTab !== 'undefined' ? _uActiveTab : '') !== 'requests') return;
-      const activeReqs = (window._myRequests||[]).filter(r => r.status !== 'completed' && r.status !== 'rejected');
-      if (!activeReqs.length) return;
-      let anyNew = false;
-      for (const req of activeReqs) {
-        const before = (window._myRequestCoc||{})[req.id]?.length || 0;
-        await myrLoadRequestCoc(req.id);
-        const after = (window._myRequestCoc||{})[req.id]?.length || 0;
-        if (after !== before) {
-          anyNew = true;
-        }
-      }
-      // Always re-render steps — CoC approval count drives step color
-      renderMyRequestsActive();
-    }, 10000);
-    console.log('[MyRequests] CoC live refresh poll started (10s)');
-  }
-  } finally {}
-};
-
-var _myrActiveSubTab = _myrActiveSubTab || 'browse';
-window.myrSwitchView = function(view, btn) {
-  _myrActiveSubTab = view;
-  document.querySelectorAll('.myr-subnav').forEach(b => {
-    b.classList.remove('on');
-    b.style.color = 'rgba(255,255,255,.35)';
-    b.style.borderBottomColor = 'transparent';
-  });
-  if (btn) {
-    btn.classList.add('on');
-    btn.style.color = '#00D2FF';
-    btn.style.borderBottomColor = '#00D2FF';
-  } else {
-    const b = document.querySelector(`.myr-subnav[data-myr="${view}"]`);
-    if (b) { b.classList.add('on'); b.style.color='#00D2FF'; b.style.borderBottomColor='#00D2FF'; }
-  }
-  ['browse','active','history'].forEach(v => {
-    const p = document.getElementById('myr-pane-'+v);
-    if (p) p.style.display = v === view ? 'block' : 'none';
-  });
-};
-
-// Workflow catalog definition
-var _WF_CATALOG = (typeof _WF_CATALOG !== "undefined") ? _WF_CATALOG : [
-  { cat:'Resource & scheduling', items:[
-    { id:'resource-alloc', title:'Resource allocation request', icon:'user', iconBg:'rgba(0,210,255,.1)', iconColor:'#00D2FF',
-      desc:'Request a change to a team member\'s allocation across projects. Routes to PM then management for approval.',
-      steps:5, avgTime:'Avg 28h', usage:'3 this month' },
-    { id:'pto-request', title:'PTO / leave request', icon:'cal', iconBg:'rgba(139,92,246,.1)', iconColor:'#8B5CF6',
-      desc:'Request time off. Automatically blocks your calendar, notifies your PM, and updates assignment constraints for the period.',
-      steps:3, avgTime:'Avg 4h', usage:'Used 6\xD7 this year', isNew:false },
-    { id:'capacity-concern', title:'Capacity overload concern', icon:'warn', iconBg:'rgba(226,75,74,.1)', iconColor:'#E24B4A',
-      desc:'Formally raise a capacity concern with your PM. Pre-populated with your current load, overdue count, and queue summary.',
-      steps:3, avgTime:'Avg 6h', usage:'PM notified immediately' },
-  ]},
-  { cat:'Approvals & reviews', items:[
-    { id:'doc-review', title:'Document review & sign-off', icon:'check', iconBg:'rgba(29,158,117,.1)', iconColor:'#1D9E75',
-      desc:'Submit a document for structured review. Routes to designated reviewers with version tracking and approval chain.',
-      steps:6, avgTime:'Avg 48h', usage:'New this month', isNew:true },
-    { id:'change-request', title:'Change request', icon:'plus-sq', iconBg:'rgba(239,159,39,.1)', iconColor:'#EF9F27',
-      desc:'Submit a scope, timeline, or resource change request. Requires PM and client acknowledgement before taking effect.',
-      steps:7, avgTime:'Avg 72h', usage:'1 this month' },
-    { id:'issue-escalation', title:'Issue escalation', icon:'info-circle', iconBg:'rgba(0,210,255,.1)', iconColor:'#00D2FF',
-      desc:'Escalate a project issue through the formal chain of custody. Auto-attaches CoC context and intervention history.',
-      steps:4, avgTime:'Avg 12h', usage:'2 this month' },
-  ]},
-  { cat:'HR & admin', items:[
-    { id:'expense', title:'Expense reimbursement', icon:'doc-lines', iconBg:'rgba(255,255,255,.06)', iconColor:'rgba(255,255,255,.5)',
-      desc:'Submit project-related expenses for reimbursement. Routes to PM then finance for approval and processing.',
-      steps:4, avgTime:'Avg 5 days', usage:'' },
-    { id:'training', title:'Training request', icon:'globe', iconBg:'rgba(255,255,255,.06)', iconColor:'rgba(255,255,255,.5)',
-      desc:'Request approval for external training, certification, or conference attendance. Includes cost and schedule impact review.',
-      steps:5, avgTime:'Avg 3 days', usage:'' },
-  ]},
-  { cat:'Project requests', items:[
-    { id:'new-project', title:'New project intake', icon:'grid', iconBg:'rgba(0,210,255,.08)', iconColor:'rgba(0,210,255,.6)',
-      desc:'Initiate a new project request. Triggers the full intake workflow including scoping, resourcing, and executive approval.',
-      steps:8, avgTime:'Avg 5 days', usage:'' },
-    { id:'project-closure', title:'Project closure', icon:'flag', iconBg:'rgba(29,158,117,.08)', iconColor:'rgba(29,158,117,.6)',
-      desc:'Formally close a project. Captures lessons learned, final CoC summary, and triggers financial reconciliation.',
-      steps:6, avgTime:'Avg 2 days', usage:'' },
-  ]},
-];
-
-const _WF_ICONS = {
-  'user': `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="4" r="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2 12c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>`,
-  'cal':  `<svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="2" width="12" height="11" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="1" y1="5.5" x2="13" y2="5.5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="1" x2="4.5" y2="3" stroke="currentColor" stroke-width="1.3"/><line x1="9.5" y1="1" x2="9.5" y2="3" stroke="currentColor" stroke-width="1.3"/></svg>`,
-  'warn': `<svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2L13 12H1Z" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="7" y1="6" x2="7" y2="9" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="10.5" r=".8" fill="currentColor"/></svg>`,
-  'check':`<svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7l3.5 3.5L12 4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>`,
-  'plus-sq':`<svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="5" y1="7" x2="9" y2="7" stroke="currentColor" stroke-width="1.3"/><line x1="7" y1="5" x2="7" y2="9" stroke="currentColor" stroke-width="1.3"/></svg>`,
-  'info-circle':`<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="7" y1="5" x2="7" y2="7.5" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="9.5" r=".8" fill="currentColor"/></svg>`,
-  'doc-lines':`<svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="1" width="10" height="12" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="4.5" y1="5" x2="9.5" y2="5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="7.5" x2="9.5" y2="7.5" stroke="currentColor" stroke-width="1"/><line x1="4.5" y1="10" x2="7.5" y2="10" stroke="currentColor" stroke-width="1"/></svg>`,
-  'globe':`<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M4 7h6M7 2v10M3 4.5c1 .7 2.5 1 4 1s3-.3 4-1M3 9.5c1-.7 2.5-1 4-1s3 .3 4 1" stroke="currentColor" stroke-width="1" fill="none"/></svg>`,
-  'grid': `<svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="1" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="8" y="1" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="1" y="8" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="8" y="8" width="5" height="5" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
-  'flag': `<svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 2v10M3 2h8l-2 3 2 3H3" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>`,
-};
-
-function renderMyRequestsCatalog() {
-  const _esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const el = document.getElementById('myr-catalog-content');
-  if (!el) return;
-  let html = '';
-  _WF_CATALOG.forEach(cat => {
-    html += `<div class="myr-cat-label"><div class="myr-cat-line"></div>${_esc(cat.cat)}<div class="myr-cat-line"></div></div>`;
-    html += `<div class="wf-catalog-grid">`;
-    cat.items.forEach(wf => {
-      const icon = _WF_ICONS[wf.icon] || '';
-      html += `<div class="wf-card${wf.isNew?' wf-card-new':''}" onclick="myrOpenWorkflowForm('${wf.id}')">
-        <div class="wf-card-top">
-          <div class="wf-icon" style="background:${wf.iconBg};color:${wf.iconColor}">${icon}</div>
-          <div class="wf-card-title">${_esc(wf.title)}</div>
-        </div>
-        <div class="wf-card-desc">${_esc(wf.desc)}</div>
-        <div class="wf-card-meta">
-          <span>${wf.steps} steps</span>
-          <span>${wf.avgTime}</span>
-          ${wf.usage?`<span>${_esc(wf.usage)}</span>`:''}
-        </div>
-        <button class="wf-card-submit" onclick="event.stopPropagation();myrOpenWorkflowForm('${wf.id}')">Submit &#8594;</button>
-      </div>`;
-    });
-    html += `</div>`;
-  });
-  el.innerHTML = html;
 }
 
-function renderMyRequestsActive() {
-  const el = document.getElementById('myr-active-content');
-  if (!el) return;
-  const reqs = window._myRequests || [];
-  const active = reqs.filter(r => r.status !== 'completed' && r.status !== 'rejected');
-
-  // Merge DOM state into persistent sets before wiping innerHTML
-  el.querySelectorAll('.myr-ar-body.open').forEach(body => {
-    const rid = body.closest('.myr-active-req')?.dataset.reqId;
-    if (rid) _myrExpandedIds.add(rid);
-  });
-  el.querySelectorAll('.myr-coc-events.open').forEach(cocEl => {
-    const rid = cocEl.closest('.myr-active-req')?.dataset.reqId;
-    if (rid) _myrCocOpenIds.add(rid);
-  });
-  const expandedIds = _myrExpandedIds;
-  const cocOpenIds  = _myrCocOpenIds;
-  if (!active.length) {
-    el.innerHTML = `<div style="font-family:var(--font-head);font-size:15px;color:rgba(255,255,255,.35);padding:32px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
-    return;
-  }
-
-  // Build a lookup of CoC events by instanceId for tooltips
-  // _myRequestCoc is populated lazily by myrLoadRequestCoc()
-  const cocByInstance = window._myRequestCoc || {};
-
-  let html = '';
-  active.forEach((req, i) => {
-    const isAmber     = req.status==='awaiting' || req.status==='in_progress';
-    const statusColor = req.status==='approved'?'#1D9E75': isAmber?'#EF9F27':'#00D2FF';
-    const dotAnim     = isAmber?'animation:myrActivePulse 1.5s infinite':'';
-
-    // Build CoC event map for this instance: event_type → {actor, time, notes}
-    const instCoc = (cocByInstance[req.id] || []);
-    const cocByType = {};
-    instCoc.forEach(e => { cocByType[e.event_type] = e; });
-
-    // Step type → CoC event_type mapping
-    const stepEventMap = {
-      'Submit':   'request.submitted',
-      'Review':   'request.approved',
-      'Approve':  'request.completed',
-      'PM review':'request.pm_reviewed',
-    };
-
-    // Build step nodes with tooltips
-    // When current_step_name is 'Submit', the ball is back with the submitter.
-    // CoC overrides are bypassed — DB step is authoritative in this state.
-
-    const instanceComplete = req.status === 'completed' || req._raw?.status === 'complete';
-
-    // Derive awaiting-resubmit from CoC events — not DB field (avoids race conditions).
-    // If the most recent lifecycle event is request.changes_requested, ball is with submitter.
-    const lastLifecycleEv = instCoc
-      .filter(e => ['request.submitted','request.approved','request.changes_requested'].includes(e.event_type))
-      .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
-    const isAwaitingResubmit = !instanceComplete &&
-      lastLifecycleEv?.event_type === 'request.changes_requested';
-    if (!isAwaitingResubmit && window._myrSubmitRefetchTs?.[req.id]) {
-      // Instance is no longer awaiting resubmit — clear debounce so future cycles work
-      delete window._myrSubmitRefetchTs[req.id];
-    }
-    // For the Review step: override done/active from CoC approval count vs assigned reviewers.
-    // This is the ground truth — independent of current_step_name or polling timing.
-    let submittedDataForStep = {};
-    try {
-      const subEv = instCoc.find(e => e.event_type === 'request.submitted');
-      if (subEv) submittedDataForStep = JSON.parse(subEv.event_notes || '{}');
-    } catch(_) {}
-    const totalReviewers   = (submittedDataForStep.reviewers||[]).length || 1;
-    // Only count approvals that occurred AFTER the most recent changes_requested reset.
-    // Without this, a reset loop still shows Review as green from prior approvals.
-    const lastResetEv = instCoc
-      .filter(e => e.event_type === 'request.changes_requested')
-      .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
-    const lastResetTs = lastResetEv ? new Date(lastResetEv.occurred_at||lastResetEv.created_at) : null;
-    const approvalCount    = instCoc.filter(e =>
-      e.event_type === 'request.approved' &&
-      (!lastResetTs || new Date(e.occurred_at||e.created_at) > lastResetTs)
-    ).length;
-    const allReviewersDone = approvalCount >= totalReviewers;
-
-    // Detect final approval from CoC or instance status
-    // approve.html doesn't write actor_resource_id — match approver by name as fallback
-    const approverName = submittedDataForStep.approver?.name || null;
-    const approverApprovedByCoC = allReviewersDone && approvalCount > totalReviewers &&
-      instCoc.some(e =>
-        e.event_type === 'request.approved' &&
-        (e.actor_resource_id === submittedDataForStep.approver?.id ||
-         (approverName && (e.actor_name||'').trim().toLowerCase() === approverName.trim().toLowerCase()))
-      );
-    // The approver's event is the last request.approved after all reviewers are done
-    const approverApproved = instanceComplete || approverApprovedByCoC ||
-      (allReviewersDone && approvalCount > totalReviewers);
-
-    let stepsHtml = (req.steps||[]).map((s, si) => {
-      // Override Review step state from CoC counts
-      // Skip override when ball is back with submitter (Submit step active)
-      if (s.label === 'Review' && !instanceComplete && !isAwaitingResubmit) {
-        if (allReviewersDone) {
-          s = { ...s, done: true,  active: false };
-        } else if (approvalCount > 0) {
-          s = { ...s, done: false, active: true };
-        } else {
-          s = { ...s, done: false, active: true }; // waiting — blue active dot
-        }
-      }
-      // Override Approve step state
-      if (s.label === 'Approve') {
-        if (approverApproved) {
-          s = { ...s, done: true, active: false };
-        } else if (isAwaitingResubmit || (lastResetTs && approvalCount === 0)) {
-          // Ball back with submitter, or post-reset no new approvals — force gray
-          s = { ...s, done: false, active: false };
-        } else if (allReviewersDone) {
-          s = { ...s, done: false, active: true }; // all reviewers done — approver's turn
-        } else {
-          s = { ...s, done: false, active: false }; // waiting for review
-        }
-      }
-      const cls     = s.done?'myr-ptd-done':s.active?'myr-ptd-active':'myr-ptd-pending';
-      const nameCls = s.done?'done':s.active?'active':'';
-      const label   = s.done?'&#10003;':(si+1);
-
-      // Look up CoC event for this step
-      const evType  = stepEventMap[s.label] || null;
-      const ev      = evType ? cocByType[evType] : null;
-      const tipTime = ev ? new Date(ev.occurred_at||ev.created_at).toLocaleString('en-US',
-        {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : null;
-      const tipActor = ev?.actor_name || null;
-
-      // Build tooltip content
-      let tipHtml = '';
-      if (s.done && tipTime && s.label !== 'Review') {
-        tipHtml = `<div class="myr-pt-tip">
-          <div style="color:rgba(0,210,255,.9);margin-bottom:2px">${_esc(s.label)}</div>
-          <div>${_esc(tipActor||'System')}</div>
-          <div style="color:rgba(255,255,255,.35)">${_esc(tipTime)}</div>
-        </div>`;
-      } else if (s.label === 'Review' || s.active || s.label === 'Approve') {
-        // Parse reviewer/approver list from request.submitted CoC event
-        let submittedData = {};
-        try {
-          // Use most recent submitted event — captures reviewer list after resubmit
-          const subEv = instCoc
-            .filter(e => e.event_type === 'request.submitted')
-            .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
-          if (subEv) submittedData = JSON.parse(subEv.event_notes || '{}');
-        } catch(_) {}
-
-        // Build reviewer decision status from ALL CoC approved/changes events — keyed by actor name
-        // Each reviewer writes one event; multiple reviewers produce multiple events of the same type.
-        // Must accumulate by actor, NOT overwrite by event_type (which caused later approvals to erase earlier ones).
-        // Build reviewer decisions scoped to post-last-reset only
-        // Use MOST RECENT event per actor so 2nd-round approvals replace 1st-round
-        const approvedByName = {};
-        const _tooltipEvents = instCoc
-          .filter(e => e.event_type === 'request.approved' || e.event_type === 'request.changes_requested')
-          .filter(e => !lastResetTs || new Date(e.occurred_at||e.created_at) > lastResetTs)
-          .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at));
-        _tooltipEvents.forEach(e => {
-            try {
-              const p = JSON.parse(e.event_notes || '{}');
-              const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
-                {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-              const name = e.actor_name || p.reviewer;
-              // Most recent event per actor wins (array sorted desc)
-              if (name && !approvedByName[name]) {
-                approvedByName[name] = {
-                  time:     t,
-                  comments: p.comments || '',
-                  approved: e.event_type === 'request.approved',
-                };
-              }
-            } catch(_) {}
-          });
-
-        if (s.label === 'Review') {
-          // Source of truth: reviewers list from the request.submitted CoC event notes.
-          // _reviewerNames is a fallback only — submittedData.reviewers always has the full list.
-          const reviewers = (submittedData.reviewers||[]).length
-            ? submittedData.reviewers
-            : (req._reviewerNames||[]).map(n => ({ name: n }));
-          const lines = reviewers.map(r => {
-            const name = r.name || r;
-            const dec  = approvedByName[name];
-            const status = dec
-              ? dec.approved
-                ? `<span style="color:#1D9E75">✓ ${_esc(dec.time)}</span>`
-                : `<span style="color:#E24B4A">↺ Changes requested ${_esc(dec.time)}</span>`
-              : `<span style="color:#EF9F27">Pending</span>`;
-            const comment = dec?.comments
-              ? `<div style="color:rgba(255,255,255,.35);font-size:10px;max-width:180px;
-                             white-space:normal;margin-top:1px">"${_esc(dec.comments)}"</div>`
-              : '';
-            return `<div style="margin-bottom:4px">
-              <div style="font-weight:600">${_esc(name)}</div>
-              <div>${status}</div>${comment}</div>`;
-          }).join('');
-          tipHtml = `<div class="myr-pt-tip" style="min-width:180px;white-space:normal">
-            <div style="color:#EF9F27;margin-bottom:4px;font-weight:600">Reviewers</div>
-            ${lines || '<div style="color:rgba(255,255,255,.3)">None assigned</div>'}
-          </div>`;
-        } else if (s.label === 'Approve') {
-          const appr = submittedData.approver;
-          const name = appr?.name || '—';
-          const dec  = approvedByName[name];
-          const status = dec
-            ? `<span style="color:#1D9E75">✓ ${_esc(dec.time)}</span>`
-            : `<span style="color:#EF9F27">Awaiting sign-off</span>`;
-          const comment = dec?.comments
-            ? `<div style="color:rgba(255,255,255,.35);font-size:10px;white-space:normal;
-                           margin-top:2px">"${_esc(dec.comments)}"</div>`
-            : '';
-          tipHtml = `<div class="myr-pt-tip" style="min-width:160px;white-space:normal">
-            <div style="color:#EF9F27;margin-bottom:4px;font-weight:600">Approver</div>
-            <div>${_esc(name)} · ${status}</div>${comment}
-          </div>`;
-        } else {
-          tipHtml = `<div class="myr-pt-tip">
-            <div style="color:#EF9F27;margin-bottom:2px">${_esc(s.label)}</div>
-            <div style="color:rgba(255,255,255,.4)">Awaiting action</div>
-          </div>`;
-        }
-      } else if (!s.done) {
-        tipHtml = `<div class="myr-pt-tip">
-          <div style="color:rgba(255,255,255,.3)">${_esc(s.label)}</div>
-          <div style="color:rgba(255,255,255,.2)">Pending</div>
-        </div>`;
-      }
-
-      const isPartialReview = s.label === 'Review' && approvalCount > 0 && !allReviewersDone;
-      const dotInline = s.done        ? 'background:#1D9E75;color:#fff;box-shadow:0 0 0 3px rgba(29,158,117,.2)'
-                      : isPartialReview ? 'background:#EF9F27;color:#060a10;box-shadow:0 0 0 3px rgba(239,159,39,.25)'
-                      : s.active      ? 'background:#00D2FF;color:#060a10;box-shadow:0 0 0 3px rgba(0,210,255,.2)'
-                      : 'background:rgba(255,255,255,.06);color:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.12)';
-      return `<div class="myr-pt-step">
-        <div class="myr-pt-dot ${cls}" style="${dotInline}">${label}</div>
-        <div class="myr-pt-name ${nameCls}">${_esc(s.label)}</div>
-        ${tipHtml}
-      </div>`;
-    }).join('');
-
-    // Build CoC event rows
-    const cocRows = instCoc.length
-      ? instCoc.map(e => {
-          const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
-            {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-          const typeLabel = (e.event_type||'').replace('request.','').replace(/_/g,' ');
-          const dotColor  = e.event_type==='request.submitted'?'#00D2FF':
-                            e.event_type==='request.completed'?'#1D9E75':
-                            e.event_type?.includes('reject')||e.event_type?.includes('withdraw')?'#E24B4A':'#EF9F27';
-          let notes = '';
-          try { const p = JSON.parse(e.event_notes||'{}'); notes = p.comments||p.note||p.title||p.doc_name||p.doc_names||''; } catch(_){}
-          return `<div class="myr-coc-row">
-            <div class="myr-coc-dot" style="background:${dotColor};margin-top:4px"></div>
-            <div class="myr-coc-time">${_esc(t)}</div>
-            <div class="myr-coc-main">
-              <div class="myr-coc-event-type">${_esc(typeLabel)}</div>
-              <div class="myr-coc-actor">${_esc(e.actor_name||'System')}</div>
-              ${notes?`<div class="myr-coc-note">${_esc(notes)}</div>`:''}
-            </div>
-          </div>`;
-        }).join('')
-      : `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">
-           Loading audit trail…
-         </div>`;
-
-    const isComplete   = approverApproved || req._raw?.status === 'complete' || req.status === 'completed';
-    // Auto-resolve open ⏳ Pending review action items when instance is complete
-    if (isComplete && req.id && !window._myrAutoResolved?.has(req.id)) {
-      window._myrAutoResolved = window._myrAutoResolved || new Set();
-      window._myrAutoResolved.add(req.id);
-      API.patch(
-        `workflow_action_items?instance_id=eq.${req.id}&status=eq.open`,
-        { status: 'resolved', updated_at: new Date().toISOString() }
-      ).catch(() => {});
-    }
-    const badgeLabel   = isComplete ? 'Approved' : req.status==='awaiting' ? 'Awaiting response' : 'In progress';
-    const badgeStyleFn = isComplete ? 'border:1px solid rgba(29,158,117,.4);color:#1D9E75'
-                       : isAmber   ? 'border:1px solid rgba(239,159,39,.4);color:#EF9F27'
-                       :             'border:1px solid rgba(0,210,255,.3);color:#00D2FF';
-
-    html += `<div class="myr-active-req" data-req-id="${req.id}">
-      <div class="myr-ar-head" onclick="myrToggleReq('myr-ar-body-${i}')">
-        <div style="width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0;${dotAnim}"></div>
-        <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1">${_esc(req.title)}</div>
-        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeStyleFn}">${badgeLabel}</span>
-        <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.55)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
-      </div>
-      <div class="myr-ar-body${(req.expanded || expandedIds.has(req.id)) ?' open':''}" id="myr-ar-body-${i}">
-        <div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.6);margin-bottom:5px">Workflow progress</div>
-        <div class="myr-pt-steps">${stepsHtml}</div>
-        ${(req.attachments||[]).length ? `
-        <div style="margin-bottom:8px">
-          <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.06em;
-                      text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:5px">
-            Documents
-          </div>
-          <div style="display:flex;flex-direction:column;gap:3px">
-            ${(req.attachments||[]).map(a => {
-              const icon = (a.type||'').includes('pdf') ? '📄' :
-                           (a.type||'').includes('word')||(a.name||'').endsWith('.docx') ? '📝' :
-                           (a.type||'').includes('sheet')||(a.name||'').endsWith('.xlsx') ? '📊' :
-                           (a.source === 'form') ? '◈' : '📎';
-              const sizeStr = a.size ? (a.size > 1048576
-                ? (a.size/1048576).toFixed(1)+'MB'
-                : (a.size/1024).toFixed(0)+'KB') : '';
-              const safePathAttr = (a.path||'').replace(/'/g, "\\'");
-              return `<button onclick="myrOpenAttachment('${safePathAttr}')"
-                style="display:flex;align-items:center;gap:6px;padding:4px 8px;width:100%;
-                       background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);
-                       color:#00D2FF;text-decoration:none;font-family:var(--font-head);font-size:11px;
-                       cursor:pointer;text-align:left;transition:background .12s"
-                onmouseover="this.style.background='rgba(0,210,255,.1)'"
-                onmouseout="this.style.background='rgba(0,210,255,.04)'">
-                <span>${icon}</span>
-                <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(a.name||'Document')}</span>
-                ${sizeStr?`<span style="color:rgba(255,255,255,.25);font-size:12px;flex-shrink:0">${sizeStr}</span>`:''}
-                <span style="color:rgba(255,255,255,.3);font-size:12px;flex-shrink:0">↗</span>
-              </button>`;
-            }).join('')}
-          </div>
-        </div>` : ''}
-        ${(() => {
-          const submitEv = instCoc.find(e => e.event_type === 'request.submitted');
-          const actor = submitEv?.actor_name || req._raw?.submitted_by_name || '';
-          const ts = submitEv
-            ? new Date(submitEv.occurred_at||submitEv.created_at).toLocaleString('en-US',
-                {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
-            : req.submitted || '';
-          return actor
-            ? `<div style="font-family:var(--font-head);font-size:11px;padding:5px 9px;
-                           background:rgba(239,159,39,.06);border-left:2px solid rgba(239,159,39,.4);
-                           color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:8px">
-                 Submitted by <strong style="color:rgba(255,255,255,.7)">${_esc(actor)}</strong>
-                 ${ts ? `· <span style="color:rgba(255,255,255,.3)">${_esc(ts)}</span>` : ''}
-                 ${isComplete ? '' : isAwaitingResubmit ? '— awaiting submitter revision' : allReviewersDone ? '— awaiting approver' : '— awaiting reviewer action'}
-               </div>`
-            : '';
-        })()}
-        <div class="myr-coc-panel">
-          <div class="myr-coc-label" onclick="myrToggleCoc('myr-coc-${i}','${req.id}',this)">
-            <span>&#9662; Chain of Custody</span>
-            <span style="color:rgba(0,210,255,.4)">${instCoc.length > 0 ? instCoc.length + ' event' + (instCoc.length!==1?'s':'') : 'Load'}</span>
-          </div>
-          <div class="myr-coc-events open" id="myr-coc-${i}">
-            ${(() => {
-              if (!instCoc.length) return `<div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded yet.</div>`;
-
-              // Parse submitted data for roles
-              let subData = {};
-              try { const se = instCoc.find(e=>e.event_type==='request.submitted'); if(se) subData=JSON.parse(se.event_notes||'{}'); } catch(_){}
-              const reviewerIds = new Set((subData.reviewers||[]).map(r=>r.id));
-              const approverId  = subData.approver?.id || null;
-
-              // Role derivation — id match first, then name fallback for approve.html events
-              const approverNameLC = (subData.approver?.name||'').trim().toLowerCase();
-              const getRole = (e) => {
-                if (e.event_type === 'request.submitted') return 'Submitter';
-                if (e.event_type === 'request.context_added') return 'Submitter';
-                if (approverId && e.actor_resource_id === approverId) return 'Approver';
-                if (approverNameLC && (e.actor_name||'').trim().toLowerCase() === approverNameLC) return 'Approver';
-                if (e.actor_resource_id && reviewerIds.has(e.actor_resource_id)) return 'Reviewer';
-                return 'Submitter';
-              };
-              const roleStyle = (role) => {
-                if (role==='Approver') return 'background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.4);color:#1D9E75';
-                if (role==='Reviewer') return 'background:rgba(239,159,39,.12);border:1px solid rgba(239,159,39,.35);color:#EF9F27';
-                return 'background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.25);color:#00D2FF';
-              };
-              const actionStyle = (evt) => {
-                if (evt==='request.submitted') return 'color:#00D2FF';
-                if (evt==='request.approved') return 'color:#1D9E75';
-                if (evt==='request.changes_requested') return 'color:#E24B4A';
-                if (evt==='request.withdrawn') return 'color:#E24B4A';
-                if (evt==='request.context_added') return 'color:rgba(255,255,255,.5)';
-                return 'color:rgba(255,255,255,.4)';
-              };
-              const actionLabel = (evt) => {
-                const map = {
-                  'request.submitted': 'Submitted',
-                  'request.approved': 'Approved',
-                  'request.changes_requested': 'Changes Requested',
-                  'request.withdrawn': 'Withdrawn',
-                  'request.context_added': 'Context Added',
-                };
-                return map[evt] || (evt||'').replace('request.','').replace(/_/g,' ');
-              };
-              const initials = (name) => (name||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-              const avatarColor = (role) => role==='Approver'?'#1D9E75':role==='Reviewer'?'#EF9F27':'#00D2FF';
-
-              // Separate comments from lifecycle events
-              const lifecycleEvts = instCoc.filter(e => e.event_type !== 'request.context_added');
-              const commentEvts   = instCoc.filter(e => {
-                if (e.event_type === 'request.context_added') return true;
-                // Include any lifecycle event that has a non-empty note or comments field
-                if (['request.approved','request.changes_requested','request.submitted'].includes(e.event_type)) {
-                  try {
-                    const p = JSON.parse(e.event_notes||'{}');
-                    return !!(p.comments || p.note);
-                  } catch(_) { return false; }
-                }
-                return false;
-              });
-
-              // Build approval process sidebar entries
-              const approvalPersons = [];
-              // Submitter
-              const submitEvt = instCoc.find(e=>e.event_type==='request.submitted');
-              if (submitEvt) approvalPersons.push({ name: submitEvt.actor_name||'Submitter', role: 'Submitter', status: 'Submitted', statusColor: '#00D2FF' });
-              // Reviewers from submitted data
-              (subData.reviewers||[]).forEach(r => {
-                const decided = instCoc.find(e => (e.event_type==='request.approved'||e.event_type==='request.changes_requested') && e.actor_resource_id===r.id);
-                approvalPersons.push({
-                  name: r.name||'Reviewer',
-                  role: 'Reviewer',
-                  status: decided ? (decided.event_type==='request.approved'?'Approved':'Changes Requested') : 'Pending',
-                  statusColor: decided ? (decided.event_type==='request.approved'?'#1D9E75':'#E24B4A') : '#EF9F27',
-                });
-              });
-              // Approver
-              if (subData.approver?.name) {
-                const apprEvt = instCoc.find(e => e.event_type === 'request.approved' &&
-                  (e.actor_resource_id === approverId ||
-                   (e.actor_name && e.actor_name.toLowerCase() === subData.approver.name.toLowerCase()))
-                );
-                approvalPersons.push({
-                  name: subData.approver.name,
-                  role: 'Approver',
-                  status: apprEvt ? 'Approved' : 'Pending',
-                  statusColor: apprEvt ? '#1D9E75' : '#EF9F27',
-                });
-              }
-
-              // Lifecycle table
-              const tableRows = lifecycleEvts.map(e => {
-                const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
-                const role = getRole(e);
-                return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
-                  <td style="padding:6px 10px 6px 0;font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.65);white-space:nowrap">${_esc(t)}</td>
-                  <td style="padding:6px 10px;font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.7);white-space:nowrap">${_esc(e.actor_name||'System')}</td>
-                  <td style="padding:6px 10px">
-                    <span style="font-family:var(--font-head);font-size:10px;padding:2px 7px;border-radius:2px;white-space:nowrap;${roleStyle(role)}">${role}</span>
-                  </td>
-                  <td style="padding:6px 0;font-family:var(--font-head);font-size:12px;font-weight:600;${actionStyle(e.event_type)}">${_esc(actionLabel(e.event_type))}</td>
-                </tr>`;
-              }).join('');
-
-              // Approval process sidebar
-              const sidebarRows = approvalPersons.map(p => `
-                <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
-                  <div style="width:36px;height:36px;border-radius:50%;background:rgba(${p.role==='Approver'?'29,158,117':p.role==='Reviewer'?'239,159,39':'0,210,255'},.15);
-                              border:2px solid ${avatarColor(p.role)};display:flex;align-items:center;justify-content:center;
-                              font-family:var(--font-head);font-size:12px;font-weight:700;color:${avatarColor(p.role)};flex-shrink:0">
-                    ${initials(p.name)}
-                  </div>
-                  <div style="min-width:0">
-                    <div style="font-family:var(--font-head);font-size:12px;font-weight:600;color:#F0F6FF;
-                                overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(p.name)}</div>
-                    <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.6);margin-top:1px">${p.role}</div>
-                    <div style="display:flex;align-items:center;gap:5px;margin-top:3px">
-                      <div style="width:7px;height:7px;border-radius:50%;background:${p.statusColor}"></div>
-                      <span style="font-family:var(--font-head);font-size:11px;font-weight:600;color:${p.statusColor}">${_esc(p.status)}</span>
-                    </div>
-                  </div>
-                </div>`).join('');
-
-              // Comments section
-              const commentsHtml = commentEvts.length ? `
-                <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)">
-                  <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.06em;
-                              text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:10px">Comments</div>
-                  ${commentEvts.map(e => {
-                    const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-                    let note = '';
-                    try { const p = JSON.parse(e.event_notes||'{}'); note = p.note || p.comments || ''; } catch(_){}
-                    return `<div style="display:flex;gap:10px;margin-bottom:10px">
-                      <div style="width:28px;height:28px;border-radius:50%;background:rgba(0,210,255,.12);
-                                  border:1px solid rgba(0,210,255,.3);display:flex;align-items:center;
-                                  justify-content:center;font-family:var(--font-head);font-size:10px;
-                                  font-weight:700;color:#00D2FF;flex-shrink:0">
-                        ${initials(e.actor_name)}
-                      </div>
-                      <div style="flex:1;min-width:0">
-                        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-                          <span style="font-family:var(--font-head);font-size:12px;font-weight:600;color:#F0F6FF">${_esc(e.actor_name||'Unknown')}</span>
-                          ${(() => { const _ac = e.event_type==='request.approved'?'Approved':e.event_type==='request.changes_requested'?'Changes Requested':e.event_type==='request.submitted'?'Submitted':''; const _cc = e.event_type==='request.approved'?'#1D9E75':e.event_type==='request.changes_requested'?'#E24B4A':'rgba(0,210,255,.8)'; return _ac?`<span style="font-family:var(--font-head);font-size:11px;color:${_cc};font-weight:600">${_ac}</span>`:'' })()}
-                          <span style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.5)">${_esc(t)}</span>
-                        </div>
-                        <div style="font-family:var(--font-head);font-size:12px;color:rgba(240,246,255,.65);
-                                    padding:7px 10px;background:rgba(255,255,255,.03);
-                                    border-left:2px solid rgba(0,210,255,.25);line-height:1.55">${_esc(note)}</div>
-                      </div>
-                    </div>`;
-                  }).join('')}
-                </div>` : '';
-
-              return `
-                <div style="display:grid;grid-template-columns:1fr 190px;gap:0;margin-top:4px;min-width:0">
-                  <!-- Left: Lifecycle table -->
-                  <div style="border-right:1px solid rgba(255,255,255,.06);padding-right:14px;min-width:0;overflow:hidden">
-                    <table style="width:100%;border-collapse:collapse;table-layout:fixed">
-                      <colgroup>
-                        <col style="width:130px">
-                        <col style="width:130px">
-                        <col style="width:90px">
-                        <col>
-                      </colgroup>
-                      <thead>
-                        <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
-                          <th style="text-align:left;padding:0 8px 6px 0;font-family:var(--font-head);font-size:12px;letter-spacing:.05em;color:rgba(255,255,255,.55);font-weight:500">DATE/TIME</th>
-                          <th style="text-align:left;padding:0 8px 6px;font-family:var(--font-head);font-size:12px;letter-spacing:.05em;color:rgba(255,255,255,.55);font-weight:500">PERSON</th>
-                          <th style="text-align:left;padding:0 8px 6px;font-family:var(--font-head);font-size:12px;letter-spacing:.05em;color:rgba(255,255,255,.55);font-weight:500">ROLE</th>
-                          <th style="text-align:left;padding:0 0 6px;font-family:var(--font-head);font-size:12px;letter-spacing:.05em;color:rgba(255,255,255,.55);font-weight:500">ACTION</th>
-                        </tr>
-                      </thead>
-                      <tbody>${tableRows}</tbody>
-                    </table>
-                    ${commentsHtml}
-                  </div>
-                  <!-- Right: Approval process -->
-                  <div style="padding-left:14px;min-width:0">
-                    <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.06em;
-                                text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:4px">Approval Process</div>
-                    ${sidebarRows}
-                  </div>
-                </div>`;
-            })()}
-          </div>
-        </div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
-          ${approverApproved ? '' : `<button onclick="myrWithdrawRequest('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;cursor:pointer;letter-spacing:.06em">Withdraw</button>`}
-          <button onclick="myrAddContext('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;border:1px solid rgba(0,210,255,.3);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Add context</button>
-          ${approverApproved ? `<button onclick="myrArchiveRequest('${req.id}')" style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:rgba(29,158,117,.08);border:1px solid rgba(29,158,117,.4);color:#1D9E75;cursor:pointer;letter-spacing:.06em">✓ Archive</button>` : ''}
-        </div>
-      </div>
-    </div>`;
-  });
-  el.innerHTML = html;
-}
-
-function renderMyRequestsHistory() {
-  const el = document.getElementById('myr-history-content');
-  if (!el) return;
-  const reqs = window._myRequests || [];
-  const hist = reqs.filter(r => r.status === 'completed' || r.status === 'rejected');
-  if (!hist.length) {
-    el.innerHTML = `<div style="font-family:var(--font-head);font-size:15px;color:rgba(255,255,255,.35);padding:32px 0;text-align:center">No completed requests yet.</div>`;
-    return;
-  }
-
-  const cocByInstance = window._myRequestCoc || {};
-  let html = '';
-
-  hist.forEach((req, i) => {
-    const isApproved   = req.status === 'completed';
-    const accentColor  = isApproved ? 'rgba(29,158,117,.5)'  : 'rgba(226,75,74,.5)';
-    const accentBg     = isApproved ? 'rgba(29,158,117,.03)' : 'rgba(226,75,74,.03)';
-    const badgeStyle   = isApproved
-      ? 'border:1px solid rgba(29,158,117,.4);color:#1D9E75'
-      : 'border:1px solid rgba(226,75,74,.4);color:#E24B4A';
-    const badgeLabel   = isApproved ? '✓ Approved'
-      : req.status === 'rejected' ? '✗ Rejected' : '✗ Withdrawn';
-
-    // Step progress — all done if approved, else show actual state
-    const stepsHtml = (req.steps||[]).map((s, si) => {
-      const cls     = s.done ? 'myr-ptd-done' : 'myr-ptd-pending';
-      const label   = s.done ? '&#10003;' : (si + 1);
-      const nameCls = s.done ? 'done' : '';
-      return `<div class="myr-pt-step">
-        <div class="myr-pt-dot ${cls}">${label}</div>
-        <div class="myr-pt-name ${nameCls}">${_esc(s.label)}</div>
-      </div>`;
-    }).join('');
-
-    // CoC rows
-    const instCoc = cocByInstance[req.id] || [];
-    // Parse submitted event for role resolution
-    let hSubData = {};
-    try { const se = instCoc.find(e=>e.event_type==='request.submitted'); if(se) hSubData=JSON.parse(se.event_notes||'{}'); } catch(_){}
-    const hReviewerIds = new Set((hSubData.reviewers||[]).map(r=>r.id));
-    const hApproverId  = hSubData.approver?.id || null;
-    const hApproverNameLC = (hSubData.approver?.name||'').trim().toLowerCase();
-    const hGetRole = (e) => {
-      if (e.event_type==='request.submitted'||e.event_type==='request.context_added') return 'Submitter';
-      if (hApproverId && e.actor_resource_id===hApproverId) return 'Approver';
-      if (hApproverNameLC && (e.actor_name||'').trim().toLowerCase()===hApproverNameLC) return 'Approver';
-      if (e.actor_resource_id && hReviewerIds.has(e.actor_resource_id)) return 'Reviewer';
-      return 'Submitter';
-    };
-    const hRoleStyle = (role) => {
-      if (role==='Approver') return 'background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.4);color:#1D9E75';
-      if (role==='Reviewer') return 'background:rgba(239,159,39,.12);border:1px solid rgba(239,159,39,.35);color:#EF9F27';
-      return 'background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.25);color:#00D2FF';
-    };
-    const hActionStyle = (evt) => {
-      if (evt==='request.submitted') return 'color:#00D2FF';
-      if (evt==='request.approved') return 'color:#1D9E75';
-      if (evt==='request.changes_requested') return 'color:#E24B4A';
-      if (evt==='request.withdrawn') return 'color:#E24B4A';
-      return 'color:rgba(255,255,255,.4)';
-    };
-    const hActionLabel = (evt) => ({
-      'request.submitted':'Submitted','request.approved':'Approved',
-      'request.changes_requested':'Changes Requested','request.withdrawn':'Withdrawn',
-      'request.context_added':'Context Added',
-    })[evt] || evt.replace('request.','');
-    const cocRows = instCoc.length
-      ? instCoc.map(e => {
-          const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
-            {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-          const role = hGetRole(e);
-          let notes = '';
-          try { const p=JSON.parse(e.event_notes||'{}'); notes=p.comments||p.note||p.title||p.doc_names||''; } catch(_){}
-          return `<div class="myr-coc-row">
-            <div class="myr-coc-time" style="min-width:110px">${_esc(t)}</div>
-            <div class="myr-coc-main" style="flex:1">
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                <span style="font-family:var(--font-head);font-size:11px;padding:1px 6px;${hRoleStyle(role)}">${role}</span>
-                <span style="font-family:var(--font-head);font-size:11px;font-weight:600;${hActionStyle(e.event_type)}">${hActionLabel(e.event_type)}</span>
-              </div>
-              <div class="myr-coc-actor" style="margin-top:2px">${_esc(e.actor_name||'System')}</div>
-              ${notes?`<div class="myr-coc-note" style="margin-top:3px">${_esc(notes)}</div>`:''}
-            </div>
-          </div>`;
-        }).join('')
-      : `<div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);padding:4px 0">No events recorded.</div>`;
-
-    const bodyId = `myr-hist-body-${i}`;
-    const cocId  = `myr-hist-coc-${i}`;
-
-    html += `<div style="border:1px solid ${accentColor};border-left-width:3px;
-                         margin-bottom:8px;overflow:hidden;background:${accentBg};
-                         box-shadow:0 2px 8px rgba(0,0,0,.3)">
-      <div onclick="myrToggleReq('${bodyId}')"
-        style="display:flex;align-items:center;gap:8px;padding:10px 14px;
-               border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .12s"
-        onmouseover="this.style.background='rgba(255,255,255,.03)'"
-        onmouseout="this.style.background=''">
-        <div style="width:8px;height:8px;border-radius:50%;background:${isApproved?'#1D9E75':'#E24B4A'};flex-shrink:0"></div>
-        <div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#F0F6FF;flex:1">${_esc(req.title)}</div>
-        <span style="font-family:var(--font-head);font-size:11px;padding:2px 8px;${badgeStyle}">${badgeLabel}</span>
-        <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.55)">${_esc(req.submitted||'')} &middot; ${_esc(req.workflow||'')}</div>
-        <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.2)">&#9656;</div>
-      </div>
-      <div id="${bodyId}" class="myr-ar-body open">
-        <div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.6);margin-bottom:5px">Workflow progress</div>
-        <div class="myr-pt-steps">${stepsHtml}</div>
-        ${(req.attachments||[]).length ? `
-        <div style="margin-bottom:8px">
-          <div style="font-family:var(--font-head);font-size:12px;letter-spacing:.06em;
-                      text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:5px">Documents</div>
-          ${(req.attachments||[]).map(a => {
-            const icon = (a.type||'').includes('pdf') ? '📄' :
-                         (a.type||'').includes('word')||(a.name||'').endsWith('.docx') ? '📝' :
-                         a.source === 'form' ? '◈' : '📎';
-            const sp = (a.path||'').replace(/'/g,"\'");
-            return `<button onclick="myrOpenAttachment('${sp}')"
-              style="display:flex;align-items:center;gap:6px;padding:4px 8px;width:100%;
-                     background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.1);
-                     color:#00D2FF;font-family:var(--font-head);font-size:11px;
-                     cursor:pointer;text-align:left;margin-bottom:3px">
-              <span>${icon}</span>
-              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(a.name||'Document')}</span>
-              <span style="color:rgba(255,255,255,.3);font-size:11px">↗</span>
-            </button>`;
-          }).join('')}
-        </div>` : ''}
-        <div class="myr-coc-panel">
-          <div class="myr-coc-label">
-            <span>&#9662; Chain of Custody</span>
-            <span style="color:rgba(0,210,255,.4)">${instCoc.length > 0 ? instCoc.length + ' event' + (instCoc.length!==1?'s':'') : ''}</span>
-          </div>
-          <div class="myr-coc-events open" id="${cocId}">${cocRows}</div>
-        </div>
-      </div>
-    </div>`;
-  });
-
-  el.innerHTML = html;
-}
-
-// Open a storage attachment via signed URL (workflow-documents bucket is private)
-window.myrOpenAttachment = async function(path) {
-  try {
-    const token  = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
-    const bucket = _mwStorageBucket();
-    const res = await fetch(
-      `${_mwSupaURL()}/storage/v1/object/sign/${bucket}/${path}`,
-      {
-        method: 'POST',
-        headers: {
-          'apikey':        _mwSupaKey(),
-          'Authorization': `Bearer ${token || _mwSupaKey()}`,
-          'Content-Type':  'application/json',
-        },
-        body: JSON.stringify({ expiresIn: 300 }),
-      }
-    );
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`${res.status}: ${err}`);
-    }
-    const data    = await res.json();
-    const signed  = data.signedURL || data.signedUrl || '';
-    if (!signed) throw new Error('No signed URL returned');
-    // Supabase returns /object/sign/... — prepend storage base (not full SUPA_URL)
-    const fullUrl = signed.startsWith('http')
-      ? signed
-      : `${_mwSupaURL()}/storage/v1${signed}`;
-    window.open(fullUrl, '_blank');
-  } catch(e) {
-    console.error('[Attachment] signed URL error:', e);
-    compassToast('Could not open file — ' + e.message, 3000);
-  }
-};
-
-window.myrToggleReq = function(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.classList.toggle('open');
-  const rid = el.closest('.myr-active-req')?.dataset.reqId;
-  if (rid) {
-    if (el.classList.contains('open')) _myrExpandedIds.add(rid);
-    else _myrExpandedIds.delete(rid);
-  }
-};
-
-// Shared CoC row renderer — used by myrToggleCoc and the live refresh poll
-// Toggle CoC panel — fetch events lazily on first open
-window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
-  const panel = document.getElementById(panelId);
-  if (!panel) return;
-
-  const isOpen = panel.classList.contains('open');
-  if (isOpen) {
-    panel.classList.remove('open');
-    if (labelEl) labelEl.querySelector('span:first-child').textContent = '▶ Chain of Custody';
-    if (instanceId) _myrCocOpenIds.delete(instanceId);
-    return;
-  }
-
-  panel.classList.add('open');
-  if (instanceId) _myrCocOpenIds.add(instanceId);
-  if (labelEl) labelEl.querySelector('span:first-child').textContent = '▼ Chain of Custody';
-
-  // If CoC not yet loaded, fetch and re-render the full card
-  if (!(window._myRequestCoc||{})[instanceId]) {
-    await myrLoadRequestCoc(instanceId);
-    // Re-render active cards to populate the new layout with fresh CoC data
-    renderMyRequestsActive();
-  }
-};
-
-// Fetch CoC events for a single instance and cache in window._myRequestCoc
-window.myrLoadRequestCoc = async function(instanceId) {
-  if (!instanceId) return;
-  window._myRequestCoc = window._myRequestCoc || {};
-  try {
-    const rows = await API.get(
-      `coc_events?entity_id=eq.${instanceId}&order=occurred_at.asc&select=*`
-    ).catch(() => []);
-    window._myRequestCoc[instanceId] = rows || [];
-  } catch(e) {
-    window._myRequestCoc[instanceId] = [];
-  }
-};
-
-window.myrOpenWorkflowForm = function(wfId) {
-  // Find workflow definition
-  let wf = null;
-  _WF_CATALOG.forEach(c => c.items.forEach(w => { if (w.id === wfId) wf = w; }));
-  if (!wf) return;
-  // Build pre-filled form based on workflow type
-  const stepPreviews = {
-    'resource-alloc': ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
-    'pto-request':    ['Submit','PM review','Approved \u2192 cal blocked + team notified'],
-    'capacity-concern':['Submit','PM review','Decision \u2192 queue adjusted'],
-    'doc-review':     ['Submit','Review','Approve'],
-    'change-request': ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
-    'issue-escalation':['Submit','PM review','Resolution plan','Resolved \u2192 CoC event'],
-    'expense':        ['Submit','PM review','Finance approval','Processed'],
-    'training':       ['Submit','PM review','Budget check','Mgmt approval','Confirmed'],
-    'new-project':    ['Submit','Initial scoping','Resourcing plan','Budget review','Exec approval','Kickoff','Schedule','Active'],
-    'project-closure':['Submit','Final CoC summary','Lessons learned','Financial reconcile','Exec sign-off','Archived'],
-  };
-  const steps = stepPreviews[wfId] || ['Submit','Review','Complete'];
-  const stepsHtml = steps.map(s=>`<span style="font-family:var(--font-head);font-size:11px;padding:3px 9px;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);background:rgba(255,255,255,.02)">${_esc(s)}</span><span style="font-size:11px;color:rgba(255,255,255,.2)">\u2192</span>`).join('').replace(/→$/, '');
-  const formBody = _buildWorkflowFormBody(wfId, wf);
-  // Show via a compass toast-style modal — reuse existing modal infrastructure if available
-  const prefillNote = wfId === 'capacity-concern' || wfId === 'resource-alloc'
-    ? `<div style="font-family:var(--font-head);font-size:11px;color:rgba(0,210,255,.5);padding:5px 8px;background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12);margin-bottom:10px;line-height:1.5">Pre-filled from My Work context where available. Review and adjust before submitting.</div>`
-    : '';
-  const modalHtml = `
-    <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px">
-      <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;flex:1">${_esc(wf.title)}</div>
-      <button onclick="myrCloseModal()" style="background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;width:20px;height:20px;cursor:pointer;font-family:var(--font-head);font-size:11px;display:flex;align-items:center;justify-content:center">&#x2715;</button>
-    </div>
-    <div style="padding:14px;overflow-y:auto;max-height:60vh">
-      ${prefillNote}
-      <div style="margin-bottom:10px">
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);margin-bottom:5px;letter-spacing:.07em;text-transform:uppercase">Workflow steps</div>
-        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">${stepsHtml}</div>
-      </div>
-      ${formBody}
-    </div>
-    <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:6px;align-items:center">
-      ${wfId === 'doc-review' ? `
-      <label style="display:flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:11px;
-                    color:rgba(255,255,255,.3);cursor:pointer;user-select:none;margin-right:auto">
-        <input type="checkbox" id="myr-save-responses"
-          ${localStorage.getItem('myr_save_responses') === '1' ? 'checked' : ''}
-          style="accent-color:#00D2FF;cursor:pointer"/>
-        Save responses
-      </label>` : '<div style="margin-right:auto"></div>'}
-      <button onclick="myrCloseModal()" style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.06em">Cancel</button>
-      <button onclick="myrSubmitWorkflow('${wfId}')" data-myr-submit style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;letter-spacing:.06em">Submit request &#8594;</button>
-    </div>`;
-  // Create modal overlay
-  let overlay = document.getElementById('myr-modal-overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'myr-modal-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
-    overlay.addEventListener('click', e => { if (e.target === overlay) myrCloseModal(); });
-    document.body.appendChild(overlay);
-  }
-  const modal = document.createElement('div');
-  modal.id = 'myr-modal';
-  modal.style.cssText = 'background:#111827;border:1px solid rgba(0,210,255,.25);width:480px;max-height:85vh;border-radius:4px;overflow:hidden;display:flex;flex-direction:column';
-  modal.innerHTML = modalHtml;
-  overlay.innerHTML = '';
-  overlay.appendChild(modal);
-  overlay.style.display = 'flex';
-
-  // Restore saved doc-review responses if checkbox was previously checked
-  if (wfId === 'doc-review' && localStorage.getItem('myr_save_responses') === '1') {
-    try {
-      const saved = JSON.parse(localStorage.getItem('myr_doc_review_saved') || '{}');
-      if (saved.reviewers?.length) {
-        window._myrPendingReviewers = saved.reviewers;
-        myrRenderReviewerPills();
-      }
-      if (saved.approver) {
-        window._myrPendingApprover = saved.approver;
-        myrRenderApproverPill();
-      }
-      if (saved.lastDocs?.length) {
-        const listEl = modal.querySelector('#myr-doc-list');
-        if (listEl) {
-          listEl.innerHTML = saved.lastDocs.map(d => {
-            const icon = (d.mime||'').includes('pdf')||(d.name||'').endsWith('.pdf') ? '📄' :
-                         (d.source==='form') ? '◈' : '📎';
-            return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;margin-bottom:4px;
-                                background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1)">
-              <span>${icon}</span>
-              <span style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
-                           flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.name}</span>
-              <span style="font-family:var(--font-head);font-size:10px;color:rgba(239,159,39,.6)">↑ re-upload</span>
-            </div>`;
-          }).join('');
-        }
-      }
-      if (saved.deadline) {
-        const dl = modal.querySelector('[data-myr-field="deadline"]');
-        if (dl) dl.value = saved.deadline;
-      }
-      if (saved.instructions) {
-        const instr = modal.querySelector('[data-myr-field="instructions"]');
-        if (instr) instr.value = saved.instructions;
-      }
-    } catch(_) {}
-  }
-};
-
-window.myrCloseModal = function() {
-  const overlay = document.getElementById('myr-modal-overlay');
-  if (overlay) overlay.style.display = 'none';
-};
-
-// ── Withdraw a submitted request ──────────────────────────
-window.myrWithdrawRequest = async function(instanceId) {
-  if (!instanceId) return;
-  const firmId  = _mwFirmId();
-  const resName = _myResource?.name || 'Unknown';
-  const resId   = _myResource?.id   || null;
-  const now     = new Date().toISOString();
-
-  // Resolve title BEFORE building the modal
-  const req   = (window._myRequests||[]).find(r => r.id === instanceId);
-  const title = req?.title || 'this request';
-
-  // Professional confirmation modal — no browser confirm()
-  const confirmed = await new Promise(resolve => {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;' +
-      'display:flex;align-items:center;justify-content:center;padding:20px';
-    overlay.innerHTML = `
-      <div style="background:#0d1b2e;border:1px solid rgba(226,75,74,.3);width:420px;
-                  border-radius:4px;overflow:hidden;font-family:var(--font-head)">
-        <div style="padding:14px 18px 12px;border-bottom:1px solid rgba(255,255,255,.07);
-                    display:flex;align-items:center;gap:10px">
-          <div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;
-                      background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.3);
-                      display:flex;align-items:center;justify-content:center;
-                      font-size:15px;color:#E24B4A">✕</div>
-          <div>
-            <div style="font-size:13px;font-weight:700;color:#F0F6FF">Withdraw Request</div>
-            <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px;
-                        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">
-              ${_esc(title)}
-            </div>
-          </div>
-        </div>
-        <div style="padding:16px 18px">
-          <div style="font-size:12px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:12px">
-            This will cancel the request and notify the reviewer.
-            Any work already done on this request will be preserved in the Chain of Custody.
-          </div>
-          <div style="background:rgba(226,75,74,.06);border:1px solid rgba(226,75,74,.2);
-                      border-left:2px solid #E24B4A;padding:8px 12px;
-                      font-size:11px;color:rgba(255,255,255,.4)">
-            This action cannot be undone.
-          </div>
-        </div>
-        <div style="padding:10px 18px 14px;display:flex;gap:8px;justify-content:flex-end;
-                    border-top:1px solid rgba(255,255,255,.06)">
-          <button id="_wdKeepBtn"
-            style="font-family:var(--font-head);font-size:11px;padding:6px 18px;
-                   background:none;border:1px solid rgba(255,255,255,.15);
-                   color:rgba(255,255,255,.5);cursor:pointer;letter-spacing:.06em">
-            Keep Request
-          </button>
-          <button id="_wdConfirmBtn"
-            style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 18px;
-                   background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.4);
-                   color:#E24B4A;cursor:pointer;letter-spacing:.06em">
-            ✕ Withdraw
-          </button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    const cleanup = result => { overlay.remove(); resolve(result); };
-    overlay.querySelector('#_wdKeepBtn').onclick    = () => cleanup(false);
-    overlay.querySelector('#_wdConfirmBtn').onclick = () => cleanup(true);
-    overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
-  });
-  if (!confirmed) return;
-
-  try {
-    // PATCH instance status to cancelled (withdrawn by submitter)
-    await API.patch(`workflow_instances?id=eq.${instanceId}`, {
-      status: 'cancelled',
-      updated_at: now,
-    });
-
-    // CoC event
-    await API.post('coc_events', {
-      id:                crypto.randomUUID(),
-      firm_id:           firmId,
-      entity_id:         instanceId,
-      entity_type:       'workflow_instance',
-      event_type:        'request.withdrawn',
-      event_class:       'lifecycle',
-      severity:          'info',
-      event_notes:       JSON.stringify({ title, withdrawn_by: resName }),
-      actor_name:        resName,
-      actor_resource_id: resId,
-      occurred_at:       now,
-      created_at:        now,
-    });
-
-    // On withdraw: cancel open workflow_requests for this instance (new dedicated table).
-    // Also patch workflow_action_items for any legacy rows during migration cutover.
-    await Promise.all([
-      API.patch(
-        `workflow_requests?instance_id=eq.${instanceId}&status=eq.open`,
-        { status: 'cancelled', updated_at: now }
-      ).catch(() => {}),
-      API.patch(
-        `workflow_action_items?instance_id=eq.${instanceId}&status=eq.open&owner_resource_id=eq.${resId}`,
-        { status: 'resolved', updated_at: now }
-      ).catch(() => {}),
-    ]);
-
-    // Optimistic local update
-    if (window._myRequests) {
-      window._myRequests = window._myRequests.map(r =>
-        r.id === instanceId ? { ...r, status: 'rejected' } : r
-      );
-    }
-    renderMyRequestsActive();
-    renderMyRequestsHistory();
-    _myrUpdateRequestBadges();
-    compassToast(`"${title}" withdrawn. Reviewer notified.`);
-
-  } catch(e) {
-    console.error('[MyRequests] withdraw failed:', e);
-    compassToast('Withdraw failed — ' + (e.message || 'check console'), 4000);
-  }
-};
-
-// ── Archive a completed request → moves to History ───────────────────────
-// ── Recalculate & repaint both request badge elements ─────────────────────
-function _myrUpdateRequestBadges() {
-  const active = (window._myRequests||[]).filter(r =>
-    r.status !== 'completed' && r.status !== 'rejected'
-  ).length;
-  const b1 = document.getElementById('ust-requests-badge');
-  if (b1) { b1.textContent = active > 0 ? active + ' active' : ''; b1.style.display = active > 0 ? 'inline' : 'none'; }
-  const b2 = document.getElementById('myr-active-badge');
-  if (b2) { b2.textContent = active > 0 ? active : ''; b2.style.display = active > 0 ? 'inline' : 'none'; }
-}
-
-window.myrArchiveRequest = async function(instanceId) {
-  if (!instanceId) return;
-  const now = new Date().toISOString();
-  try {
-    await API.patch(`workflow_instances?id=eq.${instanceId}`, {
-      status:     'complete',
-      updated_at: now,
-    }).catch(()=>{});
-    // Resolve any remaining open action items for submitter
-    await API.patch(
-      `workflow_action_items?instance_id=eq.${instanceId}&status=eq.open`,
-      { status: 'resolved', updated_at: now }
-    ).catch(()=>{});
-    // Optimistic local update → move to completed
-    if (window._myRequests) {
-      window._myRequests = window._myRequests.map(r =>
-        r.id === instanceId ? { ...r, status: 'completed' } : r
-      );
-    }
-    _myrExpandedIds.delete(instanceId);
-    _myrCocOpenIds.delete(instanceId);
-    renderMyRequestsActive();
-    renderMyRequestsHistory();
-    _myrUpdateRequestBadges();
-    compassToast('Request archived.');
-  } catch(e) {
-    compassToast('Archive failed — ' + (e.message||'check console'), 3000);
-  }
-};
-window.myrAddContext = async function(instanceId) {
-  if (!instanceId) return;
-  const req = (window._myRequests||[]).find(r => r.id === instanceId);
-  const title = req?.title || 'request';
-
-  // Inline context modal
-  const existing = document.getElementById('myr-context-overlay');
-  if (existing) existing.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'myr-context-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px';
-  overlay.innerHTML = `
-    <div style="background:#111827;border:1px solid rgba(0,210,255,.25);width:420px;border-radius:4px;overflow:hidden">
-      <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px">
-        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;flex:1">Add context</div>
-        <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(title)}</div>
-        <button onclick="document.getElementById('myr-context-overlay').remove()"
-          style="background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;width:20px;height:20px;cursor:pointer;font-family:var(--font-head);font-size:11px">&#x2715;</button>
-      </div>
-      <div style="padding:14px">
-        <textarea id="myr-context-text" placeholder="Add additional context, updates, or attachments for the reviewer…"
-          style="width:100%;padding:8px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
-                 color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;
-                 resize:none;box-sizing:border-box" rows="4"></textarea>
-      </div>
-      <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:6px;justify-content:flex-end">
-        <button onclick="document.getElementById('myr-context-overlay').remove()"
-          style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.06em">
-          Cancel
-        </button>
-        <button onclick="myrSubmitContext('${instanceId}')"
-          style="font-family:var(--font-head);font-size:11px;padding:5px 14px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.4);color:#00D2FF;cursor:pointer;letter-spacing:.06em">
-          Add to thread &#8594;
-        </button>
-      </div>
-    </div>`;
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
-  document.getElementById('myr-context-text')?.focus();
-};
-
-window.myrSubmitContext = async function(instanceId) {
-  const text = document.getElementById('myr-context-text')?.value?.trim();
-  if (!text) { compassToast('Enter some context before submitting.', 2000); return; }
-
-  const firmId  = _mwFirmId();
-  const resName = _myResource?.name || 'Unknown';
-  const resId   = _myResource?.id   || null;
-  const now     = new Date().toISOString();
-
-  try {
-    await API.post('coc_events', {
-      id:                crypto.randomUUID(),
-      firm_id:           firmId,
-      entity_id:         instanceId,
-      entity_type:       'workflow_instance',
-      event_type:        'request.context_added',
-      event_class:       'note',
-      severity:          'info',
-      event_notes:       JSON.stringify({ note: text }),
-      actor_name:        resName,
-      actor_resource_id: resId,
-      occurred_at:       now,
-      created_at:        now,
-    });
-
-    // Update local cocNote on the request
-    if (window._myRequests) {
-      window._myRequests = window._myRequests.map(r =>
-        r.id === instanceId ? { ...r, cocNote: text } : r
-      );
-    }
-    renderMyRequestsActive();
-    document.getElementById('myr-context-overlay')?.remove();
-    compassToast('Context added to request thread.');
-
-  } catch(e) {
-    console.error('[MyRequests] add context failed:', e);
-    compassToast('Failed to add context — ' + (e.message || 'check console'), 4000);
-  }
-};
-
-
-// ── Document upload helpers for doc-review requests ──────────────────────────
-// _myrPendingDocs:      staging array of docs attached to the open modal
-// _myrPendingReviewers: array of {id, name, email, dept} selected via PersonPicker
-// _myrPendingApprover:  single {id, name, email} or null
-// All cleared on modal close and after successful submit.
-window._myrPendingDocs      = [];
-window._myrPendingReviewers = [];
-window._myrPendingApprover  = null;
-
-// ── Reviewer pill helpers ─────────────────────────────────
-function _myrPersonPill(person, removeKey, removeFn, color) {
-  const ini = (person.name||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-  return `<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 5px;
-                      background:rgba(${color},.1);border:1px solid rgba(${color},.3);
-                      font-family:var(--font-head);font-size:11px;color:rgb(${color})">
-    <div style="width:20px;height:20px;border-radius:50%;background:rgba(${color},.2);
-                border:1px solid rgba(${color},.4);display:flex;align-items:center;
-                justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">
-      ${ini}
-    </div>
-    <div style="display:flex;flex-direction:column;line-height:1.2">
-      <span style="font-weight:600">${_esc(person.name)}</span>
-      ${person.dept||person.title?`<span style="font-size:10px;opacity:.6">${_esc(person.dept||person.title||'')}</span>`:''}
-    </div>
-    <button onclick="${removeFn}('${removeKey}')" type="button"
-      style="background:none;border:none;color:rgba(${color},.6);cursor:pointer;
-             font-size:12px;padding:0 0 0 3px;line-height:1">✕</button>
-  </div>`;
-}
-
-window.myrRenderReviewerPills = function() {
-  const el = document.getElementById('myr-reviewer-pills');
-  if (!el) return;
-  el.innerHTML = (_myrPendingReviewers||[])
-    .map(p => _myrPersonPill(p, p.id, 'myrRemoveReviewer', '0,210,255'))
-    .join('');
-};
-
-window.myrRemoveReviewer = function(id) {
-  window._myrPendingReviewers = (_myrPendingReviewers||[]).filter(r => r.id !== id);
-  myrRenderReviewerPills();
-};
-
-window.myrAddReviewer = function(btn) {
-  if (!window.PersonPicker?.show) {
-    compassToast('PersonPicker not available', 2000); return;
-  }
-  PersonPicker.show(btn, function(person) {
-    if (!person?.id) return;
-    window._myrPendingReviewers = window._myrPendingReviewers || [];
-    if (_myrPendingReviewers.find(r => r.id === person.id)) return; // no duplicates
-    _myrPendingReviewers.push({
-      id:    person.id,
-      name:  person.name  || '',
-      email: person.email || '',
-      dept:  person.dept  || person.department || '',
-      title: person.title || '',
-    });
-    myrRenderReviewerPills();
-  });
-};
-
-window.myrRenderApproverPill = function() {
-  const el    = document.getElementById('myr-approver-pill');
-  const btn   = document.getElementById('myr-set-approver-btn');
-  if (!el) return;
-  if (_myrPendingApprover) {
-    el.innerHTML = _myrPersonPill(_myrPendingApprover, 'approver', 'myrRemoveApprover', '196,125,24');
-    if (btn) btn.textContent = '↺ Change Approver';
-  } else {
-    el.innerHTML = '';
-    if (btn) btn.textContent = '+ Set Approver';
-  }
-};
-
-window.myrRemoveApprover = function() {
-  window._myrPendingApprover = null;
-  myrRenderApproverPill();
-};
-
-window.myrSetApprover = function(btn) {
-  if (!window.PersonPicker?.show) {
-    compassToast('PersonPicker not available', 2000); return;
-  }
-  PersonPicker.show(btn, function(person) {
-    if (!person?.id) return;
-    window._myrPendingApprover = {
-      id:    person.id,
-      name:  person.name  || '',
-      email: person.email || '',
-      dept:  person.dept  || person.department || '',
-      title: person.title || '',
-    };
-    myrRenderApproverPill();
-  });
-};
-
-// Called when the file input changes — uploads each file to Supabase Storage
-// then adds to _myrPendingDocs and re-renders the doc list.
-window.myrHandleDocUpload = async function(event) {
-  const files = Array.from(event.target.files || []);
-  if (!files.length) return;
-
-  const listEl = document.getElementById('myr-doc-list');
-  const uploadBtn = event.target.closest('label');
-  if (uploadBtn) { uploadBtn.style.opacity = '.5'; uploadBtn.style.pointerEvents = 'none'; }
-
-  for (const file of files) {
-    const docId   = crypto.randomUUID();
-    const ext     = file.name.split('.').pop();
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path    = `requests/${docId}/${safeName}`;
-
-    try {
-      // Get auth token for storage upload — Auth is a bare global from auth.js
-      const token = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
-
-      const res = await fetch(
-        `${_mwSupaURL()}/storage/v1/object/workflow-documents/${path}`,
-        {
-          method:  'POST',
-          headers: {
-            'apikey':         (_mwSupaKey()),
-            'Authorization':  `Bearer ${token || _mwSupaKey()}`,
-            'Content-Type':   file.type || 'application/octet-stream',
-            'x-upsert':       'true',
-          },
-          body: file,
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.text();
-        console.warn('[DocUpload] Storage upload failed:', err);
-        compassToast(`Upload failed: ${file.name}`, 3000);
-        continue;
-      }
-
-      // Build public URL
-      const url = `${_mwSupaURL()}/storage/v1/object/public/workflow-documents/${path}`;
-
-      window._myrPendingDocs.push({
-        id:     docId,
-        name:   file.name,
-        path,
-        url,
-        size:   file.size,
-        mime:   file.type,
-        source: 'upload',
-      });
-
-      myrRenderDocList();
-
-    } catch(e) {
-      console.error('[DocUpload] error:', e);
-      compassToast(`Upload error: ${file.name} — ${e.message}`, 3000);
-    }
-  }
-
-  // Reset the file input so the same file can be re-selected if needed
-  event.target.value = '';
-  if (uploadBtn) { uploadBtn.style.opacity = '1'; uploadBtn.style.pointerEvents = ''; }
-};
-
-// Render the pending doc list inside the modal
-window.myrRenderDocList = function() {
-  const el = document.getElementById('myr-doc-list');
-  if (!el) return;
-  const docs = window._myrPendingDocs || [];
-  if (!docs.length) { el.innerHTML = ''; return; }
-
-  el.innerHTML = docs.map((d, i) => {
-    const icon = (d.mime||'').includes('pdf') ? '📄' :
-                 (d.mime||'').includes('word') || d.name.endsWith('.docx') ? '📝' :
-                 (d.mime||'').includes('sheet') || d.name.endsWith('.xlsx') ? '📊' :
-                 d.source === 'form' ? '◈' : '📎';
-    const sizeStr = d.size > 1048576
-      ? (d.size/1048576).toFixed(1) + 'MB'
-      : (d.size/1024).toFixed(0) + 'KB';
-    return `
-      <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;margin-bottom:4px;
-                  background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.12)">
-        <span style="font-size:13px">${icon}</span>
-        <span style="font-family:var(--font-head);font-size:11px;color:#C8DFF0;
-                     flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-              title="${_esc(d.name)}">${_esc(d.name)}</span>
-        <span style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.3);
-                     flex-shrink:0">${d.source === 'form' ? 'Form' : sizeStr}</span>
-        <button onclick="myrRemoveDoc(${i})"
-          style="background:none;border:none;color:rgba(226,75,74,.6);cursor:pointer;
-                 font-size:13px;padding:0 2px;line-height:1;flex-shrink:0"
-          title="Remove">&#x2715;</button>
-      </div>`;
-  }).join('');
-};
-
-// Remove a pending doc by index
-window.myrRemoveDoc = function(idx) {
-  window._myrPendingDocs = (window._myrPendingDocs || []).filter((_,i) => i !== idx);
-  myrRenderDocList();
-};
-
-// Open a picker to select a released CadenceHUD form definition as a document
-window.myrPickCadenceForm = async function() {
-  // Fetch released form definitions
-  let forms = [];
-  try {
-    forms = await API.get(
-      `workflow_form_definitions?state=eq.released&order=source_name.asc&limit=100` +
-      `&select=id,source_name,version,source_path,category_id`
-    ).catch(() => []);
-  } catch(e) { forms = []; }
-
-  if (!forms.length) {
-    compassToast('No released forms found in the Form Library.', 3000);
-    return;
-  }
-
-  // Show picker overlay
-  const existing = document.getElementById('myr-form-picker');
-  if (existing) existing.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'myr-form-picker';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:600;' +
-    'display:flex;align-items:center;justify-content:center;padding:20px';
-
-  overlay.innerHTML = `
-    <div style="background:#0d1b2e;border:1px solid rgba(196,125,24,.35);width:460px;
-                max-height:70vh;border-radius:4px;overflow:hidden;display:flex;flex-direction:column">
-      <div style="padding:12px 16px 10px;border-bottom:1px solid rgba(255,255,255,.07);
-                  display:flex;align-items:center;gap:8px;flex-shrink:0">
-        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:#F0F6FF;flex:1">
-          Select CadenceHUD Form
-        </div>
-        <span style="font-family:var(--font-head);font-size:12px;color:rgba(196,125,24,.7)">
-          Released forms only
-        </span>
-        <button onclick="document.getElementById('myr-form-picker').remove()"
-          style="background:none;border:1px solid rgba(226,75,74,.3);color:#E24B4A;
-                 width:20px;height:20px;cursor:pointer;font-size:11px;display:flex;
-                 align-items:center;justify-content:center">&#x2715;</button>
-      </div>
-      <div style="flex:1;overflow-y:auto;padding:8px">
-        ${forms.map(f => `
-          <div onclick="myrAttachForm('${f.id}','${_esc(f.source_name)}','${_esc(f.version||'0.1.0')}','${f.source_path||''}')"
-            style="padding:9px 12px;cursor:pointer;border:1px solid rgba(255,255,255,.06);
-                   margin-bottom:4px;transition:background .1s;display:flex;align-items:center;gap:10px"
-            onmouseover="this.style.background='rgba(196,125,24,.08)';this.style.borderColor='rgba(196,125,24,.3)'"
-            onmouseout="this.style.background='';this.style.borderColor='rgba(255,255,255,.06)'">
-            <span style="font-size:16px">◈</span>
-            <div style="flex:1;min-width:0">
-              <div style="font-family:var(--font-head);font-size:12px;font-weight:600;
-                          color:#F0F6FF;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                ${_esc(f.source_name)}
-              </div>
-              <div style="font-family:var(--font-head);font-size:12px;color:rgba(196,125,24,.7);margin-top:1px">
-                v${_esc(f.version||'0.1.0')} · Released
-              </div>
-            </div>
-            <span style="font-family:var(--font-head);font-size:12px;color:rgba(0,210,255,.5)">
-              Attach ›
-            </span>
-          </div>`).join('')}
-      </div>
-    </div>`;
-
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
-};
-
-// Attach a CadenceHUD form to the pending docs list
-window.myrAttachForm = function(formId, formName, formVersion, sourcePath) {
-  document.getElementById('myr-form-picker')?.remove();
-
-  // Don't add duplicates
-  if ((window._myrPendingDocs||[]).some(d => d.form_id === formId)) {
-    compassToast(`${formName} is already attached.`, 2000);
-    return;
-  }
-
-  const url = sourcePath
-    ? `${_mwSupaURL()}/storage/v1/object/public/workflow-documents/${sourcePath}`
-    : null;
-
-  window._myrPendingDocs = window._myrPendingDocs || [];
-  window._myrPendingDocs.push({
-    id:      crypto.randomUUID(),
-    name:    `${formName} v${formVersion}`,
-    path:    sourcePath || null,
-    url,
-    size:    0,
-    mime:    'application/pdf',
-    source:  'form',
-    form_id: formId,
-  });
-
-  myrRenderDocList();
-  compassToast(`${formName} attached.`, 1800);
-};
-
-// Clear pending docs when modal closes
-var _origMyrCloseModal = window.myrCloseModal;
-window.myrCloseModal = function() {
-  window._myrPendingDocs      = [];
-  window._myrPendingReviewers = [];
-  window._myrPendingApprover  = null;
-  if (_origMyrCloseModal) _origMyrCloseModal();
-};
-
-window.myrSubmitWorkflow = async function(wfId) {
-  // ── 1. Collect form values from modal ───────────────────
-  const modal = document.getElementById('myr-modal');
-  if (!modal) return;
-
-  // Read all labelled inputs/selects/textareas by their data-field attribute
-  const getField = (fieldId) => {
-    const el = modal.querySelector(`[data-myr-field="${fieldId}"]`);
-    return el ? el.value.trim() : '';
-  };
-
-  // Build field map by workflow type
-  let title = '', details = {}, reviewerLabel = '';
-  switch (wfId) {
-    case 'doc-review': {
-      const deadline     = getField('deadline');
-      const instructions = getField('instructions');
-      const docs         = window._myrPendingDocs      || [];
-      const reviewers    = window._myrPendingReviewers  || [];
-      const approver     = window._myrPendingApprover   || null;
-      if (!docs.length)      { compassToast('Add at least one document for review.', 2500); return; }
-      if (!reviewers.length) { compassToast('Add at least one reviewer.', 2500); return; }
-      const docNames     = docs.map(d => d.name).join(', ');
-      title              = `Document review: ${docs.length === 1 ? docs[0].name : docs.length + ' documents'}`;
-      reviewerLabel      = reviewers[0]?.name || '';
-      details            = { docs, reviewers, approver, deadline, instructions,
-                             doc_count: docs.length, doc_names: docNames };
-      // Persist responses if "Save responses" is checked
-      const saveChk = modal.querySelector('#myr-save-responses');
-      if (saveChk) localStorage.setItem('myr_save_responses', saveChk.checked ? '1' : '0');
-      if (saveChk?.checked) {
-        localStorage.setItem('myr_doc_review_saved', JSON.stringify({
-          reviewers, approver, deadline, instructions,
-          lastDocs: docs.map(d => ({ name: d.name, size: d.size, mime: d.mime, source: d.source })),
-        }));
-      }
-      break;
-    }
-    case 'resource-alloc': {
-      const resource = getField('resource');
-      const alloc    = getField('allocation');
-      const effDate  = getField('effective_date');
-      const justif   = getField('justification');
-      if (!resource) { compassToast('Resource is required.', 2500); return; }
-      title   = `Resource allocation: ${resource} → ${alloc}`;
-      details = { resource, allocation: alloc, effective_date: effDate, justification: justif };
-      break;
-    }
-    case 'pto-request': {
-      const from = getField('from');
-      const to   = getField('to');
-      const plan = getField('coverage_plan');
-      if (!from || !to) { compassToast('Start and end dates are required.', 2500); return; }
-      title   = `PTO request: ${from} – ${to}`;
-      details = { from, to, coverage_plan: plan };
-      break;
-    }
-    case 'change-request': {
-      const type   = getField('change_type');
-      const desc   = getField('change_desc');
-      const impact = getField('impact');
-      if (!desc) { compassToast('Change description is required.', 2500); return; }
-      title   = `Change request: ${type}`;
-      details = { change_type: type, description: desc, impact };
-      break;
-    }
-    case 'issue-escalation': {
-      const proj  = getField('project');
-      const issue = getField('issue_desc');
-      const steps = getField('steps_taken');
-      if (!issue) { compassToast('Issue description is required.', 2500); return; }
-      title   = `Issue escalation: ${proj}`;
-      details = { project: proj, description: issue, steps_taken: steps };
-      break;
-    }
-    default: {
-      const desc = getField('details');
-      title   = wfId.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) + ' request';
-      details = { description: desc };
-    }
-  }
-
-  // ── 2. Disable submit button to prevent double-submit ───
-  const submitBtn = modal.querySelector('[data-myr-submit]');
-  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting…'; }
-
-  myrCloseModal();
-
-  const firmId   = _mwFirmId();
-  const resId    = _myResource?.id || null;
-  const resName  = _myResource?.name || 'Unknown';
-  const now      = new Date().toISOString();
-  const instanceId = crypto.randomUUID();
-
-  try {
-    // ── 3. Create workflow_instance ────────────────────────
-    const attachments = (wfId === 'doc-review' ? (details.docs || []) : [])
-      .map(d => ({ id: d.id, name: d.name, path: d.path || null, url: d.url || null,
-                   size: d.size || 0, type: d.mime || '', source: d.source || 'upload',
-                   form_id: d.form_id || null, uploaded_at: now }));
-
-    await API.post('workflow_instances', {
-      id:                       instanceId,
-      firm_id:                  firmId,
-      title,
-      status:                   'in_progress',
-      workflow_type:            wfId,
-      current_step_name:        'Review',
-      submitted_by_resource_id: resId,
-      submitted_by_name:        resName,
-      template_id:              null,
-      attachments:              attachments,
-      created_at:               now,
-    });
-
-    // Clear pending docs after successful POST
-    window._myrPendingDocs = [];
-
-    // ── 4. Write CoC event ─────────────────────────────────
-    const cocId = crypto.randomUUID();
-    await API.post('coc_events', {
-      id:               cocId,
-      firm_id:          firmId,
-      entity_id:        instanceId,
-      entity_type:      'workflow_instance',
-      event_type:       'request.submitted',
-      event_class:      'lifecycle',
-      severity:         'info',
-      event_notes:      JSON.stringify({
-        workflow_type: wfId,
-        title,
-        ...details,
-      }),
-      actor_name:       resName,
-      actor_resource_id: resId,
-      occurred_at:      now,
-      created_at:       now,
-    });
-
-    // ── 5. Create action items in My Work ──────────────────
-    // For doc-review: use _myrPendingReviewers (have .id directly — no fuzzy matching)
-    // For other types: fall back to label matching against _resources
-
-    const actionRecipients = []; // [{id, name, role}] for toast
-
-    if (wfId === 'doc-review' && (details.reviewers||[]).length) {
-      // ── POST to workflow_requests (dedicated table, not workflow_action_items) ──
-      for (const reviewer of (details.reviewers || [])) {
-        if (!reviewer.id) continue;
-        await API.post('workflow_requests', {
-          id:                crypto.randomUUID(),
-          firm_id:           firmId,
-          instance_id:       instanceId,
-          role:              'reviewer',
-          title:             `Review request: ${title}`,
-          body:              details.instructions || '',
-          status:            'open',
-          owner_resource_id: reviewer.id,
-          owner_name:        reviewer.name || '',
-          created_by_name:   resName,
-          due_date:          details.deadline || null,
-        });
-        actionRecipients.push({ name: reviewer.name, role: 'Reviewer' });
-      }
-      // Approver row
-      if (details.approver?.id) {
-        await API.post('workflow_requests', {
-          id:                crypto.randomUUID(),
-          firm_id:           firmId,
-          instance_id:       instanceId,
-          role:              'approver',
-          title:             `Approve request: ${title}`,
-          body:              details.instructions || '',
-          status:            'open',
-          owner_resource_id: details.approver.id,
-          owner_name:        details.approver.name || '',
-          created_by_name:   resName,
-          due_date:          details.deadline || null,
-        });
-        actionRecipients.push({ name: details.approver.name, role: 'Approver' });
-      }
-      // Submitter notification row — appears in Vaughn's My Work queue at same time as reviewers
-      if (resId) {
-        await API.post('workflow_action_items', {
-          id:                crypto.randomUUID(),
-          firm_id:           firmId,
-          instance_id:       instanceId,
-          title:             `⏳ Pending review: ${title}`,
-          body:              `Submitted for review. Waiting on: ${(details.reviewers||[]).map(r=>r.name).join(', ')}.`,
-          status:            'open',
-          owner_resource_id: resId,
-          owner_name:        resName,
-          created_by_name:   resName,
-          due_date:          details.deadline || null,
-        }).catch(()=>{});
-      }
-    } else {
-      // Non-doc-review: resolve by label matching
-      let ownerResId   = null;
-      let ownerResName = reviewerLabel || 'PM';
-      if (reviewerLabel && _resources?.length) {
-        const cleanLabel = reviewerLabel.replace(/\s*\(.*?\)\s*$/,'').trim();
-        const match = _resources.find(r =>
-          r.name && r.name.toLowerCase().includes(cleanLabel.toLowerCase().split(' ')[0])
-        );
-        if (match) { ownerResId = match.id; ownerResName = match.name; }
-      }
-      if (!ownerResId && _resources?.length) {
-        const pm = _resources.find(r =>
-          r.department?.toLowerCase().includes('pm') ||
-          r.title?.toLowerCase().includes('project manager')
-        );
-        if (pm) { ownerResId = pm.id; ownerResName = pm.name; }
-      }
-      if (ownerResId) {
-        await API.post('workflow_action_items', {
-          id:                crypto.randomUUID(),
-          firm_id:           firmId,
-          instance_id:       instanceId,
-          title:             `Review request: ${title}`,
-          body:              details.instructions || details.justification || details.description || '',
-          status:            'open',
-          owner_resource_id: ownerResId,
-          owner_name:        ownerResName,
-          created_by_name:   resName,
-          due_date:          details.deadline || null,
-        });
-        actionRecipients.push({ name: ownerResName, role: 'Reviewer' });
-      }
-    }
-
-    // ── 6. Optimistic local update → re-render ─────────────
-    const stepPreviews = {
-      'resource-alloc':    ['Submit','PM review','Mgmt approval','Notify resource','Update schedule'],
-      'pto-request':       ['Submit','PM review','Approved → cal blocked + team notified'],
-      'capacity-concern':  ['Submit','PM review','Decision → queue adjusted'],
-      'doc-review':        ['Submit','Review','Approve'],
-      'change-request':    ['Submit','PM review','Client review','Impact assessment','Mgmt approval','Update plan','Notify team'],
-      'issue-escalation':  ['Submit','PM review','Resolution plan','Resolved → CoC event'],
-      'expense':           ['Submit','PM review','Finance approval','Processed'],
-      'training':          ['Submit','PM review','Budget check','Mgmt approval','Confirmed'],
-      'new-project':       ['Submit','Initial scoping','Resourcing plan','Budget review','Exec approval','Kickoff','Schedule','Active'],
-      'project-closure':   ['Submit','Final CoC summary','Lessons learned','Financial reconcile','Exec sign-off','Archived'],
-    };
-    const labels = stepPreviews[wfId] || ['Submit','Review','Complete'];
-    const steps  = labels.map((label, i) => ({ label, done: i < 1, active: i === 1 }));
-
-    window._myRequests = window._myRequests || [];
-    window._myRequests.unshift({
-      id:          instanceId,
-      title,
-      status:      'in_progress',
-      workflow:    wfId.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
-      submitted:   new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}),
-      steps,
-      cocNote:     details.instructions || details.description || '',
-      attachments: attachments,
-      expanded:    true,
-    });
-
-    renderMyRequestsActive();
-    renderMyRequestsHistory();
-
-    // Update tab badge
-    const activeCount = window._myRequests.filter(r=>r.status!=='completed'&&r.status!=='rejected').length;
-    const badge = document.getElementById('ust-requests-badge');
-    if (badge) { badge.textContent = activeCount + ' active'; badge.style.display = 'inline'; }
-
-    // Switch to Active sub-tab so the user sees their new request
-    const activeBtn = document.querySelector('.myr-subnav[data-myr="active"]');
-    if (activeBtn) myrSwitchView('active', activeBtn);
-
-    // Force re-fetch on next tab visit to sync with DB
-    window._requestsLoaded = false;
-
-    // Silently notify My Work badge that a new item exists — no tab switch, no rebuild
-    (async () => {
-      try {
-        const resId = _myResource?.id;
-        if (!resId) return;
-        const fresh = await API.get(
-          `workflow_action_items?owner_resource_id=eq.${resId}&status=eq.open&select=id&limit=100`
-        ).catch(() => null);
-        if (!fresh) return;
-        const badge = document.getElementById('ust-work-badge');
-        if (badge) {
-          badge.textContent = fresh.length;
-          badge.style.display = fresh.length > 0 ? 'inline' : 'none';
-        }
-        // Mark My Work stale — will rebuild when user next switches to it
-        window._mwWorkStale = true;
-      } catch(_) {}
-    })();
-
-    const recipientSummary = actionRecipients.length
-      ? actionRecipients.map(r => r.name).join(', ')
-      : 'team';
-
-    // Email external reviewers/approvers
-    if (wfId === 'doc-review') {
-      for (const reviewer of (details.reviewers||[])) {
-        if (reviewer.email) {
-          _myrNotify({ toEmail: reviewer.email, toName: reviewer.name,
-            fromName: resName, stepName: 'Review', stepType: 'review',
-            title, instanceId, body: details.instructions || '' });
-        }
-      }
-      if (details.approver?.email) {
-        _myrNotify({ toEmail: details.approver.email, toName: details.approver.name,
-          fromName: resName, stepName: 'Approve', stepType: 'approval',
-          title, instanceId, body: details.instructions || '' });
-      }
-    }
-
-    compassToast(`✓ ${title} — routed to ${recipientSummary}`);
-    window._pollNow && window._pollNow();
-
-  } catch(e) {
-    console.error('[MyRequests] submit failed:', e);
-    compassToast('Submission failed — ' + (e.message || 'check console'), 4000);
-  }
-};
-
-function _buildWorkflowFormBody(wfId, wf) {
-  // All inputs carry data-myr-field so myrSubmitWorkflow can read values by ID
-  const inp = (label, fieldId, val='', required=true) =>
-    `<div style="margin-bottom:10px">
-      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
-        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
-      </div>
-      <input data-myr-field="${fieldId}"
-        style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
-               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;box-sizing:border-box"
-        type="text" value="${_esc(val)}"/>
-    </div>`;
-  const dateInp = (label, fieldId, required=false) =>
-    `<div style="margin-bottom:10px">
-      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
-        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
-      </div>
-      <input data-myr-field="${fieldId}" type="date"
-        style="width:160px;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
-               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;box-sizing:border-box;
-               color-scheme:dark;display:block"/>
-    </div>`;
-  const ta = (label, fieldId, val='', rows=3, required=true) =>
-    `<div style="margin-bottom:10px">
-      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
-        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
-      </div>
-      <textarea data-myr-field="${fieldId}"
-        style="width:100%;padding:7px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
-               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;
-               resize:none;box-sizing:border-box"
-        rows="${rows}">${_esc(val)}</textarea>
-    </div>`;
-  const sel = (label, fieldId, opts, required=true) =>
-    `<div style="margin-bottom:10px">
-      <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">
-        ${label}${required?' <span style="color:#E24B4A">*</span>':''}
-      </div>
-      <select data-myr-field="${fieldId}"
-        style="width:100%;padding:6px 10px;background:#1a2a40;border:1px solid rgba(0,210,255,.2);
-               color:#C8DFF0;font-family:var(--font-head);font-size:12px;outline:none;
-               cursor:pointer;box-sizing:border-box">
-        ${opts.map(o=>`<option>${_esc(o)}</option>`).join('')}
-      </select>
-    </div>`;
-
-  // Reviewer options from live _resources, fallback to seed names
-  const reviewerOpts = (_resources||[]).length
-    ? _resources.map(r => r.name + (r.department ? ` (${r.department})` : ''))
-    : ['VS (PM)','Sandra Okafor','Robert Chen','Alan Smith'];
-
-  // Resource options for allocation requests
-  const resourceOpts = (_resources||[]).length
-    ? _resources.map(r => r.name)
-    : ['Robert Chen','Sandra Okafor','Alan Smith','(Other)'];
-
-  switch (wfId) {
-    case 'resource-alloc':
-      return sel('Resource requested', 'resource', resourceOpts) +
-        sel('New allocation', 'allocation', ['40% NovaBio','60% NovaBio','80% NovaBio','100% NovaBio']) +
-        inp('Effective date', 'effective_date', 'Apr 2, 2026') +
-        ta('Justification', 'justification',
-          'Section 4.3 review requires a dedicated resource starting Apr 2. Robert Chen at current 40% is insufficient.', 3);
-
-    case 'pto-request':
-      return inp('From', 'from', 'Mon Mar 31, 2026') +
-        inp('To', 'to', 'Tue Apr 1, 2026') +
-        ta('Coverage plan', 'coverage_plan',
-          'Sandra Okafor to monitor NovaBio items. No Flexscope actions expected in this window.', 2, false);
-
-    case 'capacity-concern':
-      return `<div style="background:rgba(226,75,74,.05);border:1px solid rgba(226,75,74,.2);
-                border-left:2px solid #E24B4A;padding:9px 11px;margin-bottom:10px;
-                font-size:12px;color:rgba(240,246,255,.7);line-height:1.6">
-          <div style="font-family:var(--font-head);font-size:11px;color:#E24B4A;
-                      letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">
-            Current load — auto-generated
-          </div>
-          <div>Overdue: <strong style="color:#E24B4A">3 items</strong></div>
-          <div>Due today: <strong style="color:#EF9F27">4 items</strong></div>
-        </div>` +
-        ta('What needs to move, be delegated, or be dropped?', 'details', '', 3);
-
-    case 'doc-review':
-      return `
-        <div style="margin-bottom:10px">
-          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
-                      letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">
-            Documents for review <span style="color:#E24B4A">*</span>
-          </div>
-          <div id="myr-doc-list" style="margin-bottom:8px"></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <label style="font-family:var(--font-head);font-size:11px;padding:5px 12px;
-                           background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.25);
-                           color:#00D2FF;cursor:pointer;letter-spacing:.06em;white-space:nowrap">
-              ↑ Upload file
-              <input type="file" id="myr-doc-upload" multiple
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg"
-                style="display:none" onchange="myrHandleDocUpload(event)"/>
-            </label>
-            <button type="button" onclick="myrPickCadenceForm()"
-              style="font-family:var(--font-head);font-size:11px;padding:5px 12px;
-                     background:rgba(196,125,24,.06);border:1px solid rgba(196,125,24,.25);
-                     color:#c47d18;cursor:pointer;letter-spacing:.06em;white-space:nowrap">
-              ◈ Select CadenceHUD Form
-            </button>
-          </div>
-          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.2);margin-top:4px">
-            PDF, Word, Excel, or attach a released CadenceHUD form.
-          </div>
-        </div>
-
-        <!-- Reviewers — PersonPicker pills -->
-        <div style="margin-bottom:10px">
-          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
-                      letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">
-            Reviewer(s) <span style="color:#E24B4A">*</span>
-            <span style="font-weight:400;text-transform:none;letter-spacing:0;
-                         color:rgba(255,255,255,.2);font-size:11px"> — all must approve</span>
-          </div>
-          <div id="myr-reviewer-pills" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
-          <button type="button" id="myr-add-reviewer-btn" onclick="myrAddReviewer(this)"
-            style="font-family:var(--font-head);font-size:11px;padding:4px 12px;
-                   background:rgba(0,210,255,.05);border:1px dashed rgba(0,210,255,.3);
-                   color:#00D2FF;cursor:pointer;letter-spacing:.06em">
-            + Add Reviewer
-          </button>
-        </div>
-
-        <!-- Approver — PersonPicker single -->
-        <div style="margin-bottom:10px">
-          <div style="font-family:var(--font-head);font-size:11px;color:rgba(255,255,255,.4);
-                      letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">
-            Approver
-            <span style="font-weight:400;text-transform:none;letter-spacing:0;
-                         color:rgba(255,255,255,.2);font-size:11px"> — optional</span>
-          </div>
-          <div id="myr-approver-pill" style="margin-bottom:6px"></div>
-          <button type="button" id="myr-set-approver-btn" onclick="myrSetApprover(this)"
-            style="font-family:var(--font-head);font-size:11px;padding:4px 12px;
-                   background:rgba(196,125,24,.05);border:1px dashed rgba(196,125,24,.3);
-                   color:#c47d18;cursor:pointer;letter-spacing:.06em">
-            + Set Approver
-          </button>
-        </div>` +
-        dateInp('Review deadline', 'deadline') +
-        ta('Review instructions', 'instructions', '', 2, false);
-
-    case 'change-request':
-      return sel('Change type', 'change_type',
-          ['Scope change','Timeline change','Resource change','Budget change']) +
-        ta('Change description', 'change_desc', '', 3) +
-        ta('Justification & impact', 'impact', '', 2);
-
-    case 'issue-escalation':
-      return sel('Project', 'project', ['Flexscope','NovaBio','Internal']) +
-        ta('Issue description', 'issue_desc', '', 3) +
-        ta('Steps already taken', 'steps_taken', '', 2, false);
-
-    case 'expense':
-      return inp('Project', 'project', '') +
-        inp('Amount ($)', 'amount', '') +
-        inp('Date incurred', 'expense_date', '') +
-        ta('Description & receipts', 'description', '', 3);
-
-    case 'training':
-      return inp('Course / event name', 'course_name', '') +
-        inp('Provider', 'provider', '') +
-        inp('Cost ($)', 'cost', '') +
-        inp('Dates', 'dates', '') +
-        ta('Justification', 'justification', '', 2);
-
-    case 'new-project':
-      return inp('Project name', 'project_name', '') +
-        sel('Client', 'client',
-          [...new Set((window._projects||[]).map(p=>p.client_name||p.name).filter(Boolean)),
-           '(New client)']) +
-        inp('Target start date', 'start_date', '') +
-        ta('Scope summary', 'scope', '', 3);
-
-    case 'project-closure':
-      return sel('Project', 'project',
-          (window._projects||[]).map(p=>p.name).filter(Boolean).length
-            ? (window._projects||[]).map(p=>p.name)
-            : ['Flexscope','NovaBio','Internal']) +
-        ta('Lessons learned', 'lessons', '', 3) +
-        ta('Final notes', 'final_notes', '', 2, false);
-
-    default:
-      return ta('Details', 'details', '', 3);
-  }
-}
 
 // ── My Calendar tab ────────────────────────────────────────
 // ── Since-last-login delta strip ───────────────────────────
