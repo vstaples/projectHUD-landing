@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-190000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-200000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1033,25 +1033,35 @@ window.loadUserRequests = async function() {
   window._requestsReloading = false;
   renderMyRequestsActive();
   renderMyRequestsHistory();
+  // Restore sub-tab — reload must not reset to BROWSE
+  if (_myrActiveSubTab && _myrActiveSubTab !== 'browse') {
+    myrSwitchView(_myrActiveSubTab);
+  }
 
-  // If a ↺ Changes requested action item exists for an instance that still shows
-  // current_step_name != 'Submit', approve.html's PATCH may not have committed yet.
-  // Re-fetch once after 3s to pick it up.
+  // One-shot re-fetch: if a ↺ Changes requested item exists for an instance
+  // still showing current_step_name != 'Submit', approve.html's PATCH may not
+  // have committed yet. Re-fetch once only — guard prevents repeat firing.
+  window._myrPendingSubmitCheck = window._myrPendingSubmitCheck || new Set();
   (async () => {
     try {
-      const pendingReset = (window._myRequests||[]).some(r =>
-        r.status !== 'completed' && r.status !== 'rejected' &&
-        r._raw?.current_step_name !== 'Submit'
-      );
-      if (!pendingReset) return;
-      // Check if a ↺ Changes requested action item exists for any of our instances
       if (!resolvedResId) return;
+      const needsCheck = (window._myRequests||[]).filter(r =>
+        r.status !== 'completed' && r.status !== 'rejected' &&
+        r._raw?.current_step_name !== 'Submit' &&
+        !window._myrPendingSubmitCheck.has(r.id)
+      );
+      if (!needsCheck.length) return;
+      const ids = needsCheck.map(r => r.id);
       const changesItems = await API.get(
         `workflow_action_items?owner_resource_id=eq.${resolvedResId}&status=eq.open&title=like.%E2%86%BA Changes requested:*&select=id,instance_id&limit=10`
       ).catch(() => []);
-      if (!(changesItems||[]).length) return;
-      // A changes-requested item exists but step hasn't updated — re-fetch in 3s
-      setTimeout(async () => {
+      const matchedIds = (changesItems||[])
+        .filter(a => ids.includes(a.instance_id))
+        .map(a => a.instance_id);
+      if (!matchedIds.length) return;
+      // Mark as handled BEFORE scheduling so re-entrant calls don't double-fire
+      matchedIds.forEach(id => window._myrPendingSubmitCheck.add(id));
+      setTimeout(() => {
         window._myRequestCoc   = {};
         window._requestsLoaded = false;
         window.loadUserRequests && window.loadUserRequests();
@@ -1096,8 +1106,23 @@ window.loadUserRequests = async function() {
         freshCoc[e.entity_id].push(e);
       });
       window._myRequestCoc = freshCoc;
-      // Only render from CoC poll if loadUserRequests isn't about to run
-      if (!window._requestsReloading) renderMyRequestsActive();
+      // Only render from CoC poll if loadUserRequests isn't running
+      // and preserve expand state by merging DOM into persistent set first
+      if (!window._requestsReloading) {
+        // Snapshot current DOM state into persistent sets before render wipes it
+        const _ae = document.getElementById('myr-active-content');
+        if (_ae) {
+          _ae.querySelectorAll('.myr-ar-body.open').forEach(b => {
+            const rid = b.closest('.myr-active-req')?.dataset.reqId;
+            if (rid) _myrExpandedIds.add(rid);
+          });
+          _ae.querySelectorAll('.myr-coc-events.open').forEach(c => {
+            const rid = c.closest('.myr-active-req')?.dataset.reqId;
+            if (rid) _myrCocOpenIds.add(rid);
+          });
+        }
+        renderMyRequestsActive();
+      }
     }).catch(() => {});
   } else {
     renderMyRequestsActive();
@@ -1140,7 +1165,9 @@ window.loadUserRequests = async function() {
   } finally {}
 };
 
+var _myrActiveSubTab = _myrActiveSubTab || 'browse';
 window.myrSwitchView = function(view, btn) {
+  _myrActiveSubTab = view;
   document.querySelectorAll('.myr-subnav').forEach(b => {
     b.classList.remove('on');
     b.style.color = 'rgba(255,255,255,.35)';
@@ -1150,6 +1177,9 @@ window.myrSwitchView = function(view, btn) {
     btn.classList.add('on');
     btn.style.color = '#00D2FF';
     btn.style.borderBottomColor = '#00D2FF';
+  } else {
+    const b = document.querySelector(`.myr-subnav[data-myr="${view}"]`);
+    if (b) { b.classList.add('on'); b.style.color='#00D2FF'; b.style.borderBottomColor='#00D2FF'; }
   }
   ['browse','active','history'].forEach(v => {
     const p = document.getElementById('myr-pane-'+v);
@@ -1291,7 +1321,11 @@ function renderMyRequestsActive() {
     // CoC overrides are bypassed — DB step is authoritative in this state.
     const isAwaitingResubmit = (req._raw?.current_step_name || '') === 'Submit' &&
       !instanceComplete;
-    if (isAwaitingResubmit) console.log('[MyRequests] isAwaitingResubmit=true for', req.id?.slice(0,8), '— current_step_name:', req._raw?.current_step_name);
+    if (isAwaitingResubmit) {
+      console.log('[MyRequests] isAwaitingResubmit=true for', req.id?.slice(0,8), '— current_step_name:', req._raw?.current_step_name);
+      // Clear the one-shot guard now that Submit is confirmed — allows future cycles
+      if (window._myrPendingSubmitCheck) window._myrPendingSubmitCheck.delete(req.id);
+    }
     // For the Review step: override done/active from CoC approval count vs assigned reviewers.
     // This is the ground truth — independent of current_step_name or polling timing.
     let submittedDataForStep = {};
