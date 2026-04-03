@@ -1,5 +1,5 @@
 // cdn-template-editor.js — Cadence: template editor, spine, step CRUD
-console.log('%c[cdn-template-editor] v20260403-A','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-template-editor] v20260403-C','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // Depends on: cdn-dag-viewer, cdn-assignee, cdn-outcomes, cdn-documents
 // LOAD ORDER: 7th
 
@@ -163,12 +163,10 @@ function renderEditor() {
         oninput="markDirty()" ${isReleased ? 'disabled' : ''} />
       <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);
         flex-shrink:0;padding:0 4px" title="Version">${escHtml(ver)}</span>
-      <select class="config-select" style="width:auto;font-size:11px" id="tmpl-status-sel"
-        onchange="onStatusChange()">
-        <option value="draft"${t.status==='draft'?' selected':''}>Draft</option>
-        <option value="released"${t.status==='released'?' selected':''}>Released</option>
-        <option value="archived"${t.status==='archived'?' selected':''}>Archived</option>
-      </select>
+      <!-- Status badge — read only display, not a selector -->
+      <span class="tmpl-status ${t.status}" style="font-size:10px;font-family:var(--font-mono);
+        letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:3px;
+        flex-shrink:0">${t.status||'draft'}</span>
       <!-- Auto-save status indicator -->
       <span id="autosave-indicator"
         style="font-size:10px;font-family:var(--font-mono);color:var(--muted);
@@ -188,10 +186,14 @@ function renderEditor() {
         ${!isReleased ? `
         <button class="btn btn-ghost btn-sm" id="save-btn" onclick="saveTemplate(false)"
           title="Save without version bump">Save</button>
-        <button class="btn btn-solid btn-sm" id="commit-btn" onclick="commitTemplate()">Commit</button>
+        <button class="btn btn-ghost btn-sm" id="commit-btn" onclick="commitTemplate()"
+          title="Commit changes as new version (stays Draft)">Commit</button>
+        <button class="btn btn-solid btn-sm" id="release-btn" onclick="releaseTemplate()"
+          style="background:rgba(42,157,64,.15);border-color:rgba(42,157,64,.5);color:#4ade80"
+          title="Commit and release — publishes to Compass Browse">Release</button>
         ` : `
-        <span style="font-size:11px;color:var(--muted);padding:0 4px;
-          display:flex;align-items:center;gap:4px">🔒 Read only — set to Draft to edit</span>
+        <button class="btn btn-ghost btn-sm" onclick="returnToDraft()"
+          style="font-size:11px">↩ Return to Draft</button>
         `}
       </div>
     </div>
@@ -1363,6 +1365,81 @@ async function _toggleCompassVisible(checked) {
   } finally {
     if (chk) chk.disabled = false;
   }
+}
+
+
+async function releaseTemplate() {
+  if (!_selectedTmpl) return;
+
+  // Block if uncommitted changes exist
+  if (_binCount(_selectedTmpl.id) > 0 || _dirtySteps) {
+    cadToast('Commit pending changes before releasing', 'error');
+    return;
+  }
+
+  // Delegate to BIST gate — showGateDialog handles tier check,
+  // run-all, override path, and calls onProceed only when cleared.
+  if (typeof showGateDialog === 'function') {
+    showGateDialog(_selectedTmpl.id, _selectedTmpl.version || '0.0.0', _doRelease);
+  } else {
+    // cdn-bist.js not loaded — warn and proceed without gate
+    cadToast('BIST gate unavailable — releasing without test validation', 'error');
+    await _doRelease();
+  }
+}
+
+// Called by BIST gate (bistProceed / bistOverride) when release is cleared
+async function _doRelease() {
+  const btn = document.getElementById('release-btn');
+  if (btn) { btn.textContent = 'Releasing…'; btn.disabled = true; }
+  try {
+    // Inject a hidden select so commitTemplate reads 'released' as newStatus
+    let sel = document.getElementById('tmpl-status-sel');
+    const injected = !sel;
+    if (injected) {
+      sel = document.createElement('select');
+      sel.id = 'tmpl-status-sel';
+      sel.style.display = 'none';
+      document.body.appendChild(sel);
+    }
+    sel.innerHTML = '<option value="released" selected>Released</option>';
+    await commitTemplate();
+    if (injected) sel.remove();
+  } finally {
+    if (btn) { btn.textContent = 'Release'; btn.disabled = false; }
+  }
+}
+
+async function returnToDraft() {
+  if (!_selectedTmpl) return;
+  const confirmed = confirm(`Return "${_selectedTmpl.name}" to Draft? It will be removed from Compass Browse until re-released.`);
+  if (!confirmed) return;
+  const now = new Date().toISOString();
+  await API.patch(`workflow_templates?id=eq.${_selectedTmpl.id}`, {
+    status:          'draft',
+    compass_visible: false,
+    updated_at:      now,
+  });
+  _selectedTmpl.status          = 'draft';
+  _selectedTmpl.compass_visible = false;
+  const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+  await API.post('workflow_template_coc', {
+    firm_id:         FIRM_ID_CAD,
+    template_id:     _selectedTmpl.id,
+    event_type:      'status_changed',
+    changed_by:      _myResourceId || null,
+    changed_by_name: authorName,
+    field_name:      'status',
+    old_value:       'released',
+    new_value:       'draft',
+    note:            'Returned to Draft — removed from Compass Browse',
+    version_at:      _selectedTmpl.version || '0.0.0',
+    created_at:      now,
+  }).catch(() => {});
+  cadToast('Returned to Draft — removed from Compass Browse', 'info');
+  // Re-render template detail to show draft state
+  const inner = document.getElementById('tmpl-detail-inner');
+  if (inner && typeof renderTemplateDetail === 'function') renderTemplateDetail(_selectedTmpl, inner);
 }
 
 async function commitTemplate() {
