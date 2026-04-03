@@ -428,14 +428,14 @@ textarea.error {border-color:rgba(255,71,87,0.5)}
 </div>
 
 <div class="footer">
-  CadenceHUD · ProjectHUD · Secure Workflow Response · v20260403-B
+  CadenceHUD · ProjectHUD · Secure Workflow Response · v20260403-C
 </div>
 
 <script>
 const SUPA_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
 
-console.log('%c[approve.html] v20260403-B','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[approve.html] v20260403-C','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 let _token     = null;
 let _tokenRec  = null;
@@ -681,7 +681,7 @@ async function submitResponse() {
     const now = new Date().toISOString();
 
     // 1. Mark token as used
-    await fetch(
+    const tokenPatchRes = await fetch(
       `${SUPA_URL}/rest/v1/external_step_tokens?token=eq.${encodeURIComponent(_token)}`,
       {
         method: 'PATCH',
@@ -700,6 +700,7 @@ async function submitResponse() {
         }),
       }
     );
+    dbgLog('Token PATCH status=' + tokenPatchRes.status + (tokenPatchRes.ok ? ' OK' : ' FAILED — possible RLS block'));
 
     // 2. If this token is for a My Requests doc-review approval — complete the workflow_instance
     //    and resolve the approver's workflow_requests row
@@ -795,7 +796,11 @@ async function submitResponse() {
             }),
           }
         );
-        dbgLog('Instance PATCH done — step=Submit');
+        dbgLog('Instance PATCH status=' + patchRes.status + (patchRes.ok ? ' OK' : ' FAILED'));
+        if (!patchRes.ok) {
+          const errText = await patchRes.text().catch(() => '?');
+          dbgLog('PATCH error body: ' + errText.slice(0, 200));
+        }
         // 2. Close all reviewer workflow_requests rows — submitter must resubmit fresh
         //    They will be re-created when the submitter resubmits via the Resubmit Panel.
         await fetch(

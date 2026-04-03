@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-200000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-210000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1993,10 +1993,12 @@ window.myrToggleCoc = async function(panelId, instanceId, labelEl) {
   if (isOpen) {
     panel.classList.remove('open');
     if (labelEl) labelEl.querySelector('span:first-child').textContent = '▶ Chain of Custody';
+    if (instanceId) _myrCocOpenIds.delete(instanceId);
     return;
   }
 
   panel.classList.add('open');
+  if (instanceId) _myrCocOpenIds.add(instanceId);
   if (labelEl) labelEl.querySelector('span:first-child').textContent = '▼ Chain of Custody';
 
   // If CoC not yet loaded, fetch and re-render the full card
