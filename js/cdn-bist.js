@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-X','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-Z','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -92,6 +92,13 @@ function _bistAssert(assert, state) {
   return false;
 }
 
+// Freeze-aware wait — polls every 200ms while _bckFrozen is true
+async function _bckFreezeWait() {
+  while (window._bckFrozen) {
+    await new Promise(r => setTimeout(r, 200));
+  }
+}
+
 async function runBistScript(scriptId, onProgress) {
   const runStart = Date.now();
 
@@ -142,6 +149,8 @@ async function runBistScript(scriptId, onProgress) {
       const stp = spec.steps[si];
       onProgress?.({ type:'step_start', stepId: stp.id, stepIdx: si,
         total: spec.steps.length, action: stp.action, params: stp.params });
+
+      await _bckFreezeWait(); // freeze point — before DB write
 
       // ── Execute action ──────────────────────────────────────────────────────
       if (stp.action === 'launch_instance') {
@@ -250,6 +259,7 @@ async function runBistScript(scriptId, onProgress) {
       const stepName = stepBySeq[stp.params?.step_seq]?.name || '';
       onProgress?.({ type:'step_pass', stepId: stp.id, stepIdx: si,
         action: stp.action, stepName, outcome: stp.params?.outcome });
+      await _bckFreezeWait(); // freeze point — after step complete
     }
 
     // All steps passed
@@ -1157,6 +1167,14 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   const allResults = [];
   for (let ti = 0; ti < TESTS.length; ti++) {
     if (!document.getElementById('s9-sim-right') && !document.getElementById('s9-sim-panel') && !document.getElementById('bist-cockpit-overlay')) break; // closed
+
+    // ── FREEZE: spin-wait between scripts until resumed ──────────────────────
+    while (_bckFrozen) {
+      await new Promise(r => setTimeout(r, 200));
+      if (!document.getElementById('s9-sim-right') && !document.getElementById('s9-sim-panel')) break;
+    }
+    if (!document.getElementById('s9-sim-right') && !document.getElementById('s9-sim-panel') && !document.getElementById('bist-cockpit-overlay')) break;
+
     const t = TESTS[ti];
     _bistCkBeginTest(ti, t.name);
 
@@ -1167,7 +1185,13 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
 
     _bistCkEndTest(ti, result.status);
     allResults.push({ name: t.name, status: result.status, runId: result.runId, reason: result.reason });
+
+    // ── FREEZE: also pause between scripts after completion ──────────────────
     await new Promise(r => setTimeout(r, 400));
+    while (_bckFrozen) {
+      await new Promise(r => setTimeout(r, 200));
+      if (!document.getElementById('s9-sim-right') && !document.getElementById('s9-sim-panel')) break;
+    }
   }
 
   window._bistCkRunning = false;
@@ -1592,7 +1616,7 @@ function _bistCkEndTest(ti, status) {
 }
 
 function _bistCkOnProgress(ti, test, ev, tmplSteps) {
-  if (_bckFrozen) return;  // FREEZE active — suppress visual updates
+  if (window._bckFrozen) return;  // FREEZE active — suppress visual updates
   var type = ev.type;
   if (type === 'instance_created') {
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt on';
@@ -1777,13 +1801,13 @@ function _bistCkShowCert(tmplName, version, results, elapsed, certId, onProceed)
 }
 
 // ── Replay scrubber state ────────────────────────────────────────────────────
-var _bckFrozen = false;
+window._bckFrozen = false;
 
 function _bckToggleFreeze() {
-  _bckFrozen = !_bckFrozen;
+  window._bckFrozen = !window._bckFrozen;
   var btn = document.getElementById('bck-freeze-btn');
   if (!btn) return;
-  if (_bckFrozen) {
+  if (window._bckFrozen) {
     btn.textContent = '\u25b6 RESUME';
     btn.style.color = 'rgba(74,222,128,.8)';
     btn.style.borderColor = 'rgba(74,222,128,.4)';
