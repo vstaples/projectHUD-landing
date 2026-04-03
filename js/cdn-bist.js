@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AD','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AE','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1444,7 +1444,8 @@ function _bistCockpitHTML(tmplName, version, tests) {
 
 // ── Cockpit state ─────────────────────────────────────────────────────────────
 var _bckCocCount = 0;
-var _bckSimLog = [];  // [{ts, type, detail, color}] — replay feed
+var _bckSimLog = [];
+var _bckLastDoneId = null;  // [{ts, type, detail, color}] — replay feed
 var _bckSC = 0, _bckASC = 0, _bckRWC = 0, _bckPassC = 0;
 var _bckClockTimer = null;
 var _bckElTimer = null;
@@ -1620,6 +1621,7 @@ function _bistCkBeginTest(ti, name) {
   var de = _bckEl('bck-dend'); if (de) de.className = 'bck-de';
   var lsvg = _bckEl('bck-lsvg'); if (lsvg) lsvg.innerHTML = '';
   _bckSimLog.push({ts:Date.now(),kind:'begintest',testIdx:ti,name:name});
+  _bckLastDoneId = null;
 }
 
 function _bistCkEndTest(ti, status) {
@@ -1649,11 +1651,16 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     _bckSC++;
     var ef1 = _bckEl('bck-ef1'); if (ef1) ef1.textContent = _bckSC;
     var ef1b = _bckEl('bck-ef1b'); if (ef1b) ef1b.style.width = Math.min(100,_bckSC*4)+'%';
+    // If node already exists, this is a reset — draw rejection arc
+    if (_bckLastDoneId && document.getElementById('bck-n-'+ev.stepId)) {
+      setTimeout(function(from,to){_bckDrawRejectArc(from,to);}  .bind(null,_bckLastDoneId,ev.stepId), 80);
+    }
     // Activate node in DAG
     _bistCkSetNode(ev.stepId, idx, test, 'active', 'In progress', tmplSteps);
   } else if (type === 'step_pass') {
     var idx = ev.stepIdx || 0;
     _bistCkSetNode(ev.stepId, idx, test, 'done', ev.outcome || 'Done', tmplSteps);
+    _bckLastDoneId = ev.stepId;
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt dn';
     _bistCkAddCoc('#4ade80','step_completed', _bistEscHtml(ev.stepName||'Step')+' · '+_bistEscHtml(ev.outcome||'Done'));
     _bistCkRadio('tower',_bistEscHtml(ev.stepName||'Step')+' completed — '+_bistEscHtml(ev.outcome||'Done'));
@@ -1671,6 +1678,64 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     _bistCkAddCoc('#E24B4A','error', _bistEscHtml(ev.message||'Unknown error'));
     _bistCkRadio('reject','TOWER: Error — '+_bistEscHtml((ev.message||'').slice(0,80)));
   }
+}
+
+function _bckDrawRejectArc(fromStepId, toStepId) {
+  var svg  = _bckEl('bck-lsvg');
+  var lz   = _bckEl('bck-lz');
+  var from = document.getElementById('bck-n-'+fromStepId);
+  var to   = document.getElementById('bck-n-'+toStepId);
+  if (!svg || !lz || !from || !to) return;
+
+  var lzRect   = lz.getBoundingClientRect();
+  var fromRect = from.getBoundingClientRect();
+  var toRect   = to.getBoundingClientRect();
+
+  // Arc runs from bottom-center of "from" node to bottom-center of "to" node
+  var x1 = fromRect.left + fromRect.width/2  - lzRect.left;
+  var x2 = toRect.left   + toRect.width/2    - lzRect.left;
+  var y0 = 0;  // top of lz (lz sits just below the horizon)
+  var depth = 28 + Math.abs(x1 - x2) * 0.12;  // arc depth proportional to span
+
+  // SVG quadratic bezier: start at x1, curve down to depth, back up to x2
+  var mx = (x1 + x2) / 2;
+  var path = 'M '+x1+' '+y0+' Q '+mx+' '+depth+' '+x2+' '+y0;
+
+  var el = document.createElementNS('http://www.w3.org/2000/svg','path');
+  el.setAttribute('d', path);
+  el.setAttribute('fill', 'none');
+  el.setAttribute('stroke', '#E24B4A');
+  el.setAttribute('stroke-width', '1.5');
+  el.setAttribute('stroke-dasharray', '4 3');
+  el.setAttribute('opacity', '0.75');
+
+  // Arrowhead at destination (x2,y0)
+  var angle = Math.atan2(y0 - depth, x2 - mx);
+  var ah = 7;
+  var ax1 = x2 - ah*Math.cos(angle-0.4);
+  var ay1 = y0 - ah*Math.sin(angle-0.4);
+  var ax2 = x2 - ah*Math.cos(angle+0.4);
+  var ay2 = y0 - ah*Math.sin(angle+0.4);
+  var arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  arrow.setAttribute('points', x2+','+y0+' '+ax1+','+ay1+' '+ax2+','+ay2);
+  arrow.setAttribute('fill', '#E24B4A');
+  arrow.setAttribute('opacity', '0.75');
+
+  // Animate the dash
+  var anim = document.createElementNS('http://www.w3.org/2000/svg','animateTransform');
+  anim.setAttribute('attributeName','stroke-dashoffset');
+  anim.setAttribute('attributeType','XML');
+  anim.setAttribute('from','0'); anim.setAttribute('to','-14');
+  anim.setAttribute('dur','0.6s'); anim.setAttribute('repeatCount','indefinite');
+  el.appendChild(anim);
+
+  svg.appendChild(el);
+  svg.appendChild(arrow);
+
+  // Size svg height to fit
+  var h = Math.ceil(depth) + 8;
+  svg.setAttribute('height', h);
+  if (lz) lz.style.height = h + 'px';
 }
 
 function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
