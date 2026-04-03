@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-Z','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AA','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1439,6 +1439,7 @@ var _bckSimLog = [];  // [{ts, type, detail, color}] — replay feed
 var _bckSC = 0, _bckASC = 0, _bckRWC = 0, _bckPassC = 0;
 var _bckClockTimer = null;
 var _bckElTimer = null;
+var _bckFrozenAt = null;
 var _bckStartMs = null;
 
 function _bckEl(id) { return document.getElementById(id); }
@@ -1679,7 +1680,7 @@ function _bistCkAddCoc(color, type, detail) {
   var feed = _bckEl('bck-cocf'); if (!feed) return;
   if (_bckCocCount === 0) feed.innerHTML = '';
   _bckCocCount++;
-  _bckSimLog.push({ts: Date.now(), color: color, type: type, detail: detail});
+  _bckSimLog.push({ts: Date.now(), kind: 'coc', color: color, type: type, detail: detail});
   var ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   var ev = document.createElement('div'); ev.className = 'bck-ce';
   ev.innerHTML = '<div class="bck-cedot" style="background:'+color+'"></div><div class="bck-ceb"><div class="bck-cet" style="color:'+color+'">'+type+'</div><div class="bck-ced">'+detail+'</div><div class="bck-cts">'+ts+'</div></div>';
@@ -1691,6 +1692,7 @@ function _bistCkAddCoc(color, type, detail) {
 }
 
 function _bistCkRadio(side, msg) {
+  _bckSimLog.push({ts: Date.now(), kind: 'radio', side: side, msg: msg});
   var feed = _bckEl('bck-rf'); if (!feed) return;
   var first = feed.querySelector('div[style]'); if (first) first.remove();
   var ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -1811,10 +1813,28 @@ function _bckToggleFreeze() {
     btn.textContent = '\u25b6 RESUME';
     btn.style.color = 'rgba(74,222,128,.8)';
     btn.style.borderColor = 'rgba(74,222,128,.4)';
+    // Pause elapsed clock
+    _bckFrozenAt = Date.now();
+    if (_bckElTimer) { clearInterval(_bckElTimer); _bckElTimer = null; }
+    if (_bckClockTimer) { clearInterval(_bckClockTimer); _bckClockTimer = null; }
   } else {
     btn.innerHTML = '&#10074;&#10074; FREEZE';
     btn.style.color = 'rgba(239,159,39,.7)';
     btn.style.borderColor = 'rgba(239,159,39,.3)';
+    // Resume elapsed clock — adjust startMs for frozen duration
+    if (_bckStartMs && !_bckElTimer) {
+      _bckFrozenAt = _bckFrozenAt || Date.now();
+      _bckStartMs += (Date.now() - _bckFrozenAt);
+      _bckFrozenAt = null;
+      _bistCkStartClock(_bckStartMs);
+    }
+    // Resume wall clock
+    if (!_bckClockTimer) {
+      _bckClockTimer = setInterval(function() {
+        var el = _bckEl('bck-clock');
+        if (el) el.textContent = new Date().toTimeString().slice(0,8);
+      }, 1000);
+    }
   }
 }
 
@@ -1903,26 +1923,77 @@ function _bckRpRender(idx) {
 
   var scrub = document.getElementById('bck-rp-scrub');
   if (scrub) scrub.value = idx;
-
   var posEl = document.getElementById('bck-rp-pos');
-  if (posEl) posEl.textContent = (idx+1) + ' / ' + total;
+  if (posEl) posEl.textContent = (idx+1)+' / '+total;
 
   var entry = log[idx];
-  var tsEl  = document.getElementById('bck-rp-ts');
-  if (tsEl) {
-    var d = new Date(entry.ts);
-    tsEl.textContent = d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var tsEl = document.getElementById('bck-rp-ts');
+  if (tsEl && entry) {
+    tsEl.textContent = new Date(entry.ts).toLocaleTimeString('en-US',
+      {hour:'2-digit',minute:'2-digit',second:'2-digit'});
   }
 
+  // Ticker
   var ev = document.getElementById('bck-rp-event');
-  if (ev && log[idx]) {
-    var e = log[idx];
+  if (ev && entry) {
+    var dotColor = entry.kind==='radio' ? 'rgba(0,210,255,.6)' : (entry.color||'#888');
+    var label    = entry.kind==='radio' ? (entry.side||'radio').toUpperCase() : _bistEscHtml(entry.type);
+    var detail   = entry.kind==='radio' ? _bistEscHtml(entry.msg) : _bistEscHtml(entry.detail);
     ev.innerHTML =
-      '<div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:'+e.color+'"></div>'+
-      '<div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.9)">'+_bistEscHtml(e.type)+'</div>'+
-      '<div style="font-size:12px;color:rgba(255,255,255,.5);margin-left:6px">'+_bistEscHtml(e.detail)+'</div>'+
-      '<div style="font-size:12px;font-family:monospace;color:rgba(0,210,255,.6);margin-left:auto;white-space:nowrap">'
-        +'&#9664; '+(idx+1)+'/'+log.length+'</div>';
+      '<div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:'+dotColor+'"></div>'+
+      '<div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.9);white-space:nowrap">'+label+'</div>'+
+      '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-left:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+detail+'</div>'+
+      '<div style="font-size:12px;font-family:monospace;color:rgba(0,210,255,.6);margin-left:auto;white-space:nowrap;flex-shrink:0">'+
+        '&#9664; '+(idx+1)+'/'+total+'</div>';
+  }
+
+  // Rebuild CoC feed — entries up to idx
+  var cocFeed = document.getElementById('bck-cocf');
+  if (cocFeed) {
+    cocFeed.innerHTML = '';
+    var cocEntries = log.slice(0,idx+1).filter(function(e){return e.kind==='coc';});
+    if (!cocEntries.length) {
+      cocFeed.innerHTML = '<div style="padding:14px 10px;text-align:center;font-size:12px;'+
+        'font-family:Arial,sans-serif;color:rgba(255,255,255,.3)">No events at this position</div>';
+    } else {
+      cocEntries.forEach(function(e) {
+        var ts2 = new Date(e.ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        var el2 = document.createElement('div');
+        el2.className = 'bck-ce';
+        el2.innerHTML = '<div class="bck-cedot" style="background:'+e.color+'"></div>'+
+          '<div class="bck-ceb"><div class="bck-cet" style="color:'+e.color+'">'+_bistEscHtml(e.type)+'</div>'+
+          '<div class="bck-ced">'+_bistEscHtml(e.detail)+'</div>'+
+          '<div class="bck-cts">'+ts2+'</div></div>';
+        cocFeed.insertBefore(el2, cocFeed.firstChild);
+      });
+      var cc = document.getElementById('bck-cocc');
+      if (cc) cc.textContent = cocEntries.length+' event'+(cocEntries.length!==1?'s':'');
+    }
+  }
+
+  // Rebuild radio feed — entries up to idx
+  var radioFeed = document.getElementById('bck-rf');
+  if (radioFeed) {
+    radioFeed.innerHTML = '';
+    var radioEntries = log.slice(0,idx+1).filter(function(e){return e.kind==='radio';});
+    if (!radioEntries.length) {
+      radioFeed.innerHTML = '<div style="padding:6px 14px;font-size:12px;font-family:Arial,sans-serif;'+
+        'color:rgba(255,255,255,.25)">— Radio silence —</div>';
+    } else {
+      radioEntries.forEach(function(e) {
+        var isRej=e.side==='reject', isTow=e.side==='tower'||isRej, isGnd=e.side==='ground';
+        var tx=document.createElement('div');
+        tx.className='bck-tx '+(isGnd?'ground':isRej?'reject tower':isTow?'tower':'crew');
+        var cs=document.createElement('span'); cs.className='bck-txcs';
+        cs.textContent=isGnd?'GROUND':isRej?'TOWER':isTow?'TOWER':'CREW';
+        var bub=document.createElement('div'); bub.className='bck-txbub'; bub.textContent=e.msg;
+        var ts3=document.createElement('span'); ts3.className='bck-txts';
+        ts3.textContent=new Date(e.ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        if(isTow||isGnd){tx.appendChild(cs);tx.appendChild(bub);tx.appendChild(ts3);}
+        else{tx.appendChild(ts3);tx.appendChild(bub);tx.appendChild(cs);}
+        radioFeed.insertBefore(tx, radioFeed.firstChild);
+      });
+    }
   }
 }
 
