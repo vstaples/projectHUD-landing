@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-290000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-300000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -75,10 +75,15 @@ window._mwRefreshWorkItems = async function() {
     window._wiItems = _wiItems;
     window.myActionItems = freshActions||[];
     window._myPendingReviews = freshReviews||[];
-    // Trigger a full work view reload — _mwLoadUserView re-fetches and re-renders
-    // but only calls compass.html loadUserView on first load (_myWorkLoaded gate).
-    // Since _myWorkLoaded is already true after first load, this is safe.
-    window._mwLoadUserView && window._mwLoadUserView();
+    // Only reload the full view if the user is currently on the work tab.
+    // On any other tab, mark stale — uSwitchTab will reload when they return.
+    const _refreshActiveTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
+    console.log('[mwRefreshWorkItems] done | activeTab:', _refreshActiveTab);
+    if (_refreshActiveTab === 'work') {
+      window._mwLoadUserView && window._mwLoadUserView();
+    } else {
+      window._mwWorkStale = true;
+    }
   } catch(e) { console.warn('[mwRefreshWorkItems] error:', e.message); }
 };
 
