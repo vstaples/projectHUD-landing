@@ -1,5 +1,5 @@
-// VERSION: 20260403-220000
-console.log('%c[mw-events] v20260403-220000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260403-230000
+console.log('%c[mw-events] v20260403-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -275,7 +275,14 @@ document.addEventListener('click', function(ev) {
     document.querySelectorAll('.wi-row').forEach(r => r.classList.remove('wi-selected'));
     wiRow.classList.add('wi-selected');
     const item = _wiItems.find(w => w.id === wiRow.dataset.wiId);
-    if (item) openWorkItemDrawer(item);
+    if (!item) return;
+    // Intercept row click for resubmit items — don't open the drawer
+    const _t = item.title || '';
+    if (item.instanceId && (_t.includes('Changes requested:') || _t.includes('Re-review requested:'))) {
+      openResubmitPanel(item);
+      return;
+    }
+    openWorkItemDrawer(item);
     return;
   }
   // ── New time entry ────────────────────────────────────────

@@ -1,4 +1,6 @@
 // ── Work Item Detail Drawer ───────────────────────────────
+// VERSION: 20260403-230000
+console.log('%c[mw-drawer] v20260403-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CoC write guard — safe no-op if stale coc.js is deployed ─────────────
 if (typeof window.CoC?.write !== 'function') {

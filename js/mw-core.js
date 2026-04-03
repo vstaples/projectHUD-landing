@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-200000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -597,6 +597,11 @@ window._mwLoadUserView = async function() {
           btnLabel = w._wrRole === 'approver' ? 'Approve' : 'Review';
           btnStyle = `color:#060a10;border:1px solid var(--compass-cyan);background:var(--compass-cyan);font-weight:700`;
         } else if (w.type==='action') {
+          // Resubmit items get a dedicated button
+          const _wt = w.title || '';
+          if (w.instanceId && (_wt.includes('Changes requested:') || _wt.includes('Re-review requested:'))) {
+            btnLabel='Resubmit'; btnStyle=`color:#060a10;border:1px solid var(--compass-amber);background:var(--compass-amber);font-weight:700`;
+          } else {
           const _ns = negGetState(w.id).state;
           if (_ns==='unrated') {
             // Must be rated before it can be resolved
@@ -610,6 +615,7 @@ window._mwLoadUserView = async function() {
             // agreed or any other state — ready to resolve
             btnLabel='Resolve';  btnStyle=`color:#fff;border:1px solid var(--compass-green);background:var(--compass-green);font-weight:700`;
           }
+          } // end non-resubmit action items
         }
         else if (w.status==='blocked')    {btnLabel='Unblock';    btnStyle=`color:var(--compass-amber);border:1px solid var(--compass-amber);background:none`;}
         else if (w.pct>=100)               {btnLabel='Mark Done';  btnStyle=`color:#060a10;border:none;background:#FFFFFF`;}
