@@ -1,5 +1,5 @@
 // VERSION: 20260403-260000
-console.log('%c[mw-events] v20260403-260000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-events] v20260403-280000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -965,6 +965,7 @@ window._rsbSubmit = async function(actionItemId, instanceId) {
     window._mwWorkStale = true;
     window._requestsLoaded = false;
     window.loadUserRequests && window.loadUserRequests();
+    window._pollNow && window._pollNow();
     compassToast(`↺ Resubmitted — ${ctx.reviewers?.length||0} reviewer(s) notified.`);
 
   } catch(err) {
