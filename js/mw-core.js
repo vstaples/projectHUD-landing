@@ -1309,7 +1309,9 @@ window._mwLoadUserView = async function() {
               window.loadUserRequests && window.loadUserRequests();
               window._mwWorkStale = true;
             } else if (activeTab === 'work') {
-              // User is on work tab — rebuild it.
+              // User is on work tab — force immediate rebuild.
+              // Reset _viewLoaded so _mwLoadUserView re-fetches fresh data.
+              if (window._viewLoaded) window._viewLoaded['user'] = false;
               window._mwLoadUserView && window._mwLoadUserView();
             } else {
               // Any other tab — mark both stale.

@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-320000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-330000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1447,23 +1447,30 @@ function renderMyRequestsActive() {
         // Parse reviewer/approver list from request.submitted CoC event
         let submittedData = {};
         try {
-          const subEv = instCoc.find(e => e.event_type === 'request.submitted');
+          // Use most recent submitted event — captures reviewer list after resubmit
+          const subEv = instCoc
+            .filter(e => e.event_type === 'request.submitted')
+            .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at))[0];
           if (subEv) submittedData = JSON.parse(subEv.event_notes || '{}');
         } catch(_) {}
 
         // Build reviewer decision status from ALL CoC approved/changes events — keyed by actor name
         // Each reviewer writes one event; multiple reviewers produce multiple events of the same type.
         // Must accumulate by actor, NOT overwrite by event_type (which caused later approvals to erase earlier ones).
+        // Build reviewer decisions scoped to post-last-reset only
+        // Use MOST RECENT event per actor so 2nd-round approvals replace 1st-round
         const approvedByName = {};
-        instCoc
+        const _tooltipEvents = instCoc
           .filter(e => e.event_type === 'request.approved' || e.event_type === 'request.changes_requested')
-          .forEach(e => {
+          .filter(e => !lastResetTs || new Date(e.occurred_at||e.created_at) > lastResetTs)
+          .sort((a,b) => new Date(b.occurred_at||b.created_at) - new Date(a.occurred_at||a.created_at));
+        _tooltipEvents.forEach(e => {
             try {
               const p = JSON.parse(e.event_notes || '{}');
               const t = new Date(e.occurred_at||e.created_at).toLocaleString('en-US',
                 {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
               const name = e.actor_name || p.reviewer;
-              // First event per actor wins — preserves original decision if they acted multiple times
+              // Most recent event per actor wins (array sorted desc)
               if (name && !approvedByName[name]) {
                 approvedByName[name] = {
                   time:     t,
