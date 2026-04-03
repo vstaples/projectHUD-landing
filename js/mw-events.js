@@ -1,5 +1,5 @@
-// VERSION: 20260403-200000
-console.log('%c[mw-events] v20260403-200000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260403-210000
+console.log('%c[mw-events] v20260403-210000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -1010,30 +1010,14 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       const otherOpenReviewers = (remainingReviewers||[]).filter(r => r.id !== actionItemId);
       const allReviewersDone = otherOpenReviewers.length === 0;
 
-      if (approved) {
-        // Only advance step when approved — never write step on changes_requested
-        // (approve.html owns that reset; writing here causes a race condition).
-        // Also: only advance to Approve if not already reset to Submit.
-        const instCheck = await API.get(
-          `workflow_instances?id=eq.${instanceId}&select=current_step_name&limit=1`
-        ).catch(() => []);
-        const currentStep = instCheck?.[0]?.current_step_name || '';
-        if (currentStep !== 'Submit') {
-          const advancedStep = allReviewersDone ? 'Approve' : 'Review';
-          await API.patch(`workflow_instances?id=eq.${instanceId}`, {
-            status:            newStatus,
-            current_step_name: advancedStep,
-            updated_at:        now,
-          }).catch(()=>{});
-        }
-      } else {
-        // Changes requested from reviewer — just update status, don't touch step.
-        // approve.html handles the step reset to Submit.
-        await API.patch(`workflow_instances?id=eq.${instanceId}`, {
-          status:     newStatus,
-          updated_at: now,
-        }).catch(()=>{});
-      }
+      // Never write current_step_name from _rrpSubmit.
+      // For doc-review: step display is driven by CoC approval count in mw-tabs.
+      // approve.html is the sole owner of current_step_name for this workflow.
+      // Writing it here races with approve.html and overwrites the Submit reset.
+      await API.patch(`workflow_instances?id=eq.${instanceId}`, {
+        status:     newStatus,
+        updated_at: now,
+      }).catch(()=>{});
     }
 
     const isWrRow = !!(wrRole);
@@ -1132,6 +1116,12 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
         // If only the approver row remains open, all reviewers are done
         const onlyApproveLeft = (openRequests||[]).every(r => r.role === 'approver');
         if (onlyApproveLeft && openRequests?.length) {
+          // All reviewers done — advance step to Approve.
+          // This is now the only place current_step_name is written for doc-review.
+          await API.patch(`workflow_instances?id=eq.${instanceId}`, {
+            current_step_name: 'Approve',
+            updated_at:        new Date().toISOString(),
+          }).catch(()=>{});
           const approveRow = openRequests[0];
           const approverRes = (_resources||[]).find(r => r.id === approveRow.owner_resource_id);
           const approverEmail = approverRes?.email || '';
