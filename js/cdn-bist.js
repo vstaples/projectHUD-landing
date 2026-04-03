@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-H','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-J','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1172,6 +1172,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
 
   window._bistCkRunning = false;
   _bistCkStopClock();
+  var rb = _bckEl('bck-replay-btn'); if (rb) rb.style.display = 'inline-block';
 
   const allPass = allResults.every(r => r.status === 'passed');
   const elapsed = Math.round((Date.now() - startMs) / 1000);
@@ -1225,9 +1226,9 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-gld{width:8px;height:8px;border-radius:50%;background:#1a1208;transition:all .45s}
 .bck-gld.on{background:#4ade80;box-shadow:0 0 8px 2px rgba(74,222,128,.6)}
 .bck-gld.am{background:#EF9F27;box-shadow:0 0 8px 2px rgba(239,159,39,.6)}
-.bck-gl-lbl{font-size:8px;letter-spacing:.12em;color:rgba(255,180,60,.28);text-transform:uppercase}
+.bck-gl-lbl{font-size:12px;letter-spacing:.12em;color:rgba(255,180,60,.28);text-transform:uppercase}
 .bck-gs{flex:1}
-.bck-ann{font-size:9px;letter-spacing:.18em;color:rgba(255,180,60,.55);text-transform:uppercase;transition:all .4s}
+.bck-ann{font-size:12px;letter-spacing:.18em;color:rgba(255,180,60,.55);text-transform:uppercase;transition:all .4s}
 .bck-ann.go{color:rgba(74,222,128,.8);text-shadow:0 0 8px rgba(74,222,128,.4)}
 .bck-ann.fail{color:rgba(226,75,74,.8)}
 .bck-ws{position:relative;flex:1;min-height:0;overflow:hidden}
@@ -1247,10 +1248,10 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-hcm{position:absolute;top:64%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px}
 .bck-hw{width:28px;height:1px;background:rgba(0,210,255,.28)}
 .bck-hd{width:5px;height:5px;border-radius:50%;border:1px solid rgba(0,210,255,.42)}
-.bck-hr{position:absolute;right:8%;top:16%;font-size:8px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;text-align:right;white-space:pre}
-.bck-hl{position:absolute;left:8%;top:16%;font-size:8px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;white-space:pre}
+.bck-hr{position:absolute;right:8%;top:16%;font-size:12px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;text-align:right;white-space:pre}
+.bck-hl{position:absolute;left:8%;top:16%;font-size:12px;font-family:monospace;color:rgba(0,210,255,.35);line-height:2;white-space:pre}
 .bck-pf{position:absolute;inset:0;background:rgba(2,7,15,.92);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 60px}
-.bck-pftitle{font-size:9px;letter-spacing:.2em;color:rgba(0,210,255,.5);text-transform:uppercase;margin-bottom:12px}
+.bck-pftitle{font-size:12px;letter-spacing:.2em;color:rgba(0,210,255,.5);text-transform:uppercase;margin-bottom:12px}
 .bck-pfchecks{width:100%;max-width:420px;display:flex;flex-direction:column;gap:4px}
 .bck-pfrow{display:flex;align-items:center;gap:10px;padding:4px 12px;border-radius:3px;border:1px solid rgba(255,255,255,.04);background:rgba(255,255,255,.02);opacity:0;transition:all .3s}
 .bck-pfrow.show{opacity:1}
@@ -1259,11 +1260,11 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-pfind.chk{background:#EF9F27;box-shadow:0 0 6px rgba(239,159,39,.5);animation:bckPfp .6s ease-in-out infinite}
 .bck-pfind.ok{background:#4ade80;box-shadow:0 0 5px rgba(74,222,128,.5);animation:none}
 @keyframes bckPfp{0%,100%{opacity:1}50%{opacity:.4}}
-.bck-pflbl{font-size:9px;color:rgba(255,255,255,.6);flex:1}
-.bck-pfsub{font-size:7px;color:rgba(255,255,255,.28);margin-top:1px}
-.bck-pfres{font-size:8px;font-family:monospace;color:rgba(255,255,255,.25);text-align:right;min-width:76px}
+.bck-pflbl{font-size:12px;color:rgba(255,255,255,.6);flex:1}
+.bck-pfsub{font-size:12px;color:rgba(255,255,255,.28);margin-top:1px}
+.bck-pfres{font-size:12px;font-family:monospace;color:rgba(255,255,255,.25);text-align:right;min-width:76px}
 .bck-pfres.ok{color:rgba(74,222,128,.7)}
-.bck-pfgo{margin-top:14px;font-size:10px;letter-spacing:.12em;color:rgba(0,210,255,.6);text-transform:uppercase;opacity:0;transition:opacity .5s}
+.bck-pfgo{margin-top:14px;font-size:12px;letter-spacing:.12em;color:rgba(0,210,255,.6);text-transform:uppercase;opacity:0;transition:opacity .5s}
 .bck-pfgo.show{opacity:1}
 .bck-dag{position:absolute;left:52px;right:52px;z-index:6;display:flex;justify-content:center}
 .bck-dagrow{display:flex;align-items:center;gap:0}
@@ -1277,13 +1278,13 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-nc.dn{border-color:rgba(74,222,128,.45);background:rgba(0,10,4,.87);box-shadow:0 0 8px rgba(74,222,128,.18)}
 .bck-nc.rs{border-color:rgba(239,159,39,.35);background:rgba(12,6,0,.87)}
 .bck-nct{display:flex;align-items:center;gap:4px;padding:3px 5px 3px;border-bottom:1px solid rgba(255,255,255,.04)}
-.bck-nav{width:11px;height:11px;border-radius:50%;background:rgba(239,159,39,.18);border:1px solid rgba(239,159,39,.3);display:flex;align-items:center;justify-content:center;font-size:6px;color:rgba(239,159,39,.8);font-weight:700;flex-shrink:0}
-.bck-nan{font-size:7px;color:rgba(255,255,255,.28);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bck-nav{width:14px;height:14px;border-radius:50%;background:rgba(239,159,39,.18);border:1px solid rgba(239,159,39,.3);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(239,159,39,.8);font-weight:700;flex-shrink:0}
+.bck-nan{font-size:12px;color:rgba(255,255,255,.28);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bck-nb{padding:4px 5px}
-.bck-ntitle{font-size:8px;font-weight:500;color:rgba(255,255,255,.78);line-height:1.3;min-height:20px}
+.bck-ntitle{font-size:12px;font-weight:500;color:rgba(255,255,255,.78);line-height:1.3;min-height:20px}
 .bck-nst{display:flex;align-items:center;gap:3px;margin-top:2px}
 .bck-nsdot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
-.bck-nstxt{font-size:7px}
+.bck-nstxt{font-size:12px}
 .bck-cw{height:1.5px;background:rgba(255,255,255,.07);flex-shrink:0;transition:background .4s;width:12px}
 .bck-cw.dn{background:rgba(74,222,128,.32)}
 .bck-cw.ac{background:rgba(239,159,39,.4);animation:bckPw .9s ease-in-out infinite}
@@ -1291,8 +1292,8 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-lz{position:absolute;left:52px;right:52px;z-index:5;pointer-events:none;overflow:visible}
 .bck-coc{position:absolute;right:0;top:0;bottom:0;width:195px;background:rgba(2,5,12,.93);border-left:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;z-index:9}
 .bck-coch{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.bck-coct{font-size:7px;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,.22)}
-.bck-cocc{font-size:9px;font-family:monospace;color:rgba(0,210,255,.4)}
+.bck-coct{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:rgba(0,210,255,.8)}
+.bck-cocc{font-size:12px;font-family:monospace;color:rgba(0,210,255,.9)}
 .bck-cocf{overflow-y:auto;display:flex;flex-direction:column;flex:1;min-height:0}
 .bck-cocf::-webkit-scrollbar{width:2px}
 .bck-cocf::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
@@ -1300,22 +1301,22 @@ function _bistCockpitHTML(tmplName, version, tests) {
 @keyframes bckCi{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 .bck-cedot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:4px}
 .bck-ceb{flex:1}
-.bck-cet{font-size:8px;font-weight:500;letter-spacing:.03em}
-.bck-ced{font-size:7px;color:rgba(255,255,255,.22);line-height:1.5;margin-top:1px}
-.bck-cts{font-size:6px;font-family:monospace;color:rgba(255,255,255,.1);margin-top:1px}
+.bck-cet{font-size:12px;font-weight:500;letter-spacing:.03em}
+.bck-ced{font-size:12px;color:rgba(255,255,255,.22);line-height:1.5;margin-top:1px}
+.bck-cts{font-size:12px;font-family:monospace;color:rgba(255,255,255,.1);margin-top:1px}
 .bck-coam{background:linear-gradient(180deg,#0e0902,#0a0701);border-top:2px solid #1e1408;padding:5px 0 4px;flex-shrink:0}
 .bck-efrow{display:flex;padding:0 10px}
 .bck-ef{flex:1;padding:3px 7px;border-right:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;gap:2px}
 .bck-ef:last-child{border-right:none}
-.bck-eflbl{font-size:7px;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,160,50,.28)}
+.bck-eflbl{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,160,50,.28)}
 .bck-efval{font-size:16px;font-family:monospace;font-weight:500;letter-spacing:.04em;color:#e8d4a0;line-height:1.1;transition:color .3s}
 .bck-efval.cyan{color:#00D2FF}.bck-efval.green{color:#4ade80}
 .bck-efbar{height:2px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden}
 .bck-effill{height:100%;border-radius:1px;transition:width .5s ease}
-.bck-efsub{font-size:7px;color:rgba(255,255,255,.15);font-family:monospace}
+.bck-efsub{font-size:12px;color:rgba(255,255,255,.15);font-family:monospace}
 .bck-radio{background:#040b17;border-top:1px solid rgba(0,210,255,.08);flex-shrink:0}
 .bck-rh{display:flex;align-items:center;gap:10px;padding:4px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
-.bck-rt{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:rgba(0,210,255,.35)}
+.bck-rt{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(0,210,255,.35)}
 .bck-rdot{width:5px;height:5px;border-radius:50%;background:rgba(0,210,255,.15)}
 .bck-rdot.live{background:#00D2FF;box-shadow:0 0 5px #00D2FF;animation:bckBk .8s ease-in-out infinite}
 @keyframes bckBk{0%,100%{opacity:1}50%{opacity:.25}}
@@ -1328,8 +1329,8 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-tx.crew{flex-direction:row-reverse}
 .bck-tx.ground{flex-direction:row}
 .bck-tx.reject{flex-direction:row}
-.bck-txcs{font-size:8px;font-weight:700;letter-spacing:.06em;white-space:nowrap;flex-shrink:0;margin-top:1px}
-.bck-txbub{max-width:74%;padding:3px 7px;border-radius:3px;font-size:9px;line-height:1.5}
+.bck-txcs{font-size:12px;font-weight:700;letter-spacing:.06em;white-space:nowrap;flex-shrink:0;margin-top:1px}
+.bck-txbub{max-width:74%;padding:4px 9px;border-radius:3px;font-size:12px;line-height:1.5}
 .bck-tx.crew .bck-txbub{background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15);color:rgba(220,240,255,.75);border-radius:4px 0 4px 4px;text-align:right}
 .bck-tx.tower .bck-txbub{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.12);color:rgba(200,240,210,.75);border-radius:0 4px 4px 4px}
 .bck-tx.tower .bck-txcs{color:rgba(74,222,128,.6)}
@@ -1338,21 +1339,21 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-tx.reject .bck-txcs{color:rgba(226,75,74,.6)}
 .bck-tx.ground .bck-txbub{background:rgba(180,140,60,.06);border:1px solid rgba(180,140,60,.2);color:rgba(240,220,160,.8);border-radius:0 4px 4px 4px}
 .bck-tx.ground .bck-txcs{color:rgba(200,170,80,.7)}
-.bck-txts{font-size:7px;font-family:monospace;color:rgba(255,255,255,.15);white-space:nowrap;flex-shrink:0;margin-top:3px}
+.bck-txts{font-size:12px;font-family:monospace;color:rgba(255,255,255,.15);white-space:nowrap;flex-shrink:0;margin-top:3px}
 .bck-ped{background:#060401;border-top:1px solid rgba(255,255,255,.04);padding:7px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0}
 .bck-tts{display:flex;gap:3px;flex:1}
 .bck-tt{flex:1;padding:4px 5px;border-radius:3px;border:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.015);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:3px}
 .bck-tt:hover{background:rgba(255,255,255,.04)}
 .bck-tt.bck-ta{background:rgba(0,210,255,.05);border-color:rgba(0,210,255,.2)}
-.bck-tn{font-size:7px;font-family:monospace;color:rgba(255,255,255,.2);background:rgba(255,255,255,.05);width:12px;height:12px;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.bck-tnm{font-size:8px;color:rgba(255,255,255,.38);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bck-tn{font-size:12px;font-family:monospace;color:rgba(255,255,255,.2);background:rgba(255,255,255,.05);width:12px;height:12px;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.bck-tnm{font-size:12px;color:rgba(255,255,255,.38);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bck-td{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.07);flex-shrink:0;transition:all .3s}
 .bck-td.run{background:#00D2FF;box-shadow:0 0 5px #00D2FF;animation:bckBk .7s ease-in-out infinite}
 .bck-td.pass{background:#4ade80;box-shadow:0 0 4px #4ade80}
 .bck-td.fail{background:#E24B4A;box-shadow:0 0 4px #E24B4A}
 .bck-ring{position:relative;width:32px;height:32px;flex-shrink:0}
 .bck-ring svg{position:absolute;top:0;left:0;transform:rotate(-90deg)}
-.bck-ringc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-family:monospace;font-weight:500;color:#e8d4a0}
+.bck-ringc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-family:monospace;font-weight:500;color:#e8d4a0}
 .bck-closebtn{position:absolute;top:3px;right:10px;background:none;border:none;color:rgba(255,160,50,.35);cursor:pointer;font-size:14px;padding:2px 6px;z-index:20;line-height:1}
 .bck-closebtn:hover{color:rgba(255,160,50,.7)}
 </style>
@@ -1365,7 +1366,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
     <div class="bck-gs"></div>
     <span class="bck-ann" id="bck-ann">FLIGHT SIMULATOR · ${_bistEscHtml(tmplName.toUpperCase())} · v${_bistEscHtml(version)}</span>
     <div class="bck-gs"></div>
-    <span style="font-size:7px;font-family:monospace;color:rgba(255,160,50,.3)" id="bck-clock">--:--:--</span>
+    <span style="font-size:12px;font-family:monospace;color:rgba(255,160,50,.5)" id="bck-clock">--:--:--</span>
     <button class="bck-closebtn" onclick="_bistCockpitClose()">✕</button>
   </div>
   <div class="bck-ws" id="bck-ws">
@@ -1382,7 +1383,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
       <div class="bck-de" id="bck-dend"><svg width="4" height="4" viewBox="0 0 4 4"><rect width="4" height="4" fill="rgba(255,255,255,.3)"/></svg></div>
     </div></div>
     <div class="bck-lz" id="bck-lz"><svg id="bck-lsvg" style="width:100%;overflow:visible;display:block" height="60"></svg></div>
-    <div class="bck-coc"><div class="bck-coch"><span class="bck-coct">Chain of Custody</span><span class="bck-cocc" id="bck-cocc">0 events</span></div><div class="bck-cocf" id="bck-cocf"><div style="padding:14px 10px;text-align:center;font-size:8px;color:rgba(255,255,255,.15);line-height:1.9">Awaiting<br>simulation launch</div></div></div>
+    <div class="bck-coc"><div class="bck-coch"><span class="bck-coct">Chain of Custody</span><span class="bck-cocc" id="bck-cocc">0 events</span></div><div class="bck-cocf" id="bck-cocf"><div style="padding:14px 10px;text-align:center;font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.3);line-height:1.9">Awaiting<br>simulation launch</div></div></div>
   </div>
   <div class="bck-coam"><div class="bck-efrow">
     <div class="bck-ef"><div class="bck-eflbl">Test suite</div><div class="bck-efval cyan" id="bck-ef0">0/0</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef0b" style="width:0%;background:#00D2FF"></div></div><div class="bck-efsub" id="bck-ef0s">ready</div></div>
@@ -1392,12 +1393,13 @@ function _bistCockpitHTML(tmplName, version, tests) {
     <div class="bck-ef"><div class="bck-eflbl">CoC events</div><div class="bck-efval" id="bck-ef4">0</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef4b" style="width:0%;background:#c47d18"></div></div><div class="bck-efsub">written</div></div>
     <div class="bck-ef"><div class="bck-eflbl">Elapsed</div><div class="bck-efval cyan" id="bck-ef5">00:00</div><div class="bck-efbar"><div class="bck-effill" id="bck-ef5b" style="width:0%;background:#00D2FF"></div></div><div class="bck-efsub">mm:ss</div></div>
   </div></div>
-  <div class="bck-radio"><div class="bck-rh"><div class="bck-rdot" id="bck-rdot"></div><span class="bck-rt">Crew / Tower / Ground Communications</span></div><div class="bck-rf" id="bck-rf"><div style="padding:6px 14px;font-size:8px;color:rgba(255,255,255,.15);font-family:monospace">— Radio silence —</div></div></div>
+  <div class="bck-radio"><div class="bck-rh"><div class="bck-rdot" id="bck-rdot"></div><span class="bck-rt">Crew / Tower / Ground Communications</span></div><div class="bck-rf" id="bck-rf"><div style="padding:6px 14px;font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.25)">— Radio silence —</div></div></div>
   <div class="bck-ped">
     <div class="bck-ring" id="bck-ring"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="2.5"/><circle cx="16" cy="16" r="12" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-dasharray="75.4" id="bck-ringc" stroke-dashoffset="75.4" stroke-linecap="round" style="transition:stroke-dashoffset .5s ease"/></svg><div class="bck-ringc" id="bck-ringv">0%</div></div>
     <div class="bck-tts" id="bck-tts">${tPills}</div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-      <button style="font-size:9px;padding:5px 9px;border-radius:3px;border:1px solid rgba(226,75,74,.22);background:none;color:rgba(226,75,74,.38);cursor:pointer;letter-spacing:.06em" onclick="_bistCockpitClose()">CLOSE</button>
+      <button style="font-size:12px;font-family:Arial,sans-serif;padding:5px 12px;border-radius:3px;border:1px solid rgba(0,210,255,.2);background:none;color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.04em;margin-right:4px" onclick="_bistCkReplay()" id="bck-replay-btn" style="display:none">⟳ REPLAY</button>
+      <button style="font-size:12px;font-family:Arial,sans-serif;padding:5px 12px;border-radius:3px;border:1px solid rgba(226,75,74,.3);background:none;color:rgba(226,75,74,.6);cursor:pointer;letter-spacing:.04em" onclick="_bistCockpitClose()">CLOSE</button>
       <div id="bck-foot-btns"></div>
     </div>
   </div>
@@ -1406,6 +1408,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 
 // ── Cockpit state ─────────────────────────────────────────────────────────────
 var _bckCocCount = 0;
+var _bckSimLog = [];  // [{ts, type, detail, color}] — replay feed
 var _bckSC = 0, _bckASC = 0, _bckRWC = 0, _bckPassC = 0;
 var _bckClockTimer = null;
 var _bckElTimer = null;
@@ -1452,6 +1455,7 @@ function _bistCkInit(tests) {
   // Init EFIS
   _bckEl('bck-ef0').textContent = '0/' + tests.length;
   _bckCocCount = 0; _bckSC = 0; _bckASC = 0; _bckRWC = 0; _bckPassC = 0;
+  _bckSimLog = [];
   // Clock
   _bckClockTimer = setInterval(function() {
     var el = _bckEl('bck-clock');
@@ -1577,7 +1581,7 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
     var actor  = test.actors[stepIdx] || '?';
     var nm     = (test.nodes[stepIdx] || 'Step').split('\n');
     var card = document.createElement('div'); card.className = 'bck-nc'; card.id = nodeId;
-    card.innerHTML = '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(actor)+'</div><div class="bck-nan">'+_bistEscHtml(aname)+'</div></div><div class="bck-nb"><div class="bck-ntitle">'+_bistEscHtml(nm[0])+(nm[1]?'<br><span style="opacity:.5;font-size:7px">'+_bistEscHtml(nm[1])+'</span>':'')+'</div><div class="bck-nst" id="bck-nst-'+stepId+'"><div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div><span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span></div></div>';
+    card.innerHTML = '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(actor)+'</div><div class="bck-nan">'+_bistEscHtml(aname)+'</div></div><div class="bck-nb"><div class="bck-ntitle">'+_bistEscHtml(nm[0])+(nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+'</div><div class="bck-nst" id="bck-nst-'+stepId+'"><div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div><span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span></div></div>';
     if (nodes.children.length > 0) {
       var cw = document.createElement('div'); cw.className = 'bck-cw'; nodes.appendChild(cw);
     }
@@ -1596,6 +1600,7 @@ function _bistCkAddCoc(color, type, detail) {
   var feed = _bckEl('bck-cocf'); if (!feed) return;
   if (_bckCocCount === 0) feed.innerHTML = '';
   _bckCocCount++;
+  _bckSimLog.push({ts: Date.now(), color: color, type: type, detail: detail});
   var ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   var ev = document.createElement('div'); ev.className = 'bck-ce';
   ev.innerHTML = '<div class="bck-cedot" style="background:'+color+'"></div><div class="bck-ceb"><div class="bck-cet" style="color:'+color+'">'+type+'</div><div class="bck-ced">'+detail+'</div><div class="bck-cts">'+ts+'</div></div>';
@@ -1646,17 +1651,20 @@ function _bistCkStopClock() {
 function _bistCkShowFooter(allPass, onProceed) {
   var fb = _bckEl('bck-foot-btns'); if (!fb) return;
   if (allPass) {
-    fb.innerHTML = '<button style="font-size:10px;font-weight:700;padding:6px 14px;border-radius:3px;border:none;cursor:pointer;background:#2a9d40;color:#fff;letter-spacing:.08em;margin-right:4px" onclick="_bistCockpitProceed()">Release</button>'
-      + '<button style="font-size:9px;padding:6px 10px;border-radius:3px;border:1px solid rgba(212,144,31,.3);background:none;color:rgba(212,144,31,.7);cursor:pointer" onclick="_bistCockpitOverride()">Override…</button>';
+    fb.innerHTML = '<button style="font-size:12px;font-family:Arial,sans-serif;font-weight:700;padding:6px 14px;border-radius:3px;border:none;cursor:pointer;background:#2a9d40;color:#fff;letter-spacing:.06em;margin-right:4px" onclick="_bistCockpitProceed()">Release</button>'
+      + '<button style="font-size:12px;font-family:Arial,sans-serif;padding:6px 10px;border-radius:3px;border:1px solid rgba(212,144,31,.3);background:none;color:rgba(212,144,31,.7);cursor:pointer" onclick="_bistCockpitOverride()">Override…</button>';
   } else {
-    fb.innerHTML = '<button style="font-size:9px;padding:6px 10px;border-radius:3px;border:1px solid rgba(212,144,31,.3);background:none;color:rgba(212,144,31,.7);cursor:pointer" onclick="_bistCockpitOverride()">Override…</button>';
+    fb.innerHTML = '<button style="font-size:12px;font-family:Arial,sans-serif;padding:6px 10px;border-radius:3px;border:1px solid rgba(212,144,31,.3);background:none;color:rgba(212,144,31,.7);cursor:pointer" onclick="_bistCockpitOverride()">Override…</button>';
   }
 }
 
 function _bistCkShowCert(tmplName, version, results, elapsed, certId, onProceed) {
   _bistCkShowFooter(true, onProceed);
-  // Build cert overlay inside the cockpit overlay
-  var ov = document.getElementById('bist-cockpit-overlay'); if (!ov) return;
+  // Find cockpit container — now renders into s9-sim-right
+  var ov = document.getElementById('s9-sim-right') ||
+           document.getElementById('s9-sim-panel') ||
+           document.getElementById('bist-cockpit-overlay');
+  if (!ov) return;
   var certDiv = document.createElement('div');
   certDiv.id = 'bist-cert-overlay';
   certDiv.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,.78);z-index:100;display:flex;align-items:center;justify-content:center;animation:bckFadeIn .4s ease-out';
@@ -1671,46 +1679,71 @@ function _bistCkShowCert(tmplName, version, results, elapsed, certId, onProceed)
   var timeStr = now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   var testRows = results.map(function(r,i){
     return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(180,140,60,.08)">'
-      +'<span style="color:'+(r.status==='passed'?'#1a6b2a':'#c0404a')+';font-size:11px;font-weight:700;flex-shrink:0">'+(r.status==='passed'?'✓':'✕')+'</span>'
-      +'<span style="font-size:10px;color:#2a1e08;flex:1">T'+(i+1)+' — '+_bistEscHtml(r.name)+'</span>'
-      +'<span style="font-size:9px;color:'+(r.status==='passed'?'#1a6b2a':'#c0404a')+';font-weight:600;letter-spacing:.06em">'+(r.status==='passed'?'PASSED':'FAILED')+'</span>'
+      +'<span style="color:'+(r.status==='passed'?'#1a6b2a':'#c0404a')+';font-size:13px;font-weight:700;flex-shrink:0">'+(r.status==='passed'?'✓':'✕')+'</span>'
+      +'<span style="font-size:12px;font-family:Arial,sans-serif;color:#2a1e08;flex:1">T'+(i+1)+' — '+_bistEscHtml(r.name)+'</span>'
+      +'<span style="font-size:12px;font-family:Arial,sans-serif;color:'+(r.status==='passed'?'#1a6b2a':'#c0404a')+';font-weight:600;letter-spacing:.04em">'+(r.status==='passed'?'PASSED':'FAILED')+'</span>'
     +'</div>';
   }).join('');
   var passed = results.filter(function(r){return r.status==='passed';}).length;
   certDiv.innerHTML = '<div style="background:#fdfaf4;border-radius:4px;width:480px;max-width:95%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6);position:relative;animation:bckCertIn .5s cubic-bezier(.2,.8,.3,1)">'
     +'<div style="position:absolute;inset:8px;border:1.5px solid rgba(180,140,60,.35);border-radius:2px;pointer-events:none;z-index:0"></div>'
     +'<div style="background:linear-gradient(135deg,#1a0e2e,#0d1a3a);padding:18px 28px 14px;text-align:center;position:relative;z-index:1">'
-      +'<div style="font-size:9px;letter-spacing:.25em;color:rgba(200,180,120,.6);text-transform:uppercase;margin-bottom:4px">CadenceHUD · ProjectHUD Platform</div>'
+      +'<div style="font-size:12px;letter-spacing:.12em;color:rgba(200,180,120,.7);text-transform:uppercase;margin-bottom:4px">CadenceHUD · ProjectHUD Platform</div>'
       +'<div style="font-size:18px;font-weight:700;color:#e8d4a0;letter-spacing:.06em">VALIDATION CERTIFICATE</div>'
-      +'<div style="font-size:9px;color:rgba(200,180,120,.5);letter-spacing:.12em;text-transform:uppercase;margin-top:3px">Built-In Self Test · Flight Simulation Record</div>'
+      +'<div style="font-size:12px;color:rgba(200,180,120,.6);letter-spacing:.08em;text-transform:uppercase;margin-top:3px">Built-In Self Test · Flight Simulation Record</div>'
     +'</div>'
     +'<div style="height:2px;background:linear-gradient(90deg,transparent,rgba(180,140,60,.5) 30%,rgba(210,170,80,.8) 50%,rgba(180,140,60,.5) 70%,transparent)"></div>'
     +'<div style="padding:16px 28px 12px;background:#fdfaf4;position:relative;z-index:1">'
-      +'<div style="font-size:10px;letter-spacing:.18em;color:rgba(80,60,20,.5);text-transform:uppercase;text-align:center">This certifies that</div>'
+      +'<div style="font-size:12px;letter-spacing:.1em;color:rgba(80,60,20,.6);text-transform:uppercase;text-align:center">This certifies that</div>'
       +'<div style="font-size:17px;font-weight:700;color:#1a1208;text-align:center;margin-top:2px">'+_bistEscHtml(tmplName)+'</div>'
-      +'<div style="font-size:9px;color:rgba(80,60,20,.5);font-family:monospace;text-align:center;margin-top:2px">v'+_bistEscHtml(version)+'</div>'
-      +'<div style="font-size:10px;color:rgba(80,60,20,.5);text-align:center;margin:6px 0 10px;font-style:italic">has successfully completed all required validation tests and is certified for release</div>'
+      +'<div style="font-size:12px;color:rgba(80,60,20,.5);font-family:monospace;text-align:center;margin-top:2px">v'+_bistEscHtml(version)+'</div>'
+      +'<div style="font-size:12px;color:rgba(80,60,20,.5);text-align:center;margin:6px 0 10px;font-style:italic">has successfully completed all required validation tests and is certified for release</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0">'
-        +'<div style="background:rgba(180,140,60,.06);border:1px solid rgba(180,140,60,.18);border-radius:3px;padding:6px 10px;text-align:center"><div style="font-size:18px;font-weight:700;color:'+(passed===results.length?'#1a6b2a':'#c0404a')+';font-family:monospace">'+passed+'/'+results.length+'</div><div style="font-size:8px;letter-spacing:.1em;color:rgba(80,60,20,.5);text-transform:uppercase;margin-top:2px">Tests passed</div></div>'
-        +'<div style="background:rgba(180,140,60,.06);border:1px solid rgba(180,140,60,.18);border-radius:3px;padding:6px 10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#1a1208;font-family:monospace">'+elStr+'</div><div style="font-size:8px;letter-spacing:.1em;color:rgba(80,60,20,.5);text-transform:uppercase;margin-top:2px">Duration</div></div>'
+        +'<div style="background:rgba(180,140,60,.06);border:1px solid rgba(180,140,60,.18);border-radius:3px;padding:6px 10px;text-align:center"><div style="font-size:18px;font-weight:700;color:'+(passed===results.length?'#1a6b2a':'#c0404a')+';font-family:monospace">'+passed+'/'+results.length+'</div><div style="font-size:12px;letter-spacing:.06em;color:rgba(80,60,20,.5);text-transform:uppercase;margin-top:2px">Tests passed</div></div>'
+        +'<div style="background:rgba(180,140,60,.06);border:1px solid rgba(180,140,60,.18);border-radius:3px;padding:6px 10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#1a1208;font-family:monospace">'+elStr+'</div><div style="font-size:12px;letter-spacing:.06em;color:rgba(80,60,20,.5);text-transform:uppercase;margin-top:2px">Duration</div></div>'
       +'</div>'
       +'<div style="border-top:1px solid rgba(180,140,60,.2);padding-top:8px;margin-top:8px">'+testRows+'</div>'
-      +'<div style="font-size:8px;color:rgba(80,60,20,.4);font-family:monospace;margin-top:8px">ID: '+_bistEscHtml(certId)+'</div>'
+      +'<div style="font-size:12px;color:rgba(80,60,20,.4);font-family:monospace;margin-top:8px">ID: '+_bistEscHtml(certId)+'</div>'
     +'</div>'
     +'<div style="padding:10px 28px 16px;background:#fdfaf4;border-top:1px solid rgba(180,140,60,.15);position:relative;z-index:1">'
       +'<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">'
-        +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid rgba(80,60,20,.3);margin-bottom:4px;height:22px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px"><span style="font-size:13px;font-family:Georgia,serif;color:rgba(30,20,8,.45);font-style:italic">'+_bistEscHtml((_resources_cad&&_resources_cad.find(function(r){return r.id===_myResourceId;}))||{name:'Team Member'}).name+'</span></div><div style="font-size:8px;color:rgba(80,60,20,.45)">Submitting Principal · '+_bistEscHtml(dateStr)+'</div></div>'
-        +'<div style="width:74px;height:74px;position:relative;flex-shrink:0"><div style="width:74px;height:74px;border-radius:50%;border:3px solid rgba(180,30,30,.75);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transform:rotate(-18deg);background:rgba(180,30,30,.04);position:relative"><div style="position:absolute;inset:3px;border-radius:50%;border:1px dashed rgba(180,30,30,.3)"></div><div style="font-size:7px;letter-spacing:.1em;color:rgba(180,30,30,.8);text-transform:uppercase;font-weight:700">Validated</div><div style="font-size:15px;font-weight:900;color:rgba(180,30,30,.85);line-height:1">PASS</div><div style="font-size:8px;font-weight:700;color:rgba(180,30,30,.7)">Certified</div><div style="font-size:7px;font-family:monospace;color:rgba(180,30,30,.55)">'+now.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'})+'</div></div></div>'
-        +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid rgba(80,60,20,.3);margin-bottom:4px;height:22px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px"><span style="font-size:10px;font-family:monospace;color:rgba(30,20,8,.3)">'+_bistEscHtml(certId)+'</span></div><div style="font-size:8px;color:rgba(80,60,20,.45)">System validation · '+_bistEscHtml(timeStr)+'</div></div>'
+        +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid rgba(80,60,20,.3);margin-bottom:4px;height:22px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px"><span style="font-size:13px;font-family:Georgia,serif;color:rgba(30,20,8,.45);font-style:italic">'+_bistEscHtml((_resources_cad&&_resources_cad.find(function(r){return r.id===_myResourceId;}))||{name:'Team Member'}).name+'</span></div><div style="font-size:12px;color:rgba(80,60,20,.45)">Submitting Principal · '+_bistEscHtml(dateStr)+'</div></div>'
+        +'<div style="width:74px;height:74px;position:relative;flex-shrink:0"><div style="width:74px;height:74px;border-radius:50%;border:3px solid rgba(180,30,30,.75);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transform:rotate(-18deg);background:rgba(180,30,30,.04);position:relative"><div style="position:absolute;inset:3px;border-radius:50%;border:1px dashed rgba(180,30,30,.3)"></div><div style="font-size:12px;letter-spacing:.06em;color:rgba(180,30,30,.8);text-transform:uppercase;font-weight:700">Validated</div><div style="font-size:15px;font-weight:900;color:rgba(180,30,30,.85);line-height:1">PASS</div><div style="font-size:12px;font-weight:700;color:rgba(180,30,30,.7)">Certified</div><div style="font-size:12px;font-family:monospace;color:rgba(180,30,30,.55)">'+now.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'})+'</div></div></div>'
+        +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid rgba(80,60,20,.3);margin-bottom:4px;height:22px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px"><span style="font-size:12px;font-family:monospace;color:rgba(30,20,8,.3)">'+_bistEscHtml(certId)+'</span></div><div style="font-size:12px;color:rgba(80,60,20,.45)">System validation · '+_bistEscHtml(timeStr)+'</div></div>'
       +'</div>'
       +'<div style="display:flex;gap:8px;margin-top:10px">'
-        +(onProceed ? '<button onclick="_bistCockpitProceed()" style="flex:1;padding:8px;background:#2a9d40;color:#fff;border:none;border-radius:3px;font-size:11px;font-weight:600;letter-spacing:.08em;cursor:pointer">Release v'+_bistEscHtml(version)+'</button>' : '')
-        +'<button onclick="document.getElementById(\'bist-cert-overlay\').remove()" style="flex:1;padding:8px;background:rgba(180,140,60,.1);border:1px solid rgba(180,140,60,.3);border-radius:3px;font-size:10px;font-weight:600;letter-spacing:.1em;color:#6b4a0a;cursor:pointer">Close</button>'
+        +(onProceed ? '<button onclick="_bistCockpitProceed()" style="flex:1;padding:8px;background:#2a9d40;color:#fff;border:none;border-radius:3px;font-size:12px;font-family:Arial,sans-serif;font-weight:600;letter-spacing:.06em;cursor:pointer">Release v'+_bistEscHtml(version)+'</button>' : '')
+        +'<button onclick="document.getElementById(\'bist-cert-overlay\').remove()" style="flex:1;padding:8px;background:rgba(180,140,60,.1);border:1px solid rgba(180,140,60,.3);border-radius:3px;font-size:12px;font-family:Arial,sans-serif;font-weight:600;letter-spacing:.08em;color:#6b4a0a;cursor:pointer">Close</button>'
       +'</div>'
     +'</div>'
   +'</div>';
   certDiv.addEventListener('click', function(e){ if(e.target===certDiv) certDiv.remove(); });
   ov.appendChild(certDiv);
+}
+
+async function _bistCkReplay() {
+  if (!_bckSimLog || !_bckSimLog.length) return;
+  var rb = _bckEl('bck-replay-btn');
+  if (rb) { rb.disabled = true; rb.textContent = '⟳ Replaying…'; }
+
+  // Clear CoC feed and reset counters
+  var feed = _bckEl('bck-cocf');
+  if (feed) feed.innerHTML = '';
+  _bckCocCount = 0;
+
+  // Calculate timing — compress to 3s total
+  var log = _bckSimLog;
+  var totalMs = log.length > 1 ? (log[log.length-1].ts - log[0].ts) : 1000;
+  var speed = Math.max(totalMs / 3000, 1);
+
+  for (var i = 0; i < log.length; i++) {
+    var entry = log[i];
+    var delay = i === 0 ? 0 : Math.round((log[i].ts - log[i-1].ts) / speed);
+    if (delay > 0) await new Promise(function(r){ setTimeout(r, Math.min(delay, 600)); });
+    _bistCkAddCoc(entry.color, entry.type, entry.detail);
+  }
+
+  if (rb) { rb.disabled = false; rb.textContent = '⟳ REPLAY'; }
 }
 
 function _bistEscHtml(str) {
