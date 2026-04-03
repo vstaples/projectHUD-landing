@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AV','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AW','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1679,7 +1679,7 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
   if (type === 'instance_created') {
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt on';
     _bistCkAddCoc('#00D2FF','instance_launched','Template: '+_bistEscHtml(test.name));
-    _bistCkRadio('crew','T'+(ti+1)+' ready. '+_bistEscHtml(test.name));
+    _bistCkRadio('crew','T'+(ti+1)+' ready. '+_bistEscHtml(test.name)+' · step count: '+test.nodes.length);
     _bckSimLog.push({ts:Date.now(),kind:'trigger',testIdx:ti,state:'on'});
   } else if (type === 'step_start') {
     var idx = ev.stepIdx || 0;
@@ -1713,8 +1713,10 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     _bistCkSetNode(ev.stepId, idx, test, 'done', ev.outcome || 'Done', tmplSteps);
     _bckLastDoneId = ev.stepId;
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt dn';
-    _bistCkAddCoc('#4ade80','step_completed', _bistEscHtml(ev.stepName||'Step')+' · '+_bistEscHtml(ev.outcome||'Done'));
-    _bistCkRadio('tower',_bistEscHtml(ev.stepName||'Step')+' completed — '+_bistEscHtml(ev.outcome||'Done'));
+    var _sn = ev.stepName||'Step', _so = ev.outcome||'Done';
+    var _sl = (_bckCurrentTestIdx+1)+'.'+(idx+1);
+    _bistCkAddCoc('#4ade80','step_completed', _bistEscHtml(_sn)+' · '+_bistEscHtml(_so));
+    _bistCkRadio('tower','['+_sl+'] '+_bistEscHtml(_sn)+' — '+_bistEscHtml(_so));
   } else if (type === 'step_fail') {
     _bistCkAddCoc('#E24B4A','step_failed', _bistEscHtml(ev.reason||'Assertion failed'));
     _bistCkRadio('reject','TOWER: Step failed — '+_bistEscHtml((ev.reason||'').slice(0,80)));
@@ -1744,34 +1746,36 @@ function _bckDrawRejectArc(fromStepId, toStepId) {
   var toRect   = to.getBoundingClientRect();
 
   // Arc runs from bottom-center of "from" node to bottom-center of "to" node
-  var x1 = fromRect.left + fromRect.width/2  - lzRect.left;
-  var x2 = toRect.left   + toRect.width/2    - lzRect.left;
-  var y0 = 0;  // top of lz (lz sits just below the horizon)
-  var depth = 28 + Math.abs(x1 - x2) * 0.12;  // arc depth proportional to span
+  // x1 = rejected node (right), x2 = reset target (left)
+  // Use fromRect bottom, toRect bottom as anchor points
+  var x1 = fromRect.left + fromRect.width/2 - lzRect.left;
+  var x2 = toRect.left   + toRect.width/2   - lzRect.left;
+  var y1 = fromRect.bottom - lzRect.top;
+  var y2 = toRect.bottom  - lzRect.top;
+  var depth = Math.max(20, Math.abs(x1-x2) * 0.18);
+  var mx = (x1+x2)/2, my = Math.max(y1,y2) + depth;
 
-  // SVG quadratic bezier: start at x1, curve down to depth, back up to x2
-  var mx = (x1 + x2) / 2;
-  var path = 'M '+x1+' '+y0+' Q '+mx+' '+depth+' '+x2+' '+y0;
+  var path = 'M '+x1+' '+y1+' Q '+mx+' '+my+' '+x2+' '+y2;
 
   var el = document.createElementNS('http://www.w3.org/2000/svg','path');
   el.setAttribute('d', path);
   el.setAttribute('fill', 'none');
   el.setAttribute('stroke', '#E24B4A');
-  el.setAttribute('stroke-width', '1.5');
-  el.setAttribute('stroke-dasharray', '4 3');
-  el.setAttribute('opacity', '0.75');
+  el.setAttribute('stroke-width', '2');
+  el.setAttribute('stroke-dasharray', '5 3');
+  el.setAttribute('opacity', '0.85');
 
-  // Arrowhead at destination (x2,y0)
-  var angle = Math.atan2(y0 - depth, x2 - mx);
-  var ah = 7;
+  // Arrowhead pointing into x2,y2 from the bezier tangent
+  var angle = Math.atan2(y2 - my, x2 - mx);
+  var ah = 8;
   var ax1 = x2 - ah*Math.cos(angle-0.4);
-  var ay1 = y0 - ah*Math.sin(angle-0.4);
+  var ay1 = y2 - ah*Math.sin(angle-0.4);
   var ax2 = x2 - ah*Math.cos(angle+0.4);
-  var ay2 = y0 - ah*Math.sin(angle+0.4);
+  var ay2 = y2 - ah*Math.sin(angle+0.4);
   var arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
-  arrow.setAttribute('points', x2+','+y0+' '+ax1+','+ay1+' '+ax2+','+ay2);
+  arrow.setAttribute('points', x2+','+y2+' '+ax1+','+ay1+' '+ax2+','+ay2);
   arrow.setAttribute('fill', '#E24B4A');
-  arrow.setAttribute('opacity', '0.75');
+  arrow.setAttribute('opacity', '0.85');
 
   // Animate the dash
   var anim = document.createElementNS('http://www.w3.org/2000/svg','animate');
@@ -1784,9 +1788,10 @@ function _bckDrawRejectArc(fromStepId, toStepId) {
   svg.appendChild(arrow);
 
   // Size svg height to fit
-  var h = Math.ceil(depth) + 8;
+  var h = Math.ceil(depth) + 16;
   svg.setAttribute('height', h);
   if (lz) lz.style.height = h + 'px';
+  if (lz) lz.style.overflow = 'visible';
 }
 
 function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
