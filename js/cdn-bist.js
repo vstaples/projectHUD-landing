@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AS','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AT','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1154,14 +1154,9 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     }
     if (simPanel && typeof _s9RenderSimPanel === 'function') {
       _s9RenderSimPanel(simPanel);
-      // Set aborted gate text immediately after DOM rebuilt
+      // Set aborted gate text — no DB refresh, avoids race with stale passing result
       var _gcEl2 = document.getElementById('s9-sim-gate');
-      if (_gcEl2) { _gcEl2.textContent = '⚠ Simulation aborted — incomplete'; _gcEl2.style.color = 'rgba(226,75,74,.8)'; }
-      // Then refresh from DB after abort patch completes
-      var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
-      if (tmpl && tmpl.id && typeof _s9LoadSimScripts === 'function') {
-        setTimeout(function(){ _s9LoadSimScripts(tmpl.id, tmpl.version||'0.0.0'); }, 1200);
-      }
+      if (_gcEl2) { _gcEl2.textContent = '⚠ Aborted — reopen Simulator to refresh'; _gcEl2.style.color = 'rgba(226,75,74,.8)'; }
     } else if (!simPanel) {
       ov.remove();
     }
@@ -1804,7 +1799,10 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
   var nst = document.getElementById('bck-nst-'+stepId); if (!nst) return;
   var col = {done:'#4ade80', active:'#EF9F27', reset:'#EF9F27'}[state] || '#888';
   var lbl2 = {done:label, active:'Active', reset:'Reset → '+label}[state] || label;
-  nst.innerHTML = '<div class="bck-nsdot" style="background:'+col+'"></div><span class="bck-nstxt" style="color:'+col+'">'+_bistEscHtml(lbl2)+'</span>';
+  var _seq = (_bckCurrentTestIdx+1)+'.'+(stepIdx+1);
+  nst.innerHTML = '<div class="bck-nsdot" style="background:'+col+'"></div>'+
+    '<span class="bck-nstxt" style="color:'+col+'">'+_bistEscHtml(lbl2)+'</span>'+
+    '<span style="margin-left:auto;font-size:12px;font-family:Arial,sans-serif;font-weight:700;color:rgba(255,180,60,.85)">'+_seq+'</span>';
   // Log node state for replay
   _bckSimLog.push({ts: Date.now(), kind:'node', stepId:stepId, stepIdx:stepIdx,
     testIdx:_bckCurrentTestIdx,
