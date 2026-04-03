@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-340000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-350000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -3057,6 +3057,7 @@ window.myrSubmitWorkflow = async function(wfId) {
     }
 
     compassToast(`✓ ${title} — routed to ${recipientSummary}`);
+    window._pollNow && window._pollNow();
 
   } catch(e) {
     console.error('[MyRequests] submit failed:', e);
