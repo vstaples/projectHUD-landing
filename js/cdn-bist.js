@@ -1647,6 +1647,7 @@ function _bistCkShowCert(tmplName, version, results, elapsed, certId, onProceed)
   // Build cert overlay inside the cockpit overlay
   var ov = document.getElementById('bist-cockpit-overlay'); if (!ov) return;
   var certDiv = document.createElement('div');
+  certDiv.id = 'bist-cert-overlay';
   certDiv.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,.78);z-index:100;display:flex;align-items:center;justify-content:center;animation:bckFadeIn .4s ease-out';
   if (!document.getElementById('bck-fadein-style')) {
     var s = document.createElement('style'); s.id='bck-fadein-style';
@@ -1693,7 +1694,7 @@ function _bistCkShowCert(tmplName, version, results, elapsed, certId, onProceed)
       +'</div>'
       +'<div style="display:flex;gap:8px;margin-top:10px">'
         +(onProceed ? '<button onclick="_bistCockpitProceed()" style="flex:1;padding:8px;background:#2a9d40;color:#fff;border:none;border-radius:3px;font-size:11px;font-weight:600;letter-spacing:.08em;cursor:pointer">Release v'+_bistEscHtml(version)+'</button>' : '')
-        +'<button onclick="this.closest(\'div[style*=\\\"position:absolute\\\"]\').remove()" style="flex:1;padding:8px;background:rgba(180,140,60,.1);border:1px solid rgba(180,140,60,.3);border-radius:3px;font-size:10px;font-weight:600;letter-spacing:.1em;color:#6b4a0a;cursor:pointer">Close</button>'
+        +'<button onclick="document.getElementById(\'bist-cert-overlay\').remove()" style="flex:1;padding:8px;background:rgba(180,140,60,.1);border:1px solid rgba(180,140,60,.3);border-radius:3px;font-size:10px;font-weight:600;letter-spacing:.1em;color:#6b4a0a;cursor:pointer">Close</button>'
       +'</div>'
     +'</div>'
   +'</div>';
