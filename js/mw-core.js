@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-260000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-270000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -37,6 +37,59 @@ document.getElementById('compass-date').textContent =
 // ══════════════════════════════════════════════════════════
 // VIEW: MY WORK (Individual Contributor) — Feature #1 · Session 16
 // ══════════════════════════════════════════════════════════
+// Lightweight work list refresh — re-fetches action items and re-renders
+// #work-list-rows without resetting tab state or triggering compass.html tab restoration.
+window._mwRefreshWorkItems = async function() {
+  const resId = _myResource?.id;
+  if (!resId) return;
+  try {
+    const today = new Date().toLocaleDateString('en-CA');
+    const [freshActions, freshReviews] = await Promise.all([
+      API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
+      API.get(`workflow_requests?select=id,title,body,status,role,due_date,owner_resource_id,owner_name,created_by_name,instance_id&owner_resource_id=eq.${resId}&status=eq.open&limit=50`).catch(() => []),
+    ]);
+    // Rebuild work items for action items and pending reviews only
+    const wrInstanceIds = new Set();
+    const newItems = [];
+    (freshReviews||[]).forEach(wr => {
+      newItems.push({ type:'action', id:wr.id, title:wr.title, project:wr.role==='approver'?'Pending Approval':'Pending Review',
+        projectId:null, status:'open', due:wr.due_date||null, overdue:wr.due_date&&wr.due_date<today,
+        urgency:-1, createdBy:wr.created_by_name||null, ownerName:wr.owner_name||null,
+        ownerResourceId:resId, instanceId:wr.instance_id||null, body:wr.body||null,
+        _wrRole:wr.role, _isWrRow:true });
+      if (wr.instance_id) wrInstanceIds.add(wr.instance_id);
+    });
+    (freshActions||[]).filter(a=>a.owner_resource_id).forEach(a => {
+      if (a.instance_id && wrInstanceIds.has(a.instance_id) &&
+          ((a.title||'').startsWith('Review request:') || (a.title||'').startsWith('Approve request:'))) return;
+      const overdue = a.due_date && a.due_date < today;
+      newItems.push({ type:'action', id:a.id, title:a.title, project:'Action item',
+        projectId:null, status:a.status||'open', due:a.due_date, overdue, urgency:overdue?0:1,
+        createdBy:a.created_by_name||null, ownerName:a.owner_name||null,
+        ownerResourceId:a.owner_resource_id||null, instanceId:a.instance_id||null, body:a.body||null });
+    });
+    newItems.sort((a,b) => { if (a.urgency!==b.urgency) return a.urgency-b.urgency; if (a.due&&b.due) return a.due.localeCompare(b.due); return 0; });
+    // Merge into existing _wiItems — preserve tasks, replace action/review items
+    const taskItems = (_wiItems||[]).filter(w => w.type==='task');
+    _wiItems = [...newItems, ...taskItems];
+    window._wiItems = _wiItems;
+    window.myActionItems = freshActions||[];
+    window._myPendingReviews = freshReviews||[];
+    // Re-render just the work list rows — no tab restoration
+    const listEl = document.getElementById('work-list-rows');
+    if (listEl && typeof workListRows === 'function') {
+      listEl.innerHTML = workListRows();
+    }
+    // Update work badge
+    const badge = document.getElementById('ust-work-badge');
+    if (badge) {
+      const open = newItems.length;
+      badge.textContent = open > 0 ? open : '';
+      badge.style.display = open > 0 ? 'inline' : 'none';
+    }
+  } catch(e) { console.warn('[mwRefreshWorkItems] error:', e.message); }
+};
+
 window._mwLoadUserView = async function() {
   const loading = document.getElementById('compass-loading');
   const content = document.getElementById('user-content');
@@ -1314,10 +1367,14 @@ window._mwLoadUserView = async function() {
               window.loadUserRequests && window.loadUserRequests();
               window._mwWorkStale = true;
             } else if (activeTab === 'work') {
-              // User is on work tab — mark stale so rebuild fires on next interaction.
-              // Do NOT call _mwLoadUserView — it triggers compass.html tab restoration
-              // which can switch the user away from My Requests.
-              window._mwWorkStale = true;
+              // User is on work tab — use lightweight refresh to update items in place.
+              // _mwRefreshWorkItems re-fetches action items and re-renders the list
+              // without resetting tab state or triggering compass.html tab restoration.
+              if (window._mwRefreshWorkItems) {
+                window._mwRefreshWorkItems();
+              } else {
+                window._mwWorkStale = true;
+              }
             } else {
               // Any other tab — mark both stale.
               window._mwWorkStale = true;

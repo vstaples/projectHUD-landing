@@ -1,5 +1,5 @@
-// VERSION: 20260403-250000
-console.log('%c[mw-events] v20260403-250000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260403-260000
+console.log('%c[mw-events] v20260403-260000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -1147,14 +1147,16 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       : `↺ Changes requested — submitter notified.`
     );
 
-    // Refresh work queue — if on work tab rebuild now; otherwise mark stale.
-    const _rrpActiveTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
-    if (_rrpActiveTab === 'work') {
-      _viewLoaded['user'] = false;
-      window._mwLoadUserView && window._mwLoadUserView();
-    } else {
-      window._mwWorkStale = true;
+    // Instantly remove the item from the in-memory work list and re-render.
+    // No DB read needed — item ID is known, filter it out and refresh in place.
+    if (window._wiItems) {
+      window._wiItems = window._wiItems.filter(w => w.id !== actionItemId);
+      window._mwRefreshWorkItems && window._mwRefreshWorkItems();
     }
+
+    // Mark stale for next visit; silently refresh requests if user is on that tab.
+    window._mwWorkStale = true;
+    const _rrpActiveTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
     if (_rrpActiveTab === 'requests') {
       window._requestsLoaded = false;
       window.loadUserRequests && window.loadUserRequests();
