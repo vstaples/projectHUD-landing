@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-W','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-X','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1803,7 +1803,7 @@ function _bistCkReplay() {
     alert('No simulation log to replay. Run the simulator first.');
     return;
   }
-  _bckReplayPos  = 0;
+  _bckReplayPos  = Math.max(0, _bckSimLog.length - 1);
   _bckReplayPlay = false;
   if (_bckReplayTimer) { clearInterval(_bckReplayTimer); _bckReplayTimer = null; }
 
@@ -1818,7 +1818,7 @@ function _bistCkReplay() {
   var panel = document.createElement('div');
   panel.id = 'bck-replay-panel';
   panel.style.cssText = [
-    'position:absolute;bottom:0;left:0;right:0;z-index:50;',
+    'position:absolute;bottom:0;left:0;right:300px;z-index:50;',
     'background:rgba(2,7,15,.96);border-top:1px solid rgba(0,210,255,.15);',
     'display:flex;flex-direction:column;font-family:Arial,sans-serif'
   ].join('');
@@ -1859,7 +1859,7 @@ function _bistCkReplay() {
     '</div>';
 
   bck.appendChild(panel);
-  _bckRpRender(0);
+  _bckRpRender(_bckSimLog.length - 1);
 }
 
 function _bckRpBtn(glyph, action, title) {
@@ -1872,6 +1872,7 @@ function _bckRpBtn(glyph, action, title) {
 function _bckRpRender(idx) {
   var log   = _bckSimLog;
   var total = log.length;
+  if (!total) return;
   if (idx < 0) idx = 0;
   if (idx >= total) idx = total - 1;
   _bckReplayPos = idx;
