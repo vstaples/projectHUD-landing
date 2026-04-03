@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-L','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-M','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1721,29 +1721,198 @@ function _bistCkShowCert(tmplName, version, results, elapsed, certId, onProceed)
   ov.appendChild(certDiv);
 }
 
-async function _bistCkReplay() {
-  if (!_bckSimLog || !_bckSimLog.length) return;
-  var rb = _bckEl('bck-replay-btn');
-  if (rb) { rb.disabled = true; rb.textContent = '⟳ Replaying…'; }
+// ── Replay scrubber state ────────────────────────────────────────────────────
+var _bckReplayPos   = 0;       // current frame index
+var _bckReplayTimer = null;    // auto-play interval
+var _bckReplayPlay  = false;   // playing?
 
-  // Clear CoC feed and reset counters
-  var feed = _bckEl('bck-cocf');
-  if (feed) feed.innerHTML = '';
-  _bckCocCount = 0;
+function _bistCkReplay() {
+  if (!_bckSimLog || !_bckSimLog.length) {
+    alert('No simulation log to replay. Run the simulator first.');
+    return;
+  }
+  _bckReplayPos  = 0;
+  _bckReplayPlay = false;
+  if (_bckReplayTimer) { clearInterval(_bckReplayTimer); _bckReplayTimer = null; }
 
-  // Calculate timing — compress to 3s total
-  var log = _bckSimLog;
-  var totalMs = log.length > 1 ? (log[log.length-1].ts - log[0].ts) : 1000;
-  var speed = Math.max(totalMs / 3000, 1);
+  // Inject replay panel into the windshield area, above the existing CoC + instruments
+  var bck = document.querySelector('.bck');
+  if (!bck) return;
 
-  for (var i = 0; i < log.length; i++) {
-    var entry = log[i];
-    var delay = i === 0 ? 0 : Math.round((log[i].ts - log[i-1].ts) / speed);
-    if (delay > 0) await new Promise(function(r){ setTimeout(r, Math.min(delay, 600)); });
-    _bistCkAddCoc(entry.color, entry.type, entry.detail);
+  // Add replay overlay inside .bck above everything
+  var existing = document.getElementById('bck-replay-panel');
+  if (existing) existing.remove();
+
+  var panel = document.createElement('div');
+  panel.id = 'bck-replay-panel';
+  panel.style.cssText = [
+    'position:absolute;inset:0;z-index:50;background:rgba(2,7,15,.92);',
+    'display:flex;flex-direction:column;font-family:Arial,sans-serif'
+  ].join('');
+
+  var total = _bckSimLog.length;
+
+  panel.innerHTML = [
+    // Header
+    '<div style="padding:10px 16px;border-bottom:1px solid rgba(0,210,255,.1);',
+      'display:flex;align-items:center;justify-content:space-between;flex-shrink:0">',
+      '<div style="font-size:13px;font-weight:600;letter-spacing:.08em;',
+        'color:rgba(0,210,255,.9);text-transform:uppercase">&#9654; Flight Recorder Replay</div>',
+      '<button onclick="document.getElementById('bck-replay-panel').remove();_bckReplayStop()"',
+        ' style="background:none;border:none;color:rgba(255,255,255,.4);',
+        'font-size:16px;cursor:pointer;padding:0 4px">&#10005;</button>',
+    '</div>',
+
+    // Event display area
+    '<div id="bck-rp-event" style="flex:1;display:flex;flex-direction:column;',
+      'align-items:center;justify-content:center;padding:24px;gap:12px">',
+      '<div style="font-size:12px;color:rgba(255,255,255,.3)">Press play or use arrows</div>',
+    '</div>',
+
+    // Scrubber
+    '<div style="padding:8px 16px 4px;flex-shrink:0">',
+      '<input type="range" id="bck-rp-scrub" min="0" max="'+(total-1)+'" value="0"',
+        ' oninput="_bckRpScrub(this.value)"',
+        ' style="width:100%;height:4px;cursor:pointer;accent-color:#00D2FF">',
+      '<div style="display:flex;justify-content:space-between;',
+        'font-size:12px;color:rgba(255,255,255,.3);margin-top:3px">',
+        '<span id="bck-rp-pos">1 / '+total+'</span>',
+        '<span id="bck-rp-ts"></span>',
+      '</div>',
+    '</div>',
+
+    // Transport controls
+    '<div style="padding:8px 16px 14px;display:flex;align-items:center;',
+      'justify-content:center;gap:8px;flex-shrink:0">',
+      _bckRpBtn('&#171;', '_bckRpGo(0)',         'First'),
+      _bckRpBtn('&#8249;', '_bckRpStep(-1)',      'Back'),
+      '<button id="bck-rp-play" onclick="_bckRpTogglePlay()"',
+        ' style="width:40px;height:40px;border-radius:50%;border:2px solid rgba(0,210,255,.5);',
+        'background:rgba(0,210,255,.1);color:#00D2FF;font-size:18px;cursor:pointer">',
+        '&#9654;</button>',
+      _bckRpBtn('&#8250;', '_bckRpStep(1)',       'Forward'),
+      _bckRpBtn('&#187;',  '_bckRpGo('+(total-1)+')', 'Last'),
+      '<div style="width:1px;height:28px;background:rgba(255,255,255,.08);margin:0 8px"></div>',
+      '<select id="bck-rp-speed" onchange="_bckRpSpeedChange(this.value)"',
+        ' style="font-size:12px;font-family:Arial,sans-serif;background:rgba(0,0,0,.5);',
+        'border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);',
+        'padding:3px 6px;border-radius:3px;cursor:pointer">',
+        '<option value="1000">Slow</option>',
+        '<option value="500" selected>Normal</option>',
+        '<option value="200">Fast</option>',
+        '<option value="50">Max</option>',
+      '</select>',
+    '</div>',
+  ].join('');
+
+  bck.appendChild(panel);
+  _bckRpRender(0);
+}
+
+function _bckRpBtn(glyph, action, title) {
+  return '<button onclick="'+action+'" title="'+title+'"'+
+    ' style="width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.15);'+
+    'background:none;color:rgba(255,255,255,.6);font-size:14px;cursor:pointer">'+
+    glyph+'</button>';
+}
+
+function _bckRpRender(idx) {
+  var log   = _bckSimLog;
+  var total = log.length;
+  if (idx < 0) idx = 0;
+  if (idx >= total) idx = total - 1;
+  _bckReplayPos = idx;
+
+  var scrub = document.getElementById('bck-rp-scrub');
+  if (scrub) scrub.value = idx;
+
+  var posEl = document.getElementById('bck-rp-pos');
+  if (posEl) posEl.textContent = (idx+1) + ' / ' + total;
+
+  var entry = log[idx];
+  var tsEl  = document.getElementById('bck-rp-ts');
+  if (tsEl) {
+    var d = new Date(entry.ts);
+    tsEl.textContent = d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   }
 
-  if (rb) { rb.disabled = false; rb.textContent = '⟳ REPLAY'; }
+  var ev = document.getElementById('bck-rp-event');
+  if (ev) {
+    // Show events up to current index in the event area
+    var rows = '';
+    for (var i = Math.max(0, idx-4); i <= idx; i++) {
+      var e = log[i];
+      var isCurrent = (i === idx);
+      rows += '<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 14px;'+
+        'border-radius:5px;margin-bottom:4px;'+
+        (isCurrent
+          ? 'background:rgba(0,210,255,.07);border:1px solid rgba(0,210,255,.2)'
+          : 'background:rgba(255,255,255,.02);border:1px solid transparent') + '">'+
+        '<div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;background:'+e.color+'"></div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:13px;font-weight:'+(isCurrent?'600':'400')+';'+
+            'color:'+(isCurrent?'rgba(255,255,255,.9)':'rgba(255,255,255,.45)')+'">'+
+            _bistEscHtml(e.type)+'</div>'+
+          '<div style="font-size:12px;color:'+(isCurrent?'rgba(255,255,255,.65)':'rgba(255,255,255,.25)')+';margin-top:2px">'+
+            _bistEscHtml(e.detail)+'</div>'+
+        '</div>'+
+        (isCurrent ? '<div style="font-size:12px;font-family:monospace;color:rgba(0,210,255,.6);flex-shrink:0">&#9664; NOW</div>' : '')+
+      '</div>';
+    }
+    ev.innerHTML = '<div style="width:100%;max-width:600px">'+rows+'</div>';
+  }
+}
+
+function _bckRpScrub(val) {
+  _bckRpStop();
+  _bckRpRender(parseInt(val, 10));
+}
+
+function _bckRpStep(delta) {
+  _bckRpStop();
+  _bckRpRender(_bckReplayPos + delta);
+}
+
+function _bckRpGo(idx) {
+  _bckRpStop();
+  _bckRpRender(idx);
+}
+
+function _bckRpStop() {
+  _bckReplayPlay = false;
+  if (_bckReplayTimer) { clearInterval(_bckReplayTimer); _bckReplayTimer = null; }
+  var btn = document.getElementById('bck-rp-play');
+  if (btn) btn.innerHTML = '&#9654;';
+}
+
+function _bckRpTogglePlay() {
+  if (_bckReplayPlay) {
+    _bckRpStop();
+  } else {
+    _bckReplayPlay = true;
+    var btn = document.getElementById('bck-rp-play');
+    if (btn) btn.innerHTML = '&#9646;&#9646;';
+    var speed = parseInt((document.getElementById('bck-rp-speed')||{}).value||'500', 10);
+    _bckReplayTimer = setInterval(function() {
+      if (_bckReplayPos >= _bckSimLog.length - 1) {
+        _bckRpStop();
+        return;
+      }
+      _bckRpRender(_bckReplayPos + 1);
+    }, speed);
+  }
+}
+
+function _bckRpSpeedChange(val) {
+  if (_bckReplayPlay) {
+    _bckRpStop();
+    _bckRpTogglePlay();
+  }
+}
+
+function _bckReplayStop() {
+  _bckRpStop();
+  _bckReplayPlay = false;
 }
 
 function _bistEscHtml(str) {
