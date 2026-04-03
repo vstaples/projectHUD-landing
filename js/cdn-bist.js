@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-N','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-O','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1722,6 +1722,23 @@ function _bistCkShowCert(tmplName, version, results, elapsed, certId, onProceed)
 }
 
 // ── Replay scrubber state ────────────────────────────────────────────────────
+var _bckFrozen = false;
+
+function _bckToggleFreeze() {
+  _bckFrozen = !_bckFrozen;
+  var btn = document.getElementById('bck-freeze-btn');
+  if (!btn) return;
+  if (_bckFrozen) {
+    btn.textContent = '\u25b6 RESUME';
+    btn.style.color = 'rgba(74,222,128,.8)';
+    btn.style.borderColor = 'rgba(74,222,128,.4)';
+  } else {
+    btn.innerHTML = '&#10074;&#10074; FREEZE';
+    btn.style.color = 'rgba(239,159,39,.7)';
+    btn.style.borderColor = 'rgba(239,159,39,.3)';
+  }
+}
+
 var _bckReplayPos   = 0;       // current frame index
 var _bckReplayTimer = null;    // auto-play interval
 var _bckReplayPlay  = false;   // playing?
@@ -1746,62 +1763,57 @@ function _bistCkReplay() {
   var panel = document.createElement('div');
   panel.id = 'bck-replay-panel';
   panel.style.cssText = [
-    'position:absolute;inset:0;z-index:50;background:rgba(2,7,15,.92);',
+    'position:absolute;bottom:0;left:0;right:0;z-index:50;',
+    'background:rgba(2,7,15,.96);border-top:1px solid rgba(0,210,255,.15);',
     'display:flex;flex-direction:column;font-family:Arial,sans-serif'
   ].join('');
 
   var total = _bckSimLog.length;
 
   panel.innerHTML = [
-    // Header
-    '<div style="padding:10px 16px;border-bottom:1px solid rgba(0,210,255,.1);',
-      'display:flex;align-items:center;justify-content:space-between;flex-shrink:0">',
-      '<div style="font-size:13px;font-weight:600;letter-spacing:.08em;',
-        'color:rgba(0,210,255,.9);text-transform:uppercase">&#9654; Flight Recorder Replay</div>',
-      '<button onclick="_bckRpClose()"' +
-        ' style="background:none;border:none;color:rgba(255,255,255,.4);',
-        'font-size:16px;cursor:pointer;padding:0 4px">&#10005;</button>',
+    // Compact event ticker — single line showing current event
+    '<div id="bck-rp-event" style="padding:5px 16px;border-bottom:1px solid rgba(255,255,255,.05);',
+      'display:flex;align-items:center;gap:10px;min-height:32px">',
+      '<div style="font-size:12px;color:rgba(255,255,255,.3);font-style:italic">',
+        'Use arrows or drag scrubber to inspect events</div>',
     '</div>',
-
-    // Event display area
-    '<div id="bck-rp-event" style="flex:1;display:flex;flex-direction:column;',
-      'align-items:center;justify-content:center;padding:24px;gap:12px">',
-      '<div style="font-size:12px;color:rgba(255,255,255,.3)">Press play or use arrows</div>',
-    '</div>',
-
-    // Scrubber
-    '<div style="padding:8px 16px 4px;flex-shrink:0">',
+    // Scrubber row
+    '<div style="padding:5px 16px 2px;display:flex;align-items:center;gap:10px">',
+      '<span style="font-size:12px;font-family:Arial,sans-serif;color:rgba(0,210,255,.7);',
+        'white-space:nowrap">&#9654; REPLAY</span>',
       '<input type="range" id="bck-rp-scrub" min="0" max="'+(total-1)+'" value="0"',
         ' oninput="_bckRpScrub(this.value)"',
-        ' style="width:100%;height:4px;cursor:pointer;accent-color:#00D2FF">',
-      '<div style="display:flex;justify-content:space-between;',
-        'font-size:12px;color:rgba(255,255,255,.3);margin-top:3px">',
-        '<span id="bck-rp-pos">1 / '+total+'</span>',
-        '<span id="bck-rp-ts"></span>',
-      '</div>',
+        ' style="flex:1;height:4px;cursor:pointer;accent-color:#00D2FF">',
+      '<span id="bck-rp-pos" style="font-size:12px;font-family:Arial,sans-serif;',
+        'color:rgba(255,255,255,.4);white-space:nowrap">1/'+total+'</span>',
+      '<span id="bck-rp-ts" style="font-size:12px;font-family:monospace;',
+        'color:rgba(255,255,255,.3);white-space:nowrap"></span>',
     '</div>',
-
-    // Transport controls
-    '<div style="padding:8px 16px 14px;display:flex;align-items:center;',
-      'justify-content:center;gap:8px;flex-shrink:0">',
-      _bckRpBtn('&#171;', '_bckRpGo(0)',         'First'),
-      _bckRpBtn('&#8249;', '_bckRpStep(-1)',      'Back'),
+    // Transport controls row
+    '<div style="padding:4px 16px 8px;display:flex;align-items:center;gap:6px">',
+      _bckRpBtn('&#171;',  '_bckRpGo(0)',             'First'),
+      _bckRpBtn('&#8249;', '_bckRpStep(-1)',           'Back'),
       '<button id="bck-rp-play" onclick="_bckRpTogglePlay()"',
-        ' style="width:40px;height:40px;border-radius:50%;border:2px solid rgba(0,210,255,.5);',
-        'background:rgba(0,210,255,.1);color:#00D2FF;font-size:18px;cursor:pointer">',
-        '&#9654;</button>',
-      _bckRpBtn('&#8250;', '_bckRpStep(1)',       'Forward'),
+        ' style="width:32px;height:32px;border-radius:50%;',
+        'border:2px solid rgba(0,210,255,.5);background:rgba(0,210,255,.1);',
+        'color:#00D2FF;font-size:16px;cursor:pointer">&#9654;</button>',
+      _bckRpBtn('&#8250;', '_bckRpStep(1)',            'Forward'),
       _bckRpBtn('&#187;',  '_bckRpGo('+(total-1)+')', 'Last'),
-      '<div style="width:1px;height:28px;background:rgba(255,255,255,.08);margin:0 8px"></div>',
+      '<div style="width:1px;height:24px;background:rgba(255,255,255,.08);margin:0 4px"></div>',
       '<select id="bck-rp-speed" onchange="_bckRpSpeedChange(this.value)"',
         ' style="font-size:12px;font-family:Arial,sans-serif;background:rgba(0,0,0,.5);',
         'border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);',
-        'padding:3px 6px;border-radius:3px;cursor:pointer">',
+        'padding:2px 5px;border-radius:3px;cursor:pointer">',
         '<option value="1000">Slow</option>',
         '<option value="500" selected>Normal</option>',
         '<option value="200">Fast</option>',
         '<option value="50">Max</option>',
       '</select>',
+      '<div style="flex:1"></div>',
+      '<button onclick="_bckRpClose()"',
+        ' style="font-size:12px;font-family:Arial,sans-serif;padding:4px 10px;',
+        'border-radius:3px;border:1px solid rgba(226,75,74,.3);background:none;',
+        'color:rgba(226,75,74,.6);cursor:pointer">&#10005; Close</button>',
     '</div>',
   ].join('');
 
@@ -1837,29 +1849,14 @@ function _bckRpRender(idx) {
   }
 
   var ev = document.getElementById('bck-rp-event');
-  if (ev) {
-    // Show events up to current index in the event area
-    var rows = '';
-    for (var i = Math.max(0, idx-4); i <= idx; i++) {
-      var e = log[i];
-      var isCurrent = (i === idx);
-      rows += '<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 14px;'+
-        'border-radius:5px;margin-bottom:4px;'+
-        (isCurrent
-          ? 'background:rgba(0,210,255,.07);border:1px solid rgba(0,210,255,.2)'
-          : 'background:rgba(255,255,255,.02);border:1px solid transparent') + '">'+
-        '<div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;background:'+e.color+'"></div>'+
-        '<div style="flex:1;min-width:0">'+
-          '<div style="font-size:13px;font-weight:'+(isCurrent?'600':'400')+';'+
-            'color:'+(isCurrent?'rgba(255,255,255,.9)':'rgba(255,255,255,.45)')+'">'+
-            _bistEscHtml(e.type)+'</div>'+
-          '<div style="font-size:12px;color:'+(isCurrent?'rgba(255,255,255,.65)':'rgba(255,255,255,.25)')+';margin-top:2px">'+
-            _bistEscHtml(e.detail)+'</div>'+
-        '</div>'+
-        (isCurrent ? '<div style="font-size:12px;font-family:monospace;color:rgba(0,210,255,.6);flex-shrink:0">&#9664; NOW</div>' : '')+
-      '</div>';
-    }
-    ev.innerHTML = '<div style="width:100%;max-width:600px">'+rows+'</div>';
+  if (ev && log[idx]) {
+    var e = log[idx];
+    ev.innerHTML =
+      '<div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:'+e.color+'"></div>'+
+      '<div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.9)">'+_bistEscHtml(e.type)+'</div>'+
+      '<div style="font-size:12px;color:rgba(255,255,255,.5);margin-left:6px">'+_bistEscHtml(e.detail)+'</div>'+
+      '<div style="font-size:12px;font-family:monospace;color:rgba(0,210,255,.6);margin-left:auto;white-space:nowrap">'
+        +'&#9664; '+(idx+1)+'/'+log.length+'</div>';
   }
 }
 
