@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CadenceHUD · S9.4</title>
+<title>CadenceHUD · S9.5</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.4 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.5 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1154,7 +1154,7 @@ function _s9RenderSimPanel(el) {
       '</div>' +
 
       // Right panel
-      '<div style="flex:1;display:flex;flex-direction:column;align-items:center;' +
+      '<div id="s9-sim-right" style="flex:1;display:flex;flex-direction:column;align-items:center;' +
         'justify-content:center;gap:16px;padding:32px;background:var(--bg2)">' +
 
         (hasSource

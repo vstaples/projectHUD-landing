@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-D','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-E','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1100,34 +1100,34 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     };
   });
 
-  // ── Render cockpit natively into s9-sim-panel ───────────────────────────
-  // No overlay/modal — fills the Simulator pane directly.
+  // ── Render cockpit into the right column of s9-sim-panel ───────────────
+  // Targets s9-sim-right — leaves left rail (test scripts) intact.
+  const simRight = document.getElementById('s9-sim-right');
   const simPanel = document.getElementById('s9-sim-panel');
-  const ov = simPanel || document.createElement('div');
-  if (!simPanel) {
+  const ov = simRight || simPanel || document.createElement('div');
+  if (!simRight && !simPanel) {
     ov.id = 'bist-cockpit-overlay';
     document.documentElement.appendChild(ov);
   }
-  ov.innerHTML = '';
-  ov.style.cssText = (simPanel ? 'display:flex;flex:1;flex-direction:column;overflow:hidden' : 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column');
+  // Style the target to host the cockpit
+  if (simRight) {
+    ov.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;padding:0;gap:0;align-items:stretch;justify-content:flex-start';
+  } else if (simPanel) {
+    ov.style.cssText = 'display:flex;flex:1;flex-direction:column;overflow:hidden';
+  }
 
-  // Inject cockpit HTML directly — no wrapping modal div
+  // Inject cockpit HTML
   ov.innerHTML = _bistCockpitHTML(tmplName, version, TESTS);
 
-  // Expose close / proceed / override
-  window._bistCockpitClose   = () => {
-    if (simPanel) {
-      // Restore the simulator panel UI
-      if (typeof _s9RenderSimPanel === 'function') _s9RenderSimPanel(simPanel);
-    } else {
+  const _restoreSimPanel = () => {
+    if (simPanel && typeof _s9RenderSimPanel === 'function') {
+      _s9RenderSimPanel(simPanel);
+    } else if (!simPanel) {
       ov.remove();
     }
   };
-  window._bistCockpitProceed = () => {
-    if (simPanel && typeof _s9RenderSimPanel === 'function') _s9RenderSimPanel(simPanel);
-    else ov.remove();
-    onProceed?.();
-  };
+  window._bistCockpitClose   = () => _restoreSimPanel();
+  window._bistCockpitProceed = () => { _restoreSimPanel(); onProceed?.(); };
   window._bistCockpitOverride = async () => {
     const reason = prompt('Override reason (required — permanently recorded in Chain of Custody):');
     if (!reason?.trim()) return;
