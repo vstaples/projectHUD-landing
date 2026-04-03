@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-160000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-170000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1279,22 +1279,33 @@ window._mwLoadUserView = async function() {
             newActions.forEach(a => _knownActionIds.add(a.id));
             newReviews.forEach(r => _knownReviewIds.add(r.id));
             const activeTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
-            // Step changes always reload both My Work and My Requests —
-            // the submitter needs their queue and their request card updated together.
-            // 2s delay lets approve.html's DB writes fully commit before we read.
+            // Reload policy:
+            // - Step changes: always reload My Requests (2s delay for DB commit);
+            //   mark My Work stale but don't force-rebuild — avoids tab jump.
+            // - New action items while on requests tab: reload requests silently,
+            //   mark work stale. Never pull the user away from what they're viewing.
+            // - New action items while on work tab: rebuild work list only.
             if (stepChanged.length) {
+              // Always refresh My Requests after a step change.
+              // 2s delay lets approve.html writes fully commit before Compass reads.
               setTimeout(() => {
-                window._mwLoadUserView && window._mwLoadUserView();
                 window._requestsLoaded = false;
                 window.loadUserRequests && window.loadUserRequests();
               }, 2000);
-            } else if (activeTab === 'work') {
-              window._mwLoadUserView && window._mwLoadUserView();
+              // Mark My Work stale — will rebuild when user next visits it.
+              window._mwWorkStale = true;
             } else if (activeTab === 'requests') {
+              // User is watching their request — reload it silently, don't touch work tab.
               window._requestsLoaded = false;
               window.loadUserRequests && window.loadUserRequests();
-            } else {
               window._mwWorkStale = true;
+            } else if (activeTab === 'work') {
+              // User is on work tab — rebuild it.
+              window._mwLoadUserView && window._mwLoadUserView();
+            } else {
+              // Any other tab — mark both stale.
+              window._mwWorkStale = true;
+              window._requestsLoaded = false;
             }
           }
         } catch(e) { console.error('[Poll] error:', e.message); }
