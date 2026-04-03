@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-240000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-250000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1321,6 +1321,9 @@ function renderMyRequestsActive() {
     // Build step nodes with tooltips
     // When current_step_name is 'Submit', the ball is back with the submitter.
     // CoC overrides are bypassed — DB step is authoritative in this state.
+
+    const instanceComplete = req.status === 'completed' || req._raw?.status === 'complete';
+
     // Derive awaiting-resubmit from CoC events — not DB field (avoids race conditions).
     // If the most recent lifecycle event is request.changes_requested, ball is with submitter.
     const lastLifecycleEv = instCoc
@@ -1353,7 +1356,6 @@ function renderMyRequestsActive() {
     const allReviewersDone = approvalCount >= totalReviewers;
 
     // Detect final approval from CoC or instance status
-    const instanceComplete = req.status === 'completed' || req._raw?.status === 'complete';
     // approve.html doesn't write actor_resource_id — match approver by name as fallback
     const approverName = submittedDataForStep.approver?.name || null;
     const approverApprovedByCoC = allReviewersDone && approvalCount > totalReviewers &&
