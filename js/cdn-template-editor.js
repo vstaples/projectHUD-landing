@@ -1,4 +1,5 @@
 // cdn-template-editor.js — Cadence: template editor, spine, step CRUD
+console.log('%c[cdn-template-editor] v20260403-A','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // Depends on: cdn-dag-viewer, cdn-assignee, cdn-outcomes, cdn-documents
 // LOAD ORDER: 7th
 
@@ -1324,6 +1325,46 @@ async function saveTemplate(silent = false) {
   }
 }
 
+async function _toggleCompassVisible(checked) {
+  if (!_selectedTmpl) return;
+  const chk    = document.getElementById('compass-visible-chk');
+  const status = document.getElementById('compass-visible-status');
+  if (chk) chk.disabled = true;
+  try {
+    await API.patch(`workflow_templates?id=eq.${_selectedTmpl.id}`, {
+      compass_visible: checked,
+      updated_at:      new Date().toISOString(),
+    });
+    _selectedTmpl.compass_visible = checked;
+    // Write CoC event
+    const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
+    await API.post('workflow_template_coc', {
+      firm_id:         FIRM_ID_CAD,
+      template_id:     _selectedTmpl.id,
+      event_type:      checked ? 'compass_published' : 'compass_unpublished',
+      changed_by:      _myResourceId || null,
+      changed_by_name: authorName,
+      field_name:      'compass_visible',
+      old_value:       checked ? 'false' : 'true',
+      new_value:       checked ? 'true'  : 'false',
+      note:            checked ? 'Published to Compass Browse library' : 'Removed from Compass Browse library',
+      version_at:      _selectedTmpl.version || '0.0.0',
+      created_at:      new Date().toISOString(),
+    }).catch(() => {});
+    if (status) {
+      status.textContent = checked ? '● Live in Browse' : '○ Not in Browse';
+      status.style.color = checked ? 'var(--green)' : 'var(--muted)';
+    }
+    cadToast(checked ? 'Published to Compass Browse' : 'Removed from Compass Browse', 'success');
+  } catch(e) {
+    cadToast('Failed: ' + e.message, 'error');
+    // Revert checkbox
+    if (chk) chk.checked = !checked;
+  } finally {
+    if (chk) chk.disabled = false;
+  }
+}
+
 async function commitTemplate() {
   if (!_selectedTmpl) return;
 
@@ -1406,16 +1447,22 @@ async function commitTemplate() {
       : cocEventType === 'status_changed' ? `Returned to draft (was ${oldStatus})`
       : 'Template updated';
 
+    // Auto-publish to Compass when first released; preserve existing value on re-commit
+    const compassVisible = (newStatus === 'released' && oldStatus !== 'released')
+      ? true  // first release → auto-publish
+      : (_selectedTmpl.compass_visible || false);  // preserve existing
+
     const patch = {
-      name:          nameEl?.value?.trim()  || _selectedTmpl.name,
-      status:        newStatus,
-      trigger_type:  triggerEl?.value       || _selectedTmpl.trigger_type,
-      description:   descEl?.value?.trim()  || null,
-      version:       newVersion,
-      version_major: maj,
-      version_minor: min,
-      version_patch: pat,
-      updated_at:    new Date().toISOString(),
+      name:            nameEl?.value?.trim()  || _selectedTmpl.name,
+      status:          newStatus,
+      trigger_type:    triggerEl?.value       || _selectedTmpl.trigger_type,
+      description:     descEl?.value?.trim()  || null,
+      version:         newVersion,
+      version_major:   maj,
+      version_minor:   min,
+      version_patch:   pat,
+      compass_visible: compassVisible,
+      updated_at:      new Date().toISOString(),
     };
 
     // 1. Persist template header
