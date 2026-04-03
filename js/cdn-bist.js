@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AO','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AR','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1144,8 +1144,6 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     window._bckFrozen = false;
     _bistCkStopClock();
     window._bistCkRunning = false;
-    var _gcEl = document.getElementById('s9-sim-gate');
-    if (_gcEl) { _gcEl.textContent = '⚠ Simulation aborted — results incomplete'; _gcEl.style.color = 'rgba(226,75,74,.8)'; }
     // Patch any in-flight bist_run to aborted
     var _abortedRunId = window._bckCurrentRunId;
     window._bckCurrentRunId = null;
@@ -1156,11 +1154,13 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     }
     if (simPanel && typeof _s9RenderSimPanel === 'function') {
       _s9RenderSimPanel(simPanel);
-      // Refresh gate — runs after _s9RenderSimPanel has rebuilt the DOM
+      // Set aborted gate text immediately after DOM rebuilt
+      var _gcEl2 = document.getElementById('s9-sim-gate');
+      if (_gcEl2) { _gcEl2.textContent = '⚠ Simulation aborted — incomplete'; _gcEl2.style.color = 'rgba(226,75,74,.8)'; }
+      // Then refresh from DB after abort patch completes
       var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
       if (tmpl && tmpl.id && typeof _s9LoadSimScripts === 'function') {
-        // 800ms: enough for abort patch to write to DB, after DOM is rebuilt
-        setTimeout(function(){ _s9LoadSimScripts(tmpl.id, tmpl.version||'0.0.0'); }, 800);
+        setTimeout(function(){ _s9LoadSimScripts(tmpl.id, tmpl.version||'0.0.0'); }, 1200);
       }
     } else if (!simPanel) {
       ov.remove();
@@ -1790,8 +1790,8 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
         '<div class="bck-nst" id="bck-nst-'+stepId+'">'+
           '<div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div>'+
           '<span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span>'+
-          '<span style="font-size:12px;font-family:Arial,sans-serif;font-weight:600;color:rgba(255,180,60,.7);margin-left:auto">'+seqLabel+'</span>'+
         '</div>'+
+        '<div style="text-align:right;font-size:12px;font-family:Arial,sans-serif;font-weight:600;color:rgba(255,180,60,.8);padding:0 5px 3px">'+seqLabel+'</div>'+
       '</div>';
     if (nodes.children.length > 0) {
       var cw = document.createElement('div'); cw.className = 'bck-cw'; nodes.appendChild(cw);
@@ -2181,8 +2181,8 @@ function _bckRpRender(idx) {
           '<div class="bck-nst" id="bck-nst-'+stepId+'">'+
             '<div class="bck-nsdot" style="background:'+n.col+'"></div>'+
             '<span class="bck-nstxt" style="color:'+n.col+'">'+_bistEscHtml(n.label)+'</span>'+
-            '<span style="font-size:12px;font-family:Arial,sans-serif;font-weight:600;color:rgba(255,180,60,.7);margin-left:auto">'+rSeqLabel+'</span>'+
           '</div>'+
+          '<div style="text-align:right;font-size:12px;font-family:Arial,sans-serif;font-weight:600;color:rgba(255,180,60,.8);padding:0 5px 3px">'+rSeqLabel+'</div>'+
         '</div>';
       if (nodesEl2.children.length > 0) {
         var cw = document.createElement('div'); cw.className = 'bck-cw dn'; nodesEl2.appendChild(cw);
