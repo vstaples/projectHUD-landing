@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-O','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-P','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1173,6 +1173,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   window._bistCkRunning = false;
   _bistCkStopClock();
   var rb = _bckEl('bck-replay-btn'); if (rb) rb.style.display = 'inline-block';
+  var fb = _bckEl('bck-freeze-btn'); if (fb) fb.style.display = 'inline-block';
 
   const allPass = allResults.every(r => r.status === 'passed');
   const elapsed = Math.round((Date.now() - startMs) / 1000);
@@ -1290,7 +1291,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-cw.ac{background:rgba(239,159,39,.4);animation:bckPw .9s ease-in-out infinite}
 @keyframes bckPw{0%,100%{opacity:.4}50%{opacity:1}}
 .bck-lz{position:absolute;left:52px;right:52px;z-index:5;pointer-events:none;overflow:visible}
-.bck-coc{position:absolute;right:0;top:0;bottom:0;width:280px;background:rgba(2,5,12,.95);border-left:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;z-index:9}
+.bck-coc{position:absolute;right:0;top:26px;bottom:56px;width:300px;background:rgba(2,5,12,.97);border-left:1px solid rgba(0,210,255,.12);border-top:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;z-index:11}
 .bck-coch{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .bck-coct{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:rgba(0,210,255,.8)}
 .bck-cocc{font-size:12px;font-family:monospace;color:rgba(0,210,255,.9)}
@@ -1305,7 +1306,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-ced{font-size:12px;color:rgba(255,255,255,.22);line-height:1.5;margin-top:1px}
 .bck-cts{font-size:12px;font-family:monospace;color:rgba(255,255,255,.1);margin-top:1px}
 .bck-coam{background:linear-gradient(180deg,#0e0902,#0a0701);border-top:2px solid #1e1408;padding:5px 0 4px;flex-shrink:0}
-.bck-efrow{display:flex;padding:0 10px}
+.bck-efrow{display:flex;padding:0 10px;margin-right:300px}
 .bck-ef{flex:1;padding:3px 7px;border-right:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;gap:2px}
 .bck-ef:last-child{border-right:none}
 .bck-eflbl{font-size:12px;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,160,50,.75)}
@@ -1315,12 +1316,12 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-effill{height:100%;border-radius:1px;transition:width .5s ease}
 .bck-efsub{font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.45)}
 .bck-radio{background:#040b17;border-top:1px solid rgba(0,210,255,.08);flex-shrink:0}
-.bck-rh{display:flex;align-items:center;gap:10px;padding:4px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.bck-rh{display:flex;align-items:center;gap:10px;padding:4px 14px;border-bottom:1px solid rgba(255,255,255,.04);margin-right:300px}
 .bck-rt{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(0,210,255,.35)}
 .bck-rdot{width:5px;height:5px;border-radius:50%;background:rgba(0,210,255,.15)}
 .bck-rdot.live{background:#00D2FF;box-shadow:0 0 5px #00D2FF;animation:bckBk .8s ease-in-out infinite}
 @keyframes bckBk{0%,100%{opacity:1}50%{opacity:.25}}
-.bck-rf{height:90px;overflow-y:auto;padding:4px 14px;display:flex;flex-direction:column-reverse}
+.bck-rf{height:90px;overflow-y:auto;padding:4px 14px;display:flex;flex-direction:column-reverse;margin-right:300px}
 .bck-rf::-webkit-scrollbar{width:2px}
 .bck-rf::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
 .bck-tx{display:flex;align-items:flex-start;gap:8px;padding:2px 0;animation:bckTxi .2s ease-out}
@@ -1398,7 +1399,8 @@ function _bistCockpitHTML(tmplName, version, tests) {
     <div class="bck-ring" id="bck-ring"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="2.5"/><circle cx="16" cy="16" r="12" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-dasharray="75.4" id="bck-ringc" stroke-dashoffset="75.4" stroke-linecap="round" style="transition:stroke-dashoffset .5s ease"/></svg><div class="bck-ringc" id="bck-ringv">0%</div></div>
     <div class="bck-tts" id="bck-tts">${tPills}</div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-      <button style="font-size:12px;font-family:Arial,sans-serif;padding:5px 12px;border-radius:3px;border:1px solid rgba(0,210,255,.2);background:none;color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.04em;margin-right:4px" onclick="_bistCkReplay()" id="bck-replay-btn" style="display:none">⟳ REPLAY</button>
+      <button style="font-size:12px;font-family:Arial,sans-serif;padding:5px 12px;border-radius:3px;border:1px solid rgba(0,210,255,.2);background:none;color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.04em;display:none" onclick="_bistCkReplay()" id="bck-replay-btn">&#9654; REPLAY</button>
+      <button style="font-size:12px;font-family:Arial,sans-serif;padding:5px 12px;border-radius:3px;border:1px solid rgba(239,159,39,.3);background:none;color:rgba(239,159,39,.7);cursor:pointer;letter-spacing:.04em;display:none" onclick="_bckToggleFreeze()" id="bck-freeze-btn">&#10074;&#10074; FREEZE</button>
       <button style="font-size:12px;font-family:Arial,sans-serif;padding:5px 12px;border-radius:3px;border:1px solid rgba(226,75,74,.3);background:none;color:rgba(226,75,74,.6);cursor:pointer;letter-spacing:.04em" onclick="_bistCockpitClose()">CLOSE</button>
       <div id="bck-foot-btns"></div>
     </div>
