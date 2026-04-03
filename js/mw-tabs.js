@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-370000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-380000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1242,113 +1242,4 @@ window.populateDeltaStrip = function() {
       navigate: () => { uSwitchTab('requests', document.querySelector('.ust[data-tab=requests]')); myrSwitchView('active', document.querySelector('.myr-subnav[data-myr=active]')); } });
   }
   renderDeltaStrip(deltas);
-};
-
-// ── DEV ONLY — Purge all request data from Supabase ──────
-// Remove this button and function before production release.
-window.myrDevPurge = async function() {
-  const confirmed = await new Promise(resolve => {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9000;' +
-      'display:flex;align-items:center;justify-content:center;padding:20px';
-    overlay.innerHTML = `
-      <div style="background:#0d1b2e;border:1px solid rgba(226,75,74,.5);width:380px;
-                  border-radius:4px;font-family:var(--font-head);overflow:hidden">
-        <div style="padding:14px 18px 12px;border-bottom:1px solid rgba(255,255,255,.07);
-                    display:flex;align-items:center;gap:10px">
-          <div style="font-size:18px">⚠</div>
-          <div style="font-size:13px;font-weight:700;color:#E24B4A">DEV — Purge All Requests</div>
-        </div>
-        <div style="padding:14px 18px;font-size:12px;color:rgba(255,255,255,.55);line-height:1.6">
-          This will delete all rows from:<br>
-          <code style="color:#EF9F27">workflow_requests</code> ·
-          <code style="color:#EF9F27">workflow_instances</code> (doc-review) ·
-          <code style="color:#EF9F27">workflow_action_items</code> (review rows) ·
-          <code style="color:#EF9F27">coc_events</code> (request events)<br><br>
-          <strong style="color:#E24B4A">Cannot be undone.</strong>
-        </div>
-        <div style="padding:10px 18px 14px;display:flex;gap:8px;justify-content:flex-end;
-                    border-top:1px solid rgba(255,255,255,.06)">
-          <button id="_devPurgeCancel"
-            style="font-family:var(--font-head);font-size:11px;padding:6px 16px;
-                   background:none;border:1px solid rgba(255,255,255,.15);
-                   color:rgba(255,255,255,.5);cursor:pointer">Cancel</button>
-          <button id="_devPurgeConfirm"
-            style="font-family:var(--font-head);font-size:11px;font-weight:700;padding:6px 16px;
-                   background:rgba(226,75,74,.15);border:1px solid rgba(226,75,74,.5);
-                   color:#E24B4A;cursor:pointer">⚠ Purge Everything</button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    const cleanup = result => { overlay.remove(); resolve(result); };
-    overlay.querySelector('#_devPurgeCancel').onclick  = () => cleanup(false);
-    overlay.querySelector('#_devPurgeConfirm').onclick = () => cleanup(true);
-    overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
-  });
-  if (!confirmed) return;
-
-  const firmId = _mwFirmId();
-  const supaUrl = _mwSupaURL();
-  const supaKey = _mwSupaKey();
-  compassToast('Purging…', 60000);
-
-  // API wrapper has no delete method — use raw fetch with Supabase REST DELETE
-  const supa = async (table, query) => {
-    const token = await Auth.getFreshToken().catch(() => Auth.getToken()).catch(() => null);
-    return fetch(`${supaUrl}/rest/v1/${table}?${query}`, {
-      method: 'DELETE',
-      headers: {
-        'apikey':        supaKey,
-        'Authorization': `Bearer ${token || supaKey}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=minimal',
-      },
-    });
-  };
-
-  try {
-    // Delete in dependency order — child rows before parent rows
-    // First collect all doc-review instance IDs so we can wipe ALL their action items
-    const instRows = await API.get(
-      `workflow_instances?firm_id=eq.${firmId}&workflow_type=eq.doc-review&select=id&limit=200`
-    ).catch(() => []);
-    const instIds = (instRows||[]).map(r => r.id);
-
-    await supa('workflow_requests', `firm_id=eq.${firmId}`);
-    // Wipe ALL action items for these instances (regardless of owner or title)
-    for (const iid of instIds) {
-      await supa('workflow_action_items', `instance_id=eq.${iid}`);
-    }
-    // Also catch any remaining by title prefix (legacy / orphaned)
-    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Review request:*`);
-    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.Approve request:*`);
-    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%9C%93 Approved:*`);
-    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%86%BA*`);
-    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%8F%B3 Pending review:*`);
-    await supa('workflow_action_items', `firm_id=eq.${firmId}&title=like.%E2%84%B9 Partial*`);
-    await supa('external_step_tokens',  `firm_id=eq.${firmId}`);
-    await supa('coc_events',            `firm_id=eq.${firmId}&event_type=like.request.*`);
-    await supa('workflow_instances',    `firm_id=eq.${firmId}&workflow_type=eq.doc-review`);
-
-    // Reset local state
-    window._myRequests     = [];
-    window._myRequestCoc   = {};
-    window._myRequestReviewers = {};
-    window._requestsLoaded = false;
-
-    // Dismiss toast and re-render
-    document.querySelector('.compass-toast')?.remove();
-    renderMyRequestsActive();
-    renderMyRequestsHistory();
-
-    // Refresh My Work to clear review items from queue
-    _viewLoaded['user'] = false;
-    _mwLoadUserView();
-
-    compassToast('✓ All request data purged.', 3000);
-  } catch(e) {
-    document.querySelector('.compass-toast')?.remove();
-    compassToast('Purge failed — ' + (e.message||'check console'), 4000);
-    console.error('[DevPurge] failed:', e);
-  }
 };

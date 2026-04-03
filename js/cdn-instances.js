@@ -1,5 +1,5 @@
-// cdn-instances.js
-console.log('%c[cdn-instances] v20260403-S9','background:#185FA5;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px'); — Cadence: instance list, detail, launch, step lifecycle
+// cdn-instances.js — Cadence: instance list, detail, launch, step lifecycle
+console.log('%c[cdn-instances] v20260403-S9','background:#185FA5;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 // Largest module — instance list render, detail panel, step transitions
 // LOAD ORDER: 17th (last — depends on all others)
 
