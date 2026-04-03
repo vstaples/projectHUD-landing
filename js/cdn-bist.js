@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AX','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AY','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -198,8 +198,8 @@ async function runBistScript(scriptId, onProgress) {
         const routeStep = routeSeq ? stepBySeq[routeSeq] : null;
         // If routing backward, signal arc draw
         if (routeSeq && routeSeq < seq) {
-          // Find the BIST script step whose step_seq matches routeSeq
           const targetBistStep = spec.steps.find(s => s.params?.step_seq === routeSeq);
+          console.log('[arc-check] stp.id:', stp.id, 'seq:', seq, 'routeSeq:', routeSeq, 'target:', targetBistStep?.id);
           onProgress?.({ type:'step_route_back', fromStepId: stp.id, toSeq: routeSeq,
             toStepId: targetBistStep?.id || null });
         }
@@ -1158,7 +1158,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     window._bckCurrentRunId = null;
     if (_abortedRunId) {
       API.patch('bist_runs?id=eq.'+_abortedRunId,
-        {status:'aborted', duration_ms: Date.now() - (window._bckStartMs||Date.now())}
+        {status:'cancelled', duration_ms: Date.now() - (window._bckStartMs||Date.now())}
       ).catch(function(){});
     }
     if (simPanel && typeof _s9RenderSimPanel === 'function') {
