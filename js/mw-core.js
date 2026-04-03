@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-170000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-180000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1286,13 +1286,14 @@ window._mwLoadUserView = async function() {
             //   mark work stale. Never pull the user away from what they're viewing.
             // - New action items while on work tab: rebuild work list only.
             if (stepChanged.length) {
-              // Always refresh My Requests after a step change.
-              // 2s delay lets approve.html writes fully commit before Compass reads.
+              // Refresh My Requests after step change.
+              // 2s delay lets approve.html writes commit. Also clear CoC cache
+              // so render uses fresh current_step_name, not stale cached CoC.
               setTimeout(() => {
+                window._myRequestCoc   = {};
                 window._requestsLoaded = false;
                 window.loadUserRequests && window.loadUserRequests();
               }, 2000);
-              // Mark My Work stale — will rebuild when user next visits it.
               window._mwWorkStale = true;
             } else if (activeTab === 'requests') {
               // User is watching their request — reload it silently, don't touch work tab.

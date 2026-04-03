@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260403-170000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260403-180000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -95,6 +95,9 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
 // var (not let) — my-work.html scripts are injected via document.head.appendChild
 // and may execute more than once per page session. var re-declaration is safe; let/const are not.
 var _uActiveTab = _uActiveTab || 'work';
+// Persistent expand/CoC state — survives DOM rebuilds
+var _myrExpandedIds = _myrExpandedIds || new Set();
+var _myrCocOpenIds  = _myrCocOpenIds  || new Set();
 window.uSwitchTab = function(tab, btn) {
   // Flush any pending notes save before leaving the tab
   if (_uActiveTab === 'concerns' && tab !== 'concerns' && window._notesSaveNow) {
@@ -939,6 +942,7 @@ window.loadUserRequests = async function() {
 
   const resolvedResId = _myResource?.id;
   console.log('[MyRequests] loadUserRequests firing | resId:', resolvedResId || 'STILL UNDEFINED');
+  window._requestsReloading = true;
   if (resolvedResId) {
     try {
       const rows = await API.get(
@@ -1026,6 +1030,7 @@ window.loadUserRequests = async function() {
     window._myRequests = [];
   }
 
+  window._requestsReloading = false;
   renderMyRequestsActive();
   renderMyRequestsHistory();
 
@@ -1066,7 +1071,8 @@ window.loadUserRequests = async function() {
         freshCoc[e.entity_id].push(e);
       });
       window._myRequestCoc = freshCoc;
-      renderMyRequestsActive();
+      // Only render from CoC poll if loadUserRequests isn't about to run
+      if (!window._requestsReloading) renderMyRequestsActive();
     }).catch(() => {});
   } else {
     renderMyRequestsActive();
@@ -1216,19 +1222,17 @@ function renderMyRequestsActive() {
   const reqs = window._myRequests || [];
   const active = reqs.filter(r => r.status !== 'completed' && r.status !== 'rejected');
 
-  // Snapshot which request IDs are currently expanded before wiping innerHTML
-  const expandedIds = new Set();
-  const cocOpenIds  = new Set();
+  // Merge DOM state into persistent sets before wiping innerHTML
   el.querySelectorAll('.myr-ar-body.open').forEach(body => {
-    const card = body.closest('.myr-active-req');
-    const rid = card?.dataset.reqId;
-    if (rid) expandedIds.add(rid);
+    const rid = body.closest('.myr-active-req')?.dataset.reqId;
+    if (rid) _myrExpandedIds.add(rid);
   });
   el.querySelectorAll('.myr-coc-events.open').forEach(cocEl => {
-    const card = cocEl.closest('.myr-active-req');
-    const rid = card?.dataset.reqId;
-    if (rid) cocOpenIds.add(rid);
+    const rid = cocEl.closest('.myr-active-req')?.dataset.reqId;
+    if (rid) _myrCocOpenIds.add(rid);
   });
+  const expandedIds = _myrExpandedIds;
+  const cocOpenIds  = _myrCocOpenIds;
   if (!active.length) {
     el.innerHTML = `<div style="font-family:var(--font-head);font-size:15px;color:rgba(255,255,255,.35);padding:32px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
     return;
@@ -1911,7 +1915,13 @@ window.myrOpenAttachment = async function(path) {
 
 window.myrToggleReq = function(id) {
   const el = document.getElementById(id);
-  if (el) el.classList.toggle('open');
+  if (!el) return;
+  el.classList.toggle('open');
+  const rid = el.closest('.myr-active-req')?.dataset.reqId;
+  if (rid) {
+    if (el.classList.contains('open')) _myrExpandedIds.add(rid);
+    else _myrExpandedIds.delete(rid);
+  }
 };
 
 // Shared CoC row renderer — used by myrToggleCoc and the live refresh poll
@@ -2217,6 +2227,8 @@ window.myrArchiveRequest = async function(instanceId) {
         r.id === instanceId ? { ...r, status: 'completed' } : r
       );
     }
+    _myrExpandedIds.delete(instanceId);
+    _myrCocOpenIds.delete(instanceId);
     renderMyRequestsActive();
     renderMyRequestsHistory();
     _myrUpdateRequestBadges();

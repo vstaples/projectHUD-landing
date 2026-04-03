@@ -1,5 +1,5 @@
-// VERSION: 20260403-130000
-console.log('%c[mw-events] v20260403-130000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260403-180000
+console.log('%c[mw-events] v20260403-180000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -249,12 +249,27 @@ document.addEventListener('click', function(ev) {
         compassToast('Notification dismissed.');
         return;
       }
+      // ↺ Changes requested / Re-review → resubmit panel
+      if (item.instanceId && (
+        (item.title||'').startsWith('↺ Changes requested:') ||
+        (item.title||'').startsWith('↺ Re-review requested:')
+      )) { openResubmitPanel(item); return; }
+      // ✓ Approved / ℹ Partial → informational, dismiss on click
+      if (item.instanceId && (
+        (item.title||'').startsWith('✓ Approved:') ||
+        (item.title||'').startsWith('ℹ Partial approval:')
+      )) {
+        API.patch(`workflow_action_items?id=eq.${item.id}`,
+          { status:'resolved', updated_at: new Date().toISOString() })
+          .then(() => { _viewLoaded['user'] = false; _mwLoadUserView(); })
+          .catch(() => {});
+        compassToast('Notification dismissed.');
+        return;
+      }
       const _ns = negGetState(item.id).state;
       if (_ns==='unrated' || _ns==='pending' || _ns==='negotiating' || _ns==='escalated') {
-        // Not yet agreed — open drawer to LOE negotiation panel
         openWorkItemExpanded(item);
       } else {
-        // Agreed or locked — ready to resolve
         openCompletionPanel({ id:item.id, type:item.type, title:item.title, projectId:item.projectId||null });
       }
     } else if (parseInt(actionBtn.dataset.wiPct)>=100) {
@@ -430,15 +445,20 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
   const resName = _myResource?.name || 'Unknown';
   const resId   = _myResource?.id   || null;
 
-  // Fetch the workflow instance for full context
+  // Fetch the workflow instance for full context — retry once on 502
   let instance = null;
   let cocEvents = [];
   if (item.instanceId) {
+    const _fetchReviewData = () => Promise.all([
+      API.get(`workflow_instances?id=eq.${item.instanceId}&select=*&limit=1`).catch(()=>[]),
+      API.get(`coc_events?entity_id=eq.${item.instanceId}&order=occurred_at.asc&select=*`).catch(()=>[]),
+    ]);
     try {
-      const [instRows, coc] = await Promise.all([
-        API.get(`workflow_instances?id=eq.${item.instanceId}&select=*&limit=1`).catch(()=>[]),
-        API.get(`coc_events?entity_id=eq.${item.instanceId}&order=occurred_at.asc&select=*`).catch(()=>[]),
-      ]);
+      let [instRows, coc] = await _fetchReviewData();
+      if (!instRows?.length) {
+        await new Promise(r => setTimeout(r, 1500));
+        [instRows, coc] = await _fetchReviewData();
+      }
       instance  = instRows?.[0] || null;
       cocEvents = coc || [];
     } catch(e) { console.warn('[ReviewPanel] fetch failed:', e); }
@@ -1043,16 +1063,15 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       ).catch(()=>[]);
       inst = instRows?.[0];
 
-      // Notify submitter
-      if (inst?.submitted_by_resource_id && inst.submitted_by_resource_id !== resId) {
+      // Only notify submitter when changes are requested — that requires their action.
+      // Approvals are visible via step color + CoC; no queue item needed.
+      if (!approved && inst?.submitted_by_resource_id && inst.submitted_by_resource_id !== resId) {
         await API.post('workflow_action_items', {
           id:                crypto.randomUUID(),
           firm_id:           _mwFirmId(),
           instance_id:       instanceId,
-          title:             approved
-            ? `✓ Approved: ${inst.title||'Document review request'}`
-            : `↺ Changes requested: ${inst.title||'Document review request'}`,
-          body: comments || (approved ? 'Your request has been approved.' : 'Changes were requested. Please revise and resubmit.'),
+          title:             `↺ Changes requested: ${inst.title||'Document review request'}`,
+          body:              comments || 'Changes were requested. Please revise and resubmit.',
           status:            'open',
           owner_resource_id: inst.submitted_by_resource_id,
           owner_name:        inst.submitted_by_name || '',
