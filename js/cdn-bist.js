@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-AM','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-AN','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1144,6 +1144,8 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     window._bckFrozen = false;
     _bistCkStopClock();
     window._bistCkRunning = false;
+    var _gcEl = document.getElementById('s9-sim-gate');
+    if (_gcEl) { _gcEl.textContent = '⚠ Simulation aborted — results incomplete'; _gcEl.style.color = 'rgba(226,75,74,.8)'; }
     // Patch any in-flight bist_run to aborted
     var _abortedRunId = window._bckCurrentRunId;
     window._bckCurrentRunId = null;
@@ -1213,6 +1215,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     });
 
     _bistCkEndTest(ti, result.status);
+    if (window._bckCockpitClosed) break;  // closed during script — don't record result
     allResults.push({ name: t.name, status: result.status, runId: result.runId, reason: result.reason });
 
     // ── FREEZE: also pause between scripts after completion ──────────────────
