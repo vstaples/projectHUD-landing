@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-U','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-V','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1291,7 +1291,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-cw.ac{background:rgba(239,159,39,.4);animation:bckPw .9s ease-in-out infinite}
 @keyframes bckPw{0%,100%{opacity:.4}50%{opacity:1}}
 .bck-lz{position:absolute;left:52px;right:52px;z-index:5;pointer-events:none;overflow:visible}
-.bck-coc{position:absolute;right:0;top:26px;bottom:54px;width:300px;background:rgba(2,5,12,.97);border-left:1px solid rgba(0,210,255,.12);border-top:1px solid rgba(0,210,255,.08);border-bottom:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;z-index:15}
+.bck-coc{position:absolute;right:0;top:26px;bottom:0;width:300px;background:rgba(2,5,12,.97);border-left:1px solid rgba(0,210,255,.12);border-top:1px solid rgba(0,210,255,.08);border-bottom:1px solid rgba(0,210,255,.08);display:flex;flex-direction:column;z-index:15}
 .bck-coch{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .bck-coct{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:rgba(0,210,255,.8)}
 .bck-cocc{font-size:12px;font-family:monospace;color:rgba(0,210,255,.9)}
@@ -1455,6 +1455,20 @@ function _bckInitRadioResize() {
   }, {passive:true});
 }
 
+function _bckAlignCoc() {
+  var coc  = document.querySelector('.bck-coc');
+  var ped  = document.querySelector('.bck-ped');
+  var efis = document.querySelector('.bck-coam');
+  var bck  = document.querySelector('.bck');
+  if (!coc || !ped || !efis || !bck) return;
+  var bckRect  = bck.getBoundingClientRect();
+  var efisRect = efis.getBoundingClientRect();
+  // CoC bottom should align with bottom of EFIS row
+  var efisBottom  = efisRect.bottom - bckRect.top;  // relative to .bck
+  var bckHeight   = bckRect.height;
+  coc.style.bottom = (bckHeight - efisBottom) + 'px';
+}
+
 function _bistCkInit(tests) {
   // Stars
   var stars = _bckEl('bck-stars');
@@ -1491,6 +1505,7 @@ function _bistCkInit(tests) {
   // Recalc zone positions after layout settles
   setTimeout(_bckPosZones, 50);
   setTimeout(_bckInitRadioResize, 100);
+  setTimeout(_bckAlignCoc, 120);
   // Init EFIS
   _bckEl('bck-ef0').textContent = '0/' + tests.length;
   _bckCocCount = 0; _bckSC = 0; _bckASC = 0; _bckRWC = 0; _bckPassC = 0;
