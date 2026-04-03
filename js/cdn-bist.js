@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-E','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-F','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1111,7 +1111,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   }
   // Style the target to host the cockpit
   if (simRight) {
-    ov.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;padding:0;gap:0;align-items:stretch;justify-content:flex-start';
+    ov.style.cssText = 'flex:1;align-self:stretch;display:flex;flex-direction:column;overflow:hidden;padding:0;gap:0;height:100%;width:100%;box-sizing:border-box';
   } else if (simPanel) {
     ov.style.cssText = 'display:flex;flex:1;flex-direction:column;overflow:hidden';
   }
@@ -1220,7 +1220,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
   ).join('');
 
   return `<style>
-.bck{font-family:Arial,sans-serif;background:#02070f;overflow:hidden;border:none;display:flex;flex-direction:column;position:relative;flex:1;min-height:0;width:100%;height:100%}
+.bck{font-family:Arial,sans-serif;background:#02070f;overflow:hidden;border:none;display:flex;flex-direction:column;position:relative;flex:1;min-height:0;width:100%;height:100%;box-sizing:border-box}
 .bck-gl{background:#110c04;height:26px;border-bottom:2px solid #1e1408;display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:10;position:relative}
 .bck-gld{width:8px;height:8px;border-radius:50%;background:#1a1208;transition:all .45s}
 .bck-gld.on{background:#4ade80;box-shadow:0 0 8px 2px rgba(74,222,128,.6)}

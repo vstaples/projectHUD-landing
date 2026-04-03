@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CadenceHUD · S9.5</title>
+<title>CadenceHUD · S9.6</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.5 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.6 — Library · Simulator · Instances','background:#7F77DD;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1114,7 +1114,7 @@ function _s9RenderSimPanel(el) {
   var F14 = FA + 'font-size:14px;';
 
   el.innerHTML =
-    '<div style="position:absolute;inset:0;display:flex;overflow:hidden">' +
+    '<div style="position:absolute;inset:0;display:flex;overflow:hidden;height:100%">' +
 
       // Left rail
       '<div style="width:240px;flex-shrink:0;border-right:1px solid var(--border);' +
@@ -1154,8 +1154,8 @@ function _s9RenderSimPanel(el) {
       '</div>' +
 
       // Right panel
-      '<div id="s9-sim-right" style="flex:1;display:flex;flex-direction:column;align-items:center;' +
-        'justify-content:center;gap:16px;padding:32px;background:var(--bg2)">' +
+      '<div id="s9-sim-right" style="flex:1;align-self:stretch;display:flex;flex-direction:column;' +
+        'align-items:center;justify-content:center;gap:16px;padding:32px;background:var(--bg2)">' +
 
         (hasSource
           ? '<div style="text-align:center;max-width:440px">' +
