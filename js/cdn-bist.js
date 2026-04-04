@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-BK','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-BM','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -269,7 +269,8 @@ async function runBistScript(scriptId, onProgress) {
       stepsPassed++;
       const stepName = stepBySeq[stp.params?.step_seq]?.name || '';
       onProgress?.({ type:'step_pass', stepId: stp.id, stepIdx: si,
-        action: stp.action, stepName, outcome: stp.params?.outcome });
+        action: stp.action, stepName, outcome: stp.params?.outcome,
+        stepSeq: stp.params?.step_seq, routeToSeq: stp.params?.route_to_seq });
       await _bckFreezeWait(); // freeze point — after step complete
 
       // ── GOTO: jump back on backward route_to_seq (max 3 visits per step) ──
@@ -1181,7 +1182,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     window._bckCurrentRunId = null;
     if (_abortedRunId) {
       API.patch('bist_runs?id=eq.'+_abortedRunId,
-        {status:'cancelled', duration_ms: Date.now() - (window._bckStartMs||Date.now())}
+        {status:'failed', failure_reason:'Simulation cancelled by user', duration_ms: Date.now() - (window._bckStartMs||Date.now())}
       ).catch(function(){});
     }
     if (simPanel && typeof _s9RenderSimPanel === 'function') {
@@ -1754,6 +1755,18 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     var idx = ev.stepIdx || 0;
     _bistCkSetNode(ev.stepId, idx, test, 'done', ev.outcome || 'Done', tmplSteps);
     _bckLastDoneId = ev.stepId;
+    // Draw rejection arc if this step routes backward in the template
+    if (ev.routeToSeq && ev.stepSeq && Number(ev.routeToSeq) < Number(ev.stepSeq)) {
+      // Find the target card by matching step_seq in tmplSteps
+      var _routeTarget = tmplSteps ? tmplSteps.find(function(s){ return s.sequence_order === Number(ev.routeToSeq); }) : null;
+      var _routeTargetCard = _routeTarget ? document.querySelector('[id^="bck-n-"]') : null;
+      // Find first card whose template_step_id matches — use node id pattern
+      var _allCards = document.querySelectorAll('[id^="bck-n-"]');
+      var _toCard = null;
+      // The toCard is the card with the lowest stepIdx that matches routeToSeq
+      // For now push arc from current to pending card (next step_start)
+      window._bckPendingArcFrom = ev.stepId;
+    }
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt dn';
     var _sn = ev.stepName||'Step', _so = ev.outcome||'Done';
     var _sl = (_bckCurrentTestIdx+1)+'.'+(idx+1);
