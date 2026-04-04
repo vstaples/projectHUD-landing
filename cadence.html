@@ -964,7 +964,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.33 — Source bar fully removed: DOM, CSS, JS function, all call sites','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.34 — Left rail headers teal, health badge readable, iron rule on muted gray titles','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1144,7 +1144,7 @@ function _s9RenderSimPanel(el) {
           'flex-shrink:0;display:flex;align-items:center;justify-content:space-between">' +
           '<div style="display:flex;align-items:center;gap:5px">' +
             '<span style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;' +
-              'color:rgba(255,255,255,.3);text-transform:uppercase">Test Scripts</span>' +
+              'color:#5fd4c8;text-transform:uppercase">Test Scripts</span>' +
             '<span title="A test script is a sequence of steps that proves your workflow routes correctly. Each script tests a specific scenario — the clean path, a rejection, a decline. You need at least one script to simulate." ' +
               'style="width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.08);' +
               'border:1px solid rgba(255,255,255,.15);display:inline-flex;align-items:center;' +
@@ -1164,7 +1164,7 @@ function _s9RenderSimPanel(el) {
         '<div style="padding:8px 12px 6px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">' +
           '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">' +
             '<span style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;' +
-              'color:rgba(255,255,255,.3);text-transform:uppercase">Workflow Steps</span>' +
+              'color:#5fd4c8;text-transform:uppercase">Workflow Steps</span>' +
             '<span title="These are the actual steps in your workflow — forms, approvals, sign-offs. Click any step to add it to your test script as a \'complete step\' action." ' +
               'style="width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.08);' +
               'border:1px solid rgba(255,255,255,.15);display:inline-flex;align-items:center;' +
@@ -1179,7 +1179,7 @@ function _s9RenderSimPanel(el) {
         '<div style="padding:10px 12px;flex-shrink:0">' +
           '<div style="display:flex;align-items:center;gap:5px;margin-bottom:6px">' +
             '<span style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;' +
-              'color:rgba(255,255,255,.3);text-transform:uppercase">Release Readiness</span>' +
+              'color:#5fd4c8;text-transform:uppercase">Release Readiness</span>' +
             '<span title="Before you can publish this workflow for real use, all test scripts must pass. This tells you whether you\'re ready — or what\'s blocking you." ' +
               'style="width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.08);' +
               'border:1px solid rgba(255,255,255,.15);display:inline-flex;align-items:center;' +
@@ -1194,9 +1194,9 @@ function _s9RenderSimPanel(el) {
         '<div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.07);padding:12px 12px 10px;flex-shrink:0">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
             '<span style="' + FA + 'font-size:11px;font-weight:700;letter-spacing:.1em;' +
-              'color:rgba(255,255,255,.3);text-transform:uppercase">Suite Health</span>' +
-            '<span id="s9-suite-health-badge" style="' + FA + 'font-size:11px;font-weight:700;' +
-              'color:rgba(255,255,255,.2)">—</span>' +
+              'color:#5fd4c8;text-transform:uppercase">Suite Health</span>' +
+            '<span id="s9-suite-health-badge" style="' + FA + 'font-size:15px;font-weight:700;' +
+              'color:rgba(255,255,255,.55)">—</span>' +
           '</div>' +
           // Pass/fail big numbers
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">' +

@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE7','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260404-SE8','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -274,7 +274,7 @@ var SE_CSS = '<style id="se-css">' + [
 '#se-right{width:210px;flex-shrink:0;background:var(--se-bg1);',
 'border-left:1px solid var(--se-b);display:flex;flex-direction:column;overflow:hidden}',
 '.se-rp-sec{border-bottom:1px solid var(--se-b);padding:9px 10px;flex-shrink:0}',
-'.se-rp-t{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--se-mu);',
+'.se-rp-t{font-size:12px;font-weight:700;letter-spacing:.1em;color:#5fd4c8;',
 'text-transform:uppercase;margin-bottom:7px}',
 '.se-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}',
 '.se-stat-c{background:var(--se-bg2);border-radius:3px;padding:6px 8px;border:1px solid var(--se-b)}',
@@ -659,9 +659,9 @@ function _seRenderRight(sc) {
   });
   var totalAsserts = sc ? (sc.spec.steps||[]).reduce(function(n,s){ return n+(s.asserts||[]).length; }, 0) : 0;
   html += '<div class="se-stat-c"><div class="se-stat-v" style="color:var(--se-grn)">'+passing+'</div><div class="se-stat-l">Passing</div></div>';
-  html += '<div class="se-stat-c"><div class="se-stat-v" style="color:var(--se-red)">'+failing+'</div><div class="se-stat-l">Failing</div></div>';
+  html += '<div class="se-stat-c"><div class="se-stat-v" style="color:var(--se-red)">'+failing+'</div><div class="se-stat-l" title="Scripts that failed on last run">Failing</div></div>';
   html += '<div class="se-stat-c"><div class="se-stat-v" style="color:var(--se-mu)">'+notrun+'</div><div class="se-stat-l">Not run</div></div>';
-  html += '<div class="se-stat-c"><div class="se-stat-v" style="color:var(--se-amb)">'+totalAsserts+'</div><div class="se-stat-l">Assertions</div></div>';
+  html += '<div class="se-stat-c"><div class="se-stat-v" style="color:var(--se-amb)">'+totalAsserts+'</div><div class="se-stat-l" title="Total assert checks in current script">Assertions</div></div>';
   html += '</div></div>';
 
   // Recent runs
@@ -676,7 +676,12 @@ function _seRenderRight(sc) {
     var sc2 = _seScripts.find(function(s){ return s.id === r.script_id; });
     var name = sc2 ? sc2.name : r.script_id;
     var dur  = r.duration_ms ? Math.round(r.duration_ms/1000)+'s' : '';
-    html += '<div class="se-run-row">';
+    var runScriptId = sc2 ? sc2.id : null;
+    var runStatus = r.status === 'passed' ? 'PASSED' : 'FAILED';
+    var runDate = r.run_at ? new Date(r.run_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+    var tooltip = name + ' — ' + runStatus + (runDate ? ' · ' + runDate : '') + (dur ? ' · ' + dur : '');
+    html += '<div class="se-run-row" title="'+_seEsc(tooltip)+'"' +
+      (runScriptId ? ' style="cursor:pointer" onclick="seSelectScript(this.dataset.sid)" data-sid="'+runScriptId+'"' : '') + '>';
     html += '<div class="se-dot" style="background:'+dot+'"></div>';
     html += '<span class="se-run-n">'+_seEsc(name)+'</span>';
     html += '<span class="se-run-t">'+dur+'</span>';
@@ -1220,5 +1225,5 @@ window._seHydrateFormState = async function(state, instId, tmplSteps) { return s
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE7 — Fix: _seUndoStack at file scope, bist_runs query by script_id',
+console.log('%c[cdn-script-editor] v20260404-SE8 — Section headers teal, recent runs clickable+tooltip, suite counts clarified',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
