@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.27 — Fix: wait for FIRM_ID_CAD before all DB calls — no more stuck Loading...','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.31 — Gate indicator clickable, failing scripts highlighted and linked','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -2852,16 +2852,21 @@ async function _s9LoadSimScripts(templateId, version) {
     if (suitePassEl) suitePassEl.textContent = passingCount;
     if (suiteFailEl) suiteFailEl.textContent = failingCount;
 
+    // Track which scripts are failing so gate can link to them
+    var failingScripts = scripts.filter(function(s) {
+      return !runs.find(function(r) { return r.script_id === s.id && r.status === 'passed'; });
+    });
+
     // Update suite health bar + last run info
     var lastRun = runs.length ? runs[0] : null;
     _s9UpdateSuiteHealth(passingCount, failingCount,
       lastRun ? lastRun.run_at : null,
-      lastRun ? null : null); // run_by join requires resources lookup — omit for now
+      lastRun ? null : null);
 
     if (window._bckAborted) {
       var gateEl = document.getElementById('s9-sim-gate');
       var gateLeftEl = document.getElementById('s9-sim-gate-left');
-      if (gateEl) { gateEl.textContent = '⚠ Aborted'; gateEl.style.color = 'rgba(226,75,74,.8)'; gateEl.style.background = 'rgba(226,75,74,.08)'; gateEl.style.borderColor = 'rgba(226,75,74,.25)'; }
+      if (gateEl) { gateEl.textContent = '⚠ Aborted'; gateEl.style.color = 'rgba(226,75,74,.8)'; gateEl.style.background = 'rgba(226,75,74,.08)'; gateEl.style.borderColor = 'rgba(226,75,74,.25)'; gateEl.style.cursor = 'default'; }
       if (gateLeftEl) { gateLeftEl.textContent = '⚠ Simulation aborted — reopen Simulator to refresh'; gateLeftEl.style.color = 'rgba(226,75,74,.8)'; }
       return;
     }
@@ -2872,24 +2877,44 @@ async function _s9LoadSimScripts(templateId, version) {
       if (!runs.length) {
         gateEl.textContent = '○ Not yet run against v' + version;
         gateEl.style.color = '#f0a030'; gateEl.style.background = 'rgba(240,160,48,.1)'; gateEl.style.borderColor = 'rgba(240,160,48,.25)';
+        gateEl.style.cursor = 'default'; gateEl.onclick = null;
         gateLeftEl.textContent = '○ Run tests to check gate status for v' + version;
-        gateLeftEl.style.color = '#f0a030';
+        gateLeftEl.style.color = '#f0a030'; gateLeftEl.style.cursor = 'default'; gateLeftEl.onclick = null;
       } else if (allPass) {
         gateEl.textContent = '✓ All tests passing — cleared for release';
         gateEl.style.color = '#3de08a'; gateEl.style.background = 'rgba(61,224,138,.1)'; gateEl.style.borderColor = 'rgba(61,224,138,.25)';
+        gateEl.style.cursor = 'default'; gateEl.onclick = null;
         gateLeftEl.textContent = '✓ All tests passing — cleared for release';
-        gateLeftEl.style.color = '#3de08a';
-        // Show certificate button
+        gateLeftEl.style.color = '#3de08a'; gateLeftEl.style.cursor = 'default'; gateLeftEl.onclick = null;
         var certBtn = document.getElementById('s9-cert-btn');
         if (certBtn) certBtn.style.display = '';
       } else {
-        gateEl.textContent = '✕ ' + failingCount + ' test' + (failingCount !== 1 ? 's' : '') + ' failing — cannot release';
+        // Make gate clickable — opens the first failing script in the editor
+        var firstFailId = failingScripts.length ? failingScripts[0].id : null;
+        var gateMsg = '✕ ' + failingCount + ' test' + (failingCount !== 1 ? 's' : '') + ' failing — click to inspect';
+        gateEl.textContent = gateMsg;
         gateEl.style.color = '#f06060'; gateEl.style.background = 'rgba(240,96,96,.1)'; gateEl.style.borderColor = 'rgba(240,96,96,.25)';
-        gateLeftEl.textContent = '✕ ' + failingCount + ' test' + (failingCount !== 1 ? 's' : '') + ' failing — fix before release';
+        gateEl.style.cursor = firstFailId ? 'pointer' : 'default';
+        gateEl.title = firstFailId ? 'Open failing script: ' + failingScripts[0].name : '';
+        gateEl.onclick = firstFailId ? function() { _s9OpenScriptEditor(firstFailId); } : null;
+
+        gateLeftEl.innerHTML = '✕ ' + failingCount + ' test' + (failingCount !== 1 ? 's' : '') + ' failing — ' +
+          (firstFailId ? '<span style="color:#f06060;text-decoration:underline;cursor:pointer" onclick="_s9OpenScriptEditor(\'' + firstFailId + '\')">open failing script →</span>' : 'fix before release');
         gateLeftEl.style.color = '#f06060';
-        // Still show cert even if failing (shows partial results)
+
         var certBtn = document.getElementById('s9-cert-btn');
         if (certBtn) certBtn.style.display = '';
+
+        // Highlight failing scripts in the left rail
+        failingScripts.forEach(function(s) {
+          var rows = document.querySelectorAll('#s9-sim-scripts-list > div');
+          rows.forEach(function(row) {
+            if (row.getAttribute('onclick') && row.getAttribute('onclick').indexOf(s.id) !== -1) {
+              row.style.background = 'rgba(240,96,96,.06)';
+              row.style.borderLeft = '2px solid rgba(240,96,96,.4)';
+            }
+          });
+        });
       }
     }
   } catch(e) {
