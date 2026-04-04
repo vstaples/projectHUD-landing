@@ -1131,16 +1131,15 @@ function _s9RenderSimPanel(el) {
     '<div id="s9-simbar" style="height:38px;background:#0c0f18;border-bottom:1px solid rgba(255,255,255,.06);' +
       'display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0">' +
 
-      // Template selector
-      '<div style="display:flex;align-items:center;gap:7px;padding:4px 10px;' +
-        'background:#1a1f2e;border:1px solid rgba(255,255,255,.1);border-radius:4px;cursor:pointer;' +
-        'font-size:12px;color:rgba(255,255,255,.6)" onclick="_s9SimSwitchSource()">' +
-        '<div style="width:7px;height:7px;border-radius:50%;background:' + (hasSource ? '#28d4c0' : 'rgba(255,255,255,.25)') + ';flex-shrink:0"></div>' +
-        '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.85)">' +
-          (hasSource ? _s9EscHtml(srcName) : 'No source — go to Library') + '</span>' +
-        (srcVer ? '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);margin-left:2px">v' + _s9EscHtml(srcVer) + '</span>' : '') +
-        '<span style="color:rgba(255,255,255,.25);font-size:10px;margin-left:2px">▾</span>' +
-      '</div>' +
+      // Template selector — populated by _s9PopulateTemplateSelector()
+      '<select id="s9-tmpl-selector" onchange="_s9OnTemplateSelect(this.value)" ' +
+        'style="font-family:Arial,sans-serif;font-size:12px;background:#1a1f2e;' +
+        'border:1px solid rgba(255,255,255,.1);border-radius:4px;color:rgba(255,255,255,.85);' +
+        'padding:4px 10px;cursor:pointer;outline:none;height:28px;min-width:220px">' +
+        '<option value="" style="background:#1a1f2e">' +
+          (hasSource ? _s9EscHtml(srcName) + (srcVer ? ' v'+_s9EscHtml(srcVer) : '') : '— Select workflow —') +
+        '</option>' +
+      '</select>' +
 
       '<div style="width:1px;height:18px;background:rgba(255,255,255,.06);margin:0 2px"></div>' +
 
@@ -1295,6 +1294,8 @@ function _s9RenderSimPanel(el) {
     _s9LoadSimScripts(tmpl.id, tmpl.version || '0.0.0');
     _s9LoadTmplSteps(tmpl.id);
   }
+  // Always populate the template dropdown from DB
+  _s9PopulateTemplateSelector();
 }
 
 // ── Load template steps into left rail palette ─────────────────────────────
@@ -1325,7 +1326,55 @@ async function _s9LoadTmplSteps(templateId) {
   }).join('');
 }
 
-// ── Certificate show/hide ──────────────────────────────────────────────────
+// ── Template selector — load all workflows from DB ────────────────────────
+async function _s9PopulateTemplateSelector() {
+  var sel = document.getElementById('s9-tmpl-selector');
+  if (!sel) return;
+  var firmId = (typeof FIRM_ID_CAD !== 'undefined' && FIRM_ID_CAD) ? FIRM_ID_CAD : '';
+  if (!firmId) return;
+  var templates = await API.get(
+    'workflow_templates?firm_id=eq.' + firmId + '&order=name.asc&select=id,name,version,status'
+  ).catch(function(){ return []; });
+  if (!Array.isArray(templates) || !templates.length) return;
+
+  // Current selection
+  var currentId = (typeof _selectedTmpl !== 'undefined' && _selectedTmpl) ? _selectedTmpl.id : null;
+
+  sel.innerHTML = '<option value="" style="background:#1a1f2e">— Select workflow —</option>' +
+    templates.map(function(t) {
+      var label = t.name + (t.version ? ' v' + t.version : '') + (t.status === 'released' ? ' ✓' : '');
+      var sel2  = t.id === currentId ? ' selected' : '';
+      return '<option value="' + t.id + '" data-name="' + _s9EscHtml(t.name) + '" ' +
+        'data-ver="' + _s9EscHtml(t.version||'') + '"' + sel2 +
+        ' style="background:#1a1f2e">' + _s9EscHtml(label) + '</option>';
+    }).join('');
+}
+
+// ── Template selected from dropdown ──────────────────────────────────────
+async function _s9OnTemplateSelect(templateId) {
+  if (!templateId) return;
+  var sel = document.getElementById('s9-tmpl-selector');
+  var opt = sel ? sel.querySelector('option[value="' + templateId + '"]') : null;
+  var name = opt ? (opt.dataset.name || opt.textContent.trim()) : templateId;
+  var ver  = opt ? (opt.dataset.ver || '') : '';
+
+  // Load the full template row so _selectedTmpl is properly set
+  var rows = await API.get('workflow_templates?id=eq.' + templateId +
+    '&select=id,name,version,status,steps_data').catch(function(){ return []; });
+  var tmplRow = (Array.isArray(rows) && rows[0]) ? rows[0] : { id: templateId, name: name, version: ver };
+
+  // Set globals
+  window._selectedTmpl  = tmplRow;
+  _s9SimSourceType = 'workflow';
+  _s9SimSourceName = tmplRow.name || name;
+  _s9SimSourceVer  = tmplRow.version || ver || null;
+
+  // Re-render the panel with the new source
+  var content = document.getElementById('s9-sim-panel');
+  if (content) _s9RenderSimPanel(content);
+}
+
+
 function _s9ShowCert() {
   var overlay = document.getElementById('s9-cert-overlay');
   if (!overlay) return;
