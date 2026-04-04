@@ -1,6 +1,12 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE7','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE8','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// ── SE8 patches (2026-04-04) ────────────────────────────────────────────────
+// 1. step_route_back reset range capped at fromStepId exclusive. Previously
+//    slice(toIdx) ran to end-of-list, resetting the rejecting card (s4) to idle.
+//    That made s4 eligible for reuse by s7, causing superimposition. Now resets
+//    only toIdx..fromIdx-1 — the cards needing replay. Rejecting card keeps its
+//    done/rejected state permanently.
 // ── SE7 patches (2026-04-04) ────────────────────────────────────────────────
 // 1. Card reuse in _bistCkSetNode — when a new stepId has no existing card but
 //    an idle (className === 'bck-nc') card with matching data-seq exists, reuse
@@ -2084,15 +2090,15 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     _bistCkRadio('tower', '[route] \u21a9 Rejection loop — resetting to '+
       (ev.toStepSeq ? 'step seq '+ev.toStepSeq : ev.toStepId));
 
-    // Reset DAG cards from toStepId inclusive — that card and all downstream cards
-    // revert to blue/ready. toStepId will be re-activated by the next step_start event.
-    // Use a scoped selector — #bck-nodes .bck-nc matches all card states (.ac, .dn are additions).
+    // Reset cards from toStepId up to (but NOT including) fromStepId.
+    // The rejecting card (fromStepId) keeps its done/rejected visual permanently.
     var allNodeCards = Array.from(document.querySelectorAll('#bck-nodes .bck-nc'));
-    var toIdx = allNodeCards.findIndex(function(c) { return c.id === 'bck-n-'+ev.toStepId; });
-    console.log('[cdn-bist:route_back] toIdx in DOM:'+toIdx+' total cards:'+allNodeCards.length);
+    var toIdx   = allNodeCards.findIndex(function(c) { return c.id === 'bck-n-'+ev.toStepId; });
+    var fromIdx = allNodeCards.findIndex(function(c) { return c.id === 'bck-n-'+ev.fromStepId; });
+    console.log('[cdn-bist:route_back] toIdx:'+toIdx+' fromIdx:'+fromIdx+' total:'+allNodeCards.length);
     if (toIdx >= 0) {
-      // Reset target card AND everything after it to idle/blue (Pending)
-      allNodeCards.slice(toIdx).forEach(function(card) {
+      var endIdx = fromIdx >= 0 ? fromIdx : allNodeCards.length;
+      allNodeCards.slice(toIdx, endIdx).forEach(function(card) {
         card.className = 'bck-nc';
         var nst = card.querySelector('.bck-nst');
         if (nst) {
@@ -2102,8 +2108,7 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
           if (txt) { txt.textContent = 'Pending'; txt.style.color = 'rgba(0,210,255,.45)'; }
         }
       });
-      // Also reset connector wires into those cards to dim
-      allNodeCards.slice(toIdx).forEach(function(card) {
+      allNodeCards.slice(toIdx, endIdx).forEach(function(card) {
         var prevSib = card.previousSibling;
         if (prevSib && prevSib.className && prevSib.className.indexOf('bck-cw') >= 0) {
           prevSib.className = 'bck-cw';
