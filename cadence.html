@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.13 — Simulator showcase: animated slide deck, rotating taglines, illustrated feature panels','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.14 — Showcase: doubled durations, centered body text, 50% larger illustrations','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1376,7 +1376,7 @@ function _s9RightPanelNoSource() {
         // Rotating taglines
         '<div id="s9-tagline-wrap" style="height:22px;overflow:hidden;position:relative;margin-bottom:0">' +
           '<div id="s9-tagline" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.38);' +
-            'line-height:1.5;transition:opacity .4s">' +
+            'line-height:1.5;transition:opacity 1s ease">' +
             'The only platform that proves workflows correct before production.' +
           '</div>' +
         '</div>' +
@@ -1388,17 +1388,17 @@ function _s9RightPanelNoSource() {
 
       // ── SLIDE AREA ──
       '<div style="flex:1;min-height:0;display:flex;flex-direction:column;' +
-        'padding:20px 32px 0;position:relative;z-index:1;overflow:hidden">' +
+        'padding:20px 32px 0;position:relative;z-index:1;overflow:hidden;align-items:center">' +
 
         // Tag + headline
         '<div id="s9-slide-tag" style="' + FA + 'font-size:10px;font-weight:700;letter-spacing:.16em;' +
-          'color:rgba(40,212,192,.55);text-transform:uppercase;margin-bottom:8px">' +
+          'color:rgba(40,212,192,.55);text-transform:uppercase;margin-bottom:10px;text-align:center;width:100%">' +
           slides[0].tag + '</div>' +
-        '<div id="s9-slide-headline" style="' + FA + 'font-size:16px;font-weight:700;' +
-          'color:rgba(255,255,255,.9);line-height:1.4;margin-bottom:10px;white-space:pre-line">' +
+        '<div id="s9-slide-headline" style="' + FA + 'font-size:18px;font-weight:700;' +
+          'color:rgba(255,255,255,.9);line-height:1.4;margin-bottom:14px;white-space:pre-line;text-align:center;width:100%">' +
           slides[0].headline + '</div>' +
-        '<div id="s9-slide-body" style="' + FA + 'font-size:12px;color:rgba(255,255,255,.42);' +
-          'line-height:1.75;margin-bottom:16px;max-width:480px">' +
+        '<div id="s9-slide-body" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.45);' +
+          'line-height:2;margin-bottom:16px;max-width:520px;text-align:center;width:100%">' +
           slides[0].body + '</div>' +
 
         // Illustration
@@ -1449,9 +1449,9 @@ function _s9RightPanelNoSource() {
       var body  = document.getElementById('s9-slide-body');
       var illus = document.getElementById('s9-slide-illus');
       if (!tag) return;
-      // Fade out
+      // Fade out — slow, graceful
       [tag, hl, body, illus].forEach(function(el) {
-        if (el) { el.style.opacity = '0'; el.style.transform = 'translateY(-6px)'; el.style.transition = 'opacity .3s,transform .3s'; }
+        if (el) { el.style.opacity = '0'; el.style.transform = 'translateY(-6px)'; el.style.transition = 'opacity .7s ease,transform .7s ease'; }
       });
       setTimeout(function() {
         var s = slides[_cur];
@@ -1459,20 +1459,21 @@ function _s9RightPanelNoSource() {
         if (hl)    hl.textContent    = s.headline;
         if (body)  body.textContent  = s.body;
         if (illus) illus.innerHTML   = s.illus;
+        // Fade in — slow, graceful
         [tag, hl, body, illus].forEach(function(el) {
-          if (el) { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; }
+          if (el) { el.style.transition = 'opacity .8s ease,transform .8s ease'; el.style.opacity = '1'; el.style.transform = 'translateY(0)'; }
         });
         // Update dots
         var dots = document.querySelectorAll('.s9sc-dot');
         dots.forEach(function(d, i) { d.classList.toggle('act', i === _cur); });
-      }, 320);
+      }, 750);
     };
 
-    // Auto-advance every 5s
+    // Auto-advance every 10s
     function _next() { _s9ShowSlide((_cur + 1) % _total); }
-    _timer = setInterval(_next, 5000);
+    _timer = setInterval(_next, 10000);
 
-    // Rotating taglines
+    // Rotating taglines — 8s interval, 1s fade
     var taglines = [
       'The only platform that proves workflows correct before production.',
       'No competitor has simulation. No competitor has this certificate.',
@@ -1485,6 +1486,7 @@ function _s9RightPanelNoSource() {
       _ti = (_ti + 1) % taglines.length;
       var tl = document.getElementById('s9-tagline');
       if (!tl) return;
+      tl.style.transition = 'opacity 1s ease';
       tl.style.opacity = '0';
       setTimeout(function() {
         if (tl) { tl.textContent = taglines[_ti]; tl.style.opacity = '1'; }
@@ -1498,7 +1500,7 @@ function _s9RightPanelNoSource() {
 
 // ── Slide illustrations ────────────────────────────────────────────────────
 function _s9IllusProof() {
-  return '<div style="width:100%;max-width:420px;font-family:Arial,sans-serif">' +
+  return '<div style="width:100%;max-width:630px;font-family:Arial,sans-serif">' +
     // DAG mini
     '<div style="display:flex;align-items:center;gap:0;justify-content:center;margin-bottom:10px">' +
       _s9IllusNode('SY','Launch','done') +
@@ -1529,7 +1531,7 @@ function _s9IllusProof() {
 }
 
 function _s9IllusCockpit() {
-  return '<div style="width:100%;max-width:420px;font-family:Arial,sans-serif">' +
+  return '<div style="width:100%;max-width:630px;font-family:Arial,sans-serif">' +
     '<div style="background:linear-gradient(180deg,#0a0e1a,#060a12);border:1px solid rgba(40,212,192,.15);' +
       'border-radius:5px;padding:10px 14px;position:relative;overflow:hidden">' +
       // HUD status
@@ -1557,7 +1559,7 @@ function _s9IllusCockpit() {
 }
 
 function _s9IllusCert() {
-  return '<div style="width:100%;max-width:380px;font-family:Arial,sans-serif">' +
+  return '<div style="width:100%;max-width:570px;font-family:Arial,sans-serif">' +
     '<div style="background:#f5f2e8;border-radius:5px;overflow:hidden;' +
       'box-shadow:0 8px 32px rgba(0,0,0,.5);position:relative">' +
       '<div style="position:absolute;inset:6px;border:1px solid rgba(160,120,40,.25);border-radius:3px;pointer-events:none"></div>' +
@@ -1589,7 +1591,7 @@ function _s9IllusCert() {
 }
 
 function _s9IllusGate() {
-  return '<div style="width:100%;max-width:420px;font-family:Arial,sans-serif">' +
+  return '<div style="width:100%;max-width:630px;font-family:Arial,sans-serif">' +
     // Gate status card
     '<div style="background:#0c0f1a;border:1px solid rgba(61,224,138,.25);border-radius:5px;' +
       'padding:14px 16px;margin-bottom:8px;box-shadow:0 0 20px rgba(61,224,138,.08)">' +
@@ -1613,7 +1615,7 @@ function _s9IllusGate() {
 }
 
 function _s9IllusStart() {
-  return '<div style="width:100%;max-width:420px;font-family:Arial,sans-serif">' +
+  return '<div style="width:100%;max-width:630px;font-family:Arial,sans-serif">' +
     // Step cards
     [
       {n:'1', t:'Select workflow', d:'Choose from the dropdown above — your template loads instantly.', done:false, active:true},
@@ -1642,7 +1644,7 @@ function _s9IllusNode(initials, label, state) {
   var dot = state==='done'?'#3de08a':state==='active'?'#f0a030':'rgba(80,144,240,.4)';
   var stxt= state==='done'?'done':state==='active'?'active':'pending';
   var sc  = state==='done'?'#3de08a':state==='active'?'#f0a030':'rgba(80,144,240,.5)';
-  return '<div style="width:80px;flex-shrink:0;border-radius:4px;border:1.5px solid ' + bc + ';' +
+  return '<div style="width:110px;flex-shrink:0;border-radius:4px;border:1.5px solid ' + bc + ';' +
     'background:' + bg + ';padding:4px 5px">' +
     '<div style="font-size:9px;color:rgba(255,255,255,.4);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
       initials + '</div>' +
