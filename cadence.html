@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.15 — Showcase: bright body text, scaled illustrations, no overflow clipping','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.17 — Simulator: steps fix, mini-DAG, run history, suite health, larger text','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1219,19 +1219,35 @@ function _s9RenderSimPanel(el) {
           '</div>' +
         '</div>' +
 
-        // Suite stats
-        '<div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.06);padding:10px 12px;flex-shrink:0">' +
-          '<div style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;' +
-            'color:rgba(255,255,255,.3);text-transform:uppercase;margin-bottom:7px">Suite</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">' +
-            '<div style="background:#1a1f2e;border-radius:3px;padding:6px 8px;border:1px solid rgba(255,255,255,.06)">' +
-              '<div id="s9-suite-pass" style="' + FA + 'font-size:18px;font-weight:700;color:#3de08a;line-height:1">—</div>' +
-              '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);margin-top:2px;letter-spacing:.06em;text-transform:uppercase">Passing</div>' +
+        // Suite — rich health panel
+        '<div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.07);padding:12px 12px 10px;flex-shrink:0">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+            '<span style="' + FA + 'font-size:11px;font-weight:700;letter-spacing:.1em;' +
+              'color:rgba(255,255,255,.3);text-transform:uppercase">Suite Health</span>' +
+            '<span id="s9-suite-health-badge" style="' + FA + 'font-size:11px;font-weight:700;' +
+              'color:rgba(255,255,255,.2)">—</span>' +
+          '</div>' +
+          // Pass/fail big numbers
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">' +
+            '<div style="background:rgba(61,224,138,.07);border-radius:4px;padding:8px 10px;' +
+              'border:1px solid rgba(61,224,138,.15);text-align:center">' +
+              '<div id="s9-suite-pass" style="' + FA + 'font-size:22px;font-weight:700;color:#3de08a;line-height:1">—</div>' +
+              '<div style="' + FA + 'font-size:11px;color:rgba(61,224,138,.5);margin-top:3px;letter-spacing:.07em;text-transform:uppercase">Passing</div>' +
             '</div>' +
-            '<div style="background:#1a1f2e;border-radius:3px;padding:6px 8px;border:1px solid rgba(255,255,255,.06)">' +
-              '<div id="s9-suite-fail" style="' + FA + 'font-size:18px;font-weight:700;color:#f06060;line-height:1">—</div>' +
-              '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);margin-top:2px;letter-spacing:.06em;text-transform:uppercase">Failing</div>' +
+            '<div style="background:rgba(240,96,96,.07);border-radius:4px;padding:8px 10px;' +
+              'border:1px solid rgba(240,96,96,.15);text-align:center">' +
+              '<div id="s9-suite-fail" style="' + FA + 'font-size:22px;font-weight:700;color:#f06060;line-height:1">—</div>' +
+              '<div style="' + FA + 'font-size:11px;color:rgba(240,96,96,.5);margin-top:3px;letter-spacing:.07em;text-transform:uppercase">Failing</div>' +
             '</div>' +
+          '</div>' +
+          // Progress bar
+          '<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-bottom:7px">' +
+            '<div id="s9-suite-bar" style="height:100%;border-radius:2px;background:linear-gradient(90deg,#3de08a,#28d4c0);' +
+              'width:0%;transition:width .6s ease"></div>' +
+          '</div>' +
+          // Last run info
+          '<div id="s9-suite-last" style="' + FA + 'font-size:11px;color:rgba(255,255,255,.22);line-height:1.5">' +
+            'No runs yet' +
           '</div>' +
         '</div>' +
 
@@ -1388,17 +1404,17 @@ function _s9RightPanelNoSource() {
 
       // ── SLIDE AREA ──
       '<div style="flex:1;min-height:0;display:flex;flex-direction:column;' +
-        'padding:20px 32px 0;position:relative;z-index:1;overflow-y:auto;overflow-x:hidden;align-items:center">' +
+        'padding:28px 32px 0;position:relative;z-index:1;overflow-y:auto;overflow-x:hidden;align-items:center">' +
 
         // Tag + headline
         '<div id="s9-slide-tag" style="' + FA + 'font-size:10px;font-weight:700;letter-spacing:.16em;' +
-          'color:rgba(40,212,192,.55);text-transform:uppercase;margin-bottom:10px;text-align:center;width:100%">' +
+          'color:rgba(40,212,192,.55);text-transform:uppercase;margin-bottom:12px;text-align:center;width:100%">' +
           slides[0].tag + '</div>' +
         '<div id="s9-slide-headline" style="' + FA + 'font-size:18px;font-weight:700;' +
-          'color:rgba(255,255,255,.9);line-height:1.4;margin-bottom:14px;white-space:pre-line;text-align:center;width:100%">' +
+          'color:rgba(255,255,255,.9);line-height:1.4;margin-bottom:20px;white-space:pre-line;text-align:center;width:100%">' +
           slides[0].headline + '</div>' +
         '<div id="s9-slide-body" style="' + FA + 'font-size:15px;color:rgba(200,220,255,.82);' +
-          'line-height:2;margin-bottom:20px;max-width:560px;text-align:center;width:100%">' +
+          'line-height:2;margin-bottom:28px;max-width:560px;text-align:center;width:100%">' +
           slides[0].body + '</div>' +
 
         // Illustration
@@ -1426,10 +1442,10 @@ function _s9RightPanelNoSource() {
           '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.25);margin-bottom:10px">' +
             'Ready to begin? Select a workflow from the dropdown above — or go to the Library.' +
           '</div>' +
-          '<button onclick="_s9GoToLibrary()" style="' + FA + 'font-size:12px;font-weight:600;' +
-            'padding:7px 20px;border-radius:4px;border:1px solid rgba(255,255,255,.1);' +
-            'background:rgba(255,255,255,.04);color:rgba(255,255,255,.5);cursor:pointer;' +
-            'letter-spacing:.03em">Go to Library →</button>' +
+          '<button onclick="_s9GoToLibrary()" style="' + FA + 'font-size:13px;font-weight:700;' +
+            'padding:10px 28px;border-radius:5px;border:none;' +
+            'background:#1D9E75;color:#fff;cursor:pointer;' +
+            'letter-spacing:.05em;box-shadow:0 0 20px rgba(29,158,117,.4)">Go to Library →</button>' +
         '</div>' +
 
       '</div>' +
@@ -1469,11 +1485,11 @@ function _s9RightPanelNoSource() {
       }, 750);
     };
 
-    // Auto-advance every 10s
+    // Auto-advance every 14s
     function _next() { _s9ShowSlide((_cur + 1) % _total); }
-    _timer = setInterval(_next, 10000);
+    _timer = setInterval(_next, 14000);
 
-    // Rotating taglines — 8s interval, 1s fade
+    // Rotating taglines — 10s interval, 1s fade
     var taglines = [
       'The only platform that proves workflows correct before production.',
       'No competitor has simulation. No competitor has this certificate.',
@@ -1491,7 +1507,7 @@ function _s9RightPanelNoSource() {
       setTimeout(function() {
         if (tl) { tl.textContent = taglines[_ti]; tl.style.opacity = '1'; }
       }, 400);
-    }, 4000);
+    }, 10000);
 
   }, 80);
 
@@ -1652,53 +1668,78 @@ function _s9IllusWire(state) {
 
 function _s9RightPanelWizard(srcName, srcVer) {
   var FA = 'font-family:Arial,sans-serif;';
-  return '<div style="width:56px;height:56px;border-radius:50%;margin:0 auto 20px;' +
+  return '<div style="width:60px;height:60px;border-radius:50%;margin:0 auto 16px;' +
       'background:rgba(40,212,192,.07);border:1px solid rgba(40,212,192,.18);' +
-      'display:flex;align-items:center;justify-content:center;font-size:24px;color:rgba(40,212,192,.6)">◎</div>' +
-    '<div style="' + FA + 'font-size:17px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:6px">' +
+      'display:flex;align-items:center;justify-content:center;font-size:26px;color:rgba(40,212,192,.6)">◎</div>' +
+    '<div style="' + FA + 'font-size:19px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:4px">' +
       _s9EscHtml(srcName) + '</div>' +
-    '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.35);margin-bottom:28px">' +
+    '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.35);margin-bottom:6px">' +
       'Workflow Simulator' + (srcVer ? ' · v' + _s9EscHtml(srcVer) : '') +
     '</div>' +
-    '<div style="text-align:left;margin-bottom:28px">' +
-      _s9WizardStep(1, 'Create test scripts', 'Define the scenarios to test — the clean path, rejections, edge cases.', 'active') +
-      _s9WizardStep(2, 'Run the simulation', 'The simulator executes every script and verifies each routing path.', 'pending') +
-      _s9WizardStep(3, 'Get your certificate', 'A Routing Proof Certificate confirms every path works — required for release.', 'pending') +
+    // Mini DAG placeholder — populated by _s9UpdateMiniDag
+    '<div id="s9-mini-dag" style="margin-bottom:20px;min-height:32px"></div>' +
+    // Context message
+    '<div style="background:rgba(40,212,192,.06);border:1px solid rgba(40,212,192,.14);' +
+      'border-radius:5px;padding:12px 16px;margin-bottom:20px;text-align:left">' +
+      '<div style="' + FA + 'font-size:13px;font-weight:700;color:rgba(40,212,192,.8);margin-bottom:6px">' +
+        '👋 First time here? Here\'s what to do.' +
+      '</div>' +
+      '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.65);line-height:1.7">' +
+        'Test scripts tell the Simulator which scenarios to run — the clean approval path, ' +
+        'rejection loops, edge cases. They are specific to this workflow. ' +
+        'Start with one click below.' +
+      '</div>' +
+    '</div>' +
+    // Steps
+    '<div style="text-align:left;margin-bottom:22px;width:100%">' +
+      _s9WizardStep(1, 'Create test scripts', 'Define the scenarios to test — the clean path, rejections, edge cases. These scripts belong to this workflow only.', 'active') +
+      _s9WizardStep(2, 'Run the simulation', 'The flight simulator executes every script and verifies each routing path against your workflow definition.', 'pending') +
+      _s9WizardStep(3, 'Get your certificate', 'A Routing Proof Certificate confirms every path works — required before releasing this workflow to your team.', 'pending') +
     '</div>' +
     '<button onclick="_s9AutoGenerateScript()" ' +
-      'style="' + FA + 'font-size:14px;font-weight:700;padding:11px 28px;border-radius:5px;border:none;' +
-      'cursor:pointer;background:#1D9E75;color:#fff;width:100%;margin-bottom:10px;letter-spacing:.03em">' +
+      'style="' + FA + 'font-size:15px;font-weight:700;padding:13px 28px;border-radius:5px;border:none;' +
+      'cursor:pointer;background:#1D9E75;color:#fff;width:100%;margin-bottom:10px;letter-spacing:.03em;' +
+      'box-shadow:0 0 20px rgba(29,158,117,.35)">' +
       '⚡ Auto-generate test scripts from this workflow</button>' +
-    '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.25);margin-bottom:16px;line-height:1.5">' +
+    '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.3);margin-bottom:14px;line-height:1.6">' +
       'Creates a baseline script covering the clean approval path.<br>You can add more scenarios afterwards.' +
     '</div>' +
-    '<div style="border-top:1px solid rgba(255,255,255,.06);padding-top:14px">' +
-      '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3)">Or </span>' +
-      '<span style="' + FA + 'font-size:12px;color:#28d4c0;cursor:pointer" onclick="seNewScript && seNewScript()">+ create a script manually</span>' +
-      '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3)"> using the left panel</span>' +
+    '<div style="border-top:1px solid rgba(255,255,255,.07);padding-top:12px">' +
+      '<span style="' + FA + 'font-size:13px;color:rgba(255,255,255,.3)">Or </span>' +
+      '<span style="' + FA + 'font-size:13px;color:#28d4c0;cursor:pointer" onclick="seNewScript && seNewScript()">+ create a script manually</span>' +
+      '<span style="' + FA + 'font-size:13px;color:rgba(255,255,255,.3)"> using the left panel</span>' +
     '</div>';
 }
 
 function _s9RightPanelReady(srcName, srcVer) {
   var FA = 'font-family:Arial,sans-serif;';
-  return '<div style="width:56px;height:56px;border-radius:50%;margin:0 auto 20px;' +
+  return '<div style="width:60px;height:60px;border-radius:50%;margin:0 auto 16px;' +
       'background:rgba(40,212,192,.07);border:1px solid rgba(40,212,192,.18);' +
-      'display:flex;align-items:center;justify-content:center;font-size:24px;color:rgba(40,212,192,.6)">◎</div>' +
-    '<div style="' + FA + 'font-size:17px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:6px">' +
+      'display:flex;align-items:center;justify-content:center;font-size:26px;color:rgba(40,212,192,.6)">◎</div>' +
+    '<div style="' + FA + 'font-size:19px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:4px">' +
       _s9EscHtml(srcName) + '</div>' +
-    '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.35);margin-bottom:24px">' +
+    '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.35);margin-bottom:14px">' +
       'Workflow Simulator' + (srcVer ? ' · v' + _s9EscHtml(srcVer) : '') +
     '</div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:24px;justify-content:center">' +
-      _s9MetricCard('s9-metric-tests', '—', 'Scripts') +
-      _s9MetricCard('s9-metric-steps', '—', 'Steps') +
-      _s9MetricCard('s9-metric-last',  '—', 'Last run') +
+    // Mini DAG placeholder
+    '<div id="s9-mini-dag" style="margin-bottom:20px;min-height:32px"></div>' +
+    // History panel
+    '<div id="s9-history-panel" style="width:100%;margin-bottom:20px">' +
+      '<div style="display:flex;gap:6px;margin-bottom:14px;justify-content:center">' +
+        _s9MetricCard('s9-metric-tests', '—', 'Scripts') +
+        _s9MetricCard('s9-metric-steps', '—', 'Steps') +
+        _s9MetricCard('s9-metric-last',  '—', 'Last run') +
+      '</div>' +
+      '<div id="s9-run-history" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);' +
+        'border-radius:4px;padding:10px 14px;' + FA + 'font-size:13px;color:rgba(255,255,255,.3);' +
+        'text-align:center">Loading run history…</div>' +
     '</div>' +
-    '<button onclick="_s9LaunchSimulator()" style="' + FA + 'font-size:14px;font-weight:700;' +
-      'padding:11px 32px;border-radius:5px;border:none;cursor:pointer;' +
-      'background:#1D9E75;color:#fff;width:100%;letter-spacing:.04em;margin-bottom:10px">' +
+    '<button onclick="_s9LaunchSimulator()" style="' + FA + 'font-size:15px;font-weight:700;' +
+      'padding:13px 32px;border-radius:5px;border:none;cursor:pointer;' +
+      'background:#1D9E75;color:#fff;width:100%;letter-spacing:.04em;margin-bottom:10px;' +
+      'box-shadow:0 0 20px rgba(29,158,117,.35)">' +
       '▶ Launch Flight Simulator</button>' +
-    '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);line-height:1.6">' +
+    '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.3);line-height:1.6">' +
       'Runs all test scripts · verifies all routing paths · generates Routing Proof Certificate' +
     '</div>';
 }
@@ -1708,31 +1749,167 @@ function _s9WizardStep(num, title, desc, state) {
   var isActive = state === 'active', isDone = state === 'done';
   var dotBg    = isDone ? '#3de08a' : isActive ? '#28d4c0' : 'rgba(255,255,255,.1)';
   var dotColor = (isDone || isActive) ? '#fff' : 'rgba(255,255,255,.25)';
-  var titleCol = (isDone || isActive) ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.3)';
-  var descCol  = (isDone || isActive) ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.18)';
-  return '<div style="display:flex;gap:12px;margin-bottom:14px">' +
-    '<div style="width:24px;height:24px;border-radius:50%;background:' + dotBg + ';flex-shrink:0;' +
+  var titleCol = (isDone || isActive) ? 'rgba(255,255,255,.92)' : 'rgba(255,255,255,.3)';
+  var descCol  = (isDone || isActive) ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.18)';
+  return '<div style="display:flex;gap:13px;margin-bottom:14px">' +
+    '<div style="width:26px;height:26px;border-radius:50%;background:' + dotBg + ';flex-shrink:0;' +
       'display:flex;align-items:center;justify-content:center;' +
-      FA + 'font-size:12px;font-weight:700;color:' + dotColor + ';margin-top:1px">' +
+      FA + 'font-size:13px;font-weight:700;color:' + dotColor + ';margin-top:1px">' +
       (isDone ? '✓' : num) + '</div>' +
     '<div>' +
-      '<div style="' + FA + 'font-size:13px;font-weight:600;color:' + titleCol + ';margin-bottom:2px">' + title + '</div>' +
-      '<div style="' + FA + 'font-size:12px;color:' + descCol + ';line-height:1.5">' + desc + '</div>' +
+      '<div style="' + FA + 'font-size:14px;font-weight:600;color:' + titleCol + ';margin-bottom:3px">' + title + '</div>' +
+      '<div style="' + FA + 'font-size:13px;color:' + descCol + ';line-height:1.6">' + desc + '</div>' +
     '</div></div>';
+}
+
+// ── Mini-DAG: renders actual workflow steps inline above the launch button ─
+function _s9UpdateMiniDag(steps) {
+  var el = document.getElementById('s9-mini-dag');
+  if (!el || !steps || !steps.length) return;
+  var FA = 'font-family:Arial,sans-serif;';
+  var typeColors = {form:'#7C74E8',approval:'#f0a030',signoff:'#28d4c0',
+    meeting:'#5090f0',trigger:'rgba(255,255,255,.4)',action:'rgba(255,255,255,.35)'};
+  var shown = steps.slice(0, 6); // max 6 nodes
+  var more  = steps.length > 6 ? steps.length - 6 : 0;
+  el.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:nowrap;overflow:hidden">' +
+    shown.map(function(s, i) {
+      var c = typeColors[s.step_type] || 'rgba(255,255,255,.3)';
+      var node = '<div style="flex-shrink:0;text-align:center">' +
+        '<div style="background:rgba(255,255,255,.04);border:1px solid ' + c + ';border-radius:3px;' +
+          'padding:4px 8px;min-width:64px;max-width:80px">' +
+          '<div style="' + FA + 'font-size:11px;color:' + c + ';font-weight:700;margin-bottom:1px;' +
+            'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _s9EscHtml(s.step_type||'') + '</div>' +
+          '<div style="' + FA + 'font-size:11px;color:rgba(255,255,255,.55);overflow:hidden;' +
+            'text-overflow:ellipsis;white-space:nowrap">' +
+            _s9EscHtml((s.name||'').replace(/^(Checklist|Form|Approval|Finalize|Final):\s*/i,'')) +
+          '</div>' +
+        '</div>' +
+      '</div>';
+      var wire = i < shown.length - 1
+        ? '<div style="width:10px;height:1px;background:rgba(255,255,255,.12);flex-shrink:0;margin-top:-8px"></div>'
+        : '';
+      return node + wire;
+    }).join('') +
+    (more ? '<div style="' + FA + 'font-size:11px;color:rgba(255,255,255,.3);margin-left:6px;flex-shrink:0">+' + more + ' more</div>' : '') +
+    '</div>';
+}
+
+// ── Load and render run history on the ready panel ────────────────────────
+async function _s9LoadRunHistory(templateId, version) {
+  var el = document.getElementById('s9-run-history');
+  if (!el) return;
+  var firmId = (typeof FIRM_ID_CAD !== 'undefined') ? FIRM_ID_CAD : '';
+  if (!firmId) return;
+  var FA = 'font-family:Arial,sans-serif;';
+
+  // Get all scripts for this template to join with runs
+  var scripts = await API.get(
+    'bist_test_scripts?firm_id=eq.' + firmId + '&template_id=eq.' + templateId + '&order=created_at.asc'
+  ).catch(function(){ return []; });
+  if (!Array.isArray(scripts) || !scripts.length) {
+    el.innerHTML = '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.25);text-align:center">' +
+      'No runs yet — launch the simulator to begin.</div>';
+    return;
+  }
+
+  var ids = scripts.map(function(s){ return s.id; }).join(',');
+  var runs = await API.get(
+    'bist_runs?firm_id=eq.' + firmId + '&script_id=in.(' + ids + ')' +
+    '&order=run_at.desc&limit=10'
+  ).catch(function(){ return []; });
+  if (!Array.isArray(runs) || !runs.length) {
+    el.innerHTML = '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.25);text-align:center">' +
+      'No runs yet for this version — launch to begin.</div>';
+    return;
+  }
+
+  // Group by run_at date to show suite-level runs
+  var byDate = {};
+  runs.forEach(function(r) {
+    var dk = new Date(r.run_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    if (!byDate[dk]) byDate[dk] = { date:r.run_at, results:[], by:r.run_by };
+    byDate[dk].results.push(r);
+  });
+
+  var rows = Object.keys(byDate).slice(0,5).map(function(dk) {
+    var grp = byDate[dk];
+    var pass = grp.results.filter(function(r){ return r.status==='passed'; }).length;
+    var total = grp.results.length;
+    var allPass = pass === total;
+    var dt = new Date(grp.date);
+    var dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    var timeStr = dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    var statusColor = allPass ? '#3de08a' : '#f06060';
+    var statusIcon  = allPass ? '✓' : '✕';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;' +
+      'border-bottom:1px solid rgba(255,255,255,.05)">' +
+      '<div style="width:18px;height:18px;border-radius:50%;background:' +
+        (allPass?'rgba(61,224,138,.12)':'rgba(240,96,96,.12)') +
+        ';display:flex;align-items:center;justify-content:center;flex-shrink:0;' +
+        FA + 'font-size:11px;font-weight:700;color:' + statusColor + '">' + statusIcon + '</div>' +
+      '<div style="flex:1">' +
+        '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.75)">' +
+          dateStr + ' · ' + timeStr +
+        '</div>' +
+        '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3)">' +
+          pass + '/' + total + ' scripts passed' +
+          (grp.results[0] && grp.results[0].duration_ms
+            ? ' · ' + (grp.results[0].duration_ms/1000).toFixed(1) + 's' : '') +
+        '</div>' +
+      '</div>' +
+      '<div style="' + FA + 'font-size:12px;font-weight:700;color:' + statusColor + '">' +
+        (allPass ? 'PASS' : 'FAIL') +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  el.innerHTML = '<div style="' + FA + 'font-size:11px;font-weight:700;letter-spacing:.08em;' +
+    'text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:8px">Recent Runs</div>' + rows;
+}
+
+// ── Update suite health bar ────────────────────────────────────────────────
+function _s9UpdateSuiteHealth(passing, failing, lastRunDate, lastRunBy) {
+  var FA = 'font-family:Arial,sans-serif;';
+  var total = passing + failing;
+  var pct = total > 0 ? Math.round(passing / total * 100) : 0;
+  var bar = document.getElementById('s9-suite-bar');
+  var badge = document.getElementById('s9-suite-health-badge');
+  var lastEl = document.getElementById('s9-suite-last');
+  if (bar) bar.style.width = pct + '%';
+  if (badge) {
+    badge.textContent = total > 0 ? pct + '%' : '—';
+    badge.style.color = pct === 100 ? '#3de08a' : pct >= 50 ? '#f0a030' : '#f06060';
+  }
+  if (lastEl && lastRunDate) {
+    var dt = new Date(lastRunDate);
+    var dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}) +
+      ' · ' + dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    lastEl.textContent = 'Last run ' + dateStr + (lastRunBy ? ' · ' + lastRunBy : '');
+  }
 }
 
 function _s9UpdateRightPanel(hasScripts) {
   var inner = document.getElementById('s9-right-inner');
   if (!inner) return;
-  // Restore centered layout for wizard/ready states
   inner.style.alignItems = 'center';
   inner.style.justifyContent = 'center';
-  inner.style.maxWidth = '520px';
-  inner.style.padding = '40px 32px';
+  inner.style.maxWidth = '540px';
+  inner.style.padding = '32px 32px';
   inner.style.margin = '0 auto';
   inner.innerHTML = hasScripts
     ? _s9RightPanelReady(_s9SimSourceName||'', _s9SimSourceVer||'')
     : _s9RightPanelWizard(_s9SimSourceName||'', _s9SimSourceVer||'');
+
+  // Load mini-DAG from already-loaded steps if available
+  var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+  if (tmpl && Array.isArray(tmpl.steps) && tmpl.steps.length) {
+    _s9UpdateMiniDag(tmpl.steps);
+  }
+  // Load run history on ready panel
+  if (hasScripts && tmpl && tmpl.id) {
+    _s9LoadRunHistory(tmpl.id, tmpl.version || '0.0.0');
+  }
 }
 
 async function _s9AutoGenerateScript() {
@@ -1776,28 +1953,47 @@ async function _s9AutoGenerateScript() {
 async function _s9LoadTmplSteps(templateId) {
   var el = document.getElementById('s9-tmpl-steps-list');
   if (!el) return;
-  var steps = await API.get(
-    'workflow_template_steps?template_id=eq.' + templateId + '&order=sequence_order.asc'
-  ).catch(function(){ return []; });
+
+  // Use steps already loaded by the template editor if available — avoids extra DB call
+  var steps = null;
+  var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+  if (tmpl && tmpl.id === templateId && Array.isArray(tmpl.steps) && tmpl.steps.length) {
+    steps = tmpl.steps;
+  } else {
+    steps = await API.get(
+      'workflow_template_steps?template_id=eq.' + templateId + '&order=sequence_order.asc'
+    ).catch(function(){ return []; });
+  }
+
   if (!Array.isArray(steps) || !steps.length) {
-    el.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.25);font-style:italic">No steps found</div>';
+    el.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.3);' +
+      'padding:6px 0;font-style:italic">No steps found — open this template in Library first.</div>';
     return;
   }
+
+  // Store on tmpl for mini-DAG use
+  if (tmpl && tmpl.id === templateId) tmpl.steps = steps;
+
   el.innerHTML = steps.map(function(s) {
-    return '<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;' +
+    var typeColors = {form:'#7C74E8',approval:'#f0a030',signoff:'#28d4c0',meeting:'#5090f0',trigger:'rgba(255,255,255,.3)'};
+    var tc = typeColors[s.step_type] || 'rgba(255,255,255,.25)';
+    return '<div style="display:flex;align-items:center;gap:7px;padding:6px 8px;' +
       'border:1px solid rgba(255,255,255,.06);border-radius:3px;cursor:pointer;' +
       'background:#131720;transition:background .1s" ' +
-      'onclick="seInsertTmplStep && seInsertTmplStep(' + s.sequence_order + ')" ' +
       'onmouseover="this.style.background=\'#1a2030\'" onmouseout="this.style.background=\'#131720\'">' +
-      '<div style="width:16px;height:16px;border-radius:2px;background:#1a1f2e;' +
-        'border:1px solid rgba(40,212,192,.2);display:flex;align-items:center;' +
-        'justify-content:center;font-family:monospace;font-size:10px;color:rgba(40,212,192,.8);' +
+      '<div style="width:18px;height:18px;border-radius:2px;background:#1a1f2e;' +
+        'border:1px solid rgba(40,212,192,.22);display:flex;align-items:center;' +
+        'justify-content:center;font-family:monospace;font-size:11px;color:rgba(40,212,192,.85);' +
         'font-weight:700;flex-shrink:0">' + s.sequence_order + '</div>' +
-      '<span style="font-family:Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.6);' +
+      '<span style="font-family:Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.75);' +
         'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _s9EscHtml(s.name) + '</span>' +
-      '<span style="font-family:Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.25)">' + _s9EscHtml(s.step_type||'') + '</span>' +
+      '<span style="font-family:Arial,sans-serif;font-size:11px;color:' + tc + ';flex-shrink:0">' +
+        _s9EscHtml(s.step_type||'') + '</span>' +
       '</div>';
   }).join('');
+
+  // Trigger mini-DAG update on right panel if it's showing the wizard
+  _s9UpdateMiniDag(steps);
 }
 
 // ── Template selector — load all workflows from DB ────────────────────────
@@ -2187,6 +2383,12 @@ async function _s9LoadSimScripts(templateId, version) {
     var suiteFailEl = document.getElementById('s9-suite-fail');
     if (suitePassEl) suitePassEl.textContent = passingCount;
     if (suiteFailEl) suiteFailEl.textContent = failingCount;
+
+    // Update suite health bar + last run info
+    var lastRun = runs.length ? runs[0] : null;
+    _s9UpdateSuiteHealth(passingCount, failingCount,
+      lastRun ? lastRun.run_at : null,
+      lastRun ? null : null); // run_by join requires resources lookup — omit for now
 
     if (window._bckAborted) {
       var gateEl = document.getElementById('s9-sim-gate');
