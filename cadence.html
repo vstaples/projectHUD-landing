@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.24 — Wizard: no divider, black bg, step 1 done+DAG shown when workflow selected','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.25 — Wizard: unified black bg, no divider, static DAG+step1 workflow shown','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1667,164 +1667,105 @@ function _s9IllusWire(state) {
 function _s9RightPanelWizard(srcName, srcVer) {
   var FA = 'font-family:Arial,sans-serif;';
 
-  // Inject wizard animation styles once
   if (!document.getElementById('s9-wizard-styles')) {
     var st = document.createElement('style');
     st.id = 's9-wizard-styles';
     st.textContent =
-      '@keyframes s9wFadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}' +
-      '@keyframes s9wFadeOut{from{opacity:1}to{opacity:0}}' +
-      '.s9w-panel{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
-        'padding:16px;transition:opacity 1.2s ease;pointer-events:none}' +
-      '.s9w-panel.visible{opacity:1;pointer-events:auto}' +
-      '.s9w-panel.hidden{opacity:0}' +
-      '.s9w-step-row{transition:all .5s ease;border-radius:6px;padding:10px 12px;margin-bottom:8px;cursor:default}' +
+      '.s9w-step-row{transition:all .5s ease;border-radius:6px;padding:10px 12px;margin-bottom:6px}' +
       '.s9w-step-row.active{background:rgba(40,212,192,.07);border:1px solid rgba(40,212,192,.2)}' +
       '.s9w-step-row.inactive{background:transparent;border:1px solid transparent}';
     document.head.appendChild(st);
   }
 
+  var BG = '#0a0c10';
+
   var html =
-    // Full-height layout — centered narrow left, remainder for visual
-    '<div style="display:flex;flex-direction:column;width:100%;height:100%;background:#080a10;overflow:hidden">' +
-      '<div style="flex-shrink:0;padding:18px 28px 12px;border-bottom:1px solid rgba(255,255,255,.05);text-align:center">' +
-        '<div style="' + FA + 'font-size:19px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:2px">' +
-          _s9EscHtml(srcName) + '</div>' +
-        '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.35)">' +
-          'Workflow Simulator' + (srcVer ? ' · v' + _s9EscHtml(srcVer) : '') +
-        '</div>' +
+    '<div style="display:flex;flex-direction:column;width:100%;height:100%;background:' + BG + ';overflow:hidden">' +
+
+      '<div style="flex-shrink:0;padding:18px 28px 12px;border-bottom:1px solid rgba(255,255,255,.04);text-align:center;background:' + BG + '">' +
+        '<div style="' + FA + 'font-size:19px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:2px">' + _s9EscHtml(srcName) + '</div>' +
+        '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.35)">Workflow Simulator' + (srcVer ? ' · v' + _s9EscHtml(srcVer) : '') + '</div>' +
       '</div>' +
 
-      // ── Main body: left instructions (fixed width, centered), right visuals ──
-      '<div style="flex:1;min-height:0;display:flex;overflow:hidden">' +
+      '<div style="flex:1;min-height:0;display:flex;overflow:hidden;background:' + BG + '">' +
 
-        // Left: equal half, centered content
-        '<div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;' +
-          'justify-content:flex-start;padding:20px 24px 16px;' +
-          'border-right:1px solid rgba(255,255,255,.05);overflow-y:auto;background:#060810">' +
-
+        // LEFT
+        '<div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:20px 24px 16px;overflow-y:auto;background:' + BG + '">' +
           '<div style="width:100%;max-width:400px;display:flex;flex-direction:column;flex:1">' +
 
-          // Onboarding callout
-          '<div style="background:rgba(40,212,192,.06);border:1px solid rgba(40,212,192,.15);' +
-            'border-radius:5px;padding:10px 14px;margin-bottom:16px">' +
-            '<div style="' + FA + 'font-size:13px;font-weight:700;color:rgba(40,212,192,.85);margin-bottom:3px">' +
-              '👋 New to the Simulator?' +
+            '<div style="background:rgba(40,212,192,.06);border:1px solid rgba(40,212,192,.14);border-radius:5px;padding:10px 14px;margin-bottom:16px">' +
+              '<div style="' + FA + 'font-size:13px;font-weight:700;color:rgba(40,212,192,.8);margin-bottom:3px">\uD83D\uDC4B New to the Simulator?</div>' +
+              '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.6);line-height:1.6">Follow these 4 steps to validate your workflow before it goes live. Watch the animation \u2192</div>' +
             '</div>' +
-            '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.6);line-height:1.6">' +
-              'Follow these 4 steps to validate your workflow before it goes live. Watch the animation →' +
-            '</div>' +
-          '</div>' +
 
-          // Step 1 — active
-          '<div id="s9w-step-1" class="s9w-step-row active" style="margin-bottom:6px">' +
-            '<div style="display:flex;gap:12px;align-items:flex-start">' +
-              '<div id="s9w-dot-1" style="width:26px;height:26px;border-radius:50%;background:#28d4c0;' +
-                'display:flex;align-items:center;justify-content:center;flex-shrink:0;' +
-                FA + 'font-size:13px;font-weight:700;color:#080a10;transition:all .5s">1</div>' +
-              '<div>' +
-                '<div id="s9w-title-1" style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:2px;transition:color .5s">Pick a workflow</div>' +
-                '<div id="s9w-desc-1" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.6);line-height:1.55;transition:color .5s">Select from the dropdown above. Each workflow has its own independent set of test scripts.</div>' +
+            '<div id="s9w-step-1" class="s9w-step-row active">' +
+              '<div style="display:flex;gap:12px;align-items:flex-start">' +
+                '<div id="s9w-dot-1" style="width:26px;height:26px;border-radius:50%;background:#28d4c0;display:flex;align-items:center;justify-content:center;flex-shrink:0;' + FA + 'font-size:13px;font-weight:700;color:#080a10;transition:all .5s">1</div>' +
+                '<div>' +
+                  '<div id="s9w-title-1" style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:2px;transition:color .5s">Pick a workflow</div>' +
+                  '<div id="s9w-desc-1" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.6);line-height:1.55;transition:color .5s">' + (srcName ? '\u2713 <strong style="color:rgba(255,255,255,.88)">' + _s9EscHtml(srcName) + '</strong> selected. Steps shown \u2192' : 'Select from the dropdown above.') + '</div>' +
+                '</div>' +
               '</div>' +
             '</div>' +
-          '</div>' +
 
-          // Step 2 — inactive
-          '<div id="s9w-step-2" class="s9w-step-row inactive" style="margin-bottom:6px">' +
-            '<div style="display:flex;gap:12px;align-items:flex-start">' +
-              '<div id="s9w-dot-2" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.1);' +
-                'display:flex;align-items:center;justify-content:center;flex-shrink:0;' +
-                FA + 'font-size:13px;font-weight:700;color:rgba(255,255,255,.3);transition:all .5s">2</div>' +
-              '<div>' +
-                '<div id="s9w-title-2" style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.3);margin-bottom:2px;transition:color .5s">Create test scripts</div>' +
-                '<div id="s9w-desc-2" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2);line-height:1.55;transition:color .5s">Define scenarios — the clean approval path, rejection loops, edge cases. Auto-generate in one click.</div>' +
+            '<div id="s9w-step-2" class="s9w-step-row inactive">' +
+              '<div style="display:flex;gap:12px;align-items:flex-start">' +
+                '<div id="s9w-dot-2" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;' + FA + 'font-size:13px;font-weight:700;color:rgba(255,255,255,.3);transition:all .5s">2</div>' +
+                '<div>' +
+                  '<div id="s9w-title-2" style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.3);margin-bottom:2px;transition:color .5s">Create test scripts</div>' +
+                  '<div id="s9w-desc-2" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2);line-height:1.55;transition:color .5s">Define scenarios \u2014 clean path, rejection loops, edge cases. Auto-generate in one click.</div>' +
+                '</div>' +
               '</div>' +
             '</div>' +
-          '</div>' +
 
-          // Step 3 — inactive
-          '<div id="s9w-step-3" class="s9w-step-row inactive" style="margin-bottom:6px">' +
-            '<div style="display:flex;gap:12px;align-items:flex-start">' +
-              '<div id="s9w-dot-3" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.1);' +
-                'display:flex;align-items:center;justify-content:center;flex-shrink:0;' +
-                FA + 'font-size:13px;font-weight:700;color:rgba(255,255,255,.3);transition:all .5s">3</div>' +
-              '<div>' +
-                '<div id="s9w-title-3" style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.3);margin-bottom:2px;transition:color .5s">Run the simulation</div>' +
-                '<div id="s9w-desc-3" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2);line-height:1.55;transition:color .5s">The flight simulator executes every script and verifies each routing path against your workflow definition.</div>' +
+            '<div id="s9w-step-3" class="s9w-step-row inactive">' +
+              '<div style="display:flex;gap:12px;align-items:flex-start">' +
+                '<div id="s9w-dot-3" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;' + FA + 'font-size:13px;font-weight:700;color:rgba(255,255,255,.3);transition:all .5s">3</div>' +
+                '<div>' +
+                  '<div id="s9w-title-3" style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.3);margin-bottom:2px;transition:color .5s">Run the simulation</div>' +
+                  '<div id="s9w-desc-3" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2);line-height:1.55;transition:color .5s">The simulator executes every script and verifies each routing path against your workflow definition.</div>' +
+                '</div>' +
               '</div>' +
             '</div>' +
-          '</div>' +
 
-          // Step 4 — inactive
-          '<div id="s9w-step-4" class="s9w-step-row inactive" style="margin-bottom:6px">' +
-            '<div style="display:flex;gap:12px;align-items:flex-start">' +
-              '<div id="s9w-dot-4" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.1);' +
-                'display:flex;align-items:center;justify-content:center;flex-shrink:0;' +
-                FA + 'font-size:13px;font-weight:700;color:rgba(255,255,255,.3);transition:all .5s">4</div>' +
-              '<div>' +
-                '<div id="s9w-title-4" style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.3);margin-bottom:2px;transition:color .5s">Get your certificate</div>' +
-                '<div id="s9w-desc-4" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2);line-height:1.55;transition:color .5s">A Routing Proof Certificate confirms every path works — your proof of readiness before release.</div>' +
+            '<div id="s9w-step-4" class="s9w-step-row inactive">' +
+              '<div style="display:flex;gap:12px;align-items:flex-start">' +
+                '<div id="s9w-dot-4" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;' + FA + 'font-size:13px;font-weight:700;color:rgba(255,255,255,.3);transition:all .5s">4</div>' +
+                '<div>' +
+                  '<div id="s9w-title-4" style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.3);margin-bottom:2px;transition:color .5s">Get your certificate</div>' +
+                  '<div id="s9w-desc-4" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2);line-height:1.55;transition:color .5s">A Routing Proof Certificate confirms every path works \u2014 proof of readiness before release.</div>' +
+                '</div>' +
               '</div>' +
             '</div>' +
-          '</div>' +
 
-          // CTA pinned to bottom
-          '<div style="margin-top:auto;padding-top:16px">' +
-            '<button onclick="_s9AutoGenerateScript()" ' +
-              'style="' + FA + 'font-size:14px;font-weight:700;padding:12px 16px;border-radius:5px;border:none;' +
-              'cursor:pointer;background:#1D9E75;color:#fff;width:100%;margin-bottom:8px;letter-spacing:.03em;' +
-              'box-shadow:0 0 18px rgba(29,158,117,.3)">' +
-              '⚡ Auto-generate test scripts</button>' +
-            '<div style="text-align:center">' +
-              '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.28)">Or </span>' +
-              '<span style="' + FA + 'font-size:12px;color:#28d4c0;cursor:pointer" onclick="seNewScript && seNewScript()">+ create manually</span>' +
+            '<div style="margin-top:auto;padding-top:16px">' +
+              '<button onclick="_s9AutoGenerateScript()" style="' + FA + 'font-size:14px;font-weight:700;padding:12px 16px;border-radius:5px;border:none;cursor:pointer;background:#1D9E75;color:#fff;width:100%;margin-bottom:8px;letter-spacing:.03em;box-shadow:0 0 18px rgba(29,158,117,.3)">\u26A1 Auto-generate test scripts</button>' +
+              '<div style="text-align:center"><span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.28)">Or </span><span style="' + FA + 'font-size:12px;color:#28d4c0;cursor:pointer" onclick="seNewScript && seNewScript()">+ create manually</span></div>' +
             '</div>' +
+
           '</div>' +
-
-          '</div>' + // close max-width wrapper
-
         '</div>' +
 
-        // Right: equal half, same background, centered
-        '<div style="flex:1;min-width:0;position:relative;background:#060810;overflow:hidden">' +
+        // RIGHT — same background, no border
+        '<div style="flex:1;min-width:0;position:relative;background:' + BG + ';overflow:hidden">' +
 
-          // Panel 1: Real workflow DAG — step 1, starts visible
-          '<div id="s9w-panel-1" style="position:absolute;inset:0;display:flex;flex-direction:column;' +
-            'align-items:center;justify-content:center;padding:20px;' +
-            'transition:opacity 1.2s ease;opacity:1">' +
-            '<div style="' + FA + 'font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;' +
-              'color:rgba(40,212,192,.5);margin-bottom:16px">STEP 1 — Workflow selected: its steps are shown below</div>' +
+          '<div id="s9w-panel-1" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;transition:opacity 1.2s ease;opacity:1;background:' + BG + '">' +
+            '<div style="' + FA + 'font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(40,212,192,.5);margin-bottom:18px">' + (srcName ? 'STEP 1 \u2014 ' + _s9EscHtml(srcName) + ' \u00B7 workflow steps' : 'STEP 1 \u2014 Select a workflow') + '</div>' +
             '<div id="s9w-dag-container" style="width:100%;display:flex;flex-direction:column;align-items:center">' +
-              '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.25);font-style:italic">Loading workflow steps…</div>' +
+              _s9StaticFlowDiagram() +
             '</div>' +
           '</div>' +
 
-          // Panel 2: Flowchart — step 2, hidden
-          '<div id="s9w-panel-2" style="position:absolute;inset:0;' +
-            'transition:opacity 1.2s ease;opacity:0;pointer-events:none">' +
-            _s9VisFlowchart() +
-          '</div>' +
-
-          // Panel 3: Cockpit running — step 3, hidden
-          '<div id="s9w-panel-3" style="position:absolute;inset:0;' +
-            'transition:opacity 1.2s ease;opacity:0;pointer-events:none">' +
-            _s9VisCockpitRunning() +
-          '</div>' +
-
-          // Panel 4: Certificate — step 4, hidden
-          '<div id="s9w-panel-4" style="position:absolute;inset:0;' +
-            'transition:opacity 1.2s ease;opacity:0;pointer-events:none">' +
-            _s9VisCertificate() +
-          '</div>' +
+          '<div id="s9w-panel-2" style="position:absolute;inset:0;transition:opacity 1.2s ease;opacity:0;pointer-events:none;background:' + BG + '">' + _s9VisFlowchart() + '</div>' +
+          '<div id="s9w-panel-3" style="position:absolute;inset:0;transition:opacity 1.2s ease;opacity:0;pointer-events:none;background:' + BG + '">' + _s9VisCockpitRunning() + '</div>' +
+          '<div id="s9w-panel-4" style="position:absolute;inset:0;transition:opacity 1.2s ease;opacity:0;pointer-events:none;background:' + BG + '">' + _s9VisCertificate() + '</div>' +
 
         '</div>' +
 
       '</div>' +
-
     '</div>';
 
-  // Animation loop — 4 phases, 8s each
-  // srcName is in closure scope from _s9RightPanelWizard
+  // Animation: if workflow already selected, mark step 1 done and start from step 2
   setTimeout(function() {
     var _hasSource = !!(srcName);
     var _phase = 1;
@@ -1834,51 +1775,69 @@ function _s9RightPanelWizard(srcName, srcVer) {
     function _activatePhase(n) {
       _phase = n;
       [1,2,3,4].forEach(function(i) {
-        var row   = document.getElementById('s9w-step-' + i);
-        var dot   = document.getElementById('s9w-dot-' + i);
+        var row = document.getElementById('s9w-step-' + i);
+        var dot = document.getElementById('s9w-dot-' + i);
         var title = document.getElementById('s9w-title-' + i);
-        var desc  = document.getElementById('s9w-desc-' + i);
+        var desc = document.getElementById('s9w-desc-' + i);
         var panel = document.getElementById('s9w-panel-' + i);
         var active = (i === n);
-        // Step 1 stays as "done" (green check) if workflow is selected
-        var done = (_hasSource && i === 1 && n !== 1);
-        if (row)   row.className = 's9w-step-row ' + (active ? 'active' : 'inactive');
-        if (dot)   {
-          dot.style.background = done ? '#3de08a' : active ? '#28d4c0' : 'rgba(255,255,255,.1)';
-          dot.style.color      = (done || active) ? '#080a10' : 'rgba(255,255,255,.3)';
-          dot.textContent      = done ? '✓' : String(i);
-        }
-        if (title) title.style.color = (active || done) ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.3)';
-        if (desc)  desc.style.color  = (active || done) ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.2)';
+        var done = (_hasSource && i === 1 && n > 1);
+        if (row) row.className = 's9w-step-row ' + (active ? 'active' : 'inactive');
+        if (dot) { dot.style.background = done ? '#3de08a' : active ? '#28d4c0' : 'rgba(255,255,255,.1)'; dot.style.color = (done || active) ? '#080a10' : 'rgba(255,255,255,.3)'; dot.textContent = done ? '\u2713' : String(i); }
+        if (title) title.style.color = (active || done) ? 'rgba(255,255,255,.88)' : 'rgba(255,255,255,.3)';
+        if (desc) desc.style.color = (active || done) ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.2)';
         if (panel) { panel.style.opacity = active ? '1' : '0'; panel.style.pointerEvents = active ? 'auto' : 'none'; }
       });
     }
 
-    // Build DAG from steps — always shown on phase 1
     _s9BuildWizardDag();
 
-    // If workflow already selected, start cycling from phase 2 immediately
-    if (_hasSource) {
-      setTimeout(function() {
-        _activatePhase(2);
-        function _cycle() {
-          var next = (_phase % _total) + 1;
-          _activatePhase(next);
-          setTimeout(_cycle, _phaseMs);
-        }
-        setTimeout(_cycle, _phaseMs);
-      }, _phaseMs);
-    } else {
+    var _startPhase = _hasSource ? 2 : 1;
+    if (_startPhase === 2) _activatePhase(1); // show step 1 as done first
+    setTimeout(function() {
+      _activatePhase(_startPhase);
       function _cycle() {
         var next = (_phase % _total) + 1;
         _activatePhase(next);
         setTimeout(_cycle, _phaseMs);
       }
       setTimeout(_cycle, _phaseMs);
-    }
+    }, _hasSource ? 500 : _phaseMs);
   }, 120);
 
   return html;
+}
+
+// ── Static 4-step flow diagram — shown in panel 1 before/after DAG loads ──
+function _s9StaticFlowDiagram() {
+  var FA = 'font-family:Arial,sans-serif;';
+  var steps = [
+    {label:'Checklist', type:'form',     color:'#a09ae8', border:'rgba(124,116,232,.5)', bg:'rgba(124,116,232,.1)'},
+    {label:'Approval',  type:'approval', color:'#f0a030', border:'rgba(240,160,48,.55)', bg:'rgba(240,160,48,.1)'},
+    {label:'Sign-off',  type:'signoff',  color:'#28d4c0', border:'rgba(40,212,192,.5)',  bg:'rgba(40,212,192,.1)'},
+    {label:'Meeting',   type:'meeting',  color:'#6ab0f5', border:'rgba(80,144,240,.5)',  bg:'rgba(80,144,240,.1)'},
+  ];
+  var trigger = '<div style="display:flex;flex-direction:column;align-items:center">' +
+    '<div style="background:rgba(61,224,138,.1);border:2px solid rgba(61,224,138,.5);border-radius:20px;padding:8px 28px;' + FA + 'font-size:13px;font-weight:700;color:#3de08a">▶ Workflow Start</div>' +
+    _s9DAGArrow() + '</div>';
+  var nodes = steps.map(function(s, i) {
+    var arrow = i < steps.length - 1 ? _s9DAGArrow() : '';
+    return '<div style="display:flex;flex-direction:column;align-items:center">' +
+      '<div style="background:' + s.bg + ';border:1.5px solid ' + s.border + ';border-radius:5px;padding:8px 20px;min-width:180px;text-align:center">' +
+        '<div style="' + FA + 'font-size:11px;color:' + s.color + ';font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px">' + s.type + '</div>' +
+        '<div style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.88)">' + s.label + '</div>' +
+      '</div>' + arrow +
+    '</div>';
+  }).join('');
+  var endNode = '<div style="background:rgba(240,96,96,.1);border:2px solid rgba(240,96,96,.4);border-radius:20px;padding:8px 28px;' + FA + 'font-size:13px;font-weight:700;color:#f06060">◼ Workflow End</div>';
+  return trigger + nodes + endNode;
+}
+
+function _s9DAGArrow() {
+  return '<div style="display:flex;flex-direction:column;align-items:center;margin:2px 0">' +
+    '<div style="width:1.5px;height:16px;background:rgba(255,255,255,.15)"></div>' +
+    '<div style="border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid rgba(255,255,255,.2)"></div>' +
+  '</div>';
 }
 
 // ── Build real vertical DAG from actual template steps ────────────────────
