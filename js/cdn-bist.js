@@ -401,7 +401,7 @@ async function runBistScript(scriptId, onProgress) {
               console.log(_tag, '  GOTO: route_to_seq', gotoSeq, '→ jumping to spec step', targetId,
                 'at index', targetSi, '(visit #' + ((_visitCount[targetId]||0)+1) + ')');
               onProgress?.({ type:'step_route_back', fromStepId: stp.id,
-                toStepId: targetId });
+                toStepId: targetId, toStepSeq: gotoSeq });
               nextSi = targetSi;
             } else {
               console.log(_tag, '  GOTO suppressed — targetId', targetId, 'at visit cap');
@@ -1871,31 +1871,47 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
       window._bckPendingArcFromSeq = null;
     }
   } else if (type === 'step_route_back') {
-    _bistCkRadio('tower', '[route] Rejection loop — returning to step '+ev.toStepId);
-    // Reset all cards from toStepId onward to idle state
-    var allNodeCards = document.querySelectorAll('.bck-nc');
-    var foundTarget = false;
-    allNodeCards.forEach(function(card) {
-      if (card.id === 'bck-n-'+ev.toStepId) foundTarget = true;
-      if (foundTarget) {
+    // ev.fromStepId = BIST step id of rejection step (e.g. s4)
+    // ev.toStepId   = BIST step id of the first visit of the target (e.g. s2 = first pass of seq 1)
+    // ev.toStepSeq  = template step_seq being routed back to
+    console.log('[cdn-bist:route_back] from:'+ev.fromStepId+' to:'+ev.toStepId+' toSeq:'+ev.toStepSeq);
+    _bistCkRadio('tower', '[route] \u21a9 Rejection loop — resetting to '+
+      (ev.toStepSeq ? 'step seq '+ev.toStepSeq : ev.toStepId));
+
+    // Reset all DAG cards whose BIST step id comes AFTER toStepId in DOM order.
+    // toStepId card itself is NOT reset — it will be re-activated by the next step_start.
+    // We find toStepId card first, then reset everything after it.
+    var allNodeCards = Array.from(document.querySelectorAll('.bck-nc, .bck-nc.ac, .bck-nc.dn'));
+    var toIdx = allNodeCards.findIndex(function(c) { return c.id === 'bck-n-'+ev.toStepId; });
+    console.log('[cdn-bist:route_back] toIdx in DOM:'+toIdx+' total cards:'+allNodeCards.length);
+    if (toIdx >= 0) {
+      // Reset cards AFTER the target (cards that are now "downstream" of the reset point)
+      allNodeCards.slice(toIdx + 1).forEach(function(card) {
         card.className = 'bck-nc';
         var nst = card.querySelector('.bck-nst');
         if (nst) {
           var dot = nst.querySelector('.bck-nsdot');
           var txt = nst.querySelector('.bck-nstxt');
-          if (dot) dot.style.background = 'rgba(0,210,255,.3)';
-          if (txt) { txt.textContent = 'Pending'; txt.style.color = 'rgba(0,210,255,.6)'; }
+          if (dot) dot.style.background = 'rgba(0,210,255,.18)';
+          if (txt) { txt.textContent = 'Pending'; txt.style.color = 'rgba(0,210,255,.45)'; }
         }
-      }
-    });
+      });
+    }
+
+    // Draw arc: FROM the rejection card TO the existing target card (first visit of that seq)
     var fromCard = document.getElementById('bck-n-'+ev.fromStepId);
     var toCard   = ev.toStepId ? document.getElementById('bck-n-'+ev.toStepId) : null;
+    console.log('[cdn-bist:route_back] fromCard exists:'+!!fromCard+' toCard exists:'+!!toCard);
 
     if (fromCard && toCard) {
-      // Register arc for live tracking
       if (!window._bckArcs) window._bckArcs = [];
+      // Clear any existing arcs before adding new one (one rejection arc at a time)
+      window._bckArcs = [];
       window._bckArcs.push({from: ev.fromStepId, to: ev.toStepId});
       _bckStartArcLoop();
+    } else {
+      console.warn('[cdn-bist:route_back] Cannot draw arc — card missing. toStepId:'+ev.toStepId+
+        '. Cards in DOM:'+ Array.from(document.querySelectorAll('[id^="bck-n-"]')).map(function(el){return el.id;}).join(','));
     }
   } else if (type === 'step_pass') {
     var idx = ev.stepIdx || 0;
@@ -1969,17 +1985,35 @@ function _bckRedrawArcs() {
   window._bckArcs.forEach(function(arc) {
     var fromEl = document.getElementById('bck-n-'+arc.from);
     var toEl   = document.getElementById('bck-n-'+arc.to);
-    if (!fromEl || !toEl) return;
+    if (!fromEl || !toEl) {
+      console.warn('[cdn-bist:arc] card not found — from:bck-n-'+arc.from+' exists:'+!!fromEl+' to:bck-n-'+arc.to+' exists:'+!!toEl);
+      return;
+    }
 
     var fR = fromEl.getBoundingClientRect();
     var tR = toEl.getBoundingClientRect();
 
+    // Use card mid-height so arc connects card bodies, not bottom edges
     var x1 = fR.left + fR.width/2  - wsRect.left;
-    var y1 = fR.bottom              - wsRect.top;
+    var y1 = fR.top  + fR.height/2 - wsRect.top;
     var x2 = tR.left + tR.width/2  - wsRect.left;
-    var y2 = tR.bottom              - wsRect.top;
-    var drop = 18 + Math.abs(x1-x2) * 0.06;
-    var mx = (x1+x2)/2, my = Math.max(y1,y2) + drop;
+    var y2 = tR.top  + tR.height/2 - wsRect.top;
+
+    // Backward arc = destination is LEFT of source (rejection loop back to earlier step)
+    var isBackward = x2 < x1;
+    var span = Math.abs(x1 - x2);
+    var bow  = 36 + span * 0.20;
+
+    // Backward arcs bow UPWARD (above cards) so they visually read as going back
+    // Forward arcs bow DOWNWARD (below cards)
+    var mx = (x1 + x2) / 2;
+    var my = isBackward
+      ? Math.min(y1, y2) - bow
+      : Math.max(y1, y2) + bow;
+
+    console.log('[cdn-bist:arc] '+arc.from+'->'+arc.to+
+      ' x1:'+Math.round(x1)+' x2:'+Math.round(x2)+
+      ' backward:'+isBackward+' bow:'+Math.round(bow));
 
     var path = document.createElementNS('http://www.w3.org/2000/svg','path');
     path.setAttribute('d','M '+x1+' '+y1+' Q '+mx+' '+my+' '+x2+' '+y2);
@@ -1987,19 +2021,32 @@ function _bckRedrawArcs() {
     path.setAttribute('stroke','#E24B4A');
     path.setAttribute('stroke-width','2');
     path.setAttribute('stroke-dasharray','5 3');
-    path.setAttribute('opacity','0.85');
+    path.setAttribute('opacity','0.9');
     arcSvg.appendChild(path);
 
-    var angle = Math.atan2(y2-my, x2-mx);
-    var ah = 9;
+    // Arrowhead: quadratic bezier tangent at t=1 is direction from ctrl-point to endpoint
+    var angle = Math.atan2(y2 - my, x2 - mx);
+    var ah = 10;
     var arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
     arrow.setAttribute('points',
       x2+','+y2+' '+
-      (x2-ah*Math.cos(angle-0.4))+','+(y2-ah*Math.sin(angle-0.4))+' '+
-      (x2-ah*Math.cos(angle+0.4))+','+(y2-ah*Math.sin(angle+0.4)));
+      (x2 - ah*Math.cos(angle-0.42))+','+(y2 - ah*Math.sin(angle-0.42))+' '+
+      (x2 - ah*Math.cos(angle+0.42))+','+(y2 - ah*Math.sin(angle+0.42)));
     arrow.setAttribute('fill','#E24B4A');
-    arrow.setAttribute('opacity','0.85');
+    arrow.setAttribute('opacity','0.9');
     arcSvg.appendChild(arrow);
+
+    // Arc label at control point
+    var txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt.setAttribute('x', mx);
+    txt.setAttribute('y', my - 6);
+    txt.setAttribute('text-anchor','middle');
+    txt.setAttribute('font-size','10');
+    txt.setAttribute('font-family','Arial,sans-serif');
+    txt.setAttribute('fill','#E24B4A');
+    txt.setAttribute('opacity','0.75');
+    txt.textContent = isBackward ? '\u21a9 reset' : '\u21aa loop';
+    arcSvg.appendChild(txt);
   });
 }
 
