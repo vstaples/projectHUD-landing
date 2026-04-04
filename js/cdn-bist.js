@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-BC','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-BD','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -147,7 +147,8 @@ async function runBistScript(scriptId, onProgress) {
   }
 
   try {
-    for (let si = 0; si < spec.steps.length; si++) {
+    let si = 0;
+    while (si < spec.steps.length) {
       const stp = spec.steps[si];
       onProgress?.({ type:'step_start', stepId: stp.id, stepIdx: si,
         total: spec.steps.length, action: stp.action, params: stp.params });
@@ -196,18 +197,6 @@ async function runBistScript(scriptId, onProgress) {
         const actor = _bistResolveActor(stp.params?.actor);
         const routeSeq  = stp.params?.route_to_seq != null ? Number(stp.params.route_to_seq) : null;
         const routeStep = routeSeq ? stepBySeq[routeSeq] : null;
-        const seqNum    = Number(seq);
-        console.log('[route] stp.id:', stp.id, 'seq:', seqNum, 'routeSeq:', routeSeq);
-        if (routeSeq && routeSeq < seqNum) {
-          const targetBistStep = spec.steps.find(s => Number(s.params?.step_seq) === routeSeq);
-          const targetCardId = targetBistStep ? 'bck-n-'+targetBistStep.id : null;
-          const targetCardExists = targetCardId && !!document.getElementById(targetCardId);
-          console.log('[route-back] from:', stp.id, 'to:', targetBistStep?.id, 'cardExists:', targetCardExists, 'cardId:', targetCardId);
-          if (targetCardExists) {
-            onProgress?.({ type:'step_route_back', fromStepId: stp.id,
-              toStepId: targetBistStep.id });
-          }
-        }
         // Write step_completed
         await API.post('workflow_step_instances', {
           instance_id: instId, firm_id: FIRM_ID_CAD,
@@ -274,6 +263,23 @@ async function runBistScript(scriptId, onProgress) {
       onProgress?.({ type:'step_pass', stepId: stp.id, stepIdx: si,
         action: stp.action, stepName, outcome: stp.params?.outcome });
       await _bckFreezeWait(); // freeze point — after step complete
+
+      // ── GOTO: if complete_step routed backward, jump to that script step ──
+      let nextSi = si + 1;
+      if (stp.action === 'complete_step' && stp.params?.route_to_seq != null) {
+        const gotoSeq = Number(stp.params.route_to_seq);
+        const curSeq  = Number(stp.params.step_seq);
+        if (gotoSeq < curSeq) {
+          // Find the script step index whose step_seq matches gotoSeq
+          const targetSi = spec.steps.findIndex(s => Number(s.params?.step_seq) === gotoSeq);
+          if (targetSi >= 0 && targetSi < si) {
+            onProgress?.({ type:'step_route_back', fromStepId: stp.id,
+              toStepId: spec.steps[targetSi].id });
+            nextSi = targetSi;
+          }
+        }
+      }
+      si = nextSi;
     }
 
     // All steps passed
