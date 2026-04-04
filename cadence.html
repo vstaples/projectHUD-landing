@@ -964,7 +964,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.34 — Left rail headers teal, health badge readable, iron rule on muted gray titles','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.35 — Suite panels renamed, failing card scrolled+pulsed, diff diagnosis expanded','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1192,9 +1192,12 @@ function _s9RenderSimPanel(el) {
 
         // Suite — rich health panel
         '<div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.07);padding:12px 12px 10px;flex-shrink:0">' +
-          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
-            '<span style="' + FA + 'font-size:11px;font-weight:700;letter-spacing:.1em;' +
-              'color:#5fd4c8;text-transform:uppercase">Suite Health</span>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
+            '<div>' +
+              '<span style="' + FA + 'font-size:11px;font-weight:700;letter-spacing:.1em;' +
+                'color:#5fd4c8;text-transform:uppercase">Suite Health</span>' +
+              '<div style="' + FA + 'font-size:11px;color:rgba(255,255,255,.3);margin-top:1px">All scripts in this workflow</div>' +
+            '</div>' +
             '<span id="s9-suite-health-badge" style="' + FA + 'font-size:15px;font-weight:700;' +
               'color:rgba(255,255,255,.55)">—</span>' +
           '</div>' +

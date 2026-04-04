@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE8','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260404-SE9','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -189,7 +189,7 @@ var SE_CSS = '<style id="se-css">' + [
 'margin-bottom:6px;transition:border-color .15s;cursor:pointer}',
 '.se-card:hover{border-color:var(--se-b2)}',
 '.se-card.sel{border-color:var(--se-cad);background:rgba(127,119,221,.05)}',
-'.se-card.fail{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.04)}',
+'.se-card.fail{border-left:3px solid #f87171;border-color:rgba(248,113,113,.5);background:rgba(248,113,113,.08)}',
 '.se-card-hdr{display:flex;align-items:center;gap:6px;padding:6px 8px;',
 'border-bottom:1px solid var(--se-b)}',
 '.se-card-icon{width:20px;height:20px;border-radius:3px;display:flex;',
@@ -403,6 +403,20 @@ function seRenderEditor() {
 
   _seEditorEl.innerHTML = html;
   _seBindEvents();
+  // Auto-scroll to failing card if there is one
+  setTimeout(function() {
+    var lastRun = _seLastRunFor(_seSelectedId);
+    if (lastRun && lastRun.failure_step) {
+      var failCard = document.getElementById('se-c-' + lastRun.failure_step);
+      if (failCard) {
+        failCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Pulse the card to draw attention
+        failCard.style.transition = 'box-shadow .3s';
+        failCard.style.boxShadow = '0 0 0 3px rgba(248,113,113,.6)';
+        setTimeout(function() { failCard.style.boxShadow = '0 0 0 0 rgba(248,113,113,0)'; }, 1200);
+      }
+    }
+  }, 80);
 }
 
 // ── Left panel — Action Blocks only (Scripts + Template Steps live in Simulator left rail) ──
@@ -464,10 +478,30 @@ function _seRenderTimeline(sc, lastRun) {
   // Fail banner
   if (lastRun && lastRun.status !== 'passed' && lastRun.failure_step) {
     var reason = lastRun.failure_reason || 'Assertion failed';
+    var failStepObj = (sc.spec.steps||[]).find(function(s){ return s.id === lastRun.failure_step; });
+    var failStepName = failStepObj ? (failStepObj.params && failStepObj.params.step_seq
+      ? 'Step ' + failStepObj.params.step_seq
+      : (failStepObj.action === 'launch_instance' ? 'Instance Launch' : failStepObj.action))
+      : lastRun.failure_step;
+    // Parse expected vs actual from failure_reason
+    var expected = '', actual = '';
+    if (lastRun.failure_assertion) {
+      var opKey2 = Object.keys(lastRun.failure_assertion).find(function(k){ return k !== 'check'; });
+      if (opKey2) expected = String(lastRun.failure_assertion[opKey2]);
+    }
+    var gotMatch2 = reason.match(/got (.+)$/);
+    if (gotMatch2) actual = gotMatch2[1];
     html += '<div class="se-banner">';
-    html += '<span class="se-banner-id">✕ '+_seEsc(lastRun.failure_step)+'</span>';
-    html += '<span>'+_seEsc(reason)+'</span>';
-    html += '</div>';
+    html += '<div style="font-family:Arial,sans-serif">';
+    html += '<div style="font-size:13px;font-weight:700;color:#fca5a5;margin-bottom:4px">✕ Failed at '+_seEsc(failStepName)+'</div>';
+    if (lastRun.failure_assertion && lastRun.failure_assertion.check) {
+      html += '<div style="font-size:13px;color:rgba(255,255,255,.7);margin-bottom:2px">';
+      html += 'Checked: <code style="background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px;font-size:12px">'+_seEsc(lastRun.failure_assertion.check)+'</code>';
+      html += '</div>';
+    }
+    if (expected) html += '<div style="font-size:13px;color:rgba(255,255,255,.6)">Expected <span style="color:#86efac">'+_seEsc(expected)+'</span>'+(actual?' &nbsp;·&nbsp; got <span style="color:#fca5a5">'+_seEsc(actual)+'</span>':'')+'</div>';
+    else html += '<div style="font-size:13px;color:rgba(255,255,255,.5)">'+_seEsc(reason)+'</div>';
+    html += '</div></div>';
   }
 
   steps.forEach(function(stp, idx) {
@@ -554,19 +588,23 @@ function _seRenderCard(stp, idx, sc, lastRun) {
         html += '<button class="se-a-del" onclick="event.stopPropagation();seDeleteAssert(\''+stp.id+'\','+ai+')">✕</button>';
         html += '</div>';
 
-        // Diff block for failed assertion
-        if (aPass === false && lastRun && lastRun.failure_assertion) {
-          var fa = lastRun.failure_assertion;
-          if (fa.check === a.check) {
-            html += '<div class="se-diff">';
-            html += '<div class="se-diff-t">✕ Assertion failed</div>';
-            html += '<div class="se-diff-row"><span class="se-diff-l">expected</span><span class="se-diff-e">'+_seEsc(String(aVal))+'</span></div>';
+        // Diff block — shown for every failed assertion with plain-English explanation
+        if (aPass === false) {
+          html += '<div class="se-diff">';
+          html += '<div class="se-diff-t">✕ This assertion failed on the last run</div>';
+          html += '<div class="se-diff-row"><span class="se-diff-l">checked</span><span class="se-diff-e" style="font-family:monospace">'+_seEsc(a.check)+'</span></div>';
+          html += '<div class="se-diff-row"><span class="se-diff-l">expected</span><span class="se-diff-e">'+_seEsc(String(aVal))+'</span></div>';
+          if (lastRun && lastRun.failure_assertion && lastRun.failure_assertion.check === a.check) {
             if (lastRun.failure_reason) {
               var gotMatch = lastRun.failure_reason.match(/got (.+)$/);
               if (gotMatch) html += '<div class="se-diff-row"><span class="se-diff-l">actual</span><span class="se-diff-a">'+_seEsc(gotMatch[1])+'</span></div>';
+              html += '<div style="margin-top:6px;font-size:12px;color:rgba(255,255,255,.45);font-family:Arial,sans-serif;line-height:1.5">';
+              html += 'The workflow returned a different value than expected. ';
+              html += 'Either the workflow routed incorrectly, or this assertion needs updating to match the current workflow behavior.';
+              html += '</div>';
             }
-            html += '</div>';
           }
+          html += '</div>';
         }
       });
       html += '</div>';
@@ -648,7 +686,8 @@ function _seRenderRight(sc) {
 
   // Suite stats
   html += '<div class="se-rp-sec">';
-  html += '<div class="se-rp-t">Suite</div>';
+  html += '<div class="se-rp-t">This Script</div>';
+  html += '<div style="font-size:12px;color:var(--se-mu);margin-bottom:6px;font-family:Arial,sans-serif">Counts for the script currently open</div>';
   html += '<div class="se-stat-grid">';
   var passing = 0, failing = 0, notrun = 0;
   _seScripts.forEach(function(s) {
@@ -666,7 +705,8 @@ function _seRenderRight(sc) {
 
   // Recent runs
   html += '<div class="se-rp-sec">';
-  html += '<div class="se-rp-t">Recent runs</div>';
+  html += '<div class="se-rp-t">Recent Runs</div>';
+  html += '<div style="font-size:12px;color:var(--se-mu);margin-bottom:6px;font-family:Arial,sans-serif">Click any run to open that script</div>';
   var shown = _seRecentRuns.slice(0, 6);
   if (!shown.length) {
     html += '<div style="font-size:12px;color:var(--se-mu);font-style:italic">No runs yet</div>';
@@ -1225,5 +1265,5 @@ window._seHydrateFormState = async function(state, instId, tmplSteps) { return s
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE8 — Section headers teal, recent runs clickable+tooltip, suite counts clarified',
+console.log('%c[cdn-script-editor] v20260404-SE9 — Clear panel naming, failing card highlighted+scrolled, full diff diagnosis',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
