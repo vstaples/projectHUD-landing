@@ -1,6 +1,15 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE9','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE11','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// ── SE11 patches (2026-04-04) ───────────────────────────────────────────────
+// 1. 80ms paint yield after step_start onProgress before DB write. Without this,
+//    the orange/active card state never rendered — the browser had no chance to
+//    paint between step_start and step_pass completing. Affects T3 post-reset
+//    replay steps (s5/s6) which execute too fast to see active state.
+// ── SE10 patches (2026-04-04) ───────────────────────────────────────────────
+// 1. Seq label derived from card's DOM position, not stepIdx. Reused cards at
+//    position 2 now show 3.2 not 3.5 — stepIdx reflects spec loop index which
+//    is wrong for reused slots.
 // ── SE9 patches (2026-04-04) ────────────────────────────────────────────────
 // 1. Reused cards update seq label (e.g. 3.5→3.2) atomically with id re-assignment.
 // 2. REWORK LOOPS counter now increments on step_route_back (was only on step_fail).
@@ -265,6 +274,9 @@ async function runBistScript(scriptId, onProgress) {
         total: spec.steps.length, action: stp.action, params: stp.params,
         stepSeq: stp.params?.step_seq });
 
+      // Minimum yield so the browser paints the orange/active card state before DB write begins.
+      // _bckFreezeWait alone doesn't yield when unfrozen — this guarantees a paint frame.
+      await new Promise(r => setTimeout(r, 80));
       await _bckFreezeWait(); // freeze point — before DB write
 
       // ── Execute action ──────────────────────────────────────────────────────
@@ -2351,7 +2363,11 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps, ev) {
   var nst = document.getElementById('bck-nst-'+stepId); if (!nst) return;
   var col = {done:'#4ade80', active:'#EF9F27', reset:'#EF9F27'}[state] || '#888';
   var lbl2 = {done:label, active:'Active', reset:'Reset → '+label}[state] || label;
-  var _seq = (_bckCurrentTestIdx+1)+'.'+(stepIdx+1);
+  // Use DOM position for the seq label — reused cards occupy a different slot than stepIdx implies
+  var _nodes = _bckEl('bck-nodes');
+  var _cardEls = _nodes ? Array.from(_nodes.querySelectorAll('.bck-nc')) : [];
+  var _domPos = _cardEls.indexOf(el);
+  var _seq = (_bckCurrentTestIdx+1)+'.'+((_domPos >= 0 ? _domPos : stepIdx)+1);
   nst.innerHTML = '<div class="bck-nsdot" style="background:'+col+'"></div>'+
     '<span class="bck-nstxt" style="color:'+col+'">'+_bistEscHtml(lbl2)+'</span>'+
     '<span style="margin-left:auto;font-size:12px;font-family:Arial,sans-serif;font-weight:700;color:rgba(255,180,60,.85)">'+_seq+'</span>';
