@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE2','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260404-SE3','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -300,9 +300,14 @@ var SE_CSS = '<style id="se-css">' + [
 '</style>'].join('');
 
 // ── Entry point ──────────────────────────────────────────────────────────────
-async function seOpenEditor(templateId) {
-  _seEditorEl = document.getElementById('tmpl-tests-body');
-  if (!_seEditorEl) return;
+// targetElId: ID of the container element to render into (default: 'tmpl-tests-body')
+async function seOpenEditor(templateId, targetElId) {
+  var targetId = targetElId || 'tmpl-tests-body';
+  _seEditorEl = document.getElementById(targetId);
+  if (!_seEditorEl) {
+    console.warn('[cdn-script-editor] Target element not found:', targetId);
+    return;
+  }
 
   _seEditorEl.innerHTML = '<div style="padding:20px;color:rgba(255,255,255,.3);font-size:12px;font-family:Arial,sans-serif">Loading…</div>';
 
@@ -1173,8 +1178,7 @@ function _seBindEvents() {
   var existing = document._seKeyHandler;
   if (existing) document.removeEventListener('keydown', existing);
   document._seKeyHandler = function(e) {
-    var panel = document.getElementById('tmpl-tests-body');
-    if (!panel) return;
+    if (!_seEditorEl) return;
     if ((e.metaKey || e.ctrlKey) && e.key === 's') {
       e.preventDefault();
       seSaveScript();
@@ -1188,24 +1192,9 @@ window._seOnCompleteStep = async function(stp, instId, stepBySeq) {};
 window._seOnFormSection  = async function(stp, instId, stepBySeq) {};
 window._seHydrateFormState = async function(state, instId, tmplSteps) { return state; };
 
-// ── Install hook ─────────────────────────────────────────────────────────────
-console.log('%c[cdn-script-editor] v20260404-SE2 loaded — visual BIST editor active',
+// ── SE3: seOpenEditor is now the public API ───────────────────────────────────
+// Call seOpenEditor(templateId, targetElId) from anywhere.
+// The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
+// The loadTmplTests hook has been removed — Tests button removed from Library.
+console.log('%c[cdn-script-editor] v20260404-SE3 — target-agnostic, Simulator-native',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-
-(function _installSeHook() {
-  var _deadline = Date.now() + 8000;
-  function _tryHook() {
-    if (typeof loadTmplTests !== 'function') {
-      if (Date.now() < _deadline) setTimeout(_tryHook, 150);
-      return;
-    }
-    var _origLoad = window.loadTmplTests;
-    window.loadTmplTests = function(templateId) {
-      var bodyEl = document.getElementById('tmpl-tests-body');
-      if (bodyEl) return seOpenEditor(templateId);
-      return _origLoad.apply(this, arguments);
-    };
-    console.log('[cdn-script-editor] loadTmplTests hooked — visual editor active');
-  }
-  _tryHook();
-})();

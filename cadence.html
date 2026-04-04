@@ -2445,6 +2445,41 @@ async function _s9OnTemplateSelect(templateId) {
 
 
 
+// ── Open script editor in Simulator right panel ───────────────────────────
+function _s9OpenScriptEditor(scriptId) {
+  var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+  if (!tmpl) return;
+  var right = document.getElementById('s9-sim-right');
+  if (!right) return;
+  right.innerHTML =
+    '<div style="display:flex;flex-direction:column;height:100%;width:100%;background:#0a0c10">' +
+      '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:8px 14px;' +
+        'border-bottom:1px solid rgba(255,255,255,.06);background:#0c0f18">' +
+        '<button onclick="_s9CloseScriptEditor()" style="font-family:Arial,sans-serif;font-size:12px;' +
+          'font-weight:600;padding:4px 12px;border-radius:3px;border:1px solid rgba(255,255,255,.12);' +
+          'background:rgba(255,255,255,.05);color:rgba(255,255,255,.7);cursor:pointer">← Back</button>' +
+        '<span style="font-family:Arial,sans-serif;font-size:13px;color:rgba(255,255,255,.5)">Script Editor</span>' +
+      '</div>' +
+      '<div id="s9-script-editor-body" style="flex:1;min-height:0;overflow:hidden"></div>' +
+    '</div>';
+  if (typeof seOpenEditor === 'function') {
+    seOpenEditor(tmpl.id, 's9-script-editor-body');
+    if (scriptId) {
+      setTimeout(function() {
+        if (typeof seSelectScript === 'function') seSelectScript(scriptId);
+      }, 600);
+    }
+  } else {
+    document.getElementById('s9-script-editor-body').innerHTML =
+      '<div style="font-family:Arial,sans-serif;font-size:13px;color:rgba(255,255,255,.3);padding:24px">Script editor not loaded.</div>';
+  }
+}
+
+function _s9CloseScriptEditor() {
+  var hasScripts = document.querySelectorAll('#s9-sim-scripts-list > div').length > 0;
+  _s9UpdateRightPanel(hasScripts);
+}
+
 function _s9ShowCert() {
   var overlay = document.getElementById('s9-cert-overlay');
   if (!overlay) return;
@@ -2741,7 +2776,8 @@ async function _s9LoadSimScripts(templateId, version) {
           var stepCount = (spec.steps||[]).length;
           return '<div style="padding:7px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);' +
             'font-family:Arial,sans-serif;transition:background .1s" ' +
-            'onmouseover="this.style.background=\'rgba(255,255,255,.03)\'" ' +
+            'onclick="_s9OpenScriptEditor(\'' + s.id + '\')" ' +
+            'onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" ' +
             'onmouseout="this.style.background=\'transparent\'">' +
             '<div style="font-size:12px;color:rgba(255,255,255,.85);margin-bottom:4px;line-height:1.3">' + _s9EscHtml(s.name) + '</div>' +
             '<div style="display:flex;align-items:center;gap:5px">' +

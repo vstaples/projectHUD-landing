@@ -1,5 +1,5 @@
 // cdn-template-editor.js — Cadence: template editor, spine, step CRUD
-console.log('%c[cdn-template-editor] v20260403-C','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-template-editor] v20260403-D','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // Depends on: cdn-dag-viewer, cdn-assignee, cdn-outcomes, cdn-documents
 // LOAD ORDER: 7th
 
@@ -133,7 +133,7 @@ function renderEditor() {
           </div>
         </div>
       </div>
-      <div class="tmpl-coc-panel" id="tmpl-tests-panel">
+      <div class="tmpl-coc-panel" id="tmpl-tests-panel" style="display:none">
         <div class="tmpl-coc-resize" id="tmpl-tests-resize" title="Drag to resize"></div>
         <div class="tmpl-coc-inner">
           <div class="tmpl-coc-header">
@@ -180,10 +180,7 @@ function renderEditor() {
         <button class="btn btn-ghost btn-sm" onclick="toggleTmplCoC()" id="coc-btn"
           title="Change history">CoC</button>
         ${!isReleased ? `
-        <button class="btn btn-ghost btn-sm" onclick="toggleTmplTests()" id="tests-btn"
-          title="Built-in self tests">Tests</button>` : ''}
         <button class="btn btn-ghost btn-sm" onclick="deleteTemplate()">🗑</button>
-        ${!isReleased ? `
         <button class="btn btn-ghost btn-sm" id="save-btn" onclick="saveTemplate(false)"
           title="Save without version bump">Save</button>
         <button class="btn btn-ghost btn-sm" id="commit-btn" onclick="commitTemplate()"
