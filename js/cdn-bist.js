@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-BM','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-BN','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1755,16 +1755,9 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     var idx = ev.stepIdx || 0;
     _bistCkSetNode(ev.stepId, idx, test, 'done', ev.outcome || 'Done', tmplSteps);
     _bckLastDoneId = ev.stepId;
-    // Draw rejection arc if this step routes backward in the template
-    if (ev.routeToSeq && ev.stepSeq && Number(ev.routeToSeq) < Number(ev.stepSeq)) {
-      // Find the target card by matching step_seq in tmplSteps
-      var _routeTarget = tmplSteps ? tmplSteps.find(function(s){ return s.sequence_order === Number(ev.routeToSeq); }) : null;
-      var _routeTargetCard = _routeTarget ? document.querySelector('[id^="bck-n-"]') : null;
-      // Find first card whose template_step_id matches — use node id pattern
-      var _allCards = document.querySelectorAll('[id^="bck-n-"]');
-      var _toCard = null;
-      // The toCard is the card with the lowest stepIdx that matches routeToSeq
-      // For now push arc from current to pending card (next step_start)
+    // Draw rejection arc when step outcome routes backward
+    // Detect: next step_start fires for a stepIdx LESS than current — means loop
+    if (ev.outcome && (ev.outcome === 'rejected' || ev.outcome === 'declined' || ev.outcome === 'design_change')) {
       window._bckPendingArcFrom = ev.stepId;
     }
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt dn';
