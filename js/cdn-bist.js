@@ -1,6 +1,13 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-BQ','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE1','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// ── SE1 patches (2026-04-04) ────────────────────────────────────────────────
+// 1. complete_form_section action branch added to runBistScript dispatch
+// 2. _seOnCompleteStep hook called after complete_step CoC write (form_data)
+// 3. _seOnFormSection hook called for complete_form_section action
+// 4. reloadState augmented with _seHydrateFormState (step[N].form.* assertions)
+// 5. Structured console group logging throughout runBistScript
+// ────────────────────────────────────────────────────────────────────────────
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -102,13 +109,30 @@ async function _bckFreezeWait() {
 
 async function runBistScript(scriptId, onProgress) {
   const runStart = Date.now();
+  const _tag = '[cdn-bist:run:' + String(scriptId).slice(0,8) + ']';
+
+  console.group(_tag + ' runBistScript started');
+  console.log(_tag, 'scriptId:', scriptId, '| time:', new Date().toISOString());
 
   // Load script
   const scripts = await API.get(`bist_test_scripts?id=eq.${scriptId}`).catch(()=>[]);
   const script  = scripts?.[0];
-  if (!script) throw new Error('Script not found');
+  if (!script) {
+    console.error(_tag, 'Script not found — aborting');
+    console.groupEnd();
+    throw new Error('Script not found');
+  }
+  console.log(_tag, 'Script loaded:', script.name);
 
   const spec = typeof script.script === 'string' ? JSON.parse(script.script) : script.script;
+  console.log(_tag, 'Spec steps:', (spec.steps||[]).length, '| cleanup:', spec.cleanup || 'delete');
+
+  // Guard: spec must have a steps array
+  if (!Array.isArray(spec.steps) || !spec.steps.length) {
+    console.warn(_tag, 'Script has no steps — nothing to run');
+    console.groupEnd();
+    return { status:'error', reason:'Script has no steps' };
+  }
 
   // Create run record
   const runRows = await API.post('bist_runs', {
@@ -122,6 +146,11 @@ async function runBistScript(scriptId, onProgress) {
     run_at:           new Date().toISOString(),
   });
   const runId      = runRows?.[0]?.id;
+  if (!runId) {
+    console.error(_tag, 'bist_runs INSERT returned no id — check RLS / schema');
+  } else {
+    console.log(_tag, 'bist_runs row created:', runId);
+  }
   window._bckCurrentRunId = runId;
   let   instId     = null;
   let   stepsPassed = 0;
@@ -130,6 +159,8 @@ async function runBistScript(scriptId, onProgress) {
   const tmplSteps = await API.get(
     `workflow_template_steps?template_id=eq.${script.template_id}&order=sequence_order.asc`
   ).catch(()=>[]);
+  console.log(_tag, 'Template steps loaded:', (tmplSteps||[]).length,
+    '| ids:', (tmplSteps||[]).map(s => s.sequence_order + ':' + s.id.slice(0,6)).join(' '));
 
   const stepBySeq = {};
   (tmplSteps||[]).forEach(s => { stepBySeq[s.sequence_order] = s; });
@@ -141,9 +172,19 @@ async function runBistScript(scriptId, onProgress) {
       API.get(`workflow_step_instances?instance_id=eq.${instId}&order=created_at.asc,id.asc,id.asc`).catch(()=>[]),
     ]);
     const inst = instArr?.[0];
-    if (!inst) return null;
+    if (!inst) {
+      console.warn(_tag, 'reloadState: instance row not found for', instId);
+      return null;
+    }
     inst._tmplSteps = tmplSteps;
-    return _bistBuildState(inst, tmplSteps||[], coc||[]);
+    let state = _bistBuildState(inst, tmplSteps||[], coc||[]);
+    console.log(_tag, 'reloadState: CoC events:', (coc||[]).length,
+      '| steps in state:', Object.keys(state.steps).length);
+    // ── SE1: augment state with form submission data ──────────────────────
+    if (typeof window._seHydrateFormState === 'function') {
+      state = await window._seHydrateFormState(state, instId, tmplSteps||[]);
+    }
+    return state;
   }
 
   try {
@@ -154,10 +195,17 @@ async function runBistScript(scriptId, onProgress) {
       _visitCount[stp.id] = (_visitCount[stp.id] || 0) + 1;
       if (_visitCount[stp.id] > 3) {
         const loopReason = 'Step '+stp.id+' visited '+_visitCount[stp.id]+' times — infinite loop detected';
+        console.error(_tag, 'INFINITE LOOP:', loopReason);
         onProgress?.({ type:'step_fail', stepId: stp.id, stepIdx: si, reason: loopReason });
         onProgress?.({ type:'radio', side:'reject', msg:'TOWER: Infinite loop aborted at '+stp.id+' — check route_to_seq logic' });
+        console.groupEnd();
         return { status:'failed', runId, reason: loopReason };
       }
+
+      console.log(_tag, '→ step', stp.id, '| action:', stp.action,
+        '| seq:', stp.params?.step_seq ?? '—',
+        '| visit #' + _visitCount[stp.id]);
+
       onProgress?.({ type:'step_start', stepId: stp.id, stepIdx: si,
         total: spec.steps.length, action: stp.action, params: stp.params,
         stepSeq: stp.params?.step_seq });
@@ -169,6 +217,7 @@ async function runBistScript(scriptId, onProgress) {
         const actor   = _bistResolveActor(stp.params?.launched_by);
         const title   = (stp.params?.title||'BIST — {timestamp}')
           .replace('{timestamp}', new Date().toISOString());
+        console.log(_tag, '  launch_instance | actor:', actor.userName, '| title:', title);
         const rows = await API.post('workflow_instances', {
           firm_id:     FIRM_ID_CAD,
           template_id: script.template_id,
@@ -179,7 +228,12 @@ async function runBistScript(scriptId, onProgress) {
           created_at:  new Date().toISOString(),
         });
         instId = rows?.[0]?.id;
-        if (!instId) throw new Error('Failed to create instance');
+        if (!instId) {
+          console.error(_tag, '  launch_instance FAILED — workflow_instances INSERT returned no id');
+          console.error(_tag, '  Check: RLS on workflow_instances, FIRM_ID_CAD value, template_id exists');
+          throw new Error('Failed to create instance');
+        }
+        console.log(_tag, '  instance created:', instId);
         onProgress?.({ type:'instance_created', instId });
         // Write launch CoC event
         await API.post('workflow_step_instances', {
@@ -191,21 +245,34 @@ async function runBistScript(scriptId, onProgress) {
         // Auto-activate first step
         const firstStep = stepBySeq[1];
         if (firstStep) {
+          console.log(_tag, '  auto-activating first step seq 1:', firstStep.name);
           await API.post('workflow_step_instances', {
             instance_id: instId, firm_id: FIRM_ID_CAD,
             event_type: 'step_activated', template_step_id: firstStep.id,
             step_type: firstStep.step_type, step_name: firstStep.name,
             actor_name: 'System', created_at: new Date().toISOString(),
           });
+        } else {
+          console.warn(_tag, '  No step at seq 1 — check template steps loaded correctly');
         }
 
       } else if (stp.action === 'complete_step') {
         const seq   = stp.params?.step_seq;
         const step  = stepBySeq[seq];
-        if (!step) throw new Error(`No step at sequence ${seq}`);
+        if (!step) {
+          console.error(_tag, '  complete_step FAILED — no template step at seq', seq);
+          console.error(_tag, '  Available seqs:', Object.keys(stepBySeq).join(', '));
+          throw new Error(`No step at sequence ${seq}`);
+        }
         const actor = _bistResolveActor(stp.params?.actor);
         const routeSeq  = stp.params?.route_to_seq != null ? Number(stp.params.route_to_seq) : null;
         const routeStep = routeSeq ? stepBySeq[routeSeq] : null;
+        console.log(_tag, '  complete_step seq', seq, '| outcome:', stp.params?.outcome || '—',
+          '| actor:', actor.userName,
+          routeSeq != null ? ('| route_to_seq:' + routeSeq) : '');
+        if (routeSeq != null && !routeStep) {
+          console.warn(_tag, '  route_to_seq', routeSeq, 'has no matching template step — arc will not draw');
+        }
         // Write step_completed
         await API.post('workflow_step_instances', {
           instance_id: instId, firm_id: FIRM_ID_CAD,
@@ -218,36 +285,79 @@ async function runBistScript(scriptId, onProgress) {
           actor_name: actor.userName,
           created_at: new Date().toISOString(),
         });
+        // ── SE1: write form_data to form_submissions if present ───────────
+        if (stp.params?.form_data && typeof window._seOnCompleteStep === 'function') {
+          console.log(_tag, '  _seOnCompleteStep hook — writing form_data fields:',
+            Object.keys(stp.params.form_data).join(', '));
+          await window._seOnCompleteStep(stp, instId, stepBySeq).catch(e => {
+            console.warn(_tag, '  _seOnCompleteStep failed (non-fatal):', e.message);
+          });
+        }
         // Activate: route_to_seq if specified, else next step
         const activateStep = routeStep || stepBySeq[seq + 1];
         if (activateStep) {
+          console.log(_tag, '  activating step seq',
+            routeStep ? routeSeq : (seq + 1), ':', activateStep.name);
           await API.post('workflow_step_instances', {
             instance_id: instId, firm_id: FIRM_ID_CAD,
             event_type: 'step_activated', template_step_id: activateStep.id,
             step_type: activateStep.step_type, step_name: activateStep.name,
             actor_name: 'System', created_at: new Date().toISOString(),
           });
+        } else {
+          console.log(_tag, '  no next step to activate (end of template or last seq)');
+        }
+
+      // ── SE1: complete_form_section — new action type ──────────────────────
+      } else if (stp.action === 'complete_form_section') {
+        const seq2   = stp.params?.step_seq;
+        const step2  = stepBySeq[seq2];
+        if (!step2) {
+          console.error(_tag, '  complete_form_section FAILED — no template step at seq', seq2);
+          console.error(_tag, '  Available seqs:', Object.keys(stepBySeq).join(', '));
+          throw new Error(`No step at sequence ${seq2} for complete_form_section`);
+        }
+        const sectionId = stp.params?.section_id || 'default';
+        const sectionActor = _bistResolveActor(stp.params?.actor);
+        console.log(_tag, '  complete_form_section seq', seq2, '| section:', sectionId,
+          '| actor:', sectionActor.userName);
+        if (typeof window._seOnFormSection === 'function') {
+          await window._seOnFormSection(stp, instId, stepBySeq).catch(e => {
+            console.warn(_tag, '  _seOnFormSection failed (non-fatal):', e.message);
+          });
+        } else {
+          console.warn(_tag, '  _seOnFormSection not defined — cdn-script-editor.js may not be loaded');
         }
 
       } else if (stp.action === 'wait') {
-        await new Promise(r => setTimeout(r, stp.params?.ms || 100));
+        const waitMs = stp.params?.ms || 100;
+        console.log(_tag, '  wait', waitMs, 'ms');
+        await new Promise(r => setTimeout(r, waitMs));
 
       } else if (stp.action === 'assert_only') {
-        // No action — just fall through to assertions below
+        console.log(_tag, '  assert_only — no action, evaluating assertions only');
+
+      } else {
+        console.warn(_tag, '  Unknown action:', stp.action, '— skipping DB write');
       }
 
       // ── Evaluate assertions ─────────────────────────────────────────────────
       if (stp.asserts?.length) {
         const state = await reloadState();
         if (!state) throw new Error('Could not reload instance state');
+        console.log(_tag, '  evaluating', stp.asserts.length, 'assertion(s) for step', stp.id);
 
         for (const assert of stp.asserts) {
           const pass = _bistAssert(assert, state);
+          const actual = _bistEval(assert.check, state);
+          const expected = assert.eq ?? assert.gte ?? assert.lte ??
+            assert.contains ?? assert.not_eq ?? '(exists check)';
           if (!pass) {
-            const actual = _bistEval(assert.check, state);
-            const expected = assert.eq ?? assert.gte ?? assert.lte ??
-              assert.contains ?? assert.not_eq ?? '(exists check)';
             const reason = `${assert.check}: expected ${expected === null ? 'null' : expected === undefined ? 'undefined' : String(expected)}, got ${actual === null ? 'null' : actual === undefined ? 'null' : String(actual)}`;
+            console.error(_tag, '  ✕ ASSERTION FAILED:', reason);
+            console.error(_tag, '    check:', assert.check);
+            console.error(_tag, '    expected:', expected, '| actual:', actual);
+            console.error(_tag, '    full state.steps:', JSON.stringify(state.steps, null, 2));
             onProgress?.({ type:'step_fail', stepId: stp.id, stepIdx: si, reason });
             // Update run record as failed
             await API.patch(`bist_runs?id=eq.${runId}`, {
@@ -262,13 +372,16 @@ async function runBistScript(scriptId, onProgress) {
             }).catch(()=>{});
             // Cleanup
             await _bistCleanup(instId, spec.cleanup);
+            console.groupEnd();
             return { status:'failed', runId, reason, failedStep: stp.id };
           }
+          console.log(_tag, '  ✓ assertion passed:', assert.check, '=', actual);
         }
       }
 
       stepsPassed++;
       const stepName = stepBySeq[stp.params?.step_seq]?.name || '';
+      console.log(_tag, '  ✓ step', stp.id, 'passed | total passed:', stepsPassed);
       onProgress?.({ type:'step_pass', stepId: stp.id, stepIdx: si,
         action: stp.action, stepName, outcome: stp.params?.outcome,
         stepSeq: stp.params?.step_seq, routeToSeq: stp.params?.route_to_seq });
@@ -285,10 +398,17 @@ async function runBistScript(scriptId, onProgress) {
             const targetId = spec.steps[targetSi].id;
             // Only loop if target step hasn't hit visit cap
             if ((_visitCount[targetId] || 0) < 3) {
+              console.log(_tag, '  GOTO: route_to_seq', gotoSeq, '→ jumping to spec step', targetId,
+                'at index', targetSi, '(visit #' + ((_visitCount[targetId]||0)+1) + ')');
               onProgress?.({ type:'step_route_back', fromStepId: stp.id,
                 toStepId: targetId });
               nextSi = targetSi;
+            } else {
+              console.log(_tag, '  GOTO suppressed — targetId', targetId, 'at visit cap');
             }
+          } else {
+            console.warn(_tag, '  GOTO: route_to_seq', gotoSeq, 'target not found in spec steps',
+              '(targetSi:', targetSi, 'si:', si, ')');
           }
         }
       }
@@ -296,42 +416,56 @@ async function runBistScript(scriptId, onProgress) {
     }
 
     // All steps passed
+    const totalMs = Date.now() - runStart;
+    console.log(_tag, '✓ ALL STEPS PASSED | steps:', stepsPassed, '| duration:', totalMs + 'ms');
     await API.patch(`bist_runs?id=eq.${runId}`, {
       status:       'passed',
       steps_passed: stepsPassed,
       steps_failed: 0,
       instance_id:  instId,
-      duration_ms:  Date.now() - runStart,
+      duration_ms:  totalMs,
     }).catch(()=>{});
 
     await _bistCleanup(instId, spec.cleanup);
     onProgress?.({ type:'complete', status:'passed' });
+    console.groupEnd();
     return { status:'passed', runId };
 
   } catch(e) {
+    const totalMs = Date.now() - runStart;
+    console.error(_tag, '✕ RUN ERROR:', e.message);
+    console.error(_tag, '  instId at error:', instId || '(no instance created)');
+    console.error(_tag, '  stack:', e.stack);
     await API.patch(`bist_runs?id=eq.${runId}`, {
       status:        'error',
       failure_reason: e.message,
       instance_id:   instId,
-      duration_ms:   Date.now() - runStart,
+      duration_ms:   totalMs,
     }).catch(()=>{});
     await _bistCleanup(instId, spec.cleanup);
     onProgress?.({ type:'error', message: e.message });
+    console.groupEnd();
     return { status:'error', runId, reason: e.message };
   }
 }
 
 async function _bistCleanup(instId, mode) {
-  if (!instId || mode === 'keep') return;
+  if (!instId) { console.log('[cdn-bist:cleanup] no instId — nothing to clean'); return; }
+  if (mode === 'keep') { console.log('[cdn-bist:cleanup] mode=keep — instance', instId, 'preserved'); return; }
   if (mode === 'suspend') {
+    console.log('[cdn-bist:cleanup] mode=suspend — suspending instance', instId);
     await API.patch(`workflow_instances?id=eq.${instId}`,
       { status:'overridden', notes:'BIST cleanup', updated_at: new Date().toISOString() }
-    ).catch(()=>{});
+    ).catch(e => console.warn('[cdn-bist:cleanup] suspend PATCH failed:', e.message));
     return;
   }
   // default: delete
-  await API.del(`workflow_step_instances?instance_id=eq.${instId}`).catch(()=>{});
-  await API.del(`workflow_instances?id=eq.${instId}`).catch(()=>{});
+  console.log('[cdn-bist:cleanup] mode=delete — removing instance', instId, 'and its CoC');
+  await API.del(`workflow_step_instances?instance_id=eq.${instId}`)
+    .catch(e => console.warn('[cdn-bist:cleanup] CoC DELETE failed:', e.message));
+  await API.del(`workflow_instances?id=eq.${instId}`)
+    .catch(e => console.warn('[cdn-bist:cleanup] instance DELETE failed:', e.message));
+  console.log('[cdn-bist:cleanup] done');
 }
 
 async function runGateCheck(templateId, version) {
