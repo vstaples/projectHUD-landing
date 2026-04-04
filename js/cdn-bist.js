@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-BD','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-BH','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -264,13 +264,12 @@ async function runBistScript(scriptId, onProgress) {
         action: stp.action, stepName, outcome: stp.params?.outcome });
       await _bckFreezeWait(); // freeze point — after step complete
 
-      // ── GOTO: if complete_step routed backward, jump to that script step ──
+      // ── GOTO: jump back only if stp.params.goto === true ────────────────
       let nextSi = si + 1;
-      if (stp.action === 'complete_step' && stp.params?.route_to_seq != null) {
+      if (stp.action === 'complete_step' && stp.params?.goto === true && stp.params?.route_to_seq != null) {
         const gotoSeq = Number(stp.params.route_to_seq);
         const curSeq  = Number(stp.params.step_seq);
         if (gotoSeq < curSeq) {
-          // Find the script step index whose step_seq matches gotoSeq
           const targetSi = spec.steps.findIndex(s => Number(s.params?.step_seq) === gotoSeq);
           if (targetSi >= 0 && targetSi < si) {
             onProgress?.({ type:'step_route_back', fromStepId: stp.id,
@@ -1079,6 +1078,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   document.getElementById('bist-cockpit-overlay')?.remove();
   window._bckCockpitClosed = false;  // reset for this run
   window._bckAborted = false;
+  window._bistCkRunning = true;  // block gate refresh
   // Update simulator gate text immediately
   var _gateEl = document.getElementById('s9-sim-gate');
   if (_gateEl) {
@@ -1712,6 +1712,22 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
       setTimeout(function(){ _bckDrawRejectArc(_paf, ev.stepId); }, 60);
     }
   } else if (type === 'step_route_back') {
+    // Reset all cards from toStepId onward to idle state
+    var allNodeCards = document.querySelectorAll('.bck-nc');
+    var foundTarget = false;
+    allNodeCards.forEach(function(card) {
+      if (card.id === 'bck-n-'+ev.toStepId) foundTarget = true;
+      if (foundTarget) {
+        card.className = 'bck-nc';
+        var nst = card.querySelector('.bck-nst');
+        if (nst) {
+          var dot = nst.querySelector('.bck-nsdot');
+          var txt = nst.querySelector('.bck-nstxt');
+          if (dot) dot.style.background = 'rgba(0,210,255,.3)';
+          if (txt) { txt.textContent = 'Pending'; txt.style.color = 'rgba(0,210,255,.6)'; }
+        }
+      }
+    });
     var fromCard = document.getElementById('bck-n-'+ev.fromStepId);
     var toCard   = ev.toStepId ? document.getElementById('bck-n-'+ev.toStepId) : null;
 
