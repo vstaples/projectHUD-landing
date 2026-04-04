@@ -1368,119 +1368,247 @@ function seHydrateRunMeta() {
   el.textContent = 'Last run: ' + ts + ' · ' + dur;
 }
 
+
 // ─────────────────────────────────────────────────────────────────────────────
-// EXTENDED _bistBuildState — wraps original to add form data layer
+// FORM STATE HYDRATION
+// Real schema:
+//   workflow_form_definitions — field metadata per template step
+//     columns: id, step_id, firm_id, fields (jsonb array), routing (jsonb)
+//     fields[] shape: { id, label, type, role, required, stage, ... }
+//     routing shape: { stages: [{ stage, role, parallel_within_stage }] }
+//   workflow_form_responses — one row per (instance_id, step_id, stage, field_id)
+//     columns: id, instance_id, step_id, form_def_id, stage, field_id,
+//              value (text), note, filled_by, filled_at
+//     unique constraint: (instance_id, step_id, stage, field_id) — use upsert
+//
+// Augments state.steps[N].form so assertions like:
+//   step[N].form.fields.risk_score  → field value (text)
+//   step[N].form.required_fields_complete → bool
+//   step[N].form.sections_complete  → int
+//   step[N].form.sections.stage_1.state → 'complete'|'pending'
 // ─────────────────────────────────────────────────────────────────────────────
-// We extend the existing function by patching reloadState inside runBistScript.
-// This is done by intercepting the form_submissions query alongside the CoC query.
-// The original _bistBuildState is preserved; we augment state.steps[N].form here.
 
 async function _seHydrateFormState(state, instId, tmplSteps) {
   if (!instId || !tmplSteps || !tmplSteps.length) return state;
   try {
-    var subs = await API.get(
-      'form_submissions?instance_id=eq.' + instId + '&order=created_at.asc'
+    // Single query — all form responses for this instance
+    var responses = await API.get(
+      'workflow_form_responses?instance_id=eq.' + instId +
+      '&order=stage.asc,filled_at.asc'
     ).catch(function(){ return []; });
-    if (!subs || !subs.length) return state;
 
-    subs.forEach(function(sub) {
-      var tmplStep = tmplSteps.find(function(s){ return s.id === sub.template_step_id; });
-      if (!tmplStep) return;
+    if (!responses || !responses.length) return state;
+
+    // Group by step_id
+    var byStep = {};
+    responses.forEach(function(r) {
+      if (!byStep[r.step_id]) byStep[r.step_id] = [];
+      byStep[r.step_id].push(r);
+    });
+
+    tmplSteps.forEach(function(tmplStep) {
+      var stepResponses = byStep[tmplStep.id];
+      if (!stepResponses || !stepResponses.length) return;
+
       var seq = tmplStep.sequence_order;
       if (!state.steps[seq]) return;
 
-      // Build section states map
+      // Build field values map — latest value per field_id (highest stage wins)
+      var fields = {};
+      var stagesWithResponses = new Set();
+      var stagesWithValues = new Set();
+
+      stepResponses.forEach(function(r) {
+        // Always overwrite so higher-stage response wins for same field
+        if (r.value !== null && r.value !== '') fields[r.field_id] = r.value;
+        stagesWithResponses.add(r.stage);
+        if (r.value !== null && r.value !== '') stagesWithValues.add(r.stage);
+      });
+
+      // Pull cached form definition to determine required fields and stage config
+      var defKey = 'def_' + tmplStep.id;
+      var formDef = _seFormFieldCache[defKey];
+      var defFields = formDef ? (formDef.fields || []) : [];
+      var routingStages = formDef ? ((formDef.routing || {}).stages || []) : [];
+
+      // Required fields check
+      var requiredIds = defFields.filter(function(f){ return f.required; }).map(function(f){ return f.id; });
+      var requiredFieldsComplete = requiredIds.length === 0 ||
+        requiredIds.every(function(fid){ return fields[fid] !== undefined && fields[fid] !== ''; });
+
+      // Build sections map keyed by 'stage_N'
       var sectionStates = {};
-      (sub.section_states || []).forEach(function(ss) {
-        sectionStates[ss.section_id] = ss;
+      routingStages.forEach(function(rs) {
+        var n = rs.stage;
+        var stageResps = stepResponses.filter(function(r){ return r.stage === n; });
+        var stageFields = {};
+        stageResps.forEach(function(r){ stageFields[r.field_id] = r.value; });
+        sectionStates['stage_' + n] = {
+          section_id:   'stage_' + n,
+          role:         rs.role || '',
+          state:        stageResps.length > 0 ? 'complete' : 'pending',
+          completed_by: stageResps.length > 0 ? (stageResps[0].filled_by || '') : null,
+          field_values: stageFields,
+        };
       });
 
       state.steps[seq].form = {
-        fields:                   sub.field_values || {},
-        sections_complete:        sub.sections_complete || 0,
-        sections_total:           sub.sections_total || 0,
-        route_count:              sub.route_count || 0,
-        required_fields_complete: sub.required_fields_complete !== false,
+        fields:                   fields,
+        sections_complete:        stagesWithValues.size,
+        sections_total:           routingStages.length || stagesWithResponses.size || 1,
+        route_count:              stagesWithResponses.size,
+        required_fields_complete: requiredFieldsComplete,
         sections:                 sectionStates,
       };
+
+      console.log('[SE:hydrate] seq', seq, '| fields:', Object.keys(fields).length,
+        '| stages_complete:', stagesWithValues.size, '| required_ok:', requiredFieldsComplete);
     });
+
   } catch(e) {
-    console.warn('[SE] form state hydration failed:', e.message);
+    console.warn('[SE] _seHydrateFormState failed (non-fatal):', e.message);
   }
   return state;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FORM FIELD CACHING — lazily pull field defs from form_templates table
+// FORM FIELD CACHING
+// Queries workflow_form_definitions keyed by step_id (not form/template id).
+// Caches under 'def_{stepId}' for use by _seHydrateFormState and the assertion
+// builder. Call seLoadFormDefForStep(stepId) before rendering assertion paths.
 // ─────────────────────────────────────────────────────────────────────────────
-async function seLoadFormFields(formId) {
-  if (!formId || _seFormFieldCache[formId]) return;
+async function seLoadFormDefForStep(stepId) {
+  var key = 'def_' + stepId;
+  if (!stepId || _seFormFieldCache[key]) return;
   try {
     var rows = await API.get(
-      'form_templates?id=eq.' + formId + '&select=fields'
+      'workflow_form_definitions?step_id=eq.' + stepId +
+      '&select=id,fields,routing&limit=1'
     ).catch(function(){ return []; });
-    if (rows && rows[0] && rows[0].fields) {
-      _seFormFieldCache[formId] = (rows[0].fields || []).map(function(f) {
-        return { id: f.id || f.name, label: f.label || f.name || f.id, type: f.field_type || f.type || 'text', role: f.role || '' };
-      });
+    if (rows && rows[0]) {
+      _seFormFieldCache[key] = {
+        id:      rows[0].id,
+        fields:  (rows[0].fields || []).map(function(f) {
+          return {
+            id:       f.id,
+            label:    f.label || f.id,
+            type:     f.type || 'text',
+            role:     f.role || '',
+            required: !!f.required,
+            stage:    f.stage || 1,
+          };
+        }),
+        routing: rows[0].routing || {},
+      };
+      console.log('[SE:formcache] step', stepId, '| fields:',
+        _seFormFieldCache[key].fields.length, '| routing stages:',
+        ((_seFormFieldCache[key].routing || {}).stages || []).length);
     }
-  } catch(e) {}
+  } catch(e) {
+    console.warn('[SE] seLoadFormDefForStep failed for', stepId, ':', e.message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPLETE_STEP HANDLER — write form_data to form_submissions when present
-// This monkey-patches the relevant section of runBistScript's action handler.
-// We expose a hook: window._seOnCompleteStep(stp, instId, stepBySeq)
-// cdn-bist.js calls this if defined, after writing the step_completed CoC event.
+// COMPLETE_STEP HOOK — writes workflow_form_responses when form_data present
+// Called by cdn-bist.js after step_completed CoC write:
+//   if (stp.params?.form_data && typeof window._seOnCompleteStep === 'function')
+//     await window._seOnCompleteStep(stp, instId, stepBySeq)
+//
+// Maps form_data fields to individual workflow_form_responses rows.
+// Uses the unique constraint: (instance_id, step_id, stage, field_id).
+// PostgREST upsert: POST with Prefer: resolution=merge-duplicates header
+// handled transparently via API.post on the unique conflict columns.
 // ─────────────────────────────────────────────────────────────────────────────
 window._seOnCompleteStep = async function(stp, instId, stepBySeq) {
   var fd = stp.params && stp.params.form_data;
   if (!fd || !instId) return;
 
-  var seq = stp.params && stp.params.step_seq;
+  var seq  = stp.params && stp.params.step_seq;
   var step = seq ? stepBySeq[seq] : null;
-  if (!step) return;
-
-  // Determine sections from form routing
-  var formId = step.form_id || step.form_template_id;
-  var fields = formId ? (_seFormFieldCache[formId] || []) : [];
-  var roles = {};
-  fields.forEach(function(f) { if (f.role) roles[f.role] = true; });
-  var sectionKeys = Object.keys(roles);
-
-  try {
-    await API.post('form_submissions', {
-      instance_id:              instId,
-      template_step_id:         step.id,
-      firm_id:                  FIRM_ID_CAD,
-      field_values:             fd,
-      sections_complete:        sectionKeys.length || 1,
-      sections_total:           sectionKeys.length || 1,
-      route_count:              0,
-      required_fields_complete: true,
-      submitted_by:             stp.params.actor || null,
-      created_at:               new Date().toISOString(),
-    });
-  } catch(e) {
-    console.warn('[SE] form_submissions write failed:', e.message);
+  if (!step) {
+    console.warn('[SE:complete_step] no template step at seq', seq, '— skipping form write');
+    return;
   }
+
+  // Ensure form def is cached so we know field types and stages
+  await seLoadFormDefForStep(step.id);
+  var defKey = 'def_' + step.id;
+  var formDef = _seFormFieldCache[defKey];
+
+  // Look up form_def_id (needed as FK in workflow_form_responses)
+  var formDefId = formDef ? formDef.id : null;
+  if (!formDefId) {
+    console.warn('[SE:complete_step] no workflow_form_definitions row for step',
+      step.id, '— form_data fields will not be written');
+    return;
+  }
+
+  // Resolve which stage each field belongs to from the form definition
+  var defFields = (formDef && formDef.fields) || [];
+  var fieldStageMap = {};
+  defFields.forEach(function(f){ fieldStageMap[f.id] = f.stage || 1; });
+
+  // Build one workflow_form_responses row per field in form_data
+  // Use the actor slug to find a resource id if possible
+  var actorSlug = stp.params.actor || '';
+  var resource = (window._resources_cad || []).find(function(r) {
+    return (r.name || '').toLowerCase().replace(/\s+/g, '_') === actorSlug;
+  });
+  var filledBy = resource ? resource.id : null;
+
+  var fieldKeys = Object.keys(fd);
+  var writes = fieldKeys.map(function(fieldId) {
+    var stage = fieldStageMap[fieldId] || 1;
+    return API.post('workflow_form_responses', {
+      instance_id:  instId,
+      step_id:      step.id,
+      form_def_id:  formDefId,
+      stage:        stage,
+      field_id:     fieldId,
+      value:        String(fd[fieldId] !== null && fd[fieldId] !== undefined ? fd[fieldId] : ''),
+      filled_by:    filledBy,
+      filled_at:    new Date().toISOString(),
+    }).catch(function(e) {
+      // Unique constraint violation = already exists → attempt update via patch
+      // PostgREST: PATCH with filter on all four unique cols
+      return API.patch(
+        'workflow_form_responses?instance_id=eq.' + instId +
+        '&step_id=eq.' + step.id +
+        '&stage=eq.' + stage +
+        '&field_id=eq.' + encodeURIComponent(fieldId),
+        { value: String(fd[fieldId] !== null ? fd[fieldId] : ''), filled_at: new Date().toISOString() }
+      ).catch(function(e2) {
+        console.warn('[SE] form_responses upsert failed for field', fieldId, ':', e2.message);
+      });
+    });
+  });
+
+  await Promise.all(writes);
+  console.log('[SE:complete_step] wrote', fieldKeys.length, 'form_response rows for step',
+    step.id, '| formDefId:', formDefId);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPLETE_FORM_SECTION — new action handler hook
-// cdn-bist.js calls window._seOnFormSection(stp, instId, stepBySeq) if defined.
+// COMPLETE_FORM_SECTION HOOK — writes section responses to workflow_form_responses
+// Called by cdn-bist.js for the complete_form_section action type:
+//   if (typeof window._seOnFormSection === 'function')
+//     await window._seOnFormSection(stp, instId, stepBySeq)
+//
+// Writes a section_completed sub-event to the CoC, then writes individual
+// workflow_form_responses rows for the section's field_data.
 // ─────────────────────────────────────────────────────────────────────────────
 window._seOnFormSection = async function(stp, instId, stepBySeq) {
-  var seq = stp.params && stp.params.step_seq;
+  var seq  = stp.params && stp.params.step_seq;
   var step = seq ? stepBySeq[seq] : null;
   if (!step || !instId) return;
 
   var sectionId = (stp.params && stp.params.section_id) || 'default';
-  var actor = (stp.params && stp.params.actor) || 'system';
-  var fd = (stp.params && stp.params.field_data) || {};
+  var actor     = (stp.params && stp.params.actor) || 'system';
+  var fd        = (stp.params && stp.params.field_data) || {};
 
   try {
-    // Write a section_completed CoC sub-event
+    // Write section_completed CoC sub-event
     await API.post('workflow_step_instances', {
       instance_id:      instId,
       firm_id:          FIRM_ID_CAD,
@@ -1492,44 +1620,73 @@ window._seOnFormSection = async function(stp, instId, stepBySeq) {
       actor_name:       actor,
       created_at:       new Date().toISOString(),
     });
+    console.log('[SE:form_section] CoC event written for section', sectionId, 'step', step.id);
 
-    // Upsert section state in form_submissions
-    var existing = await API.get(
-      'form_submissions?instance_id=eq.' + instId + '&template_step_id=eq.' + step.id
-    ).catch(function(){ return []; });
+    // Only write form_responses if field_data was provided
+    var fdKeys = Object.keys(fd);
+    if (!fdKeys.length) return;
 
-    if (existing && existing[0]) {
-      var sub = existing[0];
-      var sections = sub.section_states || [];
-      var idx = sections.findIndex(function(s){ return s.section_id === sectionId; });
-      if (idx >= 0) sections[idx] = { section_id: sectionId, state: 'complete', completed_by: actor, field_values: fd };
-      else sections.push({ section_id: sectionId, state: 'complete', completed_by: actor, field_values: fd });
-      var complete = sections.filter(function(s){ return s.state === 'complete'; }).length;
-      await API.patch('form_submissions?id=eq.' + sub.id, {
-        section_states:    sections,
-        sections_complete: complete,
-        route_count:       (sub.route_count || 0) + 1,
-        updated_at:        new Date().toISOString(),
-      });
-    } else {
-      await API.post('form_submissions', {
-        instance_id:      instId,
-        template_step_id: step.id,
-        firm_id:          FIRM_ID_CAD,
-        field_values:     fd,
-        section_states:   [{ section_id: sectionId, state: 'complete', completed_by: actor, field_values: fd }],
-        sections_complete: 1,
-        sections_total:   null,
-        route_count:      1,
-        created_at:       new Date().toISOString(),
-      });
+    // Ensure form def is cached
+    await seLoadFormDefForStep(step.id);
+    var defKey = 'def_' + step.id;
+    var formDef = _seFormFieldCache[defKey];
+    var formDefId = formDef ? formDef.id : null;
+
+    if (!formDefId) {
+      console.warn('[SE:form_section] no form_def found for step', step.id, '— skipping field writes');
+      return;
     }
+
+    // Resolve stage number from section_id — section_id convention is 'stage_N'
+    // or a role name. Fall back to stage 1.
+    var stage = 1;
+    var stageMatch = String(sectionId).match(/(\d+)$/);
+    if (stageMatch) {
+      stage = parseInt(stageMatch[1], 10);
+    } else {
+      // Try matching section_id to a routing stage by role name
+      var routingStages = ((formDef.routing || {}).stages || []);
+      var rs = routingStages.find(function(s){ return s.role === sectionId; });
+      if (rs) stage = rs.stage;
+    }
+
+    var resource = (window._resources_cad || []).find(function(r) {
+      return (r.name || '').toLowerCase().replace(/\s+/g, '_') === actor;
+    });
+    var filledBy = resource ? resource.id : null;
+
+    var writes = fdKeys.map(function(fieldId) {
+      return API.post('workflow_form_responses', {
+        instance_id:  instId,
+        step_id:      step.id,
+        form_def_id:  formDefId,
+        stage:        stage,
+        field_id:     fieldId,
+        value:        String(fd[fieldId] !== null && fd[fieldId] !== undefined ? fd[fieldId] : ''),
+        filled_by:    filledBy,
+        filled_at:    new Date().toISOString(),
+      }).catch(function(e) {
+        return API.patch(
+          'workflow_form_responses?instance_id=eq.' + instId +
+          '&step_id=eq.' + step.id +
+          '&stage=eq.' + stage +
+          '&field_id=eq.' + encodeURIComponent(fieldId),
+          { value: String(fd[fieldId] !== null ? fd[fieldId] : ''), filled_at: new Date().toISOString() }
+        ).catch(function(e2) {
+          console.warn('[SE:form_section] upsert failed for field', fieldId, ':', e2.message);
+        });
+      });
+    });
+
+    await Promise.all(writes);
+    console.log('[SE:form_section] wrote', fdKeys.length, 'response rows | stage:', stage,
+      '| section:', sectionId);
+
   } catch(e) {
-    console.warn('[SE] section write failed:', e.message);
+    console.warn('[SE] _seOnFormSection failed (non-fatal):', e.message);
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 function seCurrentScript() {
