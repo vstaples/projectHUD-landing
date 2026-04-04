@@ -1416,6 +1416,11 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     window._bckFrozen = false;
     _bistCkStopClock();
     window._bistCkRunning = false;
+    // Stop arc rAF loop and clear arc state so it doesn't redraw after close
+    _bckStopArcLoop();
+    window._bckArcs = [];
+    var arcSvg = document.getElementById('bck-arc-svg');
+    if (arcSvg) arcSvg.remove();
     // Patch any in-flight bist_run to aborted
     var _abortedRunId = window._bckCurrentRunId;
     window._bckCurrentRunId = null;
@@ -1561,6 +1566,8 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-ann.go{color:rgba(74,222,128,.8);text-shadow:0 0 8px rgba(74,222,128,.4)}
 .bck-ann.fail{color:rgba(226,75,74,.8)}
 .bck-ws{position:relative;flex:1;min-height:0;overflow:hidden}
+/* Arc SVG uses overflow:visible on the SVG element itself plus the ws overflow:hidden
+   is fine because we clamp the bow to stay within ws bounds in _bckRedrawArcs */
 .bck-sky{position:absolute;inset:0;background:linear-gradient(180deg,#000308 0%,#000d2a 35%,#001845 55%,#012060 70%,#1a3d72 82%,#3a6090 100%)}
 .bck-stars{position:absolute;inset:0;pointer-events:none}
 .bck-earth{position:absolute;left:0;right:0;bottom:0;height:36%;background:linear-gradient(180deg,#1a3060 0%,#0d1f45 18%,#060f22 40%,#030810 70%,#020508 100%);overflow:hidden}
@@ -2089,14 +2096,26 @@ function _bckStopArcLoop() {
 }
 
 function _bckRedrawArcs() {
-  var ws = _bckEl('bck-ws');
+  // SVG lives in bck-ws (the full cockpit workspace).
+  // bck-dag clips at its own bounds even with overflow:visible on the SVG,
+  // because bck-ws (the ancestor) has overflow:hidden.
+  // Parenting to bck-ws and computing relative to bck-ws avoids all clipping.
+  var ws = document.getElementById('bck-ws');
   if (!ws || !window._bckArcs || !window._bckArcs.length) return;
 
   var arcSvg = document.getElementById('bck-arc-svg');
   if (!arcSvg) {
     arcSvg = document.createElementNS('http://www.w3.org/2000/svg','svg');
     arcSvg.id = 'bck-arc-svg';
-    arcSvg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:10;overflow:visible';
+    arcSvg.style.cssText = [
+      'position:absolute',
+      'inset:0',
+      'width:100%',
+      'height:100%',
+      'pointer-events:none',
+      'z-index:20',
+      'overflow:visible',
+    ].join(';');
     ws.appendChild(arcSvg);
   }
 
@@ -2106,34 +2125,33 @@ function _bckRedrawArcs() {
   window._bckArcs.forEach(function(arc) {
     var fromEl = document.getElementById('bck-n-'+arc.from);
     var toEl   = document.getElementById('bck-n-'+arc.to);
-    if (!fromEl || !toEl) {
-      console.warn('[cdn-bist:arc] card not found — from:bck-n-'+arc.from+' exists:'+!!fromEl+' to:bck-n-'+arc.to+' exists:'+!!toEl);
-      return;
-    }
+    if (!fromEl || !toEl) return;
 
     var fR = fromEl.getBoundingClientRect();
     var tR = toEl.getBoundingClientRect();
 
-    // Use card mid-height so arc connects card bodies, not bottom edges
+    // Bottom-center of each card, relative to bck-ws
     var x1 = fR.left + fR.width/2  - wsRect.left;
-    var y1 = fR.top  + fR.height/2 - wsRect.top;
+    var y1 = fR.bottom              - wsRect.top;
     var x2 = tR.left + tR.width/2  - wsRect.left;
-    var y2 = tR.top  + tR.height/2 - wsRect.top;
+    var y2 = tR.bottom              - wsRect.top;
 
-    // Backward arc = destination is LEFT of source (rejection loop back to earlier step)
     var isBackward = x2 < x1;
     var span = Math.abs(x1 - x2);
-    var bow  = 36 + span * 0.20;
+    // Arc bows DOWNWARD from card bottoms — curves below the card row
+    var bow  = 28 + span * 0.18;
 
-    // Backward arcs bow UPWARD (above cards) so they visually read as going back
-    // Forward arcs bow DOWNWARD (below cards)
     var mx = (x1 + x2) / 2;
-    var my = isBackward
-      ? Math.min(y1, y2) - bow
-      : Math.max(y1, y2) + bow;
+    var my = Math.max(y1, y2) + bow;
 
-    // Note: arc draw logging removed from rAF loop (was firing at 60fps).
-    // Arc geometry logged once at registration in _bckDrawRejectArc.
+    // bck-ws has overflow:hidden — check if bow extends beyond ws height
+    // and clamp bow so arc stays visible (min bow = 8px)
+    var wsH = ws.offsetHeight;
+    if (my > wsH - 8) {
+      bow = Math.max(8, wsH - 8 - Math.max(y1, y2));
+      my = Math.max(y1, y2) + bow;
+    }
+
     var path = document.createElementNS('http://www.w3.org/2000/svg','path');
     path.setAttribute('d','M '+x1+' '+y1+' Q '+mx+' '+my+' '+x2+' '+y2);
     path.setAttribute('fill','none');
@@ -2143,7 +2161,7 @@ function _bckRedrawArcs() {
     path.setAttribute('opacity','0.9');
     arcSvg.appendChild(path);
 
-    // Arrowhead: quadratic bezier tangent at t=1 is direction from ctrl-point to endpoint
+    // Arrowhead — tangent direction from control point to endpoint
     var angle = Math.atan2(y2 - my, x2 - mx);
     var ah = 10;
     var arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
@@ -2155,16 +2173,16 @@ function _bckRedrawArcs() {
     arrow.setAttribute('opacity','0.9');
     arcSvg.appendChild(arrow);
 
-    // Arc label at control point
+    // Label at control point
     var txt = document.createElementNS('http://www.w3.org/2000/svg','text');
     txt.setAttribute('x', mx);
-    txt.setAttribute('y', my - 6);
+    txt.setAttribute('y', my + 14);  // below the arc, not above
     txt.setAttribute('text-anchor','middle');
     txt.setAttribute('font-size','10');
     txt.setAttribute('font-family','Arial,sans-serif');
     txt.setAttribute('fill','#E24B4A');
     txt.setAttribute('opacity','0.75');
-    txt.textContent = isBackward ? '\u21a9 reset' : '\u21aa loop';
+    txt.textContent = '\u21a9 reset';
     arcSvg.appendChild(txt);
   });
 }
