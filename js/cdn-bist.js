@@ -1,6 +1,15 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE1','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE2','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// ── SE2 patches (2026-04-04) ────────────────────────────────────────────────
+// 1. step_pass handler added to _bistCkOnProgress — transitions cards Active→Done (green)
+//    and turns connector wire green. Was completely absent — root cause of all cards
+//    staying orange/active forever.
+// 2. step_route_back reset range fixed — now resets from toIdx inclusive (not toIdx+1)
+//    so the target card itself reverts to blue before being re-activated by next step_start.
+// 3. step_route_back querySelector fixed — was '.bck-nc, .bck-nc.ac, .bck-nc.dn'
+//    (duplicates), now '#bck-nodes .bck-nc' (scoped, correct).
+// 4. step_route_back now also resets connector wires for reset cards to dim.
 // ── SE1 patches (2026-04-04) ────────────────────────────────────────────────
 // 1. complete_form_section action branch added to runBistScript dispatch
 // 2. _seOnCompleteStep hook called after complete_step CoC write (form_data)
@@ -2002,15 +2011,15 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     _bistCkRadio('tower', '[route] \u21a9 Rejection loop — resetting to '+
       (ev.toStepSeq ? 'step seq '+ev.toStepSeq : ev.toStepId));
 
-    // Reset all DAG cards whose BIST step id comes AFTER toStepId in DOM order.
-    // toStepId card itself is NOT reset — it will be re-activated by the next step_start.
-    // We find toStepId card first, then reset everything after it.
-    var allNodeCards = Array.from(document.querySelectorAll('.bck-nc, .bck-nc.ac, .bck-nc.dn'));
+    // Reset DAG cards from toStepId inclusive — that card and all downstream cards
+    // revert to blue/ready. toStepId will be re-activated by the next step_start event.
+    // Use a scoped selector — #bck-nodes .bck-nc matches all card states (.ac, .dn are additions).
+    var allNodeCards = Array.from(document.querySelectorAll('#bck-nodes .bck-nc'));
     var toIdx = allNodeCards.findIndex(function(c) { return c.id === 'bck-n-'+ev.toStepId; });
     console.log('[cdn-bist:route_back] toIdx in DOM:'+toIdx+' total cards:'+allNodeCards.length);
     if (toIdx >= 0) {
-      // Reset cards AFTER the target (cards that are now "downstream" of the reset point)
-      allNodeCards.slice(toIdx + 1).forEach(function(card) {
+      // Reset target card AND everything after it to idle/blue (Pending)
+      allNodeCards.slice(toIdx).forEach(function(card) {
         card.className = 'bck-nc';
         var nst = card.querySelector('.bck-nst');
         if (nst) {
@@ -2018,6 +2027,13 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
           var txt = nst.querySelector('.bck-nstxt');
           if (dot) dot.style.background = 'rgba(0,210,255,.18)';
           if (txt) { txt.textContent = 'Pending'; txt.style.color = 'rgba(0,210,255,.45)'; }
+        }
+      });
+      // Also reset connector wires into those cards to dim
+      allNodeCards.slice(toIdx).forEach(function(card) {
+        var prevSib = card.previousSibling;
+        if (prevSib && prevSib.className && prevSib.className.indexOf('bck-cw') >= 0) {
+          prevSib.className = 'bck-cw';
         }
       });
     }
@@ -2037,6 +2053,21 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
       console.warn('[cdn-bist:route_back] Cannot draw arc — card missing. toStepId:'+ev.toStepId+
         '. Cards in DOM:'+ Array.from(document.querySelectorAll('[id^="bck-n-"]')).map(function(el){return el.id;}).join(','));
     }
+  } else if (type === 'step_pass') {
+    // Transition the completed card to Done (green)
+    _bistCkSetNode(ev.stepId, ev.stepIdx || 0, test, 'done', ev.outcome || 'Complete', tmplSteps, ev);
+    // Turn the connector wire leading INTO this card green
+    var doneCard = document.getElementById('bck-n-'+ev.stepId);
+    if (doneCard) {
+      var prevSib = doneCard.previousSibling;
+      if (prevSib && prevSib.className && prevSib.className.indexOf('bck-cw') >= 0) {
+        prevSib.className = 'bck-cw dn';
+      }
+    }
+    // CoC entry
+    var outcomeLabel = ev.outcome ? ev.outcome : 'complete';
+    _bistCkAddCoc('#4ade80', 'step_passed',
+      (ev.stepName || ev.stepId) + (ev.outcome ? ' — ' + _bistEscHtml(ev.outcome) : ''));
   } else if (type === 'radio') {
     _bistCkRadio(ev.side||'tower', ev.msg||'');
   } else if (type === 'step_fail') {
