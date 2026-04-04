@@ -1,6 +1,11 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE11','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE12','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// ── SE12 patches (2026-04-04) ───────────────────────────────────────────────
+// 1. Explicit route branch now emits step_route_back — arc and card reset were
+//    silently missing for any L2 explicit route. T3 s4 (rejected) uses this path.
+//    Also requires DB fix: remove route_to_seq:1 from T3 s4 so s5/s6/s7 handle
+//    the replay naturally without GOTO infinite loop.
 // ── SE11 patches (2026-04-04) ───────────────────────────────────────────────
 // 1. 80ms paint yield after step_start onProgress before DB write. Without this,
 //    the orange/active card state never rendered — the browser had no chance to
@@ -396,6 +401,10 @@ async function runBistScript(scriptId, onProgress) {
           });
           console.log(_tag, '  [L2] explicit route → seq', routeSeq, ':', routeStep.name,
             '| reset', stepsToReset.length, 'steps');
+          // Notify cockpit — draw rejection arc and reset DAG cards
+          const _erSpecStep = spec.steps.find(s => Number(s.params?.step_seq) === routeStep.sequence_order);
+          onProgress?.({ type: 'step_route_back', fromStepId: stp.id,
+            toStepId: _erSpecStep?.id || stp.id, toStepSeq: routeStep.sequence_order });
 
         } else if (step.reject_to && outcomeDef?.requiresReset) {
           // ── Template-defined explicit reject_to + requiresReset outcome ──────
