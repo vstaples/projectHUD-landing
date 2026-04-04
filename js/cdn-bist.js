@@ -1,6 +1,16 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE2','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE3','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// ── SE3 patches (2026-04-04) ────────────────────────────────────────────────
+// 1. Freeze guard fixed — step_route_back, radio, and step_pass events now pass
+//    through even when _bckFrozen=true. Previously these were all blocked, causing:
+//    (a) rejection arc never drawing when sim was frozen at the moment of route_back
+//    (b) Tower / Crew radio completely silenced during frozen state
+//    (c) Cards not going green when freeze was held across a step_pass event
+//    The engine pauses at _bckFreezeWait() between steps. step_route_back fires
+//    after the freeze wait, so a frozen sim at step_pass would never see the arc.
+//    Now only true CoC counter events (instance_created, step_fail, complete, error)
+//    are suppressed during freeze — all visual state events pass through.
 // ── SE2 patches (2026-04-04) ────────────────────────────────────────────────
 // 1. step_pass handler added to _bistCkOnProgress — transitions cards Active→Done (green)
 //    and turns connector wire green. Was completely absent — root cause of all cards
@@ -1955,9 +1965,12 @@ function _bistCkEndTest(ti, status) {
 
 function _bistCkOnProgress(ti, test, ev, tmplSteps) {
   var type = ev.type;
-  // FREEZE: allow node card creation (step_start) through so DAG stays visible,
-  // but block CoC writes and radio messages
-  if (window._bckFrozen && type !== 'step_start') return;
+  // FREEZE: allow node card creation (step_start) through so DAG stays visible.
+  // Also allow step_route_back (arc draw + card reset), radio (tower comms), and
+  // step_pass (card goes green) through — these are visual state events that must
+  // render regardless of freeze. Block only CoC counter writes on instance_created,
+  // step_fail, complete, error when frozen.
+  if (window._bckFrozen && type !== 'step_start' && type !== 'step_route_back' && type !== 'radio' && type !== 'step_pass') return;
   if (type === 'instance_created') {
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt on';
     _bistCkAddCoc('#00D2FF','instance_launched','Template: '+_bistEscHtml(test.name));
