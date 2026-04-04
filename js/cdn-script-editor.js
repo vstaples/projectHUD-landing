@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE15','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260404-SE16','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -272,8 +272,11 @@ var SE_CSS = '<style id="se-css">' + [
 'color:var(--se-t2);cursor:pointer;outline:none}',
 
 /* Right panel */
-'#se-right{width:210px;flex-shrink:0;background:var(--se-bg1);',
-'border-left:1px solid var(--se-b);display:flex;flex-direction:column;overflow:hidden}',
+'#se-right{width:300px;min-width:200px;max-width:520px;flex-shrink:0;background:var(--se-bg1);',
+'border-left:1px solid var(--se-b);display:flex;flex-direction:column;overflow:hidden;position:relative}',
+'#se-right-drag{position:absolute;left:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:10;',
+'background:transparent;transition:background .15s}',
+'#se-right-drag:hover{background:rgba(40,212,192,.25)}',
 '.se-rp-sec{border-bottom:1px solid var(--se-b);padding:9px 10px;flex-shrink:0}',
 '.se-rp-t{font-size:12px;font-weight:700;letter-spacing:.1em;color:#5fd4c8;',
 'text-transform:uppercase;margin-bottom:7px}',
@@ -295,7 +298,7 @@ var SE_CSS = '<style id="se-css">' + [
 '#se-pi::-webkit-scrollbar{width:2px}',
 '#se-pi::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08)}',
 '.se-pi-row{display:flex;align-items:center;gap:5px;margin-bottom:7px}',
-'.se-pi-lbl{font-size:12px;color:var(--se-mu);letter-spacing:.05em;',
+'.se-pi-lbl{font-size:12px;color:rgba(255,255,255,.65);letter-spacing:.05em;',
 'text-transform:uppercase;width:64px;flex-shrink:0}',
 '.se-pi-sel{font-size:13px;font-family:monospace;background:var(--se-bg0);',
 'border:1px solid var(--se-b);border-radius:3px;padding:2px 5px;',
@@ -410,6 +413,7 @@ function seRenderEditor() {
 
   _seEditorEl.innerHTML = html;
   _seBindEvents();
+  _seBindRightDrag();
   // Auto-scroll to failing card if there is one
   setTimeout(function() {
     var lastRun = _seLastRunFor(_seSelectedId);
@@ -690,6 +694,7 @@ function _seRenderFooter(sc) {
 // ── Right panel ──────────────────────────────────────────────────────────────
 function _seRenderRight(sc) {
   var html = '<div id="se-right">';
+  html += '<div id="se-right-drag" title="Drag to resize"></div>';
   var FA2 = 'font-family:Arial,sans-serif;';
 
   // ── THIS SCRIPT status ────────────────────────────────────────────────────
@@ -727,7 +732,10 @@ function _seRenderRight(sc) {
 
   // ── RUN HISTORY — this script only, inline, with failure detail ───────────
   html += '<div class="se-rp-sec" style="flex:1;overflow-y:auto;min-height:0">';
-  html += '<div class="se-rp-t">Run History</div>';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">';
+  html += '<div class="se-rp-t" style="margin-bottom:0">Run History</div>';
+  html += '<span onclick="window.seShowRunHistory()" style="'+FA2+'font-size:12px;color:#5fd4c8;cursor:pointer;text-decoration:underline">full history</span>';
+  html += '</div>';
   if (!scRuns.length) {
     html += '<div style="'+FA2+'font-size:12px;color:var(--se-mu);font-style:italic;margin-top:4px">No runs yet. Click ▶ Run to execute this script.</div>';
   } else {
@@ -1357,6 +1365,28 @@ function _seAssertResult(assert, lastRun, stepId) {
 }
 
 // ── Keyboard shortcut ────────────────────────────────────────────────────────
+function _seBindRightDrag() {
+  var drag = document.getElementById('se-right-drag');
+  var panel = document.getElementById('se-right');
+  if (!drag || !panel) return;
+  drag.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    var startX = e.clientX;
+    var startW = panel.offsetWidth;
+    function onMove(e) {
+      var delta = startX - e.clientX; // dragging left = wider
+      var newW = Math.min(520, Math.max(200, startW + delta));
+      panel.style.width = newW + 'px';
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
 function _seBindEvents() {
   // Cmd/Ctrl+S to save
   var existing = document._seKeyHandler;
@@ -1522,5 +1552,5 @@ window.seShowRunHistory = function seShowRunHistory() {
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE15 — Remove suspicious flag, add script diff on failing→passing transition, acknowledge button',
+console.log('%c[cdn-script-editor] v20260404-SE16 — Right panel 300px wide + drag resize, pi labels readable, full history link restored',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
