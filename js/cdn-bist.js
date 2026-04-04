@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-BP','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-BQ','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -159,7 +159,8 @@ async function runBistScript(scriptId, onProgress) {
         return { status:'failed', runId, reason: loopReason };
       }
       onProgress?.({ type:'step_start', stepId: stp.id, stepIdx: si,
-        total: spec.steps.length, action: stp.action, params: stp.params });
+        total: spec.steps.length, action: stp.action, params: stp.params,
+        stepSeq: stp.params?.step_seq });
 
       await _bckFreezeWait(); // freeze point — before DB write
 
@@ -1716,13 +1717,24 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     var ef1b = _bckEl('bck-ef1b'); if (ef1b) ef1b.style.width = Math.min(100,_bckSC*4)+'%';
     // If node already exists, this is a reset — draw rejection arc
 
+    // If this step_seq was already completed, reset the arc SVG for a fresh loop
+    if (ev.stepSeq && ev.stepSeq <= (window._bckPendingArcFromSeq || 0)) {
+      var arcSvg = document.getElementById('bck-arc-svg');
+      if (arcSvg) arcSvg.innerHTML = '';
+      window._bckArcs = [];
+    }
     // Activate node in DAG
     _bistCkSetNode(ev.stepId, idx, test, 'active', 'In progress', tmplSteps);
-    // Draw pending arc to this newly created card
-    if (window._bckPendingArcFrom) {
+    // Draw pending arc only if this step loops back (seq <= rejection seq)
+    if (window._bckPendingArcFrom && ev.params && Number(ev.params.step_seq) <= window._bckPendingArcFromSeq) {
       var _paf = window._bckPendingArcFrom;
       window._bckPendingArcFrom = null;
+      window._bckPendingArcFromSeq = null;
       setTimeout(function(){ _bckDrawRejectArc(_paf, ev.stepId); }, 60);
+    } else if (window._bckPendingArcFrom && ev.params && Number(ev.params.step_seq) > window._bckPendingArcFromSeq) {
+      // Next step is forward — not a loop, cancel pending arc
+      window._bckPendingArcFrom = null;
+      window._bckPendingArcFromSeq = null;
     }
   } else if (type === 'step_route_back') {
     _bistCkRadio('tower', '[route] Rejection loop — returning to step '+ev.toStepId);
@@ -1755,10 +1767,11 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     var idx = ev.stepIdx || 0;
     _bistCkSetNode(ev.stepId, idx, test, 'done', ev.outcome || 'Done', tmplSteps);
     _bckLastDoneId = ev.stepId;
-    // Draw rejection arc when step outcome routes backward
-    // Detect: next step_start fires for a stepIdx LESS than current — means loop
+    // Set pending arc if outcome is a rejection type
+    // Will only draw if next step_start has a lower stepSeq (confirmed loop)
     if (ev.outcome && (ev.outcome === 'rejected' || ev.outcome === 'declined' || ev.outcome === 'design_change')) {
       window._bckPendingArcFrom = ev.stepId;
+      window._bckPendingArcFromSeq = Number(ev.stepSeq || 0);
     }
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt dn';
     var _sn = ev.stepName||'Step', _so = ev.outcome||'Done';
