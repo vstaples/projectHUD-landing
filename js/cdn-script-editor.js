@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE3','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260404-SE7','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -14,6 +14,25 @@ var _seRunning        = false;
 var _seFormFieldCache = {};
 var _seEditorEl       = null;
 var _seTmplSteps      = [];
+var _seUndoStack      = [];
+var SE_UNDO_MAX       = 20;
+
+function _sePushUndo() {
+  var sc = _seGetSelected();
+  if (!sc) return;
+  _seUndoStack.push(JSON.stringify(sc.spec));
+  if (_seUndoStack.length > SE_UNDO_MAX) _seUndoStack.shift();
+}
+
+function seUndo() {
+  if (!_seUndoStack.length) return;
+  var sc = _seGetSelected();
+  if (!sc) return;
+  try { sc.spec = JSON.parse(_seUndoStack.pop()); } catch(e) { return; }
+  _seDirty = true;
+  seRefreshTimeline();
+  seRefreshBadge();
+}
 
 // ── Iron rules helpers ───────────────────────────────────────────────────────
 function _seEsc(s) {
@@ -319,13 +338,21 @@ async function seOpenEditor(templateId, targetElId) {
 
   var results = await Promise.all([
     API.get('bist_test_scripts?firm_id=eq.'+FIRM_ID_CAD+'&template_id=eq.'+tmplId+'&order=created_at.asc').catch(function(){return [];}),
-    API.get('bist_runs?firm_id=eq.'+FIRM_ID_CAD+'&template_id=eq.'+tmplId+'&order=run_at.desc&limit=40').catch(function(){return [];}),
     API.get('workflow_template_steps?template_id=eq.'+tmplId+'&order=sequence_order.asc').catch(function(){return [];})
   ]);
 
   var rawScripts = results[0] || [];
-  _seRecentRuns  = results[1] || [];
-  _seTmplSteps   = results[2] || [];
+  _seTmplSteps   = results[1] || [];
+
+  // Fetch runs by script IDs — bist_runs has no template_id column
+  _seRecentRuns = [];
+  if (rawScripts.length) {
+    var ids = rawScripts.map(function(s){ return s.id; }).join(',');
+    _seRecentRuns = await API.get(
+      'bist_runs?firm_id=eq.'+FIRM_ID_CAD+'&script_id=in.('+ids+')&order=run_at.desc&limit=40'
+    ).catch(function(){ return []; });
+    if (!Array.isArray(_seRecentRuns)) _seRecentRuns = [];
+  }
 
   _seScripts = rawScripts.map(function(row) {
     var spec;
@@ -1169,7 +1196,7 @@ function _seAssertResult(assert, lastRun, stepId) {
   return null;
 }
 
-// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+// ── Keyboard shortcut ────────────────────────────────────────────────────────
 function _seBindEvents() {
   // Cmd/Ctrl+S to save
   var existing = document._seKeyHandler;
@@ -1193,5 +1220,5 @@ window._seHydrateFormState = async function(state, instId, tmplSteps) { return s
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE6 — Undo stack, New script modal, Launch locked, badge repositioned',
+console.log('%c[cdn-script-editor] v20260404-SE7 — Fix: _seUndoStack at file scope, bist_runs query by script_id',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
