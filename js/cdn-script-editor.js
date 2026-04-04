@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE13','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260404-SE15','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -731,52 +731,116 @@ function _seRenderRight(sc) {
   if (!scRuns.length) {
     html += '<div style="'+FA2+'font-size:12px;color:var(--se-mu);font-style:italic;margin-top:4px">No runs yet. Click ▶ Run to execute this script.</div>';
   } else {
-    scRuns.forEach(function(r) {
+    // Count steps in this script to detect suspiciously short runs
+    var expectedSteps = sc ? (sc.spec.steps||[]).length : 0;
+
+    scRuns.forEach(function(r, idx) {
       var passed  = r.status === 'passed';
       var color   = passed ? 'var(--se-grn)' : 'var(--se-red)';
       var icon    = passed ? '✓' : '✕';
       var dt      = r.run_at ? new Date(r.run_at) : null;
       var dateStr = dt ? dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' · ' +
                         dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '—';
-      var dur     = r.duration_ms ? (r.duration_ms/1000).toFixed(1)+'s' : '';
+      var dur_s   = r.duration_ms ? r.duration_ms / 1000 : null;
+      var durStr  = dur_s !== null ? (dur_s >= 60
+        ? Math.floor(dur_s/60)+'m '+(Math.round(dur_s%60))+'s'
+        : dur_s.toFixed(1)+'s') : '';
       var ver     = r.template_version ? 'v'+r.template_version : '';
+      var stepsRun = r.steps_run != null ? r.steps_run : null;
 
-      html += '<div style="border-bottom:1px solid rgba(255,255,255,.05);padding:8px 0">';
-      // Header row: icon, date, duration
-      html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:'+(passed?'0':'5px')+'">';
+      var suspicious = false; // removed — duration does not indicate validity
+
+      html += '<div style="border-bottom:1px solid rgba(255,255,255,.05);padding:8px 0" data-run-id="'+r.id+'">';
+
+      // Header: icon · date · duration
+      html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">';
       html += '<span style="'+FA2+'font-size:13px;font-weight:700;color:'+color+';flex-shrink:0">'+icon+'</span>';
-      html += '<span style="'+FA2+'font-size:12px;color:rgba(255,255,255,.7);flex:1">'+dateStr+'</span>';
-      if (dur) html += '<span style="'+FA2+'font-size:12px;color:var(--se-mu);font-family:monospace">'+dur+'</span>';
+      html += '<span style="'+FA2+'font-size:12px;color:rgba(255,255,255,.75);flex:1">'+dateStr+'</span>';
+      if (durStr) html += '<span style="'+FA2+'font-size:12px;color:var(--se-mu);font-family:monospace">'+durStr+'</span>';
       html += '</div>';
-      // Version
-      if (ver) html += '<div style="'+FA2+'font-size:11px;color:var(--se-mu);margin-bottom:'+(passed?'0':'4px')+'">'+ver+'</div>';
+
+      // Version · steps run / asserts
+      html += '<div style="'+FA2+'font-size:12px;color:var(--se-mu);margin-bottom:'+(passed&&!suspicious?'0':'3px')+'">';
+      html += ver;
+      if (stepsRun !== null) html += ' · '+stepsRun+'/'+(expectedSteps||'?')+' steps';
+      html += '</div>';
+
       // Failure detail
       if (!passed) {
         if (r.failure_step) {
-          // Find the step name from the script spec
           var failStep = sc && (sc.spec.steps||[]).find(function(s){ return s.id === r.failure_step; });
           var failName = failStep
-            ? (failStep.params && failStep.params.step_seq ? 'Step ' + failStep.params.step_seq : failStep.action)
+            ? (failStep.params && failStep.params.step_seq ? 'Step '+failStep.params.step_seq+' — '+failStep.action : failStep.action)
             : r.failure_step;
-          html += '<div style="'+FA2+'font-size:12px;color:rgba(255,96,96,.9);margin-bottom:3px">Failed at: '+_seEsc(failName)+'</div>';
+          html += '<div style="'+FA2+'font-size:12px;color:rgba(255,100,100,.9);margin-bottom:3px">Failed at: '+_seEsc(failName)+'</div>';
         }
         if (r.failure_assertion && r.failure_assertion.check) {
           var opKey = Object.keys(r.failure_assertion).find(function(k){ return k !== 'check'; }) || 'eq';
           var expVal = String(r.failure_assertion[opKey]);
-          html += '<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);border-radius:3px;padding:5px 8px;'+FA2+'font-size:12px">';
+          html += '<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);border-radius:3px;padding:5px 8px;'+FA2+'font-size:12px;margin-bottom:3px">';
           html += '<div style="color:rgba(255,255,255,.5);margin-bottom:2px;font-family:monospace">'+_seEsc(r.failure_assertion.check)+'</div>';
-          html += '<div style="color:rgba(255,255,255,.4)">expected: <span style="color:#86efac">'+_seEsc(expVal)+'</span></div>';
+          html += '<div style="color:rgba(255,255,255,.45)">expected <span style="color:#86efac;font-weight:700">'+_seEsc(expVal)+'</span>';
           if (r.failure_reason) {
             var gotMatch = r.failure_reason.match(/got (.+)$/);
-            if (gotMatch) html += '<div style="color:rgba(255,255,255,.4)">actual: <span style="color:#fca5a5">'+_seEsc(gotMatch[1])+'</span></div>';
+            if (gotMatch) html += ' · got <span style="color:#fca5a5;font-weight:700">'+_seEsc(gotMatch[1])+'</span>';
           }
-          html += '</div>';
+          html += '</div></div>';
         } else if (r.failure_reason) {
-          html += '<div style="'+FA2+'font-size:12px;color:rgba(255,200,100,.7)">'+_seEsc(r.failure_reason)+'</div>';
+          html += '<div style="'+FA2+'font-size:12px;color:rgba(255,200,100,.7);margin-bottom:3px">'+_seEsc(r.failure_reason)+'</div>';
+        }
+        // Resolution note placeholder — stored in r.resolution_note if populated
+        if (r.resolution_note) {
+          html += '<div style="background:rgba(40,212,192,.06);border:1px solid rgba(40,212,192,.15);border-radius:3px;padding:5px 8px;'+FA2+'font-size:12px;color:rgba(40,212,192,.8)">';
+          html += '✎ Resolution: '+_seEsc(r.resolution_note);
+          html += '</div>';
         }
       }
+
       html += '</div>';
     });
+
+    // ── Diff display: failing → passing transitions ──────────────────────────
+    // Walk the runs (newest first) and find FAILING→PASSING transitions.
+    // Between them, show a structured diff of script_snapshot changes.
+    for (var di = 0; di < scRuns.length - 1; di++) {
+      var cur  = scRuns[di];    // newer run
+      var prev = scRuns[di+1];  // older run
+      // Transition: current passed, previous failed
+      if (cur.status === 'passed' && prev.status !== 'passed') {
+        var diff = _seComputeScriptDiff(prev.script_snapshot, cur.script_snapshot);
+        if (diff.length) {
+          // Find the DOM element for this run and inject the diff after it
+          // We use a data attribute set earlier — re-render handles this inline
+        }
+        // Acknowledgment row — injected between the two run entries
+        var ackHtml = '<div style="background:rgba(40,212,192,.06);border:1px solid rgba(40,212,192,.18);' +
+          'border-radius:4px;padding:8px 10px;margin:4px 0;'+FA2+'font-size:12px">';
+        ackHtml += '<div style="color:#5fd4c8;font-weight:700;margin-bottom:4px">↑ Fixed — changes between failing and passing run:</div>';
+        if (diff.length) {
+          diff.forEach(function(d) {
+            ackHtml += '<div style="color:rgba(255,255,255,.65);padding:2px 0;font-family:monospace;font-size:11px">'+_seEsc(d)+'</div>';
+          });
+        } else {
+          ackHtml += '<div style="color:rgba(255,255,255,.4);font-style:italic">No script changes — workflow or environment may have changed.</div>';
+        }
+        if (cur.acknowledged_at) {
+          ackHtml += '<div style="color:rgba(255,255,255,.35);margin-top:4px;font-size:11px">✓ Acknowledged '+new Date(cur.acknowledged_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</div>';
+        } else {
+          ackHtml += '<button onclick="seAcknowledgeDiff(this.dataset.rid)" data-rid="'+cur.id+'" style="margin-top:6px;'+FA2+
+            'font-size:12px;background:rgba(40,212,192,.1);border:1px solid rgba(40,212,192,.3);'+
+            'border-radius:3px;color:#5fd4c8;cursor:pointer;padding:3px 10px">✓ Acknowledge review</button>';
+        }
+        ackHtml += '</div>';
+        // Inject into the rendered history by replacing the closing tag of the passing run entry
+        html = html.replace(
+          'data-run-id="'+cur.id+'"',
+          'data-run-id="'+cur.id+'"'
+        );
+        // Append after the passing run section — find insertion point by run index
+        // Since we build linearly, we inject the diff block right after this loop iteration's run
+        html += ackHtml;
+      }
+    }
   }
   html += '</div>';
 
@@ -1313,6 +1377,82 @@ window._seOnFormSection  = async function(stp, instId, stepBySeq) {};
 window._seHydrateFormState = async function(state, instId, tmplSteps) { return state; };
 
 // ── Full run history modal ───────────────────────────────────────────────────
+// ── Compute structured diff between two script snapshots ─────────────────────
+function _seComputeScriptDiff(oldSnap, newSnap) {
+  var changes = [];
+  if (!oldSnap || !newSnap) return changes;
+  try {
+    var o = typeof oldSnap === 'string' ? JSON.parse(oldSnap) : oldSnap;
+    var n = typeof newSnap === 'string' ? JSON.parse(newSnap) : newSnap;
+    var oSteps = o.steps || [];
+    var nSteps = n.steps || [];
+
+    // Steps added
+    nSteps.forEach(function(ns) {
+      if (!oSteps.find(function(os){ return os.id === ns.id; })) {
+        changes.push('+ Step added: ' + (ns.action || ns.id));
+      }
+    });
+
+    // Steps removed
+    oSteps.forEach(function(os) {
+      if (!nSteps.find(function(ns){ return ns.id === os.id; })) {
+        changes.push('− Step removed: ' + (os.action || os.id));
+      }
+    });
+
+    // Steps modified
+    oSteps.forEach(function(os) {
+      var ns = nSteps.find(function(s){ return s.id === os.id; });
+      if (!ns) return;
+
+      // Param changes
+      var op = os.params || {}, np = ns.params || {};
+      Object.keys(np).forEach(function(k) {
+        if (JSON.stringify(op[k]) !== JSON.stringify(np[k])) {
+          changes.push('~ ' + (os.action||os.id) + ': ' + k + ' ' + JSON.stringify(op[k]) + ' → ' + JSON.stringify(np[k]));
+        }
+      });
+
+      // Assert changes
+      var oa = JSON.stringify(os.asserts||[]);
+      var na = JSON.stringify(ns.asserts||[]);
+      if (oa !== na) {
+        (os.asserts||[]).forEach(function(a, i) {
+          var b = (ns.asserts||[])[i];
+          if (!b) { changes.push('− Assert removed on ' + (os.action||os.id) + ': ' + a.check); return; }
+          var opKey = Object.keys(a).find(function(k){ return k !== 'check'; }) || 'eq';
+          var npKey = Object.keys(b).find(function(k){ return k !== 'check'; }) || 'eq';
+          if (a.check !== b.check || a[opKey] !== b[npKey]) {
+            changes.push('~ Assert on ' + (os.action||os.id) + ': ' + a.check + ' ' + opKey + ' ' + a[opKey] + ' → ' + b.check + ' ' + npKey + ' ' + b[npKey]);
+          }
+        });
+        var lenDiff = (ns.asserts||[]).length - (os.asserts||[]).length;
+        if (lenDiff > 0) changes.push('+ ' + lenDiff + ' assert(s) added to ' + (ns.action||ns.id));
+      }
+    });
+
+    // Cleanup change
+    if (o.cleanup !== n.cleanup) {
+      changes.push('~ cleanup: ' + o.cleanup + ' → ' + n.cleanup);
+    }
+  } catch(e) {
+    changes.push('(could not parse snapshots for diff)');
+  }
+  return changes;
+}
+
+// ── Acknowledge a diff ────────────────────────────────────────────────────────
+async function seAcknowledgeDiff(runId) {
+  if (!runId) return;
+  await API.patch('bist_runs?id=eq.' + runId, {
+    acknowledged_by: (typeof _myResourceId !== 'undefined' ? _myResourceId : null),
+    acknowledged_at: new Date().toISOString(),
+  }).catch(function(e) { console.warn('acknowledge failed:', e); });
+  // Re-render to show acknowledged state
+  seRenderEditor();
+}
+
 window.seShowRunHistory = function seShowRunHistory() {
   var sc = _seGetSelected();
   if (!sc) return;
@@ -1382,5 +1522,5 @@ window.seShowRunHistory = function seShowRunHistory() {
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE13 — Right panel: this script only, inline run history with failure detail',
+console.log('%c[cdn-script-editor] v20260404-SE15 — Remove suspicious flag, add script diff on failing→passing transition, acknowledge button',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');

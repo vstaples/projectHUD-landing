@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE13','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE14 — script_snapshot captured on every run','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // ── SE13 patches (2026-04-04) ───────────────────────────────────────────────
 // 1. Reverted SE12's step_route_back emission from explicit route branch.
 //    It fired before step_pass, resetting T2 cards to blue before they went green.
@@ -206,16 +206,17 @@ async function runBistScript(scriptId, onProgress) {
     return { status:'error', reason:'Script has no steps' };
   }
 
-  // Create run record
+  // Create run record — includes script_snapshot for audit diff
   const runRows = await API.post('bist_runs', {
     firm_id:          FIRM_ID_CAD,
     script_id:        scriptId,
-    template_version: _selectedTmpl?.version || spec.template_version || '?',  // always current version
+    template_version: _selectedTmpl?.version || spec.template_version || '?',
     status:           'running',
     steps_passed:     0,
     steps_failed:     0,
     run_by:           _myResourceId || null,
     run_at:           new Date().toISOString(),
+    script_snapshot:  spec,  // full spec at time of run — enables diff between runs
   });
   const runId      = runRows?.[0]?.id;
   if (!runId) {
