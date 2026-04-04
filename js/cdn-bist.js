@@ -1,6 +1,9 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE8','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE9','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// ── SE9 patches (2026-04-04) ────────────────────────────────────────────────
+// 1. Reused cards update seq label (e.g. 3.5→3.2) atomically with id re-assignment.
+// 2. REWORK LOOPS counter now increments on step_route_back (was only on step_fail).
 // ── SE8 patches (2026-04-04) ────────────────────────────────────────────────
 // 1. step_route_back reset range capped at fromStepId exclusive. Previously
 //    slice(toIdx) ran to end-of-list, resetting the rejecting card (s4) to idle.
@@ -2083,6 +2086,10 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
       window._bckPendingArcFromSeq = null;
     }
   } else if (type === 'step_route_back') {
+    // Increment rework loops counter
+    _bckRWC++;
+    var ef3 = _bckEl('bck-ef3'); if (ef3) ef3.textContent = _bckRWC;
+    var ef3b = _bckEl('bck-ef3b'); if (ef3b) ef3b.style.width = Math.min(100,_bckRWC*12)+'%';
     // ev.fromStepId = BIST step id of rejection step (e.g. s4)
     // ev.toStepId   = BIST step id of the first visit of the target (e.g. s2 = first pass of seq 1)
     // ev.toStepSeq  = template step_seq being routed back to
@@ -2305,7 +2312,12 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps, ev) {
       var oldStepId = reuseCard.id.replace('bck-n-', '');
       var oldNst = reuseCard.querySelector('#bck-nst-'+oldStepId);
       reuseCard.id = nodeId;
-      if (oldNst) oldNst.id = 'bck-nst-'+stepId;
+      if (oldNst) {
+        oldNst.id = 'bck-nst-'+stepId;
+        // Update seq label to reflect new stepIdx
+        var seqSpan = oldNst.querySelector('span[style*="margin-left:auto"]');
+        if (seqSpan) seqSpan.textContent = (_bckCurrentTestIdx+1)+'.'+(stepIdx+1);
+      }
     } else {
       // No reusable card — append a new one.
       var aname = test.anames[stepIdx] || 'Actor';
