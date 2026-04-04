@@ -1,6 +1,12 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE4','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE5','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// ── SE5 patches (2026-04-04) ────────────────────────────────────────────────
+// 1. step_route_back event now emitted from all three L2 reset branches:
+//    — reject_to + requiresReset (T3's path — was the missing case)
+//    — implicit reset to start (requiresReset, no reject_to)
+//    Previously only the explicit route_to_seq GOTO block emitted it, so T3's
+//    rejection arc never drew and cards never reset to blue.
 // ── SE4 patches (2026-04-04) ────────────────────────────────────────────────
 // 1. Tower radio added to step_pass — each completed step now echoes to comms
 //    panel with outcome label. Was absent — comms panel showed only instance_launched
@@ -386,6 +392,10 @@ async function runBistScript(scriptId, onProgress) {
             });
             console.log(_tag, '  [L2] template reject_to → seq', rejectTarget.sequence_order,
               ':', rejectTarget.name, '| reset', stepsToReset.length, 'steps');
+            // Notify cockpit — draw rejection arc and reset DAG cards
+            const _rtSpecStep = spec.steps.find(s => Number(s.params?.step_seq) === rejectTarget.sequence_order);
+            onProgress?.({ type: 'step_route_back', fromStepId: stp.id,
+              toStepId: _rtSpecStep?.id || stp.id, toStepSeq: rejectTarget.sequence_order });
           } else {
             console.warn(_tag, '  [L2] reject_to step id not found in tmplSteps — check template data');
           }
@@ -420,6 +430,10 @@ async function runBistScript(scriptId, onProgress) {
             });
             console.log(_tag, '  [L2] implicit reset to start → seq', firstStep.sequence_order,
               ':', firstStep.name, '| reset', stepsToReset.length, 'steps');
+            // Notify cockpit — draw rejection arc and reset DAG cards
+            const _irSpecStep = spec.steps.find(s => Number(s.params?.step_seq) === firstStep.sequence_order);
+            onProgress?.({ type: 'step_route_back', fromStepId: stp.id,
+              toStepId: _irSpecStep?.id || stp.id, toStepSeq: firstStep.sequence_order });
           }
 
         } else {
