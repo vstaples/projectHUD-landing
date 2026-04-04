@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.19 — Wizard: equal 50/50 columns, fixed flowchart, opacity-based panel transitions','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.20 — Wizard: fixed-width left column, real DAG from template steps','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1685,42 +1685,42 @@ function _s9RightPanelWizard(srcName, srcVer) {
   }
 
   var html =
-    // Full-height two-column layout
+    // Full-height layout — centered narrow left, remainder for visual
     '<div style="display:flex;flex-direction:column;width:100%;height:100%;background:#080a10;overflow:hidden">' +
 
       // ── Header strip ──
-      '<div style="flex-shrink:0;padding:20px 28px 12px;border-bottom:1px solid rgba(255,255,255,.05)">' +
-        '<div style="' + FA + 'font-size:19px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:3px">' +
+      '<div style="flex-shrink:0;padding:18px 28px 12px;border-bottom:1px solid rgba(255,255,255,.05);text-align:center">' +
+        '<div style="' + FA + 'font-size:19px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:2px">' +
           _s9EscHtml(srcName) + '</div>' +
         '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.35)">' +
           'Workflow Simulator' + (srcVer ? ' · v' + _s9EscHtml(srcVer) : '') +
         '</div>' +
       '</div>' +
 
-      // ── Main body: steps left, visual right ──
-      '<div style="flex:1;min-height:0;display:flex;gap:0;overflow:hidden">' +
+      // ── Main body: left instructions (fixed width, centered), right visuals ──
+      '<div style="flex:1;min-height:0;display:flex;overflow:hidden">' +
 
-        // Left: steps + CTA
-        '<div style="flex:1;min-width:0;padding:20px 20px 16px;display:flex;flex-direction:column;' +
+        // Left: max 420px, centered within its flex space
+        '<div style="flex:0 0 420px;display:flex;flex-direction:column;padding:20px 24px 16px;' +
           'border-right:1px solid rgba(255,255,255,.05);overflow-y:auto">' +
 
           // Onboarding callout
-          '<div style="background:rgba(40,212,192,.06);border:1px solid rgba(40,212,192,.14);' +
-            'border-radius:5px;padding:10px 13px;margin-bottom:16px">' +
+          '<div style="background:rgba(40,212,192,.06);border:1px solid rgba(40,212,192,.15);' +
+            'border-radius:5px;padding:10px 14px;margin-bottom:18px">' +
             '<div style="' + FA + 'font-size:13px;font-weight:700;color:rgba(40,212,192,.85);margin-bottom:4px">' +
               '👋 First time here?' +
             '</div>' +
-            '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.6);line-height:1.65">' +
-              'Test scripts are specific to this workflow. Follow the steps →' +
+            '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.65);line-height:1.65">' +
+              'Test scripts tell the Simulator which scenarios to run. They are <strong style="color:rgba(255,255,255,.85)">specific to this workflow</strong>. Follow the steps on the right →' +
             '</div>' +
           '</div>' +
 
-          // Step rows — IDs allow JS to animate active state
+          // Step rows
           '<div id="s9w-step-1" class="s9w-step-row active">' +
-            '<div style="display:flex;gap:10px;align-items:flex-start">' +
-              '<div id="s9w-dot-1" style="width:24px;height:24px;border-radius:50%;background:#28d4c0;' +
+            '<div style="display:flex;gap:12px;align-items:flex-start">' +
+              '<div id="s9w-dot-1" style="width:26px;height:26px;border-radius:50%;background:#28d4c0;' +
                 'display:flex;align-items:center;justify-content:center;flex-shrink:0;' +
-                FA + 'font-size:12px;font-weight:700;color:#080a10;transition:background .5s">1</div>' +
+                FA + 'font-size:13px;font-weight:700;color:#080a10;transition:background .5s">1</div>' +
               '<div>' +
                 '<div id="s9w-title-1" style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:3px;transition:color .5s">Create test scripts</div>' +
                 '<div id="s9w-desc-1" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.6);line-height:1.6;transition:color .5s">Define the scenarios to test — the clean path, rejections, edge cases. Scripts are specific to this workflow.</div>' +
@@ -1729,35 +1729,35 @@ function _s9RightPanelWizard(srcName, srcVer) {
           '</div>' +
 
           '<div id="s9w-step-2" class="s9w-step-row inactive">' +
-            '<div style="display:flex;gap:10px;align-items:flex-start">' +
-              '<div id="s9w-dot-2" style="width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.1);' +
+            '<div style="display:flex;gap:12px;align-items:flex-start">' +
+              '<div id="s9w-dot-2" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.1);' +
                 'display:flex;align-items:center;justify-content:center;flex-shrink:0;' +
-                FA + 'font-size:12px;font-weight:700;color:rgba(255,255,255,.3);transition:background .5s,color .5s">2</div>' +
+                FA + 'font-size:13px;font-weight:700;color:rgba(255,255,255,.3);transition:all .5s">2</div>' +
               '<div>' +
                 '<div id="s9w-title-2" style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.3);margin-bottom:3px;transition:color .5s">Run the simulation</div>' +
-                '<div id="s9w-desc-2" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2);line-height:1.6;transition:color .5s">The flight simulator executes every script and verifies each routing path against your workflow definition.</div>' +
+                '<div id="s9w-desc-2" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2);line-height:1.6;transition:color .5s">The simulator executes every script and verifies each routing path against your workflow definition.</div>' +
               '</div>' +
             '</div>' +
           '</div>' +
 
           '<div id="s9w-step-3" class="s9w-step-row inactive">' +
-            '<div style="display:flex;gap:10px;align-items:flex-start">' +
-              '<div id="s9w-dot-3" style="width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.1);' +
+            '<div style="display:flex;gap:12px;align-items:flex-start">' +
+              '<div id="s9w-dot-3" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.1);' +
                 'display:flex;align-items:center;justify-content:center;flex-shrink:0;' +
-                FA + 'font-size:12px;font-weight:700;color:rgba(255,255,255,.3);transition:background .5s,color .5s">3</div>' +
+                FA + 'font-size:13px;font-weight:700;color:rgba(255,255,255,.3);transition:all .5s">3</div>' +
               '<div>' +
                 '<div id="s9w-title-3" style="' + FA + 'font-size:14px;font-weight:700;color:rgba(255,255,255,.3);margin-bottom:3px;transition:color .5s">Get your certificate</div>' +
-                '<div id="s9w-desc-3" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2);line-height:1.6;transition:color .5s">A Routing Proof Certificate confirms every path works — required before releasing this workflow to your team.</div>' +
+                '<div id="s9w-desc-3" style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2);line-height:1.6;transition:color .5s">A Routing Proof Certificate confirms every path works — required before releasing to your team.</div>' +
               '</div>' +
             '</div>' +
           '</div>' +
 
-          // CTA
-          '<div style="margin-top:auto;padding-top:16px">' +
+          // CTA pinned to bottom
+          '<div style="margin-top:auto;padding-top:20px">' +
             '<button onclick="_s9AutoGenerateScript()" ' +
               'style="' + FA + 'font-size:14px;font-weight:700;padding:12px 16px;border-radius:5px;border:none;' +
               'cursor:pointer;background:#1D9E75;color:#fff;width:100%;margin-bottom:8px;letter-spacing:.03em;' +
-              'box-shadow:0 0 18px rgba(29,158,117,.35)">' +
+              'box-shadow:0 0 18px rgba(29,158,117,.3)">' +
               '⚡ Auto-generate test scripts</button>' +
             '<div style="text-align:center">' +
               '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.28)">Or </span>' +
@@ -1767,24 +1767,28 @@ function _s9RightPanelWizard(srcName, srcVer) {
 
         '</div>' +
 
-        // Right: animated visual panel
-        '<div style="flex:1;min-width:0;position:relative;background:#060810;overflow:hidden;height:100%">' +
+        // Right: animated visual panels — fills remaining space
+        '<div style="flex:1;min-width:0;position:relative;background:#060810;overflow:hidden">' +
 
-          // Panel 1: Flowchart — starts visible
-          '<div id="s9w-panel-1" style="position:absolute;inset:0;display:flex;align-items:center;' +
-            'justify-content:center;padding:16px;transition:opacity 1.2s ease;opacity:1">' +
-            _s9VisFlowchart() +
+          // Panel 1: Real workflow DAG — starts visible
+          '<div id="s9w-panel-1" style="position:absolute;inset:0;display:flex;flex-direction:column;' +
+            'align-items:center;justify-content:center;padding:20px;' +
+            'transition:opacity 1.2s ease;opacity:1">' +
+            '<div style="' + FA + 'font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;' +
+              'color:rgba(40,212,192,.5);margin-bottom:14px">STEP 1 — Your workflow to test</div>' +
+            '<div id="s9w-dag-container" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:0">' +
+              // Populated by _s9BuildWizardDag() after render
+              '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.25);font-style:italic">Loading workflow steps…</div>' +
+            '</div>' +
           '</div>' +
 
-          // Panel 2: Cockpit in progress — starts hidden
-          '<div id="s9w-panel-2" style="position:absolute;inset:0;display:flex;align-items:center;' +
-            'justify-content:center;padding:16px;transition:opacity 1.2s ease;opacity:0;pointer-events:none">' +
+          // Panel 2: Cockpit — hidden
+          '<div id="s9w-panel-2" style="position:absolute;inset:0;transition:opacity 1.2s ease;opacity:0;pointer-events:none">' +
             _s9VisCockpitRunning() +
           '</div>' +
 
-          // Panel 3: Certificate — starts hidden
-          '<div id="s9w-panel-3" style="position:absolute;inset:0;display:flex;align-items:center;' +
-            'justify-content:center;padding:16px;transition:opacity 1.2s ease;opacity:0;pointer-events:none">' +
+          // Panel 3: Certificate — hidden
+          '<div id="s9w-panel-3" style="position:absolute;inset:0;transition:opacity 1.2s ease;opacity:0;pointer-events:none">' +
             _s9VisCertificate() +
           '</div>' +
 
@@ -1828,6 +1832,9 @@ function _s9RightPanelWizard(srcName, srcVer) {
       });
     }
 
+    // Build real DAG from template steps
+    _s9BuildWizardDag();
+
     function _cycle() {
       var next = (_phase % 3) + 1;
       _activatePhase(next);
@@ -1838,6 +1845,93 @@ function _s9RightPanelWizard(srcName, srcVer) {
   }, 100);
 
   return html;
+}
+
+// ── Build real vertical DAG from actual template steps ────────────────────
+function _s9BuildWizardDag() {
+  var el = document.getElementById('s9w-dag-container');
+  if (!el) return;
+  var FA = 'font-family:Arial,sans-serif;';
+
+  // Use already-loaded steps
+  var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+  var steps = tmpl && Array.isArray(tmpl.steps) && tmpl.steps.length ? tmpl.steps : null;
+
+  if (!steps) {
+    // Try DB fetch
+    if (!tmpl || !tmpl.id) {
+      el.innerHTML = '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.25);font-style:italic">Select a workflow to see its steps.</div>';
+      return;
+    }
+    API.get('workflow_template_steps?template_id=eq.' + tmpl.id + '&order=sequence_order.asc')
+      .then(function(rows) {
+        if (Array.isArray(rows) && rows.length) {
+          if (tmpl) tmpl.steps = rows;
+          _s9BuildWizardDagFromSteps(el, rows);
+        } else {
+          el.innerHTML = '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.25);font-style:italic">No steps found — open this workflow in Library first.</div>';
+        }
+      }).catch(function() {
+        el.innerHTML = '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.25);font-style:italic">Could not load steps.</div>';
+      });
+    return;
+  }
+
+  _s9BuildWizardDagFromSteps(el, steps);
+}
+
+function _s9BuildWizardDagFromSteps(el, steps) {
+  var FA = 'font-family:Arial,sans-serif;';
+  var typeColors = {
+    form:     {bg:'rgba(124,116,232,.14)', border:'rgba(124,116,232,.5)', text:'#a09ae8'},
+    approval: {bg:'rgba(240,160,48,.12)',  border:'rgba(240,160,48,.55)',  text:'#f0a030'},
+    signoff:  {bg:'rgba(40,212,192,.11)',  border:'rgba(40,212,192,.5)',   text:'#28d4c0'},
+    meeting:  {bg:'rgba(80,144,240,.12)',  border:'rgba(80,144,240,.5)',   text:'#6ab0f5'},
+    trigger:  {bg:'rgba(255,255,255,.05)', border:'rgba(255,255,255,.2)', text:'rgba(255,255,255,.55)'},
+  };
+  var fallback = {bg:'rgba(80,144,240,.1)', border:'rgba(80,144,240,.35)', text:'rgba(160,200,255,.8)'};
+
+  // Trigger node (always first)
+  var trigger = '<div style="display:flex;flex-direction:column;align-items:center">' +
+    '<div style="background:rgba(61,224,138,.12);border:2px solid rgba(61,224,138,.5);' +
+      'border-radius:20px;padding:7px 22px;' + FA + 'font-size:13px;font-weight:700;color:#3de08a">' +
+      '▶ Workflow Start' +
+    '</div>' +
+    '<div style="width:1.5px;height:14px;background:rgba(255,255,255,.15)"></div>' +
+    '<div style="border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid rgba(255,255,255,.2)"></div>' +
+  '</div>';
+
+  var nodes = steps.map(function(s, i) {
+    var c = typeColors[s.step_type] || fallback;
+    var name = (s.name || '').replace(/^(Checklist|Form|Approval|Finalize|Final Meeting):\s*/i, '');
+    var arrow = i < steps.length - 1
+      ? '<div style="display:flex;flex-direction:column;align-items:center">' +
+          '<div style="width:1.5px;height:14px;background:rgba(255,255,255,.12)"></div>' +
+          '<div style="border-left:4px solid transparent;border-right:4px solid transparent;border-top:6px solid rgba(255,255,255,.18)"></div>' +
+        '</div>'
+      : '';
+    return '<div style="display:flex;flex-direction:column;align-items:center">' +
+      '<div style="background:' + c.bg + ';border:1.5px solid ' + c.border + ';border-radius:4px;' +
+        'padding:7px 16px;min-width:180px;max-width:240px;text-align:center">' +
+        '<div style="' + FA + 'font-size:11px;color:' + c.text + ';font-weight:700;margin-bottom:2px;' +
+          'letter-spacing:.04em;text-transform:uppercase">' + _s9EscHtml(s.step_type||'step') + '</div>' +
+        '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.85);font-weight:600;' +
+          'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">' + _s9EscHtml(s.name||'Step') + '</div>' +
+      '</div>' +
+      arrow +
+    '</div>';
+  }).join('');
+
+  // End node
+  var endNode = '<div style="display:flex;flex-direction:column;align-items:center">' +
+    '<div style="width:1.5px;height:14px;background:rgba(255,255,255,.15)"></div>' +
+    '<div style="background:rgba(240,96,96,.1);border:2px solid rgba(240,96,96,.4);' +
+      'border-radius:20px;padding:7px 22px;' + FA + 'font-size:13px;font-weight:700;color:#f06060">' +
+      '◼ Workflow End' +
+    '</div>' +
+  '</div>';
+
+  el.innerHTML = trigger + nodes + endNode;
 }
 
 // ── Visual Panel 1: Vertical flowchart ────────────────────────────────────
