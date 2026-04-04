@@ -1,0 +1,734 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg0:#0d0e11; --bg1:#13151a; --bg2:#1a1d24; --bg3:#22262f;
+  --b: rgba(255,255,255,.07); --b2: rgba(255,255,255,.13); --b3: rgba(255,255,255,.22);
+  --t: rgba(255,255,255,.92); --t2: rgba(255,255,255,.62); --mu: rgba(255,255,255,.32);
+  --cad:#7F77DD; --cad2:rgba(127,119,221,.18); --cad3:rgba(127,119,221,.08);
+  --grn:#4ade80; --grn2:rgba(74,222,128,.13); --grn3:rgba(74,222,128,.06);
+  --amb:#f59e0b; --amb2:rgba(245,158,11,.15); --amb3:rgba(245,158,11,.06);
+  --red:#f87171; --red2:rgba(248,113,113,.15); --red3:rgba(248,113,113,.06);
+  --teal:#2dd4bf; --teal2:rgba(45,212,191,.13);
+  --blu:#60a5fa; --blu2:rgba(96,165,250,.13);
+  --mn:'JetBrains Mono','Courier New',monospace;
+  --sn:'Inter',system-ui,sans-serif;
+}
+body,html{background:var(--bg0)}
+.shell{background:var(--bg0);color:var(--t);font-family:var(--sn);font-size:12px;display:flex;flex-direction:column;border-radius:8px;overflow:hidden;min-height:820px}
+.topbar{background:var(--bg1);border-bottom:1px solid var(--b);display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;flex-shrink:0}
+.brand{color:var(--cad);font-weight:700;font-size:13px;letter-spacing:.05em;padding-right:12px;border-right:1px solid var(--b);margin-right:4px}
+.badge{font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:2px 6px;border-radius:3px;font-family:var(--mn)}
+.bd-draft{background:var(--amb2);color:var(--amb);border:1px solid rgba(245,158,11,.3)}
+.bd-pass{background:var(--grn2);color:var(--grn);border:1px solid rgba(74,222,128,.3)}
+.bd-fail{background:var(--red2);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+.bd-new{background:var(--cad2);color:var(--cad);border:1px solid rgba(127,119,221,.3)}
+.btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;font-size:10px;font-weight:600;border-radius:4px;cursor:pointer;border:1px solid var(--b2);background:transparent;color:var(--t2);letter-spacing:.04em;transition:all .12s;font-family:var(--sn);white-space:nowrap}
+.btn:hover{background:rgba(255,255,255,.06);color:var(--t)}
+.btn-cad{background:var(--cad2);border-color:rgba(127,119,221,.45);color:var(--cad)}
+.btn-cad:hover{background:rgba(127,119,221,.28)}
+.btn-grn{background:var(--grn2);border-color:rgba(74,222,128,.4);color:var(--grn)}
+.btn-red{background:var(--red2);border-color:rgba(248,113,113,.4);color:var(--red)}
+.mla{margin-left:auto}
+/* Layout */
+.layout{display:flex;flex:1;min-height:0}
+/* Left palette */
+.palette{width:200px;flex-shrink:0;background:var(--bg1);border-right:1px solid var(--b);display:flex;flex-direction:column;overflow:hidden}
+.pal-section{border-bottom:1px solid var(--b)}
+.pal-hdr{padding:8px 12px 6px;font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--mu);text-transform:uppercase;display:flex;align-items:center;justify-content:space-between}
+.pal-add{background:none;border:none;color:var(--cad);font-size:18px;cursor:pointer;line-height:1;padding:0}
+/* Script list */
+.sc-item{padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--b);transition:background .1s;position:relative}
+.sc-item:hover{background:rgba(255,255,255,.03)}
+.sc-item.sel{background:var(--cad3);border-left:2px solid var(--cad);padding-left:10px}
+.sc-name{font-size:11px;color:var(--t);margin-bottom:3px;line-height:1.3}
+.sc-meta{display:flex;align-items:center;gap:5px}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+/* Action palette chips */
+.act-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px}
+.act-chip{padding:7px 8px;border:1px dashed var(--b2);border-radius:5px;cursor:grab;text-align:center;transition:all .15s;user-select:none;background:var(--bg2)}
+.act-chip:hover{border-color:var(--cad);background:var(--cad3)}
+.act-chip:active{cursor:grabbing;transform:scale(.96)}
+.act-icon{font-size:16px;display:block;margin-bottom:3px}
+.act-lbl{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--t2)}
+.act-chip.dragging{opacity:.5;border-style:solid;border-color:var(--cad)}
+/* Template steps */
+.tmpl-scroll{flex:1;overflow-y:auto;padding:0 0 8px}
+.ts-chip{display:flex;align-items:center;gap:6px;padding:5px 12px;cursor:grab;transition:background .1s;border-bottom:1px solid var(--b)}
+.ts-chip:hover{background:var(--bg2)}
+.ts-chip:active{cursor:grabbing}
+.ts-seq{font-size:9px;font-family:var(--mn);color:var(--mu);width:14px;text-align:center;flex-shrink:0}
+.ts-name{font-size:10px;color:var(--t2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ts-type{font-size:8px;color:var(--mu);font-family:var(--mn);flex-shrink:0}
+/* Center */
+.center{flex:1;display:flex;flex-direction:column;min-width:0}
+.sc-hdr{background:var(--bg2);border-bottom:1px solid var(--b);padding:8px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sc-title{background:transparent;border:none;font-size:13px;font-weight:600;color:var(--t);font-family:var(--sn);outline:none;flex:1}
+/* Drop zone toolbar */
+.dz-toolbar{background:var(--bg1);border-bottom:1px solid var(--b);padding:6px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.dz-hint{font-size:10px;color:var(--mu);font-style:italic}
+.dz-target{flex:1;height:32px;border:1.5px dashed var(--b2);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--mu);transition:all .15s;cursor:default}
+.dz-target.over{border-color:var(--cad);background:var(--cad3);color:var(--cad)}
+/* Timeline */
+.timeline{flex:1;overflow-y:auto;padding:16px 14px 16px}
+.step-row{display:flex;gap:0;position:relative}
+.spine{width:30px;flex-shrink:0;display:flex;flex-direction:column;align-items:center}
+.snode{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;font-family:var(--mn);flex-shrink:0;border:2px solid;z-index:2}
+.sn-launch{background:var(--cad2);border-color:var(--cad);color:var(--cad)}
+.sn-act{background:var(--blu2);border-color:var(--blu);color:var(--blu)}
+.sn-asc{background:var(--amb2);border-color:var(--amb);color:var(--amb)}
+.sn-pass{background:var(--grn2);border-color:var(--grn);color:var(--grn)}
+.sn-fail{background:var(--red2);border-color:var(--red);color:var(--red)}
+.sline{width:2px;flex:1;background:var(--b2);margin:2px 0;min-height:12px}
+.sline-dash{background:repeating-linear-gradient(to bottom,var(--amb) 0,var(--amb) 4px,transparent 4px,transparent 8px);width:2px}
+.sbody{flex:1;padding:0 0 14px 10px;min-width:0}
+/* Step card */
+.sc-card{background:var(--bg2);border:1px solid var(--b);border-radius:6px;overflow:hidden;transition:border-color .15s}
+.sc-card:hover{border-color:var(--b2)}
+.sc-card.active{border-color:rgba(127,119,221,.35)}
+.sc-card.fail{border-color:rgba(248,113,113,.4)}
+.sc-card.ghost{opacity:.38}
+.card-hdr{padding:6px 10px;display:flex;align-items:center;gap:6px;background:var(--bg3);cursor:pointer}
+.card-hdr:hover .card-expand{opacity:1}
+.card-expand{font-size:11px;color:var(--mu);margin-left:auto;opacity:.5;transition:opacity .1s;background:none;border:none;cursor:pointer;color:var(--t2)}
+.ttag{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:3px;font-family:var(--mn)}
+.tt-launch{background:var(--cad2);color:var(--cad)}
+.tt-act{background:var(--blu2);color:var(--blu)}
+.tt-asc{background:var(--amb2);color:var(--amb)}
+.card-title{font-size:11px;font-weight:600;color:var(--t)}
+.card-actor{font-size:10px;color:var(--mu);font-family:var(--mn)}
+.card-body{padding:8px 10px}
+/* Fields */
+.frow{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.fl{font-size:9px;color:var(--mu);letter-spacing:.06em;text-transform:uppercase;width:64px;flex-shrink:0}
+.fsel{font-size:10px;color:var(--t2);font-family:var(--mn);background:var(--bg0);border:1px solid var(--b);border-radius:3px;padding:2px 6px;cursor:pointer;outline:none}
+.fsel:hover{border-color:var(--b2)}
+.fval{font-size:10px;color:var(--t2);font-family:var(--mn);background:var(--bg0);border:1px solid var(--b);border-radius:3px;padding:2px 6px}
+.finput{font-size:10px;color:var(--t);font-family:var(--mn);background:var(--bg0);border:1px solid var(--b);border-radius:3px;padding:2px 6px;outline:none;width:48px}
+.finput:focus{border-color:var(--cad)}
+/* Outcome chips */
+.oc{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;font-family:var(--mn)}
+.oc-sub{background:var(--blu2);color:var(--blu);border:1px solid rgba(96,165,250,.3)}
+.oc-app{background:var(--grn2);color:var(--grn);border:1px solid rgba(74,222,128,.3)}
+.oc-rej{background:var(--red2);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+.oc-dec{background:var(--amb2);color:var(--amb);border:1px solid rgba(245,158,11,.3)}
+/* Assertions */
+.asc-list{margin-top:6px;display:flex;flex-direction:column;gap:4px}
+.asc-row{display:flex;align-items:center;gap:5px;padding:4px 7px;background:var(--bg0);border-radius:4px;border:1px solid var(--b);position:relative}
+.asc-check{font-size:9px;color:var(--teal);font-family:var(--mn);flex:1}
+.asc-op{font-size:9px;font-weight:700;color:var(--amb);font-family:var(--mn)}
+.asc-val{font-size:9px;color:var(--t2);font-family:var(--mn)}
+.asc-result-p{font-size:9px;color:var(--grn);font-weight:700;margin-left:auto}
+.asc-result-f{font-size:9px;color:var(--red);font-weight:700;margin-left:auto}
+.asc-del{background:none;border:none;color:var(--mu);cursor:pointer;font-size:12px;padding:0 0 0 4px;line-height:1}
+.asc-del:hover{color:var(--red)}
+/* Assertion builder */
+.asc-builder{background:var(--bg0);border:1px solid var(--amb2);border-radius:5px;padding:8px 10px;margin-top:6px}
+.asc-builder-title{font-size:9px;font-weight:700;color:var(--amb);letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px}
+.asc-builder-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.abtn{font-size:9px;padding:2px 8px;border-radius:3px;cursor:pointer;border:1px solid var(--b2);background:transparent;color:var(--t2);font-family:var(--sn);transition:all .12s}
+.abtn:hover{border-color:var(--cad);color:var(--cad)}
+.abtn.sel{background:var(--cad2);border-color:var(--cad);color:var(--cad)}
+/* Arc */
+.arc-bar{display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--red3);border:1px solid rgba(248,113,113,.22);border-radius:4px;font-size:9px;color:var(--red);font-family:var(--mn);margin-top:5px}
+.arc-edit{background:none;border:none;color:var(--mu);font-size:9px;cursor:pointer;margin-left:auto;font-family:var(--sn)}
+.arc-edit:hover{color:var(--t2)}
+/* Diff */
+.diff{background:var(--bg2);border:1px solid rgba(248,113,113,.25);border-radius:5px;padding:8px 10px;margin-top:6px}
+.diff-t{font-size:9px;font-weight:700;color:var(--red);margin-bottom:5px;letter-spacing:.05em}
+.diff-r{display:flex;gap:6px;font-size:9px;font-family:var(--mn);margin-bottom:3px}
+.diff-e{color:var(--grn)}
+.diff-a{color:var(--red)}
+.diff-l{color:var(--mu);width:52px;flex-shrink:0}
+.diff-hint{font-size:9px;color:var(--mu);line-height:1.5;margin-top:4px}
+/* Add step */
+.add-row{display:flex;gap:6px;padding:8px 0 0 40px;flex-wrap:wrap}
+.add-chip{padding:4px 10px;border:1px dashed rgba(255,255,255,.12);border-radius:4px;font-size:9px;color:var(--mu);cursor:pointer;transition:all .12s;background:transparent;font-family:var(--sn)}
+.add-chip:hover{border-color:var(--cad);color:var(--cad);background:var(--cad3)}
+/* Right panel */
+.rpanel{width:240px;flex-shrink:0;background:var(--bg1);border-left:1px solid var(--b);display:flex;flex-direction:column;overflow:hidden}
+.rp-sec{border-bottom:1px solid var(--b);padding:10px 12px}
+.rp-t{font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--mu);text-transform:uppercase;margin-bottom:8px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.stat-c{background:var(--bg2);border-radius:4px;padding:7px 9px;border:1px solid var(--b)}
+.stat-v{font-size:18px;font-weight:700;font-family:var(--mn);line-height:1;margin-bottom:2px}
+.stat-l{font-size:9px;color:var(--mu);letter-spacing:.06em;text-transform:uppercase}
+.run-row{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--b)}
+.run-row:last-child{border-bottom:none}
+.run-n{font-size:10px;color:var(--t2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.run-t{font-size:9px;color:var(--mu);font-family:var(--mn);flex-shrink:0}
+/* Prop inspector */
+.pi-section{padding:10px 12px;border-bottom:1px solid var(--b);flex:1;overflow-y:auto}
+.pi-row{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.pi-label{font-size:9px;color:var(--mu);letter-spacing:.06em;text-transform:uppercase;width:72px;flex-shrink:0}
+.pi-sel{font-size:10px;font-family:var(--mn);background:var(--bg0);border:1px solid var(--b);border-radius:3px;padding:3px 6px;color:var(--t2);width:100%;outline:none;cursor:pointer}
+.pi-sel:focus{border-color:var(--cad)}
+.pi-input{font-size:10px;font-family:var(--mn);background:var(--bg0);border:1px solid var(--b);border-radius:3px;padding:3px 6px;color:var(--t);width:100%;outline:none}
+.pi-input:focus{border-color:var(--cad)}
+.gate-block{background:var(--red2);border:1px solid rgba(248,113,113,.3);border-radius:4px;padding:8px 10px;margin-bottom:8px}
+.gate-t{font-size:10px;font-weight:700;color:var(--red);margin-bottom:3px}
+.gate-d{font-size:9px;color:var(--red);opacity:.8;line-height:1.5}
+.banner{background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);border-radius:4px;padding:6px 10px;margin-bottom:10px;font-size:10px;color:var(--red);display:flex;align-items:flex-start;gap:7px;flex-shrink:0}
+.footer{background:var(--bg1);border-top:1px solid var(--b);padding:6px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;font-size:9px}
+</style>
+
+<div class="shell">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <span class="brand">CadenceHUD</span>
+  <span style="font-size:10px;color:var(--mu);letter-spacing:.07em;text-transform:uppercase">Test Script Editor</span>
+  <span style="font-size:11px;color:var(--t2);margin-left:6px">Design Review Signoff</span>
+  <span class="badge bd-draft" style="margin-left:6px">v0.0.13</span>
+  <div class="mla" style="display:flex;gap:6px">
+    <button class="btn">▶ Run</button>
+    <button class="btn">▶▶ Run All</button>
+    <button class="btn btn-cad">Save</button>
+  </div>
+</div>
+
+<div class="layout">
+
+<!-- LEFT PALETTE -->
+<div class="palette">
+  <div class="pal-section">
+    <div class="pal-hdr">Scripts <button class="pal-add" title="New script">+</button></div>
+    <div id="script-list">
+      <div class="sc-item sel" onclick="selectScript('t3')">
+        <div class="sc-name">T3 — Rejection loop</div>
+        <div class="sc-meta"><div class="dot" style="background:var(--red)"></div><span style="font-size:9px;color:var(--red)">FAILING</span><span style="font-size:9px;color:var(--mu);margin-left:auto;font-family:var(--mn)">7 steps</span></div>
+      </div>
+      <div class="sc-item" onclick="selectScript('t1')">
+        <div class="sc-name">T1 — Full approval path</div>
+        <div class="sc-meta"><div class="dot" style="background:var(--grn)"></div><span style="font-size:9px;color:var(--grn)">PASSING</span><span style="font-size:9px;color:var(--mu);margin-left:auto;font-family:var(--mn)">6 steps</span></div>
+      </div>
+      <div class="sc-item" onclick="selectScript('t2')">
+        <div class="sc-name">T2 — Meeting reset</div>
+        <div class="sc-meta"><div class="dot" style="background:var(--grn)"></div><span style="font-size:9px;color:var(--grn)">PASSING</span><span style="font-size:9px;color:var(--mu);margin-left:auto;font-family:var(--mn)">6 steps</span></div>
+      </div>
+      <div class="sc-item" onclick="selectScript('t4')">
+        <div class="sc-name">T4 — Sign-off decline</div>
+        <div class="sc-meta"><div class="dot" style="background:var(--mu)"></div><span style="font-size:9px;color:var(--mu)">NOT RUN</span><span style="font-size:9px;color:var(--mu);margin-left:auto;font-family:var(--mn)">7 steps</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pal-section">
+    <div class="pal-hdr" style="padding-bottom:4px">Action Blocks</div>
+    <div style="font-size:9px;color:var(--mu);padding:0 12px 6px;font-style:italic">Drag onto timeline ↓</div>
+    <div class="act-grid">
+      <div class="act-chip" draggable="true" data-action="launch_instance" ondragstart="onPalDragStart(event,'launch_instance')" ondragend="onPalDragEnd(event)">
+        <span class="act-icon">▶</span>
+        <span class="act-lbl">Launch</span>
+      </div>
+      <div class="act-chip" draggable="true" data-action="complete_step" ondragstart="onPalDragStart(event,'complete_step')" ondragend="onPalDragEnd(event)">
+        <span class="act-icon">✓</span>
+        <span class="act-lbl">Complete</span>
+      </div>
+      <div class="act-chip" draggable="true" data-action="assert_only" ondragstart="onPalDragStart(event,'assert_only')" ondragend="onPalDragEnd(event)">
+        <span class="act-icon">≡</span>
+        <span class="act-lbl">Assert</span>
+      </div>
+      <div class="act-chip" draggable="true" data-action="wait" ondragstart="onPalDragStart(event,'wait')" ondragend="onPalDragEnd(event)">
+        <span class="act-icon">⏱</span>
+        <span class="act-lbl">Wait</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="pal-hdr" style="padding-top:8px">Template Steps</div>
+  <div style="font-size:9px;color:var(--mu);padding:0 12px 6px;font-style:italic">Drag to insert complete_step</div>
+  <div class="tmpl-scroll">
+    <div class="ts-chip" draggable="true" ondragstart="onTmplDragStart(event,1,'Checklist: Design Review','form')" ondragend="onPalDragEnd(event)">
+      <span class="ts-seq">1</span><span class="ts-name">Checklist: Design Review</span><span class="ts-type">form</span>
+    </div>
+    <div class="ts-chip" draggable="true" ondragstart="onTmplDragStart(event,2,'Form: DRA','form')" ondragend="onPalDragEnd(event)">
+      <span class="ts-seq">2</span><span class="ts-name">Form: Design Review Approval</span><span class="ts-type">form</span>
+    </div>
+    <div class="ts-chip" draggable="true" ondragstart="onTmplDragStart(event,3,'Approval: Design Review','approval')" ondragend="onPalDragEnd(event)">
+      <span class="ts-seq">3</span><span class="ts-name">Approval: Design Review</span><span class="ts-type">approval</span>
+    </div>
+    <div class="ts-chip" draggable="true" ondragstart="onTmplDragStart(event,4,'Finalize: Design Review','signoff')" ondragend="onPalDragEnd(event)">
+      <span class="ts-seq">4</span><span class="ts-name">Finalize: Design Review</span><span class="ts-type">signoff</span>
+    </div>
+    <div class="ts-chip" draggable="true" ondragstart="onTmplDragStart(event,5,'Final Meeting','meeting')" ondragend="onPalDragEnd(event)">
+      <span class="ts-seq">5</span><span class="ts-name">Final Meeting</span><span class="ts-type">meeting</span>
+    </div>
+  </div>
+</div>
+
+<!-- CENTER -->
+<div class="center">
+  <div class="sc-hdr">
+    <input class="sc-title" id="sc-title-input" value="Rejection loop — approval rejects then passes" />
+    <span class="badge bd-fail" id="sc-status-badge">FAILING</span>
+    <button class="btn" style="margin-left:6px" onclick="rerunScript()">⟳ Re-run</button>
+    <button class="btn btn-red" onclick="deleteScript()">🗑</button>
+  </div>
+
+  <!-- DROP ZONE TOOLBAR -->
+  <div class="dz-toolbar">
+    <span class="dz-hint">Drag an action block here to append →</span>
+    <div class="dz-target" id="dz-append"
+      ondragover="onDzOver(event,'dz-append')" ondragleave="onDzLeave('dz-append')" ondrop="onDzDrop(event,'append')">
+      + Drop to append step
+    </div>
+    <button class="btn btn-grn" onclick="addBuilderStep()">+ Add assertion</button>
+  </div>
+
+  <div class="timeline" id="timeline">
+    <div class="banner" id="fail-banner">
+      <span style="font-weight:700;flex-shrink:0">✕ s4</span>
+      <span>step[3].loops: expected 1, got 2 — step completed twice before assertion fired</span>
+    </div>
+    <div id="steps-container"></div>
+    <div class="add-row" id="add-row">
+      <button class="add-chip" onclick="quickAdd('launch_instance')">+ launch</button>
+      <button class="add-chip" onclick="quickAdd('complete_step')">+ complete step</button>
+      <button class="add-chip" onclick="quickAdd('assert_only')">+ assert only</button>
+      <button class="add-chip" onclick="quickAdd('wait')">+ wait</button>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span style="color:var(--mu);letter-spacing:.06em;text-transform:uppercase">Cleanup:</span>
+    <select class="fsel" style="font-size:9px" id="cleanup-sel">
+      <option value="delete">Delete instance after run</option>
+      <option value="suspend">Suspend instance</option>
+      <option value="keep">Keep instance</option>
+    </select>
+    <span style="margin-left:auto;font-family:var(--mn);color:var(--mu)" id="run-meta">Last run: 11:12 AM · 01:23 · T3</span>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="rpanel">
+  <div class="rp-sec">
+    <div class="rp-t">Suite</div>
+    <div class="stat-grid">
+      <div class="stat-c"><div class="stat-v" style="color:var(--grn)">3</div><div class="stat-l">Passing</div></div>
+      <div class="stat-c"><div class="stat-v" style="color:var(--red)">1</div><div class="stat-l">Failing</div></div>
+      <div class="stat-c"><div class="stat-v" style="color:var(--mu)">0</div><div class="stat-l">Not run</div></div>
+      <div class="stat-c"><div class="stat-v" style="color:var(--amb)">8</div><div class="stat-l">Assertions</div></div>
+    </div>
+  </div>
+
+  <div class="rp-sec">
+    <div class="rp-t">Recent runs</div>
+    <div class="run-row"><div class="dot" style="background:var(--red)"></div><span class="run-n">T3 — Rejection loop</span><span class="run-t">01:23</span></div>
+    <div class="run-row"><div class="dot" style="background:var(--grn)"></div><span class="run-n">T4 — Sign-off decline</span><span class="run-t">00:58</span></div>
+    <div class="run-row"><div class="dot" style="background:var(--grn)"></div><span class="run-n">T2 — Meeting reset</span><span class="run-t">00:44</span></div>
+    <div class="run-row"><div class="dot" style="background:var(--grn)"></div><span class="run-n">T1 — Full approval</span><span class="run-t">00:31</span></div>
+  </div>
+
+  <!-- Property Inspector for selected step -->
+  <div class="pi-section" id="prop-inspector">
+    <div class="rp-t">Step Properties</div>
+    <div style="font-size:10px;color:var(--mu);font-style:italic">Click a step card to inspect &amp; edit</div>
+  </div>
+
+  <div class="rp-sec">
+    <div class="gate-block">
+      <div class="gate-t">✕ Cannot Release</div>
+      <div class="gate-d">1 test failing. Fix T3 before publishing v0.0.13.</div>
+    </div>
+    <div style="font-size:9px;color:var(--mu);line-height:1.5">All scripts must pass before this template version can be released to Compass.</div>
+  </div>
+</div>
+
+</div>
+</div>
+
+<script>
+var actors = ['vaughn_staples','chris_staples','carlos_reyes','system'];
+var outcomes = {
+  'form':['submitted','saved_incomplete'],
+  'approval':['approved','rejected','changes_requested'],
+  'signoff':['signed','declined'],
+  'meeting':['design_change','complete']
+};
+var tmplSteps = [
+  {seq:1,name:'Checklist: Design Review',type:'form'},
+  {seq:2,name:'Form: Design Review Approval',type:'form'},
+  {seq:3,name:'Approval: Design Review',type:'approval'},
+  {seq:4,name:'Finalize: Design Review',type:'signoff'},
+  {seq:5,name:'Final Meeting',type:'meeting'},
+];
+
+var scriptData = {
+  t3: {
+    name:'Rejection loop — approval rejects then passes',
+    status:'fail',
+    steps:[
+      {id:'s1',action:'launch_instance',actor:'vaughn_staples',title:'BIST — {timestamp}',asserts:[],expanded:true,result:'pass'},
+      {id:'s2',action:'complete_step',seq:1,actor:'chris_staples',outcome:'submitted',asserts:[],expanded:false,result:'pass'},
+      {id:'s3',action:'complete_step',seq:2,actor:'chris_staples',outcome:'submitted',asserts:[],expanded:false,result:'pass'},
+      {id:'s4',action:'complete_step',seq:3,actor:'vaughn_staples',outcome:'rejected',routeBackSeq:1,
+        asserts:[{check:'step[3].loops',op:'eq',val:'1',result:'fail',actual:'2'}],expanded:true,result:'fail'},
+      {id:'s5',action:'complete_step',seq:1,actor:'chris_staples',outcome:'submitted',asserts:[],expanded:false,result:'ghost'},
+      {id:'s6',action:'complete_step',seq:2,actor:'chris_staples',outcome:'submitted',asserts:[],expanded:false,result:'ghost'},
+      {id:'s7',action:'complete_step',seq:3,actor:'vaughn_staples',outcome:'approved',
+        asserts:[{check:'step[3].loops',op:'eq',val:'1',result:'ghost',actual:'?'}],expanded:false,result:'ghost'},
+    ]
+  }
+};
+
+var currentScript = 't3';
+var dragAction = null;
+var dragTmpl = null;
+var selectedStepId = null;
+var showBuilderFor = null;
+
+function selectScript(id) {
+  currentScript = id;
+  document.querySelectorAll('.sc-item').forEach(el => el.classList.remove('sel'));
+  event.currentTarget.classList.add('sel');
+  renderTimeline();
+}
+
+function onPalDragStart(e, action) {
+  dragAction = action; dragTmpl = null;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'copy';
+}
+function onTmplDragStart(e, seq, name, type) {
+  dragTmpl = {seq, name, type}; dragAction = 'complete_step';
+  e.currentTarget.style.opacity = '.5';
+  e.dataTransfer.effectAllowed = 'copy';
+}
+function onPalDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  e.currentTarget.style.opacity = '';
+}
+function onDzOver(e, id) {
+  e.preventDefault();
+  document.getElementById(id).classList.add('over');
+}
+function onDzLeave(id) {
+  document.getElementById(id).classList.remove('over');
+}
+function onDzDrop(e, target) {
+  e.preventDefault();
+  document.getElementById('dz-append').classList.remove('over');
+  var sc = scriptData[currentScript];
+  if (!sc) return;
+  var newId = 's' + (Date.now() % 10000);
+  var newStep;
+  if (dragTmpl) {
+    newStep = {id:newId, action:'complete_step', seq:dragTmpl.seq, actor:'vaughn_staples',
+      outcome: (outcomes[dragTmpl.type]||['submitted'])[0], asserts:[], expanded:true, result:'new'};
+  } else if (dragAction === 'launch_instance') {
+    newStep = {id:newId, action:'launch_instance', actor:'vaughn_staples', title:'BIST — {timestamp}', asserts:[], expanded:true, result:'new'};
+  } else if (dragAction === 'complete_step') {
+    newStep = {id:newId, action:'complete_step', seq:1, actor:'vaughn_staples', outcome:'submitted', asserts:[], expanded:true, result:'new'};
+  } else if (dragAction === 'assert_only') {
+    newStep = {id:newId, action:'assert_only', asserts:[{check:'step[1].state',op:'eq',val:'done',result:'new',actual:''}], expanded:true, result:'new'};
+  } else if (dragAction === 'wait') {
+    newStep = {id:newId, action:'wait', ms:500, asserts:[], expanded:true, result:'new'};
+  }
+  if (newStep) { sc.steps.push(newStep); renderTimeline(); selectStep(newId); }
+  dragAction = null; dragTmpl = null;
+}
+
+function quickAdd(action) {
+  dragAction = action; dragTmpl = null;
+  onDzDrop({preventDefault:function(){}}, 'append');
+}
+
+function addBuilderStep() {
+  var sc = scriptData[currentScript];
+  if (!sc) return;
+  if (sc.steps.length === 0) return;
+  var last = sc.steps[sc.steps.length-1];
+  last.asserts = last.asserts || [];
+  last.asserts.push({check:'step[1].state',op:'eq',val:'done',result:'new',actual:''});
+  showBuilderFor = last.id;
+  last.expanded = true;
+  renderTimeline();
+}
+
+function toggleExpand(id) {
+  var sc = scriptData[currentScript];
+  var s = sc.steps.find(x=>x.id===id);
+  if (s) { s.expanded = !s.expanded; renderTimeline(); }
+}
+
+function deleteStep(id) {
+  var sc = scriptData[currentScript];
+  sc.steps = sc.steps.filter(x=>x.id!==id);
+  if (selectedStepId === id) { selectedStepId = null; renderPropInspector(null); }
+  renderTimeline();
+}
+
+function deleteAssert(stepId, idx) {
+  var sc = scriptData[currentScript];
+  var s = sc.steps.find(x=>x.id===stepId);
+  if (s) { s.asserts.splice(idx,1); renderTimeline(); }
+}
+
+function selectStep(id) {
+  selectedStepId = id;
+  var sc = scriptData[currentScript];
+  var s = sc ? sc.steps.find(x=>x.id===id) : null;
+  renderPropInspector(s);
+  document.querySelectorAll('.sc-card').forEach(el => {
+    el.classList.toggle('active-sel', el.dataset.id === id);
+  });
+}
+
+function renderPropInspector(step) {
+  var el = document.getElementById('prop-inspector');
+  if (!step) {
+    el.innerHTML = '<div class="rp-t">Step Properties</div><div style="font-size:10px;color:var(--mu);font-style:italic">Click a step card to inspect &amp; edit</div>';
+    return;
+  }
+  var tsOpts = tmplSteps.map(t=>`<option value="${t.seq}" ${step.seq===t.seq?'selected':''}>${t.seq}. ${t.name}</option>`).join('');
+  var actorOpts = actors.map(a=>`<option value="${a}" ${step.actor===a?'selected':''}>${a}</option>`).join('');
+  var stepType = step.seq ? (tmplSteps.find(t=>t.seq===step.seq)||{}).type || 'form' : 'form';
+  var ocs = (outcomes[stepType]||['submitted']);
+  var outOpts = ocs.map(o=>`<option value="${o}" ${step.outcome===o?'selected':''}>${o}</option>`).join('');
+  var routeOpts = ['—',...tmplSteps.map(t=>`${t.seq}`)].map((v,i)=>`<option value="${i===0?'':v}" ${(!step.routeBackSeq&&i===0)||step.routeBackSeq==v?'selected':''}>${i===0?'No route back':v+'. '+tmplSteps[i-1]?.name}</option>`).join('');
+  var checkOpts = ['step[1].state','step[2].state','step[3].state','step[3].loops','step[3].outcome','instance.status'].map(c=>`<option>${c}</option>`).join('');
+  var opOpts = ['eq','not_eq','gte','lte','exists','not_exists'].map(o=>`<option>${o}</option>`).join('');
+
+  el.innerHTML = `
+    <div class="rp-t">Properties — ${step.id}</div>
+    ${step.action==='complete_step'?`
+    <div class="pi-row"><span class="pi-label">Template step</span><select class="pi-sel" onchange="updateStepProp('${step.id}','seq',parseInt(this.value))">${tsOpts}</select></div>
+    <div class="pi-row"><span class="pi-label">Actor</span><select class="pi-sel" onchange="updateStepProp('${step.id}','actor',this.value)">${actorOpts}</select></div>
+    <div class="pi-row"><span class="pi-label">Outcome</span><select class="pi-sel" onchange="updateStepProp('${step.id}','outcome',this.value)">${outOpts}</select></div>
+    <div class="pi-row"><span class="pi-label">Route back</span><select class="pi-sel" onchange="updateStepProp('${step.id}','routeBackSeq',this.value?parseInt(this.value):null)">${routeOpts}</select></div>
+    `:''}
+    ${step.action==='launch_instance'?`
+    <div class="pi-row"><span class="pi-label">Actor</span><select class="pi-sel" onchange="updateStepProp('${step.id}','actor',this.value)">${actorOpts}</select></div>
+    <div class="pi-row"><span class="pi-label">Title</span><input class="pi-input" value="${step.title||''}" onchange="updateStepProp('${step.id}','title',this.value)" /></div>
+    `:''}
+    <div style="margin-top:6px">
+      <div class="rp-t" style="margin-bottom:5px">Add Assertion</div>
+      <select class="pi-sel" style="margin-bottom:4px" id="pi-check">${checkOpts}</select>
+      <div style="display:flex;gap:4px;margin-bottom:4px">
+        <select class="pi-sel" style="flex:1" id="pi-op">${opOpts}</select>
+        <input class="pi-input" style="flex:1" placeholder="value" id="pi-val" />
+      </div>
+      <button class="btn btn-grn" style="width:100%;justify-content:center;font-size:9px" onclick="addAssertFromInspector('${step.id}')">+ Add assertion</button>
+    </div>
+    <div style="margin-top:8px">
+      <button class="btn btn-red" style="width:100%;justify-content:center;font-size:9px" onclick="deleteStep('${step.id}')">Remove step</button>
+    </div>`;
+}
+
+function updateStepProp(id, key, val) {
+  var sc = scriptData[currentScript];
+  var s = sc.steps.find(x=>x.id===id);
+  if (!s) return;
+  s[key] = val;
+  renderTimeline();
+}
+
+function addAssertFromInspector(stepId) {
+  var check = document.getElementById('pi-check')?.value || 'step[1].state';
+  var op = document.getElementById('pi-op')?.value || 'eq';
+  var val = document.getElementById('pi-val')?.value || '';
+  var sc = scriptData[currentScript];
+  var s = sc.steps.find(x=>x.id===stepId);
+  if (!s) return;
+  s.asserts = s.asserts || [];
+  s.asserts.push({check, op, val, result:'new', actual:''});
+  s.expanded = true;
+  renderTimeline();
+}
+
+function rerunScript() {
+  document.getElementById('fail-banner').style.display='none';
+  document.getElementById('sc-status-badge').textContent='RUNNING';
+  document.getElementById('sc-status-badge').className='badge bd-draft';
+  setTimeout(function(){
+    document.getElementById('fail-banner').style.display='flex';
+    document.getElementById('sc-status-badge').textContent='FAILING';
+    document.getElementById('sc-status-badge').className='badge bd-fail';
+  }, 1800);
+}
+function deleteScript() {
+  if (confirm('Delete this test script?')) {
+    document.getElementById('sc-title-input').value = '';
+    renderPropInspector(null);
+  }
+}
+
+function nodeClass(result) {
+  if (result==='pass') return 'sn-pass';
+  if (result==='fail') return 'sn-fail';
+  if (result==='new') return 'sn-asc';
+  return 'sn-act';
+}
+function nodeIcon(result, action) {
+  if (result==='pass') return '✓';
+  if (result==='fail') return '✕';
+  if (result==='new') return '★';
+  if (result==='ghost') return '·';
+  if (action==='launch_instance') return '▶';
+  return '○';
+}
+function ttag(action) {
+  if (action==='launch_instance') return '<span class="ttag tt-launch">launch</span>';
+  if (action==='assert_only') return '<span class="ttag tt-asc">assert</span>';
+  return '<span class="ttag tt-act">complete step</span>';
+}
+function stepTitle(s) {
+  if (s.action==='launch_instance') return 'Instance launched';
+  if (s.action==='wait') return `Wait ${s.ms||500}ms`;
+  if (s.action==='assert_only') return 'Assert only';
+  var t = tmplSteps.find(x=>x.seq===s.seq);
+  return t ? `${t.seq}. ${t.name}` : `seq ${s.seq}`;
+}
+function outcomeChip(o) {
+  var cls = o==='approved'||o==='signed'?'oc-app':o==='rejected'?'oc-rej':o==='declined'||o==='changes_requested'?'oc-dec':'oc-sub';
+  return `<span class="oc ${cls}">${o}</span>`;
+}
+
+function renderTimeline() {
+  var sc = scriptData[currentScript];
+  if (!sc) return;
+  var con = document.getElementById('steps-container');
+  var html = '';
+  sc.steps.forEach(function(s, i) {
+    var isLast = i === sc.steps.length - 1;
+    var nc = nodeClass(s.result);
+    var ni = nodeIcon(s.result, s.action);
+    var ghost = s.result === 'ghost';
+    var isFail = s.result === 'fail';
+    var isNew = s.result === 'new';
+    var cardClass = 'sc-card' + (isFail?' fail':'') + (isNew?' active':'') + (ghost?' ghost':'') + (selectedStepId===s.id?' active':'');
+    var expanded = s.expanded;
+
+    // Assertions HTML
+    var assertsHtml = '';
+    if (s.asserts && s.asserts.length > 0 && expanded) {
+      assertsHtml += '<div class="asc-list">';
+      s.asserts.forEach(function(a, ai) {
+        var rClass = a.result==='pass'?'asc-result-p':a.result==='fail'?'asc-result-f':'';
+        var rText = a.result==='pass'?'✓ pass':a.result==='fail'?`✕ got ${a.actual}`:'';
+        assertsHtml += `<div class="asc-row" style="${a.result==='fail'?'border-color:rgba(248,113,113,.3);background:var(--red3)':''}">
+          <span class="asc-check">${a.check}</span>
+          <span class="asc-op">${a.op}</span>
+          <span class="asc-val">${a.val}</span>
+          ${rText?`<span class="${rClass}">${rText}</span>`:''}
+          <button class="asc-del" onclick="deleteAssert('${s.id}',${ai})" title="Remove">×</button>
+        </div>`;
+      });
+      assertsHtml += '</div>';
+
+      // Diff panel for failing assertion
+      if (isFail) {
+        var fa = s.asserts.find(a=>a.result==='fail');
+        if (fa) {
+          assertsHtml += `<div class="diff">
+            <div class="diff-t">✕ Assertion diff — ${fa.check}</div>
+            <div class="diff-r"><span class="diff-l">Expected</span><span class="diff-e">${fa.op} ${fa.val}</span></div>
+            <div class="diff-r"><span class="diff-l">Actual</span><span class="diff-a">${fa.op} ${fa.actual}</span></div>
+            <div class="diff-hint">step[3] has ${fa.actual} step_completed entries at this point. Consider <span style="color:var(--amb);font-family:var(--mn)">eq:${fa.actual}</span> or repositioning this assertion.</div>
+          </div>`;
+        }
+      }
+    }
+
+    // Arc indicator
+    var arcHtml = '';
+    if (s.routeBackSeq && expanded) {
+      var rt = tmplSteps.find(x=>x.seq===s.routeBackSeq);
+      arcHtml = `<div class="arc-bar">↩ ROUTE BACK → seq ${s.routeBackSeq}${rt?' ('+rt.name+')':''} <button class="arc-edit" onclick="clearRoute('${s.id}')">clear ×</button></div>`;
+    }
+
+    // Card body
+    var bodyHtml = '';
+    if (expanded) {
+      if (s.action==='launch_instance') {
+        bodyHtml = `<div class="card-body">
+          <div class="frow"><span class="fl">Title</span><span class="fval">${s.title||'BIST — {timestamp}'}</span></div>
+          <div class="frow"><span class="fl">Actor</span><span class="fval">${s.actor||'system'}</span></div>
+        </div>`;
+      } else if (s.action==='complete_step') {
+        var t = tmplSteps.find(x=>x.seq===s.seq);
+        var ocs2 = (outcomes[(t||{}).type||'form']||['submitted']);
+        var outHtml2 = ocs2.map(o=>`<option value="${o}" ${s.outcome===o?'selected':''}>${o}</option>`).join('');
+        var actOpts = actors.map(a=>`<option value="${a}" ${s.actor===a?'selected':''}>${a}</option>`).join('');
+        bodyHtml = `<div class="card-body">
+          <div class="frow">
+            <span class="fl">Outcome</span>
+            <select class="fsel" onchange="updateStepProp('${s.id}','outcome',this.value)">${outHtml2}</select>
+            <span class="fl" style="margin-left:8px">Actor</span>
+            <select class="fsel" onchange="updateStepProp('${s.id}','actor',this.value)">${actOpts}</select>
+          </div>
+          ${arcHtml}
+          ${s.asserts.length>0?`<div style="font-size:9px;color:var(--mu);margin-top:8px;margin-bottom:3px;letter-spacing:.06em;text-transform:uppercase">Assertions</div>`:``}
+          ${assertsHtml}
+          <button class="add-chip" style="margin-top:6px;font-size:9px" onclick="addAssertTo('${s.id}')">+ assertion</button>
+        </div>`;
+      } else if (s.action==='assert_only') {
+        bodyHtml = `<div class="card-body">
+          ${assertsHtml}
+          <button class="add-chip" style="margin-top:6px;font-size:9px" onclick="addAssertTo('${s.id}')">+ assertion</button>
+        </div>`;
+      } else if (s.action==='wait') {
+        bodyHtml = `<div class="card-body"><div class="frow"><span class="fl">ms</span><input class="finput" type="number" value="${s.ms||500}" onchange="updateStepProp('${s.id}','ms',parseInt(this.value))" /></div></div>`;
+      }
+    }
+
+    html += `<div class="step-row" data-id="${s.id}">
+      <div class="spine" style="${ghost?'opacity:.38':''}">
+        <div class="snode ${nc}">${ni}</div>
+        ${!isLast?`<div class="sline${s.routeBackSeq?' sline-dash':''}"></div>`:''}
+      </div>
+      <div class="sbody">
+        <div class="${cardClass}" data-id="${s.id}" onclick="selectStep('${s.id}')">
+          <div class="card-hdr" onclick="toggleExpand('${s.id}')">
+            ${ttag(s.action)}
+            <span class="card-title">${stepTitle(s)}</span>
+            ${s.action==='complete_step'&&s.outcome?outcomeChip(s.outcome):''}
+            ${s.actor?`<span class="card-actor">${s.actor}</span>`:''}
+            <span style="font-size:9px;color:var(--mu);font-family:var(--mn);margin-left:4px">${s.id}</span>
+            <button class="card-expand">${expanded?'▲':'▼'}</button>
+          </div>
+          ${bodyHtml}
+        </div>
+      </div>
+    </div>`;
+  });
+
+  con.innerHTML = html;
+
+  // Re-attach drag-to-reorder on step rows
+  con.querySelectorAll('.step-row').forEach(function(row) {
+    row.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      row.style.borderTop = '2px solid var(--cad)';
+    });
+    row.addEventListener('dragleave', function() {
+      row.style.borderTop = '';
+    });
+    row.addEventListener('drop', function(e) {
+      e.preventDefault();
+      row.style.borderTop = '';
+      onDzDrop(e, 'insert');
+    });
+  });
+}
+
+function addAssertTo(stepId) {
+  var sc = scriptData[currentScript];
+  var s = sc.steps.find(x=>x.id===stepId);
+  if (!s) return;
+  s.asserts = s.asserts || [];
+  s.asserts.push({check:'step['+( s.seq||1)+'].state',op:'eq',val:'done',result:'new',actual:''});
+  s.expanded = true;
+  renderTimeline();
+}
+
+function clearRoute(stepId) {
+  var sc = scriptData[currentScript];
+  var s = sc.steps.find(x=>x.id===stepId);
+  if (s) { s.routeBackSeq = null; renderTimeline(); }
+}
+
+renderTimeline();
+</script>
