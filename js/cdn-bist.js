@@ -1340,6 +1340,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   document.getElementById('bist-cockpit-overlay')?.remove();
   window._bckCockpitClosed = false;  // reset for this run
   window._bckAborted = false;
+  window._bckFrozen = false;         // always start unfrozen — prior session state must not carry over
   window._bistCkRunning = true;  // block gate refresh
   // Update simulator gate text immediately
   var _gateEl = document.getElementById('s9-sim-gate');
@@ -1959,7 +1960,7 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
   var type = ev.type;
   // FREEZE: allow node card creation (step_start) through so DAG stays visible,
   // but block CoC writes and radio messages
-  if (window._bckFrozen && type !== 'step_start') return;
+  if (window._bckFrozen && type !== 'step_start' && type !== 'step_l2_reset') return;
   if (type === 'instance_created') {
     var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt on';
     _bistCkAddCoc('#00D2FF','instance_launched','Template: '+_bistEscHtml(test.name));
@@ -2241,8 +2242,10 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps, ev) {
         return Number(c.dataset.seq) === replaySeq && c.className === 'bck-nc';
       });
     if (resetCard) {
-      // Re-ID the card to the new BIST stepId so subsequent lookups find it
+      // Re-ID the card and its inner status element to the new BIST stepId
       console.log('[cdn-bist:dag] reusing reset card '+resetCard.id+' → bck-n-'+stepId+' (seq '+replaySeq+')');
+      var oldNst = resetCard.querySelector('[id^="bck-nst-"]');
+      if (oldNst) oldNst.id = 'bck-nst-'+stepId;
       resetCard.id = nodeId;
       existing = resetCard;
     }
