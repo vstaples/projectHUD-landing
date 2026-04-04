@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE10','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260404-SE11','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -691,71 +691,93 @@ function _seRenderFooter(sc) {
 function _seRenderRight(sc) {
   var html = '<div id="se-right">';
 
-  // Suite stats
-  // "This Script" panel — stats for the OPEN script only
-  html += '<div class="se-rp-sec">';
-  html += '<div class="se-rp-t">This Script</div>';
-  html += '<div style="font-size:12px;color:var(--se-mu);margin-bottom:6px;font-family:Arial,sans-serif">Stats for the script currently open</div>';
-  html += '<div class="se-stat-grid">';
-  var scRuns = sc ? _seRecentRuns.filter(function(r){ return r.script_id === sc.id; }) : [];
+  var FA2 = 'font-family:Arial,sans-serif;';
+
+  // ── THIS SCRIPT: single clear status card ───────────────────────────────────
+  var scRuns    = sc ? _seRecentRuns.filter(function(r){ return r.script_id === sc.id; }) : [];
   var scLastRun = sc ? _seLastRunFor(sc.id) : null;
   var scPassed  = scRuns.filter(function(r){ return r.status === 'passed'; }).length;
   var scFailed  = scRuns.filter(function(r){ return r.status !== 'passed'; }).length;
+  var scTotal   = scRuns.length;
   var scSteps   = sc ? (sc.spec.steps||[]).length : 0;
   var scAsserts = sc ? (sc.spec.steps||[]).reduce(function(n,s){ return n+(s.asserts||[]).length; },0) : 0;
-  var lastStatus = !scLastRun ? 'NOT RUN' : scLastRun.status === 'passed' ? 'PASSING' : 'FAILING';
-  var lastColor  = !scLastRun ? 'var(--se-mu)' : scLastRun.status === 'passed' ? 'var(--se-grn)' : 'var(--se-red)';
-  html += '<div class="se-stat-c" title="Times this script passed"><div class="se-stat-v" style="color:var(--se-grn)">'+scPassed+'</div><div class="se-stat-l">Passed</div></div>';
-  html += '<div class="se-stat-c" title="Times this script failed"><div class="se-stat-v" style="color:var(--se-red)">'+scFailed+'</div><div class="se-stat-l">Failed</div></div>';
-  html += '<div class="se-stat-c" title="Steps in this script"><div class="se-stat-v" style="color:var(--se-t2)">'+scSteps+'</div><div class="se-stat-l">Steps</div></div>';
-  html += '<div class="se-stat-c" title="Assertion checks defined"><div class="se-stat-v" style="color:var(--se-amb)">'+scAsserts+'</div><div class="se-stat-l">Asserts</div></div>';
-  html += '</div>';
-  html += '<div style="margin-top:6px;font-size:12px;font-weight:700;color:'+lastColor+';font-family:Arial,sans-serif">'+lastStatus+'</div>';
-  html += '<button onclick="seShowRunHistory()" style="margin-top:6px;font-size:12px;font-family:Arial,sans-serif;' +
-    'background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:3px;' +
-    'color:rgba(255,255,255,.6);cursor:pointer;padding:3px 10px;width:100%">📋 Full run history</button>';
-  html += '</div>';
+  var scLastStatus = !scLastRun ? 'NOT RUN' : scLastRun.status === 'passed' ? 'PASSING' : 'FAILING';
+  var scLastColor  = !scLastRun ? 'var(--se-mu)' : scLastRun.status === 'passed' ? 'var(--se-grn)' : 'var(--se-red)';
+  var scLastDate   = scLastRun && scLastRun.run_at
+    ? new Date(scLastRun.run_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})
+    + ' · ' + new Date(scLastRun.run_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
+    : null;
 
-  // Suite panel — ALL scripts' last-run status
   html += '<div class="se-rp-sec">';
-  html += '<div class="se-rp-t">Suite</div>';
-  html += '<div style="font-size:12px;color:var(--se-mu);margin-bottom:6px;font-family:Arial,sans-serif">All scripts · last run each</div>';
-  html += '<div class="se-stat-grid">';
-  var suPassing = 0, suFailing = 0, suNotRun = 0, suTotal = _seScripts.length;
-  _seScripts.forEach(function(s) {
-    var r = _seLastRunFor(s.id);
-    if (!r) suNotRun++;
-    else if (r.status === 'passed') suPassing++;
-    else suFailing++;
-  });
-  html += '<div class="se-stat-c" title="Scripts whose last run passed"><div class="se-stat-v" style="color:var(--se-grn)">'+suPassing+'</div><div class="se-stat-l">Passing</div></div>';
-  html += '<div class="se-stat-c" title="Scripts whose last run failed"><div class="se-stat-v" style="color:var(--se-red)">'+suFailing+'</div><div class="se-stat-l">Failing</div></div>';
-  html += '<div class="se-stat-c" title="Scripts never run"><div class="se-stat-v" style="color:var(--se-mu)">'+suNotRun+'</div><div class="se-stat-l">Not run</div></div>';
-  html += '<div class="se-stat-c" title="Total scripts in this workflow"><div class="se-stat-v" style="color:var(--se-t2)">'+suTotal+'</div><div class="se-stat-l">Total</div></div>';
-  html += '</div></div>';
+  html += '<div class="se-rp-t">This Script</div>';
 
-  // Recent runs
+  // Status pill
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+  html += '<span style="'+FA2+'font-size:13px;font-weight:700;color:'+scLastColor+'">'+scLastStatus+'</span>';
+  if (scLastDate) html += '<span style="'+FA2+'font-size:12px;color:var(--se-mu)">'+scLastDate+'</span>';
+  html += '</div>';
+
+  // Two-line facts: last run result, then lifetime stats
+  html += '<div style="'+FA2+'font-size:12px;color:var(--se-mu);line-height:1.8">';
+  html += '<div><span style="color:rgba(255,255,255,.5)">'+scSteps+'</span> steps · <span style="color:rgba(255,255,255,.5)">'+scAsserts+'</span> assertions</div>';
+  if (scTotal > 0) {
+    html += '<div>Run <span style="color:rgba(255,255,255,.5)">'+scTotal+'</span> time'+(scTotal!==1?'s':'')+' · ';
+    html += '<span style="color:var(--se-grn)">'+scPassed+' passed</span>';
+    if (scFailed) html += ' · <span style="color:var(--se-red)">'+scFailed+' failed</span>';
+    html += '</div>';
+  } else {
+    html += '<div style="color:var(--se-mu);font-style:italic">Never run</div>';
+  }
+  html += '</div>';
+
+  // Run history button
+  html += '<button onclick="window.seShowRunHistory()" style="margin-top:8px;'+FA2+'font-size:12px;'+
+    'background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:3px;'+
+    'color:rgba(255,255,255,.6);cursor:pointer;padding:4px 10px;width:100%;text-align:left">'+
+    '📋 Full run history →</button>';
+  html += '</div>';
+
+  // ── WORKFLOW SUITE: one row per script, last-run status only ─────────────────
+  html += '<div class="se-rp-sec">';
+  html += '<div class="se-rp-t">Workflow Suite</div>';
+  html += '<div style="'+FA2+'font-size:12px;color:var(--se-mu);margin-bottom:8px">Last run result · each script</div>';
+  _seScripts.forEach(function(s) {
+    var r    = _seLastRunFor(s.id);
+    var dot  = !r ? 'var(--se-mu)' : r.status === 'passed' ? 'var(--se-grn)' : 'var(--se-red)';
+    var st   = !r ? 'not run' : r.status === 'passed' ? 'pass' : 'FAIL';
+    var stC  = !r ? 'var(--se-mu)' : r.status === 'passed' ? 'var(--se-grn)' : 'var(--se-red)';
+    var isCur = sc && s.id === sc.id;
+    html += '<div style="display:flex;align-items:center;gap:7px;padding:4px 0;'+
+      (isCur ? 'background:rgba(255,255,255,.04);border-radius:3px;padding:4px 6px;margin:0 -6px;' : '')+
+      'cursor:pointer" onclick="seSelectScript(this.dataset.sid)" data-sid="'+s.id+'">';
+    html += '<div class="se-dot" style="background:'+dot+';flex-shrink:0"></div>';
+    var nameOpacity = isCur ? '.9' : '.6';
+    html += '<span style="'+FA2+'font-size:12px;color:rgba(255,255,255,'+nameOpacity+');flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_seEsc(s.name)+'">'+_seEsc(s.name)+'</span>';
+    html += '<span style="'+FA2+'font-size:11px;font-weight:700;color:'+stC+';flex-shrink:0">'+st+'</span>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // ── RECENT RUNS: last 6 across all scripts ────────────────────────────────
   html += '<div class="se-rp-sec">';
   html += '<div class="se-rp-t">Recent Runs</div>';
-  html += '<div style="font-size:12px;color:var(--se-mu);margin-bottom:6px;font-family:Arial,sans-serif">Click any run to open that script</div>';
+  html += '<div style="'+FA2+'font-size:12px;color:var(--se-mu);margin-bottom:6px">Click to open that script</div>';
   var shown = _seRecentRuns.slice(0, 6);
   if (!shown.length) {
     html += '<div style="font-size:12px;color:var(--se-mu);font-style:italic">No runs yet</div>';
   }
   shown.forEach(function(r) {
-    var dot = r.status === 'passed' ? 'var(--se-grn)' : 'var(--se-red)';
-    var sc2 = _seScripts.find(function(s){ return s.id === r.script_id; });
-    var name = sc2 ? sc2.name : r.script_id;
-    var dur  = r.duration_ms ? Math.round(r.duration_ms/1000)+'s' : '';
-    var runScriptId = sc2 ? sc2.id : null;
-    var runStatus = r.status === 'passed' ? 'PASSED' : 'FAILED';
-    var runDate = r.run_at ? new Date(r.run_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
-    var tooltip = name + ' — ' + runStatus + (runDate ? ' · ' + runDate : '') + (dur ? ' · ' + dur : '');
-    html += '<div class="se-run-row" title="'+_seEsc(tooltip)+'"' +
-      (runScriptId ? ' style="cursor:pointer" onclick="seSelectScript(this.dataset.sid)" data-sid="'+runScriptId+'"' : '') + '>';
-    html += '<div class="se-dot" style="background:'+dot+'"></div>';
-    html += '<span class="se-run-n">'+_seEsc(name)+'</span>';
-    html += '<span class="se-run-t">'+dur+'</span>';
+    var dot2 = r.status === 'passed' ? 'var(--se-grn)' : 'var(--se-red)';
+    var sc2  = _seScripts.find(function(s){ return s.id === r.script_id; });
+    var name2= sc2 ? sc2.name : '(unknown)';
+    var dur2 = r.duration_ms ? Math.round(r.duration_ms/1000)+'s' : '';
+    var dt2  = r.run_at ? new Date(r.run_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+    var tip2 = name2 + ' — ' + (r.status === 'passed' ? 'PASSED' : 'FAILED') + (dt2 ? ' · ' + dt2 : '') + (dur2 ? ' · ' + dur2 : '');
+    html += '<div class="se-run-row" title="'+_seEsc(tip2)+'"' +
+      (sc2 ? ' style="cursor:pointer" onclick="seSelectScript(this.dataset.sid)" data-sid="'+sc2.id+'"' : '') + '>';
+    html += '<div class="se-dot" style="background:'+dot2+'"></div>';
+    html += '<span class="se-run-n">'+_seEsc(name2)+'</span>';
+    html += '<span class="se-run-t">'+dur2+'</span>';
     html += '</div>';
   });
   html += '</div>';
@@ -1296,5 +1318,5 @@ window._seHydrateFormState = async function(state, instId, tmplSteps) { return s
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE10 — Fix suite counts (per-script index), This Script stats corrected, run history modal',
+console.log('%c[cdn-script-editor] v20260404-SE11 — Right panel redesigned: clear single-script status, workflow suite list, run history fixed',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
