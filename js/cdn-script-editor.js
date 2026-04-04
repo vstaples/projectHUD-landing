@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE16','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260404-SE17','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -324,7 +324,7 @@ var SE_CSS = '<style id="se-css">' + [
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 // targetElId: ID of the container element to render into (default: 'tmpl-tests-body')
-async function seOpenEditor(templateId, targetElId) {
+async function seOpenEditor(templateId, targetElId, preSelectScriptId) {
   var targetId = targetElId || 'tmpl-tests-body';
   _seEditorEl = document.getElementById(targetId);
   if (!_seEditorEl) {
@@ -371,7 +371,10 @@ async function seOpenEditor(templateId, targetElId) {
     return { id: row.id, name: row.name || spec.name || 'Untitled', spec: spec, _raw: row };
   });
 
-  _seSelectedId   = _seScripts.length ? _seScripts[0].id : null;
+  // Pre-select the requested script if provided, otherwise first
+  _seSelectedId   = (preSelectScriptId && _seScripts.find(function(s){ return s.id === preSelectScriptId; }))
+    ? preSelectScriptId
+    : (_seScripts.length ? _seScripts[0].id : null);
   _seSelectedStep = null;
   _seDirty        = false;
 
@@ -556,8 +559,9 @@ function _seRenderCard(stp, idx, sc, lastRun) {
   html += '<button class="se-card-del" onclick="event.stopPropagation();seDeleteStep(\''+stp.id+'\')" title="Delete step">✕</button>';
   html += '</div>';
 
-  // Card body — only for selected or failing
-  if (isSel || isFail || asserts.length > 0 || routeSeq != null) {
+  // Card body: always expand launch (idx===0), selected, or failing; others collapsed by default
+  var isLaunchCard = stp.action === 'launch_instance';
+  if (isSel || isFail || isLaunchCard) {
     html += '<div class="se-card-body">';
 
     // Actor + outcome row
@@ -1505,7 +1509,7 @@ window.seShowRunHistory = function seShowRunHistory() {
       '<td style="padding:8px 10px;'+FA+'font-size:12px;color:rgba(255,255,255,.4);font-family:monospace">v'+_seEsc(ver)+'</td>' +
       '<td style="padding:8px 10px;'+FA+'font-size:13px;color:rgba(255,255,255,.6);font-weight:700;color:'+color+'">'+status+'</td>' +
       '<td style="padding:8px 10px;'+FA+'font-size:13px;color:rgba(255,255,255,.5);font-family:monospace">'+dur+'</td>' +
-      '<td style="padding:8px 10px;'+FA+'font-size:12px;color:rgba(240,96,96,.8);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_seEsc(reason)+'">'+_seEsc(reason)+'</td>' +
+      '<td style="padding:8px 10px;'+FA+'font-size:12px;color:'+(r.status==='passed'?'rgba(255,255,255,.25)':'rgba(240,96,96,.8)')+';max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_seEsc(reason)+'">'+_seEsc(reason)+'</td>' +
     '</tr>';
   }).join('') :
     '<tr><td colspan="6" style="padding:24px;text-align:center;'+FA+'font-size:13px;color:rgba(255,255,255,.3);font-style:italic">No runs recorded for this script.</td></tr>';
@@ -1552,5 +1556,5 @@ window.seShowRunHistory = function seShowRunHistory() {
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE16 — Right panel 300px wide + drag resize, pi labels readable, full history link restored',
+console.log('%c[cdn-script-editor] v20260404-SE17 — Fix script pre-selection, collapse cards by default, history failure reason display',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
