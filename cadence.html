@@ -1117,30 +1117,8 @@ function _s9RenderSimPanel(el) {
   var F12 = FA + 'font-size:12px;';
   var F13 = FA + 'font-size:13px;';
   var F14 = FA + 'font-size:14px;';
-
-  // ── No-source empty state ─────────────────────────────────────────────────
-  if (!hasSource) {
-    el.innerHTML =
-      '<div style="display:flex;flex:1;width:100%;height:100%;align-items:center;' +
-        'justify-content:center;background:var(--bg2)">' +
-        '<div style="text-align:center;max-width:380px;padding:32px">' +
-          '<div style="width:56px;height:56px;border-radius:50%;margin:0 auto 18px;' +
-            'background:rgba(40,212,192,.08);border:1px solid rgba(40,212,192,.2);' +
-            'display:flex;align-items:center;justify-content:center;' + FA + 'font-size:24px;color:rgba(40,212,192,.7)">◎</div>' +
-          '<div style="' + F14 + 'font-weight:700;color:var(--text);margin-bottom:10px;letter-spacing:.02em">Workflow Simulator</div>' +
-          '<div style="' + F13 + 'color:var(--muted);line-height:1.75;margin-bottom:22px">' +
-            'Open a workflow in the Library and click<br>' +
-            '<strong style="color:var(--text)">▶ Simulate</strong> to load it here.<br>' +
-            'All test scripts and the flight cockpit<br>will appear in this panel.' +
-          '</div>' +
-          '<button onclick="_s9GoToLibrary()" style="' + FA + 'font-size:13px;font-weight:600;' +
-            'padding:9px 22px;border-radius:4px;border:1px solid var(--border2);' +
-            'background:none;color:var(--text1);cursor:pointer;letter-spacing:.03em">' +
-            'Go to Library</button>' +
-        '</div>' +
-      '</div>';
-    return;
-  }
+  var srcName = _s9SimSourceName || (tmpl && tmpl.name) || '';
+  var srcVer  = _s9SimSourceVer  || (tmpl && tmpl.version) || '';
 
   // ── Full 3-panel Simulator layout ─────────────────────────────────────────
   el.innerHTML =
@@ -1157,10 +1135,10 @@ function _s9RenderSimPanel(el) {
       '<div style="display:flex;align-items:center;gap:7px;padding:4px 10px;' +
         'background:#1a1f2e;border:1px solid rgba(255,255,255,.1);border-radius:4px;cursor:pointer;' +
         'font-size:12px;color:rgba(255,255,255,.6)" onclick="_s9SimSwitchSource()">' +
-        '<div style="width:7px;height:7px;border-radius:50%;background:#28d4c0;flex-shrink:0"></div>' +
-        '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.85)">' + _s9EscHtml(_s9SimSourceName) + '</span>' +
-        '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);margin-left:2px">' +
-          (_s9SimSourceVer ? 'v' + _s9EscHtml(_s9SimSourceVer) : '') + '</span>' +
+        '<div style="width:7px;height:7px;border-radius:50%;background:' + (hasSource ? '#28d4c0' : 'rgba(255,255,255,.25)') + ';flex-shrink:0"></div>' +
+        '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.85)">' +
+          (hasSource ? _s9EscHtml(srcName) : 'No source — go to Library') + '</span>' +
+        (srcVer ? '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);margin-left:2px">v' + _s9EscHtml(srcVer) + '</span>' : '') +
         '<span style="color:rgba(255,255,255,.25);font-size:10px;margin-left:2px">▾</span>' +
       '</div>' +
 
@@ -1252,28 +1230,42 @@ function _s9RenderSimPanel(el) {
             'background:rgba(40,212,192,.07);border:1px solid rgba(40,212,192,.18);' +
             'display:flex;align-items:center;justify-content:center;font-size:26px;' +
             'color:rgba(40,212,192,.6)">◎</div>' +
-          '<div style="' + FA + 'font-size:16px;font-weight:700;color:rgba(255,255,255,.9);' +
-            'margin-bottom:8px;letter-spacing:.02em">' + _s9EscHtml(_s9SimSourceName) + '</div>' +
-          '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.4);margin-bottom:24px;line-height:1.7">' +
-            'Workflow flight simulator' +
-            (_s9SimSourceVer ? ' · v' + _s9EscHtml(_s9SimSourceVer) : '') +
-          '</div>' +
-          '<div style="display:flex;gap:8px;margin-bottom:24px;justify-content:center">' +
-            _s9MetricCard('s9-metric-tests', '—', 'Scripts') +
-            _s9MetricCard('s9-metric-steps', '—', 'Steps') +
-            _s9MetricCard('s9-metric-last',  '—', 'Last run') +
-          '</div>' +
-          '<button onclick="_s9LaunchSimulator()" style="' + FA + 'font-size:14px;font-weight:700;' +
-            'padding:11px 32px;border-radius:5px;border:none;cursor:pointer;' +
-            'background:#1D9E75;color:#fff;display:inline-flex;align-items:center;' +
-            'gap:8px;letter-spacing:.04em;transition:background .15s">' +
-            '▶ Launch Flight Simulator</button>' +
-          '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);margin-top:10px;line-height:1.6">' +
-            'Runs all test scripts · verifies all routing paths<br>generates Routing Proof Certificate' +
-          '</div>' +
+
+          (hasSource
+            ? '<div style="' + FA + 'font-size:16px;font-weight:700;color:rgba(255,255,255,.9);' +
+                'margin-bottom:8px;letter-spacing:.02em">' + _s9EscHtml(srcName) + '</div>' +
+              '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.4);margin-bottom:24px;line-height:1.7">' +
+                'Workflow flight simulator' + (srcVer ? ' · v' + _s9EscHtml(srcVer) : '') +
+              '</div>' +
+              '<div style="display:flex;gap:8px;margin-bottom:24px;justify-content:center">' +
+                _s9MetricCard('s9-metric-tests', '—', 'Scripts') +
+                _s9MetricCard('s9-metric-steps', '—', 'Steps') +
+                _s9MetricCard('s9-metric-last',  '—', 'Last run') +
+              '</div>' +
+              '<button onclick="_s9LaunchSimulator()" style="' + FA + 'font-size:14px;font-weight:700;' +
+                'padding:11px 32px;border-radius:5px;border:none;cursor:pointer;' +
+                'background:#1D9E75;color:#fff;display:inline-flex;align-items:center;' +
+                'gap:8px;letter-spacing:.04em;transition:background .15s">' +
+                '▶ Launch Flight Simulator</button>' +
+              '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);margin-top:10px;line-height:1.6">' +
+                'Runs all test scripts · verifies all routing paths<br>generates Routing Proof Certificate' +
+              '</div>'
+            : '<div style="' + FA + 'font-size:16px;font-weight:700;color:rgba(255,255,255,.6);' +
+                'margin-bottom:10px">Workflow Simulator</div>' +
+              '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.3);line-height:1.75;margin-bottom:24px">' +
+                'Open a workflow in the Library and click<br>' +
+                '<strong style="color:rgba(255,255,255,.55)">▶ Simulate</strong> to load it here.<br>' +
+                'All test scripts and the flight cockpit<br>will appear in this panel.' +
+              '</div>' +
+              '<button onclick="_s9GoToLibrary()" style="' + FA + 'font-size:13px;font-weight:600;' +
+                'padding:9px 24px;border-radius:4px;border:1px solid rgba(255,255,255,.12);' +
+                'background:rgba(255,255,255,.04);color:rgba(255,255,255,.6);cursor:pointer;letter-spacing:.03em">' +
+                'Go to Library</button>'
+          ) +
+
         '</div>' +
 
-      '</div>' +
+      '</div>'
     '</div>' +
 
     // ── Certificate overlay (hidden until sim completes or user clicks) ──
