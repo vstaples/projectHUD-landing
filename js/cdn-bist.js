@@ -2,11 +2,11 @@
 // LOAD ORDER: 8th
 console.log('%c[cdn-bist] v20260404-SE5','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // ── SE5 patches (2026-04-04) ────────────────────────────────────────────────
-// 1. step_route_back event now emitted from all three L2 reset branches:
-//    — reject_to + requiresReset (T3's path — was the missing case)
-//    — implicit reset to start (requiresReset, no reject_to)
-//    Previously only the explicit route_to_seq GOTO block emitted it, so T3's
-//    rejection arc never drew and cards never reset to blue.
+// 1. step_pass skips green transition when ev.routeToSeq is set. A step that
+//    routes back must stay orange until step_route_back resets it to blue —
+//    going green first (T2 s2.6) was visually wrong.
+//    NOTE: also requires DB fix on T2 s6 params: add "route_to_seq":1 so the
+//    GOTO fires step_route_back. SQL in session notes.
 // ── SE4 patches (2026-04-04) ────────────────────────────────────────────────
 // 1. Tower radio added to step_pass — each completed step now echoes to comms
 //    panel with outcome label. Was absent — comms panel showed only instance_launched
@@ -2108,19 +2108,20 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
         '. Cards in DOM:'+ Array.from(document.querySelectorAll('[id^="bck-n-"]')).map(function(el){return el.id;}).join(','));
     }
   } else if (type === 'step_pass') {
-    // Transition the completed card to Done (green)
-    _bistCkSetNode(ev.stepId, ev.stepIdx || 0, test, 'done', ev.outcome || 'Complete', tmplSteps, ev);
-    // Turn the connector wire leading INTO this card green
-    var doneCard = document.getElementById('bck-n-'+ev.stepId);
-    if (doneCard) {
-      var prevSib = doneCard.previousSibling;
-      if (prevSib && prevSib.className && prevSib.className.indexOf('bck-cw') >= 0) {
-        prevSib.className = 'bck-cw dn';
-      }
-    }
-    // CoC entry + tower radio acknowledgement
     var _stepLabel = ev.stepName || ev.stepId;
     var _outcomeLabel = ev.outcome ? ' — ' + ev.outcome : '';
+    // Only go green when NOT routing back — step_route_back will reset the card to blue.
+    if (!ev.routeToSeq) {
+      _bistCkSetNode(ev.stepId, ev.stepIdx || 0, test, 'done', ev.outcome || 'Complete', tmplSteps, ev);
+      var doneCard = document.getElementById('bck-n-'+ev.stepId);
+      if (doneCard) {
+        var prevSib = doneCard.previousSibling;
+        if (prevSib && prevSib.className && prevSib.className.indexOf('bck-cw') >= 0) {
+          prevSib.className = 'bck-cw dn';
+        }
+      }
+    }
+    // CoC + radio always fire
     _bistCkAddCoc('#4ade80', 'step_passed', _bistEscHtml(_stepLabel + _outcomeLabel));
     _bistCkRadio('tower', '\u2713 ' + _bistEscHtml(_stepLabel) + (_outcomeLabel ? ' [' + _bistEscHtml(ev.outcome) + ']' : ''));
   } else if (type === 'radio') {
