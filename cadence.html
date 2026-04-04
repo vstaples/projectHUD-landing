@@ -1337,15 +1337,17 @@ async function _s9PopulateTemplateSelector() {
   ).catch(function(){ return []; });
   if (!Array.isArray(templates) || !templates.length) return;
 
-  // Current selection
-  var currentId = (typeof _selectedTmpl !== 'undefined' && _selectedTmpl) ? _selectedTmpl.id : null;
+  // Current selection — prefer _selectedTmpl.id, fall back to name match
+  var currentId = (typeof _selectedTmpl !== 'undefined' && _selectedTmpl && _selectedTmpl.id)
+    ? _selectedTmpl.id : null;
 
   sel.innerHTML = '<option value="" style="background:#1a1f2e">— Select workflow —</option>' +
     templates.map(function(t) {
       var label = t.name + (t.version ? ' v' + t.version : '') + (t.status === 'released' ? ' ✓' : '');
-      var sel2  = t.id === currentId ? ' selected' : '';
+      var isSelected = (currentId && t.id === currentId) ||
+                       (!currentId && _s9SimSourceName && t.name === _s9SimSourceName);
       return '<option value="' + t.id + '" data-name="' + _s9EscHtml(t.name) + '" ' +
-        'data-ver="' + _s9EscHtml(t.version||'') + '"' + sel2 +
+        'data-ver="' + _s9EscHtml(t.version||'') + '"' + (isSelected ? ' selected' : '') +
         ' style="background:#1a1f2e">' + _s9EscHtml(label) + '</option>';
     }).join('');
 }
@@ -1360,7 +1362,7 @@ async function _s9OnTemplateSelect(templateId) {
 
   // Load the full template row so _selectedTmpl is properly set
   var rows = await API.get('workflow_templates?id=eq.' + templateId +
-    '&select=id,name,version,status,steps_data').catch(function(){ return []; });
+    '&select=id,name,version,status').catch(function(){ return []; });
   var tmplRow = (Array.isArray(rows) && rows[0]) ? rows[0] : { id: templateId, name: name, version: ver };
 
   // Set globals
