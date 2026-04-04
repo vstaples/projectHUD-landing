@@ -2050,20 +2050,13 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
         '. Cards in DOM:'+ Array.from(document.querySelectorAll('[id^="bck-n-"]')).map(function(el){return el.id;}).join(','));
     }
   } else if (type === 'step_l2_reset') {
-    // Fired by L2 routing branches (reject_to, implicit reset, explicit route).
-    // ev.fromStepId = BIST script step id of the rejecting step (e.g. 's4')
-    // ev.targetSeq  = template sequence_order being reset TO (e.g. 1)
-    // ev.resetSeqs  = array of sequence_orders being reset (e.g. [1, 2])
-    // ev.targetName = name of target step for radio message
     console.log('[cdn-bist:l2_reset] from:'+ev.fromStepId+
       ' targetSeq:'+ev.targetSeq+' resetSeqs:'+JSON.stringify(ev.resetSeqs));
     _bistCkRadio('tower', '\u21a9 Reset — returning to: '+_bistEscHtml(ev.targetName||'step '+ev.targetSeq));
-
-    // Find all DAG cards whose data-seq is in resetSeqs and reset them to idle
+    // Reset cards whose data-seq is in resetSeqs back to ready/idle state
     var resetSeqSet = {};
     (ev.resetSeqs || []).forEach(function(s){ resetSeqSet[s] = true; });
-    var allCards = Array.from(document.querySelectorAll('[id^="bck-n-"]'));
-    allCards.forEach(function(card) {
+    Array.from(document.querySelectorAll('[id^="bck-n-"]')).forEach(function(card) {
       var cardSeq = card.dataset.seq != null ? Number(card.dataset.seq) : null;
       if (cardSeq !== null && resetSeqSet[cardSeq]) {
         card.className = 'bck-nc';
@@ -2072,26 +2065,10 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
           var dot = nst.querySelector('.bck-nsdot');
           var txt = nst.querySelector('.bck-nstxt');
           if (dot) dot.style.background = 'rgba(0,210,255,.18)';
-          if (txt) { txt.textContent = 'Reset'; txt.style.color = 'rgba(0,210,255,.45)'; }
+          if (txt) { txt.textContent = 'Ready'; txt.style.color = 'rgba(0,210,255,.45)'; }
         }
       }
     });
-    console.log('[cdn-bist:l2_reset] reset', Object.keys(resetSeqSet).length,
-      'seq(s) visually | cards found:', allCards.length);
-    var idx = ev.stepIdx || 0;
-    _bistCkSetNode(ev.stepId, idx, test, 'done', ev.outcome || 'Done', tmplSteps, ev);
-    _bckLastDoneId = ev.stepId;
-    // Set pending arc if outcome is a rejection type
-    // Will only draw if next step_start has a lower stepSeq (confirmed loop)
-    if (ev.outcome && (ev.outcome === 'rejected' || ev.outcome === 'declined' || ev.outcome === 'design_change')) {
-      window._bckPendingArcFrom = ev.stepId;
-      window._bckPendingArcFromSeq = Number(ev.stepSeq || 0);
-    }
-    var dt = _bckEl('bck-dtrig'); if (dt) dt.className = 'bck-dt dn';
-    var _sn = ev.stepName||'Step', _so = ev.outcome||'Done';
-    var _sl = (_bckCurrentTestIdx+1)+'.'+(idx+1);
-    _bistCkAddCoc('#4ade80','step_completed', _bistEscHtml(_sn)+' · '+_bistEscHtml(_so));
-    _bistCkRadio('tower','['+_sl+'] '+_bistEscHtml(_sn)+' — '+_bistEscHtml(_so));
   } else if (type === 'radio') {
     _bistCkRadio(ev.side||'tower', ev.msg||'');
   } else if (type === 'step_fail') {
