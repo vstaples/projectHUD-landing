@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.22 — Wizard: 4 steps, DAG on step 1, flowchart step 2, cockpit step 3, cert step 4','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.23 — Wizard: equal flex:1 panels, same background, contents centered','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1698,9 +1698,12 @@ function _s9RightPanelWizard(srcName, srcVer) {
       // ── Main body: left instructions (fixed width, centered), right visuals ──
       '<div style="flex:1;min-height:0;display:flex;overflow:hidden">' +
 
-        // Left: 4-step guide, fixed 400px
-        '<div style="flex:0 0 400px;display:flex;flex-direction:column;padding:20px 22px 16px;' +
-          'border-right:1px solid rgba(255,255,255,.05);overflow-y:auto;background:#080a10">' +
+        // Left: equal half, centered content
+        '<div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;' +
+          'justify-content:flex-start;padding:20px 24px 16px;' +
+          'border-right:1px solid rgba(255,255,255,.05);overflow-y:auto;background:#060810">' +
+
+          '<div style="width:100%;max-width:400px;display:flex;flex-direction:column;flex:1">' +
 
           // Onboarding callout
           '<div style="background:rgba(40,212,192,.06);border:1px solid rgba(40,212,192,.15);' +
@@ -1778,9 +1781,11 @@ function _s9RightPanelWizard(srcName, srcVer) {
             '</div>' +
           '</div>' +
 
+          '</div>' + // close max-width wrapper
+
         '</div>' +
 
-        // Right: 4 animated visual panels
+        // Right: equal half, same background, centered
         '<div style="flex:1;min-width:0;position:relative;background:#060810;overflow:hidden">' +
 
           // Panel 1: Real workflow DAG — step 1, starts visible
