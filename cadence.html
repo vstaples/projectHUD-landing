@@ -668,31 +668,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
   border:1px solid rgba(29,158,117,.22);
 }
 
-/* Simulator tab — source badge strip below subnav */
-.s9-sim-source-bar{
-  height:36px;flex-shrink:0;
-  background:var(--bg1);
-  border-bottom:1px solid var(--border);
-  display:none;align-items:center;gap:12px;padding:0 20px;
-}
-.s9-sim-source-bar.visible{display:flex}
-.s9-sim-source-badge{
-  font-size:11px;padding:3px 10px;border-radius:12px;
-  background:rgba(29,158,117,.1);border:1px solid rgba(29,158,117,.25);
-  color:#2ab889;display:flex;align-items:center;gap:5px;
-  font-family:Arial,sans-serif;
-}
-.s9-sim-source-type{font-family:Arial,sans-serif;font-size:12px;opacity:.7}
-.s9-sim-switch-btn{
-  font-size:11px;color:var(--text2);background:none;border:none;
-  cursor:pointer;padding:0;text-decoration:underline;
-  font-family:Arial,sans-serif;
-}
-.s9-sim-switch-btn:hover{color:var(--text)}
-.s9-sim-gate-status{
-  margin-left:auto;font-family:Arial,sans-serif;font-size:12px;
-  display:flex;align-items:center;gap:5px;
-}
+
+
 .s9-gate-pass{color:var(--green)}
 .s9-gate-warn{color:var(--amber)}
 
@@ -917,11 +894,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
     <!-- Library type sub-bar — shown below subnav when Library is active -->
     <!-- (filter pills are inline above; this row reserved for future breadcrumb) -->
 
-    <!-- Simulator source bar — shown when Simulator tab is active -->
-    <div class="s9-sim-source-bar" id="s9-sim-source-bar">
-      <!-- populated by _s9UpdateSimSourceBar() -->
-    </div>
-
     <!-- Simulator panel — owns this DOM node, never touched by switchTab -->
     <div id="s9-sim-panel" style="display:none;flex:1;position:relative;height:100%;overflow:hidden"></div>
 
@@ -992,7 +964,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.31 — Gate indicator clickable, failing scripts highlighted and linked','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.33 — Source bar fully removed: DOM, CSS, JS function, all call sites','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1026,8 +998,7 @@ function _s9Switch(tab) {
   if (fp) fp.className = tab === 'library' ? 's9-lib-filters visible' : 's9-lib-filters';
 
   // Simulator source bar
-  var sb = document.querySelector('.s9-sim-source-bar');
-  if (sb) sb.className = tab === 'simulator' ? 's9-sim-source-bar visible' : 's9-sim-source-bar';
+  // Simulator source bar removed
 
   // Topbar settings gear — visible on Library tab only
   var gear = document.getElementById('topbar-settings-btn');
@@ -1102,7 +1073,7 @@ function _s9RouteSim() {
     _s9RenderSimPanel(content);
   }
 
-  _s9UpdateSimSourceBar();
+  
 }
 
 function _s9RenderSimPanel(el) {
@@ -2552,8 +2523,9 @@ function _s9RenderCertBody() {
       '</div>';
   }).join('');
 
-  // Routing paths — collected by _s9CertRoutes if available
-  var routes = window._s9CertRoutes || [
+  // Routing paths — only show as verified if real run results exist
+  var hasRealResults = results.length > 0;
+  var routes = window._s9CertRoutes || (hasRealResults ? [
     {from:'Seq 1→2', arrow:'→', desc:'Checklist submitted · forward advance to Form', verified:true},
     {from:'Seq 2→3', arrow:'→', desc:'Form submitted · forward advance to Approval', verified:true},
     {from:'Seq 3→4', arrow:'→', desc:'Approval approved · forward advance to Finalize', verified:true},
@@ -2561,9 +2533,9 @@ function _s9RenderCertBody() {
     {from:'Seq 4→3', arrow:'↩', desc:'Sign-off declined · route back to Approval · arc confirmed', verified:true},
     {from:'Seq 5→1', arrow:'↩', desc:'Meeting design_change · explicit reset to step 1', verified:true},
     {from:'Seq 5→end', arrow:'→', desc:'Final Meeting concluded · workflow complete', verified:true},
-  ];
+  ] : null);
 
-  var routeRows = routes.map(function(r) {
+  var routeRows = routes ? routes.map(function(r) {
     return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
       '<span style="' + FA + 'font-size:12px;color:#2a1e08;font-weight:700;width:60px;flex-shrink:0">' + r.from + '</span>' +
       '<span style="font-size:12px;color:rgba(80,60,20,.4);flex-shrink:0">' + r.arrow + '</span>' +
@@ -2573,12 +2545,19 @@ function _s9RenderCertBody() {
                     : 'background:rgba(200,140,20,.1);color:#7a5a0a;border:1px solid rgba(200,140,20,.22)') + '">' +
         (r.verified ? 'VERIFIED' : 'UNVERIFIED') + '</span>' +
       '</div>';
-  }).join('');
+  }).join('') :
+  '<div style="' + FA + 'font-size:13px;color:rgba(80,60,20,.45);font-style:italic;text-align:center;padding:12px 0">' +
+    'Routing paths will be verified once the simulation has been run.' +
+  '</div>';
 
   var certNameStr = tmpl ? _s9EscHtml(tmpl.name) : _s9EscHtml(_s9SimSourceName || 'Workflow');
   var certVerStr  = tmpl && tmpl.version ? 'v' + _s9EscHtml(tmpl.version) : '';
 
-  var statusBanner = allPass
+  var statusBanner = !results.length
+    ? '<div style="background:#3a2a08;padding:10px 20px;text-align:center;' +
+        FA + 'font-size:13px;font-weight:700;color:#f0c060;letter-spacing:.06em">' +
+        '⚠ PREVIEW ONLY — RUN THE SIMULATOR TO GENERATE A VALID CERTIFICATE</div>'
+    : allPass
     ? '<div style="background:#1a4a2a;padding:10px 20px;text-align:center;' +
         FA + 'font-size:13px;font-weight:700;color:#e8f8ec;letter-spacing:.06em">✓ ALL TESTS PASSED — CLEARED FOR RELEASE</div>'
     : '<div style="background:#5a1a1a;padding:10px 20px;text-align:center;' +
@@ -2597,7 +2576,7 @@ function _s9RenderCertBody() {
     '<div style="height:2px;background:linear-gradient(90deg,transparent,rgba(200,160,60,.4) 20%,' +
       'rgba(220,180,80,.85) 50%,rgba(200,160,60,.4) 80%,transparent)"></div>' +
 
-    (results.length ? statusBanner : '') +
+    statusBanner +
 
     // Body
     '<div style="padding:28px 40px;background:#faf8f2">' +
@@ -2880,16 +2859,20 @@ async function _s9LoadSimScripts(templateId, version) {
         gateEl.style.cursor = 'default'; gateEl.onclick = null;
         gateLeftEl.textContent = '○ Run tests to check gate status for v' + version;
         gateLeftEl.style.color = '#f0a030'; gateLeftEl.style.cursor = 'default'; gateLeftEl.onclick = null;
+        // No runs — cert button stays hidden
+        var certBtn = document.getElementById('s9-cert-btn');
+        if (certBtn) certBtn.style.display = 'none';
       } else if (allPass) {
         gateEl.textContent = '✓ All tests passing — cleared for release';
         gateEl.style.color = '#3de08a'; gateEl.style.background = 'rgba(61,224,138,.1)'; gateEl.style.borderColor = 'rgba(61,224,138,.25)';
         gateEl.style.cursor = 'default'; gateEl.onclick = null;
         gateLeftEl.textContent = '✓ All tests passing — cleared for release';
         gateLeftEl.style.color = '#3de08a'; gateLeftEl.style.cursor = 'default'; gateLeftEl.onclick = null;
+        // All pass — show certificate button
         var certBtn = document.getElementById('s9-cert-btn');
         if (certBtn) certBtn.style.display = '';
       } else {
-        // Make gate clickable — opens the first failing script in the editor
+        // Failing — make gate clickable to open failing script
         var firstFailId = failingScripts.length ? failingScripts[0].id : null;
         var gateMsg = '✕ ' + failingCount + ' test' + (failingCount !== 1 ? 's' : '') + ' failing — click to inspect';
         gateEl.textContent = gateMsg;
@@ -2902,8 +2885,9 @@ async function _s9LoadSimScripts(templateId, version) {
           (firstFailId ? '<span style="color:#f06060;text-decoration:underline;cursor:pointer" onclick="_s9OpenScriptEditor(\'' + firstFailId + '\')">open failing script →</span>' : 'fix before release');
         gateLeftEl.style.color = '#f06060';
 
+        // Failing — hide cert button (certificate requires all tests passing)
         var certBtn = document.getElementById('s9-cert-btn');
-        if (certBtn) certBtn.style.display = '';
+        if (certBtn) certBtn.style.display = 'none';
 
         // Highlight failing scripts in the left rail
         failingScripts.forEach(function(s) {
@@ -2937,35 +2921,8 @@ function _s9LaunchSimulator() {
   }
 }
 
-function _s9UpdateSimSourceBar() {
-  var bar = document.querySelector('.s9-sim-source-bar');
-  if (!bar) return;
-  if (_s9SimSourceName) {
-    bar.innerHTML =
-      '<div class="s9-sim-source-badge">' +
-        '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.3">' +
-          (_s9SimSourceType === 'form'
-            ? '<rect x="1" y="1" width="9" height="9" rx="1.2"/><line x1="3" y1="4" x2="8" y2="4"/><line x1="3" y1="6" x2="6" y2="6"/>'
-            : '<path d="M1 3h9M1 5.5h9M1 8h5.5"/><circle cx="8.5" cy="8" r="2"/><path d="M8.5 6.8v1.2l.6.6" stroke-linecap="round" stroke-width="1.1"/>') +
-        '</svg>' +
-        '<span class="s9-sim-source-type">' + (_s9SimSourceType === 'form' ? 'Form' : 'Workflow') + ' ·</span>' +
-        ' ' + _s9SimSourceName + (_s9SimSourceVer ? ' ' + _s9SimSourceVer : '') +
-      '</div>' +
-      '<button class="s9-sim-switch-btn" onclick="_s9SimSwitchSource()">Switch source</button>' +
-      '<div class="s9-sim-gate-status" id="s9-gate-status"></div>';
-  } else {
-    bar.innerHTML =
-      '<span style="font-family:Arial,sans-serif;font-size:12px;color:var(--text2)">' +
-        'No source selected — open a Library item and click ' +
-        '<strong style="color:var(--text)">▶ Simulate</strong> to begin' +
-      '</span>';
-  }
-}
+// Source bar removed — workflow identity shown in Simulator subbar dropdown
 
-function _s9SimSwitchSource() {
-  // Navigate to Library so user can pick a different item
-  _s9Switch('library');
-}
 
 // ── Library sub-filter ─────────────────────────────────────────────
 function _s9LibFilter(filter) {
@@ -3090,7 +3047,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ── Initialise on DOMContentLoaded ────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   // Set the source bar DOM (it's empty until a source is registered)
-  _s9UpdateSimSourceBar();
+  
   // Start on Library tab — sync filter pills and topbar
   _s9Switch('library');
   // Mark initial filter pill active
