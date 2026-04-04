@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.26 — Fix: _s9OnTemplateSelect fetches steps before re-render — left rail populates on dropdown change','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.27 — Fix: wait for FIRM_ID_CAD before all DB calls — no more stuck Loading...','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -2185,7 +2185,7 @@ function _s9UpdateMiniDag(steps) {
 async function _s9LoadRunHistory(templateId, version) {
   var el = document.getElementById('s9-run-history');
   if (!el) return;
-  var firmId = (typeof FIRM_ID_CAD !== 'undefined') ? FIRM_ID_CAD : '';
+  var firmId = await _s9WaitForFirmId();
   if (!firmId) return;
   var FA = 'font-family:Arial,sans-serif;';
 
@@ -2388,8 +2388,7 @@ async function _s9LoadTmplSteps(templateId) {
 async function _s9PopulateTemplateSelector() {
   var sel = document.getElementById('s9-tmpl-selector');
   if (!sel) return;
-  var firmId = (typeof FIRM_ID_CAD !== 'undefined' && FIRM_ID_CAD) ? FIRM_ID_CAD : '';
-  if (!firmId) return;
+  var firmId = await _s9WaitForFirmId();
   var templates = await API.get(
     'workflow_templates?firm_id=eq.' + firmId + '&order=name.asc&select=id,name,version,status'
   ).catch(function(){ return []; });
@@ -2413,21 +2412,29 @@ async function _s9PopulateTemplateSelector() {
 // ── Template selected from dropdown ──────────────────────────────────────
 async function _s9OnTemplateSelect(templateId) {
   if (!templateId) return;
+  console.log('[S9] Template selected from dropdown:', templateId);
+
   var sel = document.getElementById('s9-tmpl-selector');
   var opt = sel ? sel.querySelector('option[value="' + templateId + '"]') : null;
-  var name = opt ? (opt.dataset.name || opt.textContent.trim()) : templateId;
+  // Strip version suffix and ✓ from textContent fallback
+  var rawText = opt ? opt.textContent.trim() : templateId;
+  var name = opt ? (opt.dataset.name || rawText.replace(/\s+v\d[\d.]+.*$/, '').trim()) : templateId;
   var ver  = opt ? (opt.dataset.ver || '') : '';
+
+  console.log('[S9] Resolved name:', name, 'ver:', ver);
 
   // Fetch template row
   var rows = await API.get('workflow_templates?id=eq.' + templateId +
     '&select=id,name,version,status').catch(function(){ return []; });
   var tmplRow = (Array.isArray(rows) && rows[0]) ? rows[0] : { id: templateId, name: name, version: ver };
 
-  // Fetch steps immediately — this is what was missing
+  // Fetch steps immediately
   var steps = await API.get(
     'workflow_template_steps?template_id=eq.' + templateId + '&order=sequence_order.asc'
   ).catch(function(){ return []; });
   tmplRow.steps = Array.isArray(steps) ? steps : [];
+
+  console.log('[S9] Template row:', tmplRow.name, 'v' + tmplRow.version, '— steps:', tmplRow.steps.length);
 
   // Set globals
   window._selectedTmpl = tmplRow;
@@ -2435,7 +2442,7 @@ async function _s9OnTemplateSelect(templateId) {
   _s9SimSourceName = tmplRow.name || name;
   _s9SimSourceVer  = tmplRow.version || ver || null;
 
-  // Re-render the full panel — now with steps loaded
+  // Re-render the full panel with steps loaded
   var content = document.getElementById('s9-sim-panel');
   if (content) _s9RenderSimPanel(content);
 }
@@ -2660,21 +2667,33 @@ function _s9EscHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Wait for FIRM_ID_CAD to be set by cdn-core-state.js ──────────────────
+function _s9WaitForFirmId(maxWaitMs) {
+  maxWaitMs = maxWaitMs || 8000;
+  var start = Date.now();
+  return new Promise(function(resolve) {
+    function check() {
+      var fid = (typeof FIRM_ID_CAD !== 'undefined' && FIRM_ID_CAD) ? FIRM_ID_CAD
+              : (typeof _mwFirmId === 'function' ? _mwFirmId() : '');
+      if (fid) return resolve(fid);
+      if (Date.now() - start > maxWaitMs) return resolve('');
+      setTimeout(check, 150);
+    }
+    check();
+  });
+}
+
 async function _s9LoadSimScripts(templateId, version) {
   // Don't reset _bckAborted here — it's reset on launch by cdn-bist.js
   try {
-    // Use API.get() — handles JWT auth, avoids 401 from raw fetch with anon key
-    // Use bare FIRM_ID_CAD global set by cdn-core-state.js
-    var firmId = (typeof FIRM_ID_CAD !== 'undefined' && FIRM_ID_CAD)
-      ? FIRM_ID_CAD
-      : ((typeof _mwFirmId === 'function') ? _mwFirmId() : '');
+    var firmId = await _s9WaitForFirmId();
 
     if (!firmId) {
-      console.warn('[S9 Simulator] FIRM_ID_CAD not ready yet');
+      console.warn('[S9 Simulator] FIRM_ID_CAD not ready after wait');
       var listEl = document.getElementById('s9-sim-scripts-list');
       if (listEl) listEl.innerHTML =
         '<div style="font-family:Arial,sans-serif;font-size:12px;color:var(--muted);padding:6px 0">' +
-        'Loading… (waiting for auth)</div>';
+        'Auth timeout — please refresh.</div>';
       return;
     }
 
