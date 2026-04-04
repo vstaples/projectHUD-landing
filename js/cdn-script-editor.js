@@ -1192,7 +1192,7 @@ window._seOnCompleteStep = async function(stp, instId, stepBySeq) {};
 window._seOnFormSection  = async function(stp, instId, stepBySeq) {};
 window._seHydrateFormState = async function(state, instId, tmplSteps) { return state; };
 
-// ── SE3: seOpenEditor is now the public API ───────────────────────────────────
+// ── SE3: seOpenEditors is now the public API ───────────────────────────────────
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.

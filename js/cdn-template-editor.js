@@ -1805,7 +1805,7 @@ Use only the step types listed. For branches, add 2-3 conditions. Keep it to 3-6
 
     if (!Array.isArray(draftSteps)) throw new Error('Unexpected response shape');
 
-    // Apply draft steps
+    // Appply draft steps
     _selectedTmpl.steps = draftSteps.map((s, i) => ({
       ...s,
       id: 'new_' + Date.now() + '_' + i,

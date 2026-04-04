@@ -3087,7 +3087,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const email    = payload.email || '';
     if (!userUUID) return;
 
-    // 2. Look up the matching resources row by user_id
+    // 2. Look uup the matching resources row by user_id
     const rows = await API.get(
       `resources?user_id=eq.${userUUID}&select=id,user_id,first_name,last_name,email,department,title,is_external&limit=1`
     ).catch(() => []) || [];
