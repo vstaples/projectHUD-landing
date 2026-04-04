@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-BN','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-BO','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -1769,7 +1769,8 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     _bistCkRadio(ev.side||'tower', ev.msg||'');
   } else if (type === 'step_fail') {
     _bistCkAddCoc('#E24B4A','step_failed', _bistEscHtml(ev.reason||'Assertion failed'));
-    _bistCkRadio('reject','TOWER: Step failed — '+_bistEscHtml((ev.reason||'').slice(0,80)));
+    var _reason = (ev.reason||'').slice(0,80).replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+    _bistCkRadio('reject','TOWER: Step failed — '+_bistEscHtml(_reason));
     _bckRWC++;
     var ef3 = _bckEl('bck-ef3'); if (ef3) ef3.textContent = _bckRWC;
     var ef3b = _bckEl('bck-ef3b'); if (ef3b) ef3b.style.width = Math.min(100,_bckRWC*12)+'%';
