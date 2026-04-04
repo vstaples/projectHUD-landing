@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260403-BH','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260403-BK','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function _bistResolveActor(slug) {
   if (!slug) return { resourceId: _myResourceId, userName: 'Team Member' };
@@ -148,8 +148,16 @@ async function runBistScript(scriptId, onProgress) {
 
   try {
     let si = 0;
+    const _visitCount = {}; // stepId → visit count, cap at 3 to prevent infinite loops
     while (si < spec.steps.length) {
       const stp = spec.steps[si];
+      _visitCount[stp.id] = (_visitCount[stp.id] || 0) + 1;
+      if (_visitCount[stp.id] > 3) {
+        const loopReason = 'Step '+stp.id+' visited '+_visitCount[stp.id]+' times — infinite loop detected';
+        onProgress?.({ type:'step_fail', stepId: stp.id, stepIdx: si, reason: loopReason });
+        onProgress?.({ type:'radio', side:'reject', msg:'TOWER: Infinite loop aborted at '+stp.id+' — check route_to_seq logic' });
+        return { status:'failed', runId, reason: loopReason };
+      }
       onProgress?.({ type:'step_start', stepId: stp.id, stepIdx: si,
         total: spec.steps.length, action: stp.action, params: stp.params });
 
@@ -264,17 +272,21 @@ async function runBistScript(scriptId, onProgress) {
         action: stp.action, stepName, outcome: stp.params?.outcome });
       await _bckFreezeWait(); // freeze point — after step complete
 
-      // ── GOTO: jump back only if stp.params.goto === true ────────────────
+      // ── GOTO: jump back on backward route_to_seq (max 3 visits per step) ──
       let nextSi = si + 1;
-      if (stp.action === 'complete_step' && stp.params?.goto === true && stp.params?.route_to_seq != null) {
+      if (stp.action === 'complete_step' && stp.params?.route_to_seq != null) {
         const gotoSeq = Number(stp.params.route_to_seq);
         const curSeq  = Number(stp.params.step_seq);
         if (gotoSeq < curSeq) {
           const targetSi = spec.steps.findIndex(s => Number(s.params?.step_seq) === gotoSeq);
           if (targetSi >= 0 && targetSi < si) {
-            onProgress?.({ type:'step_route_back', fromStepId: stp.id,
-              toStepId: spec.steps[targetSi].id });
-            nextSi = targetSi;
+            const targetId = spec.steps[targetSi].id;
+            // Only loop if target step hasn't hit visit cap
+            if ((_visitCount[targetId] || 0) < 3) {
+              onProgress?.({ type:'step_route_back', fromStepId: stp.id,
+                toStepId: targetId });
+              nextSi = targetSi;
+            }
           }
         }
       }
@@ -1350,7 +1362,7 @@ function _bistCockpitHTML(tmplName, version, tests) {
 .bck-dt.dn{border-color:rgba(74,222,128,.55);background:rgba(0,15,5,.7);box-shadow:0 0 10px rgba(74,222,128,.3)}
 .bck-de{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.1);background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .35s}
 .bck-de.dn{border-color:rgba(74,222,128,.6);box-shadow:0 0 12px rgba(74,222,128,.35)}
-.bck-nc{width:120px;flex-shrink:0;border-radius:4px;border:1.5px solid rgba(255,255,255,.07);background:rgba(0,4,12,.82);backdrop-filter:blur(4px);transition:all .35s;overflow:hidden}
+.bck-nc{width:120px;flex-shrink:0;border-radius:4px;border:1.5px solid rgba(255,255,255,.07);background:rgba(0,4,12,.82);backdrop-filter:blur(4px);transition:all .35s}
 .bck-nc.ac{border-color:#EF9F27;background:rgba(12,8,0,.9);box-shadow:0 0 16px rgba(239,159,39,.35)}
 .bck-nc.dn{border-color:rgba(74,222,128,.45);background:rgba(0,10,4,.87);box-shadow:0 0 8px rgba(74,222,128,.18)}
 .bck-nc.rs{border-color:rgba(239,159,39,.35);background:rgba(12,6,0,.87)}
@@ -1712,6 +1724,7 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
       setTimeout(function(){ _bckDrawRejectArc(_paf, ev.stepId); }, 60);
     }
   } else if (type === 'step_route_back') {
+    _bistCkRadio('tower', '[route] Rejection loop — returning to step '+ev.toStepId);
     // Reset all cards from toStepId onward to idle state
     var allNodeCards = document.querySelectorAll('.bck-nc');
     var foundTarget = false;
@@ -1746,6 +1759,8 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     var _sl = (_bckCurrentTestIdx+1)+'.'+(idx+1);
     _bistCkAddCoc('#4ade80','step_completed', _bistEscHtml(_sn)+' · '+_bistEscHtml(_so));
     _bistCkRadio('tower','['+_sl+'] '+_bistEscHtml(_sn)+' — '+_bistEscHtml(_so));
+  } else if (type === 'radio') {
+    _bistCkRadio(ev.side||'tower', ev.msg||'');
   } else if (type === 'step_fail') {
     _bistCkAddCoc('#E24B4A','step_failed', _bistEscHtml(ev.reason||'Assertion failed'));
     _bistCkRadio('reject','TOWER: Step failed — '+_bistEscHtml((ev.reason||'').slice(0,80)));
