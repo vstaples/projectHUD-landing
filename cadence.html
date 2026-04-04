@@ -2412,37 +2412,33 @@ async function _s9PopulateTemplateSelector() {
 // ── Template selected from dropdown ──────────────────────────────────────
 async function _s9OnTemplateSelect(templateId) {
   if (!templateId) return;
-  console.log('[S9] Template selected from dropdown:', templateId);
+  console.log('[S9] Template selected:', templateId);
 
-  var sel = document.getElementById('s9-tmpl-selector');
-  var opt = sel ? sel.querySelector('option[value="' + templateId + '"]') : null;
-  // Strip version suffix and ✓ from textContent fallback
-  var rawText = opt ? opt.textContent.trim() : templateId;
-  var name = opt ? (opt.dataset.name || rawText.replace(/\s+v\d[\d.]+.*$/, '').trim()) : templateId;
-  var ver  = opt ? (opt.dataset.ver || '') : '';
+  // Use the same selectTemplate() function the Library uses — it fetches
+  // everything (template row + steps) and sets _selectedTmpl correctly.
+  if (typeof selectTemplate === 'function') {
+    await selectTemplate(templateId);
+  } else {
+    // Fallback if Library hasn't loaded yet
+    var rows = await API.get('workflow_templates?id=eq.' + templateId +
+      '&select=id,name,version,status').catch(function(){ return []; });
+    var tmplRow = (Array.isArray(rows) && rows[0]) ? rows[0] : { id: templateId };
+    var steps = await API.get(
+      'workflow_template_steps?template_id=eq.' + templateId + '&order=sequence_order.asc'
+    ).catch(function(){ return []; });
+    tmplRow.steps = Array.isArray(steps) ? steps : [];
+    window._selectedTmpl = tmplRow;
+  }
 
-  console.log('[S9] Resolved name:', name, 'ver:', ver);
+  // Sync Simulator source globals from whatever selectTemplate set
+  var tmpl = window._selectedTmpl;
+  if (tmpl) {
+    _s9SimSourceType = 'workflow';
+    _s9SimSourceName = tmpl.name || '';
+    _s9SimSourceVer  = tmpl.version || null;
+  }
 
-  // Fetch template row
-  var rows = await API.get('workflow_templates?id=eq.' + templateId +
-    '&select=id,name,version,status').catch(function(){ return []; });
-  var tmplRow = (Array.isArray(rows) && rows[0]) ? rows[0] : { id: templateId, name: name, version: ver };
-
-  // Fetch steps immediately
-  var steps = await API.get(
-    'workflow_template_steps?template_id=eq.' + templateId + '&order=sequence_order.asc'
-  ).catch(function(){ return []; });
-  tmplRow.steps = Array.isArray(steps) ? steps : [];
-
-  console.log('[S9] Template row:', tmplRow.name, 'v' + tmplRow.version, '— steps:', tmplRow.steps.length);
-
-  // Set globals
-  window._selectedTmpl = tmplRow;
-  _s9SimSourceType = 'workflow';
-  _s9SimSourceName = tmplRow.name || name;
-  _s9SimSourceVer  = tmplRow.version || ver || null;
-
-  // Re-render the full panel with steps loaded
+  // Now re-render — _selectedTmpl is fully populated
   var content = document.getElementById('s9-sim-panel');
   if (content) _s9RenderSimPanel(content);
 }
