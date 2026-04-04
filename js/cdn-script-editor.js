@@ -408,8 +408,9 @@ function _seRenderHeader(sc, lastRun) {
 
   var html = '<div id="se-hdr">';
   if (sc) {
-    html += '<input id="se-title" value="'+_seEsc(sc.name)+'" onchange="seRenameScript(this.value)" placeholder="Script name…"/>';
-    html += '<span class="se-badge '+badgeCls+'" id="se-badge">'+badgeTxt+'</span>';
+    html += '<input id="se-title" value="'+_seEsc(sc.name)+'" onchange="seRenameScript(this.value)" placeholder="Script name…" style="flex:1;min-width:0"/>';
+    html += '<span class="se-badge '+badgeCls+'" id="se-badge" style="cursor:default;flex-shrink:0">'+badgeTxt+'</span>';
+    html += '<button class="se-btn" onclick="seUndo()" title="Undo last change (Ctrl+Z)" id="se-undo-btn" style="opacity:'+(_seUndoStack.length?'1':'.35')+';cursor:'+(_seUndoStack.length?'pointer':'default')+'" '+(! _seUndoStack.length?'disabled':'')+'>↩ Undo</button>';
     html += '<button class="se-btn" onclick="seRunScript()" title="Run this script">▶ Run</button>';
     html += '<button class="se-btn se-btn-cad" onclick="seSaveScript()">'+(window._seDirty?'● ':'')+'Save</button>';
     html += '<button class="se-btn se-btn-red" onclick="seDeleteScript()" title="Delete script">🗑</button>';
@@ -848,9 +849,55 @@ function seSelectScript(id) {
   seRenderEditor();
 }
 
-async function seNewScript() {
-  var name = prompt('Script name:');
-  if (!name || !name.trim()) return;
+function seNewScript() {
+  // Show professional name entry modal
+  var overlay = document.createElement('div');
+  overlay.id = 'se-new-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  overlay.innerHTML = '<div style="background:#1a1f2e;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:28px 32px;width:480px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,.7)">' +
+    '<div style="font-family:Arial,sans-serif;font-size:16px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:6px">New Test Script</div>' +
+    '<div style="font-family:Arial,sans-serif;font-size:13px;color:rgba(255,255,255,.4);margin-bottom:20px">Name this script after the scenario it tests.</div>' +
+    '<input id="se-new-name" placeholder="e.g. Rejection loop — approval rejects then passes" autofocus ' +
+      'style="width:100%;box-sizing:border-box;background:#0a0c10;border:1px solid rgba(255,255,255,.15);border-radius:4px;' +
+      'padding:10px 12px;font-family:Arial,sans-serif;font-size:13px;color:rgba(255,255,255,.9);margin-bottom:12px;outline:none"/>' +
+    '<div style="font-family:Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.3);margin-bottom:16px">Or start from a template:</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:20px">' +
+      ['Full workflow — clean approval path',
+       'Rejection loop — approval rejects then passes',
+       'Sign-off decline — routes back to approval',
+       'Meeting reset — design change routes back to step 1'
+      ].map(function(t) {
+        return '<div onclick="document.getElementById(\'se-new-name\').value=this.dataset.n" data-n="'+t+'" ' +
+          'style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:4px;' +
+          'padding:8px 10px;font-family:Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.6);cursor:pointer;' +
+          'transition:all .12s" onmouseover="this.style.borderColor=\'rgba(40,212,192,.4)\';this.style.color=\'rgba(255,255,255,.9)\'" ' +
+          'onmouseout="this.style.borderColor=\'rgba(255,255,255,.08)\';this.style.color=\'rgba(255,255,255,.6)\'">'+t+'</div>';
+      }).join('') +
+    '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+      '<button onclick="document.getElementById(\'se-new-modal\').remove()" ' +
+        'style="font-family:Arial,sans-serif;font-size:13px;padding:8px 18px;border-radius:4px;' +
+        'border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.5);cursor:pointer">Cancel</button>' +
+      '<button onclick="seNewScriptConfirm()" ' +
+        'style="font-family:Arial,sans-serif;font-size:13px;font-weight:700;padding:8px 20px;border-radius:4px;' +
+        'border:none;background:#1D9E75;color:#fff;cursor:pointer">Create Script \u2192</button>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(overlay);
+  setTimeout(function() { var el = document.getElementById('se-new-name'); if (el) el.focus(); }, 50);
+  // Enter key submits
+  overlay.querySelector('#se-new-name').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') seNewScriptConfirm();
+    if (e.key === 'Escape') overlay.remove();
+  });
+}
+
+async function seNewScriptConfirm() {
+  var nameEl = document.getElementById('se-new-name');
+  var name = nameEl ? nameEl.value.trim() : '';
+  var modal = document.getElementById('se-new-modal');
+  if (modal) modal.remove();
+  if (!name) return;
   var tmplId = _selectedTmpl && _selectedTmpl.id;
   if (!tmplId) { cadToast('No template selected', 'error'); return; }
   var spec = { name: name.trim(), template_version: _selectedTmpl.version || '0.0.0',
@@ -937,6 +984,7 @@ function seSelectStep(id) {
 
 function seDeleteStep(id) {
   var sc = _seGetSelected(); if (!sc) return;
+  _sePushUndo();
   sc.spec.steps = (sc.spec.steps||[]).filter(function(s){ return s.id !== id; });
   if (_seSelectedStep === id) _seSelectedStep = null;
   _seDirty = true;
@@ -946,6 +994,7 @@ function seDeleteStep(id) {
 
 function seUpdateParam(stepId, key, val) {
   var stp = _seGetStep(stepId); if (!stp) return;
+  _sePushUndo();
   if (!stp.params) stp.params = {};
   stp.params[key] = val;
   _seDirty = true;
@@ -956,6 +1005,7 @@ function seUpdateParam(stepId, key, val) {
 
 function seUpdateRouteBack(stepId, val) {
   var stp = _seGetStep(stepId); if (!stp) return;
+  _sePushUndo();
   if (!stp.params) stp.params = {};
   if (!val) {
     delete stp.params.route_to_seq;
@@ -987,6 +1037,7 @@ function seAddAssert(stepId) {
   if (!check) return;
   var assert = { check: check };
   assert[op] = val;
+  _sePushUndo();
   if (!stp.asserts) stp.asserts = [];
   stp.asserts.push(assert);
   _seDirty = true;
@@ -996,6 +1047,7 @@ function seAddAssert(stepId) {
 
 function seDeleteAssert(stepId, idx) {
   var stp = _seGetStep(stepId); if (!stp) return;
+  _sePushUndo();
   (stp.asserts||[]).splice(idx, 1);
   _seDirty = true;
   seRefreshTimeline();
@@ -1026,6 +1078,7 @@ function _seAppendStep(action, tmplSeq) {
     stp.params = { ms: 500 };
   }
 
+  _sePushUndo();
   if (!sc.spec.steps) sc.spec.steps = [];
   sc.spec.steps.push(stp);
   _seSelectedStep = id;
@@ -1140,5 +1193,5 @@ window._seHydrateFormState = async function(state, instId, tmplSteps) { return s
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE5 — Scripts+TemplateSteps removed, Action Blocks only in left rail',
+console.log('%c[cdn-script-editor] v20260404-SE6 — Undo stack, New script modal, Launch locked, badge repositioned',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
