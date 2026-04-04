@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE11','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260404-SE12','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -1314,9 +1314,75 @@ window._seOnCompleteStep = async function(stp, instId, stepBySeq) {};
 window._seOnFormSection  = async function(stp, instId, stepBySeq) {};
 window._seHydrateFormState = async function(state, instId, tmplSteps) { return state; };
 
+// ── Full run history modal ───────────────────────────────────────────────────
+window.seShowRunHistory = function seShowRunHistory() {
+  var sc = _seGetSelected();
+  if (!sc) return;
+  var FA = 'font-family:Arial,sans-serif;';
+  var runs = _seRecentRuns.filter(function(r){ return r.script_id === sc.id; });
+
+  var rows = runs.length ? runs.map(function(r, i) {
+    var status = r.status === 'passed' ? 'PASSED' : 'FAILED';
+    var color  = r.status === 'passed' ? '#3de08a' : '#f06060';
+    var dt     = r.run_at ? new Date(r.run_at) : null;
+    var date   = dt ? dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+    var time   = dt ? dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+    var dur    = r.duration_ms ? (r.duration_ms/1000).toFixed(1)+'s' : '—';
+    var ver    = r.template_version || '—';
+    var reason = (r.status !== 'passed' && r.failure_reason) ? r.failure_reason : '';
+    var bg     = i % 2 === 0 ? 'rgba(255,255,255,.02)' : 'transparent';
+    return '<tr style="background:'+bg+';border-bottom:1px solid rgba(255,255,255,.05)">' +
+      '<td style="padding:8px 10px;'+FA+'font-size:13px;color:rgba(255,255,255,.7);white-space:nowrap">'+date+'</td>' +
+      '<td style="padding:8px 10px;'+FA+'font-size:13px;color:rgba(255,255,255,.5)">'+time+'</td>' +
+      '<td style="padding:8px 10px;'+FA+'font-size:12px;color:rgba(255,255,255,.4);font-family:monospace">v'+_seEsc(ver)+'</td>' +
+      '<td style="padding:8px 10px;'+FA+'font-size:13px;color:rgba(255,255,255,.6);font-weight:700;color:'+color+'">'+status+'</td>' +
+      '<td style="padding:8px 10px;'+FA+'font-size:13px;color:rgba(255,255,255,.5);font-family:monospace">'+dur+'</td>' +
+      '<td style="padding:8px 10px;'+FA+'font-size:12px;color:rgba(240,96,96,.8);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_seEsc(reason)+'">'+_seEsc(reason)+'</td>' +
+    '</tr>';
+  }).join('') :
+    '<tr><td colspan="6" style="padding:24px;text-align:center;'+FA+'font-size:13px;color:rgba(255,255,255,.3);font-style:italic">No runs recorded for this script.</td></tr>';
+
+  var existing = document.getElementById('se-history-modal');
+  if (existing) existing.remove();
+
+  var modal = document.createElement('div');
+  modal.id = 'se-history-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  modal.innerHTML =
+    '<div style="background:#12161f;border:1px solid rgba(255,255,255,.1);border-radius:6px;width:820px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.8)">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0">' +
+        '<div>' +
+          '<div style="'+FA+'font-size:15px;font-weight:700;color:rgba(255,255,255,.95)">Run History</div>' +
+          '<div style="'+FA+'font-size:13px;color:rgba(255,255,255,.35);margin-top:2px">'+_seEsc(sc.name)+'</div>' +
+        '</div>' +
+        '<button id="se-history-close" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:20px;line-height:1;padding:4px 8px">✕</button>' +
+      '</div>' +
+      '<div style="overflow-y:auto;flex:1">' +
+        '<table style="width:100%;border-collapse:collapse">' +
+          '<thead><tr style="background:rgba(255,255,255,.04)">' +
+            '<th style="padding:8px 10px;text-align:left;'+FA+'font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5fd4c8;white-space:nowrap">Date</th>' +
+            '<th style="padding:8px 10px;text-align:left;'+FA+'font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5fd4c8">Time</th>' +
+            '<th style="padding:8px 10px;text-align:left;'+FA+'font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5fd4c8">Version</th>' +
+            '<th style="padding:8px 10px;text-align:left;'+FA+'font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5fd4c8">Result</th>' +
+            '<th style="padding:8px 10px;text-align:left;'+FA+'font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5fd4c8">Duration</th>' +
+            '<th style="padding:8px 10px;text-align:left;'+FA+'font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5fd4c8">Failure reason</th>' +
+          '</tr></thead>' +
+          '<tbody>'+rows+'</tbody>' +
+        '</table>' +
+      '</div>' +
+      '<div style="padding:10px 20px;border-top:1px solid rgba(255,255,255,.07);flex-shrink:0;'+FA+'font-size:12px;color:rgba(255,255,255,.3);text-align:right">' +
+        runs.length+' run'+(runs.length!==1?'s':'')+' · most recent first' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
+  document.getElementById('se-history-close').addEventListener('click', function(){ modal.remove(); });
+};
+
 // ── SE3: seOpenEditor is now the public API ───────────────────────────────────
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE11 — Right panel redesigned: clear single-script status, workflow suite list, run history fixed',
+console.log('%c[cdn-script-editor] v20260404-SE12 — seShowRunHistory implemented, modal works',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
