@@ -1,6 +1,15 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE3','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE4','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// ── SE4 patches (2026-04-04) ────────────────────────────────────────────────
+// 1. Tower radio added to step_pass — each completed step now echoes to comms
+//    panel with outcome label. Was absent — comms panel showed only instance_launched
+//    and route_back messages, nothing per-step.
+// 2. Auto-freeze between tests — after each test (except the last), the sim
+//    freezes with annunciator "T{N} COMPLETE — PRESS RESUME TO CONTINUE". This
+//    keeps the final DAG state (rejection arcs, green cards) visible for inspection
+//    before _bistCkBeginTest wipes the workspace for the next test. User resumes
+//    manually. Prior behaviour: 400ms fixed pause → arc gone before user could see it.
 // ── SE3 patches (2026-04-04) ────────────────────────────────────────────────
 // 1. Freeze guard fixed — step_route_back, radio, and step_pass events now pass
 //    through even when _bckFrozen=true. Previously these were all blocked, causing:
@@ -1509,7 +1518,25 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     if (window._bckCockpitClosed) break;  // closed during script — don't record result
     allResults.push({ name: t.name, status: result.status, runId: result.runId, reason: result.reason });
 
-    // ── FREEZE: also pause between scripts after completion ──────────────────
+    // ── Auto-freeze after each test so the final DAG state (including rejection arcs)
+    // stays visible for inspection. User hits RESUME to advance to the next test.
+    // Skip auto-freeze after the last test — cert/footer handles that.
+    if (ti < TESTS.length - 1) {
+      var _autoFreezeAnn = _bckEl('bck-ann');
+      if (_autoFreezeAnn) {
+        _autoFreezeAnn.dataset.preFreeze = _autoFreezeAnn.textContent;
+        _autoFreezeAnn.textContent = 'T'+(ti+1)+' COMPLETE — PRESS RESUME TO CONTINUE';
+        _autoFreezeAnn.className = 'bck-ann';
+      }
+      window._bckFrozen = true;
+      var _fb = document.getElementById('bck-freeze-btn');
+      if (_fb) {
+        _fb.textContent = '\u25b6 RESUME';
+        _fb.style.color = 'rgba(74,222,128,.8)';
+        _fb.style.borderColor = 'rgba(74,222,128,.4)';
+      }
+    }
+    // Small fixed pause then spin on freeze (auto or user-set)
     await new Promise(r => setTimeout(r, 400));
     while (_bckFrozen) {
       if (window._bckCockpitClosed) break;
@@ -2077,10 +2104,11 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
         prevSib.className = 'bck-cw dn';
       }
     }
-    // CoC entry
-    var outcomeLabel = ev.outcome ? ev.outcome : 'complete';
-    _bistCkAddCoc('#4ade80', 'step_passed',
-      (ev.stepName || ev.stepId) + (ev.outcome ? ' — ' + _bistEscHtml(ev.outcome) : ''));
+    // CoC entry + tower radio acknowledgement
+    var _stepLabel = ev.stepName || ev.stepId;
+    var _outcomeLabel = ev.outcome ? ' — ' + ev.outcome : '';
+    _bistCkAddCoc('#4ade80', 'step_passed', _bistEscHtml(_stepLabel + _outcomeLabel));
+    _bistCkRadio('tower', '\u2713 ' + _bistEscHtml(_stepLabel) + (_outcomeLabel ? ' [' + _bistEscHtml(ev.outcome) + ']' : ''));
   } else if (type === 'radio') {
     _bistCkRadio(ev.side||'tower', ev.msg||'');
   } else if (type === 'step_fail') {
