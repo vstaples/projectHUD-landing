@@ -77,9 +77,9 @@ var SE_CSS = '<style id="se-css">' + [
 '#se-layout{display:flex;flex:1;min-height:0;overflow:hidden}',
 
 /* Left panel */
-'#se-left{width:188px;flex-shrink:0;background:var(--se-bg1);border-right:1px solid var(--se-b);',
+'#se-left{width:148px;flex-shrink:0;background:var(--se-bg1);border-right:1px solid var(--se-b);',
 'display:flex;flex-direction:column;overflow:hidden}',
-'.se-ph{padding:7px 10px 5px;font-size:10px;font-weight:700;letter-spacing:.1em;',
+'.se-ph{padding:7px 10px 5px;font-size:12px;font-weight:700;letter-spacing:.1em;',
 'color:var(--se-mu);text-transform:uppercase;display:flex;align-items:center;',
 'justify-content:space-between;border-bottom:1px solid var(--se-b);flex-shrink:0}',
 '.se-padd{background:none;border:none;color:var(--se-cad);font-size:16px;',
@@ -94,7 +94,7 @@ var SE_CSS = '<style id="se-css">' + [
 'transition:background .1s;position:relative}',
 '.se-si:hover{background:rgba(255,255,255,.03)}',
 '.se-si.sel{background:var(--se-cad3);border-left:2px solid var(--se-cad);padding-left:8px}',
-'.se-sin{font-size:11px;color:var(--se-t);margin-bottom:3px;line-height:1.3;',
+'.se-sin{font-size:13px;color:var(--se-t);margin-bottom:3px;line-height:1.3;',
 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
 '.se-sim{display:flex;align-items:center;gap:4px}',
 '.se-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}',
@@ -106,7 +106,7 @@ var SE_CSS = '<style id="se-css">' + [
 '.se-ac:hover{border-color:var(--se-cad);background:var(--se-cad3)}',
 '.se-ac:active{cursor:grabbing}',
 '.se-ac-icon{display:block;font-size:13px;margin-bottom:2px}',
-'.se-ac-lbl{font-size:9px;color:var(--se-t2);letter-spacing:.04em}',
+'.se-ac-lbl{font-size:12px;color:var(--se-t2);letter-spacing:.04em}',
 
 /* Template steps */
 '#se-tscroll{overflow-y:auto;flex:1;min-height:0}',
@@ -116,11 +116,11 @@ var SE_CSS = '<style id="se-css">' + [
 'border-bottom:1px solid var(--se-b);cursor:pointer;transition:background .1s}',
 '.se-ts:hover{background:rgba(255,255,255,.04)}',
 '.se-tsq{width:16px;height:16px;border-radius:3px;background:var(--se-bg3);',
-'display:flex;align-items:center;justify-content:center;font-size:10px;',
+'display:flex;align-items:center;justify-content:center;font-size:12px;',
 'font-family:monospace;color:var(--se-cad);flex-shrink:0;font-weight:700}',
-'.se-tsn{font-size:10px;color:var(--se-t2);flex:1;overflow:hidden;',
+'.se-tsn{font-size:12px;color:var(--se-t2);flex:1;overflow:hidden;',
 'text-overflow:ellipsis;white-space:nowrap}',
-'.se-tst{font-size:9px;color:var(--se-mu);flex-shrink:0}',
+'.se-tst{font-size:12px;color:var(--se-mu);flex-shrink:0}',
 
 /* Center */
 '#se-center{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}',
@@ -130,13 +130,13 @@ var SE_CSS = '<style id="se-css">' + [
 'font-weight:600;color:var(--se-t);font-family:Arial,sans-serif;outline:none;',
 'border-bottom:1px solid transparent;transition:border-color .15s}',
 '#se-title:focus{border-bottom-color:var(--se-cad)}',
-'.se-badge{font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;',
+'.se-badge{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;',
 'padding:2px 7px;border-radius:10px;font-family:monospace}',
 '.se-bd-pass{background:var(--se-grn2);color:var(--se-grn);border:1px solid rgba(74,222,128,.3)}',
 '.se-bd-fail{background:var(--se-red2);color:var(--se-red);border:1px solid rgba(248,113,113,.3)}',
 '.se-bd-new{background:var(--se-cad2);color:var(--se-cad);border:1px solid rgba(127,119,221,.3)}',
 '.se-bd-run{background:var(--se-amb2);color:var(--se-amb);border:1px solid rgba(239,159,39,.3)}',
-'.se-btn{display:inline-flex;align-items:center;gap:3px;padding:4px 10px;font-size:10px;',
+'.se-btn{display:inline-flex;align-items:center;gap:3px;padding:4px 10px;font-size:12px;',
 'font-weight:600;border-radius:3px;cursor:pointer;border:1px solid var(--se-b2);',
 'background:transparent;color:var(--se-t2);letter-spacing:.04em;',
 'transition:all .12s;font-family:Arial,sans-serif;white-space:nowrap}',
@@ -151,7 +151,7 @@ var SE_CSS = '<style id="se-css">' + [
 '#se-dztb{display:flex;align-items:center;gap:6px;padding:5px 10px;',
 'background:var(--se-bg2);border-bottom:1px solid var(--se-b);flex-shrink:0}',
 '#se-dz{flex:1;padding:4px 10px;border:1px dashed rgba(255,255,255,.1);border-radius:3px;',
-'font-size:10px;color:var(--se-mu);text-align:center;transition:all .15s}',
+'font-size:12px;color:var(--se-mu);text-align:center;transition:all .15s}',
 '#se-dz.over{border-color:var(--se-cad);background:var(--se-cad3);color:var(--se-cad)}',
 
 /* Timeline */
@@ -162,7 +162,7 @@ var SE_CSS = '<style id="se-css">' + [
 /* Fail banner */
 '.se-banner{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;',
 'background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);',
-'border-radius:4px;margin-bottom:8px;font-size:10px;color:var(--se-red)}',
+'border-radius:4px;margin-bottom:8px;font-size:12px;color:var(--se-red)}',
 '.se-banner-id{font-weight:700;font-family:monospace;flex-shrink:0}',
 
 /* Step cards */
@@ -174,24 +174,24 @@ var SE_CSS = '<style id="se-css">' + [
 '.se-card-hdr{display:flex;align-items:center;gap:6px;padding:6px 8px;',
 'border-bottom:1px solid var(--se-b)}',
 '.se-card-icon{width:20px;height:20px;border-radius:3px;display:flex;',
-'align-items:center;justify-content:center;font-size:11px;flex-shrink:0}',
-'.se-card-id{font-size:9px;font-family:monospace;color:var(--se-mu);flex-shrink:0}',
-'.se-card-lbl{font-size:11px;font-weight:600;color:var(--se-t);flex:1;',
+'align-items:center;justify-content:center;font-size:13px;flex-shrink:0}',
+'.se-card-id{font-size:12px;font-family:monospace;color:var(--se-mu);flex-shrink:0}',
+'.se-card-lbl{font-size:13px;font-weight:600;color:var(--se-t);flex:1;',
 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
 '.se-card-del{background:none;border:none;color:rgba(255,255,255,.15);',
 'cursor:pointer;font-size:13px;padding:0;line-height:1;transition:color .1s}',
 '.se-card-del:hover{color:var(--se-red)}',
 '.se-card-body{padding:6px 8px}',
 '.se-frow{display:flex;align-items:center;gap:5px;margin-bottom:4px;flex-wrap:wrap}',
-'.se-fl{font-size:9px;color:var(--se-mu);letter-spacing:.05em;',
+'.se-fl{font-size:12px;color:var(--se-mu);letter-spacing:.05em;',
 'text-transform:uppercase;width:52px;flex-shrink:0}',
-'.se-fval{font-size:10px;color:var(--se-t2);font-family:monospace;',
+'.se-fval{font-size:12px;color:var(--se-t2);font-family:monospace;',
 'background:var(--se-bg3);border:1px solid var(--se-b);border-radius:2px;',
 'padding:1px 5px}',
 
 /* Outcome chips */
 '.se-oc{display:inline-flex;align-items:center;padding:1px 7px;border-radius:8px;',
-'font-size:9px;font-weight:700;font-family:monospace;letter-spacing:.03em}',
+'font-size:12px;font-weight:700;font-family:monospace;letter-spacing:.03em}',
 '.se-oc-sub{background:rgba(96,165,250,.13);color:#60a5fa;border:1px solid rgba(96,165,250,.3)}',
 '.se-oc-app{background:var(--se-grn2);color:var(--se-grn);border:1px solid rgba(74,222,128,.3)}',
 '.se-oc-rej{background:var(--se-red2);color:var(--se-red);border:1px solid rgba(248,113,113,.3)}',
@@ -201,7 +201,7 @@ var SE_CSS = '<style id="se-css">' + [
 /* Route-back arc indicator */
 '.se-arc{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;',
 'background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);',
-'border-radius:3px;font-size:9px;color:var(--se-red);font-family:monospace;margin-top:3px}',
+'border-radius:3px;font-size:12px;color:var(--se-red);font-family:monospace;margin-top:3px}',
 
 /* Assertions */
 '.se-asc-list{margin-top:5px;display:flex;flex-direction:column;gap:3px}',
@@ -209,17 +209,17 @@ var SE_CSS = '<style id="se-css">' + [
 'background:var(--se-bg0);border-radius:3px;border:1px solid var(--se-b)}',
 '.se-arow.fail{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.04)}',
 '.se-arow.pass{border-color:rgba(74,222,128,.25)}',
-'.se-a-check{font-size:9px;color:var(--se-teal);font-family:monospace;flex:1}',
-'.se-a-op{font-size:9px;font-weight:700;color:var(--se-amb);font-family:monospace}',
-'.se-a-val{font-size:9px;color:var(--se-t2);font-family:monospace}',
-'.se-a-res{font-size:9px;font-weight:700;margin-left:auto;flex-shrink:0}',
+'.se-a-check{font-size:12px;color:var(--se-teal);font-family:monospace;flex:1}',
+'.se-a-op{font-size:12px;font-weight:700;color:var(--se-amb);font-family:monospace}',
+'.se-a-val{font-size:12px;color:var(--se-t2);font-family:monospace}',
+'.se-a-res{font-size:12px;font-weight:700;margin-left:auto;flex-shrink:0}',
 '.se-a-del{background:none;border:none;color:rgba(255,255,255,.15);',
-'cursor:pointer;font-size:11px;padding:0 0 0 3px;line-height:1}',
+'cursor:pointer;font-size:13px;padding:0 0 0 3px;line-height:1}',
 '.se-a-del:hover{color:var(--se-red)}',
 
 /* Diff block */
 '.se-diff{background:var(--se-bg3);border:1px solid rgba(248,113,113,.2);',
-'border-radius:3px;padding:5px 8px;margin-top:4px;font-size:9px}',
+'border-radius:3px;padding:5px 8px;margin-top:4px;font-size:12px}',
 '.se-diff-t{color:var(--se-red);font-weight:700;margin-bottom:3px}',
 '.se-diff-row{display:flex;gap:6px;font-family:monospace;margin-bottom:2px}',
 '.se-diff-l{color:var(--se-mu);width:44px;flex-shrink:0}',
@@ -228,11 +228,11 @@ var SE_CSS = '<style id="se-css">' + [
 
 /* Add assertion inline */
 '.se-add-asc{display:flex;align-items:center;gap:5px;margin-top:5px;flex-wrap:wrap}',
-'.se-asc-sel{font-size:10px;font-family:monospace;background:var(--se-bg0);',
+'.se-asc-sel{font-size:13px;font-family:monospace;background:var(--se-bg0);',
 'border:1px solid var(--se-b);border-radius:3px;padding:2px 5px;',
 'color:var(--se-t2);cursor:pointer;outline:none}',
 '.se-asc-sel:focus{border-color:var(--se-cad)}',
-'.se-asc-inp{font-size:10px;font-family:monospace;background:var(--se-bg0);',
+'.se-asc-inp{font-size:13px;font-family:monospace;background:var(--se-bg0);',
 'border:1px solid var(--se-b);border-radius:3px;padding:2px 5px;',
 'color:var(--se-t);width:60px;outline:none}',
 '.se-asc-inp:focus{border-color:var(--se-cad)}',
@@ -240,14 +240,14 @@ var SE_CSS = '<style id="se-css">' + [
 /* Add step row */
 '.se-addrow{display:flex;gap:5px;padding:4px 0;flex-wrap:wrap}',
 '.se-addchip{padding:3px 9px;border:1px dashed rgba(255,255,255,.1);border-radius:3px;',
-'font-size:9px;color:var(--se-mu);cursor:pointer;transition:all .12s;',
+'font-size:12px;color:var(--se-mu);cursor:pointer;transition:all .12s;',
 'background:transparent;font-family:Arial,sans-serif}',
 '.se-addchip:hover{border-color:var(--se-cad);color:var(--se-cad);background:var(--se-cad3)}',
 
 /* Footer */
 '#se-footer{display:flex;align-items:center;gap:8px;padding:5px 10px;',
-'background:var(--se-bg1);border-top:1px solid var(--se-b);flex-shrink:0;font-size:10px}',
-'.se-fsel{font-size:10px;font-family:Arial,sans-serif;background:var(--se-bg0);',
+'background:var(--se-bg1);border-top:1px solid var(--se-b);flex-shrink:0;font-size:12px}',
+'.se-fsel{font-size:13px;font-family:Arial,sans-serif;background:var(--se-bg0);',
 'border:1px solid var(--se-b);border-radius:3px;padding:2px 6px;',
 'color:var(--se-t2);cursor:pointer;outline:none}',
 
@@ -255,37 +255,37 @@ var SE_CSS = '<style id="se-css">' + [
 '#se-right{width:210px;flex-shrink:0;background:var(--se-bg1);',
 'border-left:1px solid var(--se-b);display:flex;flex-direction:column;overflow:hidden}',
 '.se-rp-sec{border-bottom:1px solid var(--se-b);padding:9px 10px;flex-shrink:0}',
-'.se-rp-t{font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--se-mu);',
+'.se-rp-t{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--se-mu);',
 'text-transform:uppercase;margin-bottom:7px}',
 '.se-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}',
 '.se-stat-c{background:var(--se-bg2);border-radius:3px;padding:6px 8px;border:1px solid var(--se-b)}',
 '.se-stat-v{font-size:17px;font-weight:700;font-family:monospace;line-height:1;margin-bottom:2px}',
-'.se-stat-l{font-size:9px;color:var(--se-mu);letter-spacing:.05em;text-transform:uppercase}',
+'.se-stat-l{font-size:12px;color:var(--se-mu);letter-spacing:.05em;text-transform:uppercase}',
 
 /* Recent runs */
 '.se-run-row{display:flex;align-items:center;gap:6px;padding:4px 0;',
 'border-bottom:1px solid var(--se-b)}',
 '.se-run-row:last-child{border-bottom:none}',
-'.se-run-n{font-size:10px;color:var(--se-t2);flex:1;overflow:hidden;',
+'.se-run-n{font-size:12px;color:var(--se-t2);flex:1;overflow:hidden;',
 'text-overflow:ellipsis;white-space:nowrap}',
-'.se-run-t{font-size:9px;color:var(--se-mu);font-family:monospace;flex-shrink:0}',
+'.se-run-t{font-size:12px;color:var(--se-mu);font-family:monospace;flex-shrink:0}',
 
 /* Property inspector */
 '#se-pi{flex:1;overflow-y:auto;padding:9px 10px;min-height:0}',
 '#se-pi::-webkit-scrollbar{width:2px}',
 '#se-pi::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08)}',
 '.se-pi-row{display:flex;align-items:center;gap:5px;margin-bottom:7px}',
-'.se-pi-lbl{font-size:9px;color:var(--se-mu);letter-spacing:.05em;',
+'.se-pi-lbl{font-size:12px;color:var(--se-mu);letter-spacing:.05em;',
 'text-transform:uppercase;width:64px;flex-shrink:0}',
-'.se-pi-sel{font-size:10px;font-family:monospace;background:var(--se-bg0);',
+'.se-pi-sel{font-size:13px;font-family:monospace;background:var(--se-bg0);',
 'border:1px solid var(--se-b);border-radius:3px;padding:2px 5px;',
 'color:var(--se-t2);width:100%;outline:none;cursor:pointer}',
 '.se-pi-sel:focus{border-color:var(--se-cad)}',
-'.se-pi-inp{font-size:10px;font-family:monospace;background:var(--se-bg0);',
+'.se-pi-inp{font-size:13px;font-family:monospace;background:var(--se-bg0);',
 'border:1px solid var(--se-b);border-radius:3px;padding:2px 5px;',
 'color:var(--se-t);width:100%;outline:none}',
 '.se-pi-inp:focus{border-color:var(--se-cad)}',
-'.se-pi-note{font-size:9px;color:var(--se-mu);line-height:1.5;',
+'.se-pi-note{font-size:12px;color:var(--se-mu);line-height:1.5;',
 'margin-bottom:7px;font-style:italic}',
 
 /* Gate */
@@ -295,8 +295,8 @@ var SE_CSS = '<style id="se-css">' + [
 'border-radius:3px;padding:7px 9px;margin-bottom:6px}',
 '.se-gate-warn{background:var(--se-amb2);border:1px solid rgba(239,159,39,.3);',
 'border-radius:3px;padding:7px 9px;margin-bottom:6px}',
-'.se-gate-t{font-size:10px;font-weight:700;margin-bottom:2px}',
-'.se-gate-d{font-size:9px;opacity:.8;line-height:1.5}',
+'.se-gate-t{font-size:12px;font-weight:700;margin-bottom:2px}',
+'.se-gate-d{font-size:12px;opacity:.8;line-height:1.5}',
 '</style>'].join('');
 
 // ── Entry point ──────────────────────────────────────────────────────────────
@@ -378,56 +378,17 @@ function seRenderEditor() {
   _seBindEvents();
 }
 
-// ── Left panel ───────────────────────────────────────────────────────────────
+// ── Left panel — Action Blocks only (Scripts + Template Steps live in Simulator left rail) ──
 function _seRenderLeft() {
   var html = '<div id="se-left">';
 
-  // Script list
-  html += '<div class="se-ph">Scripts<button class="se-padd" onclick="seNewScript()" title="New script">+</button></div>';
-  html += '<div id="se-slist">';
-  if (!_seScripts.length) {
-    html += '<div style="padding:10px;font-size:10px;color:var(--se-mu);font-family:Arial,sans-serif;font-style:italic">No scripts yet</div>';
-  }
-  _seScripts.forEach(function(sc) {
-    var run = _seLastRunFor(sc.id);
-    var isSel = sc.id === _seSelectedId;
-    var dotColor = !run ? 'var(--se-mu)' : run.status === 'passed' ? 'var(--se-grn)' : 'var(--se-red)';
-    var statusTxt = !run ? 'NOT RUN' : run.status === 'passed' ? 'PASSING' : 'FAILING';
-    var statusColor = !run ? 'var(--se-mu)' : run.status === 'passed' ? 'var(--se-grn)' : 'var(--se-red)';
-    var steps = (sc.spec.steps||[]).length;
-    html += '<div class="se-si'+(isSel?' sel':'')+'" onclick="seSelectScript(\''+sc.id+'\')">';
-    html += '<div class="se-sin">'+_seEsc(sc.name)+'</div>';
-    html += '<div class="se-sim">';
-    html += '<div class="se-dot" style="background:'+dotColor+'"></div>';
-    html += '<span style="font-size:9px;color:'+statusColor+'">'+statusTxt+'</span>';
-    html += '<span style="font-size:9px;color:var(--se-mu);margin-left:auto;font-family:monospace">'+steps+' steps</span>';
-    html += '</div></div>';
-  });
-  html += '</div>';
-
-  // Action palette
-  html += '<div class="se-ph" style="margin-top:4px">Action Blocks</div>';
+  html += '<div class="se-ph">Action Blocks</div>';
   html += '<div id="se-actgrid">';
   Object.keys(SE_ACTION_META).forEach(function(action) {
     var m = SE_ACTION_META[action];
-    html += '<div class="se-ac" draggable="true" ondragstart="sePalDragStart(event,\''+action+'\')" ondragend="sePalDragEnd(event)">';
+    html += '<div class="se-ac" draggable="true" onclick="seQuickAdd(\''+action+'\')" ondragstart="sePalDragStart(event,\''+action+'\')" ondragend="sePalDragEnd(event)">';
     html += '<span class="se-ac-icon" style="color:'+m.color+'">'+m.icon+'</span>';
     html += '<span class="se-ac-lbl">'+m.label+'</span>';
-    html += '</div>';
-  });
-  html += '</div>';
-
-  // Template steps
-  html += '<div class="se-ph">Template Steps</div>';
-  html += '<div id="se-tscroll">';
-  if (!_seTmplSteps.length) {
-    html += '<div style="padding:8px 10px;font-size:10px;color:var(--se-mu);font-style:italic">No steps found</div>';
-  }
-  _seTmplSteps.forEach(function(ts) {
-    html += '<div class="se-ts" onclick="seInsertTmplStep('+ts.sequence_order+')">';
-    html += '<div class="se-tsq">'+ts.sequence_order+'</div>';
-    html += '<div class="se-tsn">'+_seEsc(ts.name)+'</div>';
-    html += '<div class="se-tst">'+_seEsc(ts.step_type||'')+'</div>';
     html += '</div>';
   });
   html += '</div>';
@@ -609,7 +570,7 @@ function _seRenderAddAssert(stp) {
   }
 
   var html = '<div class="se-add-asc" style="margin-top:6px;border-top:1px solid var(--se-b);padding-top:6px">';
-  html += '<span style="font-size:9px;color:var(--se-mu);text-transform:uppercase;letter-spacing:.06em">Add assert:</span>';
+  html += '<span style="font-size:12px;color:var(--se-mu);text-transform:uppercase;letter-spacing:.06em">Add assert:</span>';
   html += '<select class="se-asc-sel" id="se-nc-'+stp.id+'" onclick="event.stopPropagation()">';
   checks.forEach(function(c) {
     html += '<option value="'+_seEsc(c)+'">'+_seEsc(c)+'</option>';
@@ -623,7 +584,7 @@ function _seRenderAddAssert(stp) {
   html += '</select>';
 
   html += '<input class="se-asc-inp" id="se-nv-'+stp.id+'" placeholder="value" onclick="event.stopPropagation()"/>';
-  html += '<button class="se-btn se-btn-cad" onclick="event.stopPropagation();seAddAssert(\''+stp.id+'\')" style="padding:2px 8px;font-size:9px">+ Add</button>';
+  html += '<button class="se-btn se-btn-cad" onclick="event.stopPropagation();seAddAssert(\''+stp.id+'\')" style="padding:2px 8px;font-size:12px">+ Add</button>';
   html += '</div>';
   return html;
 }
@@ -639,7 +600,7 @@ function _seRenderFooter(sc) {
       {delete:'Delete instance after run',suspend:'Suspend instance',keep:'Keep instance'}[v]+'</option>';
   });
   html += '</select>';
-  html += '<span style="margin-left:auto;font-family:monospace;color:var(--se-mu);font-size:10px" id="se-runmeta">';
+  html += '<span style="margin-left:auto;font-family:monospace;color:var(--se-mu);font-size:12px" id="se-runmeta">';
   if (sc) {
     var run = _seLastRunFor(sc.id);
     if (run) {
@@ -680,7 +641,7 @@ function _seRenderRight(sc) {
   html += '<div class="se-rp-t">Recent runs</div>';
   var shown = _seRecentRuns.slice(0, 6);
   if (!shown.length) {
-    html += '<div style="font-size:10px;color:var(--se-mu);font-style:italic">No runs yet</div>';
+    html += '<div style="font-size:12px;color:var(--se-mu);font-style:italic">No runs yet</div>';
   }
   shown.forEach(function(r) {
     var dot = r.status === 'passed' ? 'var(--se-grn)' : 'var(--se-red)';
@@ -864,24 +825,7 @@ function seRefreshPI() {
 }
 
 function seRefreshScriptList() {
-  var sl = document.getElementById('se-slist'); if (!sl) return;
-  var html = '';
-  _seScripts.forEach(function(sc) {
-    var run = _seLastRunFor(sc.id);
-    var isSel = sc.id === _seSelectedId;
-    var dotColor = !run ? 'var(--se-mu)' : run.status === 'passed' ? 'var(--se-grn)' : 'var(--se-red)';
-    var statusTxt = !run ? 'NOT RUN' : run.status === 'passed' ? 'PASSING' : 'FAILING';
-    var statusColor = !run ? 'var(--se-mu)' : run.status === 'passed' ? 'var(--se-grn)' : 'var(--se-red)';
-    var steps = (sc.spec.steps||[]).length;
-    html += '<div class="se-si'+(isSel?' sel':'')+'" onclick="seSelectScript(\''+sc.id+'\')">';
-    html += '<div class="se-sin">'+_seEsc(sc.name)+'</div>';
-    html += '<div class="se-sim">';
-    html += '<div class="se-dot" style="background:'+dotColor+'"></div>';
-    html += '<span style="font-size:9px;color:'+statusColor+'">'+statusTxt+'</span>';
-    html += '<span style="font-size:9px;color:var(--se-mu);margin-left:auto;font-family:monospace">'+steps+' steps</span>';
-    html += '</div></div>';
-  });
-  sl.innerHTML = html;
+  // Script list now lives in Simulator left rail — no-op here
 }
 
 function seRefreshBadge() {
@@ -1192,9 +1136,9 @@ window._seOnCompleteStep = async function(stp, instId, stepBySeq) {};
 window._seOnFormSection  = async function(stp, instId, stepBySeq) {};
 window._seHydrateFormState = async function(state, instId, tmplSteps) { return state; };
 
-// ── SE3: seOpenEditors is now the public API ───────────────────────────────────
+// ── SE3: seOpenEditor is now the public API ───────────────────────────────────
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE3 — target-agnostic, Simulator-native',
+console.log('%c[cdn-script-editor] v20260404-SE5 — Scripts+TemplateSteps removed, Action Blocks only in left rail',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
