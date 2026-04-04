@@ -1,6 +1,12 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE6','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE7','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// ── SE7 patches (2026-04-04) ────────────────────────────────────────────────
+// 1. Card reuse in _bistCkSetNode — when a new stepId has no existing card but
+//    an idle (className === 'bck-nc') card with matching data-seq exists, reuse
+//    it in-place. Both card.id (bck-n-{stepId}) and inner nst id (bck-nst-{stepId})
+//    updated atomically. Fixes T3: post-rejection replay steps (s5/s6) now
+//    activate the reset blue cards rather than appending new ones to the right.
 // ── SE6 patches (2026-04-04) ────────────────────────────────────────────────
 // 1. willRouteBack flag pre-computed before step_pass emission. SE5 used
 //    ev.routeToSeq to suppress green — wrong, because routeToSeq is set on
@@ -2276,33 +2282,51 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps, ev) {
   var nodeId = 'bck-n-'+stepId;
   var existing = document.getElementById(nodeId);
   if (!existing) {
-    // Build the node
-    var aname = test.anames[stepIdx] || 'Actor';
-    var actor  = test.actors[stepIdx] || '?';
-    var nm     = (test.nodes[stepIdx] || 'Step').split('\n');
-    var card = document.createElement('div'); card.className = 'bck-nc'; card.id = nodeId;
-    // Store step_seq as data attribute — used by arc resolution to find first-pass card
+    // Check for an idle card with matching data-seq — if found, reuse it in-place.
+    // This handles post-reset replay: the reset card (blue/idle) gets re-activated
+    // rather than a new card being appended to the right.
     var cardSeq = ev && ev.params && ev.params.step_seq != null ? ev.params.step_seq
                 : ev && ev.stepSeq != null ? ev.stepSeq : null;
-    if (cardSeq != null) card.dataset.seq = String(cardSeq);
-    var seqLabel = (_bckCurrentTestIdx+1)+'.'+(stepIdx+1);
-    card.innerHTML =
-      '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(actor)+'</div>'+
-      '<div class="bck-nan">'+_bistEscHtml(aname)+'</div></div>'+
-      '<div class="bck-nb">'+
-        '<div class="bck-ntitle">'+_bistEscHtml(nm[0])+
-        (nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+
-        '</div>'+
-        '<div class="bck-nst" id="bck-nst-'+stepId+'">'+
-          '<div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div>'+
-          '<span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span>'+
-          '<span style="margin-left:auto;font-size:12px;font-family:Arial,sans-serif;font-weight:700;color:rgba(255,180,60,.85)">'+seqLabel+'</span>'+
-        '</div>'+
-      '</div>';
-    if (nodes.children.length > 0) {
-      var cw = document.createElement('div'); cw.className = 'bck-cw'; nodes.appendChild(cw);
+    var reuseCard = null;
+    if (cardSeq != null) {
+      var allCards = Array.from(nodes.querySelectorAll('.bck-nc'));
+      reuseCard = allCards.find(function(c) {
+        // Only reuse if idle (class is exactly 'bck-nc' — not ac, dn, rs)
+        return c.dataset.seq === String(cardSeq) && c.className === 'bck-nc';
+      }) || null;
     }
-    nodes.appendChild(card);
+    if (reuseCard) {
+      // Re-ID both the card and its inner status div atomically — MUST stay in sync.
+      var oldStepId = reuseCard.id.replace('bck-n-', '');
+      var oldNst = reuseCard.querySelector('#bck-nst-'+oldStepId);
+      reuseCard.id = nodeId;
+      if (oldNst) oldNst.id = 'bck-nst-'+stepId;
+    } else {
+      // No reusable card — append a new one.
+      var aname = test.anames[stepIdx] || 'Actor';
+      var actor  = test.actors[stepIdx] || '?';
+      var nm     = (test.nodes[stepIdx] || 'Step').split('\n');
+      var card = document.createElement('div'); card.className = 'bck-nc'; card.id = nodeId;
+      if (cardSeq != null) card.dataset.seq = String(cardSeq);
+      var seqLabel = (_bckCurrentTestIdx+1)+'.'+(stepIdx+1);
+      card.innerHTML =
+        '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(actor)+'</div>'+
+        '<div class="bck-nan">'+_bistEscHtml(aname)+'</div></div>'+
+        '<div class="bck-nb">'+
+          '<div class="bck-ntitle">'+_bistEscHtml(nm[0])+
+          (nm[1]?'<br><span style="opacity:.6;font-size:12px;font-family:Arial,sans-serif">'+_bistEscHtml(nm[1])+'</span>':'')+
+          '</div>'+
+          '<div class="bck-nst" id="bck-nst-'+stepId+'">'+
+            '<div class="bck-nsdot" style="background:rgba(255,255,255,.08)"></div>'+
+            '<span class="bck-nstxt" style="color:rgba(255,255,255,.18)">Pending</span>'+
+            '<span style="margin-left:auto;font-size:12px;font-family:Arial,sans-serif;font-weight:700;color:rgba(255,180,60,.85)">'+seqLabel+'</span>'+
+          '</div>'+
+        '</div>';
+      if (nodes.children.length > 0) {
+        var cw = document.createElement('div'); cw.className = 'bck-cw'; nodes.appendChild(cw);
+      }
+      nodes.appendChild(card);
+    }
   }
   var el = document.getElementById(nodeId); if (!el) return;
   var cls = {idle:'bck-nc', active:'bck-nc ac', done:'bck-nc dn', reset:'bck-nc rs'};
