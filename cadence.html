@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.11 — Simulator redesign: 3-panel layout + Routing Proof Certificate','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.12 — Admin onboarding: setup wizard, auto-generate, tooltips, Release Readiness','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1164,40 +1164,58 @@ function _s9RenderSimPanel(el) {
     // ── Main content: left + right ──
     '<div style="display:flex;flex:1;min-height:0;overflow:hidden">' +
 
-      // ── LEFT RAIL: Script editor ──
+      // ── LEFT RAIL ──
       '<div style="width:256px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.06);' +
         'display:flex;flex-direction:column;background:#0c0f18;height:100%;overflow:hidden">' +
 
-        // Scripts header
+        // Scripts header with tooltip
         '<div style="padding:9px 12px 7px;border-bottom:1px solid rgba(255,255,255,.06);' +
           'flex-shrink:0;display:flex;align-items:center;justify-content:space-between">' +
-          '<span style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;' +
-            'color:rgba(255,255,255,.3);text-transform:uppercase">Test Scripts</span>' +
+          '<div style="display:flex;align-items:center;gap:5px">' +
+            '<span style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;' +
+              'color:rgba(255,255,255,.3);text-transform:uppercase">Test Scripts</span>' +
+            '<span title="A test script is a sequence of steps that proves your workflow routes correctly. Each script tests a specific scenario — the clean path, a rejection, a decline. You need at least one script to simulate." ' +
+              'style="width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.08);' +
+              'border:1px solid rgba(255,255,255,.15);display:inline-flex;align-items:center;' +
+              'justify-content:center;font-size:10px;color:rgba(255,255,255,.4);cursor:help;font-style:normal">?</span>' +
+          '</div>' +
           '<span style="' + FA + 'font-size:12px;color:#28d4c0;cursor:pointer" ' +
             'onclick="seNewScript && seNewScript()">+ New</span>' +
         '</div>' +
 
-        // Script list (populated by _s9LoadSimScripts)
+        // Script list — populated by _s9LoadSimScripts; shows onboarding when empty
         '<div id="s9-sim-scripts-list" style="flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.06);' +
-          'max-height:180px;overflow-y:auto">' +
-          '<div style="' + F12 + 'color:rgba(255,255,255,.3);padding:10px 12px">Loading scripts…</div>' +
+          'max-height:200px;overflow-y:auto">' +
+          '<div style="' + F12 + 'color:rgba(255,255,255,.25);padding:10px 12px;font-style:italic">Loading…</div>' +
         '</div>' +
 
-        // Template steps palette
+        // Template steps header with tooltip
         '<div style="padding:8px 12px 6px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">' +
-          '<div style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;' +
-            'color:rgba(255,255,255,.3);text-transform:uppercase;margin-bottom:6px">Template Steps</div>' +
+          '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">' +
+            '<span style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;' +
+              'color:rgba(255,255,255,.3);text-transform:uppercase">Workflow Steps</span>' +
+            '<span title="These are the actual steps in your workflow — forms, approvals, sign-offs. Click any step to add it to your test script as a \'complete step\' action." ' +
+              'style="width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.08);' +
+              'border:1px solid rgba(255,255,255,.15);display:inline-flex;align-items:center;' +
+              'justify-content:center;font-size:10px;color:rgba(255,255,255,.4);cursor:help;font-style:normal">?</span>' +
+          '</div>' +
           '<div id="s9-tmpl-steps-list" style="display:flex;flex-direction:column;gap:3px">' +
             '<div style="' + F12 + 'color:rgba(255,255,255,.25);font-style:italic">Loading…</div>' +
           '</div>' +
         '</div>' +
 
-        // Release gate
+        // Release Readiness (renamed from "Release Gate") with tooltip
         '<div style="padding:10px 12px;flex-shrink:0">' +
-          '<div style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;' +
-            'color:rgba(255,255,255,.3);text-transform:uppercase;margin-bottom:7px">Release Gate</div>' +
+          '<div style="display:flex;align-items:center;gap:5px;margin-bottom:6px">' +
+            '<span style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;' +
+              'color:rgba(255,255,255,.3);text-transform:uppercase">Release Readiness</span>' +
+            '<span title="Before you can publish this workflow for real use, all test scripts must pass. This tells you whether you\'re ready — or what\'s blocking you." ' +
+              'style="width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.08);' +
+              'border:1px solid rgba(255,255,255,.15);display:inline-flex;align-items:center;' +
+              'justify-content:center;font-size:10px;color:rgba(255,255,255,.4);cursor:help;font-style:normal">?</span>' +
+          '</div>' +
           '<div id="s9-sim-gate-left" style="' + F12 + 'color:#f0a030;line-height:1.6">' +
-            '○ Run tests to check gate status' +
+            '○ Create and run test scripts first' +
           '</div>' +
         '</div>' +
 
@@ -1219,47 +1237,17 @@ function _s9RenderSimPanel(el) {
 
       '</div>' +
 
-      // ── RIGHT: Cockpit (owned by cdn-bist.js once launched) ──
+      // ── RIGHT: context-aware — setup wizard or launch/cockpit ──
       '<div id="s9-sim-right" style="flex:1;display:flex;flex-direction:column;' +
-        'align-items:center;justify-content:center;gap:18px;padding:36px;' +
+        'align-items:center;justify-content:center;gap:0;padding:0;' +
         'background:#080a10;height:100%;overflow:hidden">' +
 
-        '<div style="text-align:center;max-width:440px">' +
-          '<div style="width:60px;height:60px;border-radius:50%;margin:0 auto 20px;' +
-            'background:rgba(40,212,192,.07);border:1px solid rgba(40,212,192,.18);' +
-            'display:flex;align-items:center;justify-content:center;font-size:26px;' +
-            'color:rgba(40,212,192,.6)">◎</div>' +
+        // Inner content — replaced by cockpit on launch, or by _s9UpdateRightPanel() when scripts load
+        '<div id="s9-right-inner" style="text-align:center;max-width:520px;padding:40px 32px">' +
 
           (hasSource
-            ? '<div style="' + FA + 'font-size:16px;font-weight:700;color:rgba(255,255,255,.9);' +
-                'margin-bottom:8px;letter-spacing:.02em">' + _s9EscHtml(srcName) + '</div>' +
-              '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.4);margin-bottom:24px;line-height:1.7">' +
-                'Workflow flight simulator' + (srcVer ? ' · v' + _s9EscHtml(srcVer) : '') +
-              '</div>' +
-              '<div style="display:flex;gap:8px;margin-bottom:24px;justify-content:center">' +
-                _s9MetricCard('s9-metric-tests', '—', 'Scripts') +
-                _s9MetricCard('s9-metric-steps', '—', 'Steps') +
-                _s9MetricCard('s9-metric-last',  '—', 'Last run') +
-              '</div>' +
-              '<button onclick="_s9LaunchSimulator()" style="' + FA + 'font-size:14px;font-weight:700;' +
-                'padding:11px 32px;border-radius:5px;border:none;cursor:pointer;' +
-                'background:#1D9E75;color:#fff;display:inline-flex;align-items:center;' +
-                'gap:8px;letter-spacing:.04em;transition:background .15s">' +
-                '▶ Launch Flight Simulator</button>' +
-              '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);margin-top:10px;line-height:1.6">' +
-                'Runs all test scripts · verifies all routing paths<br>generates Routing Proof Certificate' +
-              '</div>'
-            : '<div style="' + FA + 'font-size:16px;font-weight:700;color:rgba(255,255,255,.6);' +
-                'margin-bottom:10px">Workflow Simulator</div>' +
-              '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.3);line-height:1.75;margin-bottom:24px">' +
-                'Open a workflow in the Library and click<br>' +
-                '<strong style="color:rgba(255,255,255,.55)">▶ Simulate</strong> to load it here.<br>' +
-                'All test scripts and the flight cockpit<br>will appear in this panel.' +
-              '</div>' +
-              '<button onclick="_s9GoToLibrary()" style="' + FA + 'font-size:13px;font-weight:600;' +
-                'padding:9px 24px;border-radius:4px;border:1px solid rgba(255,255,255,.12);' +
-                'background:rgba(255,255,255,.04);color:rgba(255,255,255,.6);cursor:pointer;letter-spacing:.03em">' +
-                'Go to Library</button>'
+            ? _s9RightPanelWizard(srcName, srcVer)
+            : _s9RightPanelNoSource()
           ) +
 
         '</div>' +
@@ -1299,6 +1287,138 @@ function _s9RenderSimPanel(el) {
 }
 
 // ── Load template steps into left rail palette ─────────────────────────────
+// ── Right panel content helpers ───────────────────────────────────────────
+function _s9RightPanelNoSource() {
+  var FA = 'font-family:Arial,sans-serif;';
+  return '<div style="width:56px;height:56px;border-radius:50%;margin:0 auto 20px;' +
+      'background:rgba(40,212,192,.06);border:1px solid rgba(40,212,192,.15);' +
+      'display:flex;align-items:center;justify-content:center;font-size:24px;color:rgba(40,212,192,.5)">◎</div>' +
+    '<div style="' + FA + 'font-size:16px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:10px">Workflow Simulator</div>' +
+    '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.3);line-height:1.75;margin-bottom:24px">' +
+      'Select a workflow from the dropdown above<br>to begin setting up your test suite.' +
+    '</div>' +
+    '<button onclick="_s9GoToLibrary()" style="' + FA + 'font-size:13px;font-weight:600;' +
+      'padding:9px 24px;border-radius:4px;border:1px solid rgba(255,255,255,.12);' +
+      'background:rgba(255,255,255,.04);color:rgba(255,255,255,.6);cursor:pointer">Go to Library</button>';
+}
+
+function _s9RightPanelWizard(srcName, srcVer) {
+  var FA = 'font-family:Arial,sans-serif;';
+  return '<div style="width:56px;height:56px;border-radius:50%;margin:0 auto 20px;' +
+      'background:rgba(40,212,192,.07);border:1px solid rgba(40,212,192,.18);' +
+      'display:flex;align-items:center;justify-content:center;font-size:24px;color:rgba(40,212,192,.6)">◎</div>' +
+    '<div style="' + FA + 'font-size:17px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:6px">' +
+      _s9EscHtml(srcName) + '</div>' +
+    '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.35);margin-bottom:28px">' +
+      'Workflow Simulator' + (srcVer ? ' · v' + _s9EscHtml(srcVer) : '') +
+    '</div>' +
+    '<div style="text-align:left;margin-bottom:28px">' +
+      _s9WizardStep(1, 'Create test scripts', 'Define the scenarios to test — the clean path, rejections, edge cases.', 'active') +
+      _s9WizardStep(2, 'Run the simulation', 'The simulator executes every script and verifies each routing path.', 'pending') +
+      _s9WizardStep(3, 'Get your certificate', 'A Routing Proof Certificate confirms every path works — required for release.', 'pending') +
+    '</div>' +
+    '<button onclick="_s9AutoGenerateScript()" ' +
+      'style="' + FA + 'font-size:14px;font-weight:700;padding:11px 28px;border-radius:5px;border:none;' +
+      'cursor:pointer;background:#1D9E75;color:#fff;width:100%;margin-bottom:10px;letter-spacing:.03em">' +
+      '⚡ Auto-generate test scripts from this workflow</button>' +
+    '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.25);margin-bottom:16px;line-height:1.5">' +
+      'Creates a baseline script covering the clean approval path.<br>You can add more scenarios afterwards.' +
+    '</div>' +
+    '<div style="border-top:1px solid rgba(255,255,255,.06);padding-top:14px">' +
+      '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3)">Or </span>' +
+      '<span style="' + FA + 'font-size:12px;color:#28d4c0;cursor:pointer" onclick="seNewScript && seNewScript()">+ create a script manually</span>' +
+      '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3)"> using the left panel</span>' +
+    '</div>';
+}
+
+function _s9RightPanelReady(srcName, srcVer) {
+  var FA = 'font-family:Arial,sans-serif;';
+  return '<div style="width:56px;height:56px;border-radius:50%;margin:0 auto 20px;' +
+      'background:rgba(40,212,192,.07);border:1px solid rgba(40,212,192,.18);' +
+      'display:flex;align-items:center;justify-content:center;font-size:24px;color:rgba(40,212,192,.6)">◎</div>' +
+    '<div style="' + FA + 'font-size:17px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:6px">' +
+      _s9EscHtml(srcName) + '</div>' +
+    '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.35);margin-bottom:24px">' +
+      'Workflow Simulator' + (srcVer ? ' · v' + _s9EscHtml(srcVer) : '') +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:24px;justify-content:center">' +
+      _s9MetricCard('s9-metric-tests', '—', 'Scripts') +
+      _s9MetricCard('s9-metric-steps', '—', 'Steps') +
+      _s9MetricCard('s9-metric-last',  '—', 'Last run') +
+    '</div>' +
+    '<button onclick="_s9LaunchSimulator()" style="' + FA + 'font-size:14px;font-weight:700;' +
+      'padding:11px 32px;border-radius:5px;border:none;cursor:pointer;' +
+      'background:#1D9E75;color:#fff;width:100%;letter-spacing:.04em;margin-bottom:10px">' +
+      '▶ Launch Flight Simulator</button>' +
+    '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);line-height:1.6">' +
+      'Runs all test scripts · verifies all routing paths · generates Routing Proof Certificate' +
+    '</div>';
+}
+
+function _s9WizardStep(num, title, desc, state) {
+  var FA = 'font-family:Arial,sans-serif;';
+  var isActive = state === 'active', isDone = state === 'done';
+  var dotBg    = isDone ? '#3de08a' : isActive ? '#28d4c0' : 'rgba(255,255,255,.1)';
+  var dotColor = (isDone || isActive) ? '#fff' : 'rgba(255,255,255,.25)';
+  var titleCol = (isDone || isActive) ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.3)';
+  var descCol  = (isDone || isActive) ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.18)';
+  return '<div style="display:flex;gap:12px;margin-bottom:14px">' +
+    '<div style="width:24px;height:24px;border-radius:50%;background:' + dotBg + ';flex-shrink:0;' +
+      'display:flex;align-items:center;justify-content:center;' +
+      FA + 'font-size:12px;font-weight:700;color:' + dotColor + ';margin-top:1px">' +
+      (isDone ? '✓' : num) + '</div>' +
+    '<div>' +
+      '<div style="' + FA + 'font-size:13px;font-weight:600;color:' + titleCol + ';margin-bottom:2px">' + title + '</div>' +
+      '<div style="' + FA + 'font-size:12px;color:' + descCol + ';line-height:1.5">' + desc + '</div>' +
+    '</div></div>';
+}
+
+function _s9UpdateRightPanel(hasScripts) {
+  var inner = document.getElementById('s9-right-inner');
+  if (!inner) return;
+  inner.innerHTML = hasScripts
+    ? _s9RightPanelReady(_s9SimSourceName||'', _s9SimSourceVer||'')
+    : _s9RightPanelWizard(_s9SimSourceName||'', _s9SimSourceVer||'');
+}
+
+async function _s9AutoGenerateScript() {
+  var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+  if (!tmpl || !tmpl.id) { alert('No workflow selected.'); return; }
+  var btn = document.querySelector('[onclick="_s9AutoGenerateScript()"]');
+  if (btn) { btn.textContent = '⏳ Generating…'; btn.disabled = true; }
+  var steps = await API.get(
+    'workflow_template_steps?template_id=eq.' + tmpl.id + '&order=sequence_order.asc'
+  ).catch(function(){ return []; });
+  if (!Array.isArray(steps) || !steps.length) {
+    if (btn) { btn.textContent = '⚡ Auto-generate test scripts'; btn.disabled = false; }
+    alert('No steps found in this workflow. Add steps in the Library first.');
+    return;
+  }
+  var specSteps = [{ id:'s1', action:'launch_instance',
+    params:{ title:'BIST — ' + tmpl.name + ' — {timestamp}', launched_by:'vaughn_staples' },
+    asserts:[{ eq:'in_progress', check:'instance.status' },{ eq:'active', check:'step[1].state' }]
+  }];
+  steps.forEach(function(s, i) {
+    var seq = s.sequence_order;
+    var defaultOutcome = ({form:'submitted',approval:'approved',signoff:'signed',meeting:'concluded'})[s.step_type] || 'submitted';
+    var asserts = [{ eq:'done', check:'step['+seq+'].state' }];
+    if (seq < steps.length) asserts.push({ eq:'active', check:'step['+(seq+1)+'].state' });
+    specSteps.push({ id:'s'+(i+2), action:'complete_step',
+      params:{ step_seq:seq, actor:'vaughn_staples', outcome:defaultOutcome }, asserts:asserts });
+  });
+  var spec = { name:'Full workflow — clean approval path',
+    template_version:tmpl.version||'0.0.0', cleanup:'delete', steps:specSteps };
+  var firmId = (typeof FIRM_ID_CAD !== 'undefined') ? FIRM_ID_CAD : '';
+  var rows = await API.post('bist_test_scripts', {
+    firm_id:firmId, template_id:tmpl.id,
+    name:'Full workflow — clean approval path',
+    script:JSON.stringify(spec), created_at:new Date().toISOString(),
+  }).catch(function(e){ alert('Failed to create script: '+e.message); return null; });
+  if (!rows || !rows[0]) { if (btn) { btn.textContent='⚡ Auto-generate test scripts'; btn.disabled=false; } return; }
+  var content = document.getElementById('s9-sim-panel');
+  if (content) _s9RenderSimPanel(content);
+}
+
 async function _s9LoadTmplSteps(templateId) {
   var el = document.getElementById('s9-tmpl-steps-list');
   if (!el) return;
@@ -1621,15 +1741,33 @@ async function _s9LoadSimScripts(templateId, version) {
     // Array.isArray guard — API may return error object on policy failure
     if (!Array.isArray(scripts)) scripts = [];
 
+    // Fetch runs upfront so script list can show pass/fail status
+    var runs = [];
+    if (scripts.length) {
+      var ids = scripts.map(function(s) { return s.id; }).join(',');
+      runs = await API.get(
+        'bist_runs?firm_id=eq.' + firmId +
+        '&script_id=in.(' + ids + ')' +
+        '&template_version=eq.' + encodeURIComponent(version) +
+        '&order=run_at.desc&limit=20'
+      ).catch(function() { return []; });
+      if (!Array.isArray(runs)) runs = [];
+    }
+
     var listEl = document.getElementById('s9-sim-scripts-list');
     if (listEl) {
       if (!scripts.length) {
         listEl.innerHTML =
-          '<div style="font-family:Arial,sans-serif;font-size:12px;color:var(--muted);' +
-          'padding:6px 0;line-height:1.7">No test scripts found.<br>' +
-          '<span style="color:var(--text3)">Add scripts to <code>bist_test_scripts</code>' +
-          ' to enable the Simulator.</span></div>';
+          '<div style="font-family:Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.3);' +
+          'padding:12px 12px;line-height:1.7;font-style:italic">' +
+          'No test scripts yet.<br>' +
+          '<span style="color:#28d4c0;cursor:pointer;font-style:normal" onclick="_s9AutoGenerateScript()">⚡ Auto-generate from workflow</span>' +
+          '</div>';
+        // Update right panel to show setup wizard
+        _s9UpdateRightPanel(false);
       } else {
+        // Update right panel to show launch button
+        _s9UpdateRightPanel(true);
         listEl.innerHTML = scripts.map(function(s) {
           var run = runs.find(function(r){ return r.script_id === s.id; });
           var dotColor = !run ? 'rgba(255,255,255,.25)'
@@ -1671,15 +1809,7 @@ async function _s9LoadSimScripts(templateId, version) {
 
     if (!scripts.length) return;
 
-    var ids = scripts.map(function(s) { return s.id; }).join(',');
-    var runs = await API.get(
-      'bist_runs?firm_id=eq.' + firmId +
-      '&script_id=in.(' + ids + ')' +
-      '&template_version=eq.' + encodeURIComponent(version) +
-      '&order=run_at.desc&limit=20'
-    ).catch(function() { return []; });
-
-    if (!Array.isArray(runs)) runs = [];
+    // runs already fetched above
 
     var lastEl = document.getElementById('s9-metric-last');
     if (lastEl && runs.length) {
