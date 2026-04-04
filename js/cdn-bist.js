@@ -293,19 +293,123 @@ async function runBistScript(scriptId, onProgress) {
             console.warn(_tag, '  _seOnCompleteStep failed (non-fatal):', e.message);
           });
         }
-        // Activate: route_to_seq if specified, else next step
-        const activateStep = routeStep || stepBySeq[seq + 1];
-        if (activateStep) {
-          console.log(_tag, '  activating step seq',
-            routeStep ? routeSeq : (seq + 1), ':', activateStep.name);
+        // ── Layer 2 routing — mirrors cdn-instances.js submitComplete exactly ──
+        // Priority: explicit route_to_seq (script param) → template outcome routing → advance
+        const outcome       = stp.params?.outcome || null;
+        const outcomeDef    = outcome
+          ? (step.outcomes || []).find(o => o.id === outcome || o.label === outcome)
+          : null;
+        const allTmplSteps  = tmplSteps || [];
+        const currOrder     = step.sequence_order;
+        const now           = Date.now();
+
+        if (routeStep) {
+          // ── Explicit route_to_seq in script ──────────────────────────────────
+          // Write step_reset events for all steps between route target and current
+          const stepsToReset = allTmplSteps
+            .filter(s => s.sequence_order >= routeStep.sequence_order
+                      && s.sequence_order < currOrder)
+            .sort((a, b) => a.sequence_order - b.sequence_order);
+          for (let ri = 0; ri < stepsToReset.length; ri++) {
+            const rs = stepsToReset[ri];
+            await API.post('workflow_step_instances', {
+              instance_id: instId, firm_id: FIRM_ID_CAD,
+              event_type: 'step_reset', template_step_id: rs.id,
+              step_type: rs.step_type || 'action', step_name: rs.name || null,
+              actor_name: 'System',
+              event_notes: `BIST reset — ${outcome || 'rejection'} on ${step.name}`,
+              created_at: new Date(now + ri + 1).toISOString(),
+            });
+          }
           await API.post('workflow_step_instances', {
             instance_id: instId, firm_id: FIRM_ID_CAD,
-            event_type: 'step_activated', template_step_id: activateStep.id,
-            step_type: activateStep.step_type, step_name: activateStep.name,
-            actor_name: 'System', created_at: new Date().toISOString(),
+            event_type: 'step_activated', template_step_id: routeStep.id,
+            step_type: routeStep.step_type || 'action', step_name: routeStep.name || null,
+            actor_name: 'System',
+            created_at: new Date(now + stepsToReset.length + 2).toISOString(),
           });
+          console.log(_tag, '  [L2] explicit route → seq', routeSeq, ':', routeStep.name,
+            '| reset', stepsToReset.length, 'steps');
+
+        } else if (step.reject_to && outcomeDef?.requiresReset) {
+          // ── Template-defined explicit reject_to + requiresReset outcome ──────
+          const rejectTarget = allTmplSteps.find(s => s.id === step.reject_to);
+          if (rejectTarget) {
+            const stepsToReset = allTmplSteps
+              .filter(s => s.sequence_order >= rejectTarget.sequence_order
+                        && s.sequence_order < currOrder)
+              .sort((a, b) => a.sequence_order - b.sequence_order);
+            for (let ri = 0; ri < stepsToReset.length; ri++) {
+              const rs = stepsToReset[ri];
+              await API.post('workflow_step_instances', {
+                instance_id: instId, firm_id: FIRM_ID_CAD,
+                event_type: 'step_reset', template_step_id: rs.id,
+                step_type: rs.step_type || 'action', step_name: rs.name || null,
+                actor_name: 'System',
+                event_notes: `BIST reset — ${outcome} on ${step.name} → reject_to`,
+                created_at: new Date(now + ri + 1).toISOString(),
+              });
+            }
+            await API.post('workflow_step_instances', {
+              instance_id: instId, firm_id: FIRM_ID_CAD,
+              event_type: 'step_activated', template_step_id: rejectTarget.id,
+              step_type: rejectTarget.step_type || 'action', step_name: rejectTarget.name || null,
+              actor_name: 'System',
+              created_at: new Date(now + stepsToReset.length + 2).toISOString(),
+            });
+            console.log(_tag, '  [L2] template reject_to → seq', rejectTarget.sequence_order,
+              ':', rejectTarget.name, '| reset', stepsToReset.length, 'steps');
+          } else {
+            console.warn(_tag, '  [L2] reject_to step id not found in tmplSteps — check template data');
+          }
+
+        } else if (outcomeDef?.requiresReset) {
+          // ── Implicit reset — requiresReset outcome but no reject_to ──────────
+          // Reset all steps from first non-trigger step up to (not including) current
+          const firstStep = allTmplSteps
+            .filter(s => s.step_type !== 'trigger')
+            .sort((a, b) => a.sequence_order - b.sequence_order)[0];
+          if (firstStep) {
+            const stepsToReset = allTmplSteps
+              .filter(s => s.sequence_order >= firstStep.sequence_order
+                        && s.sequence_order < currOrder)
+              .sort((a, b) => a.sequence_order - b.sequence_order);
+            for (let ri = 0; ri < stepsToReset.length; ri++) {
+              const rs = stepsToReset[ri];
+              await API.post('workflow_step_instances', {
+                instance_id: instId, firm_id: FIRM_ID_CAD,
+                event_type: 'step_reset', template_step_id: rs.id,
+                step_type: rs.step_type || 'action', step_name: rs.name || null,
+                actor_name: 'System',
+                event_notes: `BIST reset to start — ${outcome} on ${step.name}`,
+                created_at: new Date(now + ri + 1).toISOString(),
+              });
+            }
+            await API.post('workflow_step_instances', {
+              instance_id: instId, firm_id: FIRM_ID_CAD,
+              event_type: 'step_activated', template_step_id: firstStep.id,
+              step_type: firstStep.step_type || 'action', step_name: firstStep.name || null,
+              actor_name: 'System',
+              created_at: new Date(now + stepsToReset.length + 2).toISOString(),
+            });
+            console.log(_tag, '  [L2] implicit reset to start → seq', firstStep.sequence_order,
+              ':', firstStep.name, '| reset', stepsToReset.length, 'steps');
+          }
+
         } else {
-          console.log(_tag, '  no next step to activate (end of template or last seq)');
+          // ── Normal forward advance ────────────────────────────────────────────
+          const activateStep = stepBySeq[seq + 1];
+          if (activateStep) {
+            console.log(_tag, '  [L2] forward advance → seq', seq + 1, ':', activateStep.name);
+            await API.post('workflow_step_instances', {
+              instance_id: instId, firm_id: FIRM_ID_CAD,
+              event_type: 'step_activated', template_step_id: activateStep.id,
+              step_type: activateStep.step_type || 'action', step_name: activateStep.name || null,
+              actor_name: 'System', created_at: new Date().toISOString(),
+            });
+          } else {
+            console.log(_tag, '  [L2] no next step — end of template');
+          }
         }
 
       // ── SE1: complete_form_section — new action type ──────────────────────
@@ -1858,13 +1962,27 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
       window._bckArcs = [];
     }
     // Activate node in DAG
-    _bistCkSetNode(ev.stepId, idx, test, 'active', 'In progress', tmplSteps);
+    _bistCkSetNode(ev.stepId, idx, test, 'active', 'In progress', tmplSteps, ev);
     // Draw pending arc only if this step loops back (seq <= rejection seq)
     if (window._bckPendingArcFrom && ev.params && Number(ev.params.step_seq) <= window._bckPendingArcFromSeq) {
       var _paf = window._bckPendingArcFrom;
+      var _targetSeq = Number(ev.params.step_seq);
       window._bckPendingArcFrom = null;
       window._bckPendingArcFromSeq = null;
-      setTimeout(function(){ _bckDrawRejectArc(_paf, ev.stepId); }, 60);
+      // Arc must point to the FIRST card that ran this seq (the existing card from the
+      // first pass), NOT the new card just created (ev.stepId). Find it by data-seq.
+      setTimeout(function(){
+        var allCards = Array.from(document.querySelectorAll('[id^="bck-n-"][data-seq]'));
+        var firstPassCard = allCards.find(function(c) {
+          return Number(c.dataset.seq) === _targetSeq && c.id !== 'bck-n-'+ev.stepId;
+        });
+        var arcToId = firstPassCard ? firstPassCard.id.replace('bck-n-','') : ev.stepId;
+        console.log('[cdn-bist:arc] pending arc resolved — from:'+_paf+
+          ' target seq:'+_targetSeq+
+          ' firstPassCard:'+(firstPassCard ? firstPassCard.id : 'NOT FOUND — falling back to '+ev.stepId)+
+          ' arcTo:'+arcToId);
+        _bckDrawRejectArc(_paf, arcToId);
+      }, 60);
     } else if (window._bckPendingArcFrom && ev.params && Number(ev.params.step_seq) > window._bckPendingArcFromSeq) {
       // Next step is forward — not a loop, cancel pending arc
       window._bckPendingArcFrom = null;
@@ -1915,7 +2033,7 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     }
   } else if (type === 'step_pass') {
     var idx = ev.stepIdx || 0;
-    _bistCkSetNode(ev.stepId, idx, test, 'done', ev.outcome || 'Done', tmplSteps);
+    _bistCkSetNode(ev.stepId, idx, test, 'done', ev.outcome || 'Done', tmplSteps, ev);
     _bckLastDoneId = ev.stepId;
     // Set pending arc if outcome is a rejection type
     // Will only draw if next step_start has a lower stepSeq (confirmed loop)
@@ -1949,6 +2067,9 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
 function _bckDrawRejectArc(fromStepId, toStepId) {
   if (!window._bckArcs) window._bckArcs = [];
   window._bckArcs.push({from: fromStepId, to: toStepId});
+  console.log('[cdn-bist:arc] registered — from:bck-n-'+fromStepId+' to:bck-n-'+toStepId+
+    ' fromExists:'+!!document.getElementById('bck-n-'+fromStepId)+
+    ' toExists:'+!!document.getElementById('bck-n-'+toStepId));
   _bckStartArcLoop();
 }
 
@@ -2011,10 +2132,8 @@ function _bckRedrawArcs() {
       ? Math.min(y1, y2) - bow
       : Math.max(y1, y2) + bow;
 
-    console.log('[cdn-bist:arc] '+arc.from+'->'+arc.to+
-      ' x1:'+Math.round(x1)+' x2:'+Math.round(x2)+
-      ' backward:'+isBackward+' bow:'+Math.round(bow));
-
+    // Note: arc draw logging removed from rAF loop (was firing at 60fps).
+    // Arc geometry logged once at registration in _bckDrawRejectArc.
     var path = document.createElementNS('http://www.w3.org/2000/svg','path');
     path.setAttribute('d','M '+x1+' '+y1+' Q '+mx+' '+my+' '+x2+' '+y2);
     path.setAttribute('fill','none');
@@ -2050,7 +2169,7 @@ function _bckRedrawArcs() {
   });
 }
 
-function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
+function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps, ev) {
   var nodes = _bckEl('bck-nodes'); if (!nodes) return;
   var nodeId = 'bck-n-'+stepId;
   var existing = document.getElementById(nodeId);
@@ -2060,6 +2179,10 @@ function _bistCkSetNode(stepId, stepIdx, test, state, label, tmplSteps) {
     var actor  = test.actors[stepIdx] || '?';
     var nm     = (test.nodes[stepIdx] || 'Step').split('\n');
     var card = document.createElement('div'); card.className = 'bck-nc'; card.id = nodeId;
+    // Store step_seq as data attribute — used by arc resolution to find first-pass card
+    var cardSeq = ev && ev.params && ev.params.step_seq != null ? ev.params.step_seq
+                : ev && ev.stepSeq != null ? ev.stepSeq : null;
+    if (cardSeq != null) card.dataset.seq = String(cardSeq);
     var seqLabel = (_bckCurrentTestIdx+1)+'.'+(stepIdx+1);
     card.innerHTML =
       '<div class="bck-nct"><div class="bck-nav">'+_bistEscHtml(actor)+'</div>'+
