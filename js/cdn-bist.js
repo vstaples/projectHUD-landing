@@ -1,6 +1,12 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE5','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260404-SE6','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// ── SE6 patches (2026-04-04) ────────────────────────────────────────────────
+// 1. willRouteBack flag pre-computed before step_pass emission. SE5 used
+//    ev.routeToSeq to suppress green — wrong, because routeToSeq is set on
+//    every pass including the final one (visit cap reached). willRouteBack is
+//    true only when the GOTO will actually fire (target visit count < 3).
+//    Final pass of a routing step now correctly goes green.
 // ── SE5 patches (2026-04-04) ────────────────────────────────────────────────
 // 1. step_pass skips green transition when ev.routeToSeq is set. A step that
 //    routes back must stay orange until step_route_back resets it to blue —
@@ -526,12 +532,9 @@ async function runBistScript(scriptId, onProgress) {
       stepsPassed++;
       const stepName = stepBySeq[stp.params?.step_seq]?.name || '';
       console.log(_tag, '  ✓ step', stp.id, 'passed | total passed:', stepsPassed);
-      onProgress?.({ type:'step_pass', stepId: stp.id, stepIdx: si,
-        action: stp.action, stepName, outcome: stp.params?.outcome,
-        stepSeq: stp.params?.step_seq, routeToSeq: stp.params?.route_to_seq });
-      await _bckFreezeWait(); // freeze point — after step complete
 
-      // ── GOTO: jump back on backward route_to_seq (max 3 visits per step) ──
+      // ── Pre-compute willRouteBack so step_pass cockpit handler knows whether to go green ──
+      let willRouteBack = false;
       let nextSi = si + 1;
       if (stp.action === 'complete_step' && stp.params?.route_to_seq != null) {
         const gotoSeq = Number(stp.params.route_to_seq);
@@ -540,21 +543,31 @@ async function runBistScript(scriptId, onProgress) {
           const targetSi = spec.steps.findIndex(s => Number(s.params?.step_seq) === gotoSeq);
           if (targetSi >= 0 && targetSi < si) {
             const targetId = spec.steps[targetSi].id;
-            // Only loop if target step hasn't hit visit cap
             if ((_visitCount[targetId] || 0) < 3) {
-              console.log(_tag, '  GOTO: route_to_seq', gotoSeq, '→ jumping to spec step', targetId,
-                'at index', targetSi, '(visit #' + ((_visitCount[targetId]||0)+1) + ')');
-              onProgress?.({ type:'step_route_back', fromStepId: stp.id,
-                toStepId: targetId, toStepSeq: gotoSeq });
-              nextSi = targetSi;
-            } else {
-              console.log(_tag, '  GOTO suppressed — targetId', targetId, 'at visit cap');
+              willRouteBack = true;
             }
-          } else {
-            console.warn(_tag, '  GOTO: route_to_seq', gotoSeq, 'target not found in spec steps',
-              '(targetSi:', targetSi, 'si:', si, ')');
           }
         }
+      }
+
+      onProgress?.({ type:'step_pass', stepId: stp.id, stepIdx: si,
+        action: stp.action, stepName, outcome: stp.params?.outcome,
+        stepSeq: stp.params?.step_seq, routeToSeq: stp.params?.route_to_seq,
+        willRouteBack });
+      await _bckFreezeWait(); // freeze point — after step complete
+
+      // ── GOTO: jump back on backward route_to_seq ──
+      if (willRouteBack) {
+        const gotoSeq  = Number(stp.params.route_to_seq);
+        const targetSi = spec.steps.findIndex(s => Number(s.params?.step_seq) === gotoSeq);
+        const targetId = spec.steps[targetSi].id;
+        console.log(_tag, '  GOTO: route_to_seq', gotoSeq, '→ jumping to spec step', targetId,
+          'at index', targetSi, '(visit #' + ((_visitCount[targetId]||0)+1) + ')');
+        onProgress?.({ type:'step_route_back', fromStepId: stp.id,
+          toStepId: targetId, toStepSeq: gotoSeq });
+        nextSi = targetSi;
+      } else if (stp.action === 'complete_step' && stp.params?.route_to_seq != null) {
+        console.log(_tag, '  GOTO suppressed — visit cap or target not found');
       }
       si = nextSi;
     }
@@ -2111,7 +2124,7 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
     var _stepLabel = ev.stepName || ev.stepId;
     var _outcomeLabel = ev.outcome ? ' — ' + ev.outcome : '';
     // Only go green when NOT routing back — step_route_back will reset the card to blue.
-    if (!ev.routeToSeq) {
+    if (!ev.willRouteBack) {
       _bistCkSetNode(ev.stepId, ev.stepIdx || 0, test, 'done', ev.outcome || 'Complete', tmplSteps, ev);
       var doneCard = document.getElementById('bck-n-'+ev.stepId);
       if (doneCard) {
