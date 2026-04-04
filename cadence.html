@@ -964,7 +964,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.36 — Suite Health subtitle added, consistent with SE10 script panel fix','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.38 — Back/Script Editor bar removed from script editor view','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1156,7 +1156,7 @@ function _s9RenderSimPanel(el) {
 
         // Script list — populated by _s9LoadSimScripts; shows onboarding when empty
         '<div id="s9-sim-scripts-list" style="flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.06);' +
-          'max-height:200px;overflow-y:auto">' +
+          'max-height:260px;overflow-y:auto">' +
           '<div style="' + F12 + 'color:rgba(255,255,255,.25);padding:10px 12px;font-style:italic">Loading…</div>' +
         '</div>' +
 
@@ -1195,7 +1195,7 @@ function _s9RenderSimPanel(el) {
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
             '<div>' +
               '<span style="' + FA + 'font-size:11px;font-weight:700;letter-spacing:.1em;' +
-                'color:#5fd4c8;text-transform:uppercase">Suite Health</span>' +
+                'color:#5fd4c8;text-transform:uppercase">Script Suite Health</span>' +
               '<div style="' + FA + 'font-size:11px;color:rgba(255,255,255,.3);margin-top:1px">All scripts in this workflow</div>' +
             '</div>' +
             '<span id="s9-suite-health-badge" style="' + FA + 'font-size:15px;font-weight:700;' +
@@ -2426,16 +2426,7 @@ function _s9OpenScriptEditor(scriptId) {
   var right = document.getElementById('s9-sim-right');
   if (!right) return;
   right.innerHTML =
-    '<div style="display:flex;flex-direction:column;height:100%;width:100%;background:#0a0c10">' +
-      '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:8px 14px;' +
-        'border-bottom:1px solid rgba(255,255,255,.06);background:#0c0f18">' +
-        '<button onclick="_s9CloseScriptEditor()" style="font-family:Arial,sans-serif;font-size:12px;' +
-          'font-weight:600;padding:4px 12px;border-radius:3px;border:1px solid rgba(255,255,255,.12);' +
-          'background:rgba(255,255,255,.05);color:rgba(255,255,255,.7);cursor:pointer">← Back</button>' +
-        '<span style="font-family:Arial,sans-serif;font-size:13px;color:rgba(255,255,255,.5)">Script Editor</span>' +
-      '</div>' +
-      '<div id="s9-script-editor-body" style="flex:1;min-height:0;overflow:hidden"></div>' +
-    '</div>';
+    '<div id="s9-script-editor-body" style="height:100%;width:100%;overflow:hidden"></div>';
   if (typeof seOpenEditor === 'function') {
     seOpenEditor(tmpl.id, 's9-script-editor-body');
     if (scriptId) {
@@ -2747,7 +2738,6 @@ async function _s9LoadSimScripts(templateId, version) {
       runs = await API.get(
         'bist_runs?firm_id=eq.' + firmId +
         '&script_id=in.(' + ids + ')' +
-        '&template_version=eq.' + encodeURIComponent(version) +
         '&order=run_at.desc&limit=20'
       ).catch(function() { return []; });
       if (!Array.isArray(runs)) runs = [];
