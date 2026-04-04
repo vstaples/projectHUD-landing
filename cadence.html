@@ -992,7 +992,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.23 — Wizard: equal flex:1 panels, same background, contents centered','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.24 — Wizard: no divider, black bg, step 1 done+DAG shown when workflow selected','background:#5a52cc;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1824,7 +1824,9 @@ function _s9RightPanelWizard(srcName, srcVer) {
     '</div>';
 
   // Animation loop — 4 phases, 8s each
+  // srcName is in closure scope from _s9RightPanelWizard
   setTimeout(function() {
+    var _hasSource = !!(srcName);
     var _phase = 1;
     var _total = 4;
     var _phaseMs = 8000;
@@ -1838,24 +1840,42 @@ function _s9RightPanelWizard(srcName, srcVer) {
         var desc  = document.getElementById('s9w-desc-' + i);
         var panel = document.getElementById('s9w-panel-' + i);
         var active = (i === n);
+        // Step 1 stays as "done" (green check) if workflow is selected
+        var done = (_hasSource && i === 1 && n !== 1);
         if (row)   row.className = 's9w-step-row ' + (active ? 'active' : 'inactive');
-        if (dot)   { dot.style.background = active ? '#28d4c0' : 'rgba(255,255,255,.1)'; dot.style.color = active ? '#080a10' : 'rgba(255,255,255,.3)'; }
-        if (title) title.style.color = active ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.3)';
-        if (desc)  desc.style.color  = active ? 'rgba(255,255,255,.6)'  : 'rgba(255,255,255,.2)';
+        if (dot)   {
+          dot.style.background = done ? '#3de08a' : active ? '#28d4c0' : 'rgba(255,255,255,.1)';
+          dot.style.color      = (done || active) ? '#080a10' : 'rgba(255,255,255,.3)';
+          dot.textContent      = done ? '✓' : String(i);
+        }
+        if (title) title.style.color = (active || done) ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.3)';
+        if (desc)  desc.style.color  = (active || done) ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.2)';
         if (panel) { panel.style.opacity = active ? '1' : '0'; panel.style.pointerEvents = active ? 'auto' : 'none'; }
       });
     }
 
-    // Build DAG immediately on first phase
+    // Build DAG from steps — always shown on phase 1
     _s9BuildWizardDag();
 
-    function _cycle() {
-      var next = (_phase % _total) + 1;
-      _activatePhase(next);
+    // If workflow already selected, start cycling from phase 2 immediately
+    if (_hasSource) {
+      setTimeout(function() {
+        _activatePhase(2);
+        function _cycle() {
+          var next = (_phase % _total) + 1;
+          _activatePhase(next);
+          setTimeout(_cycle, _phaseMs);
+        }
+        setTimeout(_cycle, _phaseMs);
+      }, _phaseMs);
+    } else {
+      function _cycle() {
+        var next = (_phase % _total) + 1;
+        _activatePhase(next);
+        setTimeout(_cycle, _phaseMs);
+      }
       setTimeout(_cycle, _phaseMs);
     }
-
-    setTimeout(_cycle, _phaseMs);
   }, 120);
 
   return html;
