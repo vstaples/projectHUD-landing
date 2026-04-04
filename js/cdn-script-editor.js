@@ -1169,7 +1169,7 @@ function _seAssertResult(assert, lastRun, stepId) {
   return null;
 }
 
-// ── Keyboard shortcut ────────────────────────────────────────────────────────
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
 function _seBindEvents() {
   // Cmd/Ctrl+S to save
   var existing = document._seKeyHandler;
