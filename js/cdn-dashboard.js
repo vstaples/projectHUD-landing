@@ -11,7 +11,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260406-CD5 — conformance exceptions in hot queue','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260406-CD6 — latest-run-per-script pass counts','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -591,13 +591,20 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
   if (countEl) countEl.textContent = tmpls.length+' template'+(tmpls.length>1?'s':'');
 
   gridEl.innerHTML = tmpls.map(function(t){
-    var cert   = certByTmpl[t.id] || null;
+    var cert     = certByTmpl[t.id] || null;
     var tmplRuns = runsByTmpl[t.id] || [];
     var tmplPaths= pathsByTmpl[t.id] || {total:0,covered:0};
     var scriptCt = scriptsByTmpl[t.id] || 0;
     var lastRun  = tmplRuns[0] || null;
-    var passCt   = tmplRuns.filter(function(r){ return r.status==='passed'; }).length;
-    var failCt   = tmplRuns.filter(function(r){ return r.status==='failed'; }).length;
+    // Count pass/fail from latest run per script only (not cumulative history)
+    var latestByScript = {};
+    tmplRuns.forEach(function(r){
+      if (!r.script_id) return;
+      if (!latestByScript[r.script_id]) latestByScript[r.script_id] = r;
+    });
+    var latestRuns = Object.values(latestByScript);
+    var passCt = latestRuns.filter(function(r){ return r.status==='passed'; }).length;
+    var failCt = latestRuns.filter(function(r){ return r.status==='failed'; }).length;
 
     // Coverage
     var covPct = tmplPaths.total > 0 ? Math.round((tmplPaths.covered / tmplPaths.total)*100) : 0;
@@ -625,9 +632,9 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
       }
     }
 
-    // Suite line
+    // Suite line — latest run per script
     var suiteLine = scriptCt
-      ? passCt+' passing · '+failCt+' failing · '+scriptCt+' script'+(scriptCt>1?'s':'')
+      ? passCt+'/'+scriptCt+' passing'+(failCt?' · '+failCt+' failing':'')
       : '0 scripts — no test coverage';
 
     // Cert date

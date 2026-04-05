@@ -1242,6 +1242,9 @@ function _s9RenderSimPanel(el) {
           '</div>' +
           '<span style="' + FA + 'font-size:12px;color:#28d4c0;cursor:pointer" ' +
             'onclick="seNewScript && seNewScript()">+ New</span>' +
+          '<span style="' + FA + 'font-size:11px;color:rgba(95,212,200,.6);cursor:pointer;margin-left:6px;border:1px solid rgba(95,212,200,.25);border-radius:3px;padding:1px 7px" ' +
+            'onclick="_sgGenerateScripts && _selectedTmpl && _sgGenerateScripts(_selectedTmpl.id)" ' +
+            'title="Auto-generate one test script per unique routing path through this workflow">⚡ Generate All Paths</span>' +
         '</div>' +
 
         // Script list — populated by _s9LoadSimScripts; shows onboarding when empty
@@ -4863,6 +4866,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-bist.js?v=20260406-BQ4"></script>
 <script src="/js/cdn-dashboard.js?v=20260406-CD5"></script>
 <script src="/js/cdn-conformance.js?v=20260406-CF1"></script>
+<script src="/js/cdn-script-generator.js?v=20260406-SG1"></script>
 <script src="/js/cdn-script-editor.js?v=20260405-SE30e"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
