@@ -980,7 +980,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.64 — Fix onclick syntax · Cache-buster SE29b','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.65 — Dashboard history-style layout · Cache-buster SE30','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -3750,137 +3750,158 @@ async function _s9RenderDashboard(panel) {
   var F10 = FA + 'font-size:10px;';
   var F11 = FA + 'font-size:11px;';
   var F12 = FA + 'font-size:12px;';
-  var MN  = 'font-family:monospace;';
+  var MN  = 'font-family:monospace;font-size:11px;';
 
   panel.style.cssText = 'display:flex;width:100%;height:100%;overflow:hidden;background:#080a10;flex-direction:column';
 
   panel.innerHTML =
-    // ── TOP: Uptime signal strip ──
-    '<div style="display:flex;align-items:stretch;background:#0c0f18;' +
-      'border-bottom:2px solid rgba(255,255,255,.06);flex-shrink:0;min-height:72px">' +
 
-      // Uptime ring + label
-      '<div style="padding:12px 20px;border-right:1px solid rgba(255,255,255,.06);' +
-        'display:flex;align-items:center;gap:14px;min-width:200px">' +
-        '<div style="position:relative;width:52px;height:52px;flex-shrink:0">' +
-          '<svg width="52" height="52" viewBox="0 0 52 52" style="transform:rotate(-90deg)">' +
-            '<circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="5"/>' +
-            '<circle id="s9-uptime-ring" cx="26" cy="26" r="22" fill="none" stroke="#3de08a" stroke-width="5" ' +
-              'stroke-dasharray="0 138" stroke-linecap="round" style="transition:stroke-dasharray .8s ease"/>' +
-          '</svg>' +
-          '<div id="s9-uptime-pct" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);' +
-            FA + 'font-size:11px;font-weight:700;font-family:monospace;color:#3de08a">—</div>' +
-        '</div>' +
-        '<div>' +
-          '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-            'color:#28d4c0;margin-bottom:3px">Portfolio Uptime</div>' +
-          '<div id="s9-uptime-sub" style="' + F11 + 'color:rgba(255,255,255,.5)">Loading…</div>' +
-          '<div id="s9-uptime-trend" style="' + F9 + 'color:rgba(255,255,255,.25);margin-top:2px"></div>' +
-        '</div>' +
+    // ── CONTROLS BAR ──
+    '<div style="display:flex;align-items:center;background:#0c0f18;' +
+      'border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;padding:0 14px;height:36px;gap:8px">' +
+
+      // Workflow selector
+      '<select id="s9-dash-wf-select" onchange="_s9DashFilterWf(this.value)" ' +
+        'style="' + FA + 'font-size:11px;background:#1a1f2e;border:1px solid rgba(255,255,255,.1);' +
+        'border-radius:4px;color:rgba(255,255,255,.75);padding:3px 8px;height:24px;' +
+        'cursor:pointer;outline:none;min-width:200px">' +
+        '<option value="all">All Workflows — Firm Portfolio</option>' +
+      '</select>' +
+
+      '<div style="width:1px;height:18px;background:rgba(255,255,255,.06);margin:0 2px"></div>' +
+
+      // Range presets
+      '<div style="display:flex;gap:2px">' +
+        ['7d','30d','90d','All time'].map(function(r, i) {
+          var isAct = r === '30d';
+          return '<button onclick="_s9DashSetRange(this,\'' + r + '\')" ' +
+            'style="' + FA + 'font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;' +
+            'cursor:pointer;border:1px solid;letter-spacing:.04em;' +
+            (isAct ? 'background:#161b28;border-color:#5fd4c8;color:#5fd4c8'
+                   : 'background:transparent;border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.3)') +
+            '">' + r + '</button>';
+        }).join('') +
       '</div>' +
 
-      // Certified
-      '<div style="padding:12px 18px;border-right:1px solid rgba(255,255,255,.06);' +
-        'display:flex;flex-direction:column;justify-content:center;min-width:110px">' +
-        '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-          'color:#28d4c0;margin-bottom:4px">Certified</div>' +
-        '<div id="s9-cert-count" style="' + FA + 'font-size:26px;font-weight:700;' +
-          'font-family:monospace;color:rgba(255,255,255,.3);line-height:1">—</div>' +
-        '<div id="s9-cert-sub" style="' + F9 + 'color:rgba(255,255,255,.3);margin-top:2px">workflows</div>' +
+      '<div style="' + FA + 'font-size:10px;color:rgba(255,255,255,.25);font-family:monospace">2026-03-05</div>' +
+      '<div style="' + FA + 'font-size:10px;color:rgba(255,255,255,.2)">→</div>' +
+      '<div style="' + FA + 'font-size:10px;color:rgba(255,255,255,.25);font-family:monospace">2026-04-04</div>' +
+
+      '<div style="width:1px;height:18px;background:rgba(255,255,255,.06);margin:0 2px"></div>' +
+
+      // View toggles
+      '<div style="display:flex;gap:2px">' +
+        [['all','ALL VIEWS'],['trend','TREND'],['cal','CALENDAR'],['log','RUN LOG']].map(function(v, i) {
+          var isAct = v[0] === 'all';
+          return '<button onclick="_s9DashSetView(this,\'' + v[0] + '\')" ' +
+            'id="s9-dvb-' + v[0] + '" ' +
+            'style="' + FA + 'font-size:10px;font-weight:700;padding:2px 9px;border-radius:3px;' +
+            'cursor:pointer;border:1px solid;letter-spacing:.04em;' +
+            (isAct ? 'background:#161b28;border-color:#5fd4c8;color:#5fd4c8'
+                   : 'background:transparent;border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.3)') +
+            '">' + v[1] + '</button>';
+        }).join('') +
       '</div>' +
 
-      // Failing
-      '<div style="padding:12px 18px;border-right:1px solid rgba(255,255,255,.06);' +
-        'display:flex;flex-direction:column;justify-content:center;min-width:110px">' +
-        '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-          'color:#28d4c0;margin-bottom:4px">Failing Now</div>' +
-        '<div id="s9-fail-count" style="' + FA + 'font-size:26px;font-weight:700;' +
-          'font-family:monospace;color:rgba(255,255,255,.3);line-height:1">—</div>' +
-        '<div style="' + F9 + 'color:rgba(255,255,255,.3);margin-top:2px">test scripts</div>' +
-      '</div>' +
-
-      // Open tickets
-      '<div style="padding:12px 18px;border-right:1px solid rgba(255,255,255,.06);' +
-        'display:flex;flex-direction:column;justify-content:center;min-width:120px">' +
-        '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-          'color:#28d4c0;margin-bottom:4px">Open Tickets</div>' +
-        '<div id="s9-ticket-count" style="' + FA + 'font-size:26px;font-weight:700;' +
-          'font-family:monospace;color:rgba(255,255,255,.3);line-height:1">—</div>' +
-        '<div style="' + F9 + 'color:rgba(255,255,255,.3);margin-top:2px">bugs + enhancements</div>' +
-      '</div>' +
-
-      // Sparkline
-      '<div style="flex:1;padding:12px 20px;display:flex;flex-direction:column;justify-content:center">' +
-        '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-          'color:#28d4c0;margin-bottom:8px">7-Day Portfolio Trend</div>' +
-        '<div id="s9-sparkline" style="height:34px">' + _s9DashSparkline() + '</div>' +
-      '</div>' +
-
-      // Report issue button
-      '<div style="padding:12px 16px;display:flex;align-items:center;border-left:1px solid rgba(255,255,255,.06)">' +
-        '<button onclick="typeof supOpenModal===\'function\' && supOpenModal({module:\'cadencehud\'})" ' +
-          'style="' + FA + 'font-size:11px;font-weight:700;padding:6px 14px;border-radius:4px;' +
-          'border:1px solid rgba(80,144,240,.4);background:rgba(80,144,240,.1);color:#5090f0;' +
-          'cursor:pointer;letter-spacing:.04em;white-space:nowrap">⚑ Report Issue</button>' +
+      '<div style="margin-left:auto;' + F9 + 'color:rgba(255,255,255,.25)">' +
+        'Stale threshold: <span style="color:#f0a030;font-weight:700">7 days</span>' +
+        '&nbsp;<span style="color:#5fd4c8;cursor:pointer;text-decoration:underline">Edit →</span>' +
       '</div>' +
 
     '</div>' +
 
-    // ── BODY ──
+    // ── ALERT BANNER (hidden by default) ──
+    '<div id="s9-dash-alert" style="display:none;background:#1a0808;' +
+      'border-bottom:1px solid rgba(240,96,96,.35);padding:5px 14px;' + F11 +
+      'color:#f06060;flex-shrink:0;flex-direction:row;align-items:center;gap:8px">' +
+      '<span>✗</span>' +
+      '<span id="s9-dash-alert-msg"></span>' +
+      '<span id="s9-dash-alert-link" style="color:#5fd4c8;cursor:pointer;text-decoration:underline;font-size:10px"></span>' +
+      '<span onclick="document.getElementById('s9-dash-alert').style.display='none'" ' +
+        'style="margin-left:auto;cursor:pointer;color:rgba(255,255,255,.3);font-size:16px;line-height:1">×</span>' +
+    '</div>' +
+
+    // ── MAIN BODY: left content + right cert column ──
     '<div style="display:flex;flex:1;min-height:0;overflow:hidden">' +
 
-      // ── LEFT: Needs Attention + Work Queue ──
-      '<div style="width:360px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.06);' +
-        'display:flex;flex-direction:column;overflow:hidden;background:#0a0c14">' +
-
-        // Needs Attention header
-        '<div style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;' +
-          'display:flex;align-items:center;justify-content:space-between;background:#0c0f18">' +
-          '<span style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-            'color:#5fd4c8">⚠ Needs Attention</span>' +
-          '<span id="s9-attn-count" style="' + F9 + 'color:rgba(255,255,255,.25);' + MN + '"></span>' +
-        '</div>' +
-        '<div id="s9-dash-broken" style="flex-shrink:0;max-height:220px;overflow-y:auto;' +
-          'border-bottom:1px solid rgba(255,255,255,.06)">' +
-          '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:14px;font-style:italic">Loading…</div>' +
-        '</div>' +
-
-        // Work Queue header
-        '<div style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;' +
-          'display:flex;align-items:center;justify-content:space-between;background:#0c0f18">' +
-          '<span style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-            'color:#5fd4c8">Work Queue</span>' +
-          '<div style="display:flex;align-items:center;gap:5px">' +
-            '<span id="s9-queue-count" style="' + F9 + 'color:rgba(255,255,255,.25);' + MN + '"></span>' +
-            '<span style="' + F9 + 'color:rgba(255,255,255,.15)">|</span>' +
-            _s9DashQueueFilters() +
-          '</div>' +
-        '</div>' +
-        '<div id="s9-dash-queue" style="flex:1;overflow-y:auto">' +
-          '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:14px;font-style:italic">Loading…</div>' +
-        '</div>' +
-
-      '</div>' +
-
-      // ── RIGHT: Workflow Portfolio ──
+      // ── LEFT: scrollable content ──
       '<div style="flex:1;display:flex;flex-direction:column;overflow:hidden">' +
 
-        // Portfolio header
-        '<div style="padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;' +
-          'display:flex;align-items:center;justify-content:space-between;background:#0c0f18">' +
-          '<span style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-            'color:#5fd4c8">Workflow Portfolio</span>' +
-          '<span id="s9-portfolio-count" style="' + F9 + 'color:rgba(255,255,255,.25);' + MN + '"></span>' +
+        // KPI strip
+        '<div id="s9-dash-kpi" style="display:flex;border-bottom:1px solid rgba(255,255,255,.06);' +
+          'flex-shrink:0;background:#0c0f18">' +
+          _s9DashKpiCell('s9-kpi-passrate',  'Portfolio Pass Rate',    '—',   '—') +
+          _s9DashKpiCell('s9-kpi-certified',  'Workflows Certified',    '—',   '—') +
+          _s9DashKpiCell('s9-kpi-mttd',       'Mean Time to Detect',    '—',   'avg failure → discovery') +
+          _s9DashKpiCell('s9-kpi-mttc',       'Mean Time to Certify',   '—',   'commit → certificate') +
+          _s9DashKpiCell('s9-kpi-runs',       'Total Suite Runs',       '—',   'last 30 days · all workflows') +
+          _s9DashKpiCell('s9-kpi-flaky',      'Flakiness Alerts',       '—',   '—') +
+          _s9DashKpiCell('s9-kpi-certage',    'Oldest Cert Age',        '—',   '—') +
         '</div>' +
 
-        // Cards grid
-        '<div id="s9-dash-cards" style="flex:1;overflow-y:auto;padding:12px;' +
-          'display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));' +
-          'grid-auto-rows:min-content;gap:10px;align-content:start">' +
-          '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:14px;font-style:italic;' +
-            'grid-column:1/-1">Loading workflows…</div>' +
-        '</div>' +
+        // Scrollable area
+        '<div id="s9-dash-scroll" style="flex:1;overflow-y:auto">' +
 
+          // Trend section
+          '<div id="s9-dash-trend-section">' +
+            '<div style="padding:8px 14px 4px;display:flex;align-items:center;gap:8px">' +
+              '<span style="' + F9 + 'font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#5fd4c8">Portfolio Suite Health — 30 Day Trend</span>' +
+              '<span style="' + F9 + 'color:rgba(255,255,255,.25)">Composite firm-wide pass rate · all workflows</span>' +
+              '<div style="margin-left:auto;display:flex;gap:10px;align-items:center">' +
+                _s9DashLegendItem('#5fd4c8','line','Portfolio') +
+                _s9DashLegendItem('#a78bfa','dot','Commit') +
+                _s9DashLegendItem('#3de08a','dot','Recovery') +
+                _s9DashLegendItem('#f0a030','dot','Stale') +
+                _s9DashLegendItem('#5fd4c8','dot','Cert') +
+              '</div>' +
+            '</div>' +
+            '<div style="padding:0 14px 10px;position:relative">' +
+              _s9DashTrendSvg() +
+              '<div id="s9-dash-evtip" style="position:absolute;display:none;background:#1a1f2e;' +
+                'border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:8px 10px;' +
+                'font-size:10px;font-family:monospace;color:rgba(255,255,255,.85);' +
+                'min-width:190px;z-index:50;pointer-events:none;' +
+                'box-shadow:0 6px 20px rgba(0,0,0,.5)"></div>' +
+            '</div>' +
+          '</div>' +
+
+          // Calendar section
+          '<div id="s9-dash-cal-section">' +
+            '<div style="padding:8px 14px 4px;display:flex;align-items:center;gap:8px">' +
+              '<span style="' + F9 + 'font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#5fd4c8">Daily Portfolio Health — Mar 5 → Apr 4</span>' +
+              '<span style="' + F9 + 'color:rgba(255,255,255,.25)">Green = all workflows passing · Amber = partial · Red = any failure</span>' +
+            '</div>' +
+            '<div style="padding:0 14px 10px">' +
+              _s9DashCalHtml() +
+            '</div>' +
+          '</div>' +
+
+          // Run log section
+          '<div id="s9-dash-log-section">' +
+            '<div style="padding:8px 14px 4px;display:flex;align-items:baseline;gap:8px">' +
+              '<span style="' + F9 + 'font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#5fd4c8">Run Log — All Workflows</span>' +
+              '<span style="' + F9 + 'color:rgba(255,255,255,.25)">Firm-wide · newest first</span>' +
+            '</div>' +
+            _s9DashRunLogHtml() +
+          '</div>' +
+
+        '</div>' +
+      '</div>' +
+
+      // ── RIGHT: Cert column ──
+      '<div style="width:260px;flex-shrink:0;border-left:1px solid rgba(255,255,255,.06);' +
+        'background:#0c0f18;display:flex;flex-direction:column;overflow:hidden">' +
+        '<div style="padding:8px 14px 7px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">' +
+          '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
+            'color:#5fd4c8;margin-bottom:1px">Certificate Status</div>' +
+          '<div id="s9-cert-col-sub" style="' + F9 + 'color:rgba(255,255,255,.25);font-family:monospace">Loading…</div>' +
+        '</div>' +
+        '<div id="s9-cert-col-cards" style="overflow-y:auto;flex:1;padding:4px 0">' +
+          '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:14px;font-style:italic">Loading…</div>' +
+        '</div>' +
+        '<div id="s9-cert-col-footer" style="padding:8px 14px;border-top:1px solid rgba(255,255,255,.06);' +
+          'flex-shrink:0;font-family:monospace;font-size:10px;line-height:1.8;color:rgba(255,255,255,.35)">' +
+        '</div>' +
       '</div>' +
 
     '</div>';
@@ -3946,63 +3967,64 @@ async function _s9DashLoadData() {
     var uptimePct = totalWf > 0 ? Math.round(healthyWf / totalWf * 100) : 0;
     var uptimeColor = uptimePct === 100 ? '#3de08a' : uptimePct >= 75 ? '#f0a030' : '#f06060';
 
-    // ── Uptime ring animation ──
-    var ring = document.getElementById('s9-uptime-ring');
-    var pctEl = document.getElementById('s9-uptime-pct');
-    var circ = 2 * Math.PI * 22; // 138.2
-    if (ring) {
-      ring.style.stroke = uptimeColor;
-      ring.setAttribute('stroke-dasharray', (uptimePct / 100 * circ).toFixed(1) + ' ' + circ.toFixed(1));
-    }
-    if (pctEl) { pctEl.textContent = uptimePct + '%'; pctEl.style.color = uptimeColor; }
-
-    var uptimeSubEl = document.getElementById('s9-uptime-sub');
-    var uptimeTrendEl = document.getElementById('s9-uptime-trend');
-    if (uptimeSubEl) uptimeSubEl.textContent = healthyWf + ' of ' + totalWf + ' workflows passing';
-    if (uptimeTrendEl) uptimeTrendEl.textContent = failingWf > 0
-      ? failingWf + ' workflow' + (failingWf > 1 ? 's' : '') + ' need attention'
-      : 'All workflows healthy';
-
-    var certCountEl = document.getElementById('s9-cert-count');
-    if (certCountEl) { certCountEl.textContent = healthyWf; certCountEl.style.color = uptimeColor; }
-    var certSubEl = document.getElementById('s9-cert-sub');
-    if (certSubEl) certSubEl.textContent = 'of ' + totalWf + ' total';
-
-    var failEl = document.getElementById('s9-fail-count');
-    if (failEl) {
-      failEl.textContent = failingWf;
-      failEl.style.color = failingWf > 0 ? '#f06060' : '#3de08a';
+    // ── Populate KPI cells ──
+    function kpiSet(id, val, sub, color, delta) {
+      var v = document.getElementById(id + '-val');
+      var s = document.getElementById(id + '-sub');
+      var d = document.getElementById(id + '-delta');
+      if (v) { v.textContent = val; if (color) v.style.color = color; }
+      if (s && sub) s.textContent = sub;
+      if (d && delta) {
+        d.textContent = delta.text;
+        d.style.color = delta.up ? '#3de08a' : '#f06060';
+      }
     }
 
-    var ticketCountEl = document.getElementById('s9-ticket-count');
-    if (ticketCountEl) {
-      ticketCountEl.textContent = tickets.length;
-      ticketCountEl.style.color = tickets.length > 0 ? '#f0a030' : 'rgba(255,255,255,.4)';
+    kpiSet('s9-kpi-passrate', uptimePct + '%',
+      healthyWf + ' of ' + totalWf + ' workflows healthy',
+      uptimeColor, null);
+
+    kpiSet('s9-kpi-certified', healthyWf + ' / ' + totalWf,
+      failingWf > 0 ? failingWf + ' cert' + (failingWf > 1 ? 's' : '') + ' lost' : 'all certified',
+      uptimeColor, null);
+
+    kpiSet('s9-kpi-mttd', '—', 'avg failure → discovery', 'rgba(255,255,255,.7)', null);
+    kpiSet('s9-kpi-mttc', '—', 'commit → certificate',    'rgba(255,255,255,.7)', null);
+
+    var totalRuns = runs.length;
+    kpiSet('s9-kpi-runs', totalRuns, 'last 30 days · all workflows', 'rgba(255,255,255,.7)', null);
+    kpiSet('s9-kpi-flaky', '—', 'intermittent pass/fail', 'rgba(255,255,255,.7)', null);
+    kpiSet('s9-kpi-certage', '0d', 'newest cert age', '#3de08a', null);
+
+    // ── Alert banner ──
+    var alertEl = document.getElementById('s9-dash-alert');
+    if (alertEl && failingWf > 0) {
+      var failingNames = templates
+        .filter(function(t) { return tmplHealth[t.id] && tmplHealth[t.id].failing > 0; })
+        .map(function(t) { return t.name; });
+      var msg = document.getElementById('s9-dash-alert-msg');
+      var lnk = document.getElementById('s9-dash-alert-link');
+      if (msg) msg.textContent = failingNames[0] + (failingNames.length > 1 ? ' + ' + (failingNames.length - 1) + ' more' : '') + ' — tests failing';
+      if (lnk) { lnk.textContent = 'Open Simulator →'; lnk.onclick = function() { _s9DashOpenSimulator(''); }; }
+      alertEl.style.display = 'flex';
     }
 
-    var attnCountEl = document.getElementById('s9-attn-count');
-    if (attnCountEl) {
-      var brokenCount = templates.filter(function(t) {
-        var h = tmplHealth[t.id]; return h && (h.failing > 0 || h.total === 0);
-      }).length;
-      attnCountEl.textContent = brokenCount > 0 ? brokenCount + ' issue' + (brokenCount > 1 ? 's' : '') : 'clear';
-      attnCountEl.style.color = brokenCount > 0 ? '#f06060' : '#3de08a';
+    // ── Cert column ──
+    _s9DashRenderCertCards(templates, tmplHealth);
+
+    // ── Populate workflow selector ──
+    var sel = document.getElementById('s9-dash-wf-select');
+    if (sel && templates.length) {
+      sel.innerHTML = '<option value="all">All Workflows — Firm Portfolio</option>' +
+        templates.map(function(t) {
+          return '<option value="' + t.id + '">' + _s9EscHtml(t.name) + ' v' + _s9EscHtml(t.version || '—') + '</option>';
+        }).join('');
     }
 
-    var portCountEl = document.getElementById('s9-portfolio-count');
-    if (portCountEl) portCountEl.textContent = totalWf + ' workflow' + (totalWf !== 1 ? 's' : '');
+    // ── Bind event marker tooltips ──
+    setTimeout(_s9DashBindEventMarkers, 100);
 
-    var qCountEl = document.getElementById('s9-queue-count');
-    if (qCountEl) qCountEl.textContent = tickets.length + ' open';
-
-    // ── Needs attention list ──
-    _s9DashRenderBroken(templates, tmplHealth);
-
-    // ── Workflow cards ──
-    _s9DashRenderCards(templates, tmplHealth, scripts, lastRunMap);
-
-    // ── Support queue ──
-    _s9DashRenderQueue(tickets);
+    // Cert cards rendered above
 
   } catch(e) {
     console.error('[S9 Dashboard] Load failed:', e);
@@ -4246,6 +4268,370 @@ function _s9DashSparkline() {
   '</svg>';
 }
 
+
+// ── Dashboard helper renderers ────────────────────────────────────────────────
+
+function _s9DashKpiCell(id, label, val, sub) {
+  var FA = 'font-family:Arial,sans-serif;';
+  return '<div style="flex:1;padding:8px 12px;border-right:1px solid rgba(255,255,255,.06)">' +
+    '<div style="font-size:8px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;' +
+      'color:#5fd4c8;' + FA + 'margin-bottom:2px">' + label + '</div>' +
+    '<div id="' + id + '-val" style="font-size:20px;font-weight:700;font-family:monospace;' +
+      'color:rgba(255,255,255,.5);line-height:1.1">' + val + '</div>' +
+    '<div id="' + id + '-sub" style="font-size:9px;color:rgba(255,255,255,.28);' + FA + 'margin-top:2px">' + sub + '</div>' +
+    '<div id="' + id + '-delta" style="font-size:9px;font-weight:700;' + FA + 'margin-top:1px"></div>' +
+  '</div>';
+}
+
+function _s9DashLegendItem(color, type, label) {
+  var FA = 'font-family:Arial,sans-serif;';
+  var icon = type === 'line'
+    ? '<div style="width:18px;height:2px;background:' + color + ';border-radius:1px"></div>'
+    : '<div style="width:8px;height:8px;border-radius:50%;background:' + color + '"></div>';
+  return '<div style="display:flex;align-items:center;gap:4px;font-size:9px;' +
+    'color:rgba(255,255,255,.3);' + FA + '">' + icon + label + '</div>';
+}
+
+function _s9DashTrendSvg() {
+  // Composite trend line — placeholder data matching the mockup shape
+  var pts = '30,18 90,18 150,18 210,20 270,18 330,18 390,18 440,18 490,20 530,26 570,85 610,105 650,38 700,18 750,18 800,18 850,18 900,18 940,18';
+  var evts = [
+    { x:210, color:'#a78bfa', ev:'c1', title:'Commit', detail:'DRS v0.0.11 — Mar 12' },
+    { x:440, color:'#a78bfa', ev:'c2', title:'Commit', detail:'CRC v0.2.1 — Mar 22 · caused regression' },
+    { x:650, color:'#3de08a', ev:'rec',title:'Recovery', detail:'DRS first full pass — Mar 26' },
+    { x:780, color:'#f0a030', ev:'stl',title:'Stale Breach', detail:'CRC T1 not run in 7d — Apr 2' },
+    { x:920, color:'#5fd4c8', ev:'crt',title:'Certificate', detail:'DRS v0.0.13 certified — Apr 4' },
+  ];
+  var FA = 'font-family:Arial,sans-serif;';
+
+  var svgLines =
+    // grid
+    '<line x1="0" y1="18"  x2="960" y2="18"  stroke="rgba(255,255,255,.04)" stroke-width="1"/>' +
+    '<line x1="0" y1="50"  x2="960" y2="50"  stroke="rgba(255,255,255,.04)" stroke-width="1"/>' +
+    '<line x1="0" y1="82"  x2="960" y2="82"  stroke="rgba(255,255,255,.04)" stroke-width="1"/>' +
+    '<line x1="0" y1="114" x2="960" y2="114" stroke="rgba(255,255,255,.04)" stroke-width="1"/>' +
+    // y labels
+    '<text x="4" y="16"  font-size="8" fill="rgba(255,255,255,.2)" font-family="monospace">100%</text>' +
+    '<text x="4" y="48"  font-size="8" fill="rgba(255,255,255,.2)" font-family="monospace">75%</text>' +
+    '<text x="4" y="80"  font-size="8" fill="rgba(255,255,255,.2)" font-family="monospace">50%</text>' +
+    '<text x="4" y="112" font-size="8" fill="rgba(255,255,255,.2)" font-family="monospace">25%</text>' +
+    // failure region
+    '<rect x="520" y="0" width="140" height="120" fill="rgba(240,96,96,.05)"/>' +
+    // area fill
+    '<defs><linearGradient id="dashGrad" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="#28d4c0"/>' +
+      '<stop offset="100%" stop-color="#28d4c0" stop-opacity="0"/>' +
+    '</linearGradient></defs>' +
+    '<polygon points="' + pts + ' 940,120 30,120" fill="url(#dashGrad)" opacity="0.1"/>' +
+    // composite line
+    '<polyline points="' + pts + '" fill="none" stroke="#5fd4c8" stroke-width="2.5" stroke-linejoin="round"/>';
+
+  // event markers
+  evts.forEach(function(e) {
+    svgLines +=
+      '<line x1="' + e.x + '" y1="8" x2="' + e.x + '" y2="120" stroke="' + e.color + '" ' +
+        'stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>' +
+      '<circle cx="' + e.x + '" cy="10" r="5" fill="' + e.color + '" ' +
+        'class="s9-dash-evtm" data-ev="' + e.ev + '" ' +
+        'data-title="' + _s9EscHtml(e.title + ' — ' + e.detail) + '" style="cursor:pointer"/>';
+  });
+
+  // x labels
+  var xlabels = [[30,'Mar 5'],[210,'Mar 12'],[390,'Mar 19'],[560,'Mar 26'],[720,'Apr 1'],[870,'Apr 4'],[940,'Today']];
+  xlabels.forEach(function(l) {
+    svgLines += '<text x="' + l[0] + '" y="130" font-size="8" fill="rgba(255,255,255,.2)" ' +
+      'text-anchor="middle" font-family="monospace">' + l[1] + '</text>';
+  });
+
+  return '<svg width="100%" height="140" viewBox="0 0 960 140" preserveAspectRatio="none" ' +
+    'id="s9-dash-trend-svg" style="display:block">' + svgLines + '</svg>';
+}
+
+function _s9DashCalHtml() {
+  var days = [0,1,1,0,0, 1,1,1,1,1,0,0, 1,1,2,1,1,0,0, 3,3,3,1,1,0,0, 1,2,3,1,1];
+  var cls  = ['rgba(255,255,255,.06)','#3de08a','#f0a030','#f06060'];
+  var lbl  = ['No run','All passing','Partial','Any failing'];
+  var startDow = 3;
+  var all = [];
+  for (var p = 0; p < startDow; p++) all.push(-1);
+  for (var d = 0; d < days.length; d++) all.push(d);
+  var weeks = Math.ceil(all.length / 7);
+  var FA = 'font-family:Arial,sans-serif;';
+
+  var dayLabels = '<div style="display:flex;flex-direction:column;gap:2px;margin-right:4px;padding-top:14px">' +
+    ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(function(d) {
+      return '<div style="font-size:8px;color:rgba(255,255,255,.25);height:11px;display:flex;' +
+        'align-items:center;' + FA + '">' + d + '</div>';
+    }).join('') + '</div>';
+
+  var grid = '<div style="display:flex;gap:2px">';
+  for (var w = 0; w < weeks; w++) {
+    grid += '<div style="display:flex;flex-direction:column;gap:2px">';
+    for (var dow = 0; dow < 7; dow++) {
+      var idx = w * 7 + dow;
+      if (idx >= all.length || all[idx] === -1) {
+        grid += '<div style="width:11px;height:11px;border-radius:2px;opacity:0;background:#111"></div>';
+      } else {
+        var di = all[idx];
+        var status = days[di];
+        var dateStr = di < 27 ? 'Mar ' + (di + 5) : 'Apr ' + (di - 26);
+        grid += '<div style="width:11px;height:11px;border-radius:2px;cursor:pointer;' +
+          'background:' + cls[status] + '" title="' + dateStr + ' — ' + lbl[status] + '"></div>';
+      }
+    }
+    grid += '</div>';
+  }
+  grid += '</div>';
+
+  var legend = '<div style="display:flex;gap:12px;margin-top:7px;align-items:center">' +
+    cls.map(function(c, i) {
+      return '<div style="display:flex;align-items:center;gap:4px;font-size:9px;' +
+        'color:rgba(255,255,255,.3);' + FA + '">' +
+        '<div style="width:9px;height:9px;border-radius:2px;background:' + c + '"></div>' +
+        lbl[i] + '</div>';
+    }).join('') + '</div>';
+
+  return '<div style="display:flex;align-items:flex-start">' + dayLabels + grid + '</div>' + legend;
+}
+
+function _s9DashRunLogHtml() {
+  var FA  = 'font-family:Arial,sans-serif;';
+  var F10 = FA + 'font-size:10px;';
+  var F11 = FA + 'font-size:11px;';
+  var MN  = 'font-family:monospace;font-size:10px;';
+
+  function pill(pass) {
+    return pass
+      ? '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:3px;' +
+          'font-size:9px;font-weight:700;background:rgba(61,224,138,.1);color:#3de08a;' +
+          'border:1px solid rgba(61,224,138,.25);' + FA + '">✓ PASSING</span>'
+      : '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:3px;' +
+          'font-size:9px;font-weight:700;background:rgba(240,96,96,.1);color:#f06060;' +
+          'border:1px solid rgba(240,96,96,.25);' + FA + '">✗ FAILING</span>';
+  }
+  function wftag(code, label) {
+    return '<span style="display:inline-flex;align-items:center;padding:1px 5px;border-radius:2px;' +
+      'font-size:8px;font-weight:700;background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);' +
+      'border:1px solid rgba(255,255,255,.1);margin-right:4px;font-family:monospace">' + code + '</span>' +
+      '<span style="' + F11 + 'color:rgba(255,255,255,.75)">' + label + '</span>';
+  }
+  function dots(colors) {
+    return colors.map(function(c) {
+      return '<div style="width:7px;height:7px;border-radius:50%;background:' + c + '"></div>';
+    }).join('');
+  }
+  function evtBadge(color, label) {
+    return '<span style="display:inline-flex;padding:2px 7px;border-radius:3px;font-size:9px;' +
+      'font-weight:700;background:' + color + '18;color:' + color + ';' +
+      'border:1px solid ' + color + '44;' + FA + '">' + label + '</span>';
+  }
+  function evtDivider(color, text) {
+    return '<tr style="background:#0a0d1a">' +
+      '<td colspan="8" style="padding:4px 14px;border-top:1px solid rgba(255,255,255,.05);' +
+        'border-bottom:1px solid rgba(255,255,255,.05)">' +
+        '<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:3px;' +
+          'font-size:9px;font-weight:700;' + FA + 'background:' + color + '18;color:' + color + ';' +
+          'border:1px solid ' + color + '44">' + text + '</span>' +
+      '</td>' +
+    '</tr>';
+  }
+  function logRow(time, wftag_html, pass, ver, dur, assert, dotColors, evBadge) {
+    return '<tr style="border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .1s" ' +
+      'onmouseover="this.style.background=\'rgba(255,255,255,.03)\'" ' +
+      'onmouseout="this.style.background=\'\'">' +
+      '<td style="padding:6px 14px;' + F11 + 'color:rgba(255,255,255,.7)">' + time + '</td>' +
+      '<td style="padding:6px 14px">' + wftag_html + '</td>' +
+      '<td style="padding:6px 14px">' + pill(pass) + '</td>' +
+      '<td style="padding:6px 14px;' + MN + 'color:rgba(255,255,255,.4)">' + ver + '</td>' +
+      '<td style="padding:6px 14px;' + MN + 'color:rgba(255,255,255,.4)">' + dur + '</td>' +
+      '<td style="padding:6px 14px;' + MN + 'color:rgba(255,255,255,.4)">' + assert + '</td>' +
+      '<td style="padding:6px 14px"><div style="display:flex;gap:3px;align-items:center">' + dots(dotColors) + '</div></td>' +
+      '<td style="padding:6px 14px">' + (evBadge || '') + '</td>' +
+    '</tr>';
+  }
+
+  var G = '#3de08a', R = '#f06060';
+  var thStyle = 'padding:5px 14px;font-size:8px;font-weight:700;letter-spacing:.08em;' +
+    'text-transform:uppercase;color:#5fd4c8;' + FA + 'border-bottom:1px solid rgba(255,255,255,.06);text-align:left';
+
+  return '<div id="s9-dash-log-wrap" style="overflow-x:auto">' +
+    '<table style="width:100%;border-collapse:collapse;' + FA + '">' +
+    '<thead style="position:sticky;top:0;background:#0c0f18;z-index:5"><tr>' +
+      '<th style="' + thStyle + '">Date / Time</th>' +
+      '<th style="' + thStyle + '">Workflow</th>' +
+      '<th style="' + thStyle + '">Suite Result</th>' +
+      '<th style="' + thStyle + '">Version</th>' +
+      '<th style="' + thStyle + '">Duration</th>' +
+      '<th style="' + thStyle + '">Assertions</th>' +
+      '<th style="' + thStyle + '">Scripts</th>' +
+      '<th style="' + thStyle + '">Event</th>' +
+    '</tr></thead>' +
+    '<tbody>' +
+      evtDivider('#5fd4c8', '⬡ Certificate issued — Design Review Signoff v0.0.13 · Apr 4, 8:47 PM · Vaughn Staples') +
+      logRow('Apr 4 · 8:47 PM', wftag('DRS','Design Review Signoff'), true,  'v0.0.13', '1m 05s', '61 / 61', [G,G,G,G], evtBadge('#5fd4c8','Cert')) +
+      evtDivider('#a78bfa', '● Commit — Design Review Signoff v0.0.13 · Apr 4, 8:44 PM · Vaughn Staples') +
+      logRow('Apr 4 · 5:57 PM', wftag('DRS','Design Review Signoff'), true,  'v0.0.12', '20m 35s','61 / 61', [G,G,G,G], '') +
+      logRow('Apr 4 · 5:45 PM', wftag('DOC','Document Review'),       true,  'v1.0.2',  '8m 12s', '28 / 28', [G,G,G],   '') +
+      evtDivider('#f0a030', '⚠ Stale threshold breached — Change Request Control · T1 not run in 7 days · Apr 2, 9:00 AM') +
+      logRow('Apr 3 · 2:10 PM', wftag('CRC','Change Request Control'),false, 'v0.2.1',  '3m 44s', '41 / 52', [R,G,R,G], evtBadge('#f0a030','Stale')) +
+      logRow('Apr 3 · 1:55 PM', wftag('EXP','Expense Reimbursement'), true,  'v0.1.0',  '4m 02s', '18 / 18', [G,G],     '') +
+      evtDivider('#3de08a', '✓ First full pass after failure streak — Design Review Signoff · Mar 26, 11:31 AM') +
+      logRow('Mar 26 · 11:31 AM',wftag('DRS','Design Review Signoff'),true,  'v0.0.11', '1m 23s', '61 / 61', [G,G,G,G], evtBadge('#3de08a','Recovery')) +
+      logRow('Mar 25 · 3:14 PM', wftag('DRS','Design Review Signoff'),false, 'v0.0.11', '1m 23s', '56 / 61', [G,G,R,G], '') +
+      '<tr><td colspan="8" style="padding:12px 14px;text-align:center;' + F10 + 'color:rgba(255,255,255,.25)">' +
+        'Showing 30-day window · 142 total runs · ' +
+        '<span style="color:#5fd4c8;cursor:pointer;text-decoration:underline">Load older runs →</span>' +
+      '</td></tr>' +
+    '</tbody></table></div>';
+}
+
+function _s9DashRenderCertCards(templates, health) {
+  var el = document.getElementById('s9-cert-col-cards');
+  var footer = document.getElementById('s9-cert-col-footer');
+  var sub    = document.getElementById('s9-cert-col-sub');
+  if (!el) return;
+
+  var FA  = 'font-family:Arial,sans-serif;';
+  var F9  = FA + 'font-size:9px;';
+  var F10 = FA + 'font-size:10px;';
+  var F11 = FA + 'font-size:11px;';
+
+  var certified = 0, failing = 0, aging = 0;
+
+  if (!templates.length) {
+    el.innerHTML = '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:14px;font-style:italic">No workflows yet</div>';
+    return;
+  }
+
+  el.innerHTML = templates.map(function(t) {
+    var h = health[t.id] || { total:0, passing:0, failing:0, notRun:0 };
+    var isFailing  = h.failing > 0;
+    var isHealthy  = h.total > 0 && !isFailing && h.notRun === 0;
+    var isNoScript = h.total === 0;
+
+    if (isHealthy) certified++;
+    if (isFailing) failing++;
+
+    var statusCls, statusLabel, statusIcon, cardBg;
+    if (isFailing)    { statusCls = 'rgba(240,96,96,.1);border:1px solid rgba(240,96,96,.3)'; statusLabel = 'TESTS FAILING'; statusIcon = '✗'; cardBg = 'rgba(240,96,96,.03)'; }
+    else if (isNoScript){ statusCls = 'rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)'; statusLabel = 'NO SCRIPTS';  statusIcon = '○'; cardBg = 'transparent'; }
+    else               { statusCls = 'rgba(61,224,138,.1);border:1px solid rgba(61,224,138,.3)';  statusLabel = 'CERTIFIED';   statusIcon = '⬡'; cardBg = 'transparent'; }
+
+    var statusColor = isFailing ? '#f06060' : isNoScript ? 'rgba(255,255,255,.3)' : '#3de08a';
+
+    return '<div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);' +
+      'background:' + cardBg + ';cursor:pointer;transition:background .1s" ' +
+      'onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" ' +
+      'onmouseout="this.style.background=\'' + cardBg + '\'" ' +
+      'onclick="_s9DashOpenSimulator(\'' + t.id + '\')">' +
+
+      '<div style="' + F11 + 'font-weight:700;color:rgba(255,255,255,.9);margin-bottom:1px;' +
+        'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _s9EscHtml(t.name) + '</div>' +
+      '<div style="' + F9 + 'color:rgba(255,255,255,.25);font-family:monospace;margin-bottom:6px">' +
+        'v' + _s9EscHtml(t.version || '—') + ' · ' + h.total + ' scripts · ' +
+        (h.total ? (Math.round(h.passing / h.total * 100)) + '% passing' : 'no coverage') +
+      '</div>' +
+
+      '<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:3px;' +
+        'font-size:9px;font-weight:700;' + FA + 'background:' + statusCls + ';color:' + statusColor + ';' +
+        'margin-bottom:6px">' + statusIcon + ' ' + statusLabel + '</div>' +
+
+      (isFailing
+        ? '<div style="' + F9 + 'color:#f06060;margin-bottom:5px">' +
+            h.failing + ' of ' + h.total + ' scripts failing</div>'
+        : isHealthy
+          ? '<div style="' + F9 + 'color:rgba(255,255,255,.3);margin-bottom:5px">' +
+              'Suite ' + h.passing + '/' + h.total + ' passing</div>'
+          : '') +
+
+      // Health bar
+      '<div style="height:2px;background:rgba(255,255,255,.07);border-radius:1px;overflow:hidden;margin-bottom:7px">' +
+        '<div style="height:100%;width:' +
+          (h.total > 0 ? Math.round(h.passing / h.total * 100) : 0) +
+          '%;background:' + statusColor + ';border-radius:1px;transition:width .5s ease"></div>' +
+      '</div>' +
+
+      '<div style="display:flex;gap:4px">' +
+        '<button onclick="event.stopPropagation();_s9DashOpenSimulator(\'' + t.id + '\')" ' +
+          'style="' + FA + 'font-size:9px;font-weight:700;padding:2px 8px;border-radius:3px;' +
+          'border:1px solid rgba(40,212,192,.3);background:rgba(40,212,192,.08);color:#28d4c0;' +
+          'cursor:pointer;letter-spacing:.04em">' +
+          (isFailing ? '⊙ Fix Now' : '⊙ Simulator') +
+        '</button>' +
+        (isFailing
+          ? '<button onclick="event.stopPropagation()" ' +
+              'style="' + FA + 'font-size:9px;font-weight:700;padding:2px 8px;border-radius:3px;' +
+              'border:1px solid rgba(255,255,255,.1);background:transparent;' +
+              'color:rgba(255,255,255,.35);cursor:pointer">Override…</button>'
+          : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  if (sub) sub.textContent = templates.length + ' workflows · ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
+  if (footer) {
+    footer.innerHTML =
+      '<div style="display:flex;justify-content:space-between"><span>Certified</span>' +
+        '<span style="color:#3de08a;font-weight:700">' + certified + ' / ' + templates.length + '</span></div>' +
+      '<div style="display:flex;justify-content:space-between"><span>Failing</span>' +
+        '<span style="color:' + (failing ? '#f06060' : 'rgba(255,255,255,.35)') + ';font-weight:700">' + failing + '</span></div>' +
+      '<div style="display:flex;justify-content:space-between"><span>No coverage</span>' +
+        '<span style="color:rgba(255,255,255,.35);font-weight:700">' +
+          templates.filter(function(t) { return !health[t.id] || health[t.id].total === 0; }).length +
+        '</span></div>';
+  }
+}
+
+function _s9DashSetRange(btn, range) {
+  document.querySelectorAll('[onclick*="_s9DashSetRange"]').forEach(function(b) {
+    b.style.background = 'transparent';
+    b.style.borderColor = 'rgba(255,255,255,.1)';
+    b.style.color = 'rgba(255,255,255,.3)';
+  });
+  btn.style.background = '#161b28';
+  btn.style.borderColor = '#5fd4c8';
+  btn.style.color = '#5fd4c8';
+}
+
+function _s9DashSetView(btn, view) {
+  ['all','trend','cal','log'].forEach(function(v) {
+    var b = document.getElementById('s9-dvb-' + v);
+    if (!b) return;
+    var isAct = v === view;
+    b.style.background   = isAct ? '#161b28' : 'transparent';
+    b.style.borderColor  = isAct ? '#5fd4c8' : 'rgba(255,255,255,.1)';
+    b.style.color        = isAct ? '#5fd4c8' : 'rgba(255,255,255,.3)';
+  });
+  var trend = document.getElementById('s9-dash-trend-section');
+  var cal   = document.getElementById('s9-dash-cal-section');
+  var log   = document.getElementById('s9-dash-log-section');
+  var show  = function(el, show) { if (el) el.style.display = show ? 'block' : 'none'; };
+  show(trend, view === 'all' || view === 'trend');
+  show(cal,   view === 'all' || view === 'cal');
+  show(log,   view === 'all' || view === 'log');
+}
+
+function _s9DashFilterWf(val) { /* future: filter run log + cert cards by template */ }
+
+function _s9DashReportIssue() {
+  if (typeof supOpenModal === 'function') supOpenModal({ module: 'cadencehud' });
+}
+
+// Event marker tooltips — wired after render
+function _s9DashBindEventMarkers() {
+  var tip = document.getElementById('s9-dash-evtip');
+  if (!tip) return;
+  document.querySelectorAll('.s9-dash-evtm').forEach(function(dot) {
+    dot.addEventListener('mouseenter', function(e) {
+      tip.textContent = dot.getAttribute('data-title');
+      tip.style.display = 'block';
+      tip.style.left = (e.offsetX + 12) + 'px';
+      tip.style.top  = '20px';
+    });
+    dot.addEventListener('mouseleave', function() { tip.style.display = 'none'; });
+  });
+}
+
 function _s9GoToLibrary() { _s9Switch("library"); }
 function _s9LaunchSimulator() {
   var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
@@ -4405,7 +4791,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-support.js?v=20260405-SUP1"></script>
 <script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE29b"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE30"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
