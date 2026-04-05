@@ -3871,8 +3871,8 @@ async function _s9RenderDashboard(panel) {
               '<span style="' + F9 + 'font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#5fd4c8">Daily Portfolio Health — Mar 5 → Apr 4</span>' +
               '<span style="' + F9 + 'color:rgba(255,255,255,.25)">Green = all workflows passing · Amber = partial · Red = any failure</span>' +
             '</div>' +
-            '<div style="padding:0 14px 10px">' +
-              _s9DashCalHtml() +
+            '<div style="padding:0 14px 10px" id="s9-dash-cal-inner">' +
+              _s9DashCalHtml(null) +
             '</div>' +
           '</div>' +
 
@@ -4008,6 +4008,25 @@ async function _s9DashLoadData() {
       if (lnk) { lnk.textContent = 'Open Simulator →'; lnk.onclick = function() { _s9DashOpenSimulator(''); }; }
       alertEl.style.display = 'flex';
     }
+
+    // ── Build dayMap for calendar ──
+    var dayMap = {};
+    runs.forEach(function(r) {
+      if (!r.run_at) return;
+      var d = new Date(r.run_at);
+      d.setHours(0,0,0,0);
+      var key = d.getFullYear() + '-' +
+        String(d.getMonth()+1).padStart(2,'0') + '-' +
+        String(d.getDate()).padStart(2,'0');
+      if (!dayMap[key]) dayMap[key] = { pass:0, fail:0, total:0 };
+      dayMap[key].total++;
+      if (r.status === 'passed') dayMap[key].pass++;
+      else if (r.status === 'failed' || r.status === 'error') dayMap[key].fail++;
+    });
+
+    // Re-render calendar with real data
+    var calInner = document.getElementById('s9-dash-cal-inner');
+    if (calInner) calInner.innerHTML = _s9DashCalHtml(dayMap);
 
     // ── Cert column ──
     _s9DashRenderCertCards(templates, tmplHealth);
@@ -4347,51 +4366,86 @@ function _s9DashTrendSvg() {
     'id="s9-dash-trend-svg" style="display:block">' + svgLines + '</svg>';
 }
 
-function _s9DashCalHtml() {
-  var days = [0,1,1,0,0, 1,1,1,1,1,0,0, 1,1,2,1,1,0,0, 3,3,3,1,1,0,0, 1,2,3,1,1];
-  var cls  = ['rgba(255,255,255,.06)','#3de08a','#f0a030','#f06060'];
-  var lbl  = ['No run','All passing','Partial','Any failing'];
-  var startDow = 3;
-  var all = [];
-  for (var p = 0; p < startDow; p++) all.push(-1);
-  for (var d = 0; d < days.length; d++) all.push(d);
-  var weeks = Math.ceil(all.length / 7);
-  var FA = 'font-family:Arial,sans-serif;';
+function _s9DashCalHtml(dayMap) {
+  var FA  = 'font-family:Arial,sans-serif;';
+  var cls = ['rgba(255,255,255,.06)', '#3de08a', '#f0a030', '#f06060'];
+  var lbl = ['No runs', 'All passing', 'Partial pass', 'Any failing'];
 
-  var dayLabels = '<div style="display:flex;flex-direction:column;gap:2px;margin-right:4px;padding-top:14px">' +
-    ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(function(d) {
-      return '<div style="font-size:12px;color:rgba(255,255,255,.25);height:11px;display:flex;' +
-        'align-items:center;' + FA + '">' + d + '</div>';
+  var today = new Date(); today.setHours(0,0,0,0);
+  var dates = [];
+  for (var i = 29; i >= 0; i--) {
+    var d = new Date(today); d.setDate(d.getDate() - i); dates.push(d);
+  }
+  var startDow = (dates[0].getDay() + 6) % 7;
+  var all = [];
+  for (var p = 0; p < startDow; p++) all.push(null);
+  for (var di = 0; di < dates.length; di++) all.push(dates[di]);
+  var weeks = Math.ceil(all.length / 7);
+
+  function dateKey(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function statusOf(d) {
+    if (!d || !dayMap) return 0;
+    var e = dayMap[dateKey(d)];
+    if (!e || e.total === 0) return 0;
+    if (e.fail > 0 && e.pass === 0) return 3;
+    if (e.fail > 0) return 2;
+    return 1;
+  }
+  function tipFor(d, st) {
+    var base = d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) + ' — ' + lbl[st];
+    if (!dayMap) return base + '&#10;No data loaded yet';
+    var e = dayMap[dateKey(d)];
+    if (!e || e.total === 0) return base + '&#10;No test runs recorded this day';
+    return base + '&#10;' + e.pass + ' passing · ' + e.fail + ' failing&#10;' + e.total + ' run' + (e.total!==1?'s':'') + ' across all workflows';
+  }
+
+  var dayLabels = '<div style="display:flex;flex-direction:column;gap:3px;margin-right:6px;padding-top:16px">' +
+    ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(function(dl) {
+      return '<div style="font-size:12px;color:rgba(255,255,255,.3);height:13px;display:flex;align-items:center;' + FA + '">' + dl + '</div>';
     }).join('') + '</div>';
 
-  var grid = '<div style="display:flex;gap:2px">';
+  var grid = '<div style="display:flex;gap:3px">';
+  var lastMonth = -1;
+  var monthRow = '<div style="display:flex;gap:3px;margin-bottom:3px">';
   for (var w = 0; w < weeks; w++) {
-    grid += '<div style="display:flex;flex-direction:column;gap:2px">';
+    // Month label
+    var firstCell = null;
+    for (var d2=0;d2<7;d2++){var i2=w*7+d2;if(i2<all.length&&all[i2]){firstCell=all[i2];break;}}
+    if (firstCell && firstCell.getMonth()!==lastMonth){lastMonth=firstCell.getMonth();monthRow+='<div style="width:16px;font-size:12px;color:rgba(255,255,255,.3);'+FA+'">'+firstCell.toLocaleDateString('en-US',{month:'short'})+'</div>';}
+    else monthRow+='<div style="width:16px"></div>';
+
+    grid += '<div style="display:flex;flex-direction:column;gap:3px">';
     for (var dow = 0; dow < 7; dow++) {
-      var idx = w * 7 + dow;
-      if (idx >= all.length || all[idx] === -1) {
-        grid += '<div style="width:11px;height:11px;border-radius:2px;opacity:0;background:#111"></div>';
+      var idx = w*7+dow;
+      var cell = idx < all.length ? all[idx] : null;
+      if (!cell) {
+        grid += '<div style="width:13px;height:13px;border-radius:2px;opacity:0"></div>';
       } else {
-        var di = all[idx];
-        var status = days[di];
-        var dateStr = di < 27 ? 'Mar ' + (di + 5) : 'Apr ' + (di - 26);
-        grid += '<div style="width:11px;height:11px;border-radius:2px;cursor:pointer;' +
-          'background:' + cls[status] + '" title="' + dateStr + ' — ' + lbl[status] + '"></div>';
+        var st = statusOf(cell);
+        var tip = tipFor(cell, st);
+        grid += '<div style="width:13px;height:13px;border-radius:2px;cursor:pointer;' +
+          'transition:transform .1s;background:' + cls[st] + '" title="' + tip + '" ' +
+          'onmouseover="this.style.transform=\'scale(1.6)\';this.style.position=\'relative\';this.style.zIndex=\'10\'" ' +
+          'onmouseout="this.style.transform=\'\';this.style.position=\'\';this.style.zIndex=\'\'"></div>';
       }
     }
     grid += '</div>';
   }
+  monthRow += '</div>';
   grid += '</div>';
 
-  var legend = '<div style="display:flex;gap:12px;margin-top:7px;align-items:center">' +
-    cls.map(function(c, i) {
-      return '<div style="display:flex;align-items:center;gap:4px;font-size:12px;' +
-        'color:rgba(255,255,255,.3);' + FA + '">' +
-        '<div style="width:9px;height:9px;border-radius:2px;background:' + c + '"></div>' +
-        lbl[i] + '</div>';
-    }).join('') + '</div>';
+  var legend = '<div style="display:flex;gap:14px;margin-top:8px;align-items:center;flex-wrap:wrap">' +
+    cls.map(function(c,i){
+      return '<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,.4);' + FA + '">' +
+        '<div style="width:11px;height:11px;border-radius:2px;background:' + c + '"></div>' + lbl[i] + '</div>';
+    }).join('') +
+    '<span style="font-size:12px;color:rgba(255,255,255,.2);' + FA + 'margin-left:4px">· hover cells for details</span>' +
+  '</div>';
 
-  return '<div style="display:flex;align-items:flex-start">' + dayLabels + grid + '</div>' + legend;
+  return '<div><div style="display:flex;align-items:flex-start">' + dayLabels +
+    '<div>' + monthRow + grid + '</div></div>' + legend + '</div>';
 }
 
 function _s9DashRunLogHtml() {
@@ -4791,7 +4845,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-support.js?v=20260405-SUP1"></script>
 <script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE30c"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE30d"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
