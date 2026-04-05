@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-dashboard.js  ·  v20260406-CD2
+// cdn-dashboard.js  ·  v20260406-CD3
 // CadenceHUD — Process Certification Portfolio Dashboard
 //
 // Layout: KPI strip → Cert Portfolio grid (main) + Right rail (health + requests + CoC)
@@ -11,7 +11,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260406-CD2 — Portfolio grid · focused scope','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260406-CD3 — bist_runs join via script_id · portfolio grid fix','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -323,7 +323,7 @@ async function _cdLoadAll() {
 async function _cdLoadKpiAndHealth(firmId) {
   try {
     var results = await Promise.all([
-      _cdQ('bist_runs', { filters:[['firm_id','eq',firmId]], order:'run_at.desc', limit:50, select:'id,status,run_at,duration_ms,template_id' }),
+      _cdQ('bist_runs', { filters:[['firm_id','eq',firmId]], order:'run_at.desc', limit:100, select:'id,status,run_at,duration_ms,script_id' }),
       _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]], order:'issued_at.desc', select:'id,status,issued_at,template_id,template_version,workflow_templates(name)' }),
       _cdQ('health_scores', { filters:[['firm_id','eq',firmId]], order:'calculated_at.desc', limit:7, select:'id,composite_score,domain_scores,calculated_at' })
     ]);
@@ -511,18 +511,27 @@ async function _cdLoadPortfolio(firmId) {
       _cdQ('workflow_templates', { filters:[['firm_id','eq',firmId]], select:'id,name,version,status,updated_at,created_at' }),
       _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]], order:'issued_at.desc', select:'id,status,template_id,template_version,issued_at,certified_by_name' }),
       _cdQ('bist_test_scripts', { filters:[['firm_id','eq',firmId]], select:'id,template_id,name' }),
-      _cdQ('bist_runs', { filters:[['firm_id','eq',firmId]], order:'run_at.desc', limit:100, select:'id,status,template_id,run_at,steps_passed,steps_failed' }),
       _cdQ('bist_coverage_paths', { filters:[['firm_id','eq',firmId]], select:'id,template_id,coverage_status' })
     ]);
     var tmpls   = results[0] || [];
     var certs   = results[1] || [];
     var scripts = results[2] || [];
-    var runs    = results[3] || [];
-    var paths   = results[4] || [];
+    var paths   = results[3] || [];
+
+    // Fetch runs via script_id join — bist_runs has no template_id
+    var runs = [];
+    if (scripts.length) {
+      var scriptIds = scripts.map(function(s){ return s.id; }).join(',');
+      try {
+        runs = await API.get('bist_runs?firm_id=eq.'+firmId+'&script_id=in.('+scriptIds+')&order=run_at.desc&limit=200&select=id,status,run_at,script_id,steps_passed,steps_failed') || [];
+      } catch(e) { runs = []; }
+    }
+
     _cdRenderPortfolio(tmpls, certs, scripts, runs, paths);
   } catch(e) {
+    console.warn('[CD] Portfolio load failed:', e);
     var el = document.getElementById('cd-port-grid');
-    if (el) el.innerHTML = '<div style="padding:12px;font-size:11px;color:rgba(255,255,255,.4)">Portfolio unavailable</div>';
+    if (el) el.innerHTML = '<div style="grid-column:1/-1;padding:12px;font-size:11px;color:rgba(255,255,255,.4)">Portfolio unavailable — '+_cdEsc(e.message||'')+'</div>';
   }
 }
 
@@ -534,9 +543,21 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
   var certByTmpl = {};
   certs.forEach(function(c){ if (!certByTmpl[c.template_id]) certByTmpl[c.template_id] = c; });
   var scriptsByTmpl = {};
-  scripts.forEach(function(s){ if (!scriptsByTmpl[s.template_id]) scriptsByTmpl[s.template_id] = 0; scriptsByTmpl[s.template_id]++; });
+  // Also build script_id → template_id map for run joining
+  var tmplByScriptId = {};
+  scripts.forEach(function(s){
+    if (!scriptsByTmpl[s.template_id]) scriptsByTmpl[s.template_id] = 0;
+    scriptsByTmpl[s.template_id]++;
+    tmplByScriptId[s.id] = s.template_id;
+  });
+  // Build runsByTmpl via script_id join
   var runsByTmpl = {};
-  runs.forEach(function(r){ if (!runsByTmpl[r.template_id]) runsByTmpl[r.template_id] = []; runsByTmpl[r.template_id].push(r); });
+  runs.forEach(function(r){
+    var tmplId = r.template_id || tmplByScriptId[r.script_id];
+    if (!tmplId) return;
+    if (!runsByTmpl[tmplId]) runsByTmpl[tmplId] = [];
+    runsByTmpl[tmplId].push(r);
+  });
   var pathsByTmpl = {};
   paths.forEach(function(p){ if (!pathsByTmpl[p.template_id]) pathsByTmpl[p.template_id] = {total:0,covered:0}; pathsByTmpl[p.template_id].total++; if (p.coverage_status==='covered') pathsByTmpl[p.template_id].covered++; });
 
