@@ -48,7 +48,7 @@
     + '.cd-domain:hover{background:rgba(255,255,255,.025)}\n'
     + '.cd-domain-lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.75);font-family:var(--font-mono)}\n'
     + '.cd-domain-score{font-size:21px;font-weight:700;font-family:var(--font-mono);letter-spacing:-.02em;line-height:1.1}\n'
-    + '.cd-domain-bar{height:2px;border-radius:1px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:2px}\n'
+    + '.cd-domain-bar{height:3px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:3px}\n'
     + '.cd-domain-fill{height:100%;border-radius:1px;transition:width .5s}\n'
     + '.cd-domain-det{font-size:11px;color:rgba(255,255,255,.55);font-family:var(--font-mono);margin-top:2px;line-height:1.4}\n'
     + '.cd-kpis{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--border)}\n'
@@ -133,7 +133,7 @@
     + '.cd-tc:last-child{border-bottom:none}\n'
     + '.cd-tc-name{font-size:11px;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
     + '.cd-tc-ver{font-size:10px;color:var(--text2);font-family:var(--font-mono);margin-top:1px}\n'
-    + '.cd-tc-bar{width:68px;height:3px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;flex-shrink:0}\n'
+    + '.cd-tc-bar{width:80px;height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;flex-shrink:0}\n'
     + '.cd-tc-fill{height:100%;border-radius:2px}\n'
     + '.cd-tc-pct{font-size:10px;font-family:var(--font-mono);width:28px;text-align:right;flex-shrink:0;font-weight:700}\n'
     + '\n'
@@ -571,7 +571,7 @@ function _cdRenderKpis(runs, certs, hs) {
   var passed = r30.filter(function(r){ return r.status==='passed'; });
   var mttd = failed.length ? Math.round(failed.reduce(function(a,r){ return a+(r.duration_ms||0); },0)/failed.length/60000) : 0;
   var mttc = passed.length ? Math.round(passed.reduce(function(a,r){ return a+(r.duration_ms||0); },0)/passed.length/60000) : 0;
-  var thresh = (hs && hs.threshold_config && hs.threshold_config.stale_cert_days) || 30;
+  var thresh = Number((hs && hs.threshold_config && hs.threshold_config.stale_cert_days) || 30);
   var oldClr = oldest > thresh ? 'var(--cd-red)' : oldest > thresh*.7 ? 'var(--cd-amb)' : '#3de08a';
 
   var kpis = [
