@@ -342,10 +342,22 @@ function _cdEsc(s) {
 }
 
 // ── Route (called by _s9Switch) ───────────────────────────────────────────────
+var _cdLastLoad = 0;
+var _cdLoadTtl  = 120000; // 2 minutes
+
 function _s9RouteDashboard() {
   var panel = document.getElementById('s9-dash-panel');
   if (!panel) return;
-  _cdRenderBrief(panel);
+  var now = Date.now();
+  // Re-render shell only if not already populated
+  if (!document.getElementById('cd-body')) {
+    _cdRenderBrief(panel);
+  } else if (now - _cdLastLoad > _cdLoadTtl) {
+    // Shell exists — just refresh data without blowing away the DOM
+    _cdLastLoad = now;
+    _cdLoadBrief();
+  }
+  // else: shell is fresh — do nothing
 }
 
 // ── Render shell ──────────────────────────────────────────────────────────────
@@ -435,6 +447,7 @@ async function _cdLoadBrief() {
     console.warn('[CD Brief] No firmId — aborting load');
     return;
   }
+  _cdLastLoad = Date.now();
   // Parallel load
   _cdLoadHealth(firmId);
   _cdLoadHotQueue(firmId);
@@ -577,7 +590,6 @@ function _cdRenderKpis(runs, certs, hs) {
   var oldClrVal = oldest === 0 ? '#3de08a' : oldest > thresh ? 'var(--cd-red)' : oldest > thresh * 0.7 ? 'var(--cd-amb)' : '#3de08a';
   var oldClr = oldClrVal;
 
-  console.log('[CD KPI] oldest='+oldest+' thresh='+thresh+' thresh*.7='+(thresh*.7)+' oldClr='+oldClr);
   var kpis = [
     { val: valid+'/'+total, lbl:'Workflows Certified', delta:(valid===total?'↑ All valid':'↓ '+(total-valid)+' invalidated'), dc:(valid===total?'#3de08a':'var(--cd-red)'), vc:(valid===total?'#3de08a':'var(--cd-amb)') },
     { val: mttd?mttd+'m':'—', lbl:'Mean Time to Detect', delta:'Last 30 days', dc:'var(--text2)', vc:'var(--cd-amb)' },
