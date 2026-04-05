@@ -1015,7 +1015,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.67 — Default to Dashboard · Cache-buster SE30b','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.68 — Cert persistence + PDF export','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -2788,7 +2788,7 @@ function _s9RenderCertBody() {
 
       // Actions
       '<div style="display:flex;gap:8px;justify-content:center;padding-top:16px;border-top:1px solid rgba(160,120,40,.14)">' +
-        '<button style="' + FA + 'font-size:13px;font-weight:700;padding:9px 22px;border-radius:4px;' +
+        '<button onclick="_s9ExportCertPdf()" style="' + FA + 'font-size:13px;font-weight:700;padding:9px 22px;border-radius:4px;' +
           'background:#1a4a2a;color:#e8f8ec;border:none;cursor:pointer;letter-spacing:.04em">⬇ Export PDF</button>' +
         '<button onclick="navigator.clipboard && navigator.clipboard.writeText(\'' + certId + '\')" ' +
           'style="' + FA + 'font-size:13px;font-weight:700;padding:9px 18px;border-radius:4px;' +
@@ -2807,7 +2807,81 @@ window._s9OnSimComplete = function(allResults) {
   window._s9CertResults = allResults || [];
   var btn = document.getElementById('s9-cert-btn');
   if (btn) btn.style.display = '';
+
+  // Persist only when all tests pass
+  var results = allResults || [];
+  var allPass = results.length > 0 && results.every(function(r){ return r.status === 'passed'; });
+  if (!allPass) return;
+
+  var now      = new Date();
+  var certNum  = 'CERT-' + now.toISOString().replace(/[-:T]/g,'').slice(0,14) + '-' +
+                 Math.floor(Math.random()*9000+1000);
+  window._s9LastCertId = certNum;
+  window._s9LastCertTs = now.toISOString();
+
+  var tmpl     = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+  var firmId   = window._s9FirmId || null;
+  var userId   = (window.CURRENT_USER && window.CURRENT_USER.resource_id) || null;
+  var userName = (window.CURRENT_USER && window.CURRENT_USER.name) || 'System';
+  var passing  = results.filter(function(r){ return r.status === 'passed'; }).length;
+  var total    = results.length;
+  var expires  = new Date(now.getTime() + 30*86400*1000).toISOString();
+
+  API.post('bist_certificates', {
+    firm_id:            firmId,
+    template_id:        tmpl ? tmpl.id : null,
+    template_version:   tmpl ? (tmpl.version || '--') : '--',
+    certificate_number: certNum,
+    version_hash:       certNum.slice(-8).toLowerCase(),
+    paths_covered:      passing,
+    paths_total:        total,
+    assertions_passed:  passing,
+    assertions_total:   total,
+    status:             'valid',
+    certified_by:       userId,
+    issued_at:          now.toISOString(),
+    expires_at:         expires,
+  }).then(function(rows) {
+    var certRowId = rows && rows[0] && rows[0].id;
+    API.post('coc_events', {
+      firm_id:           firmId,
+      entity_type:       'bist_certificate',
+      entity_id:         certRowId || null,
+      event_type:        'cert.issued',
+      actor_name:        userName,
+      actor_resource_id: userId,
+      metadata: {
+        certificate_number: certNum,
+        template:     tmpl ? tmpl.name : '--',
+        version:      tmpl ? (tmpl.version || '--') : '--',
+        tests_passed: passing,
+        tests_total:  total,
+      },
+      event_class:  'governance',
+      severity:     'info',
+      occurred_at:  now.toISOString(),
+    }).catch(function(e){ console.warn('[S9] CoC cert.issued write failed:', e); });
+    console.log('%c[S9] Certificate persisted -- ' + certNum, 'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
+  }).catch(function(e){ console.warn('[S9] bist_certificates write failed:', e); });
 };
+
+function _s9ExportCertPdf() {
+  var certWrap = document.getElementById('s9-cert-wrap');
+  if (!certWrap) return;
+  // Open print dialog scoped to cert content only
+  var FA = 'font-family:Arial,sans-serif;';
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<title>Validation Certificate</title>' +
+    '<style>' +
+      'body{margin:0;padding:0;background:#fff}' +
+      '@media print{@page{margin:10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}' +
+    '</style></head><body>' +
+    certWrap.outerHTML +
+    '<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script>' +
+    '</body></html>';
+  var win = window.open('', '_blank', 'width=740,height=960');
+  if (win) { win.document.write(html); win.document.close(); }
+}
 
 function _s9MetricCard(id, val, lbl) {
   return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;' +
