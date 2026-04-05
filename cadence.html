@@ -959,15 +959,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 .cd-tip-host:hover .cd-tip{display:block}
 .cd-tip{
   display:none;position:absolute;z-index:9999;
-  bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  top:calc(100% + 8px);left:50%;transform:translateX(-50%);
   min-width:220px;max-width:300px;
   background:#1a1f2e;border:1px solid rgba(255,255,255,.14);border-radius:5px;
   padding:10px 12px;pointer-events:none;
   box-shadow:0 8px 28px rgba(0,0,0,.7);
 }
 .cd-tip::after{
-  content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
-  border:5px solid transparent;border-top-color:#1a1f2e;
+  content:'';position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-bottom-color:#1a1f2e;
 }
 .cd-tip-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
   color:var(--cyan);font-family:var(--font-mono);margin-bottom:6px}
