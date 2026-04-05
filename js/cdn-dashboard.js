@@ -571,8 +571,11 @@ function _cdRenderKpis(runs, certs, hs) {
   var passed = r30.filter(function(r){ return r.status==='passed'; });
   var mttd = failed.length ? Math.round(failed.reduce(function(a,r){ return a+(r.duration_ms||0); },0)/failed.length/60000) : 0;
   var mttc = passed.length ? Math.round(passed.reduce(function(a,r){ return a+(r.duration_ms||0); },0)/passed.length/60000) : 0;
-  var thresh = Number((hs && hs.threshold_config && hs.threshold_config.stale_cert_days) || 30);
-  var oldClr = oldest > thresh ? 'var(--cd-red)' : oldest > thresh*.7 ? 'var(--cd-amb)' : '#3de08a';
+  var thresh = 30;
+  try { if (hs && hs.threshold_config) thresh = Number(hs.threshold_config.stale_cert_days) || 30; } catch(e){}
+  // oldest=0 means no valid certs found — treat as green (nothing to stale)
+  var oldClrVal = oldest === 0 ? '#3de08a' : oldest > thresh ? 'var(--cd-red)' : oldest > thresh * 0.7 ? 'var(--cd-amb)' : '#3de08a';
+  var oldClr = oldClrVal;
 
   var kpis = [
     { val: valid+'/'+total, lbl:'Workflows Certified', delta:(valid===total?'↑ All valid':'↓ '+(total-valid)+' invalidated'), dc:(valid===total?'#3de08a':'var(--cd-red)'), vc:(valid===total?'#3de08a':'var(--cd-amb)') },
@@ -828,7 +831,7 @@ async function _cdLoadTraining(firmId) {
     var tot  = list.reduce(function(a,t){return a+t.total;},0);
     var cov  = list.reduce(function(a,t){return a+t.covered;},0);
     var overall = tot>0 ? Math.round((cov/tot)*100) : 0;
-    var overallClr = _cdScoreColor(overall);
+    var overallClr = overall >= 75 ? '#3de08a' : overall >= 25 ? 'var(--cd-amb)' : 'var(--cd-red)';
 
     var html = '<div style="padding:6px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
       '<div style="font-size:11px;font-family:var(--font-mono);color:var(--text2)">Path coverage · all templates</div>' +
@@ -837,7 +840,7 @@ async function _cdLoadTraining(firmId) {
 
     html += list.map(function(t){
       var pct = t.total>0 ? Math.round((t.covered/t.total)*100) : 0;
-      var clr = _cdScoreColor(pct);
+      var clr = pct >= 75 ? '#3de08a' : pct >= 25 ? 'var(--cd-amb)' : 'var(--cd-red)';
       return '<div class="cd-tc">' +
         '<div style="flex:1;min-width:0">' +
           '<div class="cd-tc-name">'+_cdEsc(t.name)+'</div>' +
