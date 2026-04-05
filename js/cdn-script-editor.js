@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE17','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260404-SE23','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -9,6 +9,7 @@ var _seSelectedStep   = null;
 var _seDirty          = false;
 var _seRecentRuns     = [];
 var _seLastRunPerScript = {};
+var _seSessionRuns = {};  // scriptId → result for runs done THIS session
 var _seDragAction     = null;
 var _seDragTmplSeq    = null;
 var _seRunning        = false;
@@ -100,7 +101,7 @@ var SE_CSS = '<style id="se-css">' + [
 '#se-left{width:148px;flex-shrink:0;background:var(--se-bg1);border-right:1px solid var(--se-b);',
 'display:flex;flex-direction:column;overflow:hidden}',
 '.se-ph{padding:7px 10px 5px;font-size:12px;font-weight:700;letter-spacing:.1em;',
-'color:var(--se-mu);text-transform:uppercase;display:flex;align-items:center;',
+'color:#5fd4c8;text-transform:uppercase;display:flex;align-items:center;',
 'justify-content:space-between;border-bottom:1px solid var(--se-b);flex-shrink:0}',
 '.se-padd{background:none;border:none;color:var(--se-cad);font-size:16px;',
 'cursor:pointer;line-height:1;padding:0 2px}',
@@ -225,13 +226,14 @@ var SE_CSS = '<style id="se-css">' + [
 
 /* Assertions */
 '.se-asc-list{margin-top:5px;display:flex;flex-direction:column;gap:3px}',
-'.se-arow{display:flex;align-items:center;gap:4px;padding:3px 6px;',
+'.se-arow{display:flex;align-items:center;gap:6px;padding:4px 8px;',
 'background:var(--se-bg0);border-radius:3px;border:1px solid var(--se-b)}',
 '.se-arow.fail{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.04)}',
 '.se-arow.pass{border-color:rgba(74,222,128,.25)}',
+'.se-a-lbl{font-size:12px;color:rgba(255,255,255,.75);font-family:Arial,sans-serif;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
 '.se-a-check{font-size:12px;color:var(--se-teal);font-family:monospace;flex:1}',
-'.se-a-op{font-size:12px;font-weight:700;color:var(--se-amb);font-family:monospace}',
-'.se-a-val{font-size:12px;color:var(--se-t2);font-family:monospace}',
+'.se-a-op{font-size:12px;font-weight:700;color:var(--se-amb);font-family:monospace;flex-shrink:0}',
+'.se-a-val{font-size:12px;color:var(--se-t2);font-family:monospace;flex:1}',
 '.se-a-res{font-size:12px;font-weight:700;margin-left:auto;flex-shrink:0}',
 '.se-a-del{background:none;border:none;color:rgba(255,255,255,.15);',
 'cursor:pointer;font-size:13px;padding:0 0 0 3px;line-height:1}',
@@ -259,9 +261,9 @@ var SE_CSS = '<style id="se-css">' + [
 
 /* Add step row */
 '.se-addrow{display:flex;gap:5px;padding:4px 0;flex-wrap:wrap}',
-'.se-addchip{padding:3px 9px;border:1px dashed rgba(255,255,255,.1);border-radius:3px;',
-'font-size:12px;color:var(--se-mu);cursor:pointer;transition:all .12s;',
-'background:transparent;font-family:Arial,sans-serif}',
+'.se-addchip{padding:4px 10px;border:1px solid rgba(255,255,255,.15);border-radius:3px;',
+'font-size:12px;color:rgba(255,255,255,.7);cursor:pointer;transition:all .12s;',
+'background:rgba(255,255,255,.05);font-family:Arial,sans-serif;white-space:nowrap}',
 '.se-addchip:hover{border-color:var(--se-cad);color:var(--se-cad);background:var(--se-cad3)}',
 
 /* Footer */
@@ -454,12 +456,18 @@ function _seRenderLeft() {
 
 // ── Header ───────────────────────────────────────────────────────────────────
 function _seRenderHeader(sc, lastRun) {
-  var badgeCls = 'se-bd-new', badgeTxt = 'NEW';
-  if (lastRun) {
-    if (lastRun.status === 'passed') { badgeCls = 'se-bd-pass'; badgeTxt = 'PASSING'; }
-    else { badgeCls = 'se-bd-fail'; badgeTxt = 'FAILING'; }
+  // Badge reflects THIS SESSION only — not historical runs
+  var sessionResult = _seSelectedId ? _seSessionRuns[_seSelectedId] : null;
+  var badgeCls, badgeTxt;
+  if (_seDirty) {
+    badgeCls = 'se-bd-run'; badgeTxt = 'UNSAVED';
+  } else if (sessionResult === 'passed') {
+    badgeCls = 'se-bd-pass'; badgeTxt = 'PASSING';
+  } else if (sessionResult) {
+    badgeCls = 'se-bd-fail'; badgeTxt = 'FAILING';
+  } else {
+    badgeCls = 'se-bd-new'; badgeTxt = 'NOT RUN';
   }
-  if (_seDirty) { badgeCls = 'se-bd-run'; badgeTxt = 'UNSAVED'; }
 
   var html = '<div id="se-hdr">';
   if (sc) {
@@ -478,10 +486,22 @@ function _seRenderHeader(sc, lastRun) {
 
 // ── Drop zone toolbar ────────────────────────────────────────────────────────
 function _seRenderDzToolbar() {
-  return '<div id="se-dztb">'+
-    '<div id="se-dz" ondragover="seDzOver(event)" ondragleave="seDzLeave()" ondrop="seDzDrop(event)">'+
-    '← Drag action block here to append</div>'+
-    '</div>';
+  var FA = 'font-family:Arial,sans-serif;';
+  var btnStyle = 'font-size:12px;'+FA+'padding:3px 10px;border-radius:3px;cursor:pointer;'+
+    'background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);'+
+    'color:rgba(255,255,255,.7);transition:all .12s;white-space:nowrap';
+  return '<div id="se-dztb">' +
+    // Add-step buttons group
+    '<div style="display:flex;gap:5px;flex-shrink:0">' +
+      '<span style="'+FA+'font-size:11px;color:rgba(255,255,255,.3);align-self:center;margin-right:2px">Add:</span>' +
+      '<button class="se-addchip" onclick="seQuickAdd(\'complete_step\')" title="Append a workflow step action — choose which step to complete and what outcome to record">+ Step</button>' +
+      '<button class="se-addchip" onclick="seQuickAdd(\'assert_only\')" title="Append an assertion-only check — verifies a value without performing any workflow action">+ Assert</button>' +
+      '<button class="se-addchip" onclick="seQuickAdd(\'wait\')" title="Append a wait pause — delays execution for a set number of milliseconds">+ Wait</button>' +
+    '</div>' +
+    // Drag zone
+    '<div id="se-dz" ondragover="seDzOver(event)" ondragleave="seDzLeave()" ondrop="seDzDrop(event)">' +
+    '← Drag action block here to append</div>' +
+  '</div>';
 }
 
 // ── Timeline ─────────────────────────────────────────────────────────────────
@@ -522,14 +542,6 @@ function _seRenderTimeline(sc, lastRun) {
     html += _seRenderCard(stp, idx, sc, lastRun);
   });
 
-  // Add row
-  html += '<div class="se-addrow">';
-  html += '<button class="se-addchip" onclick="seQuickAdd(\'launch_instance\')">+ launch</button>';
-  html += '<button class="se-addchip" onclick="seQuickAdd(\'complete_step\')">+ complete step</button>';
-  html += '<button class="se-addchip" onclick="seQuickAdd(\'assert_only\')">+ assert only</button>';
-  html += '<button class="se-addchip" onclick="seQuickAdd(\'wait\')">+ wait</button>';
-  html += '</div>';
-
   return html;
 }
 
@@ -551,7 +563,7 @@ function _seRenderCard(stp, idx, sc, lastRun) {
   // Card header
   html += '<div class="se-card-hdr">';
   html += '<div class="se-card-icon" style="background:'+meta.color+'22;color:'+meta.color+'">'+meta.icon+'</div>';
-  html += '<span class="se-card-id">'+_seEsc(stp.id)+'</span>';
+  html += '<span class="se-card-id">Step '+idx+'</span>';
   html += '<span class="se-card-lbl">'+_seEsc(stepName)+'</span>';
   if (stp.params && stp.params.step_seq) {
     html += '<span class="se-fval" style="margin-left:auto">seq '+stp.params.step_seq+'</span>';
@@ -564,17 +576,17 @@ function _seRenderCard(stp, idx, sc, lastRun) {
   if (isSel || isFail || isLaunchCard) {
     html += '<div class="se-card-body">';
 
-    // Actor + outcome row
-    if (actor || outcome) {
+    // Actor + outcome — each on its own row to prevent badge overlap
+    if (actor) {
       html += '<div class="se-frow">';
-      if (actor) {
-        html += '<span class="se-fl">Actor</span>';
-        html += '<span class="se-fval">'+_seEsc(actor)+'</span>';
-      }
-      if (outcome) {
-        html += '<span class="se-fl" style="margin-left:8px">Outcome</span>';
-        html += '<span class="'+_seOutcomeClass(outcome)+'">'+_seEsc(outcome)+'</span>';
-      }
+      html += '<span class="se-fl">Actor</span>';
+      html += '<span class="se-fval" style="flex-shrink:0">'+_seEsc(actor)+'</span>';
+      html += '</div>';
+    }
+    if (outcome) {
+      html += '<div class="se-frow">';
+      html += '<span class="se-fl">Outcome</span>';
+      html += '<span class="'+_seOutcomeClass(outcome)+'" style="flex-shrink:0">'+_seEsc(outcome)+'</span>';
       html += '</div>';
     }
 
@@ -586,6 +598,41 @@ function _seRenderCard(stp, idx, sc, lastRun) {
       html += '</div>';
     }
 
+    // Assertions header with help tooltip
+    if (asserts.length || isSel) {
+      var FA3 = 'font-family:Arial,sans-serif;';
+      var assertHelp = [
+        'Assertions verify the workflow responded correctly.',
+        '',
+        'WHAT YOU CAN CHECK:',
+        '  instance.status   - Overall workflow state',
+        '    in_progress | complete | suspended | cancelled',
+        '',
+        '  step[N].state     - Whether step N was acted on',
+        '    active (waiting) | done (completed) | skipped',
+        '',
+        '  step[N].outcome   - Decision recorded at step N',
+        '    submitted | approved | rejected | signed |',
+        '    declined | design_change',
+        '',
+        '  step[N].loops     - Times step N was visited',
+        '    eq 2 = step was reset once (rejection loop)',
+        '',
+        'OPERATORS:',
+        '  eq | not_eq | gte | lte | exists | not_exists',
+        '',
+        'EXAMPLE:',
+        '  step[3].outcome eq approved',
+        '  After step 3, confirm it was approved.',
+        '  If rejected instead — this assertion fails.'
+      ].join('\n');
+      html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;margin-top:6px">';
+      html += '<span style="'+FA3+'font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5)">Assertions</span>';
+      html += '<span style="'+FA3+'font-size:11px;color:rgba(255,255,255,.3)">— checks that run after this step</span>';
+      html += '<span title="'+assertHelp+'" style="width:15px;height:15px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);'+
+        'display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:rgba(255,255,255,.5);cursor:help;margin-left:auto">?</span>';
+      html += '</div>';
+    }
     // Assertions
     if (asserts.length) {
       html += '<div class="se-asc-list">';
@@ -594,8 +641,41 @@ function _seRenderCard(stp, idx, sc, lastRun) {
         var aVal  = a[opKey];
         var aPass = _seAssertResult(a, lastRun, stp.id);
         var aRowCls = 'se-arow' + (aPass === false ? ' fail' : aPass === true ? ' pass' : '');
+
+        // Derive plain-English label from check path + card context
+        var label = '';
+        var checkMatch = a.check.match(/^(instance|step\[(\d+)\])\.(status|state|outcome|loops)$/);
+        if (checkMatch) {
+          var subject = checkMatch[1];
+          var stepN   = checkMatch[2] ? parseInt(checkMatch[2]) : null;
+          var prop    = checkMatch[3];
+          var cardSeq = stp.params && stp.params.step_seq ? parseInt(stp.params.step_seq) : null;
+
+          if (subject === 'instance') {
+            label = prop === 'status' ? 'Workflow status' : 'Workflow · ' + prop;
+          } else if (stepN !== null) {
+            var stepObj = _seTmplStepBySeq(stepN);
+            var stepName = stepObj ? stepObj.name.replace(/^(Checklist|Form|Approval|Finalize|Final):\s*/i,'') : 'Step '+stepN;
+            if (prop === 'state') {
+              if (cardSeq !== null && stepN === cardSeq)      label = stepName + ' end state';
+              else if (cardSeq !== null && stepN === cardSeq + 1) label = 'Next task state';
+              else if (cardSeq !== null && stepN < cardSeq)       label = stepName + ' state';
+              else                                                  label = stepName + ' state';
+            } else if (prop === 'outcome') {
+              label = stepName + ' outcome';
+            } else if (prop === 'loops') {
+              label = stepName + ' loop count';
+            }
+          }
+        }
+
         html += '<div class="'+aRowCls+'">';
-        html += '<span class="se-a-check">'+_seEsc(a.check)+'</span>';
+        if (label) {
+          // Show plain-English label; raw check path on hover
+          html += '<span class="se-a-lbl" title="'+_seEsc(a.check)+'">'+_seEsc(label)+'</span>';
+        } else {
+          html += '<span class="se-a-check">'+_seEsc(a.check)+'</span>';
+        }
         html += '<span class="se-a-op">'+opKey+'</span>';
         html += '<span class="se-a-val">'+_seEsc(String(aVal))+'</span>';
         if (aPass === true)  html += '<span class="se-a-res" style="color:var(--se-grn)">✓</span>';
@@ -1045,6 +1125,7 @@ function seSelectScript(id) {
   _seSelectedId   = id;
   _seSelectedStep = null;
   _seDirty        = false;
+  // Don't clear _seSessionRuns[id] — preserve result if already run this session
   seRenderEditor();
 }
 
@@ -1170,6 +1251,11 @@ async function seRunScript() {
   _seRecentRuns = await API.get('bist_runs?firm_id=eq.'+FIRM_ID_CAD+
     '&template_id=eq.'+_selectedTmpl.id+'&order=run_at.desc&limit=40').catch(function(){return [];});
   _seRunning = false;
+  // Record result in session tracker so badge reflects this session's run
+  if (_seSelectedId) {
+    var freshRun = _seLastRunFor(_seSelectedId);
+    _seSessionRuns[_seSelectedId] = freshRun ? freshRun.status : 'unknown';
+  }
   seRenderEditor();
   cadToast('Run complete', 'info');
 }
@@ -1556,5 +1642,5 @@ window.seShowRunHistory = function seShowRunHistory() {
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE17 — Fix script pre-selection, collapse cards by default, history failure reason display',
+console.log('%c[cdn-script-editor] v20260404-SE23 — Assertion rows: plain-English label column, raw check on hover',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
