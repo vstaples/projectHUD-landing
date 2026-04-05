@@ -169,17 +169,19 @@
     + '\n'
     + '/* ── CD Tooltip ── */\n'
     + '.cd-tip-host{position:relative}\n'
-    + '.cd-tip-host:hover .cd-tip{display:block}\n'
     + '.cd-tip{\n'
-    + '  display:none;position:absolute;z-index:9999;\n'
-    + '  top:calc(100% + 8px);left:50%;transform:translateX(-50%);\n'
+    + '  display:none;position:fixed;z-index:9999;\n'
     + '  min-width:220px;max-width:300px;\n'
     + '  background:#1a1f2e;border:1px solid rgba(255,255,255,.14);border-radius:5px;\n'
     + '  padding:10px 12px;pointer-events:none;\n'
     + '  box-shadow:0 8px 28px rgba(0,0,0,.7);\n'
     + '}\n'
-    + '.cd-tip::after{\n'
-    + '  content:\'\';position:absolute;bottom:100%;left:50%;transform:translateX(-50%);\n'
+    + '.cd-tip.tip-above::after{\n'
+    + '  content:\'\';position:absolute;top:100%;left:var(--tip-arrow-left,50%);transform:translateX(-50%);\n'
+    + '  border:5px solid transparent;border-top-color:#1a1f2e;\n'
+    + '}\n'
+    + '.cd-tip.tip-below::after{\n'
+    + '  content:\'\';position:absolute;bottom:100%;left:var(--tip-arrow-left,50%);transform:translateX(-50%);\n'
     + '  border:5px solid transparent;border-bottom-color:#1a1f2e;\n'
     + '}\n'
     + '.cd-tip-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;\n'
@@ -238,6 +240,49 @@
 })();
 
 // ── Dashboard functions (global scope, _cd* prefix) ───────────────────────────
+
+// ── Tooltip positioning (fixed, viewport-aware) ───────────────────────────────
+(function _cdInitTooltips() {
+  var _activeTip = null;
+  document.addEventListener('mouseover', function(e) {
+    var host = e.target.closest('.cd-tip-host');
+    if (!host) return;
+    var tip = host.querySelector('.cd-tip');
+    if (!tip) return;
+    // Show and position
+    tip.style.display = 'block';
+    _activeTip = tip;
+    var hr  = host.getBoundingClientRect();
+    var tr  = tip.getBoundingClientRect();
+    var vw  = window.innerWidth;
+    var vh  = window.innerHeight;
+    var spaceBelow = vh - hr.bottom;
+    var spaceAbove = hr.top;
+    // Flip above if not enough space below
+    if (spaceBelow < tr.height + 16 && spaceAbove > tr.height + 16) {
+      tip.className = tip.className.replace('tip-below','').replace('tip-above','').trim() + ' tip-above';
+      tip.style.top  = (hr.top - tr.height - 8) + 'px';
+    } else {
+      tip.className = tip.className.replace('tip-above','').replace('tip-below','').trim() + ' tip-below';
+      tip.style.top  = (hr.bottom + 8) + 'px';
+    }
+    // Horizontal: centre on host, clamp to viewport
+    var left = hr.left + hr.width/2 - tr.width/2;
+    left = Math.max(8, Math.min(left, vw - tr.width - 8));
+    tip.style.left = left + 'px';
+    // Position arrow
+    var arrow_left = (hr.left + hr.width/2) - left;
+    tip.style.setProperty('--tip-arrow-left', arrow_left + 'px');
+  });
+  document.addEventListener('mouseout', function(e) {
+    var host = e.target.closest('.cd-tip-host');
+    if (!host) return;
+    var tip = host.querySelector('.cd-tip');
+    if (tip) tip.style.display = 'none';
+    _activeTip = null;
+  });
+})();
+
 // ── Action handlers ──────────────────────────────────────────────────────────
 function _cdConveneMrb(mrbId) {
   // Phase II: open MRB disposition form instance
