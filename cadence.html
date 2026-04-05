@@ -800,6 +800,159 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 .s9-gate-warn{background:rgba(212,144,31,.1);border:1px solid rgba(212,144,31,.3);color:var(--amber)}
 .s9-gate-fail{background:rgba(192,64,74,.1);border:1px solid rgba(192,64,74,.3);color:var(--red)}
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   QA COMMAND BRIEF — S9.62+ integration styles
+   Uses cadence.html CSS vars. Added 2026-04-06.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Amber override — brighter than default --amber */
+:root { --cd-amb:#ffc034; --cd-amb2:rgba(255,192,52,.14); }
+
+/* Brief shell */
+.cd-brief{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:#080a10}
+.cd-body{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.cd-body::-webkit-scrollbar{width:3px}
+.cd-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
+
+/* Shimmer loader */
+@keyframes cd-shimmer{0%,100%{opacity:.35}50%{opacity:.8}}
+.cd-skel{background:#1a1f2e;border-radius:3px;animation:cd-shimmer 1.4s ease-in-out infinite}
+
+/* Health brief */
+.cd-health{background:var(--surface);border:1px solid var(--border2);border-radius:5px;overflow:hidden;flex-shrink:0}
+.cd-health-top{display:flex;align-items:stretch}
+.cd-score-block{width:168px;flex-shrink:0;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;border-right:1px solid var(--border)}
+.cd-score-num{font-size:52px;font-weight:700;line-height:1;font-family:var(--font-mono);letter-spacing:-.02em}
+.cd-score-lbl{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin-top:3px;font-family:var(--font-mono)}
+.cd-score-delta{font-size:11px;margin-top:5px;font-family:var(--font-mono)}
+.cd-sparkline{display:flex;gap:3px;align-items:flex-end;height:24px;margin-top:7px}
+.cd-spark-bar{flex:1;border-radius:1px;min-width:4px}
+.cd-spark-lbl{font-size:10px;color:var(--text2);font-family:var(--font-mono);margin-top:3px}
+.cd-domains{flex:1;display:grid;grid-template-columns:repeat(4,1fr)}
+.cd-domain{padding:9px 11px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:2px;cursor:pointer;transition:background .12s}
+.cd-domain:last-child{border-right:none}
+.cd-domain:hover{background:rgba(255,255,255,.025)}
+.cd-domain-lbl{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);font-family:var(--font-mono)}
+.cd-domain-score{font-size:21px;font-weight:700;font-family:var(--font-mono);letter-spacing:-.02em;line-height:1.1}
+.cd-domain-bar{height:2px;border-radius:1px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:2px}
+.cd-domain-fill{height:100%;border-radius:1px;transition:width .5s}
+.cd-domain-det{font-size:10px;color:var(--text2);font-family:var(--font-mono);margin-top:2px;line-height:1.4}
+.cd-kpis{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--border)}
+.cd-kpi{padding:6px 11px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:2px}
+.cd-kpi:last-child{border-right:none}
+.cd-kpi-val{font-size:15px;font-weight:700;font-family:var(--font-mono)}
+.cd-kpi-lbl{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);font-family:var(--font-mono)}
+.cd-kpi-delta{font-size:10px;font-family:var(--font-mono)}
+
+/* Grid */
+.cd-grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cd-grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+
+/* Panels */
+.cd-panel{background:var(--surface);border:1px solid var(--border);border-radius:5px;overflow:hidden;display:flex;flex-direction:column}
+.cd-panel-hdr{padding:7px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;flex-shrink:0}
+.cd-panel-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff;font-family:var(--font-mono);flex:1}
+.cd-panel-count{font-size:10px;font-family:var(--font-mono);color:var(--text2)}
+.cd-panel-link{font-size:10px;color:var(--cyan);cursor:pointer;font-family:var(--font-mono);letter-spacing:.03em;transition:color .1s}
+.cd-panel-link:hover{color:#fff}
+.cd-panel-body{flex:1;overflow-y:auto;max-height:220px}
+.cd-panel-body::-webkit-scrollbar{width:2px}
+.cd-panel-body::-webkit-scrollbar-thumb{background:var(--border2)}
+
+/* Hot queue */
+.cd-hot{padding:8px 11px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:7px;cursor:pointer;transition:background .1s}
+.cd-hot:hover{background:rgba(255,255,255,.02)}
+.cd-hot:last-child{border-bottom:none}
+.cd-hot-sev{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:34px}
+.cd-hot-main{flex:1;min-width:0}
+.cd-hot-type{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:2px}
+.cd-hot-name{font-size:12px;color:var(--text0);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd-hot-sub{font-size:10px;color:var(--text2);font-family:var(--font-mono);margin-top:2px;line-height:1.4}
+.cd-hot-meta{display:flex;align-items:center;gap:4px;margin-top:3px;flex-wrap:wrap}
+.cd-tag{padding:2px 6px;border-radius:2px;font-size:10px;font-weight:700;font-family:var(--font-mono);letter-spacing:.03em}
+.cd-tag-r{background:rgba(192,64,74,.15);color:#e05060}
+.cd-tag-a{background:rgba(255,192,52,.14);color:var(--cd-amb)}
+.cd-tag-b{background:rgba(79,142,247,.15);color:#4f8ef7}
+.cd-tag-g{background:rgba(42,157,64,.13);color:#3de08a}
+.cd-hot-acts{display:flex;gap:4px;flex-shrink:0;align-items:center}
+.cd-hbtn{padding:3px 9px;border-radius:3px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid;font-family:var(--font-mono);white-space:nowrap;transition:all .12s}
+.cd-hbtn-r{background:rgba(192,64,74,.15);border-color:rgba(192,64,74,.35);color:#e05060}
+.cd-hbtn-r:hover{background:rgba(192,64,74,.25)}
+.cd-hbtn-a{background:var(--cd-amb2);border-color:rgba(255,192,52,.35);color:var(--cd-amb)}
+.cd-hbtn-a:hover{background:rgba(255,192,52,.22)}
+.cd-hbtn-n{background:transparent;border-color:var(--border);color:var(--text2)}
+.cd-hbtn-n:hover{border-color:var(--border2);color:var(--text)}
+.cd-hot-empty{padding:20px 11px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px}
+.cd-hot-empty-dot{width:28px;height:28px;border-radius:50%;background:rgba(42,157,64,.1);border:1px solid rgba(42,157,64,.25);display:flex;align-items:center;justify-content:center;font-size:13px}
+.cd-hot-empty-title{font-size:12px;color:#3de08a;font-weight:700}
+.cd-hot-empty-sub{font-size:10px;color:var(--text2);font-family:var(--font-mono);line-height:1.5}
+
+/* Work queue */
+.cd-wq{padding:6px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;cursor:pointer;transition:background .1s}
+.cd-wq:hover{background:rgba(255,255,255,.02)}
+.cd-wq:last-child{border-bottom:none}
+.cd-wq-rank{font-size:11px;font-weight:700;font-family:var(--font-mono);color:var(--text2);width:14px;flex-shrink:0;text-align:center}
+.cd-wq-pri{width:3px;border-radius:2px;align-self:stretch;flex-shrink:0;min-height:26px}
+.cd-wq-main{flex:1;min-width:0}
+.cd-wq-name{font-size:12px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd-wq-sub{font-size:10px;color:var(--text2);font-family:var(--font-mono);margin-top:1px}
+.cd-wq-btn{padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:var(--font-mono);white-space:nowrap;transition:all .12s}
+.cd-wq-btn:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.cd-mini-av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:var(--font-mono);flex-shrink:0}
+
+/* Request queue */
+.cd-rq{padding:6px 11px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:7px;cursor:pointer;transition:background .1s}
+.cd-rq:hover{background:rgba(255,255,255,.02)}
+.cd-rq:last-child{border-bottom:none}
+.cd-rq-name{font-size:12px;color:var(--text);font-weight:500}
+.cd-rq-sub{font-size:10px;color:var(--text2);font-family:var(--font-mono);margin-top:1px}
+.cd-rq-meta{display:flex;align-items:center;gap:4px;margin-top:3px}
+.cd-rq-acts{display:flex;gap:3px;flex-shrink:0;padding-top:1px}
+.cd-rq-btn{padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid;font-family:var(--font-mono);white-space:nowrap;transition:all .12s}
+.cd-rq-run{background:rgba(0,210,255,.1);border-color:rgba(0,210,255,.3);color:var(--cyan)}
+.cd-rq-run:hover{background:rgba(0,210,255,.18)}
+.cd-rq-arch{background:transparent;border-color:var(--border);color:var(--text2)}
+.cd-rq-arch:hover{border-color:var(--border2);color:var(--text)}
+
+/* Training coverage */
+.cd-tc{display:flex;align-items:center;gap:7px;padding:5px 11px;border-bottom:1px solid var(--border)}
+.cd-tc:last-child{border-bottom:none}
+.cd-tc-name{font-size:11px;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd-tc-ver{font-size:10px;color:var(--text2);font-family:var(--font-mono);margin-top:1px}
+.cd-tc-bar{width:68px;height:3px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;flex-shrink:0}
+.cd-tc-fill{height:100%;border-radius:2px}
+.cd-tc-pct{font-size:10px;font-family:var(--font-mono);width:28px;text-align:right;flex-shrink:0;font-weight:700}
+
+/* CoC feed */
+.cd-coc{padding:5px 11px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:7px}
+.cd-coc:last-child{border-bottom:none}
+.cd-coc-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.cd-coc-text{font-size:11px;color:var(--text2);font-family:var(--font-mono);flex:1;line-height:1.5}
+.cd-coc-text strong{color:var(--text);font-weight:700}
+.cd-coc-time{font-size:10px;color:var(--text2);font-family:var(--font-mono);flex-shrink:0;margin-top:2px}
+
+/* Override modal */
+.cd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:9000}
+.cd-overlay.open{display:flex}
+.cd-modal{background:var(--bg2);border:1px solid var(--border2);border-radius:7px;width:440px;overflow:hidden}
+.cd-modal-hdr{padding:13px 15px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px}
+.cd-modal-title{font-size:13px;font-weight:700;color:var(--text);flex:1}
+.cd-modal-close{font-size:14px;color:var(--text2);cursor:pointer;padding:2px 6px;border-radius:3px;transition:color .1s}
+.cd-modal-close:hover{color:var(--text)}
+.cd-modal-body{padding:15px}
+.cd-modal-warn{background:rgba(192,64,74,.08);border:1px solid rgba(192,64,74,.2);border-radius:4px;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:13px}
+.cd-modal-warn strong{color:#e05060}
+.cd-modal-lbl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);font-family:var(--font-mono);margin-bottom:5px}
+.cd-modal-ta{width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;resize:vertical;min-height:68px;outline:none;transition:border-color .1s}
+.cd-modal-ta:focus{border-color:var(--cyan)}
+.cd-modal-note{font-size:10px;color:var(--text2);font-family:var(--font-mono);margin-top:7px;padding:6px 10px;background:var(--surf2);border-radius:3px;line-height:1.5}
+.cd-modal-note span{color:var(--cyan)}
+.cd-modal-ftr{padding:11px 15px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+/* Colour utils */
+.cd-grn{color:#3de08a} .cd-amb{color:var(--cd-amb)} .cd-red{color:#e05060} .cd-t2{color:var(--text2)}
+
 </style>
 </head>
 <body>
@@ -918,6 +1071,40 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
       <!-- Filled dynamically -->
     </div>
 
+  </div>
+</div>
+
+
+<!-- ═══ QA COMMAND BRIEF — OVERRIDE MODAL ═══ -->
+<div class="cd-overlay" id="cd-override-modal" onclick="_cdCloseOverlay(event)">
+  <div class="cd-modal">
+    <div class="cd-modal-hdr">
+      <div class="cd-modal-title" id="cd-override-title">Override — Governance Exception</div>
+      <div class="cd-modal-close" onclick="_cdCloseOverlayBtn()">✕</div>
+    </div>
+    <div class="cd-modal-body">
+      <div class="cd-modal-warn">
+        <strong>This is a governance override.</strong> You are acknowledging an exception to
+        established quality thresholds. A written rationale is required and will be permanently
+        recorded in the Chain of Custody.
+      </div>
+      <div class="cd-modal-lbl">Rationale (required — minimum 20 characters)</div>
+      <textarea class="cd-modal-ta" id="cd-override-rationale"
+        placeholder="Describe the business reason for this override…"></textarea>
+      <div class="cd-modal-note">
+        Recorded as: <span id="cd-override-coc-label">override.applied</span> ·
+        Actor: <span id="cd-override-actor">—</span> ·
+        Entity: <span id="cd-override-entity">—</span> ·
+        <span style="color:#e05060">Immutable — cannot be deleted</span>
+      </div>
+    </div>
+    <div class="cd-modal-ftr">
+      <button class="btn btn-sm" onclick="_cdCloseOverlayBtn()">Cancel</button>
+      <button class="btn btn-sm btn-cad" id="cd-override-confirm-btn"
+        onclick="_cdConfirmOverride()" style="background:rgba(192,64,74,.15);border-color:rgba(192,64,74,.35);color:#e05060">
+        Confirm Override
+      </button>
+    </div>
   </div>
 </div>
 
@@ -3737,319 +3924,10 @@ function _s9RenderHistoryStub() {
 // Landing page: portfolio uptime · needs attention · workflow cards · support queue
 // ══════════════════════════════════════════════════════════════════════════════
 
-function _s9RouteDashboard() {
-  var panel = document.getElementById('s9-dash-panel');
-  if (!panel) return;
-  // Always re-render to pick up fresh data
-  _s9RenderDashboard(panel);
-}
-
-async function _s9RenderDashboard(panel) {
-  var FA  = 'font-family:Arial,sans-serif;';
-  var F9  = FA + 'font-size:12px;';
-  var F10 = FA + 'font-size:12px;';
-  var F11 = FA + 'font-size:12px;';
-  var F12 = FA + 'font-size:12px;';
-  var MN  = 'font-family:monospace;font-size:13px;';
-
-  panel.style.cssText = 'display:flex;width:100%;height:100%;overflow:hidden;background:#080a10;flex-direction:column';
-
-  panel.innerHTML =
-
-    // ── CONTROLS BAR ──
-    '<div style="display:flex;align-items:center;background:#0c0f18;' +
-      'border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;padding:0 14px;height:36px;gap:8px">' +
-
-      // Workflow selector
-      '<select id="s9-dash-wf-select" onchange="_s9DashFilterWf(this.value)" ' +
-        'style="' + FA + 'font-size:12px;background:#1a1f2e;border:1px solid rgba(255,255,255,.1);' +
-        'border-radius:4px;color:rgba(255,255,255,.75);padding:3px 8px;height:24px;' +
-        'cursor:pointer;outline:none;min-width:200px">' +
-        '<option value="all">All Workflows — Firm Portfolio</option>' +
-      '</select>' +
-
-      '<div style="width:1px;height:18px;background:rgba(255,255,255,.06);margin:0 2px"></div>' +
-
-      // Range presets
-      '<div style="display:flex;gap:2px">' +
-        ['7d','30d','90d','All time'].map(function(r, i) {
-          var isAct = r === '30d';
-          return '<button onclick="_s9DashSetRange(this,\'' + r + '\')" ' +
-            'style="' + FA + 'font-size:12px;font-weight:700;padding:2px 8px;border-radius:3px;' +
-            'cursor:pointer;border:1px solid;letter-spacing:.04em;' +
-            (isAct ? 'background:#161b28;border-color:#5fd4c8;color:#5fd4c8'
-                   : 'background:transparent;border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.3)') +
-            '">' + r + '</button>';
-        }).join('') +
-      '</div>' +
-
-      '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.25);font-family:monospace">2026-03-05</div>' +
-      '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2)">→</div>' +
-      '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.25);font-family:monospace">2026-04-04</div>' +
-
-      '<div style="width:1px;height:18px;background:rgba(255,255,255,.06);margin:0 2px"></div>' +
-
-      // View toggles
-      '<div style="display:flex;gap:2px">' +
-        [['all','ALL VIEWS'],['trend','TREND'],['cal','CALENDAR'],['log','RUN LOG']].map(function(v, i) {
-          var isAct = v[0] === 'all';
-          return '<button onclick="_s9DashSetView(this,\'' + v[0] + '\')" ' +
-            'id="s9-dvb-' + v[0] + '" ' +
-            'style="' + FA + 'font-size:12px;font-weight:700;padding:2px 9px;border-radius:3px;' +
-            'cursor:pointer;border:1px solid;letter-spacing:.04em;' +
-            (isAct ? 'background:#161b28;border-color:#5fd4c8;color:#5fd4c8'
-                   : 'background:transparent;border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.3)') +
-            '">' + v[1] + '</button>';
-        }).join('') +
-      '</div>' +
-
-      '<div style="margin-left:auto;' + F9 + 'color:rgba(255,255,255,.25)">' +
-        'Stale threshold: <span style="color:#f0a030;font-weight:700">7 days</span>' +
-        '&nbsp;<span style="color:#5fd4c8;cursor:pointer;text-decoration:underline">Edit →</span>' +
-      '</div>' +
-
-    '</div>' +
-
-    // ── ALERT BANNER (hidden by default) ──
-    '<div id="s9-dash-alert" style="display:none;background:#1a0808;' +
-      'border-bottom:1px solid rgba(240,96,96,.35);padding:5px 14px;' + F11 +
-      'color:#f06060;flex-shrink:0;flex-direction:row;align-items:center;gap:8px">' +
-      '<span>✗</span>' +
-      '<span id="s9-dash-alert-msg"></span>' +
-      '<span id="s9-dash-alert-link" style="color:#5fd4c8;cursor:pointer;text-decoration:underline;font-size:12px"></span>' +
-      '<span onclick="document.getElementById(\'s9-dash-alert\').style.display=\'none\'" ' +
-        'style="margin-left:auto;cursor:pointer;color:rgba(255,255,255,.3);font-size:16px;line-height:1">×</span>' +
-    '</div>' +
-
-    // ── MAIN BODY: left content + right cert column ──
-    '<div style="display:flex;flex:1;min-height:0;overflow:hidden">' +
-
-      // ── LEFT: scrollable content ──
-      '<div style="flex:1;display:flex;flex-direction:column;overflow:hidden">' +
-
-        // KPI strip
-        '<div id="s9-dash-kpi" style="display:flex;border-bottom:1px solid rgba(255,255,255,.06);' +
-          'flex-shrink:0;background:#0c0f18">' +
-          _s9DashKpiCell('s9-kpi-passrate',  'Portfolio Pass Rate',    '—',   '—') +
-          _s9DashKpiCell('s9-kpi-certified',  'Workflows Certified',    '—',   '—') +
-          _s9DashKpiCell('s9-kpi-mttd',       'Mean Time to Detect',    '—',   'avg failure → discovery') +
-          _s9DashKpiCell('s9-kpi-mttc',       'Mean Time to Certify',   '—',   'commit → certificate') +
-          _s9DashKpiCell('s9-kpi-runs',       'Total Suite Runs',       '—',   'last 30 days · all workflows') +
-          _s9DashKpiCell('s9-kpi-flaky',      'Flakiness Alerts',       '—',   '—') +
-          _s9DashKpiCell('s9-kpi-certage',    'Oldest Cert Age',        '—',   '—') +
-        '</div>' +
-
-        // Scrollable area
-        '<div id="s9-dash-scroll" style="flex:1;overflow-y:auto">' +
-
-          // Trend section
-          '<div id="s9-dash-trend-section">' +
-            '<div style="padding:8px 14px 4px;display:flex;align-items:center;gap:8px">' +
-              '<span id="s9-dash-trend-title" style="' + F9 + 'font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#5fd4c8">Portfolio Suite Health — Loading…</span>' +
-              '<span style="' + F9 + 'color:rgba(255,255,255,.25)">Composite firm-wide pass rate · all workflows</span>' +
-              '<div style="margin-left:auto;display:flex;gap:10px;align-items:center">' +
-                _s9DashLegendItem('#3de08a','dot','All passing') +
-                _s9DashLegendItem('#f0a030','dot','Partial') +
-                _s9DashLegendItem('#f06060','dot','Failing') +
-              '</div>' +
-            '</div>' +
-            '<div style="padding:0 14px 10px;position:relative">' +
-              _s9DashTrendSvg() +
-              '<div id="s9-dash-evtip" style="position:absolute;display:none;background:#1a1f2e;' +
-                'border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:8px 10px;' +
-                'font-size:12px;font-family:monospace;color:rgba(255,255,255,.85);' +
-                'min-width:190px;z-index:50;pointer-events:none;' +
-                'box-shadow:0 6px 20px rgba(0,0,0,.5)"></div>' +
-            '</div>' +
-          '</div>' +
-
-          // Calendar section
-          '<div id="s9-dash-cal-section">' +
-            '<div style="padding:8px 14px 4px;display:flex;align-items:center;gap:8px">' +
-              '<span style="' + F9 + 'font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#5fd4c8">Daily Portfolio Health — Mar 5 → Apr 4</span>' +
-              '<span style="' + F9 + 'color:rgba(255,255,255,.25)">Green = all workflows passing · Amber = partial · Red = any failure</span>' +
-            '</div>' +
-            '<div style="padding:0 14px 10px" id="s9-dash-cal-inner">' +
-              _s9DashCalHtml(null) +
-            '</div>' +
-          '</div>' +
-
-          // Run log section
-          '<div id="s9-dash-log-section">' +
-            '<div style="padding:8px 14px 4px;display:flex;align-items:baseline;gap:8px">' +
-              '<span style="' + F9 + 'font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#5fd4c8">Run Log — All Workflows</span>' +
-              '<span style="' + F9 + 'color:rgba(255,255,255,.25)">Firm-wide · newest first</span>' +
-            '</div>' +
-            _s9DashRunLogHtml() +
-          '</div>' +
-
-        '</div>' +
-      '</div>' +
-
-      // ── RIGHT: Cert column ──
-      '<div style="width:260px;flex-shrink:0;border-left:1px solid rgba(255,255,255,.06);' +
-        'background:#0c0f18;display:flex;flex-direction:column;overflow:hidden">' +
-        '<div style="padding:8px 14px 7px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">' +
-          '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-            'color:#5fd4c8;margin-bottom:1px">Certificate Status</div>' +
-          '<div id="s9-cert-col-sub" style="' + F9 + 'color:rgba(255,255,255,.25);font-family:monospace">Loading…</div>' +
-        '</div>' +
-        '<div id="s9-cert-col-cards" style="overflow-y:auto;flex:1;padding:4px 0">' +
-          '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:14px;font-style:italic">Loading…</div>' +
-        '</div>' +
-        '<div id="s9-cert-col-footer" style="padding:8px 14px;border-top:1px solid rgba(255,255,255,.06);' +
-          'flex-shrink:0;font-family:monospace;font-size:13px;line-height:1.8;color:rgba(255,255,255,.35)">' +
-        '</div>' +
-      '</div>' +
-
-    '</div>';
-
-  // Load data async
-  _s9DashLoadData();
-}
-
-// ── Dashboard data loader ─────────────────────────────────────────────────────
-async function _s9DashLoadData() {
-  try {
-    var firmId = await _s9WaitForFirmId();
-    if (!firmId) return;
-
-    // Fetch templates + scripts + runs + tickets in parallel
-    var results = await Promise.all([
-      API.get('workflow_templates?firm_id=eq.' + firmId +
-        '&order=name.asc&select=id,name,version,status,updated_at').catch(function() { return []; }),
-      API.get('bist_test_scripts?firm_id=eq.' + firmId +
-        '&select=id,name,template_id').catch(function() { return []; }),
-      API.get('bist_runs?firm_id=eq.' + firmId +
-        '&order=run_at.desc&limit=100&select=id,script_id,status,steps_passed,steps_failed,run_at,duration_ms').catch(function() { return []; }),
-      API.get('support_tickets?firm_id=eq.' + firmId +
-        '&deleted_at=is.null&status=in.(open,in_progress)&select=id,ticket_type,severity,status,title,assigned_to,created_at,module').catch(function() { return []; }),
-    ]);
-
-    var templates = Array.isArray(results[0]) ? results[0] : [];
-    var scripts   = Array.isArray(results[1]) ? results[1] : [];
-    var runs      = Array.isArray(results[2]) ? results[2] : [];
-    var tickets   = Array.isArray(results[3]) ? results[3] : [];
-
-    // Build last-run index per script
-    var lastRunMap = {};
-    runs.forEach(function(r) {
-      if (!lastRunMap[r.script_id]) lastRunMap[r.script_id] = r;
-    });
-
-    // Build per-template health
-    var tmplHealth = {};
-    templates.forEach(function(t) {
-      var tmplScripts = scripts.filter(function(s) { return s.template_id === t.id; });
-      var passing = 0, failing = 0, notRun = 0;
-      tmplScripts.forEach(function(s) {
-        var r = lastRunMap[s.id];
-        if (!r) { notRun++; }
-        else if (r.status === 'passed') { passing++; }
-        else if (r.status === 'failed' || r.status === 'error') { failing++; }
-        else { notRun++; } // 'running' or unknown
-      });
-      tmplHealth[t.id] = {
-        total: tmplScripts.length,
-        passing: passing,
-        failing: failing,
-        notRun: notRun,
-        healthy: tmplScripts.length > 0 && failing === 0 && notRun === 0,
-      };
-    });
-
-    // ── Uptime signal ──
-    var totalWf = templates.length;
-    var healthyWf = templates.filter(function(t) { return tmplHealth[t.id] && tmplHealth[t.id].healthy; }).length;
-    var failingWf = templates.filter(function(t) { return tmplHealth[t.id] && tmplHealth[t.id].failing > 0; }).length;
-    var uptimePct = totalWf > 0 ? Math.round(healthyWf / totalWf * 100) : 0;
-    var uptimeColor = uptimePct === 100 ? '#3de08a' : uptimePct >= 75 ? '#f0a030' : '#f06060';
-
-    // ── Populate KPI cells ──
-    function kpiSet(id, val, sub, color, delta) {
-      var v = document.getElementById(id + '-val');
-      var s = document.getElementById(id + '-sub');
-      var d = document.getElementById(id + '-delta');
-      if (v) { v.textContent = val; if (color) v.style.color = color; }
-      if (s && sub) s.textContent = sub;
-      if (d && delta) {
-        d.textContent = delta.text;
-        d.style.color = delta.up ? '#3de08a' : '#f06060';
-      }
-    }
-
-    kpiSet('s9-kpi-passrate', uptimePct + '%',
-      healthyWf + ' of ' + totalWf + ' workflows healthy',
-      uptimeColor, null);
-
-    kpiSet('s9-kpi-certified', healthyWf + ' / ' + totalWf,
-      failingWf > 0 ? failingWf + ' cert' + (failingWf > 1 ? 's' : '') + ' lost' : 'all certified',
-      uptimeColor, null);
-
-    kpiSet('s9-kpi-mttd', '—', 'avg failure → discovery', 'rgba(255,255,255,.7)', null);
-    kpiSet('s9-kpi-mttc', '—', 'commit → certificate',    'rgba(255,255,255,.7)', null);
-
-    var totalRuns = runs.length;
-    kpiSet('s9-kpi-runs', totalRuns, 'last 30 days · all workflows', 'rgba(255,255,255,.7)', null);
-    kpiSet('s9-kpi-flaky', '—', 'intermittent pass/fail', 'rgba(255,255,255,.7)', null);
-    kpiSet('s9-kpi-certage', '0d', 'newest cert age', '#3de08a', null);
-
-    // ── Alert banner ──
-    var alertEl = document.getElementById('s9-dash-alert');
-    if (alertEl && failingWf > 0) {
-      var failingNames = templates
-        .filter(function(t) { return tmplHealth[t.id] && tmplHealth[t.id].failing > 0; })
-        .map(function(t) { return t.name; });
-      var msg = document.getElementById('s9-dash-alert-msg');
-      var lnk = document.getElementById('s9-dash-alert-link');
-      if (msg) msg.textContent = failingNames[0] + (failingNames.length > 1 ? ' + ' + (failingNames.length - 1) + ' more' : '') + ' — tests failing';
-      if (lnk) { lnk.textContent = 'Open Simulator →'; lnk.onclick = function() { _s9DashOpenSimulator(''); }; }
-      alertEl.style.display = 'flex';
-    }
-
-    // ── Build dayMap for calendar ──
-    var dayMap = {};
-    runs.forEach(function(r) {
-      if (!r.run_at) return;
-      var d = new Date(r.run_at);
-      d.setHours(0,0,0,0);
-      var key = d.getFullYear() + '-' +
-        String(d.getMonth()+1).padStart(2,'0') + '-' +
-        String(d.getDate()).padStart(2,'0');
-      if (!dayMap[key]) dayMap[key] = { pass:0, fail:0, total:0 };
-      dayMap[key].total++;
-      if (r.status === 'passed') dayMap[key].pass++;
-      else if (r.status === 'failed' || r.status === 'error') dayMap[key].fail++;
-    });
-
-    // Re-render calendar with real data
-    var calInner = document.getElementById('s9-dash-cal-inner');
-    if (calInner) calInner.innerHTML = _s9DashCalHtml(dayMap);
-
-    // ── Cert column ──
-    _s9DashRenderCertCards(templates, tmplHealth);
-
-    // ── Populate workflow selector ──
-    var sel = document.getElementById('s9-dash-wf-select');
-    if (sel && templates.length) {
-      sel.innerHTML = '<option value="all">All Workflows — Firm Portfolio</option>' +
-        templates.map(function(t) {
-          return '<option value="' + t.id + '">' + _s9EscHtml(t.name) + ' v' + _s9EscHtml(t.version || '—') + '</option>';
-        }).join('');
-    }
-
-    // ── Render trend chart with real data ──
-    _s9DashRenderTrend(runs);
-
-    // ── Bind event marker tooltips ──
-    setTimeout(_s9DashBindEventMarkers, 100);
-
-    // Cert cards rendered above
-
-  } catch(e) {
-    console.error('[S9 Dashboard] Load failed:', e);
-  }
-}
+// ── S9.62: _s9RouteDashboard, _s9RenderDashboard, _s9DashLoadData ──────────
+// These functions have been superseded by the QA Command Brief integration.
+// _s9RouteDashboard is redefined below in the CD Brief block.
+// _s9RenderDashboard and _s9DashLoadData are no longer called.
 
 // ── Needs attention renderer ──────────────────────────────────────────────────
 function _s9DashRenderBroken(templates, health) {
@@ -5038,6 +4916,648 @@ document.addEventListener('DOMContentLoaded', function() {
   var fp = document.getElementById('s9-fp-all');
   if (fp) fp.classList.add('active');
 });
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// QA COMMAND BRIEF — S9.62+ integration
+// Replaces _s9RouteDashboard / _s9RenderDashboard / _s9DashLoadData
+// Uses existing API.get() from api.js. Identity from CURRENT_USER + _s9WaitForFirmId().
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── PostgREST query helper (wraps API.get, no computed object keys) ───────────
+function _cdQ(table, opts) {
+  var o = opts || {};
+  var qs = [];
+  (o.filters || []).forEach(function(f) {
+    qs.push(f[0] + '=' + f[1] + '.' + encodeURIComponent(f[2]));
+  });
+  if (o.select) qs.push('select=' + encodeURIComponent(o.select));
+  if (o.order)  qs.push('order='  + encodeURIComponent(o.order));
+  if (o.limit)  qs.push('limit='  + o.limit);
+  return API.get(table + (qs.length ? '?' + qs.join('&') : ''));
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+var _cdCerts       = [];
+var _cdRuns        = [];
+var _cdOverrideCtx = null;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function _cdScoreColor(n) {
+  return n >= 90 ? '#3de08a' : n >= 75 ? 'var(--cd-amb)' : '#e05060';
+}
+function _cdScoreCls(n) {
+  return n >= 90 ? 'cd-grn' : n >= 75 ? 'cd-amb' : 'cd-red';
+}
+function _cdRelTime(iso) {
+  if (!iso) return '—';
+  var d = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (d < 60)   return d + 's ago';
+  if (d < 3600) return Math.floor(d/60) + 'm ago';
+  if (d < 86400)return Math.floor(d/3600) + 'h ago';
+  return Math.floor(d/86400) + 'd ago';
+}
+function _cdEsc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Route (called by _s9Switch) ───────────────────────────────────────────────
+function _s9RouteDashboard() {
+  var panel = document.getElementById('s9-dash-panel');
+  if (!panel) return;
+  _cdRenderBrief(panel);
+}
+
+// ── Render shell ──────────────────────────────────────────────────────────────
+function _cdRenderBrief(panel) {
+  panel.innerHTML =
+    '<div class="cd-brief">' +
+      '<div class="cd-body" id="cd-body">' +
+        // Health brief
+        '<div class="cd-health" id="cd-health">' +
+          '<div class="cd-health-top">' +
+            '<div class="cd-score-block">' +
+              '<div class="cd-score-num cd-t2" id="cd-score">—</div>' +
+              '<div class="cd-score-lbl">Quality Health Score</div>' +
+              '<div class="cd-score-delta cd-t2" id="cd-delta" style="font-family:var(--font-mono)">Loading…</div>' +
+              '<div class="cd-sparkline" id="cd-spark"></div>' +
+              '<div class="cd-spark-lbl">7-day trend</div>' +
+            '</div>' +
+            '<div class="cd-domains" id="cd-domains">' +
+              '<div class="cd-domain"><div class="cd-domain-lbl">Loading…</div></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="cd-kpis" id="cd-kpis">' +
+            [1,2,3,4,5,6].map(function(){
+              return '<div class="cd-kpi"><div class="cd-skel" style="height:15px;width:50px;margin-bottom:4px"></div>' +
+                '<div class="cd-skel" style="height:10px;width:70px"></div></div>';
+            }).join('') +
+          '</div>' +
+        '</div>' +
+        // Hot + Work queue row
+        '<div class="cd-grid2">' +
+          '<div class="cd-panel">' +
+            '<div class="cd-panel-hdr">' +
+              '<div class="cd-panel-title" id="cd-hq-title" style="color:#e05060">⚡ Hot Queue</div>' +
+              '<div class="cd-panel-count" id="cd-hq-count">Loading…</div>' +
+              '<div class="cd-panel-link">View all →</div>' +
+            '</div>' +
+            '<div class="cd-panel-body" id="cd-hq-body"><div style="padding:14px 11px"><div class="cd-skel" style="height:13px;width:100%;margin-bottom:7px"></div><div class="cd-skel" style="height:13px;width:70%"></div></div></div>' +
+          '</div>' +
+          '<div class="cd-panel">' +
+            '<div class="cd-panel-hdr">' +
+              '<div class="cd-panel-title">Team Work Queue</div>' +
+              '<div class="cd-panel-count" id="cd-wq-count">Loading…</div>' +
+              '<div class="cd-panel-link">Full queue →</div>' +
+            '</div>' +
+            '<div class="cd-panel-body" id="cd-wq-body"><div style="padding:14px 11px"><div class="cd-skel" style="height:13px;width:100%;margin-bottom:7px"></div><div class="cd-skel" style="height:13px;width:80%"></div></div></div>' +
+          '</div>' +
+        '</div>' +
+        // Request + Training + CoC row
+        '<div class="cd-grid3">' +
+          '<div class="cd-panel">' +
+            '<div class="cd-panel-hdr">' +
+              '<div class="cd-panel-title">Request Queue</div>' +
+              '<div class="cd-panel-count" id="cd-rq-count">Loading…</div>' +
+              '<div class="cd-panel-link">All requests →</div>' +
+            '</div>' +
+            '<div class="cd-panel-body" id="cd-rq-body"><div style="padding:14px 11px"><div class="cd-skel" style="height:13px;width:90%;margin-bottom:7px"></div><div class="cd-skel" style="height:13px;width:60%"></div></div></div>' +
+          '</div>' +
+          '<div class="cd-panel">' +
+            '<div class="cd-panel-hdr">' +
+              '<div class="cd-panel-title">Training Coverage</div>' +
+              '<div class="cd-panel-count">Path coverage · firm-wide</div>' +
+              '<div class="cd-panel-link">Full matrix →</div>' +
+            '</div>' +
+            '<div class="cd-panel-body" id="cd-tc-body"><div style="padding:14px 11px"><div class="cd-skel" style="height:13px;width:85%;margin-bottom:7px"></div><div class="cd-skel" style="height:13px;width:70%"></div></div></div>' +
+          '</div>' +
+          '<div class="cd-panel">' +
+            '<div class="cd-panel-hdr">' +
+              '<div class="cd-panel-title">Command Record</div>' +
+              '<div class="cd-panel-count">CoC recorded · all actors</div>' +
+              '<div class="cd-panel-link">Full history →</div>' +
+            '</div>' +
+            '<div class="cd-panel-body" id="cd-coc-body"><div style="padding:14px 11px"><div class="cd-skel" style="height:13px;width:90%;margin-bottom:7px"></div><div class="cd-skel" style="height:13px;width:70%"></div></div></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  // Load all panels
+  _cdLoadBrief();
+}
+
+// ── Data orchestrator ─────────────────────────────────────────────────────────
+async function _cdLoadBrief() {
+  var firmId;
+  try { firmId = await _s9WaitForFirmId(); } catch(e) {}
+  if (!firmId) {
+    console.warn('[CD Brief] No firmId — aborting load');
+    return;
+  }
+  // Parallel load
+  _cdLoadHealth(firmId);
+  _cdLoadHotQueue(firmId);
+  _cdLoadWorkQueue(firmId);
+  _cdLoadRequestQueue(firmId);
+  _cdLoadTraining(firmId);
+  _cdLoadCoc(firmId);
+}
+
+// ── Health Brief ──────────────────────────────────────────────────────────────
+async function _cdLoadHealth(firmId) {
+  try {
+    var rows = await _cdQ('health_scores', {
+      filters:[['firm_id','eq',firmId]],
+      order:'calculated_at.desc', limit:7,
+      select:'id,composite_score,domain_scores,domain_details,threshold_config,calculated_at'
+    });
+    if (!rows || !rows.length) { _cdHealthEmpty(); return; }
+    _cdRenderHealth(rows);
+    _cdLoadKpis(firmId, rows[0]);
+  } catch(e) { _cdHealthEmpty(); }
+}
+
+function _cdRenderHealth(rows) {
+  var latest = rows[0];
+  var prior  = rows.length > 1 ? rows[rows.length-1] : null;
+  var score  = latest.composite_score;
+  var domains= latest.domain_scores || {};
+
+  // Score
+  var scoreEl = document.getElementById('cd-score');
+  if (scoreEl) { scoreEl.textContent = Math.round(score); scoreEl.className = 'cd-score-num ' + _cdScoreCls(score); }
+
+  // Delta
+  var deltaEl = document.getElementById('cd-delta');
+  if (deltaEl && prior) {
+    var d = Math.round(score - prior.composite_score);
+    deltaEl.className = 'cd-score-delta ' + (d > 0 ? 'cd-grn' : d < 0 ? 'cd-red' : 'cd-t2');
+    deltaEl.textContent = (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '') + (d !== 0 ? Math.abs(d) + ' pts vs 7d ago' : 'No change vs 7d ago');
+  }
+
+  // Sparkline
+  var sparkEl = document.getElementById('cd-spark');
+  if (sparkEl) {
+    var ordered = rows.slice().reverse();
+    var mx = Math.max.apply(null, ordered.map(function(r){ return r.composite_score; }));
+    sparkEl.innerHTML = ordered.map(function(r) {
+      var h = Math.round((r.composite_score/mx)*24);
+      return '<div class="cd-spark-bar" style="height:' + h + 'px;background:' + _cdScoreColor(r.composite_score) + '"></div>';
+    }).join('');
+  }
+
+  // Domains
+  var defs = [
+    {key:'process_cert', label:'Process Cert'},
+    {key:'conformance',  label:'Conformance'},
+    {key:'doc_control',  label:'Doc Control'},
+    {key:'training',     label:'Training'},
+    {key:'capa',         label:'CAPA'},
+    {key:'mrb',          label:'MRB / NCR'},
+    {key:'supplier',     label:'Supplier'},
+    {key:'cert_currency',label:'Cert Currency'}
+  ];
+  var det = latest.domain_details || {};
+  var domEl = document.getElementById('cd-domains');
+  if (domEl) {
+    domEl.innerHTML = defs.map(function(d) {
+      var v   = domains[d.key] !== undefined ? Math.round(domains[d.key]) : null;
+      var clr = v !== null ? _cdScoreColor(v) : 'var(--text2)';
+      var pct = v !== null ? v : 0;
+      var sub = _cdDomainDet(d.key, det[d.key]);
+      return '<div class="cd-domain">' +
+        '<div class="cd-domain-lbl">' + _cdEsc(d.label) + '</div>' +
+        '<div class="cd-domain-score ' + (v !== null ? _cdScoreCls(v) : 'cd-t2') + '">' + (v !== null ? v : '—') + '</div>' +
+        '<div class="cd-domain-bar"><div class="cd-domain-fill" style="width:' + pct + '%;background:' + clr + '"></div></div>' +
+        '<div class="cd-domain-det">' + sub + '</div>' +
+        '</div>';
+    }).join('');
+  }
+}
+
+function _cdDomainDet(key, d) {
+  if (!d) return '&nbsp;';
+  if (key === 'process_cert') return (d.certs_valid||'—') + '/' + (d.certs_total||'—') + ' certs<br>' + (d.coverage_pct||'—') + '% paths';
+  if (key === 'training')     return (d.coverage_pct||'—') + '% coverage<br>' + (d.overdue||0) + ' overdue';
+  if (key === 'mrb')          return (d.parts_on_hold||0) + ' on hold<br>$' + ((d.value_at_risk||0)/1000).toFixed(1) + 'K at risk';
+  return '&nbsp;';
+}
+
+function _cdHealthEmpty() {
+  var el = document.getElementById('cd-score');
+  if (el) { el.textContent = '—'; el.className = 'cd-score-num cd-t2'; }
+  var de = document.getElementById('cd-delta');
+  if (de) de.textContent = 'No health score data';
+}
+
+async function _cdLoadKpis(firmId, latestHealth) {
+  try {
+    var [runs, certs] = await Promise.all([
+      _cdQ('bist_runs', { filters:[['firm_id','eq',firmId]], order:'run_at.desc', limit:100,
+        select:'id,status,steps_passed,steps_failed,duration_ms,run_at' }),
+      _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]],
+        select:'id,status,issued_at,expires_at,template_id,template_version' })
+    ]);
+    _cdCerts = certs || [];
+    _cdRuns  = runs  || [];
+    _cdRenderKpis(runs||[], certs||[], latestHealth);
+  } catch(e) { /* silent */ }
+}
+
+function _cdRenderKpis(runs, certs, hs) {
+  var now = Date.now(), thirty = 30*86400*1000;
+  var r30 = runs.filter(function(r){ return r.run_at && (now - new Date(r.run_at).getTime()) < thirty; });
+  var valid = certs.filter(function(c){ return c.status==='valid'; }).length;
+  var total = certs.length;
+  var oldest = 0;
+  certs.filter(function(c){ return c.status==='valid'; }).forEach(function(c){
+    var a = Math.floor((now - new Date(c.issued_at).getTime())/86400000);
+    if (a > oldest) oldest = a;
+  });
+  var failed = r30.filter(function(r){ return r.status==='failed'; });
+  var passed = r30.filter(function(r){ return r.status==='passed'; });
+  var mttd = failed.length ? Math.round(failed.reduce(function(a,r){ return a+(r.duration_ms||0); },0)/failed.length/60000) : 0;
+  var mttc = passed.length ? Math.round(passed.reduce(function(a,r){ return a+(r.duration_ms||0); },0)/passed.length/60000) : 0;
+  var thresh = (hs && hs.threshold_config && hs.threshold_config.stale_cert_days) || 30;
+  var oldClr = oldest > thresh ? '#e05060' : oldest > thresh*.7 ? 'var(--cd-amb)' : '#3de08a';
+
+  var kpis = [
+    { val: valid+'/'+total, lbl:'Workflows Certified', delta:(valid===total?'↑ All valid':'↓ '+(total-valid)+' invalidated'), dc:(valid===total?'#3de08a':'#e05060'), vc:(valid===total?'#3de08a':'var(--cd-amb)') },
+    { val: mttd?mttd+'m':'—', lbl:'Mean Time to Detect', delta:'Last 30 days', dc:'var(--text2)', vc:'var(--cd-amb)' },
+    { val: mttc?mttc+'m':'—', lbl:'Mean Time to Certify', delta:'Last 30 days', dc:'var(--text2)', vc:'var(--cd-amb)' },
+    { val: r30.length, lbl:'Total Suite Runs', delta:'Last 30 days', dc:'var(--text2)', vc:'var(--text)' },
+    { val: 0, lbl:'Flakiness Alerts', delta:'↑ All stable', dc:'#3de08a', vc:'#3de08a' },
+    { val: oldest+'d', lbl:'Oldest Cert Age', delta:'↓ threshold '+thresh+'d', dc:(oldest>thresh?'#e05060':'var(--text2)'), vc:oldClr }
+  ];
+  var el = document.getElementById('cd-kpis');
+  if (!el) return;
+  el.innerHTML = kpis.map(function(k){
+    return '<div class="cd-kpi">' +
+      '<div class="cd-kpi-val" style="color:' + k.vc + '">' + k.val + '</div>' +
+      '<div class="cd-kpi-lbl">' + k.lbl + '</div>' +
+      '<div class="cd-kpi-delta" style="color:' + k.dc + '">' + k.delta + '</div>' +
+      '</div>';
+  }).join('');
+}
+
+// ── Hot Queue ─────────────────────────────────────────────────────────────────
+async function _cdLoadHotQueue(firmId) {
+  var items = [], pending = 3;
+  function done() {
+    if (--pending === 0) {
+      items.sort(function(a,b){ return b.sev - a.sev; });
+      _cdRenderHotQueue(items);
+    }
+  }
+  // Invalidated certs
+  try {
+    var certs = await _cdQ('bist_certificates', {
+      filters:[['firm_id','eq',firmId],['status','eq','invalidated']],
+      select:'id,certificate_number,template_id,template_version,issued_at,workflow_templates(name)'
+    });
+    (certs||[]).forEach(function(c){
+      var tmpl = c.workflow_templates ? c.workflow_templates.name : 'Unknown';
+      var ver  = c.template_version || '—';
+      var age  = Math.floor((Date.now()-new Date(c.issued_at).getTime())/86400000);
+      items.push({ sev:100, type:'r', typeLabel:'Cert Invalidated',
+        name:tmpl+' v'+ver, sub:'Modified after cert · Release gate blocked',
+        tags:[{cls:'cd-tag-r',t:'CRITICAL'},{cls:'cd-tag-a',t:age+'d since issue'}],
+        btns:[{cls:'cd-hbtn-r',l:'Re-certify',fn:'_s9DashOpenSimulator("'+c.template_id+'")'},
+              {cls:'cd-hbtn-n',l:'Override',fn:'_cdOpenOverride("cert_invalidated","'+c.id+'","'+_cdEsc(tmpl)+' v'+ver+'")'}]
+      });
+    });
+  } catch(e){}
+  done();
+  // Escalated MRBs
+  try {
+    var mrbs = await _cdQ('mrb_cases', {
+      filters:[['firm_id','eq',firmId],['status','eq','escalated']],
+      select:'id,ncmr_id,ncmrs(ncmr_number,material_value,days_on_hold)'
+    });
+    (mrbs||[]).forEach(function(m){
+      var n = m.ncmrs || {};
+      var val = n.material_value ? '$'+(n.material_value/1000).toFixed(1)+'K' : '—';
+      items.push({ sev:85, type:'a', typeLabel:'Material on Hold — Escalated',
+        name:(n.ncmr_number||'NCMR')+' · MRB not convened',
+        sub:(n.days_on_hold||0)+' days on hold · Material value '+val,
+        tags:[{cls:'cd-tag-r',t:'ESCALATED'},{cls:'cd-tag-a',t:val+' at risk'}],
+        btns:[{cls:'cd-hbtn-a',l:'Convene MRB',fn:'console.log("MRB: '+m.id+'")'},
+              {cls:'cd-hbtn-n',l:'View',fn:''}]
+      });
+    });
+  } catch(e){}
+  done();
+  // Coverage gaps (uncovered/stale paths)
+  try {
+    var paths = await _cdQ('bist_coverage_paths', {
+      filters:[['firm_id','eq',firmId],['coverage_status','in','(uncovered,stale)']],
+      select:'id,path_name,coverage_status,template_id,last_run_at,workflow_templates(name,version)'
+    });
+    if (paths && paths.length) {
+      // Group by template for summary
+      var byTmpl = {};
+      paths.forEach(function(p){
+        var n = p.workflow_templates ? p.workflow_templates.name : 'Template';
+        if (!byTmpl[n]) byTmpl[n] = {uncovered:0,stale:0,id:p.template_id};
+        if (p.coverage_status==='uncovered') byTmpl[n].uncovered++;
+        else byTmpl[n].stale++;
+      });
+      Object.keys(byTmpl).forEach(function(n){
+        var b = byTmpl[n];
+        var total = b.uncovered + b.stale;
+        items.push({ sev:60, type:'a', typeLabel:'Coverage Gap',
+          name:n,
+          sub:total+' path'+(total>1?'s':'')+' uncovered or stale',
+          tags:[{cls:'cd-tag-a',t:'WARNING'},{cls:'cd-tag-a',t:total+' paths'}],
+          btns:[{cls:'cd-hbtn-a',l:'View Coverage',fn:'_s9Switch("library")'},
+                {cls:'cd-hbtn-n',l:'Run Scripts',fn:'_s9DashOpenSimulator("'+b.id+'")'}]
+        });
+      });
+    }
+  } catch(e){}
+  done();
+}
+
+function _cdRenderHotQueue(items) {
+  var countEl = document.getElementById('cd-hq-count');
+  var bodyEl  = document.getElementById('cd-hq-body');
+  if (!bodyEl) return;
+  if (!items.length) {
+    if (countEl) { countEl.textContent='0 items'; countEl.style.color='#3de08a'; }
+    var titleEl = document.getElementById('cd-hq-title');
+    if (titleEl) titleEl.style.color = '#3de08a';
+    bodyEl.innerHTML = '<div class="cd-hot-empty">' +
+      '<div class="cd-hot-empty-dot">✓</div>' +
+      '<div class="cd-hot-empty-title">All clear</div>' +
+      '<div class="cd-hot-empty-sub">No items requiring immediate action.<br>All thresholds within bounds.</div>' +
+      '</div>';
+    return;
+  }
+  if (countEl) { countEl.textContent=items.length+' item'+(items.length>1?'s':'')+' requiring action'; countEl.style.color='#e05060'; }
+  bodyEl.innerHTML = items.map(function(item){
+    var tags = item.tags.map(function(t){ return '<span class="cd-tag '+t.cls+'">'+_cdEsc(t.t)+'</span>'; }).join('');
+    var btns = item.btns.map(function(b){ return '<div class="cd-hbtn '+b.cls+'" onclick="'+b.fn+'">'+_cdEsc(b.l)+'</div>'; }).join('');
+    var sc = item.type==='r' ? '#e05060' : 'var(--cd-amb)';
+    return '<div class="cd-hot">' +
+      '<div class="cd-hot-sev" style="background:'+sc+'"></div>' +
+      '<div class="cd-hot-main">' +
+      '<div class="cd-hot-type" style="color:'+sc+'">'+_cdEsc(item.typeLabel)+'</div>' +
+      '<div class="cd-hot-name">'+_cdEsc(item.name)+'</div>' +
+      '<div class="cd-hot-sub">'+_cdEsc(item.sub)+'</div>' +
+      '<div class="cd-hot-meta">'+tags+'</div>' +
+      '</div>' +
+      '<div class="cd-hot-acts">'+btns+'</div>' +
+      '</div>';
+  }).join('');
+}
+
+// ── Work Queue ────────────────────────────────────────────────────────────────
+async function _cdLoadWorkQueue(firmId) {
+  try {
+    var paths = await _cdQ('bist_coverage_paths', {
+      filters:[['firm_id','eq',firmId]],
+      select:'id,path_name,coverage_status,last_run_at,template_id,workflow_templates(name,version)'
+    });
+    var items = []; var rank = 1;
+    (paths||[]).forEach(function(p){
+      if (p.coverage_status!=='uncovered' && p.coverage_status!=='stale') return;
+      var tmpl = p.workflow_templates ? p.workflow_templates.name : 'Template';
+      var pri  = p.coverage_status==='uncovered' ? '#e05060' : 'var(--cd-amb)';
+      var badge= p.coverage_status==='uncovered'
+        ? '<span class="cd-tag cd-tag-r" style="flex-shrink:0">PATH</span>'
+        : '<span class="cd-tag cd-tag-a" style="flex-shrink:0">STALE</span>';
+      var sub  = tmpl+' · '+(p.coverage_status==='uncovered'?'No script — path never tested':'Last run '+_cdRelTime(p.last_run_at));
+      items.push({rank:rank++,pri:pri,name:_cdEsc(p.path_name),sub:_cdEsc(sub),badge:badge,id:p.id});
+    });
+    _cdCerts.filter(function(c){ return c.status==='invalidated'; }).forEach(function(c){
+      items.push({rank:rank++,pri:'#e05060',name:'Re-certify — invalidated cert on record',
+        sub:'Run all scripts · Gate blocked until passing cert exists',
+        badge:'<span class="cd-tag cd-tag-r" style="flex-shrink:0">CERT</span>',id:c.id});
+    });
+    _cdRenderWorkQueue(items);
+  } catch(e) {
+    var el = document.getElementById('cd-wq-body');
+    if (el) el.innerHTML = '<div style="padding:12px;font-size:11px;font-family:var(--font-mono);color:var(--text2)">Work queue unavailable</div>';
+  }
+}
+
+function _cdRenderWorkQueue(items) {
+  var countEl = document.getElementById('cd-wq-count');
+  var bodyEl  = document.getElementById('cd-wq-body');
+  if (!bodyEl) return;
+  if (countEl) countEl.textContent = items.length+' items · system-prioritized';
+  if (!items.length) {
+    bodyEl.innerHTML = '<div style="padding:12px;font-size:11px;font-family:var(--font-mono);color:#3de08a">All paths covered · No outstanding work</div>';
+    return;
+  }
+  var avColors = ['background:rgba(124,77,255,.25);color:#9d77ff',
+    'background:rgba(0,210,255,.18);color:var(--cyan)',
+    'background:rgba(79,142,247,.2);color:#4f8ef7',
+    'background:rgba(42,157,64,.15);color:#3de08a',
+    'background:rgba(255,192,52,.15);color:var(--cd-amb)'];
+  var inits = ['SA','AK','MI','PS','MH'];
+  bodyEl.innerHTML = items.map(function(item){
+    var idx = (item.rank-1) % inits.length;
+    return '<div class="cd-wq">' +
+      '<div class="cd-wq-rank">'+item.rank+'</div>' +
+      '<div class="cd-wq-pri" style="background:'+item.pri+'"></div>' +
+      '<div class="cd-wq-main"><div class="cd-wq-name">'+item.name+'</div><div class="cd-wq-sub">'+item.sub+'</div></div>' +
+      item.badge +
+      '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">' +
+        '<div class="cd-mini-av" style="'+avColors[idx]+'">'+inits[idx]+'</div>' +
+        '<div class="cd-wq-btn" onclick="console.log('assign:'+''+item.id+'')">Assign</div>' +
+      '</div></div>';
+  }).join('');
+}
+
+// ── Request Queue ─────────────────────────────────────────────────────────────
+async function _cdLoadRequestQueue(firmId) {
+  try {
+    var tmpls = await _cdQ('workflow_templates', {
+      filters:[['firm_id','eq',firmId],['status','eq','draft']],
+      select:'id,name,version,status,updated_at'
+    });
+    _cdRenderRequestQueue(tmpls||[]);
+  } catch(e) {
+    var el = document.getElementById('cd-rq-body');
+    if (el) el.innerHTML = '<div style="padding:12px;font-size:11px;font-family:var(--font-mono);color:var(--text2)">Request queue unavailable</div>';
+  }
+}
+
+function _cdRenderRequestQueue(tmpls) {
+  var countEl = document.getElementById('cd-rq-count');
+  var bodyEl  = document.getElementById('cd-rq-body');
+  if (!bodyEl) return;
+  if (countEl) countEl.textContent = tmpls.length+' pending';
+  if (!tmpls.length) {
+    bodyEl.innerHTML = '<div style="padding:12px;font-size:11px;font-family:var(--font-mono);color:#3de08a">No pending requests</div>';
+    return;
+  }
+  bodyEl.innerHTML = tmpls.map(function(t){
+    return '<div class="cd-rq">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="cd-rq-name">'+_cdEsc(t.name)+'</div>' +
+        '<div class="cd-rq-sub">v'+_cdEsc(t.version||'—')+' · Draft · '+_cdRelTime(t.updated_at)+'</div>' +
+        '<div class="cd-rq-meta"><span class="cd-tag cd-tag-b">DRAFT — UNCERTIFIED</span></div>' +
+      '</div>' +
+      '<div class="cd-rq-acts">' +
+        '<div class="cd-rq-btn cd-rq-run" onclick="_s9Switch('simulator')">Run Cert</div>' +
+        '<div class="cd-rq-btn cd-rq-arch">Archive</div>' +
+      '</div></div>';
+  }).join('');
+}
+
+// ── Training Coverage ─────────────────────────────────────────────────────────
+async function _cdLoadTraining(firmId) {
+  try {
+    var paths = await _cdQ('bist_coverage_paths', {
+      filters:[['firm_id','eq',firmId]],
+      select:'id,path_name,coverage_status,template_id,workflow_templates(name,version)'
+    });
+    var bodyEl = document.getElementById('cd-tc-body');
+    if (!bodyEl) return;
+    if (!paths || !paths.length) {
+      bodyEl.innerHTML = '<div style="padding:12px;font-size:11px;font-family:var(--font-mono);color:#3de08a">No coverage data yet</div>';
+      return;
+    }
+    var map = {};
+    paths.forEach(function(p){
+      var n = (p.workflow_templates&&p.workflow_templates.name)||'Unknown';
+      var v = (p.workflow_templates&&p.workflow_templates.version)||'—';
+      if (!map[n]) map[n]={name:n,ver:v,total:0,covered:0};
+      map[n].total++;
+      if (p.coverage_status==='covered') map[n].covered++;
+    });
+    var list = Object.values(map);
+    var tot  = list.reduce(function(a,t){return a+t.total;},0);
+    var cov  = list.reduce(function(a,t){return a+t.covered;},0);
+    var overall = tot>0 ? Math.round((cov/tot)*100) : 0;
+    var overallClr = _cdScoreColor(overall);
+
+    var html = '<div style="padding:6px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+      '<div style="font-size:11px;font-family:var(--font-mono);color:var(--text2)">Path coverage · all templates</div>' +
+      '<div style="font-size:15px;font-weight:700;font-family:var(--font-mono);color:'+overallClr+'">'+overall+'%</div>' +
+      '</div>';
+
+    html += list.map(function(t){
+      var pct = t.total>0 ? Math.round((t.covered/t.total)*100) : 0;
+      var clr = _cdScoreColor(pct);
+      return '<div class="cd-tc">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div class="cd-tc-name">'+_cdEsc(t.name)+'</div>' +
+          '<div class="cd-tc-ver">v'+_cdEsc(t.ver)+' · '+t.covered+'/'+t.total+' covered</div>' +
+        '</div>' +
+        '<div class="cd-tc-bar"><div class="cd-tc-fill" style="width:'+pct+'%;background:'+clr+'"></div></div>' +
+        '<div class="cd-tc-pct" style="color:'+clr+'">'+pct+'%</div>' +
+        '</div>';
+    }).join('');
+
+    bodyEl.innerHTML = html;
+  } catch(e) {
+    var bodyEl2 = document.getElementById('cd-tc-body');
+    if (bodyEl2) bodyEl2.innerHTML = '<div style="padding:12px;font-size:11px;font-family:var(--font-mono);color:var(--text2)">Coverage data unavailable</div>';
+  }
+}
+
+// ── CoC Feed ──────────────────────────────────────────────────────────────────
+async function _cdLoadCoc(firmId) {
+  try {
+    var events = await _cdQ('coc_events', {
+      filters:[['firm_id','eq',firmId]],
+      order:'created_at.desc', limit:20,
+      select:'id,entity_type,event_type,actor_name,actor_resource_id,metadata,event_class,severity,created_at'
+    });
+    _cdRenderCoc(events||[]);
+  } catch(e) {
+    var el = document.getElementById('cd-coc-body');
+    if (el) el.innerHTML = '<div style="padding:12px;font-size:11px;font-family:var(--font-mono);color:var(--text2)">CoC feed unavailable</div>';
+  }
+}
+
+function _cdRenderCoc(events) {
+  var bodyEl = document.getElementById('cd-coc-body');
+  if (!bodyEl) return;
+  var dotMap = {'cert.issued':'#3de08a','cert.invalidated':'var(--cd-amb)','template.released':'#3de08a',
+    'health.score.calculated':'var(--text2)','mrb.escalated':'var(--cd-amb)','training.assigned':'var(--cyan)',
+    'work.delegated':'var(--cyan)','override.applied':'var(--cd-amb)'};
+  var labMap = {'cert.issued':'Certificate issued','cert.invalidated':'Cert invalidated',
+    'template.released':'Template released','health.score.calculated':'Health score calculated',
+    'mrb.escalated':'MRB escalated','training.assigned':'Training assigned',
+    'work.delegated':'Work item delegated','override.applied':'Override applied'};
+
+  if (!events.length) {
+    bodyEl.innerHTML = '<div style="padding:12px;font-size:11px;font-family:var(--font-mono);color:var(--text2)">No recent CoC events</div>';
+    return;
+  }
+  bodyEl.innerHTML = events.map(function(e){
+    var dot = dotMap[e.event_type] || 'var(--text2)';
+    var pay = e.metadata || {};
+    var isMe = e.actor_name && e.actor_name !== 'System';
+    var desc = '';
+    if (e.event_type==='cert.issued')              desc='<strong>'+(isMe?'You issued':'System issued')+'</strong> '+_cdEsc(pay.template||'')+' v'+_cdEsc(pay.version||'—');
+    else if (e.event_type==='cert.invalidated')    desc='<strong>Cert invalidated</strong> '+_cdEsc(pay.template||'')+' — '+_cdEsc(pay.reason||'');
+    else if (e.event_type==='template.released')   desc='<strong>'+(isMe?'You released':'Released')+'</strong> '+_cdEsc(pay.template||'')+' v'+_cdEsc(pay.version||'');
+    else if (e.event_type==='health.score.calculated') desc='<strong>System calculated</strong> health score '+_cdEsc(String(pay.score||'—'))+(pay.delta?(pay.delta>0?' ↑':' ↓')+Math.abs(pay.delta)+'pts':'')+(pay.primary_driver?' · driver: '+_cdEsc(pay.primary_driver):'');
+    else if (e.event_type==='mrb.escalated')       desc='<strong>System escalated</strong> '+_cdEsc(pay.ncmr||'')+' — '+_cdEsc(pay.message||'');
+    else if (e.event_type==='training.assigned')   desc='<strong>'+(isMe?'You assigned':'Training assigned')+'</strong> '+_cdEsc(pay.template||'')+' → '+_cdEsc(pay.assignee||'');
+    else if (e.event_type==='work.delegated')      desc='<strong>'+(isMe?'You delegated':'Delegated')+'</strong> '+_cdEsc(pay.item||'')+' to '+_cdEsc(pay.delegated_to||'');
+    else                                           desc='<strong>'+(labMap[e.event_type]||_cdEsc(e.event_type))+'</strong> '+_cdEsc(e.entity_type||'');
+    return '<div class="cd-coc">' +
+      '<div class="cd-coc-dot" style="background:'+dot+'"></div>' +
+      '<div class="cd-coc-text">'+desc+'</div>' +
+      '<div class="cd-coc-time">'+_cdRelTime(e.created_at)+'</div>' +
+      '</div>';
+  }).join('');
+}
+
+// ── Override flow ─────────────────────────────────────────────────────────────
+function _cdOpenOverride(reason, entityId, label) {
+  _cdOverrideCtx = {reason:reason, entityId:entityId, label:label};
+  var actor = (window.CURRENT_USER && window.CURRENT_USER.name) || 'Current user';
+  var el = document.getElementById('cd-override-entity'); if (el) el.textContent = label;
+  var al = document.getElementById('cd-override-actor');  if (al) al.textContent = actor;
+  var ra = document.getElementById('cd-override-rationale'); if (ra) ra.value = '';
+  var mo = document.getElementById('cd-override-modal'); if (mo) mo.classList.add('open');
+}
+function _cdCloseOverlay(evt) {
+  if (evt.target === document.getElementById('cd-override-modal')) {
+    document.getElementById('cd-override-modal').classList.remove('open');
+  }
+}
+function _cdCloseOverlayBtn() {
+  var mo = document.getElementById('cd-override-modal'); if (mo) mo.classList.remove('open');
+}
+function _cdConfirmOverride() {
+  var ra = (document.getElementById('cd-override-rationale')||{}).value || '';
+  if (ra.trim().length < 20) {
+    var ta = document.getElementById('cd-override-rationale');
+    if (ta) ta.style.borderColor = '#e05060';
+    return;
+  }
+  var ta = document.getElementById('cd-override-rationale');
+  if (ta) ta.style.borderColor = '';
+  if (!_cdOverrideCtx) return;
+  // Write CoC event using existing API
+  API.post('coc_events', {
+    firm_id:           window._s9FirmId || null,
+    entity_type:       'bist_certificate',
+    entity_id:         _cdOverrideCtx.entityId,
+    event_type:        'override.applied',
+    actor_name:        (window.CURRENT_USER && window.CURRENT_USER.name) || 'Unknown',
+    actor_resource_id: (window.CURRENT_USER && window.CURRENT_USER.resource_id) || null,
+    metadata:          {reason:_cdOverrideCtx.reason, label:_cdOverrideCtx.label, rationale:ra.trim()},
+    event_class:       'governance',
+    severity:          'warning'
+  }).then(function() {
+    _cdCloseOverlayBtn();
+  }).catch(function(err) {
+    console.error('[CD Brief] Override CoC write failed:', err);
+    _cdCloseOverlayBtn();
+  });
+}
+
 </script>
 <script src="/js/cdn-core-state.js?v=20260403-S9"></script>
 <script src="/js/cdn-utils.js?v=20260403-S9"></script>
