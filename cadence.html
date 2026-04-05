@@ -980,7 +980,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.65 — Dashboard history-style layout · Cache-buster SE30','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.66 — Fix dismiss onclick · Cache-buster SE30a','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -3817,7 +3817,7 @@ async function _s9RenderDashboard(panel) {
       '<span>✗</span>' +
       '<span id="s9-dash-alert-msg"></span>' +
       '<span id="s9-dash-alert-link" style="color:#5fd4c8;cursor:pointer;text-decoration:underline;font-size:10px"></span>' +
-      '<span onclick="document.getElementById('s9-dash-alert').style.display='none'" ' +
+      '<span onclick="document.getElementById(\'s9-dash-alert\').style.display=\'none\'" ' +
         'style="margin-left:auto;cursor:pointer;color:rgba(255,255,255,.3);font-size:16px;line-height:1">×</span>' +
     '</div>' +
 
@@ -4791,7 +4791,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-support.js?v=20260405-SUP1"></script>
 <script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE30"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE30a"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
