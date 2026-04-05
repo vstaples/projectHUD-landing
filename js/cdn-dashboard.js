@@ -69,7 +69,7 @@
     + '.cd-panel-count{font-size:12px;font-family:var(--font-mono);color:rgba(255,255,255,.65)}\n'
     + '.cd-panel-link{font-size:12px;color:var(--cyan);cursor:pointer;font-family:var(--font-mono);letter-spacing:.03em;transition:color .1s}\n'
     + '.cd-panel-link:hover{color:#fff}\n'
-    + '.cd-panel-body{flex:1;overflow-y:auto;max-height:240px}\n'
+    + '.cd-panel-body{flex:1;overflow-y:auto;max-height:280px}\n'
     + '.cd-panel-body::-webkit-scrollbar{width:2px}\n'
     + '.cd-panel-body::-webkit-scrollbar-thumb{background:var(--border2)}\n'
     + '\n'
@@ -414,7 +414,7 @@ function _cdRenderBrief(panel) {
           '<div class="cd-panel">' +
             '<div class="cd-panel-hdr">' +
               '<div class="cd-panel-title">Command Record</div>' +
-              '<div class="cd-panel-count">CoC recorded · all actors</div>' +
+              '<div class="cd-panel-count" id="cd-coc-count">CoC recorded · all actors</div>' +
               '<div class="cd-panel-link">Full history →</div>' +
             '</div>' +
             '<div class="cd-panel-body" id="cd-coc-body"><div style="padding:14px 11px"><div class="cd-skel" style="height:13px;width:90%;margin-bottom:7px"></div><div class="cd-skel" style="height:13px;width:70%"></div></div></div>' +
@@ -873,34 +873,123 @@ async function _cdLoadCoc(firmId) {
 function _cdRenderCoc(events) {
   var bodyEl = document.getElementById('cd-coc-body');
   if (!bodyEl) return;
-  var dotMap = {'cert.issued':'#3de08a','cert.invalidated':'var(--cd-amb)','template.released':'#3de08a',
-    'health.score.calculated':'var(--text2)','mrb.escalated':'var(--cd-amb)','training.assigned':'var(--cyan)',
-    'work.delegated':'var(--cyan)','override.applied':'var(--cd-amb)'};
-  var labMap = {'cert.issued':'Certificate issued','cert.invalidated':'Cert invalidated',
-    'template.released':'Template released','health.score.calculated':'Health score calculated',
-    'mrb.escalated':'MRB escalated','training.assigned':'Training assigned',
-    'work.delegated':'Work item delegated','override.applied':'Override applied'};
+  var dotMap = {
+    'cert.issued':              '#3de08a',
+    'cert.invalidated':         'var(--cd-amb)',
+    'template.released':        '#3de08a',
+    'template.created':         'var(--cyan)',
+    'template.updated':         'var(--cyan)',
+    'template.archived':        'var(--text2)',
+    'health.score.calculated':  'var(--text2)',
+    'mrb.escalated':            'var(--cd-amb)',
+    'training.assigned':        'var(--cyan)',
+    'training.completed':       '#3de08a',
+    'work.delegated':           'var(--cyan)',
+    'override.applied':         'var(--cd-amb)',
+    'form.saved':               'var(--cyan)',
+    'form.state_changed':       'var(--cyan)',
+    'form.submitted':           '#3de08a',
+    'instance.started':         'var(--cyan)',
+    'instance.completed':       '#3de08a',
+    'instance.cancelled':       'var(--text2)',
+    'step.completed':           '#3de08a',
+    'step.approved':            '#3de08a',
+    'step.rejected':            'var(--cd-amb)',
+  };
+  var labMap = {
+    'cert.issued':             'certified',
+    'cert.invalidated':        'cert invalidated',
+    'template.released':       'released to Library',
+    'template.created':        'created template',
+    'template.updated':        'updated template',
+    'template.archived':       'archived template',
+    'health.score.calculated': 'health score calculated',
+    'mrb.escalated':           'MRB escalated',
+    'training.assigned':       'assigned training',
+    'training.completed':      'completed training',
+    'work.delegated':          'delegated work item',
+    'override.applied':        'applied override',
+    'form.saved':              'saved',
+    'form.state_changed':      'updated status of',
+    'form.submitted':          'submitted',
+    'instance.started':        'started instance of',
+    'instance.completed':      'completed',
+    'instance.cancelled':      'cancelled',
+    'step.completed':          'completed step in',
+    'step.approved':           'approved step in',
+    'step.rejected':           'rejected step in',
+  };
+  // Human-readable actor label
+  function _cdActorLabel(e) {
+    if (!e.actor_name || e.actor_name === 'System') return null;
+    var cu = window.CURRENT_USER;
+    if (cu && (e.actor_name === cu.name || e.actor_name === (cu.first_name + ' ' + cu.last_name).trim())) return 'You';
+    // Shorten to first name only
+    return e.actor_name.split(' ')[0];
+  }
+  // Clean entity label — strip internal prefixes/suffixes
+  function _cdEntityLabel(entityType) {
+    if (!entityType) return '';
+    return entityType.replace(/_/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  }
+
+  // Update header to reflect current user context
+  var cocCount = document.getElementById('cd-coc-count');
+  if (cocCount) {
+    var cu = window.CURRENT_USER;
+    var myEvents = cu ? events.filter(function(e){
+      return e.actor_name && (e.actor_name === cu.name ||
+        e.actor_name === (cu.first_name+' '+cu.last_name).trim());
+    }).length : 0;
+    cocCount.textContent = myEvents + ' my actions · CoC recorded';
+  }
 
   if (!events.length) {
     bodyEl.innerHTML = '<div style="padding:12px;font-size:11px;font-family:var(--font-mono);color:var(--text2)">No recent CoC events</div>';
     return;
   }
   bodyEl.innerHTML = events.map(function(e){
-    var dot = dotMap[e.event_type] || 'var(--text2)';
-    var pay = e.metadata || {};
-    var isMe = e.actor_name && e.actor_name !== 'System';
+    var dot  = dotMap[e.event_type] || 'var(--text2)';
+    var pay  = e.metadata || {};
+    var actor = _cdActorLabel(e);
+    var actorStr = actor ? '<strong>' + _cdEsc(actor) + '</strong> ' : '';
     var desc = '';
-    if (e.event_type==='cert.issued')              desc='<strong>'+(isMe?'You issued':'System issued')+'</strong> '+_cdEsc(pay.template||'')+' v'+_cdEsc(pay.version||'—');
-    else if (e.event_type==='cert.invalidated')    desc='<strong>Cert invalidated</strong> '+_cdEsc(pay.template||'')+' — '+_cdEsc(pay.reason||'');
-    else if (e.event_type==='template.released')   desc='<strong>'+(isMe?'You released':'Released')+'</strong> '+_cdEsc(pay.template||'')+' v'+_cdEsc(pay.version||'');
-    else if (e.event_type==='health.score.calculated') desc='<strong>System calculated</strong> health score '+_cdEsc(String(pay.score||'—'))+(pay.delta?(pay.delta>0?' ↑':' ↓')+Math.abs(pay.delta)+'pts':'')+(pay.primary_driver?' · driver: '+_cdEsc(pay.primary_driver):'');
-    else if (e.event_type==='mrb.escalated')       desc='<strong>System escalated</strong> '+_cdEsc(pay.ncmr||'')+' — '+_cdEsc(pay.message||'');
-    else if (e.event_type==='training.assigned')   desc='<strong>'+(isMe?'You assigned':'Training assigned')+'</strong> '+_cdEsc(pay.template||'')+' → '+_cdEsc(pay.assignee||'');
-    else if (e.event_type==='work.delegated')      desc='<strong>'+(isMe?'You delegated':'Delegated')+'</strong> '+_cdEsc(pay.item||'')+' to '+_cdEsc(pay.delegated_to||'');
+    if (e.event_type==='cert.issued')
+      desc = actorStr + 'certified <strong>' + _cdEsc(pay.template||e.entity_type||'workflow') + '</strong>' + (pay.version?' v'+_cdEsc(pay.version):'');
+    else if (e.event_type==='cert.invalidated')
+      desc = '<strong>Cert invalidated</strong> — ' + _cdEsc(pay.template||e.entity_type||'') + (pay.reason?' · '+_cdEsc(pay.reason):'');
+    else if (e.event_type==='template.released')
+      desc = actorStr + 'released <strong>' + _cdEsc(pay.template||e.entity_type||'') + '</strong>' + (pay.version?' v'+_cdEsc(pay.version):'') + ' to Library';
+    else if (e.event_type==='template.created' || e.event_type==='template.updated')
+      desc = actorStr + _cdEsc(labMap[e.event_type]) + ' <strong>' + _cdEsc(pay.template||e.entity_type||'') + '</strong>';
+    else if (e.event_type==='health.score.calculated')
+      desc = '<strong>System</strong> calculated health score <strong>' + _cdEsc(String(pay.score||'—')) + '</strong>'
+        + (pay.delta ? (pay.delta>0?' ↑':' ↓') + Math.abs(pay.delta) + ' pts' : '')
+        + (pay.primary_driver ? ' · driver: ' + _cdEsc(pay.primary_driver) : '');
+    else if (e.event_type==='mrb.escalated')
+      desc = '<strong>System</strong> escalated <strong>' + _cdEsc(pay.ncmr||e.entity_type||'MRB') + '</strong>' + (pay.message?' — '+_cdEsc(pay.message):'');
+    else if (e.event_type==='training.assigned')
+      desc = actorStr + 'assigned training <strong>' + _cdEsc(pay.template||e.entity_type||'') + '</strong>' + (pay.assignee?' → '+_cdEsc(pay.assignee):'');
+    else if (e.event_type==='training.completed')
+      desc = actorStr + 'completed <strong>' + _cdEsc(pay.template||e.entity_type||'training') + '</strong>';
+    else if (e.event_type==='work.delegated')
+      desc = actorStr + 'delegated <strong>' + _cdEsc(pay.item||e.entity_type||'item') + '</strong>' + (pay.delegated_to?' → '+_cdEsc(pay.delegated_to):'');
+    else if (e.event_type==='override.applied')
+      desc = actorStr + 'applied override on <strong>' + _cdEsc(pay.label||e.entity_type||'item') + '</strong>';
+    else if (e.event_type==='form.saved' || e.event_type==='form.submitted')
+      desc = actorStr + _cdEsc(labMap[e.event_type]||'saved') + ' <strong>' + _cdEsc(pay.form_name||pay.name||_cdEntityLabel(e.entity_type)) + '</strong>';
+    else if (e.event_type==='form.state_changed')
+      desc = actorStr + 'updated <strong>' + _cdEsc(pay.form_name||pay.name||_cdEntityLabel(e.entity_type)) + '</strong>'
+        + (pay.from&&pay.to ? ' · ' + _cdEsc(pay.from) + ' → ' + _cdEsc(pay.to) : '');
+    else if (e.event_type==='instance.started' || e.event_type==='instance.completed' || e.event_type==='instance.cancelled')
+      desc = actorStr + _cdEsc(labMap[e.event_type]||e.event_type.split('.')[1]) + ' <strong>' + _cdEsc(pay.template||pay.name||_cdEntityLabel(e.entity_type)) + '</strong>';
+    else if (e.event_type==='step.completed' || e.event_type==='step.approved' || e.event_type==='step.rejected')
+      desc = actorStr + _cdEsc(labMap[e.event_type]||e.event_type.split('.')[1]) + ' <strong>' + _cdEsc(pay.step||pay.name||_cdEntityLabel(e.entity_type)) + '</strong>';
     else {
-      var evLabel = labMap[e.event_type] || e.event_type.replace(/[._]/g,' ');
-      var evActor = e.actor_name && e.actor_name !== 'System' ? e.actor_name : null;
-      desc = '<strong>'+(evActor?evActor+':':'')+_cdEsc(evLabel)+'</strong>'+(e.entity_type?' · '+_cdEsc(e.entity_type):'');
+      // Generic fallback — clean verb from event type, no raw internal names
+      var verb = (labMap[e.event_type] || e.event_type.replace(/[._]/g,' ')).toLowerCase();
+      var obj  = pay.template||pay.name||pay.form_name||_cdEntityLabel(e.entity_type)||'';
+      desc = actorStr + _cdEsc(verb) + (obj ? ' <strong>' + _cdEsc(obj) + '</strong>' : '');
     }
     return '<div class="cd-coc">' +
       '<div class="cd-coc-dot" style="background:'+dot+'"></div>' +
