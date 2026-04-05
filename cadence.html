@@ -964,7 +964,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.57 — Coverage DOM fix · Cache-buster SE28b','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.58 — Coverage self-heal · Cache-buster SE28c','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1068,10 +1068,11 @@ function _s9RouteSim() {
     }
   }
 
-  // Render a proper Simulator panel in s9-sim-panel (never cad-content)
+  // Always re-render sim panel to pick up state changes (sub-tab, source, etc.)
   var content = document.getElementById('s9-sim-panel');
   if (content) {
     _s9RenderSimPanel(content);
+    // _s9RenderSimPanel already calls _s9LoadSimScripts + _s9PopulateTemplateSelector
   }
 
   
@@ -2949,6 +2950,19 @@ async function _s9LoadSimScripts(templateId, version) {
 function _s9SwitchSimSubTab(tab) {
   _s9SimSubTab = tab;
 
+  // If sub-tab panels don't exist yet, re-render the sim panel first
+  if (!document.getElementById('s9-subtab-scripts')) {
+    var simPanel = document.getElementById('s9-sim-panel');
+    if (simPanel) {
+      _s9RenderSimPanel(simPanel);
+      var tmplR = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+      if (tmplR && tmplR.id) {
+        _s9LoadSimScripts(tmplR.id, tmplR.version || '0.0.0');
+        _s9PopulateTemplateSelector();
+      }
+    }
+  }
+
   // Update tab strip styles
   ['scripts','coverage','history'].forEach(function(t) {
     var el = document.getElementById('s9-simsubtab-' + t);
@@ -3818,7 +3832,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-dag-viewer.js?v=20260403-S9"></script>
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE28b"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE28c"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
