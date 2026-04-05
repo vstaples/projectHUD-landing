@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE23','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260404-SE25','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -230,10 +230,10 @@ var SE_CSS = '<style id="se-css">' + [
 'background:var(--se-bg0);border-radius:3px;border:1px solid var(--se-b)}',
 '.se-arow.fail{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.04)}',
 '.se-arow.pass{border-color:rgba(74,222,128,.25)}',
-'.se-a-lbl{font-size:12px;color:rgba(255,255,255,.75);font-family:Arial,sans-serif;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+'.se-a-lbl{font-size:12px;color:rgba(255,255,255,.75);font-family:Arial,sans-serif;width:150px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
 '.se-a-check{font-size:12px;color:var(--se-teal);font-family:monospace;flex:1}',
 '.se-a-op{font-size:12px;font-weight:700;color:var(--se-amb);font-family:monospace;flex-shrink:0}',
-'.se-a-val{font-size:12px;color:var(--se-t2);font-family:monospace;flex:1}',
+'.se-a-val{font-size:12px;color:var(--se-t2);font-family:monospace;flex-shrink:0}',
 '.se-a-res{font-size:12px;font-weight:700;margin-left:auto;flex-shrink:0}',
 '.se-a-del{background:none;border:none;color:rgba(255,255,255,.15);',
 'cursor:pointer;font-size:13px;padding:0 0 0 3px;line-height:1}',
@@ -626,9 +626,9 @@ function _seRenderCard(stp, idx, sc, lastRun) {
         '  After step 3, confirm it was approved.',
         '  If rejected instead — this assertion fails.'
       ].join('\n');
-      html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;margin-top:6px">';
-      html += '<span style="'+FA3+'font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5)">Assertions</span>';
-      html += '<span style="'+FA3+'font-size:11px;color:rgba(255,255,255,.3)">— checks that run after this step</span>';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;margin-top:8px">';
+      html += '<span style="'+FA3+'font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5fd4c8">Confirmations</span>';
+      html += '<span style="'+FA3+'font-size:12px;color:rgba(255,255,255,.5)">that run when step completes</span>';
       html += '<span title="'+assertHelp+'" style="width:15px;height:15px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);'+
         'display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:rgba(255,255,255,.5);cursor:help;margin-left:auto">?</span>';
       html += '</div>';
@@ -654,28 +654,31 @@ function _seRenderCard(stp, idx, sc, lastRun) {
           if (subject === 'instance') {
             label = prop === 'status' ? 'Workflow status' : 'Workflow · ' + prop;
           } else if (stepN !== null) {
-            var stepObj = _seTmplStepBySeq(stepN);
-            var stepName = stepObj ? stepObj.name.replace(/^(Checklist|Form|Approval|Finalize|Final):\s*/i,'') : 'Step '+stepN;
             if (prop === 'state') {
-              if (cardSeq !== null && stepN === cardSeq)      label = stepName + ' end state';
-              else if (cardSeq !== null && stepN === cardSeq + 1) label = 'Next task state';
-              else if (cardSeq !== null && stepN < cardSeq)       label = stepName + ' state';
-              else                                                  label = stepName + ' state';
+              if (cardSeq !== null && stepN === cardSeq)           label = 'This task end state:';
+              else if (cardSeq !== null && stepN === cardSeq + 1)  label = 'Next task state:';
+              else if (cardSeq !== null && stepN < cardSeq)        label = 'Step '+stepN+' state:';
+              else                                                   label = 'Step '+stepN+' state:';
             } else if (prop === 'outcome') {
-              label = stepName + ' outcome';
+              if (cardSeq !== null && stepN === cardSeq)           label = 'This task action:';
+              else                                                   label = 'Step '+stepN+' action:';
             } else if (prop === 'loops') {
-              label = stepName + ' loop count';
+              if (cardSeq !== null && stepN === cardSeq)           label = 'This task loop count:';
+              else                                                   label = 'Step '+stepN+' loops:';
             }
           }
         }
 
         html += '<div class="'+aRowCls+'">';
+        // Column 1: plain-English label
         if (label) {
-          // Show plain-English label; raw check path on hover
-          html += '<span class="se-a-lbl" title="'+_seEsc(a.check)+'">'+_seEsc(label)+'</span>';
+          html += '<span class="se-a-lbl">'+_seEsc(label)+'</span>';
         } else {
-          html += '<span class="se-a-check">'+_seEsc(a.check)+'</span>';
+          html += '<span class="se-a-lbl" style="color:var(--se-teal);font-family:monospace">'+_seEsc(a.check)+'</span>';
         }
+        // Column 2: technical path in teal (always shown)
+        html += '<span style="font-family:monospace;font-size:12px;color:var(--se-teal);width:140px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_seEsc(a.check)+'">'+_seEsc(a.check)+'</span>';
+        // Column 3: operator + value
         html += '<span class="se-a-op">'+opKey+'</span>';
         html += '<span class="se-a-val">'+_seEsc(String(aVal))+'</span>';
         if (aPass === true)  html += '<span class="se-a-res" style="color:var(--se-grn)">✓</span>';
@@ -1642,5 +1645,5 @@ window.seShowRunHistory = function seShowRunHistory() {
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE23 — Assertion rows: plain-English label column, raw check on hover',
+console.log('%c[cdn-script-editor] v20260404-SE25 — Assertion rows: 3-column label|path|eq-value per mockup',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
