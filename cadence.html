@@ -2873,13 +2873,14 @@ function _s9ExportCertPdf() {
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
     '<title>Validation Certificate</title>' +
     '<style>' +
-      'body{margin:0;padding:0;background:#fff}' +
-      '@media print{@page{margin:10mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}' +
+      'body{margin:0;padding:20px;background:#fff}' +
+      '#s9-cert-wrap{max-height:none!important;overflow:visible!important;box-shadow:none!important;width:100%!important;max-width:680px!important;margin:0 auto}' +
+      '@media print{@page{margin:12mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}#s9-cert-wrap{max-height:none!important;overflow:visible!important}}' +
     '</style></head><body>' +
     certWrap.outerHTML +
     '<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script>' +
     '</body></html>';
-  var win = window.open('', '_blank', 'width=740,height=960');
+  var win = window.open('', '_blank', 'width=740,height=800');
   if (win) { win.document.write(html); win.document.close(); }
 }
 
@@ -4859,8 +4860,9 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-dag-viewer.js?v=20260403-S9"></script>
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-support.js?v=20260405-SUP1"></script>
-<script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-dashboard.js?v=20260406-CD1"></script>
+<script src="/js/cdn-bist.js?v=20260406-BQ4"></script>
+<script src="/js/cdn-dashboard.js?v=20260406-CD5"></script>
+<script src="/js/cdn-conformance.js?v=20260406-CF1"></script>
 <script src="/js/cdn-script-editor.js?v=20260405-SE30e"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>

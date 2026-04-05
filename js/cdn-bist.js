@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260406-BQ2 — T3 arc fix: seq-based card resolution survives reuse','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260406-BQ4 — cert-gated release · Supabase persist · cert invalidation on draft revert','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // ── SE13 patches (2026-04-04) ───────────────────────────────────────────────
 // 1. Reverted SE12's step_route_back emission from explicit route branch.
 //    It fired before step_pass, resetting T2 cards to blue before they went green.
@@ -662,27 +662,30 @@ async function _bistCleanup(instId, mode) {
 }
 
 async function runGateCheck(templateId, version) {
-  const [scripts, allRuns] = await Promise.all([
-    API.get(`bist_test_scripts?firm_id=eq.${FIRM_ID_CAD}&template_id=eq.${templateId}&order=created_at.asc`).catch(()=>[]),
-    API.get(`bist_runs?firm_id=eq.${FIRM_ID_CAD}&template_version=eq.${version}&order=run_at.desc&limit=200`).catch(()=>[]),
+  const [scripts, allRuns, certs] = await Promise.all([
+    API.get('bist_test_scripts?firm_id=eq.'+FIRM_ID_CAD+'&template_id=eq.'+templateId+'&order=created_at.asc').catch(()=>[]),
+    API.get('bist_runs?firm_id=eq.'+FIRM_ID_CAD+'&template_version=eq.'+version+'&order=run_at.desc&limit=200').catch(()=>[]),
+    API.get('bist_certificates?firm_id=eq.'+FIRM_ID_CAD+'&template_id=eq.'+templateId+'&template_version=eq.'+version+'&status=eq.valid&order=issued_at.desc&limit=1').catch(()=>[]),
   ]);
 
-  if (!scripts?.length) return { tier: 0, results: [] };
+  if (!scripts || !scripts.length) return { tier: 0, results: [], cert: null };
 
-  const results = (scripts||[]).map(s => {
-    const latestRun = (allRuns||[]).find(r => r.script_id === s.id);
-    const state = !latestRun            ? 'not_run'
+  const results = (scripts||[]).map(function(s) {
+    const latestRun = (allRuns||[]).find(function(r){ return r.script_id === s.id; });
+    const state = !latestRun ? 'not_run'
                 : latestRun.status === 'passed' ? 'passed'
                 : 'failed';
     return { script: s, run: latestRun || null, state };
   });
 
-  const failed  = results.filter(r => r.state === 'failed');
-  const notRun  = results.filter(r => r.state === 'not_run');
+  const failed   = results.filter(function(r){ return r.state === 'failed'; });
+  const notRun   = results.filter(function(r){ return r.state === 'not_run'; });
+  const validCert = (certs||[])[0] || null;
 
-  if (failed.length)  return { tier: 2, results, failed };
-  if (notRun.length)  return { tier: 1, results, notRun };
-  return { tier: 3, results };
+  if (failed.length)  return { tier: 2, results, failed, cert: validCert };
+  if (notRun.length)  return { tier: 1, results, notRun, cert: validCert };
+  if (!validCert)     return { tier: 2.5, results, cert: null };
+  return { tier: 3, results, cert: validCert };
 }
 
 async function showGateDialog(templateId, version, onProceed) {
@@ -920,13 +923,14 @@ async function onStatusChange() {
 
     if (gate.tier !== 3) {
       if (sel) sel.value = _selectedTmpl.status || 'draft';
-      const msg = gate.tier === 0 ? 'No test coverage — write and pass tests before releasing'
-                : gate.tier === 1 ? 'Tests not run against this version — run tests before releasing'
+      const msg = gate.tier === 0   ? 'No test coverage — write and run tests before releasing'
+                : gate.tier === 1   ? 'Tests not run against this version — run tests before releasing'
+                : gate.tier === 2.5 ? 'All tests passing but no Validation Certificate on record — run all tests via the cockpit to generate one'
                 : 'Tests failing — fix and pass all tests before releasing';
       cadToast(msg, 'error');
       return;
     }
-    // Tier 3 — all passing, fall through
+    // Tier 3 — all passing + valid cert on record, fall through
   }
 
   _proceedRelease(newStatus);
@@ -951,10 +955,46 @@ function _proceedRelease(newStatus) {
   const freshSel = document.getElementById('tmpl-status-sel');
   if (freshSel) freshSel.value = status;
 
+  // Persist status change to Supabase
+  const tmplId  = _selectedTmpl.id;
+  const version = _selectedTmpl.version || '0.0.0';
+  const actorName = (window.CURRENT_USER && window.CURRENT_USER.name) || 'System';
+  const actorId   = (window.CURRENT_USER && window.CURRENT_USER.resource_id) || null;
+
+  API.patch('workflow_templates?id=eq.'+tmplId, { status: status })
+    .then(function() {
+      // Write coc_event
+      const evtType = status === 'released' ? 'template.released' : 'template.updated';
+      API.post('coc_events', {
+        firm_id:           FIRM_ID_CAD,
+        entity_type:       'workflow_template',
+        entity_id:         tmplId,
+        event_type:        evtType,
+        actor_name:        actorName,
+        actor_resource_id: actorId,
+        metadata:          { template: _selectedTmpl.name, version: version, status: status },
+        event_class:       'governance',
+        severity:          'info',
+        occurred_at:       new Date().toISOString(),
+      }).catch(function(e){ console.warn('[BIST] CoC write failed:', e); });
+
+      // If reverting to draft — invalidate any valid cert for this version
+      if (status === 'draft') {
+        API.patch(
+          'bist_certificates?firm_id=eq.'+FIRM_ID_CAD+'&template_id=eq.'+tmplId+'&template_version=eq.'+version+'&status=eq.valid',
+          { status: 'invalidated', revoked_at: new Date().toISOString(), revoke_reason: 'Template reverted to draft' }
+        ).catch(function(e){ console.warn('[BIST] Cert invalidation failed:', e); });
+      }
+
+      console.log('%c[BIST] Template '+status+' persisted — '+_selectedTmpl.name+' v'+version,
+        'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
+    })
+    .catch(function(e){ console.warn('[BIST] workflow_templates patch failed:', e); });
+
   if (status === 'released') {
-    cadToast('Released — template is now read only', 'info');
+    cadToast('Released — template is now read only · persisted to database', 'info');
   } else if (status === 'draft') {
-    cadToast('Back to Draft — editing enabled', 'info');
+    cadToast('Back to Draft — editing enabled · certificate invalidated', 'info');
   }
 }
 
@@ -1581,26 +1621,13 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     if (window._bckCockpitClosed) break;  // closed during script — don't record result
     allResults.push({ name: t.name, status: result.status, runId: result.runId, reason: result.reason });
 
-    // ── Auto-freeze after each test so the final DAG state (including rejection arcs)
-    // stays visible for inspection. User hits RESUME to advance to the next test.
-    // Skip auto-freeze after the last test — cert/footer handles that.
+    // Auto-advance to next test — 800ms pause so DAG is briefly visible, then continue.
+    // User can still manually freeze at any time via the FREEZE button.
     if (ti < TESTS.length - 1) {
       var _autoFreezeAnn = _bckEl('bck-ann');
-      if (_autoFreezeAnn) {
-        _autoFreezeAnn.dataset.preFreeze = _autoFreezeAnn.textContent;
-        _autoFreezeAnn.textContent = 'T'+(ti+1)+' COMPLETE — PRESS RESUME TO CONTINUE';
-        _autoFreezeAnn.className = 'bck-ann';
-      }
-      window._bckFrozen = true;
-      var _fb = document.getElementById('bck-freeze-btn');
-      if (_fb) {
-        _fb.textContent = '\u25b6 RESUME';
-        _fb.style.color = 'rgba(74,222,128,.8)';
-        _fb.style.borderColor = 'rgba(74,222,128,.4)';
-      }
+      if (_autoFreezeAnn) _autoFreezeAnn.textContent = 'T'+(ti+1)+' COMPLETE — LOADING NEXT TEST...';
     }
-    // Small fixed pause then spin on freeze (auto or user-set)
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 800));
     while (_bckFrozen) {
       if (window._bckCockpitClosed) break;
       await new Promise(r => setTimeout(r, 200));
