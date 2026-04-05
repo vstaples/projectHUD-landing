@@ -577,6 +577,7 @@ function _cdRenderKpis(runs, certs, hs) {
   var oldClrVal = oldest === 0 ? '#3de08a' : oldest > thresh ? 'var(--cd-red)' : oldest > thresh * 0.7 ? 'var(--cd-amb)' : '#3de08a';
   var oldClr = oldClrVal;
 
+  console.log('[CD KPI] oldest='+oldest+' thresh='+thresh+' thresh*.7='+(thresh*.7)+' oldClr='+oldClr);
   var kpis = [
     { val: valid+'/'+total, lbl:'Workflows Certified', delta:(valid===total?'↑ All valid':'↓ '+(total-valid)+' invalidated'), dc:(valid===total?'#3de08a':'var(--cd-red)'), vc:(valid===total?'#3de08a':'var(--cd-amb)') },
     { val: mttd?mttd+'m':'—', lbl:'Mean Time to Detect', delta:'Last 30 days', dc:'var(--text2)', vc:'var(--cd-amb)' },
