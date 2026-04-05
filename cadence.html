@@ -980,7 +980,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.63 — Dashboard visual rebuild · Cache-buster SE29a','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.64 — Fix onclick syntax · Cache-buster SE29b','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -3818,7 +3818,7 @@ async function _s9RenderDashboard(panel) {
 
       // Report issue button
       '<div style="padding:12px 16px;display:flex;align-items:center;border-left:1px solid rgba(255,255,255,.06)">' +
-        '<button onclick="typeof supOpenModal==='function' && supOpenModal({module:'cadencehud'})" ' +
+        '<button onclick="typeof supOpenModal===\'function\' && supOpenModal({module:\'cadencehud\'})" ' +
           'style="' + FA + 'font-size:11px;font-weight:700;padding:6px 14px;border-radius:4px;' +
           'border:1px solid rgba(80,144,240,.4);background:rgba(80,144,240,.1);color:#5090f0;' +
           'cursor:pointer;letter-spacing:.04em;white-space:nowrap">⚑ Report Issue</button>' +
@@ -4405,7 +4405,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-support.js?v=20260405-SUP1"></script>
 <script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE29a"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE29b"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
