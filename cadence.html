@@ -3845,14 +3845,12 @@ async function _s9RenderDashboard(panel) {
           // Trend section
           '<div id="s9-dash-trend-section">' +
             '<div style="padding:8px 14px 4px;display:flex;align-items:center;gap:8px">' +
-              '<span style="' + F9 + 'font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#5fd4c8">Portfolio Suite Health — 30 Day Trend</span>' +
+              '<span id="s9-dash-trend-title" style="' + F9 + 'font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#5fd4c8">Portfolio Suite Health — Loading…</span>' +
               '<span style="' + F9 + 'color:rgba(255,255,255,.25)">Composite firm-wide pass rate · all workflows</span>' +
               '<div style="margin-left:auto;display:flex;gap:10px;align-items:center">' +
-                _s9DashLegendItem('#5fd4c8','line','Portfolio') +
-                _s9DashLegendItem('#a78bfa','dot','Commit') +
-                _s9DashLegendItem('#3de08a','dot','Recovery') +
-                _s9DashLegendItem('#f0a030','dot','Stale') +
-                _s9DashLegendItem('#5fd4c8','dot','Cert') +
+                _s9DashLegendItem('#3de08a','dot','All passing') +
+                _s9DashLegendItem('#f0a030','dot','Partial') +
+                _s9DashLegendItem('#f06060','dot','Failing') +
               '</div>' +
             '</div>' +
             '<div style="padding:0 14px 10px;position:relative">' +
@@ -4039,6 +4037,9 @@ async function _s9DashLoadData() {
           return '<option value="' + t.id + '">' + _s9EscHtml(t.name) + ' v' + _s9EscHtml(t.version || '—') + '</option>';
         }).join('');
     }
+
+    // ── Render trend chart with real data ──
+    _s9DashRenderTrend(runs);
 
     // ── Bind event marker tooltips ──
     setTimeout(_s9DashBindEventMarkers, 100);
@@ -4312,58 +4313,259 @@ function _s9DashLegendItem(color, type, label) {
 }
 
 function _s9DashTrendSvg() {
-  // Composite trend line — placeholder data matching the mockup shape
-  var pts = '30,18 90,18 150,18 210,20 270,18 330,18 390,18 440,18 490,20 530,26 570,85 610,105 650,38 700,18 750,18 800,18 850,18 900,18 940,18';
-  var evts = [
-    { x:210, color:'#a78bfa', ev:'c1', title:'Commit', detail:'DRS v0.0.11 — Mar 12' },
-    { x:440, color:'#a78bfa', ev:'c2', title:'Commit', detail:'CRC v0.2.1 — Mar 22 · caused regression' },
-    { x:650, color:'#3de08a', ev:'rec',title:'Recovery', detail:'DRS first full pass — Mar 26' },
-    { x:780, color:'#f0a030', ev:'stl',title:'Stale Breach', detail:'CRC T1 not run in 7d — Apr 2' },
-    { x:920, color:'#5fd4c8', ev:'crt',title:'Certificate', detail:'DRS v0.0.13 certified — Apr 4' },
-  ];
+  // Placeholder — replaced by _s9DashRenderTrend(runs) after data loads
+  return '<div id="s9-dash-trend-wrap" style="position:relative">' +
+    '<div style="height:140px;display:flex;align-items:center;justify-content:center;' +
+      'color:rgba(255,255,255,.2);font-family:Arial,sans-serif;font-size:12px">Loading…</div>' +
+  '</div>';
+}
+
+function _s9DashRenderTrend(runs) {
   var FA = 'font-family:Arial,sans-serif;';
+  var wrap = document.getElementById('s9-dash-trend-wrap');
+  // Also try the section header span for dynamic title
+  var titleEl = document.getElementById('s9-dash-trend-title');
 
-  var svgLines =
-    // grid
-    '<line x1="0" y1="18"  x2="960" y2="18"  stroke="rgba(255,255,255,.04)" stroke-width="1"/>' +
-    '<line x1="0" y1="50"  x2="960" y2="50"  stroke="rgba(255,255,255,.04)" stroke-width="1"/>' +
-    '<line x1="0" y1="82"  x2="960" y2="82"  stroke="rgba(255,255,255,.04)" stroke-width="1"/>' +
-    '<line x1="0" y1="114" x2="960" y2="114" stroke="rgba(255,255,255,.04)" stroke-width="1"/>' +
-    // y labels
-    '<text x="4" y="16"  font-size="8" fill="rgba(255,255,255,.2)" font-family="monospace">100%</text>' +
-    '<text x="4" y="48"  font-size="8" fill="rgba(255,255,255,.2)" font-family="monospace">75%</text>' +
-    '<text x="4" y="80"  font-size="8" fill="rgba(255,255,255,.2)" font-family="monospace">50%</text>' +
-    '<text x="4" y="112" font-size="8" fill="rgba(255,255,255,.2)" font-family="monospace">25%</text>' +
-    // failure region
-    '<rect x="520" y="0" width="140" height="120" fill="rgba(240,96,96,.05)"/>' +
-    // area fill
-    '<defs><linearGradient id="dashGrad" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0%" stop-color="#28d4c0"/>' +
-      '<stop offset="100%" stop-color="#28d4c0" stop-opacity="0"/>' +
-    '</linearGradient></defs>' +
-    '<polygon points="' + pts + ' 940,120 30,120" fill="url(#dashGrad)" opacity="0.1"/>' +
-    // composite line
-    '<polyline points="' + pts + '" fill="none" stroke="#5fd4c8" stroke-width="2.5" stroke-linejoin="round"/>';
+  if (!wrap) return;
 
-  // event markers
-  evts.forEach(function(e) {
-    svgLines +=
-      '<line x1="' + e.x + '" y1="8" x2="' + e.x + '" y2="120" stroke="' + e.color + '" ' +
-        'stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>' +
-      '<circle cx="' + e.x + '" cy="10" r="5" fill="' + e.color + '" ' +
-        'class="s9-dash-evtm" data-ev="' + e.ev + '" ' +
-        'data-title="' + _s9EscHtml(e.title + ' — ' + e.detail) + '" style="cursor:pointer"/>';
+  // ── Build daily pass-rate data from runs ──
+  if (!runs || !runs.length) {
+    wrap.innerHTML =
+      '<div style="height:140px;display:flex;flex-direction:column;align-items:center;' +
+        'justify-content:center;gap:6px">' +
+        '<div style="color:rgba(255,255,255,.2);font-size:12px;' + FA + '">No test run data yet</div>' +
+        '<div style="color:rgba(255,255,255,.15);font-size:12px;' + FA + '">Run test scripts to populate the trend chart</div>' +
+      '</div>';
+    if (titleEl) titleEl.textContent = 'Portfolio Suite Health — No Data';
+    return;
+  }
+
+  // Group runs by date, compute pass rate per day
+  var dayData = {}; // 'YYYY-MM-DD' → { pass, fail, total, runAt }
+  runs.forEach(function(r) {
+    if (!r.run_at) return;
+    var d = new Date(r.run_at);
+    d.setHours(0,0,0,0);
+    var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    if (!dayData[key]) dayData[key] = { pass:0, fail:0, total:0, date:d, key:key };
+    dayData[key].total++;
+    if (r.status === 'passed') dayData[key].pass++;
+    else if (r.status === 'failed' || r.status === 'error') dayData[key].fail++;
   });
 
-  // x labels
-  var xlabels = [[30,'Mar 5'],[210,'Mar 12'],[390,'Mar 19'],[560,'Mar 26'],[720,'Apr 1'],[870,'Apr 4'],[940,'Today']];
-  xlabels.forEach(function(l) {
-    svgLines += '<text x="' + l[0] + '" y="130" font-size="8" fill="rgba(255,255,255,.2)" ' +
-      'text-anchor="middle" font-family="monospace">' + l[1] + '</text>';
+  var keys = Object.keys(dayData).sort();
+  var points = keys.map(function(k) {
+    var e = dayData[k];
+    return {
+      key:   k,
+      date:  e.date,
+      rate:  e.total > 0 ? Math.round(e.pass / e.total * 100) : 0,
+      pass:  e.pass,
+      fail:  e.fail,
+      total: e.total,
+    };
   });
 
-  return '<svg width="100%" height="140" viewBox="0 0 960 140" preserveAspectRatio="none" ' +
-    'id="s9-dash-trend-svg" style="display:block">' + svgLines + '</svg>';
+  // Dynamic title
+  var dayCount = points.length;
+  var titleStr = dayCount === 1 ? '1 Day Trend'
+               : dayCount <= 7 ? dayCount + ' Day Trend'
+               : dayCount <= 31 ? dayCount + ' Day Trend'
+               : dayCount + ' Day Trend';
+  if (titleEl) titleEl.textContent = 'Portfolio Suite Health — ' + titleStr;
+
+  // ── SVG dimensions ──
+  var W = 900, H = 130, padL = 36, padR = 12, padT = 14, padB = 22;
+  var chartW = W - padL - padR;
+  var chartH = H - padT - padB;
+
+  function xOf(i) {
+    return points.length === 1
+      ? padL + chartW / 2
+      : padL + (i / (points.length - 1)) * chartW;
+  }
+  function yOf(rate) {
+    return padT + (1 - rate / 100) * chartH;
+  }
+
+  // ── Grid lines ──
+  var grid = '';
+  [100, 75, 50, 25].forEach(function(pct) {
+    var y = yOf(pct);
+    grid += '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (W-padR) + '" y2="' + y.toFixed(1) + '" ' +
+      'stroke="rgba(255,255,255,.05)" stroke-width="1"/>';
+    grid += '<text x="' + (padL-4) + '" y="' + (y+3).toFixed(1) + '" font-size="9" ' +
+      'fill="rgba(255,255,255,.25)" text-anchor="end" font-family="monospace">' + pct + '%</text>';
+  });
+
+  // ── Line + area ──
+  var pathPts = points.map(function(p, i) {
+    return xOf(i).toFixed(1) + ',' + yOf(p.rate).toFixed(1);
+  }).join(' ');
+
+  var areaClose = ' ' + xOf(points.length-1).toFixed(1) + ',' + (padT+chartH).toFixed(1) +
+    ' ' + xOf(0).toFixed(1) + ',' + (padT+chartH).toFixed(1);
+
+  var lineColor = points.every(function(p) { return p.fail === 0; }) ? '#3de08a'
+                : points.some(function(p)  { return p.fail > 0; })  ? '#5fd4c8'
+                : '#5fd4c8';
+
+  var line = '<defs><linearGradient id="tg' + Date.now() + '" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="' + lineColor + '"/>' +
+    '<stop offset="100%" stop-color="' + lineColor + '" stop-opacity="0"/>' +
+    '</linearGradient></defs>';
+
+  // Failure regions — shade days where fail > 0
+  var failShade = '';
+  points.forEach(function(p, i) {
+    if (p.fail > 0) {
+      var x1 = i > 0 ? (xOf(i-1) + xOf(i)) / 2 : xOf(i) - 8;
+      var x2 = i < points.length-1 ? (xOf(i) + xOf(i+1)) / 2 : xOf(i) + 8;
+      failShade += '<rect x="' + x1.toFixed(1) + '" y="' + padT + '" ' +
+        'width="' + (x2-x1).toFixed(1) + '" height="' + chartH + '" ' +
+        'fill="rgba(240,96,96,.07)"/>';
+    }
+  });
+
+  var area = '<polygon points="' + pathPts + areaClose + '" fill="' + lineColor + '" opacity="0.08"/>';
+  var path = '<polyline points="' + pathPts + '" fill="none" stroke="' + lineColor + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+
+  // Data points — dots on each day
+  var dots = points.map(function(p, i) {
+    var dotColor = p.fail > 0 ? '#f06060' : p.rate === 100 ? '#3de08a' : '#f0a030';
+    return '<circle cx="' + xOf(i).toFixed(1) + '" cy="' + yOf(p.rate).toFixed(1) + '" ' +
+      'r="3" fill="' + dotColor + '" stroke="' + lineColor + '" stroke-width="1" ' +
+      'class="s9-trend-dot" data-idx="' + i + '"/>';
+  }).join('');
+
+  // X-axis labels — smart spacing
+  var xLabels = '';
+  var labelEvery = Math.max(1, Math.ceil(points.length / 7));
+  points.forEach(function(p, i) {
+    if (i % labelEvery !== 0 && i !== points.length - 1) return;
+    var fmt = p.date.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+    xLabels += '<text x="' + xOf(i).toFixed(1) + '" y="' + (padT+chartH+14) + '" ' +
+      'font-size="9" fill="rgba(255,255,255,.25)" text-anchor="middle" font-family="monospace">' +
+      fmt + '</text>';
+  });
+
+  // Invisible hover overlay segments
+  var hoverSegs = points.map(function(p, i) {
+    var x1 = i > 0 ? (xOf(i-1) + xOf(i)) / 2 : padL;
+    var x2 = i < points.length-1 ? (xOf(i) + xOf(i+1)) / 2 : W-padR;
+    return '<rect x="' + x1.toFixed(1) + '" y="' + padT + '" ' +
+      'width="' + (x2-x1).toFixed(1) + '" height="' + (chartH+padB) + '" ' +
+      'fill="transparent" class="s9-trend-seg" data-idx="' + i + '" ' +
+      'onmouseenter="_s9DashTrendHover(event,' + i + ')" ' +
+      'onmousemove="_s9DashTrendHover(event,' + i + ')" ' +
+      'onmouseleave="_s9DashTrendHide()"/>';
+  }).join('');
+
+  // Crosshair line
+  var crosshair = '<line id="s9-trend-crosshair" x1="0" y1="' + padT + '" x2="0" y2="' + (padT+chartH) + '" ' +
+    'stroke="rgba(255,255,255,.2)" stroke-width="1" stroke-dasharray="3 3" style="display:none"/>';
+
+  var svgId = 's9-dash-trend-svg';
+  var svg = '<svg id="' + svgId + '" width="100%" height="' + H + '" ' +
+    'viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="display:block;overflow:visible">' +
+    line + failShade + grid + area + path + dots + xLabels + hoverSegs + crosshair +
+  '</svg>';
+
+  // Tooltip div
+  var tipDiv = '<div id="s9-trend-tip" style="position:absolute;display:none;' +
+    'background:#1a1f2e;border:1px solid rgba(255,255,255,.15);border-radius:4px;' +
+    'padding:10px 12px;font-family:monospace;font-size:13px;color:rgba(255,255,255,.9);' +
+    'min-width:200px;z-index:99;pointer-events:none;' +
+    'box-shadow:0 8px 24px rgba(0,0,0,.6)"></div>';
+
+  wrap.innerHTML = svg + tipDiv;
+
+  // Store points for hover handler
+  wrap._trendPoints = points;
+  wrap._trendW = W;
+  wrap._trendPadL = padL;
+  wrap._trendPadR = padR;
+  wrap._trendPadT = padT;
+  wrap._trendChartW = chartW;
+  wrap._trendChartH = chartH;
+  wrap._trendLineColor = lineColor;
+}
+
+function _s9DashTrendHover(e, idx) {
+  var wrap = document.getElementById('s9-dash-trend-wrap');
+  var tip  = document.getElementById('s9-trend-tip');
+  var cross = document.getElementById('s9-trend-crosshair');
+  if (!wrap || !tip || !wrap._trendPoints) return;
+
+  var p = wrap._trendPoints[idx];
+  if (!p) return;
+
+  var FA = 'font-family:Arial,sans-serif;';
+  var dotColor = p.fail > 0 ? '#f06060' : p.rate === 100 ? '#3de08a' : '#f0a030';
+  var statusStr = p.fail === 0 && p.total > 0 ? 'All passing'
+                : p.pass === 0 && p.fail > 0  ? 'All failing'
+                : p.total === 0               ? 'No runs'
+                : 'Partial — ' + p.fail + ' failing';
+
+  tip.innerHTML =
+    '<div style="' + FA + 'font-size:13px;font-weight:700;color:#5fd4c8;margin-bottom:6px">' +
+      p.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}) +
+    '</div>' +
+    '<div style="' + FA + 'font-size:22px;font-weight:700;color:' + dotColor + ';line-height:1;margin-bottom:6px">' +
+      p.rate + '%' +
+    '</div>' +
+    '<div style="display:flex;flex-direction:column;gap:3px">' +
+      '<div style="display:flex;justify-content:space-between;gap:16px;' + FA + 'font-size:12px">' +
+        '<span style="color:rgba(255,255,255,.4)">Status</span>' +
+        '<span style="color:' + dotColor + ';font-weight:700">' + statusStr + '</span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;gap:16px;' + FA + 'font-size:12px">' +
+        '<span style="color:rgba(255,255,255,.4)">Runs</span>' +
+        '<span style="color:rgba(255,255,255,.85)">' + p.total + '</span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;gap:16px;' + FA + 'font-size:12px">' +
+        '<span style="color:rgba(255,255,255,.4)">Passing</span>' +
+        '<span style="color:#3de08a">' + p.pass + '</span>' +
+      '</div>' +
+      (p.fail > 0
+        ? '<div style="display:flex;justify-content:space-between;gap:16px;' + FA + 'font-size:12px">' +
+            '<span style="color:rgba(255,255,255,.4)">Failing</span>' +
+            '<span style="color:#f06060">' + p.fail + '</span>' +
+          '</div>'
+        : '') +
+    '</div>';
+
+  // Position tooltip — prefer left of cursor, flip if near right edge
+  var rect = wrap.getBoundingClientRect();
+  var tipW = 220;
+  var ex = e.clientX - rect.left;
+  var ey = e.clientY - rect.top;
+  var left = ex + 14;
+  if (left + tipW > rect.width) left = ex - tipW - 8;
+  tip.style.left  = left + 'px';
+  tip.style.top   = Math.max(0, ey - 30) + 'px';
+  tip.style.display = 'block';
+
+  // Crosshair
+  var svgRect = document.getElementById('s9-dash-trend-svg');
+  if (svgRect && cross) {
+    // Compute x position of this data point in SVG coords mapped to rendered width
+    var svgW = svgRect.getBoundingClientRect().width;
+    var scale = svgW / wrap._trendW;
+    var pts = wrap._trendPoints;
+    var xNorm = pts.length === 1 ? wrap._trendPadL + wrap._trendChartW / 2
+      : wrap._trendPadL + (idx / (pts.length - 1)) * wrap._trendChartW;
+    cross.setAttribute('x1', xNorm.toFixed(1));
+    cross.setAttribute('x2', xNorm.toFixed(1));
+    cross.style.display = '';
+  }
+}
+
+function _s9DashTrendHide() {
+  var tip   = document.getElementById('s9-trend-tip');
+  var cross = document.getElementById('s9-trend-crosshair');
+  if (tip)   tip.style.display = 'none';
+  if (cross) cross.style.display = 'none';
 }
 
 function _s9DashCalHtml(dayMap) {
@@ -4671,6 +4873,9 @@ function _s9DashReportIssue() {
   if (typeof supOpenModal === 'function') supOpenModal({ module: 'cadencehud' });
 }
 
+window._s9DashTrendHover = _s9DashTrendHover;
+window._s9DashTrendHide  = _s9DashTrendHide;
+
 // Event marker tooltips — wired after render
 function _s9DashBindEventMarkers() {
   var tip = document.getElementById('s9-dash-evtip');
@@ -4845,7 +5050,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-support.js?v=20260405-SUP1"></script>
 <script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE30d"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE30e"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
