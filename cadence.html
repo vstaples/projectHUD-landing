@@ -981,7 +981,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 
       <!-- DASHBOARD — landing page, portfolio health -->
       <div class="subnav-item s9-dash active" id="s9-tab-dashboard"
-           onclick="_s9Switch('dashboard')">
+           onclick="_s9Switch(&quot;dashboard&quot;)">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
              stroke="currentColor" stroke-width="1.4" style="flex-shrink:0">
           <rect x="1" y="1" width="5" height="5" rx=".8"/>
@@ -994,7 +994,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 
       <!-- LIBRARY — merges Templates + Form Library -->
       <div class="subnav-item s9-lib" id="s9-tab-library"
-           onclick="_s9Switch('library')">
+           onclick="_s9Switch(&quot;library&quot;)">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
              stroke="currentColor" stroke-width="1.4" style="flex-shrink:0">
           <rect x="1" y="1" width="4.5" height="5.5" rx=".8"/>
@@ -5367,7 +5367,7 @@ function _cdRenderWorkQueue(items) {
       item.badge +
       '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">' +
         '<div class="cd-mini-av" style="'+avColors[idx]+'">'+inits[idx]+'</div>' +
-        '<div class="cd-wq-btn" onclick="console.log('assign:'+''+item.id+'')">Assign</div>' +
+        '<div class="cd-wq-btn" onclick="_cdDelegateItem(this)">Assign</div>' +
       '</div></div>';
   }).join('');
 }
@@ -5403,7 +5403,7 @@ function _cdRenderRequestQueue(tmpls) {
         '<div class="cd-rq-meta"><span class="cd-tag cd-tag-b">DRAFT — UNCERTIFIED</span></div>' +
       '</div>' +
       '<div class="cd-rq-acts">' +
-        '<div class="cd-rq-btn cd-rq-run" onclick="_s9Switch('simulator')">Run Cert</div>' +
+        '<div class="cd-rq-btn cd-rq-run" onclick="_s9Switch(&quot;simulator&quot;)">Run Cert</div>' +
         '<div class="cd-rq-btn cd-rq-arch">Archive</div>' +
       '</div></div>';
   }).join('');
