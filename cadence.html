@@ -856,7 +856,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 .cd-panel-count{font-size:10px;font-family:var(--font-mono);color:var(--text2)}
 .cd-panel-link{font-size:10px;color:var(--cyan);cursor:pointer;font-family:var(--font-mono);letter-spacing:.03em;transition:color .1s}
 .cd-panel-link:hover{color:#fff}
-.cd-panel-body{flex:1;overflow-y:auto;max-height:220px}
+.cd-panel-body{flex:1;overflow-y:auto;max-height:240px}
 .cd-panel-body::-webkit-scrollbar{width:2px}
 .cd-panel-body::-webkit-scrollbar-thumb{background:var(--border2)}
 
@@ -964,10 +964,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
     <!-- Top bar -->
     <div class="cad-topbar">
       <div class="cad-topbar-brand">CadenceHUD</div>
-      <div class="cad-topbar-sub">Workflow Engine</div>
+      <div class="cad-topbar-sub" id="cad-topbar-sub">QA Command Brief</div>
       <div class="cad-topbar-actions">
-        <a href="/projects.html" class="btn btn-ghost btn-sm"
-          style="text-decoration:none">← Dashboard</a>
+        <a href="/projects.html" class="btn btn-ghost btn-sm" id="topbar-back-btn"
+          style="text-decoration:none;display:none">← Dashboard</a>
         <button class="btn btn-ghost btn-sm" id="topbar-settings-btn"
           onclick="_cadOpenLibrarySettings()" style="display:none"
           title="Triggers &amp; form settings">⚙ Settings</button>
@@ -981,7 +981,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 
       <!-- DASHBOARD — landing page, portfolio health -->
       <div class="subnav-item s9-dash active" id="s9-tab-dashboard"
-           onclick="_s9Switch(&quot;dashboard&quot;)">
+           onclick="_s9Switch('dashboard')">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
              stroke="currentColor" stroke-width="1.4" style="flex-shrink:0">
           <rect x="1" y="1" width="5" height="5" rx=".8"/>
@@ -994,7 +994,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 
       <!-- LIBRARY — merges Templates + Form Library -->
       <div class="subnav-item s9-lib" id="s9-tab-library"
-           onclick="_s9Switch(&quot;library&quot;)">
+           onclick="_s9Switch('library')">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
              stroke="currentColor" stroke-width="1.4" style="flex-shrink:0">
           <rect x="1" y="1" width="4.5" height="5.5" rx=".8"/>
@@ -1244,6 +1244,14 @@ function _s9Switch(tab) {
   } else if (tab === 'instances') {
     if (typeof switchTab === 'function') switchTab('instances');
   }
+
+  // Update topbar subtitle and back button visibility per tab
+  var subLabels = {dashboard:'QA Command Brief', library:'Workflow Engine',
+                   simulator:'Simulator', instances:'Instances'};
+  var subEl = document.getElementById('cad-topbar-sub');
+  if (subEl) subEl.textContent = subLabels[tab] || 'Workflow Engine';
+  var backBtn = document.getElementById('topbar-back-btn');
+  if (backBtn) backBtn.style.display = tab === 'dashboard' ? 'none' : '';
 }
 
 // ── Library routing ────────────────────────────────────────────────
@@ -4918,6 +4926,20 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 
+// ── Action handlers ──────────────────────────────────────────────────────────
+function _cdConveneMrb(mrbId) {
+  // Phase II: open MRB disposition form instance
+  // For now: switch to Instances tab so user can find and act on it
+  _s9Switch('instances');
+  console.log('[CD Brief] Convene MRB:', mrbId);
+}
+function _cdDelegateItem(btn) {
+  // Phase I Step 6: open assignee picker, write coc_event work.delegated
+  // For now: visual acknowledgement
+  if (btn) { btn.textContent = 'Assigned'; btn.style.opacity = '.5'; btn.style.pointerEvents = 'none'; }
+  console.log('[CD Brief] Delegate item');
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // QA COMMAND BRIEF — S9.62+ integration
 // Replaces _s9RouteDashboard / _s9RenderDashboard / _s9DashLoadData
@@ -5243,7 +5265,7 @@ async function _cdLoadHotQueue(firmId) {
         name:(n.ncmr_number||'NCMR')+' · MRB not convened',
         sub:(n.days_on_hold||0)+' days on hold · Material value '+val,
         tags:[{cls:'cd-tag-r',t:'ESCALATED'},{cls:'cd-tag-a',t:val+' at risk'}],
-        btns:[{cls:'cd-hbtn-a',l:'Convene MRB',fn:'console.log("MRB: '+m.id+'")'},
+        btns:[{cls:'cd-hbtn-a',l:'Convene MRB',fn:'_cdConveneMrb("'+m.id+'")'},
               {cls:'cd-hbtn-n',l:'View',fn:''}]
       });
     });
@@ -5267,10 +5289,13 @@ async function _cdLoadHotQueue(firmId) {
       Object.keys(byTmpl).forEach(function(n){
         var b = byTmpl[n];
         var total = b.uncovered + b.stale;
-        items.push({ sev:60, type:'a', typeLabel:'Coverage Gap',
+        var detail = [];
+        if (b.uncovered) detail.push(b.uncovered + ' uncovered');
+        if (b.stale)     detail.push(b.stale + ' stale');
+        items.push({ sev:60, type:'a', typeLabel:'Training Gap — Coverage',
           name:n,
-          sub:total+' path'+(total>1?'s':'')+' uncovered or stale',
-          tags:[{cls:'cd-tag-a',t:'WARNING'},{cls:'cd-tag-a',t:total+' paths'}],
+          sub:detail.join(' · ') + ' — no script or script not run',
+          tags:[{cls:'cd-tag-a',t:'WARNING'},{cls:'cd-tag-a',t:total+' path'+(total>1?'s':'')}],
           btns:[{cls:'cd-hbtn-a',l:'View Coverage',fn:'_s9Switch("library")'},
                 {cls:'cd-hbtn-n',l:'Run Scripts',fn:'_s9DashOpenSimulator("'+b.id+'")'}]
         });
@@ -5403,7 +5428,7 @@ function _cdRenderRequestQueue(tmpls) {
         '<div class="cd-rq-meta"><span class="cd-tag cd-tag-b">DRAFT — UNCERTIFIED</span></div>' +
       '</div>' +
       '<div class="cd-rq-acts">' +
-        '<div class="cd-rq-btn cd-rq-run" onclick="_s9Switch(&quot;simulator&quot;)">Run Cert</div>' +
+        '<div class="cd-rq-btn cd-rq-run" onclick="_s9Switch(\"simulator\")">Run Cert</div>' +
         '<div class="cd-rq-btn cd-rq-arch">Archive</div>' +
       '</div></div>';
   }).join('');
@@ -5503,7 +5528,11 @@ function _cdRenderCoc(events) {
     else if (e.event_type==='mrb.escalated')       desc='<strong>System escalated</strong> '+_cdEsc(pay.ncmr||'')+' — '+_cdEsc(pay.message||'');
     else if (e.event_type==='training.assigned')   desc='<strong>'+(isMe?'You assigned':'Training assigned')+'</strong> '+_cdEsc(pay.template||'')+' → '+_cdEsc(pay.assignee||'');
     else if (e.event_type==='work.delegated')      desc='<strong>'+(isMe?'You delegated':'Delegated')+'</strong> '+_cdEsc(pay.item||'')+' to '+_cdEsc(pay.delegated_to||'');
-    else                                           desc='<strong>'+(labMap[e.event_type]||_cdEsc(e.event_type))+'</strong> '+_cdEsc(e.entity_type||'');
+    else {
+      var evLabel = labMap[e.event_type] || e.event_type.replace(/[._]/g,' ');
+      var evActor = e.actor_name && e.actor_name !== 'System' ? e.actor_name : null;
+      desc = '<strong>'+(evActor?evActor+':':'')+_cdEsc(evLabel)+'</strong>'+(e.entity_type?' · '+_cdEsc(e.entity_type):'');
+    }
     return '<div class="cd-coc">' +
       '<div class="cd-coc-dot" style="background:'+dot+'"></div>' +
       '<div class="cd-coc-text">'+desc+'</div>' +
@@ -5540,8 +5569,10 @@ function _cdConfirmOverride() {
   if (ta) ta.style.borderColor = '';
   if (!_cdOverrideCtx) return;
   // Write CoC event using existing API
+  // Resolve firm_id — try multiple sources
+  var _firmId = (window.CURRENT_FIRM && window.CURRENT_FIRM.id) || window._s9FirmId || null;
   API.post('coc_events', {
-    firm_id:           window._s9FirmId || null,
+    firm_id:           _firmId,
     entity_type:       'bist_certificate',
     entity_id:         _cdOverrideCtx.entityId,
     event_type:        'override.applied',
@@ -5549,7 +5580,8 @@ function _cdConfirmOverride() {
     actor_resource_id: (window.CURRENT_USER && window.CURRENT_USER.resource_id) || null,
     metadata:          {reason:_cdOverrideCtx.reason, label:_cdOverrideCtx.label, rationale:ra.trim()},
     event_class:       'governance',
-    severity:          'warning'
+    severity:          'warning',
+    occurred_at:       new Date().toISOString()
   }).then(function() {
     _cdCloseOverlayBtn();
   }).catch(function(err) {
