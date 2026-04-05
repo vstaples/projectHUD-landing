@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CadenceHUD — Coverage Tab Mockup</title>
+<style>
+  :root {
+    --bg:        #080a0f;
+    --bg2:       #0d1017;
+    --bg3:       #111520;
+    --bg4:       #161b28;
+    --border:    #1e2535;
+    --border2:   #252d3f;
+    --teal:      #5fd4c8;
+    --teal-dim:  #3a8a84;
+    --teal-glow: rgba(95,212,200,0.12);
+    --orange:    #f5820a;
+    --orange-dim:#7a4108;
+    --red:       #e84040;
+    --red-dim:   #5a1a1a;
+    --green:     #3dd68c;
+    --green-dim: #1a4a35;
+    --amber:     #f5c842;
+    --amber-dim: #5a4a10;
+    --gray:      #4a5568;
+    --gray-dim:  #1e2535;
+    --text:      #e2e8f0;
+    --text-dim:  #6b7a99;
+    --text-mid:  #94a3b8;
+    --purple:    #a78bfa;
+    --font-mono: 'Courier New', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP NAV ── */
+  .topnav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    height: 42px;
+    flex-shrink: 0;
+    gap: 0;
+  }
+  .brand {
+    color: var(--orange);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: .05em;
+    margin-right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .brand-dot { width:8px;height:8px;border-radius:50%;background:var(--orange);animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+  .brand-sub { color: var(--text-dim); font-size:11px; font-weight:400; margin-left:4px; }
+
+  .nav-tabs { display:flex; gap:0; margin-left:8px; }
+  .nav-tab {
+    padding: 0 16px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .15s;
+  }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .nav-badge {
+    background: var(--bg4);
+    color: var(--text-mid);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 10px;
+  }
+  .nav-tab.active .nav-badge { background: var(--teal-glow); color: var(--teal); }
+
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .btn {
+    padding: 5px 12px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    cursor: pointer;
+    border: 1px solid;
+    text-transform: uppercase;
+  }
+  .btn-ghost { background: transparent; border-color: var(--border2); color: var(--text-mid); }
+  .btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+  .btn-primary { background: var(--teal); border-color: var(--teal); color: #000; font-weight:700; }
+  .btn-orange { background: var(--orange); border-color: var(--orange); color: #000; }
+
+  /* ── SUBBAR ── */
+  .subbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    height: 36px;
+    flex-shrink: 0;
+    gap: 0;
+  }
+  .template-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 11px;
+    color: var(--text);
+    margin-right: 16px;
+  }
+  .version-tag {
+    color: var(--text-dim);
+    font-size: 10px;
+    font-family: var(--font-mono);
+  }
+
+  .sim-tabs { display: flex; gap: 0; }
+  .sim-tab {
+    padding: 0 14px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .15s;
+  }
+  .sim-tab:hover { color: var(--text); }
+  .sim-tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+
+  .subbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+  /* gate pill */
+  .gate-pill {
+    display: flex; align-items: center; gap: 5px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .gate-green { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+  .gate-dot { width:6px;height:6px;border-radius:50%; background:currentColor; }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── SCORE SIDEBAR ── */
+  .score-sidebar {
+    width: 220px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+
+  .sidebar-section {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 10px;
+  }
+
+  /* composite score ring */
+  .score-ring-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0 4px;
+  }
+  .score-ring {
+    position: relative;
+    width: 90px;
+    height: 90px;
+  }
+  .score-ring svg { transform: rotate(-90deg); }
+  .score-ring-val {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--green);
+  }
+  .score-ring-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    text-align: center;
+    letter-spacing:.05em;
+  }
+
+  .score-breakdown {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .score-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+  }
+  .score-row-label { color: var(--text-mid); }
+  .score-row-val { font-weight: 700; font-family: var(--font-mono); }
+  .score-bar-wrap {
+    height: 3px;
+    background: var(--bg4);
+    border-radius: 2px;
+    margin-top: 2px;
+    overflow: hidden;
+  }
+  .score-bar { height: 100%; border-radius: 2px; }
+
+  /* status legend */
+  .legend { display: flex; flex-direction: column; gap: 7px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-mid); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .legend-count { margin-left: auto; font-family: var(--font-mono); font-size: 11px; font-weight: 700; }
+
+  /* script coverage list */
+  .script-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .script-item:last-child { border-bottom: none; }
+  .script-item:hover { background: var(--bg3); margin: 0 -12px; padding-left: 12px; padding-right: 12px; }
+  .script-name { font-size: 11px; color: var(--text); }
+  .script-meta { font-size: 10px; color: var(--text-dim); display: flex; gap: 6px; align-items: center; }
+  .script-coverage-bar {
+    height: 2px;
+    background: var(--bg4);
+    border-radius: 1px;
+    overflow: hidden;
+    margin-top: 2px;
+  }
+
+  /* ── CENTER PANEL ── */
+  .center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* view toggle */
+  .view-toggle {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    flex-shrink: 0;
+  }
+  .view-btn {
+    padding: 4px 12px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    color: var(--text-dim);
+    background: transparent;
+    transition: all .15s;
+  }
+  .view-btn.active { background: var(--bg4); border-color: var(--teal); color: var(--teal); }
+  .view-label { font-size: 10px; color: var(--text-dim); margin-left: 8px; }
+
+  /* ── DAG VIEW ── */
+  .dag-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 20px;
+    gap: 0;
+  }
+
+  /* DAG path rows */
+  .dag-scroll { overflow-y: auto; flex: 1; }
+  .dag-path-section {
+    margin-bottom: 24px;
+  }
+  .dag-path-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dag-path-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .dag-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 8px;
+    position: relative;
+  }
+
+  .dag-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    position: relative;
+  }
+
+  .dag-box {
+    width: 120px;
+    border: 1px solid;
+    border-radius: 4px;
+    padding: 7px 8px;
+    font-size: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .dag-box:hover { transform: translateY(-1px); }
+
+  .dag-box.covered     { background: #0d2a1e; border-color: var(--green); }
+  .dag-box.stale       { background: #2a200a; border-color: var(--amber); }
+  .dag-box.partial     { background: #1a1a2e; border-color: var(--purple); }
+  .dag-box.uncovered   { background: var(--red-dim); border-color: var(--red); }
+  .dag-box.excluded    { background: var(--bg3); border-color: var(--gray); }
+  .dag-box.trigger-node{ background: var(--bg3); border-color: var(--border2); }
+
+  .dag-box-type {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    opacity: .7;
+  }
+  .dag-box-name { font-weight: 700; color: var(--text); font-size: 10px; line-height: 1.3; }
+  .dag-box-status {
+    font-size: 9px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .status-dot { width: 5px; height: 5px; border-radius: 50%; }
+  .dot-green  { background: var(--green); }
+  .dot-amber  { background: var(--amber); }
+  .dot-red    { background: var(--red); }
+  .dot-purple { background: var(--purple); }
+  .dot-gray   { background: var(--gray); }
+
+  /* outcome labels on arrows */
+  .dag-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .dag-arrow {
+    width: 100%;
+    height: 1px;
+    background: var(--border2);
+    position: relative;
+  }
+  .dag-arrow::after {
+    content: '▶';
+    position: absolute;
+    right: -6px;
+    top: -6px;
+    font-size: 10px;
+    color: var(--border2);
+  }
+  .dag-arrow.covered-edge  { background: var(--green); }
+  .dag-arrow.covered-edge::after { color: var(--green); }
+  .dag-arrow.uncovered-edge { background: var(--red); }
+  .dag-arrow.uncovered-edge::after { color: var(--red); }
+  .dag-arrow.stale-edge { background: var(--amber); }
+  .dag-arrow.stale-edge::after { color: var(--amber); }
+
+  .dag-edge-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    background: var(--bg);
+    padding: 0 3px;
+    border-radius: 2px;
+  }
+
+  /* script tag on node */
+  .dag-script-tag {
+    font-size: 8px;
+    padding: 1px 5px;
+    border-radius: 2px;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--text-dim);
+    white-space: nowrap;
+    margin-top: 3px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .dag-script-tag:hover { border-color: var(--teal); color: var(--teal); }
+
+  /* ── PATH LIST (below DAG) ── */
+  .path-list {
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--bg2);
+  }
+  .path-list-header {
+    display: grid;
+    grid-template-columns: 220px 80px 80px 80px 1fr 100px;
+    gap: 0;
+    padding: 6px 16px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .path-list-header-cell {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--teal);
+  }
+  .path-row {
+    display: grid;
+    grid-template-columns: 220px 80px 80px 80px 1fr 100px;
+    gap: 0;
+    padding: 6px 16px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    cursor: pointer;
+    transition: background .1s;
+  }
+  .path-row:hover { background: var(--bg3); }
+  .path-row:last-child { border-bottom: none; }
+
+  .path-name { font-size: 11px; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .path-cell { font-size: 11px; color: var(--text-mid); font-family: var(--font-mono); }
+  .path-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+  .pill-covered  { background: var(--green-dim);  color: var(--green);  border: 1px solid var(--green); }
+  .pill-stale    { background: var(--amber-dim);  color: var(--amber);  border: 1px solid var(--amber); }
+  .pill-partial  { background: #1a1a3a; color: var(--purple); border: 1px solid var(--purple); }
+  .pill-uncovered{ background: var(--red-dim);    color: var(--red);    border: 1px solid var(--red); }
+  .pill-excluded { background: var(--gray-dim);   color: var(--gray);   border: 1px solid var(--gray); }
+
+  .path-script-link {
+    font-size: 10px;
+    color: var(--teal);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .path-script-link:hover { color: #fff; }
+  .path-no-script { font-size: 10px; color: var(--red); }
+
+  /* ── MATRIX VIEW ── */
+  .matrix-view {
+    flex: 1;
+    overflow: auto;
+    padding: 20px;
+  }
+  .matrix-wrap {
+    display: inline-block;
+    min-width: 100%;
+  }
+  .matrix-table {
+    border-collapse: collapse;
+    font-size: 10px;
+  }
+  .matrix-table th {
+    padding: 6px 10px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--teal);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .matrix-table th.row-header {
+    left: 0;
+    z-index: 3;
+    min-width: 160px;
+    text-align: left;
+    color: var(--text-mid);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .matrix-table td {
+    border: 1px solid var(--border);
+    padding: 0;
+    text-align: center;
+    vertical-align: middle;
+  }
+  .matrix-table td.step-label {
+    padding: 5px 10px;
+    text-align: left;
+    color: var(--text-mid);
+    background: var(--bg2);
+    font-size: 10px;
+    white-space: nowrap;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    border-right: 2px solid var(--border2);
+  }
+  .matrix-cell {
+    width: 100px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: filter .15s;
+  }
+  .matrix-cell:hover { filter: brightness(1.3); }
+  .mc-covered   { background: #0d2a1e; color: var(--green); }
+  .mc-stale     { background: #2a200a; color: var(--amber); }
+  .mc-partial   { background: #1a1a2e; color: var(--purple); }
+  .mc-uncovered { background: var(--red-dim); color: var(--red); }
+  .mc-excluded  { background: var(--bg3); color: var(--gray); }
+  .mc-na        { background: var(--bg); color: var(--border2); }
+
+  /* ── TOOLTIP ── */
+  .tooltip {
+    position: fixed;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--text);
+    z-index: 999;
+    pointer-events: none;
+    min-width: 200px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    display: none;
+  }
+  .tooltip.visible { display: block; }
+  .tooltip-title { font-weight: 700; margin-bottom: 6px; color: var(--teal); font-size: 11px; }
+  .tooltip-row { display: flex; justify-content: space-between; gap: 12px; margin-top: 3px; color: var(--text-mid); font-size: 10px; }
+  .tooltip-row span:last-child { color: var(--text); font-family: var(--font-mono); }
+
+  /* ── HIDDEN PANELS ── */
+  .hidden { display: none !important; }
+
+  /* Stale warning banner */
+  .stale-banner {
+    background: #2a1f05;
+    border-bottom: 1px solid var(--amber);
+    padding: 5px 16px;
+    font-size: 10px;
+    color: var(--amber);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .stale-banner b { color: #fff; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gray); }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <div class="brand">
+    <div class="brand-dot"></div>
+    CadenceHUD <span class="brand-sub">Workflow Engine</span>
+  </div>
+  <div class="nav-tabs">
+    <div class="nav-tab">⊞ Library <span class="nav-badge">1</span></div>
+    <div class="nav-tab active">⊙ Simulator</div>
+    <div class="nav-tab">≡ Instances <span class="nav-badge">16</span></div>
+  </div>
+  <div class="nav-right">
+    <button class="btn btn-ghost">← Dashboard</button>
+    <button class="btn btn-ghost">⚙ Settings</button>
+    <button class="btn btn-orange">+ New</button>
+  </div>
+</div>
+
+<!-- SUBBAR -->
+<div class="subbar">
+  <div class="template-pill">
+    <span>Design Review Signoff</span>
+    <span class="version-tag">v0.0.13 ▾</span>
+  </div>
+  <div class="sim-tabs">
+    <div class="sim-tab">Scripts</div>
+    <div class="sim-tab active">Coverage</div>
+    <div class="sim-tab">History</div>
+  </div>
+  <div class="subbar-right">
+    <div class="gate-pill gate-green">
+      <div class="gate-dot"></div>
+      All Tests Passing — Cleared for Release
+    </div>
+    <button class="btn btn-ghost">▶▶ Run All Tests</button>
+    <button class="btn btn-primary">◎ View Certificate</button>
+  </div>
+</div>
+
+<!-- STALE WARNING -->
+<div class="stale-banner">
+  ⚠ <b>1 script</b> last ran 9 days ago — coverage data may not reflect current template state.
+  <span style="margin-left:auto;cursor:pointer;text-decoration:underline;">Re-run stale scripts →</span>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- SCORE SIDEBAR -->
+  <div class="score-sidebar">
+
+    <!-- Composite Score -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Coverage Score</div>
+      <div class="score-ring-wrap">
+        <div class="score-ring">
+          <svg width="90" height="90" viewBox="0 0 90 90">
+            <!-- track -->
+            <circle cx="45" cy="45" r="38" fill="none" stroke="#1e2535" stroke-width="7"/>
+            <!-- path coverage arc: 75% -->
+            <circle cx="45" cy="45" r="38" fill="none" stroke="#3dd68c" stroke-width="7"
+              stroke-dasharray="179 239" stroke-linecap="round"/>
+          </svg>
+          <div class="score-ring-val">75%</div>
+        </div>
+        <div class="score-ring-label">Composite Coverage</div>
+      </div>
+
+      <div class="score-breakdown">
+        <div>
+          <div class="score-row">
+            <span class="score-row-label">Path coverage</span>
+            <span class="score-row-val" style="color:var(--green)">75%</span>
+          </div>
+          <div class="score-bar-wrap">
+            <div class="score-bar" style="width:75%;background:var(--green)"></div>
+          </div>
+        </div>
+        <div>
+          <div class="score-row">
+            <span class="score-row-label">Step coverage</span>
+            <span class="score-row-val" style="color:var(--green)">100%</span>
+          </div>
+          <div class="score-bar-wrap">
+            <div class="score-bar" style="width:100%;background:var(--green)"></div>
+          </div>
+        </div>
+        <div>
+          <div class="score-row">
+            <span class="score-row-label">Assertion density</span>
+            <span class="score-row-val" style="color:var(--amber)">62%</span>
+          </div>
+          <div class="score-bar-wrap">
+            <div class="score-bar" style="width:62%;background:var(--amber)"></div>
+          </div>
+        </div>
+        <div>
+          <div class="score-row">
+            <span class="score-row-label">Freshness</span>
+            <span class="score-row-val" style="color:var(--amber)">78%</span>
+          </div>
+          <div class="score-bar-wrap">
+            <div class="score-bar" style="width:78%;background:var(--amber)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Legend -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Path Status</div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--green)"></div>
+          Covered — passing
+          <span class="legend-count" style="color:var(--green)">3</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--amber)"></div>
+          Covered — stale
+          <span class="legend-count" style="color:var(--amber)">1</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--purple)"></div>
+          Partial — assertions fail
+          <span class="legend-count" style="color:var(--purple)">0</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--red)"></div>
+          Uncovered — no script
+          <span class="legend-count" style="color:var(--red)">1</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--gray)"></div>
+          Excluded
+          <span class="legend-count" style="color:var(--gray)">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Script Coverage -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Scripts</div>
+      <div class="script-item">
+        <div class="script-name">Full workflow — clean approval</div>
+        <div class="script-meta">
+          <div class="status-dot dot-green"></div>
+          <span>6 steps · Apr 4</span>
+        </div>
+        <div class="script-coverage-bar">
+          <div style="width:100%;height:100%;background:var(--green);border-radius:1px"></div>
+        </div>
+      </div>
+      <div class="script-item">
+        <div class="script-name">Meeting reset — design change</div>
+        <div class="script-meta">
+          <div class="status-dot dot-green"></div>
+          <span>6 steps · Apr 4</span>
+        </div>
+        <div class="script-coverage-bar">
+          <div style="width:100%;height:100%;background:var(--green);border-radius:1px"></div>
+        </div>
+      </div>
+      <div class="script-item">
+        <div class="script-name">Rejection loop — rejects then passes</div>
+        <div class="script-meta">
+          <div class="status-dot dot-amber"></div>
+          <span>7 steps · Mar 26 · 9d ago</span>
+        </div>
+        <div class="script-coverage-bar">
+          <div style="width:85%;height:100%;background:var(--amber);border-radius:1px"></div>
+        </div>
+      </div>
+      <div class="script-item">
+        <div class="script-name">Sign-off decline — routes to approval</div>
+        <div class="script-meta">
+          <div class="status-dot dot-green"></div>
+          <span>7 steps · Apr 4</span>
+        </div>
+        <div class="script-coverage-bar">
+          <div style="width:100%;height:100%;background:var(--green);border-radius:1px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Uncovered Alert -->
+    <div class="sidebar-section">
+      <div class="sidebar-label" style="color:var(--red)">⚠ Uncovered Paths</div>
+      <div style="font-size:10px;color:var(--text-mid);line-height:1.6">
+        <div style="color:var(--red);font-weight:700;margin-bottom:4px">1 path has no test coverage</div>
+        Final Meeting → <span style="color:var(--text)">Cancelled</span> outcome has never been exercised by any test script.
+        <div style="margin-top:8px">
+          <span style="color:var(--teal);cursor:pointer;text-decoration:underline">+ Create script for this path →</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /score-sidebar -->
+
+  <!-- CENTER -->
+  <div class="center">
+
+    <!-- View toggle -->
+    <div class="view-toggle">
+      <button class="view-btn active" onclick="showView('dag')">⬡ Flow + Path List</button>
+      <button class="view-btn" onclick="showView('matrix')">▦ Matrix</button>
+      <span class="view-label">Design Review Signoff v0.0.13 · 8 routing paths enumerated · Last analyzed Apr 4 8:47 PM</span>
+    </div>
+
+    <!-- DAG VIEW -->
+    <div id="dag-view" class="dag-view" style="display:flex">
+      <div class="dag-scroll">
+
+        <!-- Happy paths -->
+        <div class="dag-path-section">
+          <div class="dag-path-label">Happy Path — Clean Approval</div>
+          <div class="dag-row">
+            <!-- trigger -->
+            <div class="dag-node">
+              <div class="dag-box trigger-node">
+                <div class="dag-box-type" style="color:var(--orange)">Trigger</div>
+                <div class="dag-box-name">Instance Launch</div>
+                <div class="dag-box-status"><div class="status-dot dot-green"></div><span style="color:var(--text-dim)">covered</span></div>
+              </div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">starts</div>
+              <div class="dag-arrow covered-edge"></div>
+            </div>
+            <!-- step 1 -->
+            <div class="dag-node">
+              <div class="dag-box covered" data-tip="step1">
+                <div class="dag-box-type" style="color:#a78bfa">Form</div>
+                <div class="dag-box-name">Complete Design Review</div>
+                <div class="dag-box-status"><div class="status-dot dot-green"></div><span style="color:var(--green)">covered</span></div>
+              </div>
+              <div class="dag-script-tag">Full workflow — clean approval</div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">submitted</div>
+              <div class="dag-arrow covered-edge"></div>
+            </div>
+            <!-- step 2 -->
+            <div class="dag-node">
+              <div class="dag-box covered" data-tip="step2">
+                <div class="dag-box-type" style="color:#a78bfa">Form</div>
+                <div class="dag-box-name">Design Review Approval</div>
+                <div class="dag-box-status"><div class="status-dot dot-green"></div><span style="color:var(--green)">covered</span></div>
+              </div>
+              <div class="dag-script-tag">Full workflow — clean approval</div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">submitted</div>
+              <div class="dag-arrow covered-edge"></div>
+            </div>
+            <!-- step 3 -->
+            <div class="dag-node">
+              <div class="dag-box covered">
+                <div class="dag-box-type" style="color:var(--green)">Approval</div>
+                <div class="dag-box-name">Approval: Design Review</div>
+                <div class="dag-box-status"><div class="status-dot dot-green"></div><span style="color:var(--green)">covered</span></div>
+              </div>
+              <div class="dag-script-tag">Full workflow — clean approval</div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">approved</div>
+              <div class="dag-arrow covered-edge"></div>
+            </div>
+            <!-- step 4 -->
+            <div class="dag-node">
+              <div class="dag-box covered">
+                <div class="dag-box-type" style="color:var(--orange)">Sign-off</div>
+                <div class="dag-box-name">Finalize: Design Review</div>
+                <div class="dag-box-status"><div class="status-dot dot-green"></div><span style="color:var(--green)">covered</span></div>
+              </div>
+              <div class="dag-script-tag">Full workflow — clean approval</div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">signed</div>
+              <div class="dag-arrow covered-edge"></div>
+            </div>
+            <!-- step 5 -->
+            <div class="dag-node">
+              <div class="dag-box covered">
+                <div class="dag-box-type" style="color:var(--teal)">Meeting</div>
+                <div class="dag-box-name">Final Meeting</div>
+                <div class="dag-box-status"><div class="status-dot dot-green"></div><span style="color:var(--green)">covered</span></div>
+              </div>
+              <div class="dag-script-tag">Full workflow — clean approval</div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">concluded</div>
+              <div class="dag-arrow covered-edge"></div>
+            </div>
+            <!-- end -->
+            <div class="dag-node">
+              <div class="dag-box covered" style="width:70px;text-align:center">
+                <div class="dag-box-name" style="font-size:11px">✓ END</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rejection loop path -->
+        <div class="dag-path-section">
+          <div class="dag-path-label">Rejection Loop — Approval Rejects Then Passes</div>
+          <div class="dag-row">
+            <div class="dag-node">
+              <div class="dag-box trigger-node">
+                <div class="dag-box-type" style="color:var(--orange)">Trigger</div>
+                <div class="dag-box-name">Instance Launch</div>
+              </div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">starts</div>
+              <div class="dag-arrow stale-edge"></div>
+            </div>
+            <div class="dag-node">
+              <div class="dag-box stale">
+                <div class="dag-box-type" style="color:#a78bfa">Form</div>
+                <div class="dag-box-name">Complete Design Review</div>
+                <div class="dag-box-status"><div class="status-dot dot-amber"></div><span style="color:var(--amber)">stale · 9d</span></div>
+              </div>
+              <div class="dag-script-tag">Rejection loop — rejects then passes</div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">submitted</div>
+              <div class="dag-arrow stale-edge"></div>
+            </div>
+            <div class="dag-node">
+              <div class="dag-box stale">
+                <div class="dag-box-type" style="color:var(--green)">Approval</div>
+                <div class="dag-box-name">Approval: Design Review</div>
+                <div class="dag-box-status"><div class="status-dot dot-amber"></div><span style="color:var(--amber)">stale · 9d</span></div>
+              </div>
+              <div class="dag-script-tag">Rejection loop — rejects then passes</div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">rejected →<br>re-submit</div>
+              <div class="dag-arrow stale-edge"></div>
+            </div>
+            <div class="dag-node">
+              <div class="dag-box stale">
+                <div class="dag-box-type" style="color:var(--green)">Approval</div>
+                <div class="dag-box-name">Approval: Design Review</div>
+                <div class="dag-box-status"><div class="status-dot dot-amber"></div><span style="color:var(--amber)">stale · 9d</span></div>
+              </div>
+              <div class="dag-script-tag">Rejection loop — rejects then passes</div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">approved</div>
+              <div class="dag-arrow stale-edge"></div>
+            </div>
+            <div class="dag-node">
+              <div class="dag-box stale">
+                <div class="dag-box-type" style="color:var(--orange)">Sign-off</div>
+                <div class="dag-box-name">Finalize: Design Review</div>
+                <div class="dag-box-status"><div class="status-dot dot-amber"></div><span style="color:var(--amber)">stale</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Meeting reset path -->
+        <div class="dag-path-section">
+          <div class="dag-path-label">Meeting Reset — Design Change Routes Back to Step 1</div>
+          <div class="dag-row">
+            <div class="dag-node">
+              <div class="dag-box trigger-node">
+                <div class="dag-box-type" style="color:var(--orange)">Trigger</div>
+                <div class="dag-box-name">Instance Launch</div>
+              </div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">starts</div>
+              <div class="dag-arrow covered-edge"></div>
+            </div>
+            <div class="dag-node">
+              <div class="dag-box covered">
+                <div class="dag-box-type" style="color:var(--teal)">Meeting</div>
+                <div class="dag-box-name">Final Meeting</div>
+                <div class="dag-box-status"><div class="status-dot dot-green"></div><span style="color:var(--green)">covered</span></div>
+              </div>
+              <div class="dag-script-tag">Meeting reset — design change</div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">design<br>change</div>
+              <div class="dag-arrow covered-edge"></div>
+            </div>
+            <div class="dag-node">
+              <div class="dag-box covered">
+                <div class="dag-box-type" style="color:#a78bfa">Form</div>
+                <div class="dag-box-name">Complete Design Review</div>
+                <div class="dag-box-status"><div class="status-dot dot-green"></div><span style="color:var(--green)">covered</span></div>
+              </div>
+              <div class="dag-script-tag">Meeting reset — design change</div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">restarted</div>
+              <div class="dag-arrow covered-edge"></div>
+            </div>
+            <div class="dag-node">
+              <div class="dag-box covered" style="width:80px;text-align:center">
+                <div class="dag-box-name" style="font-size:10px">… continues</div>
+                <div class="dag-box-status"><div class="status-dot dot-green"></div><span style="color:var(--green)">covered</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Uncovered path -->
+        <div class="dag-path-section">
+          <div class="dag-path-label" style="color:var(--red)">⚠ Uncovered — Final Meeting → Cancelled</div>
+          <div class="dag-row">
+            <div class="dag-node">
+              <div class="dag-box trigger-node">
+                <div class="dag-box-type" style="color:var(--orange)">Trigger</div>
+                <div class="dag-box-name">Instance Launch</div>
+              </div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">starts</div>
+              <div class="dag-arrow uncovered-edge"></div>
+            </div>
+            <div class="dag-node">
+              <div class="dag-box uncovered">
+                <div class="dag-box-type" style="color:var(--teal)">Meeting</div>
+                <div class="dag-box-name">Final Meeting</div>
+                <div class="dag-box-status"><div class="status-dot dot-red"></div><span style="color:var(--red)">no coverage</span></div>
+              </div>
+            </div>
+            <div class="dag-connector">
+              <div class="dag-edge-label">cancelled</div>
+              <div class="dag-arrow uncovered-edge"></div>
+            </div>
+            <div class="dag-node">
+              <div class="dag-box uncovered" style="width:80px;text-align:center">
+                <div class="dag-box-name" style="font-size:10px;color:var(--red)">? UNKNOWN</div>
+                <div class="dag-box-status"><div class="status-dot dot-red"></div><span style="color:var(--red)">untested</span></div>
+              </div>
+            </div>
+            <div style="margin-left:20px;display:flex;align-items:center">
+              <span style="color:var(--teal);font-size:10px;cursor:pointer;text-decoration:underline">+ Create covering script →</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /dag-scroll -->
+
+      <!-- PATH LIST -->
+      <div class="path-list">
+        <div class="path-list-header">
+          <div class="path-list-header-cell">Routing Path</div>
+          <div class="path-list-header-cell">Steps</div>
+          <div class="path-list-header-cell">Assertions</div>
+          <div class="path-list-header-cell">Last Run</div>
+          <div class="path-list-header-cell">Script</div>
+          <div class="path-list-header-cell">Status</div>
+        </div>
+        <!-- rows -->
+        <div class="path-row">
+          <div class="path-name"><div class="status-dot dot-green"></div>Full workflow — clean approval path</div>
+          <div class="path-cell">6</div>
+          <div class="path-cell">16</div>
+          <div class="path-cell">Apr 4</div>
+          <div><span class="path-script-link">Full workflow — clean approval</span></div>
+          <div><span class="path-status-pill pill-covered"><div class="status-dot dot-green"></div>Covered</span></div>
+        </div>
+        <div class="path-row">
+          <div class="path-name"><div class="status-dot dot-amber"></div>Rejection loop — rejects then passes</div>
+          <div class="path-cell">7</div>
+          <div class="path-cell">12</div>
+          <div class="path-cell">Mar 26</div>
+          <div><span class="path-script-link">Rejection loop — rejects then passes</span></div>
+          <div><span class="path-status-pill pill-stale"><div class="status-dot dot-amber"></div>Stale · 9d</span></div>
+        </div>
+        <div class="path-row">
+          <div class="path-name"><div class="status-dot dot-green"></div>Meeting reset — design change routes to step 1</div>
+          <div class="path-cell">6</div>
+          <div class="path-cell">10</div>
+          <div class="path-cell">Apr 4</div>
+          <div><span class="path-script-link">Meeting reset — design change</span></div>
+          <div><span class="path-status-pill pill-covered"><div class="status-dot dot-green"></div>Covered</span></div>
+        </div>
+        <div class="path-row">
+          <div class="path-name"><div class="status-dot dot-green"></div>Sign-off decline — routes back to approval</div>
+          <div class="path-cell">7</div>
+          <div class="path-cell">14</div>
+          <div class="path-cell">Apr 4</div>
+          <div><span class="path-script-link">Sign-off decline — routes to approval</span></div>
+          <div><span class="path-status-pill pill-covered"><div class="status-dot dot-green"></div>Covered</span></div>
+        </div>
+        <div class="path-row">
+          <div class="path-name"><div class="status-dot dot-red"></div>Final Meeting → Cancelled outcome</div>
+          <div class="path-cell">5</div>
+          <div class="path-cell">—</div>
+          <div class="path-cell">Never</div>
+          <div><span class="path-no-script">No script assigned</span></div>
+          <div><span class="path-status-pill pill-uncovered"><div class="status-dot dot-red"></div>Uncovered</span></div>
+        </div>
+      </div>
+    </div><!-- /dag-view -->
+
+    <!-- MATRIX VIEW -->
+    <div id="matrix-view" class="matrix-view" style="display:none">
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th class="row-header">Step / Outcome</th>
+            <th>Full workflow<br>clean approval</th>
+            <th>Rejection loop<br>rejects → passes</th>
+            <th>Meeting reset<br>design change</th>
+            <th>Sign-off decline<br>→ approval</th>
+            <th>Final Meeting<br>Cancelled</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="step-label">S0 · Instance Launch</td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-stale">~ Stale</div></td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
+          </tr>
+          <tr>
+            <td class="step-label">S1 · Complete Design Review Form</td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-stale">~ Stale</div></td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
+          </tr>
+          <tr>
+            <td class="step-label">S2 · Form: Design Review Approval</td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-stale">~ Stale</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
+          </tr>
+          <tr>
+            <td class="step-label">S3 · Approval: Design Review</td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-stale">~ Stale</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
+          </tr>
+          <tr>
+            <td class="step-label">S3 · Approval → Rejected outcome</td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-stale">~ Stale</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
+          </tr>
+          <tr>
+            <td class="step-label">S4 · Finalize: Design Review</td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-stale">~ Stale</div></td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
+          </tr>
+          <tr>
+            <td class="step-label">S4 · Sign-off Declined outcome</td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
+          </tr>
+          <tr>
+            <td class="step-label">S5 · Final Meeting</td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-stale">~ Stale</div></td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
+          </tr>
+          <tr>
+            <td class="step-label">S5 · Final Meeting → Cancelled</td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
+          </tr>
+          <tr>
+            <td class="step-label">S5 · Design Change Required</td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na">— N/A</div></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top:20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:.06em;text-transform:uppercase">Legend:</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:5px;font-size:10px">
+            <div style="width:14px;height:14px;background:#0d2a1e;border:1px solid var(--green);border-radius:2px"></div>
+            <span style="color:var(--text-mid)">Covered — passing</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:10px">
+            <div style="width:14px;height:14px;background:#2a200a;border:1px solid var(--amber);border-radius:2px"></div>
+            <span style="color:var(--text-mid)">Stale — needs re-run</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:10px">
+            <div style="width:14px;height:14px;background:var(--red-dim);border:1px solid var(--red);border-radius:2px"></div>
+            <span style="color:var(--text-mid)">Uncovered — no script</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:10px">
+            <div style="width:14px;height:14px;background:var(--bg);border:1px solid var(--border);border-radius:2px"></div>
+            <span style="color:var(--text-mid)">N/A — path doesn't include this step</span>
+          </div>
+        </div>
+      </div>
+    </div><!-- /matrix-view -->
+
+  </div><!-- /center -->
+</div><!-- /main -->
+
+<!-- TOOLTIP -->
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+  function showView(v) {
+    document.getElementById('dag-view').style.display   = v==='dag'    ? 'flex' : 'none';
+    document.getElementById('matrix-view').style.display = v==='matrix' ? 'block': 'none';
+    document.querySelectorAll('.view-btn').forEach((b,i)=>{
+      b.classList.toggle('active', (i===0&&v==='dag')||(i===1&&v==='matrix'));
+    });
+  }
+
+  // Tooltip on dag-box
+  var tip = document.getElementById('tooltip');
+  var tipData = {
+    step1: { title:'Complete Design Review Form', type:'Collaborative Form', scripts:'Full workflow, Rejection loop, Meeting reset, Sign-off decline', assertions:'4 assertions', last:'Apr 4, 8:47 PM' },
+    step2: { title:'Form: Design Review Approval', type:'Collaborative Form', scripts:'Full workflow, Sign-off decline', assertions:'3 assertions', last:'Apr 4, 8:47 PM' },
+  };
+  document.querySelectorAll('[data-tip]').forEach(el=>{
+    el.addEventListener('mouseenter', e=>{
+      var d = tipData[el.dataset.tip]; if(!d) return;
+      tip.innerHTML = '<div class="tooltip-title">'+d.title+'</div>'+
+        '<div class="tooltip-row"><span>Type</span><span>'+d.type+'</span></div>'+
+        '<div class="tooltip-row"><span>Scripts</span><span>'+d.scripts+'</span></div>'+
+        '<div class="tooltip-row"><span>Assertions</span><span>'+d.assertions+'</span></div>'+
+        '<div class="tooltip-row"><span>Last run</span><span>'+d.last+'</span></div>';
+      tip.classList.add('visible');
+    });
+    el.addEventListener('mousemove', e=>{
+      tip.style.left = (e.clientX+14)+'px';
+      tip.style.top  = (e.clientY-10)+'px';
+    });
+    el.addEventListener('mouseleave', ()=>tip.classList.remove('visible'));
+  });
+</script>
+</body>
+</html>
