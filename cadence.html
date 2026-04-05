@@ -807,7 +807,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* Amber override — brighter than default --amber */
-:root { --cd-amb:#ffc034; --cd-amb2:rgba(255,192,52,.14); }
+:root { --cd-amb:#ffd94a; --cd-amb2:rgba(255,217,74,.18); --cd-red:#ff3d3d; --cd-red2:rgba(255,61,61,.16); }
 
 /* Brief shell */
 .cd-brief{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:#080a10}
@@ -824,25 +824,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 .cd-health-top{display:flex;align-items:stretch}
 .cd-score-block{width:168px;flex-shrink:0;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;border-right:1px solid var(--border)}
 .cd-score-num{font-size:52px;font-weight:700;line-height:1;font-family:var(--font-mono);letter-spacing:-.02em}
-.cd-score-lbl{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin-top:3px;font-family:var(--font-mono)}
-.cd-score-delta{font-size:11px;margin-top:5px;font-family:var(--font-mono)}
+.cd-score-lbl{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.75);margin-top:3px;font-family:var(--font-mono)}
+.cd-score-delta{font-size:12px;margin-top:5px;font-family:var(--font-mono)}
 .cd-sparkline{display:flex;gap:3px;align-items:flex-end;height:24px;margin-top:7px}
 .cd-spark-bar{flex:1;border-radius:1px;min-width:4px}
-.cd-spark-lbl{font-size:10px;color:var(--text2);font-family:var(--font-mono);margin-top:3px}
+.cd-spark-lbl{font-size:11px;color:rgba(255,255,255,.65);font-family:var(--font-mono);margin-top:3px}
 .cd-domains{flex:1;display:grid;grid-template-columns:repeat(4,1fr)}
 .cd-domain{padding:9px 11px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:2px;cursor:pointer;transition:background .12s}
 .cd-domain:last-child{border-right:none}
 .cd-domain:hover{background:rgba(255,255,255,.025)}
-.cd-domain-lbl{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);font-family:var(--font-mono)}
+.cd-domain-lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.75);font-family:var(--font-mono)}
 .cd-domain-score{font-size:21px;font-weight:700;font-family:var(--font-mono);letter-spacing:-.02em;line-height:1.1}
 .cd-domain-bar{height:2px;border-radius:1px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:2px}
 .cd-domain-fill{height:100%;border-radius:1px;transition:width .5s}
-.cd-domain-det{font-size:10px;color:var(--text2);font-family:var(--font-mono);margin-top:2px;line-height:1.4}
+.cd-domain-det{font-size:11px;color:rgba(255,255,255,.55);font-family:var(--font-mono);margin-top:2px;line-height:1.4}
 .cd-kpis{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--border)}
 .cd-kpi{padding:6px 11px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:2px}
 .cd-kpi:last-child{border-right:none}
 .cd-kpi-val{font-size:15px;font-weight:700;font-family:var(--font-mono)}
-.cd-kpi-lbl{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);font-family:var(--font-mono)}
+.cd-kpi-lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.75);font-family:var(--font-mono)}
 .cd-kpi-delta{font-size:10px;font-family:var(--font-mono)}
 
 /* Grid */
@@ -852,9 +852,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 /* Panels */
 .cd-panel{background:var(--surface);border:1px solid var(--border);border-radius:5px;overflow:hidden;display:flex;flex-direction:column}
 .cd-panel-hdr{padding:7px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;flex-shrink:0}
-.cd-panel-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff;font-family:var(--font-mono);flex:1}
-.cd-panel-count{font-size:10px;font-family:var(--font-mono);color:var(--text2)}
-.cd-panel-link{font-size:10px;color:var(--cyan);cursor:pointer;font-family:var(--font-mono);letter-spacing:.03em;transition:color .1s}
+.cd-panel-title{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;font-family:var(--font-mono);flex:1}
+.cd-panel-count{font-size:11px;font-family:var(--font-mono);color:rgba(255,255,255,.55)}
+.cd-panel-link{font-size:11px;color:var(--cyan);cursor:pointer;font-family:var(--font-mono);letter-spacing:.03em;transition:color .1s}
 .cd-panel-link:hover{color:#fff}
 .cd-panel-body{flex:1;overflow-y:auto;max-height:240px}
 .cd-panel-body::-webkit-scrollbar{width:2px}
@@ -866,19 +866,19 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 .cd-hot:last-child{border-bottom:none}
 .cd-hot-sev{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:34px}
 .cd-hot-main{flex:1;min-width:0}
-.cd-hot-type{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:2px}
-.cd-hot-name{font-size:12px;color:var(--text0);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cd-hot-sub{font-size:10px;color:var(--text2);font-family:var(--font-mono);margin-top:2px;line-height:1.4}
+.cd-hot-type{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:2px}
+.cd-hot-name{font-size:13px;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd-hot-sub{font-size:11px;color:rgba(255,255,255,.55);font-family:var(--font-mono);margin-top:2px;line-height:1.4}
 .cd-hot-meta{display:flex;align-items:center;gap:4px;margin-top:3px;flex-wrap:wrap}
-.cd-tag{padding:2px 6px;border-radius:2px;font-size:10px;font-weight:700;font-family:var(--font-mono);letter-spacing:.03em}
-.cd-tag-r{background:rgba(192,64,74,.15);color:#e05060}
+.cd-tag{padding:2px 7px;border-radius:2px;font-size:11px;font-weight:700;font-family:var(--font-mono);letter-spacing:.03em}
+.cd-tag-r{background:rgba(255,61,61,.15);color:var(--cd-red)}
 .cd-tag-a{background:rgba(255,192,52,.14);color:var(--cd-amb)}
 .cd-tag-b{background:rgba(79,142,247,.15);color:#4f8ef7}
 .cd-tag-g{background:rgba(42,157,64,.13);color:#3de08a}
 .cd-hot-acts{display:flex;gap:4px;flex-shrink:0;align-items:center}
 .cd-hbtn{padding:3px 9px;border-radius:3px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid;font-family:var(--font-mono);white-space:nowrap;transition:all .12s}
-.cd-hbtn-r{background:rgba(192,64,74,.15);border-color:rgba(192,64,74,.35);color:#e05060}
-.cd-hbtn-r:hover{background:rgba(192,64,74,.25)}
+.cd-hbtn-r{background:var(--cd-red2);border-color:rgba(255,61,61,.4);color:var(--cd-red)}
+.cd-hbtn-r:hover{background:rgba(255,61,61,.28)}
 .cd-hbtn-a{background:var(--cd-amb2);border-color:rgba(255,192,52,.35);color:var(--cd-amb)}
 .cd-hbtn-a:hover{background:rgba(255,192,52,.22)}
 .cd-hbtn-n{background:transparent;border-color:var(--border);color:var(--text2)}
@@ -942,7 +942,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 .cd-modal-close:hover{color:var(--text)}
 .cd-modal-body{padding:15px}
 .cd-modal-warn{background:rgba(192,64,74,.08);border:1px solid rgba(192,64,74,.2);border-radius:4px;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:13px}
-.cd-modal-warn strong{color:#e05060}
+.cd-modal-warn strong{color:var(--cd-red)}
 .cd-modal-lbl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);font-family:var(--font-mono);margin-bottom:5px}
 .cd-modal-ta{width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;resize:vertical;min-height:68px;outline:none;transition:border-color .1s}
 .cd-modal-ta:focus{border-color:var(--cyan)}
@@ -951,7 +951,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 .cd-modal-ftr{padding:11px 15px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
 
 /* Colour utils */
-.cd-grn{color:#3de08a} .cd-amb{color:var(--cd-amb)} .cd-red{color:#e05060} .cd-t2{color:var(--text2)}
+.cd-grn{color:#3de08a} .cd-amb{color:var(--cd-amb)} .cd-red{color:var(--cd-red)} .cd-t2{color:rgba(255,255,255,.65)}
 
 </style>
 </head>
@@ -1095,13 +1095,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
         Recorded as: <span id="cd-override-coc-label">override.applied</span> ·
         Actor: <span id="cd-override-actor">—</span> ·
         Entity: <span id="cd-override-entity">—</span> ·
-        <span style="color:#e05060">Immutable — cannot be deleted</span>
+        <span style="color:var(--cd-red)">Immutable — cannot be deleted</span>
       </div>
     </div>
     <div class="cd-modal-ftr">
       <button class="btn btn-sm" onclick="_cdCloseOverlayBtn()">Cancel</button>
       <button class="btn btn-sm btn-cad" id="cd-override-confirm-btn"
-        onclick="_cdConfirmOverride()" style="background:rgba(192,64,74,.15);border-color:rgba(192,64,74,.35);color:#e05060">
+        onclick="_cdConfirmOverride()" style="background:var(--cd-red2);border-color:rgba(255,61,61,.4);color:var(--cd-red)">
         Confirm Override
       </button>
     </div>
@@ -4966,7 +4966,7 @@ var _cdOverrideCtx = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function _cdScoreColor(n) {
-  return n >= 90 ? '#3de08a' : n >= 75 ? 'var(--cd-amb)' : '#e05060';
+  return n >= 90 ? '#3de08a' : n >= 75 ? 'var(--cd-amb)' : 'var(--cd-red)';
 }
 function _cdScoreCls(n) {
   return n >= 90 ? 'cd-grn' : n >= 75 ? 'cd-amb' : 'cd-red';
@@ -5021,7 +5021,7 @@ function _cdRenderBrief(panel) {
         '<div class="cd-grid2">' +
           '<div class="cd-panel">' +
             '<div class="cd-panel-hdr">' +
-              '<div class="cd-panel-title" id="cd-hq-title" style="color:#e05060">⚡ Hot Queue</div>' +
+              '<div class="cd-panel-title" id="cd-hq-title" style="color:var(--cd-red)">⚡ Hot Queue</div>' +
               '<div class="cd-panel-count" id="cd-hq-count">Loading…</div>' +
               '<div class="cd-panel-link">View all →</div>' +
             '</div>' +
@@ -5203,15 +5203,15 @@ function _cdRenderKpis(runs, certs, hs) {
   var mttd = failed.length ? Math.round(failed.reduce(function(a,r){ return a+(r.duration_ms||0); },0)/failed.length/60000) : 0;
   var mttc = passed.length ? Math.round(passed.reduce(function(a,r){ return a+(r.duration_ms||0); },0)/passed.length/60000) : 0;
   var thresh = (hs && hs.threshold_config && hs.threshold_config.stale_cert_days) || 30;
-  var oldClr = oldest > thresh ? '#e05060' : oldest > thresh*.7 ? 'var(--cd-amb)' : '#3de08a';
+  var oldClr = oldest > thresh ? 'var(--cd-red)' : oldest > thresh*.7 ? 'var(--cd-amb)' : '#3de08a';
 
   var kpis = [
-    { val: valid+'/'+total, lbl:'Workflows Certified', delta:(valid===total?'↑ All valid':'↓ '+(total-valid)+' invalidated'), dc:(valid===total?'#3de08a':'#e05060'), vc:(valid===total?'#3de08a':'var(--cd-amb)') },
+    { val: valid+'/'+total, lbl:'Workflows Certified', delta:(valid===total?'↑ All valid':'↓ '+(total-valid)+' invalidated'), dc:(valid===total?'#3de08a':'var(--cd-red)'), vc:(valid===total?'#3de08a':'var(--cd-amb)') },
     { val: mttd?mttd+'m':'—', lbl:'Mean Time to Detect', delta:'Last 30 days', dc:'var(--text2)', vc:'var(--cd-amb)' },
     { val: mttc?mttc+'m':'—', lbl:'Mean Time to Certify', delta:'Last 30 days', dc:'var(--text2)', vc:'var(--cd-amb)' },
     { val: r30.length, lbl:'Total Suite Runs', delta:'Last 30 days', dc:'var(--text2)', vc:'var(--text)' },
     { val: 0, lbl:'Flakiness Alerts', delta:'↑ All stable', dc:'#3de08a', vc:'#3de08a' },
-    { val: oldest+'d', lbl:'Oldest Cert Age', delta:'↓ threshold '+thresh+'d', dc:(oldest>thresh?'#e05060':'var(--text2)'), vc:oldClr }
+    { val: oldest+'d', lbl:'Oldest Cert Age', delta:'↓ threshold '+thresh+'d', dc:(oldest>thresh?'var(--cd-red)':'var(--text2)'), vc:oldClr }
   ];
   var el = document.getElementById('cd-kpis');
   if (!el) return;
@@ -5320,11 +5320,11 @@ function _cdRenderHotQueue(items) {
       '</div>';
     return;
   }
-  if (countEl) { countEl.textContent=items.length+' item'+(items.length>1?'s':'')+' requiring action'; countEl.style.color='#e05060'; }
+  if (countEl) { countEl.textContent=items.length+' item'+(items.length>1?'s':'')+' requiring action'; countEl.style.color='var(--cd-red)'; }
   bodyEl.innerHTML = items.map(function(item){
     var tags = item.tags.map(function(t){ return '<span class="cd-tag '+t.cls+'">'+_cdEsc(t.t)+'</span>'; }).join('');
     var btns = item.btns.map(function(b){ return '<div class="cd-hbtn '+b.cls+'" onclick="'+b.fn+'">'+_cdEsc(b.l)+'</div>'; }).join('');
-    var sc = item.type==='r' ? '#e05060' : 'var(--cd-amb)';
+    var sc = item.type==='r' ? 'var(--cd-red)' : 'var(--cd-amb)';
     return '<div class="cd-hot">' +
       '<div class="cd-hot-sev" style="background:'+sc+'"></div>' +
       '<div class="cd-hot-main">' +
@@ -5349,7 +5349,7 @@ async function _cdLoadWorkQueue(firmId) {
     (paths||[]).forEach(function(p){
       if (p.coverage_status!=='uncovered' && p.coverage_status!=='stale') return;
       var tmpl = p.workflow_templates ? p.workflow_templates.name : 'Template';
-      var pri  = p.coverage_status==='uncovered' ? '#e05060' : 'var(--cd-amb)';
+      var pri  = p.coverage_status==='uncovered' ? 'var(--cd-red)' : 'var(--cd-amb)';
       var badge= p.coverage_status==='uncovered'
         ? '<span class="cd-tag cd-tag-r" style="flex-shrink:0">PATH</span>'
         : '<span class="cd-tag cd-tag-a" style="flex-shrink:0">STALE</span>';
@@ -5357,7 +5357,7 @@ async function _cdLoadWorkQueue(firmId) {
       items.push({rank:rank++,pri:pri,name:_cdEsc(p.path_name),sub:_cdEsc(sub),badge:badge,id:p.id});
     });
     _cdCerts.filter(function(c){ return c.status==='invalidated'; }).forEach(function(c){
-      items.push({rank:rank++,pri:'#e05060',name:'Re-certify — invalidated cert on record',
+      items.push({rank:rank++,pri:'var(--cd-red)',name:'Re-certify — invalidated cert on record',
         sub:'Run all scripts · Gate blocked until passing cert exists',
         badge:'<span class="cd-tag cd-tag-r" style="flex-shrink:0">CERT</span>',id:c.id});
     });
@@ -5562,7 +5562,7 @@ function _cdConfirmOverride() {
   var ra = (document.getElementById('cd-override-rationale')||{}).value || '';
   if (ra.trim().length < 20) {
     var ta = document.getElementById('cd-override-rationale');
-    if (ta) ta.style.borderColor = '#e05060';
+    if (ta) ta.style.borderColor = 'var(--cd-red)';
     return;
   }
   var ta = document.getElementById('cd-override-rationale');
