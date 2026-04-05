@@ -964,7 +964,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.58 — Coverage self-heal · Cache-buster SE28c','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.60 — Sub-tab persist · Cache-buster SE28e','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -1318,6 +1318,30 @@ function _s9RenderSimPanel(el) {
   }
   // Always populate the template dropdown from DB
   _s9PopulateTemplateSelector();
+
+  // Restore active sub-tab after re-render (may have been called mid-session)
+  if (_s9SimSubTab && _s9SimSubTab !== 'scripts') {
+    setTimeout(function() {
+      var panels = ['scripts','coverage','history'];
+      panels.forEach(function(t) {
+        var el = document.getElementById('s9-subtab-' + t);
+        if (el) el.style.display = (t === _s9SimSubTab) ? 'flex' : 'none';
+      });
+      ['scripts','coverage','history'].forEach(function(t) {
+        var tab = document.getElementById('s9-simsubtab-' + t);
+        if (!tab) return;
+        var isAct = (t === _s9SimSubTab);
+        tab.style.borderBottom = '2px solid ' + (isAct ? '#5fd4c8' : 'transparent');
+        tab.style.color = isAct ? '#5fd4c8' : 'rgba(255,255,255,.3)';
+      });
+      // Reload coverage data if coverage tab is active
+      if (_s9SimSubTab === 'coverage') {
+        var tmpl2 = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+        if (tmpl2 && tmpl2.id) _s9LoadCoverageData(tmpl2.id, tmpl2.version || '0.0.0');
+      }
+      if (_s9SimSubTab === 'history') _s9RenderHistoryStub();
+    }, 100);
+  }
 }
 
 // ── Load template steps into left rail palette ─────────────────────────────
@@ -2949,6 +2973,14 @@ async function _s9LoadSimScripts(templateId, version) {
 // ── Sub-tab switcher ───────────────────────────────────────────────────────────
 function _s9SwitchSimSubTab(tab) {
   _s9SimSubTab = tab;
+  console.log('[S9 SubTab] switching to:', tab,
+    '| s9-sim-panel:', !!document.getElementById('s9-sim-panel'),
+    '| s9-sim-panel innerHTML length:', (document.getElementById('s9-sim-panel')||{}).innerHTML && document.getElementById('s9-sim-panel').innerHTML.length,
+    '| s9-subtab-scripts:', !!document.getElementById('s9-subtab-scripts'),
+    '| s9-subtab-coverage:', !!document.getElementById('s9-subtab-coverage'),
+    '| s9-sim-body:', !!document.getElementById('s9-sim-body'),
+    '| _selectedTmpl:', typeof _selectedTmpl !== 'undefined' ? (_selectedTmpl && _selectedTmpl.id) : 'undefined'
+  );
 
   // If sub-tab panels don't exist yet, re-render the sim panel first
   if (!document.getElementById('s9-subtab-scripts')) {
@@ -3832,7 +3864,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-dag-viewer.js?v=20260403-S9"></script>
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE28c"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE28e"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
