@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260404-SE14 — script_snapshot captured on every run','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260406-BQ2 — T3 arc fix: seq-based card resolution survives reuse','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // ── SE13 patches (2026-04-04) ───────────────────────────────────────────────
 // 1. Reverted SE12's step_route_back emission from explicit route branch.
 //    It fired before step_pass, resetting T2 cards to blue before they went green.
@@ -2125,8 +2125,17 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
 
     // Reset cards from toStepId up to (but NOT including) fromStepId.
     // The rejecting card (fromStepId) keeps its done/rejected visual permanently.
+    // Use data-seq to find the target index — card ids change on reuse, seq does not.
     var allNodeCards = Array.from(document.querySelectorAll('#bck-nodes .bck-nc'));
-    var toIdx   = allNodeCards.findIndex(function(c) { return c.id === 'bck-n-'+ev.toStepId; });
+    var toIdx = -1;
+    // Primary: find by toStepSeq (stable through card reuse)
+    if (ev.toStepSeq != null) {
+      toIdx = allNodeCards.findIndex(function(c){ return Number(c.dataset.seq) === Number(ev.toStepSeq); });
+    }
+    // Fallback: find by toStepId
+    if (toIdx < 0) {
+      toIdx = allNodeCards.findIndex(function(c){ return c.id === 'bck-n-'+ev.toStepId; });
+    }
     var fromIdx = allNodeCards.findIndex(function(c) { return c.id === 'bck-n-'+ev.fromStepId; });
     console.log('[cdn-bist:route_back] toIdx:'+toIdx+' fromIdx:'+fromIdx+' total:'+allNodeCards.length);
     if (toIdx >= 0) {
@@ -2158,7 +2167,12 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
       if (!window._bckArcs) window._bckArcs = [];
       // Clear any existing arcs before adding new one (one rejection arc at a time)
       window._bckArcs = [];
-      window._bckArcs.push({from: ev.fromStepId, to: ev.toStepId});
+      // Store seq-based keys so the rAF loop can re-resolve after card reuse.
+      // fromSeq = seq of rejecting step; toSeq = seq being reset to.
+      var _arcFromSeq = fromCard.dataset.seq != null ? Number(fromCard.dataset.seq) : null;
+      var _arcToSeq   = toCard.dataset.seq   != null ? Number(toCard.dataset.seq)   : null;
+      window._bckArcs.push({from: ev.fromStepId, to: ev.toStepId,
+        fromSeq: _arcFromSeq, toSeq: _arcToSeq});
       _bckStartArcLoop();
     } else {
       console.warn('[cdn-bist:route_back] Cannot draw arc — card missing. toStepId:'+ev.toStepId+
@@ -2201,10 +2215,14 @@ function _bistCkOnProgress(ti, test, ev, tmplSteps) {
 
 function _bckDrawRejectArc(fromStepId, toStepId) {
   if (!window._bckArcs) window._bckArcs = [];
-  window._bckArcs.push({from: fromStepId, to: toStepId});
-  console.log('[cdn-bist:arc] registered — from:bck-n-'+fromStepId+' to:bck-n-'+toStepId+
-    ' fromExists:'+!!document.getElementById('bck-n-'+fromStepId)+
-    ' toExists:'+!!document.getElementById('bck-n-'+toStepId));
+  var _fEl = document.getElementById('bck-n-'+fromStepId);
+  var _tEl = document.getElementById('bck-n-'+toStepId);
+  var _fSeq = _fEl && _fEl.dataset.seq != null ? Number(_fEl.dataset.seq) : null;
+  var _tSeq = _tEl && _tEl.dataset.seq != null ? Number(_tEl.dataset.seq) : null;
+  window._bckArcs.push({from: fromStepId, to: toStepId, fromSeq: _fSeq, toSeq: _tSeq});
+  console.log('[cdn-bist:arc] registered — from:bck-n-'+fromStepId+'(seq:'+_fSeq+') to:bck-n-'+toStepId+'(seq:'+_tSeq+')'+
+    ' fromExists:'+!!_fEl+
+    ' toExists:'+!!_tEl);
   _bckStartArcLoop();
 }
 
@@ -2251,8 +2269,21 @@ function _bckRedrawArcs() {
   var wsRect = ws.getBoundingClientRect();
 
   window._bckArcs.forEach(function(arc) {
-    var fromEl = document.getElementById('bck-n-'+arc.from);
-    var toEl   = document.getElementById('bck-n-'+arc.to);
+    // Prefer seq-based lookup (stable through card reuse) over id-based lookup.
+    // arc.fromSeq / arc.toSeq are set when the arc is registered.
+    // Fallback to arc.from / arc.to (legacy BIST step id) for backward compat.
+    var fromEl, toEl;
+    if (arc.fromSeq != null) {
+      var allC = Array.from(document.querySelectorAll('[id^="bck-n-"][data-seq]'));
+      fromEl = allC.find(function(c){ return Number(c.dataset.seq) === arc.fromSeq; }) || null;
+    }
+    if (!fromEl) fromEl = document.getElementById('bck-n-'+arc.from);
+    if (arc.toSeq != null) {
+      var allC2 = Array.from(document.querySelectorAll('[id^="bck-n-"][data-seq]'));
+      // For the TO card we want the FIRST card with that seq (first pass of that step)
+      toEl = allC2.find(function(c){ return Number(c.dataset.seq) === arc.toSeq; }) || null;
+    }
+    if (!toEl) toEl = document.getElementById('bck-n-'+arc.to);
     if (!fromEl || !toEl) return;
 
     var fR = fromEl.getBoundingClientRect();
