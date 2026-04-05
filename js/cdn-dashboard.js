@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-dashboard.js  ·  v20260406-CD3
+// cdn-dashboard.js  ·  v20260406-CD4
 // CadenceHUD — Process Certification Portfolio Dashboard
 //
 // Layout: KPI strip → Cert Portfolio grid (main) + Right rail (health + requests + CoC)
@@ -11,7 +11,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260406-CD3 — bist_runs join via script_id · portfolio grid fix','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260406-CD4 — schema audit clean · all columns verified','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -324,7 +324,7 @@ async function _cdLoadKpiAndHealth(firmId) {
   try {
     var results = await Promise.all([
       _cdQ('bist_runs', { filters:[['firm_id','eq',firmId]], order:'run_at.desc', limit:100, select:'id,status,run_at,duration_ms,script_id' }),
-      _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]], order:'issued_at.desc', select:'id,status,issued_at,template_id,template_version,workflow_templates(name)' }),
+      _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]], order:'issued_at.desc', select:'id,status,issued_at,expires_at,template_id,template_version' }),
       _cdQ('health_scores', { filters:[['firm_id','eq',firmId]], order:'calculated_at.desc', limit:7, select:'id,composite_score,domain_scores,calculated_at' })
     ]);
     var runs  = results[0] || [];
@@ -509,7 +509,7 @@ async function _cdLoadPortfolio(firmId) {
   try {
     var results = await Promise.all([
       _cdQ('workflow_templates', { filters:[['firm_id','eq',firmId]], select:'id,name,version,status,updated_at,created_at' }),
-      _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]], order:'issued_at.desc', select:'id,status,template_id,template_version,issued_at,certified_by_name' }),
+      _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]], order:'issued_at.desc', select:'id,status,template_id,template_version,issued_at,expires_at' }),
       _cdQ('bist_test_scripts', { filters:[['firm_id','eq',firmId]], select:'id,template_id,name' }),
       _cdQ('bist_coverage_paths', { filters:[['firm_id','eq',firmId]], select:'id,template_id,coverage_status' })
     ]);
@@ -611,7 +611,7 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
 
     // Cert date
     var certDateLine = cert && cert.issued_at
-      ? 'Cert issued '+_cdRelTime(cert.issued_at)+(cert.certified_by_name ? ' · '+cert.certified_by_name : '')
+      ? 'Cert issued ' + _cdRelTime(cert.issued_at)
       : 'Never certified';
 
     // Last run
