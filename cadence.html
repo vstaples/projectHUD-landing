@@ -853,8 +853,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 .cd-panel{background:var(--surface);border:1px solid var(--border);border-radius:5px;overflow:hidden;display:flex;flex-direction:column}
 .cd-panel-hdr{padding:7px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;flex-shrink:0}
 .cd-panel-title{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;font-family:var(--font-mono);flex:1}
-.cd-panel-count{font-size:11px;font-family:var(--font-mono);color:rgba(255,255,255,.55)}
-.cd-panel-link{font-size:11px;color:var(--cyan);cursor:pointer;font-family:var(--font-mono);letter-spacing:.03em;transition:color .1s}
+.cd-panel-count{font-size:12px;font-family:var(--font-mono);color:rgba(255,255,255,.65)}
+.cd-panel-link{font-size:12px;color:var(--cyan);cursor:pointer;font-family:var(--font-mono);letter-spacing:.03em;transition:color .1s}
 .cd-panel-link:hover{color:#fff}
 .cd-panel-body{flex:1;overflow-y:auto;max-height:240px}
 .cd-panel-body::-webkit-scrollbar{width:2px}
@@ -953,6 +953,31 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 /* Colour utils */
 .cd-grn{color:#3de08a} .cd-amb{color:var(--cd-amb)} .cd-red{color:var(--cd-red)} .cd-t2{color:rgba(255,255,255,.65)}
 
+
+/* ── CD Tooltip ── */
+.cd-tip-host{position:relative}
+.cd-tip-host:hover .cd-tip{display:block}
+.cd-tip{
+  display:none;position:absolute;z-index:9999;
+  bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  min-width:220px;max-width:300px;
+  background:#1a1f2e;border:1px solid rgba(255,255,255,.14);border-radius:5px;
+  padding:10px 12px;pointer-events:none;
+  box-shadow:0 8px 28px rgba(0,0,0,.7);
+}
+.cd-tip::after{
+  content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:#1a1f2e;
+}
+.cd-tip-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--cyan);font-family:var(--font-mono);margin-bottom:6px}
+.cd-tip-row{display:flex;justify-content:space-between;gap:12px;
+  font-size:11px;font-family:var(--font-mono);color:rgba(255,255,255,.55);
+  padding:2px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.cd-tip-row:last-child{border-bottom:none}
+.cd-tip-row span:last-child{color:rgba(255,255,255,.85);font-weight:700;text-align:right}
+.cd-tip-formula{font-size:10px;font-family:var(--font-mono);color:rgba(255,255,255,.3);
+  margin-top:6px;line-height:1.5;border-top:1px solid rgba(255,255,255,.06);padding-top:6px}
 </style>
 </head>
 <body>
@@ -4999,7 +5024,7 @@ function _cdRenderBrief(panel) {
         // Health brief
         '<div class="cd-health" id="cd-health">' +
           '<div class="cd-health-top">' +
-            '<div class="cd-score-block">' +
+            '<div class="cd-score-block cd-tip-host"><div class="cd-tip"><div class="cd-tip-title">Quality Health Score</div><div class="cd-tip-row"><span>Scale</span><span>0 – 100</span></div><div class="cd-tip-row"><span>Green</span><span>≥ 90</span></div><div class="cd-tip-row"><span>Amber</span><span>≥ 75</span></div><div class="cd-tip-row"><span>Red</span><span>&lt; 75</span></div><div class="cd-tip-row"><span>Triggered by</span><span>Scheduled · State change</span></div><div class="cd-tip-formula">Weighted sum of 8 domain scores. Domains: Process Cert (20) · Conformance (20) · Doc Control (14) · Training (14) · CAPA (10) · MRB (10) · Supplier (7) · Cert Currency (5)</div></div>' +
               '<div class="cd-score-num cd-t2" id="cd-score">—</div>' +
               '<div class="cd-score-lbl">Quality Health Score</div>' +
               '<div class="cd-score-delta cd-t2" id="cd-delta" style="font-family:var(--font-mono)">Loading…</div>' +
@@ -5109,7 +5134,7 @@ function _cdRenderHealth(rows) {
 
   // Score
   var scoreEl = document.getElementById('cd-score');
-  if (scoreEl) { scoreEl.textContent = Math.round(score); scoreEl.className = 'cd-score-num ' + _cdScoreCls(score); }
+  if (scoreEl) { scoreEl.textContent = Math.round(score) + '%'; scoreEl.className = 'cd-score-num ' + _cdScoreCls(score); }
 
   // Delta
   var deltaEl = document.getElementById('cd-delta');
@@ -5144,14 +5169,26 @@ function _cdRenderHealth(rows) {
   var det = latest.domain_details || {};
   var domEl = document.getElementById('cd-domains');
   if (domEl) {
+    var domTips = {
+    'process_cert': '<div class="cd-tip"><div class="cd-tip-title">Process Certification · 20pts</div><div class="cd-tip-row"><span>Weight</span><span>20 pts of 100</span></div><div class="cd-tip-row"><span>Threshold</span><span>≥90 green · ≥75 amber · <75 red</span></div><div class="cd-tip-row"><span>Inputs</span><span>bist_certificates · bist_coverage_paths</span></div><div class="cd-tip-formula">Valid certs ÷ total certs × 100, weighted by path coverage %</div></div>',
+    'conformance': '<div class="cd-tip"><div class="cd-tip-title">Process Conformance · 20pts</div><div class="cd-tip-row"><span>Weight</span><span>20 pts of 100</span></div><div class="cd-tip-row"><span>Status</span><span>Engine not yet built — scored from run history</span></div><div class="cd-tip-row"><span>Inputs</span><span>coc_events · bist_runs · bist_certificates</span></div><div class="cd-tip-formula">Live CoC event patterns matched against certified test assertions</div></div>',
+    'doc_control': '<div class="cd-tip"><div class="cd-tip-title">Document Control · 14pts</div><div class="cd-tip-row"><span>Weight</span><span>14 pts of 100</span></div><div class="cd-tip-row"><span>Threshold</span><span>Overdue review drops score proportionally</span></div><div class="cd-tip-row"><span>Inputs</span><span>controlled_documents · review_frequency_days</span></div><div class="cd-tip-formula">Controlled docs in released status, not overdue for review</div></div>',
+    'training': '<div class="cd-tip"><div class="cd-tip-title">Training Coverage · 14pts</div><div class="cd-tip-row"><span>Weight</span><span>14 pts of 100</span></div><div class="cd-tip-row"><span>Threshold</span><span>Each overdue assignment deducts 2 pts</span></div><div class="cd-tip-row"><span>Inputs</span><span>training_completions · document_training_requirements</span></div><div class="cd-tip-formula">Completions ÷ required assignments across QA dept × 100</div></div>',
+    'capa': '<div class="cd-tip"><div class="cd-tip-title">CAPA Health · 10pts</div><div class="cd-tip-row"><span>Weight</span><span>10 pts of 100</span></div><div class="cd-tip-row"><span>Status</span><span>Phase II — scored from health_scores seed</span></div><div class="cd-tip-row"><span>Inputs</span><span>capas · capa_actions</span></div><div class="cd-tip-formula">Open CAPAs on-time ÷ total open CAPAs, weighted by severity</div></div>',
+    'mrb': '<div class="cd-tip"><div class="cd-tip-title">MRB / NCR Velocity · 10pts</div><div class="cd-tip-row"><span>Weight</span><span>10 pts of 100</span></div><div class="cd-tip-row"><span>Escalation</span><span>MRBs held >14 days auto-escalate</span></div><div class="cd-tip-row"><span>Inputs</span><span>ncmrs · mrb_cases · days_on_hold</span></div><div class="cd-tip-formula">Parts cleared this period ÷ parts received, penalised by hold age</div></div>',
+    'supplier': '<div class="cd-tip"><div class="cd-tip-title">Supplier Quality · 7pts</div><div class="cd-tip-row"><span>Weight</span><span>7 pts of 100</span></div><div class="cd-tip-row"><span>Status</span><span>Phase II — scored from health_scores seed</span></div><div class="cd-tip-row"><span>Inputs</span><span>suppliers · ncmrs</span></div><div class="cd-tip-formula">Qualified suppliers ÷ active suppliers, adjusted for open NCMRs</div></div>',
+    'cert_currency': '<div class="cd-tip"><div class="cd-tip-title">Certificate Currency · 5pts</div><div class="cd-tip-row"><span>Weight</span><span>5 pts of 100</span></div><div class="cd-tip-row"><span>Threshold</span><span>Stale after 30 days (firm-configurable)</span></div><div class="cd-tip-row"><span>Inputs</span><span>bist_certificates · issued_at</span></div><div class="cd-tip-formula">Days since newest cert ÷ stale threshold, inverted</div></div>'
+  };
     domEl.innerHTML = defs.map(function(d) {
       var v   = domains[d.key] !== undefined ? Math.round(domains[d.key]) : null;
       var clr = v !== null ? _cdScoreColor(v) : 'var(--text2)';
       var pct = v !== null ? v : 0;
       var sub = _cdDomainDet(d.key, det[d.key]);
-      return '<div class="cd-domain">' +
+      var tip = domTips[d.key] || '';
+      return '<div class="cd-domain cd-tip-host">' +
+        tip +
         '<div class="cd-domain-lbl">' + _cdEsc(d.label) + '</div>' +
-        '<div class="cd-domain-score ' + (v !== null ? _cdScoreCls(v) : 'cd-t2') + '">' + (v !== null ? v : '—') + '</div>' +
+        '<div class="cd-domain-score ' + (v !== null ? _cdScoreCls(v) : 'cd-t2') + '">' + (v !== null ? v + '%' : '—') + '</div>' +
         '<div class="cd-domain-bar"><div class="cd-domain-fill" style="width:' + pct + '%;background:' + clr + '"></div></div>' +
         '<div class="cd-domain-det">' + sub + '</div>' +
         '</div>';
