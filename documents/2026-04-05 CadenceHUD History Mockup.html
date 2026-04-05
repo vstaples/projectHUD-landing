@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CadenceHUD — History Tab Mockup</title>
+<style>
+  :root {
+    --bg:        #080a0f;
+    --bg2:       #0d1017;
+    --bg3:       #111520;
+    --bg4:       #161b28;
+    --border:    #1e2535;
+    --border2:   #252d3f;
+    --teal:      #5fd4c8;
+    --teal-dim:  #3a8a84;
+    --teal-glow: rgba(95,212,200,0.12);
+    --orange:    #f5820a;
+    --red:       #e84040;
+    --red-dim:   #5a1a1a;
+    --green:     #3dd68c;
+    --green-dim: #1a4a35;
+    --amber:     #f5c842;
+    --amber-dim: #5a4a10;
+    --gray:      #4a5568;
+    --gray-dim:  #1e2535;
+    --purple:    #a78bfa;
+    --blue:      #60a5fa;
+    --text:      #e2e8f0;
+    --text-dim:  #6b7a99;
+    --text-mid:  #94a3b8;
+    --font-mono: 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP NAV ── */
+  .topnav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 16px; height: 42px; flex-shrink: 0; gap: 0;
+  }
+  .brand { color: var(--orange); font-weight:700; font-size:14px; letter-spacing:.05em; margin-right:16px; display:flex; align-items:center; gap:6px; }
+  .brand-dot { width:8px;height:8px;border-radius:50%;background:var(--orange);animation:pulse 2s infinite; }
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .brand-sub { color:var(--text-dim);font-size:11px;font-weight:400;margin-left:4px; }
+  .nav-tabs { display:flex; gap:0; margin-left:8px; }
+  .nav-tab { padding:0 16px; height:42px; display:flex; align-items:center; gap:6px; color:var(--text-dim); font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; border-bottom:2px solid transparent; }
+  .nav-tab.active { color:var(--teal); border-bottom-color:var(--teal); }
+  .nav-badge { background:var(--bg4); color:var(--text-mid); border-radius:3px; padding:1px 5px; font-size:10px; }
+  .nav-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+  .btn { padding:5px 12px; border-radius:3px; font-size:11px; font-weight:700; letter-spacing:.05em; cursor:pointer; border:1px solid; text-transform:uppercase; }
+  .btn-ghost { background:transparent; border-color:var(--border2); color:var(--text-mid); }
+  .btn-ghost:hover { border-color:var(--teal); color:var(--teal); }
+  .btn-primary { background:var(--teal); border-color:var(--teal); color:#000; }
+  .btn-orange { background:var(--orange); border-color:var(--orange); color:#000; }
+
+  /* ── SUBBAR ── */
+  .subbar { background:var(--bg2); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 16px; height:36px; flex-shrink:0; gap:0; }
+  .template-pill { display:flex; align-items:center; gap:6px; background:var(--bg4); border:1px solid var(--border2); border-radius:4px; padding:3px 10px; font-size:11px; color:var(--text); margin-right:16px; }
+  .version-tag { color:var(--text-dim); font-size:10px; font-family:var(--font-mono); }
+  .sim-tab { padding:0 14px; height:36px; display:flex; align-items:center; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-dim); cursor:pointer; border-bottom:2px solid transparent; }
+  .sim-tab.active { color:var(--teal); border-bottom-color:var(--teal); }
+  .subbar-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+  .gate-pill { display:flex; align-items:center; gap:5px; padding:3px 10px; border-radius:3px; font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+  .gate-green { background:var(--green-dim); color:var(--green); border:1px solid var(--green); }
+  .gate-dot { width:6px;height:6px;border-radius:50%;background:currentColor; }
+
+  /* ── MAIN ── */
+  .main { display:flex; flex:1; overflow:hidden; flex-direction:column; }
+
+  /* ── CONTROLS BAR ── */
+  .controls-bar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 6px 16px; gap: 12px; flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .controls-label { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim); }
+  .range-presets { display:flex; gap:3px; }
+  .range-btn { padding:3px 9px; border-radius:3px; font-size:10px; font-weight:700; cursor:pointer; border:1px solid var(--border2); color:var(--text-dim); background:transparent; letter-spacing:.04em; }
+  .range-btn.active { background:var(--bg4); border-color:var(--teal); color:var(--teal); }
+  .range-btn:hover:not(.active) { border-color:var(--border2); color:var(--text); }
+  .date-inputs { display:flex; align-items:center; gap:6px; }
+  .date-input { background:var(--bg4); border:1px solid var(--border2); border-radius:3px; padding:3px 8px; font-size:10px; color:var(--text-mid); font-family:var(--font-mono); width:88px; cursor:pointer; }
+  .date-sep { color:var(--text-dim); font-size:10px; }
+
+  .controls-divider { width:1px; height:20px; background:var(--border); }
+
+  /* script filter pills */
+  .filter-pills { display:flex; gap:4px; flex-wrap:wrap; }
+  .filter-pill { display:flex; align-items:center; gap:4px; padding:2px 8px; border-radius:10px; font-size:10px; cursor:pointer; border:1px solid; font-weight:700; }
+  .filter-pill.on  { opacity:1; }
+  .filter-pill.off { opacity:.35; }
+  .fp-all    { border-color:var(--teal);   color:var(--teal);   background:var(--teal-glow); }
+  .fp-t1     { border-color:var(--green);  color:var(--green);  background:var(--green-dim); }
+  .fp-t2     { border-color:var(--blue);   color:var(--blue);   background:#1a2a4a; }
+  .fp-t3     { border-color:var(--amber);  color:var(--amber);  background:var(--amber-dim); }
+  .fp-t4     { border-color:var(--purple); color:var(--purple); background:#1a1a3a; }
+
+  /* view toggle */
+  .view-toggle-bar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 5px 16px; gap:6px; flex-shrink:0;
+  }
+  .view-btn { padding:3px 10px; border-radius:3px; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; border:1px solid var(--border2); color:var(--text-dim); background:transparent; }
+  .view-btn.active { background:var(--bg4); border-color:var(--teal); color:var(--teal); }
+
+  /* ── SCROLL BODY ── */
+  .history-body { flex:1; overflow-y:auto; display:flex; flex-direction:column; }
+
+  /* ── KPI STRIP ── */
+  .kpi-strip {
+    display: flex; gap:0;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0; background: var(--bg2);
+  }
+  .kpi-cell {
+    flex:1; padding:10px 16px;
+    border-right:1px solid var(--border);
+    display:flex; flex-direction:column; gap:3px;
+  }
+  .kpi-cell:last-child { border-right:none; }
+  .kpi-label { font-size:9px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--teal); }
+  .kpi-val { font-size:20px; font-weight:700; font-family:var(--font-mono); }
+  .kpi-sub { font-size:10px; color:var(--text-dim); }
+  .kpi-delta { font-size:10px; font-weight:700; }
+  .delta-up   { color:var(--green); }
+  .delta-down { color:var(--red); }
+  .delta-flat { color:var(--text-dim); }
+
+  /* ── TREND CHART ── */
+  .chart-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .chart-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .chart-title { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--teal); }
+  .chart-legend { display:flex; gap:12px; margin-left:auto; }
+  .chart-legend-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--text-dim); }
+  .chart-legend-line { width:20px; height:2px; border-radius:1px; }
+  .chart-legend-dot  { width:8px; height:8px; border-radius:50%; }
+
+  .chart-wrap { position:relative; }
+  .chart-svg  { width:100%; display:block; }
+
+  /* event marker tooltip */
+  .event-tooltip {
+    position:absolute; display:none;
+    background:var(--bg3); border:1px solid var(--border2);
+    border-radius:4px; padding:8px 10px;
+    font-size:10px; color:var(--text);
+    min-width:180px; z-index:50;
+    box-shadow:0 6px 20px rgba(0,0,0,.5);
+    pointer-events:none;
+  }
+  .event-tooltip.show { display:block; }
+  .et-title { font-weight:700; color:var(--teal); margin-bottom:4px; font-size:10px; }
+  .et-row   { color:var(--text-dim); margin-top:2px; }
+  .et-row span { color:var(--text); }
+
+  /* ── CALENDAR HEATMAP ── */
+  .cal-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .cal-title { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--teal); margin-bottom:10px; }
+  .cal-wrap { display:flex; gap:3px; align-items:flex-start; }
+  .cal-months { display:flex; gap:3px; }
+  .cal-month { display:flex; flex-direction:column; gap:2px; }
+  .cal-month-label { font-size:9px; color:var(--text-dim); margin-bottom:2px; text-align:center; }
+  .cal-week { display:flex; flex-direction:column; gap:2px; }
+  .cal-weeks-wrap { display:flex; gap:2px; }
+  .cal-day {
+    width:11px; height:11px; border-radius:2px; cursor:pointer;
+    transition: transform .1s;
+  }
+  .cal-day:hover { transform:scale(1.4); z-index:10; position:relative; }
+  .cd-none    { background:var(--bg4); }
+  .cd-pass    { background:var(--green); }
+  .cd-fail    { background:var(--red); }
+  .cd-partial { background:var(--amber); }
+  .cd-stale   { background:#3a3010; border:1px solid var(--amber); }
+  .cal-day-labels { display:flex; flex-direction:column; gap:2px; margin-right:4px; padding-top:14px; }
+  .cal-day-label  { font-size:8px; color:var(--text-dim); height:11px; display:flex; align-items:center; }
+  .cal-footer { display:flex; align-items:center; gap:10px; margin-top:8px; }
+  .cal-footer-label { font-size:9px; color:var(--text-dim); }
+  .cal-footer-scale { display:flex; gap:3px; align-items:center; }
+  .cal-footer-cell { width:11px;height:11px;border-radius:2px; }
+
+  /* ── RUN LOG ── */
+  .log-section { padding:0; flex:1; }
+  .log-header {
+    display:grid;
+    grid-template-columns: 140px 90px 70px 80px 80px 80px 1fr 60px;
+    gap:0; padding:6px 16px;
+    background:var(--bg3); border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:5;
+  }
+  .log-header-cell { font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--teal); }
+  .log-row {
+    display:grid;
+    grid-template-columns: 140px 90px 70px 80px 80px 80px 1fr 60px;
+    gap:0; padding:7px 16px;
+    border-bottom:1px solid var(--border);
+    align-items:center; cursor:pointer;
+    transition:background .1s; position:relative;
+  }
+  .log-row:hover { background:var(--bg3); }
+  .log-row.event-row { background:#0d1420; }
+  .log-cell { font-size:11px; color:var(--text-mid); font-family:var(--font-mono); }
+  .log-cell-main { font-size:11px; color:var(--text); }
+
+  .suite-pill { display:inline-flex; align-items:center; gap:4px; padding:2px 7px; border-radius:3px; font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+  .sp-pass    { background:var(--green-dim); color:var(--green); border:1px solid var(--green); }
+  .sp-fail    { background:var(--red-dim);   color:var(--red);   border:1px solid var(--red); }
+  .sp-partial { background:var(--amber-dim); color:var(--amber); border:1px solid var(--amber); }
+
+  /* mini script results in row */
+  .mini-results { display:flex; gap:3px; align-items:center; }
+  .mini-dot { width:8px;height:8px;border-radius:50%; flex-shrink:0; cursor:pointer; }
+
+  /* event badge in log */
+  .event-badge {
+    display:inline-flex; align-items:center; gap:4px;
+    padding:2px 7px; border-radius:3px;
+    font-size:9px; font-weight:700;
+    letter-spacing:.04em;
+  }
+  .eb-commit  { background:#1a1a3a; color:var(--purple); border:1px solid var(--purple); }
+  .eb-script  { background:#0d2035; color:var(--blue);   border:1px solid var(--blue); }
+  .eb-recover { background:var(--green-dim); color:var(--green); border:1px solid var(--green); }
+  .eb-stale   { background:var(--amber-dim); color:var(--amber); border:1px solid var(--amber); }
+  .eb-manual  { background:var(--bg4); color:var(--text-mid); border:1px solid var(--border2); }
+
+  /* event divider row */
+  .event-divider {
+    display:flex; align-items:center; gap:8px;
+    padding:4px 16px; background:#0a0e1a;
+    border-bottom:1px solid var(--border);
+    border-top:1px solid var(--border);
+  }
+  .event-divider-line { flex:1; height:1px; background:var(--border2); }
+
+  /* drill-down panel */
+  .drill-panel {
+    display:none;
+    background:var(--bg3);
+    border-bottom:1px solid var(--border2);
+    padding:10px 16px 10px 40px;
+  }
+  .drill-panel.open { display:block; }
+  .drill-grid { display:flex; gap:24px; }
+  .drill-col { display:flex; flex-direction:column; gap:4px; min-width:140px; }
+  .drill-col-label { font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--teal); margin-bottom:3px; }
+  .drill-script-row { display:flex; align-items:center; gap:6px; font-size:10px; color:var(--text-mid); }
+  .drill-script-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0; }
+  .drill-script-name { flex:1; }
+  .drill-script-val  { font-family:var(--font-mono); color:var(--text); }
+  .drill-fail-detail { font-size:10px; color:var(--red); margin-top:2px; padding:5px 8px; background:var(--red-dim); border-radius:3px; border-left:2px solid var(--red); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width:5px; height:5px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <div class="brand"><div class="brand-dot"></div>CadenceHUD <span class="brand-sub">Workflow Engine</span></div>
+  <div class="nav-tabs">
+    <div class="nav-tab">⊞ Library <span class="nav-badge">1</span></div>
+    <div class="nav-tab active">⊙ Simulator</div>
+    <div class="nav-tab">≡ Instances <span class="nav-badge">16</span></div>
+  </div>
+  <div class="nav-right">
+    <button class="btn btn-ghost">← Dashboard</button>
+    <button class="btn btn-ghost">⚙ Settings</button>
+    <button class="btn btn-orange">+ New</button>
+  </div>
+</div>
+
+<!-- SUBBAR -->
+<div class="subbar">
+  <div class="template-pill">
+    <span>Design Review Signoff</span>
+    <span class="version-tag">v0.0.13 ▾</span>
+  </div>
+  <div style="display:flex">
+    <div class="sim-tab">Scripts</div>
+    <div class="sim-tab">Coverage</div>
+    <div class="sim-tab active">History</div>
+  </div>
+  <div class="subbar-right">
+    <div class="gate-pill gate-green"><div class="gate-dot"></div>All Tests Passing — Cleared for Release</div>
+    <button class="btn btn-ghost">▶▶ Run All Tests</button>
+    <button class="btn btn-primary">◎ View Certificate</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- CONTROLS BAR -->
+  <div class="controls-bar">
+    <span class="controls-label">Range</span>
+    <div class="range-presets">
+      <button class="range-btn" onclick="setRange(this,'7d')">7d</button>
+      <button class="range-btn active" onclick="setRange(this,'30d')">30d</button>
+      <button class="range-btn" onclick="setRange(this,'90d')">90d</button>
+      <button class="range-btn" onclick="setRange(this,'all')">All time</button>
+    </div>
+    <div class="date-inputs">
+      <input class="date-input" type="text" value="2026-03-05" readonly>
+      <span class="date-sep">→</span>
+      <input class="date-input" type="text" value="2026-04-04" readonly>
+    </div>
+    <div class="controls-divider"></div>
+    <span class="controls-label">Scripts</span>
+    <div class="filter-pills">
+      <div class="filter-pill fp-all on" onclick="togglePill(this)">All</div>
+      <div class="filter-pill fp-t1  on" onclick="togglePill(this)">T1 · Full workflow</div>
+      <div class="filter-pill fp-t2  on" onclick="togglePill(this)">T2 · Meeting reset</div>
+      <div class="filter-pill fp-t3  on" onclick="togglePill(this)">T3 · Rejection loop</div>
+      <div class="filter-pill fp-t4  on" onclick="togglePill(this)">T4 · Sign-off decline</div>
+    </div>
+    <div class="controls-divider"></div>
+    <span class="controls-label">Events</span>
+    <div class="filter-pills">
+      <div class="filter-pill on" style="border-color:var(--purple);color:var(--purple);background:#1a1a3a" onclick="togglePill(this)">Commits</div>
+      <div class="filter-pill on" style="border-color:var(--blue);color:var(--blue);background:#0d2035" onclick="togglePill(this)">Scripts</div>
+      <div class="filter-pill on" style="border-color:var(--green);color:var(--green);background:var(--green-dim)" onclick="togglePill(this)">Recovery</div>
+      <div class="filter-pill on" style="border-color:var(--amber);color:var(--amber);background:var(--amber-dim)" onclick="togglePill(this)">Stale</div>
+      <div class="filter-pill on" style="border-color:var(--gray);color:var(--text-mid);background:var(--gray-dim)" onclick="togglePill(this)">Manual</div>
+    </div>
+  </div>
+
+  <!-- VIEW TOGGLE -->
+  <div class="view-toggle-bar">
+    <button class="view-btn active" onclick="setView('all')">All Views</button>
+    <button class="view-btn" onclick="setView('trend')">Trend Chart</button>
+    <button class="view-btn" onclick="setView('cal')">Health Calendar</button>
+    <button class="view-btn" onclick="setView('log')">Run Log</button>
+    <span style="margin-left:auto;font-size:10px;color:var(--text-dim)">
+      Stale threshold: <span style="color:var(--amber);font-weight:700">7 days</span>
+      <span style="color:var(--teal);cursor:pointer;margin-left:6px;text-decoration:underline">Edit →</span>
+    </span>
+  </div>
+
+  <!-- SCROLLABLE BODY -->
+  <div class="history-body" id="historyBody">
+
+    <!-- KPI STRIP -->
+    <div class="kpi-strip" id="kpiStrip">
+      <div class="kpi-cell">
+        <div class="kpi-label">Suite Pass Rate</div>
+        <div class="kpi-val" style="color:var(--green)">92%</div>
+        <div class="kpi-sub">last 30 days · 66 runs</div>
+        <div class="kpi-delta delta-up">↑ +4% vs prior 30d</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">Mean Time to Detect</div>
+        <div class="kpi-val" style="color:var(--teal)">1h 12m</div>
+        <div class="kpi-sub">avg failure → discovery</div>
+        <div class="kpi-delta delta-up">↑ faster by 23m</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">Mean Time to Certify</div>
+        <div class="kpi-val" style="color:var(--teal)">4h 38m</div>
+        <div class="kpi-sub">commit → certificate</div>
+        <div class="kpi-delta delta-down">↓ slower by 18m</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">Consecutive Passes</div>
+        <div class="kpi-val" style="color:var(--green)">47</div>
+        <div class="kpi-sub">current streak · since Mar 26</div>
+        <div class="kpi-delta delta-up">↑ longest streak</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">Flakiness Index</div>
+        <div class="kpi-val" style="color:var(--amber)">0.08</div>
+        <div class="kpi-sub">T3 intermittent · 3 flips</div>
+        <div class="kpi-delta delta-down">↓ watch T3</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">Cert Age</div>
+        <div class="kpi-val" style="color:var(--green)">0d</div>
+        <div class="kpi-sub">issued Apr 4 · 8:47 PM</div>
+        <div class="kpi-delta delta-flat">threshold: 30d</div>
+      </div>
+    </div>
+
+    <!-- TREND CHART SECTION -->
+    <div class="chart-section" id="trendSection">
+      <div class="chart-header">
+        <div class="chart-title">Suite Pass Rate — 30 Day Trend</div>
+        <div class="chart-legend">
+          <div class="chart-legend-item"><div class="chart-legend-line" style="background:var(--teal)"></div>Composite</div>
+          <div class="chart-legend-item"><div class="chart-legend-line" style="background:var(--green)"></div>T1</div>
+          <div class="chart-legend-item"><div class="chart-legend-line" style="background:var(--blue)"></div>T2</div>
+          <div class="chart-legend-item"><div class="chart-legend-line" style="background:var(--amber)"></div>T3</div>
+          <div class="chart-legend-item"><div class="chart-legend-line" style="background:var(--purple)"></div>T4</div>
+          <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--purple)"></div>Commit</div>
+          <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--blue)"></div>Script Δ</div>
+          <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--green)"></div>Recovery</div>
+          <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--amber)"></div>Stale</div>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <svg class="chart-svg" height="160" viewBox="0 0 900 160" preserveAspectRatio="none" id="trendSvg">
+          <!-- grid lines -->
+          <line x1="0" y1="20"  x2="900" y2="20"  stroke="#1e2535" stroke-width="1"/>
+          <line x1="0" y1="60"  x2="900" y2="60"  stroke="#1e2535" stroke-width="1"/>
+          <line x1="0" y1="100" x2="900" y2="100" stroke="#1e2535" stroke-width="1"/>
+          <line x1="0" y1="140" x2="900" y2="140" stroke="#1e2535" stroke-width="1"/>
+          <!-- y-axis labels -->
+          <text x="4" y="18"  font-size="9" fill="#6b7a99">100%</text>
+          <text x="4" y="58"  font-size="9" fill="#6b7a99">75%</text>
+          <text x="4" y="98"  font-size="9" fill="#6b7a99">50%</text>
+          <text x="4" y="138" font-size="9" fill="#6b7a99">25%</text>
+
+          <!-- stale threshold reference line -->
+          <line x1="0" y1="20" x2="900" y2="20" stroke="#5a4a10" stroke-width="1" stroke-dasharray="4 4"/>
+
+          <!-- failure region (Mar 22-25) shaded -->
+          <rect x="290" y="0" width="90" height="150" fill="rgba(232,64,64,0.06)" rx="0"/>
+
+          <!-- T1 line — always passing (green) -->
+          <polyline points="30,22 90,22 150,22 210,22 270,22 330,22 390,55 430,22 490,22 550,22 610,22 670,22 730,22 790,22 850,22"
+            fill="none" stroke="#3dd68c" stroke-width="1.5" opacity="0.7"/>
+
+          <!-- T2 line — mostly passing (blue) -->
+          <polyline points="30,22 90,22 150,22 210,22 270,22 330,80 390,100 430,22 490,22 550,22 610,22 670,22 730,22 790,22 850,22"
+            fill="none" stroke="#60a5fa" stroke-width="1.5" opacity="0.7"/>
+
+          <!-- T3 line — flaky (amber) -->
+          <polyline points="30,22 90,40 150,22 210,60 270,22 330,140 390,140 430,40 490,22 550,55 610,22 670,40 730,22 790,22 850,22"
+            fill="none" stroke="#f5c842" stroke-width="1.5" opacity="0.8"/>
+
+          <!-- T4 line (purple) -->
+          <polyline points="30,22 90,22 150,22 210,22 270,22 330,22 390,80 430,22 490,22 550,22 610,22 670,22 730,22 790,22 850,22"
+            fill="none" stroke="#a78bfa" stroke-width="1.5" opacity="0.7"/>
+
+          <!-- Composite line (teal, thicker) -->
+          <polyline points="30,22 90,28 150,22 210,30 270,22 330,85 390,105 430,32 490,22 550,30 610,22 670,30 730,22 790,22 850,22"
+            fill="none" stroke="#5fd4c8" stroke-width="2.5"/>
+
+          <!-- composite area fill -->
+          <polygon points="30,22 90,28 150,22 210,30 270,22 330,85 390,105 430,32 490,22 550,30 610,22 670,30 730,22 790,22 850,22 850,150 30,150"
+            fill="url(#tealGrad)" opacity="0.15"/>
+          <defs>
+            <linearGradient id="tealGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#5fd4c8"/>
+              <stop offset="100%" stop-color="#5fd4c8" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+
+          <!-- EVENT MARKERS -->
+          <!-- Commit v0.0.10 -->
+          <line x1="150" y1="10" x2="150" y2="150" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+          <circle cx="150" cy="12" r="5" fill="#a78bfa" class="event-marker" data-ev="commit-010" style="cursor:pointer"/>
+
+          <!-- Script added (T4) -->
+          <line x1="270" y1="10" x2="270" y2="150" stroke="#60a5fa" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+          <circle cx="270" cy="12" r="5" fill="#60a5fa" class="event-marker" data-ev="script-add" style="cursor:pointer"/>
+
+          <!-- Commit v0.0.11 causing failure -->
+          <line x1="330" y1="10" x2="330" y2="150" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+          <circle cx="330" cy="12" r="5" fill="#a78bfa" class="event-marker" data-ev="commit-011" style="cursor:pointer"/>
+
+          <!-- Recovery marker -->
+          <line x1="430" y1="10" x2="430" y2="150" stroke="#3dd68c" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+          <circle cx="430" cy="12" r="5" fill="#3dd68c" class="event-marker" data-ev="recovery" style="cursor:pointer"/>
+
+          <!-- Stale threshold breach -->
+          <line x1="550" y1="10" x2="550" y2="150" stroke="#f5c842" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+          <circle cx="550" cy="12" r="5" fill="#f5c842" class="event-marker" data-ev="stale" style="cursor:pointer"/>
+
+          <!-- Commit v0.0.13 -->
+          <line x1="730" y1="10" x2="730" y2="150" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+          <circle cx="730" cy="12" r="5" fill="#a78bfa" class="event-marker" data-ev="commit-013" style="cursor:pointer"/>
+
+          <!-- x-axis date labels -->
+          <text x="30"  y="158" font-size="8" fill="#6b7a99" text-anchor="middle">Mar 5</text>
+          <text x="150" y="158" font-size="8" fill="#6b7a99" text-anchor="middle">Mar 12</text>
+          <text x="270" y="158" font-size="8" fill="#6b7a99" text-anchor="middle">Mar 19</text>
+          <text x="390" y="158" font-size="8" fill="#6b7a99" text-anchor="middle">Mar 26</text>
+          <text x="510" y="158" font-size="8" fill="#6b7a99" text-anchor="middle">Apr 1</text>
+          <text x="630" y="158" font-size="8" fill="#6b7a99" text-anchor="middle">Apr 3</text>
+          <text x="790" y="158" font-size="8" fill="#6b7a99" text-anchor="middle">Apr 4</text>
+          <text x="850" y="158" font-size="8" fill="#6b7a99" text-anchor="middle">Today</text>
+        </svg>
+        <!-- event tooltip -->
+        <div class="event-tooltip" id="evTip"></div>
+      </div>
+    </div>
+
+    <!-- HEALTH CALENDAR -->
+    <div class="cal-section" id="calSection">
+      <div class="cal-title">Daily Suite Health — March 5 → April 4</div>
+      <div class="cal-wrap">
+        <div class="cal-day-labels">
+          <div class="cal-day-label">Mon</div>
+          <div class="cal-day-label">Tue</div>
+          <div class="cal-day-label">Wed</div>
+          <div class="cal-day-label">Thu</div>
+          <div class="cal-day-label">Fri</div>
+          <div class="cal-day-label">Sat</div>
+          <div class="cal-day-label">Sun</div>
+        </div>
+        <div class="cal-months" id="calGrid"></div>
+      </div>
+      <div class="cal-footer">
+        <span class="cal-footer-label">Less</span>
+        <div class="cal-footer-scale">
+          <div class="cal-footer-cell cd-none"></div>
+          <div class="cal-footer-cell cd-stale"></div>
+          <div class="cal-footer-cell cd-partial"></div>
+          <div class="cal-footer-cell cd-pass"></div>
+        </div>
+        <span class="cal-footer-label">More / All pass</span>
+        <div style="width:16px"></div>
+        <div class="cal-footer-cell cd-fail" style="margin-right:4px"></div>
+        <span class="cal-footer-label">Failure</span>
+        <div style="width:16px"></div>
+        <div class="cal-footer-cell cd-none" style="margin-right:4px"></div>
+        <span class="cal-footer-label">No run</span>
+      </div>
+    </div>
+
+    <!-- RUN LOG -->
+    <div class="log-section" id="logSection">
+      <div class="log-header">
+        <div class="log-header-cell">Date / Time</div>
+        <div class="log-header-cell">Suite Result</div>
+        <div class="log-header-cell">Version</div>
+        <div class="log-header-cell">Duration</div>
+        <div class="log-header-cell">Steps Fired</div>
+        <div class="log-header-cell">Assertions</div>
+        <div class="log-header-cell">Scripts T1–T4</div>
+        <div class="log-header-cell">Event</div>
+      </div>
+
+      <!-- event divider: commit -->
+      <div class="event-divider">
+        <div class="event-divider-line"></div>
+        <span class="event-badge eb-commit">● Commit v0.0.13 — Apr 4, 8:44 PM — Vaughn Staples</span>
+        <div class="event-divider-line"></div>
+      </div>
+
+      <!-- run rows -->
+      <div class="log-row" onclick="toggleDrill(this)">
+        <div class="log-cell-main">Apr 4 · 8:47 PM</div>
+        <div><span class="suite-pill sp-pass">✓ Passing</span></div>
+        <div class="log-cell">v0.0.13</div>
+        <div class="log-cell">1m 05s</div>
+        <div class="log-cell">24</div>
+        <div class="log-cell">61 / 61</div>
+        <div class="mini-results">
+          <div class="mini-dot" style="background:var(--green)" title="T1 Pass"></div>
+          <div class="mini-dot" style="background:var(--green)" title="T2 Pass"></div>
+          <div class="mini-dot" style="background:var(--green)" title="T3 Pass"></div>
+          <div class="mini-dot" style="background:var(--green)" title="T4 Pass"></div>
+        </div>
+        <div><span class="event-badge eb-commit" style="font-size:8px">Cert issued</span></div>
+      </div>
+      <div class="drill-panel">
+        <div class="drill-grid">
+          <div class="drill-col">
+            <div class="drill-col-label">Script Results</div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--green)"></div><span class="drill-script-name">T1 Full workflow</span><span class="drill-script-val">✓ 9.0s</span></div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--green)"></div><span class="drill-script-name">T2 Meeting reset</span><span class="drill-script-val">✓ 20.3s</span></div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--green)"></div><span class="drill-script-name">T3 Rejection loop</span><span class="drill-script-val">✓ 22.5s</span></div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--green)"></div><span class="drill-script-name">T4 Sign-off decline</span><span class="drill-script-val">✓ 13.0s</span></div>
+          </div>
+          <div class="drill-col">
+            <div class="drill-col-label">Run By</div>
+            <div class="drill-script-row" style="color:var(--text)">Automated — post-commit</div>
+            <div class="drill-col-label" style="margin-top:8px">Triggered By</div>
+            <div class="drill-script-row" style="color:var(--text)">Template commit v0.0.13</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="log-row" onclick="toggleDrill(this)">
+        <div class="log-cell-main">Apr 4 · 5:57 PM</div>
+        <div><span class="suite-pill sp-pass">✓ Passing</span></div>
+        <div class="log-cell">v0.0.12</div>
+        <div class="log-cell">20m 35s</div>
+        <div class="log-cell">24</div>
+        <div class="log-cell">61 / 61</div>
+        <div class="mini-results">
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+        </div>
+        <div></div>
+      </div>
+      <div class="drill-panel"></div>
+
+      <!-- event divider: stale -->
+      <div class="event-divider">
+        <div class="event-divider-line"></div>
+        <span class="event-badge eb-stale">⚠ Stale threshold breached — T3 not run in 7 days · Apr 2, 9:00 AM</span>
+        <div class="event-divider-line"></div>
+      </div>
+
+      <div class="log-row" onclick="toggleDrill(this)">
+        <div class="log-cell-main">Apr 4 · 5:45 PM</div>
+        <div><span class="suite-pill sp-pass">✓ Passing</span></div>
+        <div class="log-cell">v0.0.12</div>
+        <div class="log-cell">22m 25s</div>
+        <div class="log-cell">24</div>
+        <div class="log-cell">61 / 61</div>
+        <div class="mini-results">
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+        </div>
+        <div><span class="event-badge eb-manual" style="font-size:8px">Manual · VS</span></div>
+      </div>
+      <div class="drill-panel">
+        <div class="drill-grid">
+          <div class="drill-col">
+            <div class="drill-col-label">Run By</div>
+            <div class="drill-script-row" style="color:var(--text)">Vaughn Staples — manual trigger</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- event divider: recovery -->
+      <div class="event-divider">
+        <div class="event-divider-line"></div>
+        <span class="event-badge eb-recover">✓ First full pass after 4-run failure streak — Mar 26, 11:31 AM</span>
+        <div class="event-divider-line"></div>
+      </div>
+
+      <div class="log-row" onclick="toggleDrill(this)">
+        <div class="log-cell-main">Mar 26 · 11:31 AM</div>
+        <div><span class="suite-pill sp-pass">✓ Passing</span></div>
+        <div class="log-cell">v0.0.11</div>
+        <div class="log-cell">1m 23s</div>
+        <div class="log-cell">24</div>
+        <div class="log-cell">61 / 61</div>
+        <div class="mini-results">
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+        </div>
+        <div><span class="event-badge eb-recover" style="font-size:8px">Recovery</span></div>
+      </div>
+      <div class="drill-panel"></div>
+
+      <div class="log-row" onclick="toggleDrill(this)">
+        <div class="log-cell-main">Mar 25 · 3:14 PM</div>
+        <div><span class="suite-pill sp-fail">✗ Failing</span></div>
+        <div class="log-cell">v0.0.11</div>
+        <div class="log-cell">1m 23s</div>
+        <div class="log-cell">24</div>
+        <div class="log-cell">56 / 61</div>
+        <div class="mini-results">
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--red)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+        </div>
+        <div></div>
+      </div>
+      <div class="drill-panel">
+        <div class="drill-grid">
+          <div class="drill-col">
+            <div class="drill-col-label">Script Results</div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--green)"></div><span class="drill-script-name">T1 Full workflow</span><span class="drill-script-val">✓ 9.0s</span></div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--green)"></div><span class="drill-script-name">T2 Meeting reset</span><span class="drill-script-val">✓ 19.8s</span></div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--red)"></div><span class="drill-script-name">T3 Rejection loop</span><span class="drill-script-val">✗ 23.1s</span></div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--green)"></div><span class="drill-script-name">T4 Sign-off decline</span><span class="drill-script-val">✓ 13.4s</span></div>
+          </div>
+          <div class="drill-col">
+            <div class="drill-col-label">Failure Detail — T3</div>
+            <div class="drill-fail-detail">step[3].loops — expected 1, got 2<br>Fix: remove route_to_seq from s4 params</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="log-row" onclick="toggleDrill(this)">
+        <div class="log-cell-main">Mar 25 · 1:52 PM</div>
+        <div><span class="suite-pill sp-fail">✗ Failing</span></div>
+        <div class="log-cell">v0.0.11</div>
+        <div class="log-cell">1m 19s</div>
+        <div class="log-cell">24</div>
+        <div class="log-cell">56 / 61</div>
+        <div class="mini-results">
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--red)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+        </div>
+        <div></div>
+      </div>
+      <div class="drill-panel"></div>
+
+      <!-- event divider: commit -->
+      <div class="event-divider">
+        <div class="event-divider-line"></div>
+        <span class="event-badge eb-commit">● Commit v0.0.11 — Mar 22, 9:30 AM — Vaughn Staples · Step modified: Final Meeting</span>
+        <div class="event-divider-line"></div>
+      </div>
+
+      <div class="log-row" onclick="toggleDrill(this)">
+        <div class="log-cell-main">Mar 22 · 9:50 AM</div>
+        <div><span class="suite-pill sp-fail">✗ Failing</span></div>
+        <div class="log-cell">v0.0.11</div>
+        <div class="log-cell">1m 23s</div>
+        <div class="log-cell">24</div>
+        <div class="log-cell">56 / 61</div>
+        <div class="mini-results">
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--red)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+        </div>
+        <div><span class="event-badge eb-commit" style="font-size:8px">Post-commit</span></div>
+      </div>
+      <div class="drill-panel"></div>
+
+      <!-- event divider: script added -->
+      <div class="event-divider">
+        <div class="event-divider-line"></div>
+        <span class="event-badge eb-script">+ Script added: T4 Sign-off decline — Mar 19, 2:10 PM — Vaughn Staples</span>
+        <div class="event-divider-line"></div>
+      </div>
+
+      <div class="log-row" onclick="toggleDrill(this)">
+        <div class="log-cell-main">Mar 19 · 2:14 PM</div>
+        <div><span class="suite-pill sp-partial">~ Partial</span></div>
+        <div class="log-cell">v0.0.10</div>
+        <div class="log-cell">55s</div>
+        <div class="log-cell">19</div>
+        <div class="log-cell">47 / 52</div>
+        <div class="mini-results">
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--green)"></div>
+          <div class="mini-dot" style="background:var(--amber)" title="T4 first run — 5 assertions not yet written"></div>
+        </div>
+        <div><span class="event-badge eb-script" style="font-size:8px">Script Δ</span></div>
+      </div>
+      <div class="drill-panel">
+        <div class="drill-grid">
+          <div class="drill-col">
+            <div class="drill-col-label">Script Results</div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--green)"></div><span class="drill-script-name">T1 Full workflow</span><span class="drill-script-val">✓ 9.0s</span></div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--green)"></div><span class="drill-script-name">T2 Meeting reset</span><span class="drill-script-val">✓ 18.2s</span></div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--green)"></div><span class="drill-script-name">T3 Rejection loop</span><span class="drill-script-val">✓ 20.1s</span></div>
+            <div class="drill-script-row"><div class="drill-script-dot" style="background:var(--amber)"></div><span class="drill-script-name">T4 Sign-off decline</span><span class="drill-script-val">~ 7.7s · 5 assertions pending</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:20px 16px; color:var(--text-dim); font-size:10px; text-align:center; border-top:1px solid var(--border)">
+        Showing 30-day window · 66 total runs · <span style="color:var(--teal);cursor:pointer;text-decoration:underline">Load older runs →</span>
+      </div>
+
+    </div><!-- /log-section -->
+  </div><!-- /history-body -->
+</div><!-- /main -->
+
+<script>
+  // ── Range preset toggle ──
+  function setRange(btn, range) {
+    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  // ── Filter pill toggle ──
+  function togglePill(el) {
+    el.classList.toggle('on');
+    el.classList.toggle('off');
+  }
+
+  // ── View toggle ──
+  function setView(v) {
+    document.querySelectorAll('.view-btn').forEach((b,i) => {
+      b.classList.toggle('active', b.textContent.toLowerCase().includes(v) || v==='all');
+    });
+    var trend = document.getElementById('trendSection');
+    var cal   = document.getElementById('calSection');
+    var log   = document.getElementById('logSection');
+    var kpi   = document.getElementById('kpiStrip');
+    if(v==='all')   { trend.style.display='block'; cal.style.display='block'; log.style.display='block'; kpi.style.display='flex'; }
+    if(v==='trend') { trend.style.display='block'; cal.style.display='none';  log.style.display='none';  kpi.style.display='flex'; }
+    if(v==='cal')   { trend.style.display='none';  cal.style.display='block'; log.style.display='none';  kpi.style.display='none'; }
+    if(v==='log')   { trend.style.display='none';  cal.style.display='none';  log.style.display='block'; kpi.style.display='none'; }
+  }
+
+  // ── Drill-down toggle ──
+  function toggleDrill(row) {
+    var panel = row.nextElementSibling;
+    if(!panel || !panel.classList.contains('drill-panel')) return;
+    panel.classList.toggle('open');
+  }
+
+  // ── Event marker tooltips ──
+  var evData = {
+    'commit-010': { type:'Commit', color:'#a78bfa', title:'Template Commit v0.0.10', date:'Mar 12, 10:15 AM', user:'Vaughn Staples', detail:'Step modified: Approval: Design Review · Added "Changes requested" outcome' },
+    'script-add': { type:'Script Δ', color:'#60a5fa', title:'Script Added: T4 Sign-off decline', date:'Mar 19, 2:10 PM', user:'Vaughn Staples', detail:'Coverage: 3→4 scripts · Suite re-run triggered automatically' },
+    'commit-011': { type:'Commit', color:'#a78bfa', title:'Template Commit v0.0.11', date:'Mar 22, 9:30 AM', user:'Vaughn Staples', detail:'Step modified: Final Meeting · Added "Design change required" outcome · Caused T3 regression' },
+    'recovery':   { type:'Recovery', color:'#3dd68c', title:'First Full Pass After Failure Streak', date:'Mar 26, 11:31 AM', user:'Automated', detail:'4 consecutive failures resolved · T3 fix: removed route_to_seq from s4 · Streak reset to 0 → now at 47' },
+    'stale':      { type:'Stale Breach', color:'#f5c842', title:'Stale Threshold Breached', date:'Apr 2, 9:00 AM', user:'System', detail:'T3 Rejection loop not run in 7 days · Threshold: 7 days (template setting) · Auto-alert sent to Vaughn Staples' },
+    'commit-013': { type:'Commit', color:'#a78bfa', title:'Template Commit v0.0.13', date:'Apr 4, 8:44 PM', user:'Vaughn Staples', detail:'Comprehensive update · All tests re-run automatically · Certificate issued 8:47 PM' },
+  };
+  var evTip = document.getElementById('evTip');
+  document.querySelectorAll('.event-marker').forEach(function(dot) {
+    dot.addEventListener('mouseenter', function(e) {
+      var d = evData[dot.dataset.ev]; if(!d) return;
+      evTip.innerHTML =
+        '<div class="et-title" style="color:'+d.color+'">'+d.type+' — '+d.title+'</div>'+
+        '<div class="et-row">Date: <span>'+d.date+'</span></div>'+
+        '<div class="et-row">By: <span>'+d.user+'</span></div>'+
+        '<div class="et-row" style="margin-top:6px;color:var(--text-mid);font-size:9px;line-height:1.5">'+d.detail+'</div>';
+      evTip.classList.add('show');
+      evTip.style.left = (e.offsetX + 10) + 'px';
+      evTip.style.top  = '30px';
+    });
+    dot.addEventListener('mouseleave', function() { evTip.classList.remove('show'); });
+  });
+
+  // ── Build Calendar Heatmap ──
+  (function buildCal() {
+    // 31 days Mar 5 → Apr 4
+    // status per day: 0=none,1=pass,2=partial,3=fail,4=stale
+    var days = [
+      0,1,1,0,0, // Mar 5–9 (Thu–Sun, Mon)
+      1,1,1,1,1,0,0, // Mar 10–16
+      1,1,2,1,1,0,0, // Mar 17–23 (Wed partial = manual)
+      3,3,3,1,1,0,0, // Mar 24–30 (Mon–Wed fail, Thu–Fri pass)
+      1,1,4,1,1      // Mar 31–Apr 4 (Wed stale breach, rest pass)
+    ];
+    var classes = ['cd-none','cd-pass','cd-partial','cd-fail','cd-stale'];
+    var labels  = ['No run','All passing','Partial','Failing','Stale breach'];
+
+    // Mar starts on Wednesday (index 2 in Mon=0 scheme)
+    // We'll just render as flat weeks
+    var grid = document.getElementById('calGrid');
+    var startDow = 3; // Mar 5 is Thursday → index 3 (Mon=0)
+
+    // pad front
+    var all = [];
+    for(var p=0;p<startDow;p++) all.push(-1);
+    for(var d=0;d<days.length;d++) all.push(d);
+
+    // split into weeks of 7
+    var weekCount = Math.ceil(all.length/7);
+    for(var w=0;w<weekCount;w++) {
+      var col = document.createElement('div');
+      col.className = 'cal-week';
+      for(var dow=0;dow<7;dow++) {
+        var idx = w*7+dow;
+        var cell = document.createElement('div');
+        cell.className = 'cal-day';
+        if(idx >= all.length || all[idx]===-1) {
+          cell.className += ' cd-none';
+          cell.style.opacity = '0';
+        } else {
+          var dayIdx = all[idx];
+          var status = days[dayIdx];
+          cell.className += ' '+classes[status];
+          var dateStr = dayIdx < 27
+            ? 'Mar '+(dayIdx+5)
+            : 'Apr '+(dayIdx-26);
+          cell.title = dateStr+' — '+labels[status];
+        }
+        col.appendChild(cell);
+      }
+      grid.appendChild(col);
+    }
+  })();
+</script>
+</body>
+</html>

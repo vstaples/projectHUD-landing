@@ -614,7 +614,7 @@
   .mc-partial   { background: #1a1a2e; color: var(--purple); }
   .mc-uncovered { background: var(--red-dim); color: var(--red); }
   .mc-excluded  { background: var(--bg3); color: var(--gray); }
-  .mc-na        { background: var(--bg); color: var(--border2); }
+  .mc-na        { background: #1a1f2e; color: transparent; }
 
   /* ── TOOLTIP ── */
   .tooltip {
@@ -652,6 +652,108 @@
     flex-shrink: 0;
   }
   .stale-banner b { color: #fff; }
+
+  /* ── SCORE TOOLTIPS ── */
+  .score-tip-wrap {
+    position: relative;
+    cursor: help;
+  }
+  .score-tip-wrap:hover .score-tip { display: block; }
+  .score-tip {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: calc(100% + 6px);
+    z-index: 100;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 10px 12px;
+    min-width: 230px;
+    max-width: 260px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.6);
+    pointer-events: none;
+  }
+  .score-tip-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 7px;
+  }
+  .score-tip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 10px;
+    color: var(--text-mid);
+    margin-bottom: 3px;
+    line-height: 1.5;
+  }
+  .score-tip-row span:last-child { color: var(--text); font-family: var(--font-mono); }
+  .score-tip-formula {
+    margin-top: 7px;
+    padding-top: 7px;
+    border-top: 1px solid var(--border);
+    font-size: 9px;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    line-height: 1.6;
+  }
+  .score-tip-result {
+    margin-top: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ── SCRIPT EDITOR OVERLAY (CTA mock) ── */
+  .editor-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .editor-overlay.open { display: flex; }
+  .editor-modal {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    width: 560px;
+    padding: 20px 24px;
+    box-shadow: 0 16px 48px rgba(0,0,0,.7);
+  }
+  .editor-modal-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--teal);
+    margin-bottom: 4px;
+  }
+  .editor-modal-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+  .editor-modal-pre {
+    background: var(--bg4);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-mid);
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+  .editor-modal-pre .k { color: var(--teal); }
+  .editor-modal-pre .v { color: var(--amber); }
+  .editor-modal-pre .c { color: var(--text-dim); }
+  .editor-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
   /* scrollbar */
   ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -731,7 +833,9 @@
       </div>
 
       <div class="score-breakdown">
-        <div>
+
+        <!-- Path Coverage -->
+        <div class="score-tip-wrap">
           <div class="score-row">
             <span class="score-row-label">Path coverage</span>
             <span class="score-row-val" style="color:var(--green)">75%</span>
@@ -739,8 +843,26 @@
           <div class="score-bar-wrap">
             <div class="score-bar" style="width:75%;background:var(--green)"></div>
           </div>
+          <div class="score-tip">
+            <div class="score-tip-title">Path Coverage</div>
+            <div class="score-tip-row"><span>Total routing paths</span><span>8</span></div>
+            <div class="score-tip-row"><span>Covered (passing)</span><span>3</span></div>
+            <div class="score-tip-row"><span>Covered (stale)</span><span>1</span></div>
+            <div class="score-tip-row"><span>Uncovered</span><span>1</span></div>
+            <div class="score-tip-row"><span>Excluded</span><span>0</span></div>
+            <div class="score-tip-formula">
+              covered paths ÷ total paths<br>
+              stale counts as 0.5 weight
+            </div>
+            <div class="score-tip-result">
+              <span style="color:var(--text-dim)">Score</span>
+              <span style="color:var(--green)">(3 + 0.5) ÷ 8 = 75%</span>
+            </div>
+          </div>
         </div>
-        <div>
+
+        <!-- Step Coverage -->
+        <div class="score-tip-wrap">
           <div class="score-row">
             <span class="score-row-label">Step coverage</span>
             <span class="score-row-val" style="color:var(--green)">100%</span>
@@ -748,8 +870,24 @@
           <div class="score-bar-wrap">
             <div class="score-bar" style="width:100%;background:var(--green)"></div>
           </div>
+          <div class="score-tip">
+            <div class="score-tip-title">Step Coverage</div>
+            <div class="score-tip-row"><span>Total unique steps</span><span>6</span></div>
+            <div class="score-tip-row"><span>Steps touched by ≥1 script</span><span>6</span></div>
+            <div class="score-tip-row"><span>Steps with no coverage</span><span>0</span></div>
+            <div class="score-tip-formula">
+              steps touched ÷ total steps<br>
+              any script touching a step counts
+            </div>
+            <div class="score-tip-result">
+              <span style="color:var(--text-dim)">Score</span>
+              <span style="color:var(--green)">6 ÷ 6 = 100%</span>
+            </div>
+          </div>
         </div>
-        <div>
+
+        <!-- Assertion Density -->
+        <div class="score-tip-wrap">
           <div class="score-row">
             <span class="score-row-label">Assertion density</span>
             <span class="score-row-val" style="color:var(--amber)">62%</span>
@@ -757,8 +895,26 @@
           <div class="score-bar-wrap">
             <div class="score-bar" style="width:62%;background:var(--amber)"></div>
           </div>
+          <div class="score-tip">
+            <div class="score-tip-title">Assertion Density</div>
+            <div class="score-tip-row"><span>Total step-path intersections</span><span>34</span></div>
+            <div class="score-tip-row"><span>Intersections with ≥1 assertion</span><span>21</span></div>
+            <div class="score-tip-row"><span>Target (recommended)</span><span>≥2 per step</span></div>
+            <div class="score-tip-row"><span>Actual avg assertions/step</span><span>1.4</span></div>
+            <div class="score-tip-formula">
+              asserted intersections ÷ total<br>
+              measures how deeply each step<br>
+              is verified, not just executed
+            </div>
+            <div class="score-tip-result">
+              <span style="color:var(--text-dim)">Score</span>
+              <span style="color:var(--amber)">21 ÷ 34 = 62%</span>
+            </div>
+          </div>
         </div>
-        <div>
+
+        <!-- Freshness -->
+        <div class="score-tip-wrap">
           <div class="score-row">
             <span class="score-row-label">Freshness</span>
             <span class="score-row-val" style="color:var(--amber)">78%</span>
@@ -766,7 +922,25 @@
           <div class="score-bar-wrap">
             <div class="score-bar" style="width:78%;background:var(--amber)"></div>
           </div>
+          <div class="score-tip">
+            <div class="score-tip-title">Freshness</div>
+            <div class="score-tip-row"><span>Total scripts</span><span>4</span></div>
+            <div class="score-tip-row"><span>Run since last commit</span><span>3</span></div>
+            <div class="score-tip-row"><span>Stale (last run &gt;7d ago)</span><span>1</span></div>
+            <div class="score-tip-row"><span>Never run</span><span>0</span></div>
+            <div class="score-tip-row"><span>Stale threshold</span><span>7 days</span></div>
+            <div class="score-tip-formula">
+              (passing + 0.5×stale) ÷ total<br>
+              resets on every template commit<br>
+              stale scripts decay at 50% weight
+            </div>
+            <div class="score-tip-result">
+              <span style="color:var(--text-dim)">Score</span>
+              <span style="color:var(--amber)">(3 + 0.5) ÷ 4 = 78%</span>
+            </div>
+          </div>
         </div>
+
       </div>
     </div>
 
@@ -854,7 +1028,7 @@
         <div style="color:var(--red);font-weight:700;margin-bottom:4px">1 path has no test coverage</div>
         Final Meeting → <span style="color:var(--text)">Cancelled</span> outcome has never been exercised by any test script.
         <div style="margin-top:8px">
-          <span style="color:var(--teal);cursor:pointer;text-decoration:underline">+ Create script for this path →</span>
+          <span class="path-no-script" style="color:var(--teal);cursor:pointer;text-decoration:underline" onclick="openEditorModal()">+ Create script for this path →</span>
         </div>
       </div>
     </div>
@@ -1104,7 +1278,7 @@
               </div>
             </div>
             <div style="margin-left:20px;display:flex;align-items:center">
-              <span style="color:var(--teal);font-size:10px;cursor:pointer;text-decoration:underline">+ Create covering script →</span>
+              <span style="color:var(--teal);font-size:10px;cursor:pointer;text-decoration:underline" onclick="openEditorModal()">+ Create covering script →</span>
             </div>
           </div>
         </div>
@@ -1199,7 +1373,7 @@
             <td class="step-label">S2 · Form: Design Review Approval</td>
             <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
             <td><div class="matrix-cell mc-stale">~ Stale</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
             <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
             <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
           </tr>
@@ -1207,16 +1381,16 @@
             <td class="step-label">S3 · Approval: Design Review</td>
             <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
             <td><div class="matrix-cell mc-stale">~ Stale</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
             <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
             <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
           </tr>
           <tr>
             <td class="step-label">S3 · Approval → Rejected outcome</td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
             <td><div class="matrix-cell mc-stale">~ Stale</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
             <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
           </tr>
           <tr>
@@ -1224,14 +1398,14 @@
             <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
             <td><div class="matrix-cell mc-stale">~ Stale</div></td>
             <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
             <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
           </tr>
           <tr>
             <td class="step-label">S4 · Sign-off Declined outcome</td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
             <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
             <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
           </tr>
@@ -1245,19 +1419,19 @@
           </tr>
           <tr>
             <td class="step-label">S5 · Final Meeting → Cancelled</td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
             <td><div class="matrix-cell mc-uncovered">✗ None</div></td>
           </tr>
           <tr>
             <td class="step-label">S5 · Design Change Required</td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
             <td><div class="matrix-cell mc-covered">✓ Covered</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
-            <td><div class="matrix-cell mc-na">— N/A</div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
+            <td><div class="matrix-cell mc-na"></div></td>
           </tr>
         </tbody>
       </table>
@@ -1278,8 +1452,8 @@
             <span style="color:var(--text-mid)">Uncovered — no script</span>
           </div>
           <div style="display:flex;align-items:center;gap:5px;font-size:10px">
-            <div style="width:14px;height:14px;background:var(--bg);border:1px solid var(--border);border-radius:2px"></div>
-            <span style="color:var(--text-mid)">N/A — path doesn't include this step</span>
+            <div style="width:14px;height:14px;background:#1a1f2e;border:1px solid var(--border);border-radius:2px"></div>
+            <span style="color:var(--text-mid)">N/A — step not on this path</span>
           </div>
         </div>
       </div>
@@ -1287,6 +1461,31 @@
 
   </div><!-- /center -->
 </div><!-- /main -->
+
+<!-- EDITOR MODAL (CTA mock) -->
+<div class="editor-overlay" id="editorOverlay" onclick="if(event.target===this)closeEditorModal()">
+  <div class="editor-modal">
+    <div class="editor-modal-title">Opening Script Editor — New Script</div>
+    <div class="editor-modal-sub">Pre-seeded from uncovered path: <strong style="color:var(--text)">Final Meeting → Cancelled</strong></div>
+    <div class="editor-modal-pre">
+<span class="c">// Script pre-seeded from Coverage Map</span><br>
+<span class="k">name:</span>  <span class="v">"Final Meeting — Cancelled outcome"</span><br>
+<span class="k">path:</span>  <span class="v">["Launch", "Step1", "Step2", "Step3", "Step4", "FinalMeeting→Cancelled"]</span><br>
+<span class="k">steps:</span><br>
+&nbsp;&nbsp;<span class="k">s0</span> Launch instance<br>
+&nbsp;&nbsp;<span class="k">s1</span> Complete Design Review Form → submitted<br>
+&nbsp;&nbsp;<span class="k">s2</span> Form: Design Review Approval → submitted<br>
+&nbsp;&nbsp;<span class="k">s3</span> Approval: Design Review → approved<br>
+&nbsp;&nbsp;<span class="k">s4</span> Finalize: Design Review → signed<br>
+&nbsp;&nbsp;<span class="k">s5</span> Final Meeting → <span class="v">cancelled</span>  <span class="c">← uncovered outcome</span><br>
+<span class="k">assertions:</span> <span class="c">// add your confirmations below</span>
+    </div>
+    <div class="editor-modal-actions">
+      <button class="btn btn-ghost" onclick="closeEditorModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="closeEditorModal()">Open in Script Editor →</button>
+    </div>
+  </div>
+</div>
 
 <!-- TOOLTIP -->
 <div class="tooltip" id="tooltip"></div>
@@ -1299,6 +1498,9 @@
       b.classList.toggle('active', (i===0&&v==='dag')||(i===1&&v==='matrix'));
     });
   }
+
+  function openEditorModal()  { document.getElementById('editorOverlay').classList.add('open'); }
+  function closeEditorModal() { document.getElementById('editorOverlay').classList.remove('open'); }
 
   // Tooltip on dag-box
   var tip = document.getElementById('tooltip');

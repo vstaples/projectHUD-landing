@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CadenceHUD — Simulator Runtime</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#060810;--bg1:#0c0f18;--bg2:#131720;--bg3:#1a1f2e;--bg4:#222838;
+  --b:rgba(255,255,255,.055);--b2:rgba(255,255,255,.10);--b3:rgba(255,255,255,.17);
+  --t:rgba(255,255,255,.92);--t2:rgba(255,255,255,.60);--mu:rgba(255,255,255,.28);
+  --grn:#3de08a;--grn2:rgba(61,224,138,.13);--grn3:rgba(61,224,138,.05);
+  --amb:#f0a030;--amb2:rgba(240,160,48,.14);--amb3:rgba(240,160,48,.06);
+  --red:#f06060;--red2:rgba(240,96,96,.13);--red3:rgba(240,96,96,.06);
+  --teal:#28d4c0;--teal2:rgba(40,212,192,.13);--teal3:rgba(40,212,192,.06);
+  --blu:#5090f0;--blu2:rgba(80,144,240,.13);
+  --pur:#a78bfa;--pur2:rgba(167,139,250,.13);
+  --ora:#f5820a;
+  --mn:'JetBrains Mono',monospace;--sn:'Syne',sans-serif;
+}
+html,body{height:100%;background:var(--bg0);color:var(--t);font-family:var(--sn);font-size:13px;overflow:hidden}
+.shell{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* ── TOP BAR ── */
+.topbar{
+  height:44px;background:var(--bg1);border-bottom:1px solid var(--b);
+  display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;z-index:50;
+}
+.brand{font-family:var(--sn);font-weight:800;font-size:15px;letter-spacing:-.02em;
+  color:#fff;display:flex;align-items:center;gap:6px}
+.brand-o{color:var(--ora)}
+.brand-sep{width:1px;height:22px;background:var(--b2);margin:0 4px}
+.brand-sub{font-size:11px;font-weight:500;color:var(--mu);letter-spacing:.08em;text-transform:uppercase}
+.nav-tabs{display:flex;gap:2px;margin-left:8px}
+.nav-tab{padding:5px 14px;border-radius:4px;font-size:11px;font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+  color:var(--mu);border:1px solid transparent;font-family:var(--sn);}
+.nav-tab:hover{color:var(--t2);background:rgba(255,255,255,.04)}
+.nav-tab.act{color:var(--t);background:var(--bg3);border-color:var(--b2)}
+.nav-tab.act.sim{color:var(--teal);border-color:rgba(40,212,192,.3);background:var(--teal2)}
+.nav-badge{display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;border-radius:8px;font-size:9px;font-weight:700;
+  background:var(--bg3);color:var(--t2);margin-left:4px;font-family:var(--mn);}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.live-dot{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--grn);font-family:var(--mn);letter-spacing:.04em;}
+.live-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--grn);
+  box-shadow:0 0 8px var(--grn);animation:blip 1.4s ease-in-out infinite;}
+@keyframes blip{0%,100%{opacity:1}50%{opacity:.3}}
+.avatar{width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,var(--pur),var(--teal));
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;color:#fff;font-family:var(--mn);}
+
+/* ── SIMBAR ── */
+.simbar{height:36px;background:var(--bg1);border-bottom:1px solid var(--b);
+  display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:40;}
+.tmpl-chip{display:flex;align-items:center;gap:7px;padding:4px 10px;
+  background:var(--bg3);border:1px solid var(--b2);border-radius:4px;
+  font-size:11px;color:var(--t2);font-family:var(--mn);}
+.tmpl-chip .ver{color:var(--mu);font-size:10px;}
+.sim-subtabs{display:flex;gap:1px;}
+.sim-subtab{padding:0 13px;height:36px;display:flex;align-items:center;
+  font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--mu);cursor:pointer;border-bottom:2px solid transparent;font-family:var(--sn);}
+.sim-subtab:hover{color:var(--t2);}
+.sim-subtab.act{color:var(--teal);border-bottom-color:var(--teal);}
+.simbar-right{margin-left:auto;display:flex;align-items:center;gap:7px;}
+
+/* buttons */
+.btn{padding:5px 13px;border-radius:4px;font-size:11px;font-weight:700;
+  letter-spacing:.05em;cursor:pointer;border:1px solid;text-transform:uppercase;
+  font-family:var(--sn);}
+.btn-ghost{background:transparent;border-color:var(--b2);color:var(--t2);}
+.btn-ghost:hover{border-color:var(--b3);color:var(--t);}
+.btn-teal{background:var(--teal);border-color:var(--teal);color:#000;}
+.btn-run{background:transparent;border-color:var(--grn);color:var(--grn);
+  display:flex;align-items:center;gap:5px;}
+.btn-run:hover{background:var(--grn2);}
+.btn-cert{background:transparent;border-color:var(--teal);color:var(--teal);
+  display:flex;align-items:center;gap:5px;}
+.btn-cert:hover{background:var(--teal2);}
+.btn-cert.locked{border-color:var(--mu);color:var(--mu);cursor:not-allowed;}
+
+/* gate status pill */
+.gate-pill{display:flex;align-items:center;gap:6px;padding:4px 11px;border-radius:4px;
+  font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-family:var(--mn);}
+.gate-pass{background:var(--grn3);border:1px solid rgba(61,224,138,.4);color:var(--grn);}
+.gate-fail{background:var(--red3);border:1px solid rgba(240,96,96,.4);color:var(--red);}
+.gate-run {background:var(--amb3);border:1px solid rgba(240,160,48,.4);color:var(--amb);}
+.gate-dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+.gate-dot.spin{animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── MAIN LAYOUT ── */
+.runtime-main{flex:1;display:flex;overflow:hidden;}
+
+/* ── LEFT RAIL ── */
+.left-rail{
+  width:230px;flex-shrink:0;
+  background:var(--bg1);border-right:1px solid var(--b);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.rail-section{border-bottom:1px solid var(--b);padding:10px 12px;flex-shrink:0;}
+.rail-label{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--teal);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.rail-label-count{font-family:var(--mn);color:var(--mu);font-size:9px;margin-left:auto;}
+
+/* script list */
+.script-item{
+  padding:7px 8px;border-radius:4px;cursor:pointer;margin-bottom:2px;
+  border:1px solid transparent;transition:all .12s;
+}
+.script-item:hover{background:var(--bg3);border-color:var(--b);}
+.script-item.active{background:var(--teal2);border-color:rgba(40,212,192,.3);}
+.script-item.running{background:var(--amb2);border-color:rgba(240,160,48,.3);
+  animation:scriptPulse 1.5s ease-in-out infinite;}
+@keyframes scriptPulse{0%,100%{opacity:1}50%{opacity:.7}}
+.script-item.pass{border-left:2px solid var(--grn);}
+.script-item.fail{border-left:2px solid var(--red);}
+.si-header{display:flex;align-items:center;gap:6px;}
+.si-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.si-name{font-size:11px;color:var(--t);flex:1;line-height:1.3;}
+.si-steps{font-size:9px;color:var(--mu);font-family:var(--mn);margin-left:13px;margin-top:2px;}
+.si-status{font-size:9px;font-weight:700;font-family:var(--mn);margin-left:auto;flex-shrink:0;}
+
+/* timeline (selected script) */
+.timeline-wrap{overflow-y:auto;flex:1;padding:10px 12px;}
+.tl-header{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--teal);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.tl-rerun{margin-left:auto;font-size:9px;color:var(--teal);cursor:pointer;
+  text-decoration:underline;text-underline-offset:2px;}
+.tl-step{
+  display:flex;gap:8px;margin-bottom:2px;
+  padding:6px 8px;border-radius:3px;cursor:pointer;
+  border:1px solid transparent;transition:all .12s;position:relative;
+}
+.tl-step:hover{background:var(--bg3);}
+.tl-step.tl-pass{background:var(--grn3);border-color:rgba(61,224,138,.15);}
+.tl-step.tl-fail{background:var(--red3);border-color:rgba(240,96,96,.25);}
+.tl-step.tl-run {background:var(--amb3);border-color:rgba(240,160,48,.3);
+  animation:scriptPulse 1s ease-in-out infinite;}
+.tl-step.tl-wait{opacity:.45;}
+.tl-step-num{font-size:9px;font-family:var(--mn);color:var(--mu);width:16px;flex-shrink:0;margin-top:1px;}
+.tl-step-body{flex:1;}
+.tl-step-name{font-size:10px;color:var(--t);font-weight:600;}
+.tl-step-meta{font-size:9px;color:var(--mu);font-family:var(--mn);margin-top:1px;}
+.tl-step-icon{width:14px;text-align:center;flex-shrink:0;margin-top:1px;}
+.tl-assert-row{display:flex;align-items:center;gap:5px;margin-top:3px;padding-top:3px;
+  border-top:1px solid var(--b);font-size:9px;font-family:var(--mn);}
+.tl-assert-key{color:var(--teal);flex-shrink:0;}
+.tl-assert-eq{color:var(--mu);}
+.tl-assert-val{color:var(--amb);}
+.tl-assert-result{margin-left:auto;font-weight:700;}
+.tl-fail-detail{margin-top:4px;padding:4px 6px;background:rgba(240,96,96,.1);
+  border-left:2px solid var(--red);border-radius:2px;font-size:9px;
+  font-family:var(--mn);color:var(--red);line-height:1.5;}
+
+/* suite health -->  left bottom -->  */
+.health-wrap{padding:10px 12px;border-top:1px solid var(--b);flex-shrink:0;}
+.health-label{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:var(--teal);margin-bottom:6px;}
+.health-bar-wrap{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:6px;}
+.health-bar{height:100%;border-radius:2px;background:var(--grn);transition:width .4s;}
+.health-counts{display:flex;gap:10px;}
+.hc{display:flex;align-items:center;gap:4px;font-size:10px;font-family:var(--mn);}
+.hc-dot{width:6px;height:6px;border-radius:50%;}
+
+/* ── CENTER DAG ── */
+.center-dag{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+  background:var(--bg0);position:relative;
+}
+
+/* status banner */
+.status-banner{
+  padding:6px 16px;font-size:11px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;text-align:center;flex-shrink:0;font-family:var(--mn);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.sb-pass{background:var(--grn3);color:var(--grn);border-bottom:1px solid rgba(61,224,138,.2);}
+.sb-fail{background:var(--red3);color:var(--red);border-bottom:1px solid rgba(240,96,96,.2);}
+.sb-run {background:var(--amb3);color:var(--amb);border-bottom:1px solid rgba(240,160,48,.2);}
+
+/* dag canvas */
+.dag-canvas{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:30px 20px;}
+.dag-flow{display:flex;align-items:center;gap:0;position:relative;}
+
+/* node */
+.dag-node{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;}
+.dag-box{
+  width:130px;border:1px solid;border-radius:6px;padding:10px 10px 8px;
+  cursor:pointer;transition:all .2s;position:relative;overflow:hidden;
+}
+.dag-box::before{
+  content:'';position:absolute;inset:0;opacity:0;transition:opacity .2s;
+  background:radial-gradient(circle at 50% 0%,rgba(255,255,255,.06),transparent 70%);
+}
+.dag-box:hover::before{opacity:1;}
+.dag-box:hover{transform:translateY(-2px);}
+
+/* node states */
+.dn-pending {background:var(--bg2);border-color:var(--b2);}
+.dn-active  {background:#1a2010;border-color:rgba(61,224,138,.5);
+  box-shadow:0 0 20px rgba(61,224,138,.1),0 0 0 1px rgba(61,224,138,.2);}
+.dn-active::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--grn);animation:scanline 1.5s ease-in-out infinite;}
+@keyframes scanline{0%{opacity:.4}50%{opacity:1}100%{opacity:.4}}
+.dn-complete{background:var(--grn3);border-color:rgba(61,224,138,.35);}
+.dn-fail    {background:var(--red3);border-color:rgba(240,96,96,.45);
+  box-shadow:0 0 16px rgba(240,96,96,.15);}
+.dn-rework  {background:var(--amb3);border-color:rgba(240,160,48,.4);}
+
+.dn-type{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  opacity:.7;margin-bottom:3px;font-family:var(--mn);}
+.dn-name{font-size:11px;font-weight:700;color:var(--t);line-height:1.3;}
+.dn-assignee{font-size:9px;color:var(--mu);margin-top:3px;font-family:var(--mn);
+  display:flex;align-items:center;gap:4px;}
+.dn-avatar{width:12px;height:12px;border-radius:50%;
+  background:linear-gradient(135deg,var(--pur),var(--teal));
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:7px;font-weight:700;color:#fff;}
+.dn-timer{font-size:10px;font-family:var(--mn);color:var(--mu);margin-top:4px;display:flex;align-items:center;gap:4px;}
+.dn-timer .t-val{color:var(--t2);}
+.dn-outcome{margin-top:5px;}
+.outcome-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;
+  border-radius:3px;font-size:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  font-family:var(--mn);}
+.op-green {background:var(--grn3);color:var(--grn);border:1px solid rgba(61,224,138,.3);}
+.op-amber {background:var(--amb2);color:var(--amb);border:1px solid rgba(240,160,48,.3);}
+.op-red   {background:var(--red2);color:var(--red);border:1px solid rgba(240,96,96,.3);}
+.op-gray  {background:var(--bg4);color:var(--mu);border:1px solid var(--b2);}
+.rework-badge{
+  position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);
+  background:var(--bg0);border:1px solid var(--amb);border-radius:10px;
+  padding:1px 7px;font-size:8px;font-weight:700;color:var(--amb);
+  font-family:var(--mn);white-space:nowrap;
+}
+
+/* connector */
+.dag-conn{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:50px;flex-shrink:0;position:relative;}
+.dag-arrow{width:100%;height:1px;position:relative;}
+.dag-arrow::after{content:'▶';position:absolute;right:-5px;top:-6px;font-size:10px;}
+.arrow-pass   {background:var(--grn);}
+.arrow-pass::after{color:var(--grn);}
+.arrow-active {background:var(--amb);animation:arrowPulse 1s ease-in-out infinite;}
+.arrow-active::after{color:var(--amb);}
+@keyframes arrowPulse{0%,100%{opacity:1}50%{opacity:.4}}
+.arrow-pending{background:var(--b2);}
+.arrow-pending::after{color:var(--mu);}
+.arrow-rework {background:var(--red);stroke-dasharray:4 4;}
+.arrow-rework::after{color:var(--red);}
+.conn-label{font-size:8px;color:var(--mu);font-family:var(--mn);
+  margin-bottom:2px;white-space:nowrap;background:var(--bg0);padding:0 3px;border-radius:2px;}
+
+/* rework loop arc below nodes */
+.rework-arc-wrap{position:absolute;bottom:-28px;left:0;right:0;display:flex;justify-content:center;}
+.rework-arc{
+  border:1px dashed var(--red);border-top:none;
+  border-radius:0 0 20px 20px;height:18px;
+  display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:2px;
+}
+.rework-arc-label{font-size:8px;color:var(--red);font-family:var(--mn);
+  background:var(--bg0);padding:0 4px;}
+
+/* seq label under box -->  */
+.seq-label{font-size:9px;color:var(--mu);font-family:var(--mn);letter-spacing:.04em;}
+
+/* ── BOTTOM PANEL ── */
+.bottom-panel{
+  flex-shrink:0;border-top:1px solid var(--b);
+  display:flex;flex-direction:column;background:var(--bg1);
+}
+
+/* stats bar -->  */
+.stats-bar{
+  display:flex;border-bottom:1px solid var(--b);flex-shrink:0;
+}
+.stat-cell{
+  flex:1;padding:6px 12px;border-right:1px solid var(--b);
+  display:flex;flex-direction:column;gap:1px;
+}
+.stat-cell:last-child{border-right:none;}
+.stat-label{font-size:8px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--teal);font-family:var(--mn);}
+.stat-val  {font-size:16px;font-weight:700;font-family:var(--mn);}
+.stat-sub  {font-size:8px;color:var(--mu);font-family:var(--mn);}
+
+/* comms log -->  */
+.comms-log{height:90px;overflow-y:auto;padding:6px 0;flex-shrink:0;}
+.comms-row{display:flex;align-items:baseline;gap:8px;padding:2px 14px;font-size:10px;
+  font-family:var(--mn);line-height:1.5;}
+.comms-row:hover{background:var(--bg2);}
+.comms-src{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:48px;flex-shrink:0;}
+.src-tower{color:var(--teal);}
+.src-crew {color:var(--amb);}
+.src-sys  {color:var(--mu);}
+.comms-time{color:var(--mu);width:64px;flex-shrink:0;}
+.comms-msg{color:var(--t2);flex:1;}
+.comms-msg .pass-word{color:var(--grn);font-weight:700;}
+.comms-msg .fail-word{color:var(--red);font-weight:700;}
+.comms-msg .warn-word{color:var(--amb);font-weight:700;}
+.comms-msg .step-ref{color:var(--teal);}
+.comms-msg .assert-ref{color:var(--pur);}
+
+/* ── SCRIPT TAB STRIP ── */
+.script-tabs{
+  display:flex;border-top:1px solid var(--b);
+  flex-shrink:0;overflow-x:auto;
+  background:var(--bg2);
+}
+.script-tab{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 14px;border-right:1px solid var(--b);
+  cursor:pointer;font-size:10px;font-family:var(--mn);
+  color:var(--mu);white-space:nowrap;border-bottom:2px solid transparent;
+  transition:all .12s;flex-shrink:0;
+}
+.script-tab:hover{background:var(--bg3);color:var(--t2);}
+.script-tab.act{background:var(--bg1);color:var(--t);border-bottom-color:var(--teal);}
+.script-tab.st-pass .st-dot{background:var(--grn);}
+.script-tab.st-fail .st-dot{background:var(--red);}
+.script-tab.st-run  .st-dot{background:var(--amb);animation:blip 1s infinite;}
+.script-tab.st-wait .st-dot{background:var(--mu);}
+.st-dot{width:6px;height:6px;border-radius:50%;}
+.st-counts{font-size:9px;color:var(--mu);}
+.st-counts .pass{color:var(--grn);}
+.st-counts .fail{color:var(--red);}
+
+.tabs-right{margin-left:auto;display:flex;align-items:center;gap:6px;padding:0 10px;flex-shrink:0;}
+.run-controls{display:flex;align-items:center;gap:5px;}
+
+/* ── RIGHT PANEL ── */
+.right-panel{
+  width:260px;flex-shrink:0;border-left:1px solid var(--b);
+  background:var(--bg1);display:flex;flex-direction:column;overflow:hidden;
+}
+.rp-section{border-bottom:1px solid var(--b);padding:10px 12px;flex-shrink:0;}
+.rp-label{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--teal);margin-bottom:8px;}
+
+/* CoC events */
+.coc-scroll{overflow-y:auto;flex:1;padding:8px 12px;}
+.coc-event{
+  padding:6px 0;border-bottom:1px solid var(--b);
+  font-size:10px;font-family:var(--mn);
+}
+.coc-event:last-child{border-bottom:none;}
+.coc-ev-type{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px;}
+.ev-pass    {color:var(--grn);}
+.ev-fail    {color:var(--red);}
+.ev-launch  {color:var(--teal);}
+.ev-step    {color:var(--t2);}
+.coc-ev-detail{color:var(--t2);line-height:1.5;}
+.coc-ev-detail .bold{color:var(--t);font-weight:700;}
+.coc-ev-time{color:var(--mu);font-size:9px;margin-top:1px;}
+
+/* cert footer -->  */
+.cert-footer{padding:10px 12px;border-top:1px solid var(--b);flex-shrink:0;}
+.cert-status-row{display:flex;align-items:center;gap:6px;font-size:10px;font-family:var(--mn);}
+.cert-icon{font-size:14px;}
+.cert-label{color:var(--t2);}
+.cert-val-pass{color:var(--grn);font-weight:700;}
+.cert-val-fail{color:var(--red);font-weight:700;}
+
+/* scrollbar -->  */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px;}
+
+/* node tooltip -->  */
+.node-tip{
+  position:fixed;display:none;
+  background:var(--bg3);border:1px solid var(--b2);border-radius:5px;
+  padding:10px 12px;font-size:10px;color:var(--t);
+  min-width:200px;z-index:999;pointer-events:none;
+  box-shadow:0 8px 24px rgba(0,0,0,.6);font-family:var(--mn);
+}
+.node-tip.show{display:block;}
+.nt-title{font-weight:700;color:var(--teal);margin-bottom:6px;font-size:11px;font-family:var(--sn);}
+.nt-row{display:flex;justify-content:space-between;gap:10px;color:var(--mu);margin-top:3px;}
+.nt-row span:last-child{color:var(--t);}
+
+/* running animation for active node -->  -->  -->  -->  -->  -->  */
+.pulse-ring{
+  position:absolute;inset:-4px;border-radius:10px;
+  border:1px solid var(--grn);opacity:0;
+  animation:ringPulse 2s ease-out infinite;
+}
+@keyframes ringPulse{0%{opacity:.6;transform:scale(1)}100%{opacity:0;transform:scale(1.04)}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="brand"><span class="brand-o">○</span> CadenceHUD <span class="brand-sep"></span><span class="brand-sub">Workflow Engine</span></div>
+  <div class="nav-tabs">
+    <div class="nav-tab">⊞ Library <span class="nav-badge">1</span></div>
+    <div class="nav-tab act sim">⊙ Simulator</div>
+    <div class="nav-tab">≡ Instances <span class="nav-badge">16</span></div>
+  </div>
+  <div class="topbar-right">
+    <div class="live-dot">LIVE</div>
+    <div class="btn btn-ghost" style="font-size:10px">← Dashboard</div>
+    <div class="avatar">VS</div>
+  </div>
+</div>
+
+<!-- SIMBAR -->
+<div class="simbar">
+  <div class="tmpl-chip">
+    Design Review Signoff <span class="ver">v0.0.13 ▾</span>
+  </div>
+  <div class="sim-subtabs">
+    <div class="sim-subtab">Scripts</div>
+    <div class="sim-subtab act">Coverage</div>
+    <div class="sim-subtab">History</div>
+  </div>
+  <div class="simbar-right">
+    <!-- gate: currently failing -->
+    <div class="gate-pill gate-fail" id="gatePill">
+      <div class="gate-dot"></div>
+      <span id="gateText">1 Test Failed — Cannot Release</span>
+    </div>
+    <button class="btn btn-run" onclick="runAll()">▶▶ Run All Tests</button>
+    <button class="btn btn-cert locked" id="certBtn">◎ View Certificate</button>
+  </div>
+</div>
+
+<!-- RUNTIME MAIN -->
+<div class="runtime-main">
+
+  <!-- LEFT RAIL -->
+  <div class="left-rail">
+    <div class="rail-section">
+      <div class="rail-label">Test Scripts <span class="rail-label-count">4</span></div>
+
+      <div class="script-item pass" onclick="selectScript(0)" id="si-0">
+        <div class="si-header">
+          <div class="si-dot" style="background:var(--grn)"></div>
+          <div class="si-name">Full workflow — clean approval</div>
+          <div class="si-status" style="color:var(--grn)">✓</div>
+        </div>
+        <div class="si-steps">6 steps · 16 assertions</div>
+      </div>
+
+      <div class="script-item pass" onclick="selectScript(1)" id="si-1">
+        <div class="si-header">
+          <div class="si-dot" style="background:var(--grn)"></div>
+          <div class="si-name">Meeting reset — design change</div>
+          <div class="si-status" style="color:var(--grn)">✓</div>
+        </div>
+        <div class="si-steps">6 steps · 10 assertions</div>
+      </div>
+
+      <div class="script-item fail active" onclick="selectScript(2)" id="si-2">
+        <div class="si-header">
+          <div class="si-dot" style="background:var(--red)"></div>
+          <div class="si-name">Rejection loop — rejects then passes</div>
+          <div class="si-status" style="color:var(--red)">✗</div>
+        </div>
+        <div class="si-steps">7 steps · 12 assertions</div>
+      </div>
+
+      <div class="script-item pass" onclick="selectScript(3)" id="si-3">
+        <div class="si-header">
+          <div class="si-dot" style="background:var(--grn)"></div>
+          <div class="si-name">Sign-off decline — routes to approval</div>
+          <div class="si-status" style="color:var(--grn)">✓</div>
+        </div>
+        <div class="si-steps">7 steps · 14 assertions</div>
+      </div>
+    </div>
+
+    <!-- TIMELINE for selected script (T3 - failing) -->
+    <div class="timeline-wrap" id="timelineWrap">
+      <div class="tl-header">
+        Timeline — T3
+        <span class="tl-rerun" onclick="rerunScript()">↺ Re-run</span>
+      </div>
+
+      <!-- s1 Launch -->
+      <div class="tl-step tl-pass">
+        <div class="tl-step-num">s1</div>
+        <div class="tl-step-body">
+          <div class="tl-step-name">Launch Instance</div>
+          <div class="tl-step-meta">seq 1 · automated</div>
+          <div class="tl-assert-row">
+            <span class="tl-assert-key">instance.status</span>
+            <span class="tl-assert-eq">eq</span>
+            <span class="tl-assert-val">in_progress</span>
+            <span class="tl-assert-result" style="color:var(--grn)">✓</span>
+          </div>
+          <div class="tl-assert-row">
+            <span class="tl-assert-key">step[1].state</span>
+            <span class="tl-assert-eq">eq</span>
+            <span class="tl-assert-val">active</span>
+            <span class="tl-assert-result" style="color:var(--grn)">✓</span>
+          </div>
+        </div>
+        <div class="tl-step-icon" style="color:var(--grn)">✓</div>
+      </div>
+
+      <!-- s2 Checklist -->
+      <div class="tl-step tl-pass">
+        <div class="tl-step-num">s2</div>
+        <div class="tl-step-body">
+          <div class="tl-step-name">Checklist: Design Review</div>
+          <div class="tl-step-meta">seq 1 · submitted · chris_staples</div>
+          <div class="tl-assert-row">
+            <span class="tl-assert-key">step[1].state</span>
+            <span class="tl-assert-eq">eq</span>
+            <span class="tl-assert-val">done</span>
+            <span class="tl-assert-result" style="color:var(--grn)">✓</span>
+          </div>
+          <div class="tl-assert-row">
+            <span class="tl-assert-key">step[2].state</span>
+            <span class="tl-assert-eq">eq</span>
+            <span class="tl-assert-val">active</span>
+            <span class="tl-assert-result" style="color:var(--grn)">✓</span>
+          </div>
+        </div>
+        <div class="tl-step-icon" style="color:var(--grn)">✓</div>
+      </div>
+
+      <!-- s3 Form -->
+      <div class="tl-step tl-pass">
+        <div class="tl-step-num">s3</div>
+        <div class="tl-step-body">
+          <div class="tl-step-name">Form: Design Review Approval</div>
+          <div class="tl-step-meta">seq 3 · submitted · chris_staples</div>
+          <div class="tl-assert-row">
+            <span class="tl-assert-key">step[3].state</span>
+            <span class="tl-assert-eq">eq</span>
+            <span class="tl-assert-val">active</span>
+            <span class="tl-assert-result" style="color:var(--grn)">✓</span>
+          </div>
+        </div>
+        <div class="tl-step-icon" style="color:var(--grn)">✓</div>
+      </div>
+
+      <!-- s4 Approval — FAILING -->
+      <div class="tl-step tl-fail">
+        <div class="tl-step-num">s4</div>
+        <div class="tl-step-body">
+          <div class="tl-step-name">Approval: Design Review</div>
+          <div class="tl-step-meta">seq 3 · rejected · vaughn_staples</div>
+          <div class="tl-assert-row">
+            <span class="tl-assert-key">step[3].outcome</span>
+            <span class="tl-assert-eq">eq</span>
+            <span class="tl-assert-val">rejected</span>
+            <span class="tl-assert-result" style="color:var(--grn)">✓</span>
+          </div>
+          <div class="tl-assert-row">
+            <span class="tl-assert-key">step[3].loops</span>
+            <span class="tl-assert-eq">eq</span>
+            <span class="tl-assert-val">1</span>
+            <span class="tl-assert-result" style="color:var(--red)">✗</span>
+          </div>
+          <div class="tl-fail-detail">expected 1 · got 2<br>Fix: remove route_to_seq from s4 params</div>
+        </div>
+        <div class="tl-step-icon" style="color:var(--red)">✗</div>
+      </div>
+
+      <!-- s5+ dimmed -->
+      <div class="tl-step tl-wait">
+        <div class="tl-step-num">s5</div>
+        <div class="tl-step-body">
+          <div class="tl-step-name">Checklist (replay)</div>
+          <div class="tl-step-meta">not reached</div>
+        </div>
+        <div class="tl-step-icon" style="color:var(--mu)">—</div>
+      </div>
+      <div class="tl-step tl-wait">
+        <div class="tl-step-num">s6</div>
+        <div class="tl-step-body">
+          <div class="tl-step-name">Form Approval (replay)</div>
+          <div class="tl-step-meta">not reached</div>
+        </div>
+        <div class="tl-step-icon" style="color:var(--mu)">—</div>
+      </div>
+      <div class="tl-step tl-wait">
+        <div class="tl-step-num">s7</div>
+        <div class="tl-step-body">
+          <div class="tl-step-name">Approval: Design Review</div>
+          <div class="tl-step-meta">not reached</div>
+        </div>
+        <div class="tl-step-icon" style="color:var(--mu)">—</div>
+      </div>
+    </div>
+
+    <!-- SUITE HEALTH -->
+    <div class="health-wrap">
+      <div class="health-label">Script Suite Health</div>
+      <div class="health-bar-wrap">
+        <div class="health-bar" style="width:75%;background:linear-gradient(90deg,var(--grn),var(--amb))"></div>
+      </div>
+      <div class="health-counts">
+        <div class="hc"><div class="hc-dot" style="background:var(--grn)"></div><span style="color:var(--grn);font-weight:700">3</span>&nbsp;passing</div>
+        <div class="hc"><div class="hc-dot" style="background:var(--red)"></div><span style="color:var(--red);font-weight:700">1</span>&nbsp;failing</div>
+        <div style="margin-left:auto;font-size:9px;color:var(--mu)">Last: 01:23</div>
+      </div>
+    </div>
+  </div><!-- /left-rail -->
+
+  <!-- CENTER DAG -->
+  <div class="center-dag">
+
+    <!-- status banner -->
+    <div class="status-banner sb-fail" id="statusBanner">
+      <span>✗</span> 1 Test Failed — Cannot Release · T3 Rejection Loop
+    </div>
+
+    <!-- dag canvas -->
+    <div class="dag-canvas">
+      <div class="dag-flow" id="dagFlow">
+
+        <!-- TRIGGER -->
+        <div class="dag-node">
+          <div class="dag-box dn-complete" style="width:80px;text-align:center"
+            onmouseenter="showNodeTip(event,'trigger')" onmouseleave="hideNodeTip()">
+            <div class="dn-type" style="color:var(--ora)">Trigger</div>
+            <div class="dn-name" style="font-size:10px">Instance<br>Launch</div>
+            <div class="dn-timer"><span class="t-val">0m</span></div>
+            <div class="dn-outcome"><span class="outcome-pill op-green">● Done</span></div>
+          </div>
+          <div class="seq-label">3.1</div>
+        </div>
+
+        <div class="dag-conn">
+          <div class="conn-label">starts</div>
+          <div class="dag-arrow arrow-pass"></div>
+        </div>
+
+        <!-- CHECKLIST -->
+        <div class="dag-node">
+          <div class="dag-box dn-complete" style="position:relative"
+            onmouseenter="showNodeTip(event,'checklist')" onmouseleave="hideNodeTip()">
+            <div class="dn-type" style="color:var(--pur)">Checklist</div>
+            <div class="dn-name">Design Review</div>
+            <div class="dn-assignee"><span class="dn-avatar">CS</span> Chris Staples</div>
+            <div class="dn-timer"><span class="t-val">1m</span></div>
+            <div class="dn-outcome"><span class="outcome-pill op-green">● submitted</span></div>
+          </div>
+          <div class="seq-label">3.2</div>
+        </div>
+
+        <div class="dag-conn">
+          <div class="conn-label">submitted</div>
+          <div class="dag-arrow arrow-pass"></div>
+        </div>
+
+        <!-- FORM -->
+        <div class="dag-node">
+          <div class="dag-box dn-complete"
+            onmouseenter="showNodeTip(event,'form')" onmouseleave="hideNodeTip()">
+            <div class="dn-type" style="color:var(--pur)">Form</div>
+            <div class="dn-name">Design Review Approval</div>
+            <div class="dn-assignee"><span class="dn-avatar">CS</span> Chris Staples</div>
+            <div class="dn-timer"><span class="t-val">15h 35m</span></div>
+            <div class="dn-outcome"><span class="outcome-pill op-green">● submitted</span></div>
+          </div>
+          <div class="seq-label">3.3</div>
+        </div>
+
+        <div class="dag-conn">
+          <div class="conn-label">submitted</div>
+          <div class="dag-arrow arrow-pass"></div>
+        </div>
+
+        <!-- APPROVAL — REJECTED (active/failing) -->
+        <div class="dag-node" style="position:relative">
+          <div class="dag-box dn-fail" style="position:relative"
+            onmouseenter="showNodeTip(event,'approval')" onmouseleave="hideNodeTip()">
+            <div class="pulse-ring" style="border-color:var(--red);animation:ringPulse 1.5s ease-out infinite"></div>
+            <div class="dn-type" style="color:var(--grn)">Approval</div>
+            <div class="dn-name">Approval: Design Review</div>
+            <div class="dn-assignee"><span class="dn-avatar">VS</span> Vaughn Staples</div>
+            <div class="dn-timer"><span class="t-val">0m</span></div>
+            <div class="dn-outcome"><span class="outcome-pill op-red">✗ rejected</span></div>
+            <div class="rework-badge">✗ 1× rework</div>
+          </div>
+          <div class="seq-label">3.4</div>
+          <!-- rework arc -->
+          <div class="rework-arc-wrap">
+            <div class="rework-arc" style="width:290px">
+              <div class="rework-arc-label">↩ 1× reset to step 1</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dag-conn" style="margin-top:-20px">
+          <div class="conn-label">pending</div>
+          <div class="dag-arrow arrow-pending"></div>
+        </div>
+
+        <!-- FINALIZE — pending -->
+        <div class="dag-node">
+          <div class="dag-box dn-pending"
+            onmouseenter="showNodeTip(event,'finalize')" onmouseleave="hideNodeTip()">
+            <div class="dn-type" style="color:var(--ora)">Sign-off</div>
+            <div class="dn-name">Finalize: Design Review</div>
+            <div class="dn-assignee"><span class="dn-avatar" style="opacity:.4">VS</span> <span style="opacity:.4">Pending</span></div>
+            <div class="dn-timer" style="opacity:.3"><span class="t-val">—</span></div>
+            <div class="dn-outcome"><span class="outcome-pill op-gray">● pending</span></div>
+          </div>
+          <div class="seq-label">3.5</div>
+        </div>
+
+      </div><!-- /dag-flow -->
+    </div><!-- /dag-canvas -->
+
+    <!-- BOTTOM PANEL -->
+    <div class="bottom-panel">
+
+      <!-- STATS BAR -->
+      <div class="stats-bar">
+        <div class="stat-cell">
+          <div class="stat-label">Test Suite</div>
+          <div class="stat-val" style="color:var(--red)" id="suiteVal">3/4</div>
+          <div class="stat-sub" id="suiteSubText">1 failing</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Steps Fired</div>
+          <div class="stat-val" style="color:var(--t)">24</div>
+          <div class="stat-sub">actions</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Assertions</div>
+          <div class="stat-val" style="color:var(--t)">0</div>
+          <div class="stat-sub">checked</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Rework Loops</div>
+          <div class="stat-val" style="color:var(--amb)">1</div>
+          <div class="stat-sub">resets</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">CoC Events</div>
+          <div class="stat-val" style="color:var(--t)">31</div>
+          <div class="stat-sub">written</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Elapsed</div>
+          <div class="stat-val" style="color:var(--amb)" id="elapsedVal">01:23</div>
+          <div class="stat-sub">mm:ss</div>
+        </div>
+      </div>
+
+      <!-- COMMS LOG -->
+      <div class="comms-log" id="commsLog">
+        <div class="comms-row">
+          <span class="comms-src src-sys">SYS</span>
+          <span class="comms-time">01:23:20</span>
+          <span class="comms-msg">Instance launched · Template: <span class="step-ref">Rejection loop — approval rejects then passes</span></span>
+        </div>
+        <div class="comms-row">
+          <span class="comms-src src-crew">CREW</span>
+          <span class="comms-time">01:23:04</span>
+          <span class="comms-msg">T3 ready. Rejection loop — rejects then passes · step count: 7</span>
+        </div>
+        <div class="comms-row">
+          <span class="comms-src src-tower">TOWER</span>
+          <span class="comms-time">01:22:59</span>
+          <span class="comms-msg"><span class="step-ref">[3.2] Checklist: Design Review</span> — <span class="pass-word">submitted</span></span>
+        </div>
+        <div class="comms-row">
+          <span class="comms-src src-tower">TOWER</span>
+          <span class="comms-time">01:22:51</span>
+          <span class="comms-msg"><span class="step-ref">[3.3] Form: DRA</span> — <span class="pass-word">submitted</span></span>
+        </div>
+        <div class="comms-row">
+          <span class="comms-src src-tower">TOWER</span>
+          <span class="comms-time">01:22:44</span>
+          <span class="comms-msg"><span class="step-ref">[3.4] Approval: Design Review</span> — <span class="warn-word">rejected</span></span>
+        </div>
+        <div class="comms-row">
+          <span class="comms-src src-tower">TOWER</span>
+          <span class="comms-time">01:22:38</span>
+          <span class="comms-msg">↩ Rejection loop — resetting to <span class="step-ref">step 1 · Approval: Design Review rejected</span></span>
+        </div>
+        <div class="comms-row">
+          <span class="comms-src src-tower">TOWER</span>
+          <span class="comms-time">01:22:30</span>
+          <span class="comms-msg"><span class="assert-ref">step[3].loops</span> — <span class="fail-word">expected 1 · got 2</span> · Release blocked</span>
+        </div>
+        <div class="comms-row">
+          <span class="comms-src src-tower">TOWER</span>
+          <span class="comms-time">01:22:28</span>
+          <span class="comms-msg">✗ Step failed — <span class="assert-ref">step[3].loops</span>. Review failures and re-run.</span>
+        </div>
+        <div class="comms-row" style="opacity:.5">
+          <span class="comms-src src-sys">SYS</span>
+          <span class="comms-time">01:22:00</span>
+          <span class="comms-msg">22 prior events — scroll to view</span>
+        </div>
+      </div>
+
+      <!-- SCRIPT TAB STRIP -->
+      <div class="script-tabs">
+        <div class="script-tab st-pass" onclick="selectTab(this,0)">
+          <div class="st-dot"></div>
+          T1 Full workflow — clean approval path
+          <span class="st-counts"><span class="pass">●</span></span>
+        </div>
+        <div class="script-tab st-pass" onclick="selectTab(this,1)">
+          <div class="st-dot"></div>
+          T2 Meeting reset — design change
+          <span class="st-counts"><span class="pass">●</span></span>
+        </div>
+        <div class="script-tab st-fail act" onclick="selectTab(this,2)">
+          <div class="st-dot"></div>
+          T3 Rejection loop — rejects then passes
+          <span class="st-counts"><span class="fail">✗ step[3].loops</span></span>
+        </div>
+        <div class="script-tab st-pass" onclick="selectTab(this,3)">
+          <div class="st-dot"></div>
+          T4 Sign-off decline — routes to approval
+          <span class="st-counts"><span class="pass">●</span></span>
+        </div>
+        <div class="tabs-right">
+          <div class="run-controls">
+            <button class="btn btn-ghost" style="font-size:10px" onclick="freezeRun()">⏸ Freeze</button>
+            <button class="btn btn-ghost" style="font-size:10px">↺ Replay</button>
+            <button class="btn btn-ghost" style="font-size:10px;color:var(--red);border-color:rgba(240,96,96,.3)">✕ Close</button>
+            <button class="btn btn-ghost" style="font-size:10px;color:var(--amb);border-color:rgba(240,160,48,.3)">Override</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /bottom-panel -->
+  </div><!-- /center-dag -->
+
+  <!-- RIGHT PANEL — CoC -->
+  <div class="right-panel">
+    <div class="rp-section" style="display:flex;justify-content:space-between;align-items:center">
+      <div class="rp-label" style="margin-bottom:0">Chain of Custody</div>
+      <div style="font-size:9px;color:var(--mu);font-family:var(--mn)">31 events</div>
+    </div>
+
+    <div class="coc-scroll">
+
+      <div class="coc-event">
+        <div class="coc-ev-type ev-fail">step_failed</div>
+        <div class="coc-ev-detail"><span class="bold">step[3].loops</span> · expected 1, got 2</div>
+        <div class="coc-ev-time">01:23:20 PM</div>
+      </div>
+
+      <div class="coc-event">
+        <div class="coc-ev-type ev-step">step_passed</div>
+        <div class="coc-ev-detail">Approval: Design Review — <span class="bold">rejected</span></div>
+        <div class="coc-ev-time">01:22:44 PM</div>
+      </div>
+
+      <div class="coc-event">
+        <div class="coc-ev-type ev-step">step_passed</div>
+        <div class="coc-ev-detail">Form: Design Review Approval — <span class="bold">submitted</span></div>
+        <div class="coc-ev-time">01:22:30 PM</div>
+      </div>
+
+      <div class="coc-event">
+        <div class="coc-ev-type ev-step">step_passed</div>
+        <div class="coc-ev-detail">Checklist: Design Review — <span class="bold">submitted</span></div>
+        <div class="coc-ev-time">01:22:14 PM</div>
+      </div>
+
+      <div class="coc-event">
+        <div class="coc-ev-type ev-launch">instance_launched</div>
+        <div class="coc-ev-detail">Template: <span class="bold">Rejection loop</span> — approval rejects then passes</div>
+        <div class="coc-ev-time">01:22:00 PM</div>
+      </div>
+
+      <div class="coc-event" style="opacity:.5">
+        <div class="coc-ev-type" style="color:var(--mu)">step_passed · T2</div>
+        <div class="coc-ev-detail">Final Meeting — design_change</div>
+        <div class="coc-ev-time">01:21:58 PM</div>
+      </div>
+
+      <div class="coc-event" style="opacity:.5">
+        <div class="coc-ev-type" style="color:var(--mu)">step_passed · T1</div>
+        <div class="coc-ev-detail">Finalize: Design Review — signed</div>
+        <div class="coc-ev-time">01:21:44 PM</div>
+      </div>
+
+      <div class="coc-event" style="opacity:.4">
+        <div class="coc-ev-type" style="color:var(--mu)">step_passed — T1 · T2</div>
+        <div class="coc-ev-detail">22 prior events — scroll to view</div>
+        <div class="coc-ev-time">01:11–01:21 PM</div>
+      </div>
+
+      <!-- suite summary at bottom -->
+      <div style="margin-top:12px;padding:8px;background:var(--bg3);border-radius:4px;border:1px solid var(--b2)">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);margin-bottom:6px;font-family:var(--mn)">Suite — v0.0.13</div>
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <div style="display:flex;justify-content:space-between;font-size:10px;font-family:var(--mn)">
+            <span style="color:var(--grn)">● T1 Passing</span><span style="color:var(--mu)">9.0s</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;font-family:var(--mn)">
+            <span style="color:var(--grn)">● T2 Passing</span><span style="color:var(--mu)">20.3s</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;font-family:var(--mn)">
+            <span style="color:var(--red)">✗ T3 Failing</span><span style="color:var(--mu)">1:23</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;font-family:var(--mn)">
+            <span style="color:var(--grn)">● T4 Passing</span><span style="color:var(--mu)">13.0s</span>
+          </div>
+          <div style="margin-top:4px;padding-top:4px;border-top:1px solid var(--b);display:flex;justify-content:space-between;font-size:10px;font-family:var(--mn)">
+            <span style="color:var(--mu)">Assertions</span><span style="color:var(--t2)">8</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /coc-scroll -->
+
+    <!-- cert footer -->
+    <div class="cert-footer">
+      <div class="cert-status-row">
+        <span class="cert-icon">◎</span>
+        <div style="flex:1">
+          <div class="cert-label" style="font-size:9px;font-family:var(--mn)">Certificate Status</div>
+          <div class="cert-val-fail" style="font-size:11px;font-family:var(--mn)">Not cleared for release</div>
+        </div>
+      </div>
+      <div style="margin-top:6px;font-size:9px;color:var(--mu);font-family:var(--mn);line-height:1.5">
+        Fix T3 failure and re-run to issue certificate
+      </div>
+    </div>
+
+  </div><!-- /right-panel -->
+
+</div><!-- /runtime-main -->
+</div><!-- /shell -->
+
+<!-- NODE TOOLTIP -->
+<div class="node-tip" id="nodeTip"></div>
+
+<script>
+var nodeData = {
+  trigger:  { title:'Instance Launch', type:'Trigger · Automated', elapsed:'0m', outcome:'Done', assertions:'2 checked · 2 passed' },
+  checklist:{ title:'Checklist: Design Review', type:'Collaborative Form', elapsed:'1m', outcome:'Submitted', assertions:'2 checked · 2 passed', actor:'Chris Staples' },
+  form:     { title:'Form: Design Review Approval', type:'Collaborative Form', elapsed:'15h 35m', outcome:'Submitted', assertions:'1 checked · 1 passed', actor:'Chris Staples' },
+  approval: { title:'Approval: Design Review', type:'Approval Step', elapsed:'0m', outcome:'Rejected · ✗ loop assertion failed', assertions:'2 checked · 1 passed · 1 FAILED', actor:'Vaughn Staples' },
+  finalize: { title:'Finalize: Design Review', type:'Sign-off', elapsed:'—', outcome:'Pending — not reached', assertions:'—', actor:'—' },
+};
+
+function showNodeTip(e, key) {
+  var d = nodeData[key]; if(!d) return;
+  var tip = document.getElementById('nodeTip');
+  tip.innerHTML = '<div class="nt-title">'+d.title+'</div>'+
+    '<div class="nt-row"><span>Type</span><span>'+d.type+'</span></div>'+
+    (d.actor ? '<div class="nt-row"><span>Actor</span><span>'+d.actor+'</span></div>' : '')+
+    '<div class="nt-row"><span>Elapsed</span><span>'+d.elapsed+'</span></div>'+
+    '<div class="nt-row"><span>Outcome</span><span>'+d.outcome+'</span></div>'+
+    '<div class="nt-row"><span>Assertions</span><span>'+d.assertions+'</span></div>';
+  tip.classList.add('show');
+  tip.style.left = (e.clientX + 12) + 'px';
+  tip.style.top  = (e.clientY - 10) + 'px';
+}
+function hideNodeTip() { document.getElementById('nodeTip').classList.remove('show'); }
+
+// script tab selection
+function selectTab(el, idx) {
+  document.querySelectorAll('.script-tab').forEach(t => t.classList.remove('act'));
+  el.classList.add('act');
+  selectScript(idx);
+}
+
+// script item selection
+function selectScript(idx) {
+  document.querySelectorAll('.script-item').forEach((s,i) => {
+    s.classList.toggle('active', i === idx);
+  });
+}
+
+// run all — demo animation
+var running = false;
+function runAll() {
+  if(running) return;
+  running = true;
+  var gate = document.getElementById('gatePill');
+  var gateText = document.getElementById('gateText');
+  var banner = document.getElementById('statusBanner');
+  var elapsed = document.getElementById('elapsedVal');
+  var suiteVal = document.getElementById('suiteVal');
+  var suiteSubText = document.getElementById('suiteSubText');
+
+  // show running state
+  gate.className = 'gate-pill gate-run';
+  gate.querySelector('.gate-dot').classList.add('spin');
+  gateText.textContent = 'Running Test Suite…';
+  banner.className = 'status-banner sb-run';
+  banner.innerHTML = '<span>◉</span> Running — T3 Rejection loop in progress';
+  elapsed.textContent = '00:00';
+  suiteVal.style.color = 'var(--amb)';
+
+  // tick elapsed
+  var secs = 0;
+  var ticker = setInterval(function() {
+    secs++;
+    var mm = String(Math.floor(secs/60)).padStart(2,'0');
+    var ss = String(secs%60).padStart(2,'0');
+    elapsed.textContent = mm+':'+ss;
+    if(secs >= 5) {
+      clearInterval(ticker);
+      // resolve to passing
+      gate.className = 'gate-pill gate-pass';
+      gate.querySelector('.gate-dot').classList.remove('spin');
+      gateText.textContent = 'All Tests Passing — Cleared for Release';
+      banner.className = 'status-banner sb-pass';
+      banner.innerHTML = '<span>✓</span> All Tests Passing — Cleared for Release';
+      suiteVal.textContent = '4/4';
+      suiteVal.style.color = 'var(--grn)';
+      suiteSubText.textContent = 'all passing';
+      document.getElementById('certBtn').classList.remove('locked');
+      // update T3 item
+      var si2 = document.getElementById('si-2');
+      si2.className = 'script-item pass active';
+      si2.querySelector('.si-dot').style.background = 'var(--grn)';
+      si2.querySelector('.si-status').style.color = 'var(--grn)';
+      si2.querySelector('.si-status').textContent = '✓';
+      // add comms entry
+      var log = document.getElementById('commsLog');
+      var row = document.createElement('div');
+      row.className = 'comms-row';
+      row.innerHTML = '<span class="comms-src src-tower">TOWER</span><span class="comms-time">'+elapsed.textContent+'</span><span class="comms-msg"><span class="pass-word">✓ All tests passing.</span> Certificate issued · Cleared for release.</span>';
+      log.insertBefore(row, log.firstChild);
+      running = false;
+    }
+  }, 1000);
+}
+
+function freezeRun() {
+  // visual demo only
+  var banner = document.getElementById('statusBanner');
+  if(banner.classList.contains('sb-run')) {
+    banner.className = 'status-banner sb-fail';
+    banner.innerHTML = '<span>⏸</span> Frozen — Review state at step 3.4';
+  }
+}
+
+function rerunScript() {
+  document.getElementById('si-2').classList.add('running');
+  setTimeout(function() {
+    document.getElementById('si-2').classList.remove('running');
+  }, 2000);
+}
+</script>
+</body>
+</html>
