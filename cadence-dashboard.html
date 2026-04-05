@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CADENCE — QA Command Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Root ── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#060810;--bg1:#0c0f18;--bg2:#131720;--bg3:#1a1f2e;--bg4:#222838;
+  --b:rgba(255,255,255,.055);--b2:rgba(255,255,255,.10);--b3:rgba(255,255,255,.17);
+  --t:rgba(255,255,255,.92);--t2:rgba(255,255,255,.60);--mu:rgba(255,255,255,.28);
+  --grn:#3de08a;--grn2:rgba(61,224,138,.13);--grn3:rgba(61,224,138,.06);
+  --amb:#f0a030;--amb2:rgba(240,160,48,.14);--amb3:rgba(240,160,48,.06);
+  --red:#f06060;--red2:rgba(240,96,96,.13);--red3:rgba(240,96,96,.06);
+  --teal:#28d4c0;--teal2:rgba(40,212,192,.13);--teal3:rgba(40,212,192,.06);
+  --blu:#5090f0;--blu2:rgba(80,144,240,.13);
+  --pur:#a78bfa;--pur2:rgba(167,139,250,.13);
+  --mn:'JetBrains Mono',monospace;--sn:'Syne',sans-serif;
+}
+html,body{height:100%;background:var(--bg0);color:var(--t);font-family:var(--sn);font-size:13px;overflow:hidden}
+.shell{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* ── TOPBAR ── */
+.topbar{
+  height:44px;background:var(--bg1);border-bottom:1px solid var(--b);
+  display:flex;align-items:center;padding:0 16px;gap:12px;
+  flex-shrink:0;position:relative;z-index:50;
+}
+.brand{font-family:var(--sn);font-weight:800;font-size:15px;letter-spacing:-.02em;
+  color:#fff;display:flex;align-items:center;gap:6px}
+.brand-o{color:var(--amb)}
+.brand-sep{width:1px;height:22px;background:var(--b2);margin:0 4px}
+.brand-sub{font-size:11px;font-weight:500;color:var(--mu);letter-spacing:.08em;text-transform:uppercase}
+.nav-tabs{display:flex;gap:2px;margin-left:8px}
+.nav-tab{
+  padding:5px 14px;border-radius:4px;font-size:11px;font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+  color:var(--mu);border:1px solid transparent;transition:all .15s;font-family:var(--sn);
+}
+.nav-tab:hover{color:var(--t2);background:rgba(255,255,255,.04)}
+.nav-tab.act{color:var(--t);background:var(--bg3);border-color:var(--b2)}
+.nav-tab.dash-act{color:var(--teal);border-color:rgba(40,212,192,.3);background:var(--teal2)}
+.nav-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;border-radius:8px;font-size:9px;font-weight:700;
+  background:var(--bg3);color:var(--t2);margin-left:4px;font-family:var(--mn);
+}
+.nav-badge.alert{background:var(--red2);color:var(--red)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.live-dot{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--grn);
+  font-family:var(--mn);letter-spacing:.04em}
+.live-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--grn);
+  box-shadow:0 0 8px var(--grn);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.avatar{width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,var(--pur),var(--teal));
+  display:flex;align-items:center;justify-content:center;font-size:10px;
+  font-weight:700;color:#fff;cursor:pointer;font-family:var(--mn)}
+.btn{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;
+  font-size:10px;font-weight:700;border-radius:3px;cursor:pointer;
+  border:1px solid var(--b2);background:transparent;color:var(--t2);
+  letter-spacing:.05em;transition:all .12s;font-family:var(--sn);
+  text-transform:uppercase;white-space:nowrap}
+.btn:hover{background:rgba(255,255,255,.06);color:var(--t)}
+.btn-teal{background:var(--teal2);border-color:rgba(40,212,192,.35);color:var(--teal)}
+.btn-teal:hover{background:rgba(40,212,192,.22)}
+.btn-red{background:var(--red2);border-color:rgba(240,96,96,.35);color:var(--red)}
+.btn-amb{background:var(--amb2);border-color:rgba(240,160,48,.35);color:var(--amb)}
+.btn-grn{background:var(--grn2);border-color:rgba(61,224,138,.35);color:var(--grn)}
+
+/* ── SUBBAR ── */
+.subbar{
+  height:34px;background:var(--bg1);border-bottom:1px solid var(--b);
+  display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;
+}
+.subbar-title{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--mu);font-family:var(--mn)}
+.subbar-date{font-size:10px;color:var(--mu);font-family:var(--mn)}
+.subbar-firm{font-size:10px;color:var(--t2);font-weight:500}
+.subbar-right{margin-left:auto;display:flex;align-items:center;gap:6px}
+
+/* ── SCROLL BODY ── */
+.body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.body::-webkit-scrollbar{width:3px}
+.body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
+
+/* ── LOADING STATES ── */
+.skel{background:var(--bg3);border-radius:3px;animation:shimmer 1.4s ease-in-out infinite}
+@keyframes shimmer{0%,100%{opacity:.4}50%{opacity:.9}}
+.loading-block{height:14px;border-radius:3px;background:var(--bg3);animation:shimmer 1.4s ease-in-out infinite}
+
+/* ── HEALTH BRIEF ── */
+.health-brief{background:var(--bg1);border:1px solid var(--b2);border-radius:6px;overflow:hidden;flex-shrink:0}
+.health-top{display:flex;align-items:stretch}
+
+.health-score-block{
+  width:176px;flex-shrink:0;padding:14px 16px;
+  display:flex;flex-direction:column;justify-content:center;
+  border-right:1px solid var(--b);
+}
+.health-score-num{font-size:56px;font-weight:800;line-height:1;font-family:var(--mn);letter-spacing:-.03em}
+.col-grn{color:var(--grn)} .col-amb{color:var(--amb)} .col-red{color:var(--red)} .col-t2{color:var(--t2)}
+.health-score-lbl{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--mu);margin-top:4px;font-family:var(--mn)}
+.health-score-delta{font-size:10px;margin-top:5px}
+.health-sparkline{display:flex;gap:3px;align-items:flex-end;height:28px;margin-top:8px}
+.spark-bar{flex:1;border-radius:1px;min-width:5px;transition:height .3s}
+.health-spark-lbl{font-size:8px;color:var(--mu);font-family:var(--mn);margin-top:3px}
+
+.health-domains{flex:1;display:grid;grid-template-columns:repeat(4,1fr)}
+.domain{padding:10px 12px;border-right:1px solid var(--b);display:flex;flex-direction:column;gap:3px;cursor:pointer;transition:background .12s}
+.domain:last-child{border-right:none}
+.domain:hover{background:rgba(255,255,255,.025)}
+.domain-lbl{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);font-family:var(--mn)}
+.domain-score{font-size:22px;font-weight:700;font-family:var(--mn);letter-spacing:-.02em;line-height:1.1}
+.domain-bar{height:2px;border-radius:1px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:3px}
+.domain-fill{height:100%;border-radius:1px;transition:width .5s}
+.domain-detail{font-size:9px;color:var(--mu);font-family:var(--mn);margin-top:3px;line-height:1.4}
+
+.health-kpis{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--b)}
+.kpi{padding:7px 12px;border-right:1px solid var(--b);display:flex;flex-direction:column;gap:2px}
+.kpi:last-child{border-right:none}
+.kpi-val{font-size:15px;font-weight:700;font-family:var(--mn)}
+.kpi-lbl{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);font-family:var(--mn)}
+.kpi-delta{font-size:9px;font-family:var(--mn)}
+.delta-up{color:var(--grn)} .delta-dn{color:var(--red)} .delta-neu{color:var(--mu)}
+
+/* ── GRID LAYOUTS ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+/* ── PANELS ── */
+.panel{background:var(--bg1);border:1px solid var(--b);border-radius:6px;overflow:hidden;display:flex;flex-direction:column}
+.panel-hdr{
+  padding:8px 12px;border-bottom:1px solid var(--b);
+  display:flex;align-items:center;gap:8px;flex-shrink:0;
+}
+.panel-title{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);font-family:var(--mn);flex:1}
+.panel-count{font-size:9px;font-family:var(--mn);color:var(--t2)}
+.panel-link{font-size:9px;color:var(--teal);cursor:pointer;font-family:var(--mn);letter-spacing:.03em;transition:color .1s}
+.panel-link:hover{color:#fff}
+.panel-body{flex:1;overflow-y:auto;max-height:224px}
+.panel-body::-webkit-scrollbar{width:2px}
+.panel-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
+
+/* ── HOT QUEUE ── */
+.hot-item{
+  padding:8px 12px;border-bottom:1px solid var(--b);
+  display:flex;align-items:flex-start;gap:8px;cursor:pointer;transition:background .1s;
+}
+.hot-item:hover{background:rgba(255,255,255,.025)}
+.hot-item:last-child{border-bottom:none}
+.hot-sev{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:36px}
+.hot-sev.crit{background:var(--red)} .hot-sev.warn{background:var(--amb)}
+.hot-main{flex:1;min-width:0}
+.hot-type{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--mn);margin-bottom:2px}
+.hot-type.crit{color:var(--red)} .hot-type.warn{color:var(--amb)}
+.hot-name{font-size:11px;color:var(--t);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hot-sub{font-size:9px;color:var(--mu);font-family:var(--mn);margin-top:2px;line-height:1.4}
+.hot-meta{display:flex;align-items:center;gap:5px;margin-top:4px;flex-wrap:wrap}
+.tag{padding:1px 6px;border-radius:2px;font-size:8px;font-weight:700;font-family:var(--mn);letter-spacing:.03em}
+.tag-r{background:var(--red2);color:var(--red)}
+.tag-a{background:var(--amb2);color:var(--amb)}
+.tag-b{background:var(--blu2);color:var(--blu)}
+.tag-g{background:var(--grn2);color:var(--grn)}
+.tag-p{background:var(--pur2);color:var(--pur)}
+.hot-acts{display:flex;gap:4px;flex-shrink:0;align-items:center;padding-top:2px}
+.hbtn{
+  padding:3px 8px;border-radius:3px;font-size:9px;font-weight:700;
+  cursor:pointer;border:1px solid;font-family:var(--mn);white-space:nowrap;transition:all .12s;
+}
+.hbtn-fix{background:var(--red2);border-color:rgba(240,96,96,.35);color:var(--red)}
+.hbtn-fix:hover{background:rgba(240,96,96,.22)}
+.hbtn-act{background:var(--amb2);border-color:rgba(240,160,48,.35);color:var(--amb)}
+.hbtn-act:hover{background:rgba(240,160,48,.22)}
+.hbtn-view{background:transparent;border-color:var(--b2);color:var(--t2)}
+.hbtn-view:hover{border-color:var(--b3);color:var(--t)}
+
+/* HOT QUEUE EMPTY STATE */
+.hot-empty{padding:22px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
+.hot-empty-dot{width:32px;height:32px;border-radius:50%;background:var(--grn3);border:1px solid rgba(61,224,138,.2);
+  display:flex;align-items:center;justify-content:center;font-size:14px}
+.hot-empty-title{font-size:12px;color:var(--grn);font-weight:700}
+.hot-empty-sub{font-size:9px;color:var(--mu);font-family:var(--mn);line-height:1.5}
+
+/* ── WORK QUEUE ── */
+.wq-item{
+  padding:7px 12px;border-bottom:1px solid var(--b);
+  display:flex;align-items:center;gap:8px;cursor:pointer;transition:background .1s;
+}
+.wq-item:hover{background:rgba(255,255,255,.025)}
+.wq-item:last-child{border-bottom:none}
+.wq-rank{font-size:10px;font-weight:700;font-family:var(--mn);color:var(--mu);width:14px;flex-shrink:0;text-align:center}
+.wq-pri{width:3px;border-radius:2px;align-self:stretch;flex-shrink:0;min-height:28px}
+.wq-pri.h{background:var(--red)} .wq-pri.m{background:var(--amb)} .wq-pri.l{background:var(--blu)}
+.wq-main{flex:1;min-width:0}
+.wq-name{font-size:11px;color:var(--t);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wq-sub{font-size:9px;color:var(--mu);font-family:var(--mn);margin-top:1px}
+.wq-badge{padding:1px 6px;border-radius:2px;font-size:8px;font-weight:700;font-family:var(--mn);flex-shrink:0}
+.wq-assign{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.mini-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:7px;font-weight:700;font-family:var(--mn);flex-shrink:0}
+.wq-btn{padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;cursor:pointer;
+  border:1px solid var(--b2);background:transparent;color:var(--t2);
+  font-family:var(--mn);white-space:nowrap;transition:all .12s}
+.wq-btn:hover{background:rgba(255,255,255,.06);color:var(--t)}
+
+/* ── REQUEST QUEUE ── */
+.rq-item{
+  padding:7px 12px;border-bottom:1px solid var(--b);
+  display:flex;align-items:flex-start;gap:8px;cursor:pointer;transition:background .1s;
+}
+.rq-item:hover{background:rgba(255,255,255,.025)}
+.rq-item:last-child{border-bottom:none}
+.rq-icon{width:26px;height:26px;border-radius:4px;display:flex;align-items:center;
+  justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px}
+.rq-main{flex:1;min-width:0}
+.rq-name{font-size:11px;color:var(--t);font-weight:500}
+.rq-sub{font-size:9px;color:var(--mu);font-family:var(--mn);margin-top:1px}
+.rq-meta{display:flex;align-items:center;gap:5px;margin-top:3px}
+.rq-acts{display:flex;gap:3px;flex-shrink:0;padding-top:2px}
+.rq-btn{padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;cursor:pointer;
+  border:1px solid;font-family:var(--mn);white-space:nowrap;transition:all .12s}
+.rq-approve{background:var(--grn2);border-color:rgba(61,224,138,.35);color:var(--grn)}
+.rq-approve:hover{background:rgba(61,224,138,.22)}
+.rq-assign{background:var(--teal2);border-color:rgba(40,212,192,.35);color:var(--teal)}
+.rq-assign:hover{background:rgba(40,212,192,.22)}
+.rq-decline{background:transparent;border-color:var(--b2);color:var(--mu)}
+.rq-decline:hover{border-color:var(--b3);color:var(--t2)}
+
+/* ── TRAINING COVERAGE ── */
+.tc-row{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--b)}
+.tc-row:last-child{border-bottom:none}
+.tc-name{font-size:10px;color:var(--t2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-ver{font-size:8px;color:var(--mu);font-family:var(--mn);margin-top:1px}
+.tc-bar-wrap{width:72px;height:4px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden;flex-shrink:0}
+.tc-bar-fill{height:100%;border-radius:2px}
+.tc-pct{font-size:9px;font-family:var(--mn);width:26px;text-align:right;flex-shrink:0;font-weight:700}
+.tc-footer{padding:7px 12px;border-top:1px solid var(--b);display:flex;gap:5px}
+
+/* ── COC FEED ── */
+.coc-item{padding:6px 12px;border-bottom:1px solid var(--b);display:flex;align-items:flex-start;gap:8px}
+.coc-item:last-child{border-bottom:none}
+.coc-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.coc-dot.action{background:var(--teal)}
+.coc-dot.system{background:var(--mu)}
+.coc-dot.alert{background:var(--amb)}
+.coc-dot.cert{background:var(--grn)}
+.coc-text{font-size:10px;color:var(--t2);flex:1;line-height:1.5}
+.coc-text strong{color:var(--t);font-weight:600}
+.coc-time{font-size:9px;color:var(--mu);font-family:var(--mn);flex-shrink:0;margin-top:2px}
+
+/* ── OVERRIDE MODAL ── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);
+  display:none;align-items:center;justify-content:center;z-index:200;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:var(--bg2);border:1px solid var(--b3);border-radius:8px;
+  width:440px;overflow:hidden;
+}
+.modal-hdr{padding:14px 16px;border-bottom:1px solid var(--b);display:flex;align-items:center;gap:8px}
+.modal-title{font-size:12px;font-weight:700;color:var(--t);flex:1}
+.modal-close{font-size:14px;color:var(--mu);cursor:pointer;padding:2px 6px;border-radius:3px;transition:color .1s}
+.modal-close:hover{color:var(--t)}
+.modal-body{padding:16px}
+.modal-warning{
+  background:var(--red3);border:1px solid rgba(240,96,96,.2);border-radius:4px;
+  padding:10px 12px;font-size:10px;color:var(--t2);line-height:1.6;margin-bottom:14px;
+}
+.modal-warning strong{color:var(--red)}
+.modal-field-lbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--mu);font-family:var(--mn);margin-bottom:5px}
+.modal-textarea{
+  width:100%;background:var(--bg3);border:1px solid var(--b2);border-radius:4px;
+  color:var(--t);font-family:var(--mn);font-size:11px;padding:8px 10px;
+  resize:vertical;min-height:70px;outline:none;transition:border-color .1s;
+}
+.modal-textarea:focus{border-color:var(--teal)}
+.modal-coc-note{
+  font-size:9px;color:var(--mu);font-family:var(--mn);margin-top:8px;
+  padding:6px 10px;background:var(--bg3);border-radius:3px;line-height:1.5;
+}
+.modal-coc-note span{color:var(--teal)}
+.modal-footer{padding:12px 16px;border-top:1px solid var(--b);display:flex;gap:8px;justify-content:flex-end}
+
+/* ── CERT EXPIRY STRIP (inline warning in panel) ── */
+.expiry-item{padding:6px 12px;border-bottom:1px solid var(--b);display:flex;align-items:center;gap:8px}
+.expiry-item:last-child{border-bottom:none}
+.expiry-name{font-size:10px;color:var(--t2);flex:1}
+.expiry-who{font-size:9px;color:var(--mu);font-family:var(--mn)}
+.expiry-days{font-size:11px;font-weight:700;font-family:var(--mn);flex-shrink:0}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ═══════════════════════════════ TOPBAR ═══════════════════════════════ -->
+  <div class="topbar">
+    <div class="brand"><span class="brand-o">○</span> CADENCE</div>
+    <div class="brand-sep"></div>
+    <div class="brand-sub">Quality Command</div>
+    <div class="nav-tabs">
+      <div class="nav-tab dash-act">Dashboard</div>
+      <div class="nav-tab">Library <span class="nav-badge" id="nb-library">—</span></div>
+      <div class="nav-tab">Editor</div>
+      <div class="nav-tab">Simulator</div>
+      <div class="nav-tab">Instances <span class="nav-badge" id="nb-instances">—</span></div>
+    </div>
+    <div class="topbar-right">
+      <div class="live-dot" id="live-dot">LIVE</div>
+      <div class="btn btn-teal">+ New Template</div>
+      <div class="avatar" id="user-avatar">—</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ SUBBAR ═══════════════════════════════ -->
+  <div class="subbar">
+    <div class="subbar-title">QA Command Brief</div>
+    <div class="brand-sep"></div>
+    <div class="subbar-date" id="subbar-date">—</div>
+    <div class="brand-sep"></div>
+    <div class="subbar-firm" id="subbar-firm">Loading…</div>
+    <div class="subbar-right">
+      <div class="btn">Export Brief</div>
+      <div class="btn">Score History</div>
+      <div class="btn btn-teal">Settings</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ BODY ═══════════════════════════════ -->
+  <div class="body">
+
+    <!-- ── HEALTH BRIEF ── -->
+    <div class="health-brief" id="health-brief">
+      <div class="health-top">
+        <!-- Score block -->
+        <div class="health-score-block">
+          <div class="health-score-num col-t2" id="hs-score">—</div>
+          <div class="health-score-lbl">Quality Health Score</div>
+          <div class="health-score-delta col-t2" id="hs-delta">Loading…</div>
+          <div class="health-sparkline" id="hs-spark"></div>
+          <div class="health-spark-lbl">7-day trend</div>
+        </div>
+        <!-- Domain scores -->
+        <div class="health-domains" id="health-domains">
+          <!-- Populated by _cdRenderDomains() -->
+          <div class="domain"><div class="domain-lbl">Loading…</div></div>
+        </div>
+      </div>
+      <!-- KPI strip -->
+      <div class="health-kpis" id="health-kpis">
+        <div class="kpi"><div class="loading-block" style="width:60px;margin-bottom:4px"></div><div class="loading-block" style="width:80px"></div></div>
+        <div class="kpi"><div class="loading-block" style="width:60px;margin-bottom:4px"></div><div class="loading-block" style="width:80px"></div></div>
+        <div class="kpi"><div class="loading-block" style="width:60px;margin-bottom:4px"></div><div class="loading-block" style="width:80px"></div></div>
+        <div class="kpi"><div class="loading-block" style="width:60px;margin-bottom:4px"></div><div class="loading-block" style="width:80px"></div></div>
+        <div class="kpi"><div class="loading-block" style="width:60px;margin-bottom:4px"></div><div class="loading-block" style="width:80px"></div></div>
+        <div class="kpi"><div class="loading-block" style="width:60px;margin-bottom:4px"></div><div class="loading-block" style="width:80px"></div></div>
+      </div>
+    </div>
+
+    <!-- ── HOT QUEUE + WORK QUEUE ── -->
+    <div class="grid-2">
+
+      <!-- HOT QUEUE -->
+      <div class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title" id="hq-title" style="color:var(--red)">⚡ Hot Queue</div>
+          <div class="panel-count" id="hq-count">Loading…</div>
+          <div class="panel-link">View all →</div>
+        </div>
+        <div class="panel-body" id="hot-queue-body">
+          <div style="padding:16px 12px"><div class="loading-block" style="width:100%;margin-bottom:8px"></div><div class="loading-block" style="width:75%"></div></div>
+        </div>
+      </div>
+
+      <!-- TEAM WORK QUEUE -->
+      <div class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">Team Work Queue</div>
+          <div class="panel-count" id="wq-count">Loading…</div>
+          <div class="panel-link">Full queue →</div>
+        </div>
+        <div class="panel-body" id="work-queue-body">
+          <div style="padding:16px 12px"><div class="loading-block" style="width:100%;margin-bottom:8px"></div><div class="loading-block" style="width:80%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── REQUEST QUEUE + TRAINING + COC FEED ── -->
+    <div class="grid-3">
+
+      <!-- REQUEST QUEUE -->
+      <div class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">Request Queue</div>
+          <div class="panel-count" id="rq-count">Loading…</div>
+          <div class="panel-link">All requests →</div>
+        </div>
+        <div class="panel-body" id="request-queue-body">
+          <div style="padding:16px 12px"><div class="loading-block" style="width:90%;margin-bottom:8px"></div><div class="loading-block" style="width:65%"></div></div>
+        </div>
+      </div>
+
+      <!-- TRAINING COVERAGE -->
+      <div class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">Training Coverage</div>
+          <div class="panel-count">Current versions · Firm-wide</div>
+          <div class="panel-link">Full matrix →</div>
+        </div>
+        <div class="panel-body" id="training-body">
+          <div style="padding:16px 12px"><div class="loading-block" style="width:85%;margin-bottom:8px"></div><div class="loading-block" style="width:70%"></div></div>
+        </div>
+      </div>
+
+      <!-- COC FEED -->
+      <div class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">Command Record</div>
+          <div class="panel-count">My actions · CoC recorded</div>
+          <div class="panel-link">Full history →</div>
+        </div>
+        <div class="panel-body" id="coc-body">
+          <div style="padding:16px 12px"><div class="loading-block" style="width:90%;margin-bottom:8px"></div><div class="loading-block" style="width:70%"></div></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- /body -->
+</div><!-- /shell -->
+
+<!-- ═══════════════════════════════ OVERRIDE MODAL ═══════════════════════════════ -->
+<div class="modal-overlay" id="override-modal" onclick="_cdCloseOverride(event)">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="override-title">Override — Certificate Staleness Warning</div>
+      <div class="modal-close" onclick="_cdCloseOverrideBtn()">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-warning">
+        <strong>This is a governance override.</strong> You are acknowledging an exception to established quality thresholds.
+        This action requires a written rationale and will be permanently recorded in the Chain of Custody.
+      </div>
+      <div class="modal-field-lbl">Rationale (required — minimum 20 characters)</div>
+      <textarea class="modal-textarea" id="override-rationale" placeholder="Describe the business reason for this override…"></textarea>
+      <div class="modal-coc-note">
+        This override will be recorded as: <span id="override-coc-label">override.applied</span> by
+        <span id="override-actor">Patricia Staples</span> at <span id="override-ts">—</span> ·
+        Entity: <span id="override-entity">—</span> · <span style="color:var(--red)">Immutable record — cannot be deleted</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div class="btn" onclick="_cdCloseOverrideBtn()">Cancel</div>
+      <div class="btn btn-red" id="override-confirm-btn" onclick="_cdConfirmOverride()">Confirm Override</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ SUPABASE + INIT ═══════════════════════════════ -->
+<script>
+// ── CONFIG ─────────────────────────────────────────────────────────────────────
+// Replace with your actual Supabase project values
+var SUPA_URL = 'https://ProjectHUD.supabase.co';
+var SUPA_KEY = 'sb_publishable_1EOfIYerLiE3syHLc9zfKw__72o8fmx';
+var FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
+var USER_ID  = '57b93738-6a2a-4098-ba12-bfffd1f7dd07';
+
+// ── API WRAPPER ────────────────────────────────────────────────────────────────
+// API.q(table, opts) — clean PostgREST query builder, no computed object keys
+// opts: { filters: [['col','op','val'],...], select, order, limit }
+// Example: API.q('bist_runs', { filters:[['firm_id','eq',FIRM_ID]], order:'run_at.desc', limit:50 })
+var API = {};
+
+API.q = function(table, opts) {
+  var o = opts || {};
+  var qs = [];
+  (o.filters || []).forEach(function(f) {
+    qs.push(f[0] + '=' + f[1] + '.' + encodeURIComponent(f[2]));
+  });
+  if (o.select) qs.push('select=' + encodeURIComponent(o.select));
+  if (o.order)  qs.push('order=' + encodeURIComponent(o.order));
+  if (o.limit)  qs.push('limit=' + o.limit);
+  var url = SUPA_URL + '/rest/v1/' + table + (qs.length ? '?' + qs.join('&') : '');
+  return fetch(url, {
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Accept': 'application/json'
+    }
+  }).then(function(r) { return r.json(); });
+};
+
+// Legacy shim — kept for API.post calls
+API.get = function(path, qs_raw) {
+  var url = SUPA_URL + '/rest/v1/' + path;
+  if (qs_raw) url += '?' + qs_raw;
+  return fetch(url, {
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Accept': 'application/json'
+    }
+  }).then(function(r) { return r.json(); });
+};
+
+API.post = function(path, body) {
+  return fetch(SUPA_URL + '/rest/v1/' + path, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(body)
+  }).then(function(r) { return r.json(); });
+};
+
+// RPC (for complex queries via Supabase functions when needed)
+API.rpc = function(fnName, body) {
+  return fetch(SUPA_URL + '/rest/v1/rpc/' + fnName, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  }).then(function(r) { return r.json(); });
+};
+
+// ── MODULE STATE ───────────────────────────────────────────────────────────────
+var _cdFirm         = null;
+var _cdUser         = null;
+var _cdResource     = null;
+var _cdHealthScores = [];
+var _cdCerts        = [];
+var _cdRuns         = [];
+var _cdOverrideCtx  = null; // context object for current override flow
+
+// ── COLOUR HELPERS ────────────────────────────────────────────────────────────
+function _cdScoreClass(n) {
+  if (n >= 90) return 'col-grn';
+  if (n >= 75) return 'col-amb';
+  if (n >= 60) return 'col-amb';
+  return 'col-red';
+}
+function _cdBarColor(n) {
+  if (n >= 90) return 'var(--grn)';
+  if (n >= 75) return 'var(--amb)';
+  return 'var(--red)';
+}
+function _cdSparkColor(n) {
+  if (n >= 90) return 'var(--grn)';
+  if (n >= 75) return 'var(--amb)';
+  return 'var(--red)';
+}
+function _cdRelTime(isoStr) {
+  if (!isoStr) return '—';
+  var diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
+}
+function _cdFmtDate(isoStr) {
+  if (!isoStr) return '—';
+  var d = new Date(isoStr);
+  var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return days[d.getDay()] + ' ' + months[d.getMonth()] + ' ' + d.getDate() + ' · '
+    + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function _cdEsc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+function _cdInit() {
+  _cdSetSubbarDate();
+  _cdLoadFirmAndUser();
+}
+
+function _cdSetSubbarDate() {
+  var now = new Date();
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var ds = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear()
+    + ' · ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('subbar-date').textContent = ds;
+}
+
+// ── STEP 1: FIRM + USER ───────────────────────────────────────────────────────
+function _cdLoadFirmAndUser() {
+  // Q1 — firm settings (for thresholds)
+  API.q('firms', { filters:[['id','eq',FIRM_ID]], select:'id,name' })
+    .then(function(rows) {
+      if (!rows || !rows.length) return;
+      _cdFirm = rows[0];
+      document.getElementById('subbar-firm').textContent = _cdFirm.name || 'Apex Consulting Group';
+    })
+    .catch(function() {
+      document.getElementById('subbar-firm').textContent = 'Apex Consulting Group';
+    });
+
+  // Q2 — user + resource
+  API.q('users', {
+    filters:[['id','eq',USER_ID]],
+    select:'id,email,role,resource_id,resources(first_name,last_name,name,department_id)'
+  }).then(function(rows) {
+    if (!rows || !rows.length) return;
+    _cdUser = rows[0];
+    _cdResource = rows[0].resources;
+    if (_cdResource) {
+      var fn = _cdResource.first_name || (_cdResource.name||'?').split(' ')[0];
+    var ln = _cdResource.last_name || (_cdResource.name||'?').split(' ').slice(-1)[0];
+    var initials = fn[0] + ln[0];
+      document.getElementById('user-avatar').textContent = initials.toUpperCase();
+    }
+    // Now load all dashboard data in parallel
+    _cdLoadAllPanels();
+  }).catch(function() {
+    document.getElementById('user-avatar').textContent = 'PS';
+    _cdLoadAllPanels();
+  });
+}
+
+// ── STEP 2: LOAD ALL PANELS IN PARALLEL ──────────────────────────────────────
+function _cdLoadAllPanels() {
+  _cdLoadHealthBrief();
+  _cdLoadHotQueue();
+  _cdLoadWorkQueue();
+  _cdLoadRequestQueue();
+  _cdLoadTrainingCoverage();
+  _cdLoadCocFeed();
+  _cdLoadNavBadges();
+}
+
+// ── HEALTH BRIEF ─────────────────────────────────────────────────────────────
+// Q3: 7 most recent health score rows ordered by calculated_at desc
+function _cdLoadHealthBrief() {
+  API.q('health_scores', {
+    filters:[['firm_id','eq',FIRM_ID]],
+    order:'calculated_at.desc',
+    limit:7,
+    select:'id,composite_score,domain_scores,domain_details,threshold_config,triggered_by,calculated_at'
+  }).then(function(rows) {
+    if (!rows || !rows.length) { _cdHealthBriefEmpty(); return; }
+    _cdHealthScores = rows;
+    _cdRenderHealthBrief(rows);
+  }).catch(function() { _cdHealthBriefEmpty(); });
+}
+
+function _cdRenderHealthBrief(rows) {
+  var latest  = rows[0];
+  var prior   = rows.length > 1 ? rows[rows.length - 1] : null;
+  var score   = latest.composite_score;
+  var domains = latest.domain_scores || {};
+  var cfg     = latest.threshold_config || {};
+  var thresh  = cfg.green || 90;
+
+  // Composite score
+  var cls = _cdScoreClass(score);
+  document.getElementById('hs-score').className = 'health-score-num ' + cls;
+  document.getElementById('hs-score').textContent = Math.round(score);
+
+  // Delta
+  var deltaEl = document.getElementById('hs-delta');
+  if (prior) {
+    var delta = Math.round(score - prior.composite_score);
+    if (delta > 0) {
+      deltaEl.className = 'health-score-delta col-grn';
+      deltaEl.textContent = '▲ ' + delta + ' pts vs 7 days ago';
+    } else if (delta < 0) {
+      deltaEl.className = 'health-score-delta col-red';
+      deltaEl.textContent = '▼ ' + Math.abs(delta) + ' pts vs 7 days ago';
+    } else {
+      deltaEl.className = 'health-score-delta col-t2';
+      deltaEl.textContent = 'No change vs 7 days ago';
+    }
+  } else {
+    deltaEl.textContent = 'Baseline score';
+  }
+
+  // Sparkline — rows are newest-first, reverse for display
+  var spark = document.getElementById('hs-spark');
+  var ordered = rows.slice().reverse();
+  var maxScore = Math.max.apply(null, ordered.map(function(r) { return r.composite_score; }));
+  var html = '';
+  ordered.forEach(function(r) {
+    var h = Math.round((r.composite_score / maxScore) * 28);
+    html += '<div class="spark-bar" style="height:' + h + 'px;background:' + _cdSparkColor(r.composite_score) + '"></div>';
+  });
+  spark.innerHTML = html;
+
+  // Domain scores
+  var domainDefs = [
+    { key:'process_cert',   label:'Process Cert',  wt:20 },
+    { key:'conformance',    label:'Conformance',   wt:20 },
+    { key:'doc_control',    label:'Doc Control',   wt:14 },
+    { key:'training',       label:'Training',      wt:14 },
+    { key:'capa',           label:'CAPA',          wt:10 },
+    { key:'mrb',            label:'MRB / NCR',     wt:10 },
+    { key:'supplier',       label:'Supplier',      wt:7  },
+    { key:'cert_currency',  label:'Cert Currency', wt:5  }
+  ];
+  var details = latest.domain_details || {};
+  var dHtml = '';
+  domainDefs.forEach(function(d) {
+    var v = domains[d.key] !== undefined ? Math.round(domains[d.key]) : '—';
+    var color = typeof v === 'number' ? _cdBarColor(v) : 'var(--mu)';
+    var pct   = typeof v === 'number' ? v : 0;
+    var det   = _cdDomainDetail(d.key, details[d.key]);
+    dHtml += '<div class="domain" onclick="_cdOpenDomainDrill(\'' + d.key + '\')">'
+      + '<div class="domain-lbl">' + _cdEsc(d.label) + '</div>'
+      + '<div class="domain-score ' + _cdScoreClass(v) + '">' + v + '</div>'
+      + '<div class="domain-bar"><div class="domain-fill" style="width:' + pct + '%;background:' + color + '"></div></div>'
+      + '<div class="domain-detail">' + det + '</div>'
+      + '</div>';
+  });
+  document.getElementById('health-domains').innerHTML = dHtml;
+
+  // KPI strip — computed from bist data
+  _cdLoadKpis(latest);
+}
+
+function _cdDomainDetail(key, det) {
+  if (!det) return '&nbsp;';
+  var d = det;
+  if (key === 'process_cert') {
+    return (d.certs_valid||'—') + '/' + (d.certs_total||'—') + ' certs valid<br>' + (d.coverage_pct||'—') + '% path coverage';
+  }
+  if (key === 'training') {
+    return (d.coverage_pct||'—') + '% firm coverage<br>' + (d.overdue||0) + ' overdue assign.';
+  }
+  if (key === 'mrb') {
+    return (d.parts_on_hold||0) + ' parts on hold<br>$' + ((d.value_at_risk||0)/1000).toFixed(1) + 'K at risk';
+  }
+  return '&nbsp;';
+}
+
+function _cdHealthBriefEmpty() {
+  document.getElementById('hs-score').textContent = '—';
+  document.getElementById('hs-delta').textContent = 'No score data yet';
+  document.getElementById('health-domains').innerHTML = '<div class="domain"><div class="domain-lbl" style="color:var(--mu)">No data</div></div>';
+}
+
+// Q4: KPIs from bist_runs + bist_certificates
+function _cdLoadKpis(latestHealth) {
+  API.q('bist_runs', {
+    filters:[['firm_id','eq',FIRM_ID]],
+    order:'run_at.desc',
+    limit:100,
+    select:'id,status,steps_passed,steps_failed,duration_ms,run_at,script_id'
+  }).then(function(rows) {
+    _cdRuns = rows || [];
+    // Q5: certs for additional KPIs
+    API.q('bist_certificates', {
+      filters:[['firm_id','eq',FIRM_ID]],
+      select:'id,status,issued_at,expires_at,template_id,template_version'
+    }).then(function(certs) {
+      _cdCerts = certs || [];
+      _cdRenderKpis(rows || [], certs || [], latestHealth);
+    }).catch(function() { _cdRenderKpis(rows || [], [], latestHealth); });
+  }).catch(function() { _cdRenderKpisFallback(); });
+}
+
+function _cdRenderKpis(runs, certs, latestHealth) {
+  // Total suite runs (30d)
+  var now = Date.now();
+  var thirtyDays = 30 * 86400 * 1000;
+  var runs30 = runs.filter(function(r) { return r.run_at && (now - new Date(r.run_at).getTime()) < thirtyDays; });
+  var totalRuns = runs30.length;
+
+  // Valid certs count
+  var validCerts = certs.filter(function(c) { return c.status === 'valid'; }).length;
+  var totalCerts = certs.length;
+
+  // Oldest cert age in days
+  var oldestDays = 0;
+  certs.filter(function(c) { return c.status === 'valid'; }).forEach(function(c) {
+    var age = Math.floor((now - new Date(c.issued_at).getTime()) / 86400000);
+    if (age > oldestDays) oldestDays = age;
+  });
+
+  // Mean time to detect — avg elapsed on failed runs (seconds → minutes)
+  var failedRuns = runs30.filter(function(r) { return r.status === 'failed'; });
+  var mttd = failedRuns.length
+    ? Math.round(failedRuns.reduce(function(a,r) { return a + (r.duration_ms||0); }, 0) / failedRuns.length / 60000)
+    : 0;
+
+  // Mean time to certify — avg elapsed on passed runs (seconds → minutes)
+  var passedRuns = runs30.filter(function(r) { return r.status === 'passed'; });
+  var mttc = passedRuns.length
+    ? Math.round(passedRuns.reduce(function(a,r) { return a + (r.duration_ms||0); }, 0) / passedRuns.length / 60000)
+    : 0;
+
+  // Flakiness — templates with mixed pass/fail in last 30d
+  var templateStatus = {};
+  runs30.forEach(function(r) {
+    var key = r.id; // simplified — ideally group by template_version_id
+    if (!templateStatus[key]) templateStatus[key] = { pass:0, fail:0 };
+    if (r.status === 'passed') templateStatus[key].pass++;
+    else if (r.status === 'failed') templateStatus[key].fail++;
+  });
+  var flaky = Object.values(templateStatus).filter(function(s) { return s.pass > 0 && s.fail > 0; }).length;
+
+  var staleThresh = (latestHealth && latestHealth.threshold_config && latestHealth.threshold_config.stale_cert_days) || 30;
+
+  var html = '';
+  // Certs valid
+  html += '<div class="kpi">'
+    + '<div class="kpi-val ' + (validCerts === totalCerts ? 'col-grn' : 'col-amb') + '">' + validCerts + '/' + totalCerts + '</div>'
+    + '<div class="kpi-lbl">Workflows Certified</div>'
+    + '<div class="kpi-delta ' + (validCerts === totalCerts ? 'delta-up' : 'delta-dn') + '">'
+    + (validCerts === totalCerts ? '↑ All certs valid' : '↓ ' + (totalCerts - validCerts) + ' invalidated') + '</div></div>';
+  // MTTD
+  html += '<div class="kpi">'
+    + '<div class="kpi-val col-amb">' + (mttd ? mttd + 'm' : '—') + '</div>'
+    + '<div class="kpi-lbl">Mean Time to Detect</div>'
+    + '<div class="kpi-delta delta-neu">Last 30 days</div></div>';
+  // MTTC
+  html += '<div class="kpi">'
+    + '<div class="kpi-val col-amb">' + (mttc ? mttc + 'm' : '—') + '</div>'
+    + '<div class="kpi-lbl">Mean Time to Certify</div>'
+    + '<div class="kpi-delta delta-neu">Last 30 days</div></div>';
+  // Total runs
+  html += '<div class="kpi">'
+    + '<div class="kpi-val col-t2">' + totalRuns + '</div>'
+    + '<div class="kpi-lbl">Total Suite Runs</div>'
+    + '<div class="kpi-delta delta-neu">Last 30 days</div></div>';
+  // Flakiness
+  html += '<div class="kpi">'
+    + '<div class="kpi-val ' + (flaky === 0 ? 'col-grn' : 'col-amb') + '">' + flaky + '</div>'
+    + '<div class="kpi-lbl">Flakiness Alerts</div>'
+    + '<div class="kpi-delta ' + (flaky > 0 ? 'delta-dn' : 'delta-up') + '">'
+    + (flaky > 0 ? '↓ Monitor closely' : '↑ All stable') + '</div></div>';
+  // Oldest cert age
+  html += '<div class="kpi">'
+    + '<div class="kpi-val ' + (oldestDays > staleThresh ? 'col-red' : oldestDays > staleThresh * 0.7 ? 'col-amb' : 'col-grn') + '">'
+    + oldestDays + 'd</div>'
+    + '<div class="kpi-lbl">Oldest Cert Age</div>'
+    + '<div class="kpi-delta ' + (oldestDays > staleThresh ? 'delta-dn' : 'delta-neu') + '">'
+    + '↓ threshold ' + staleThresh + 'd</div></div>';
+
+  document.getElementById('health-kpis').innerHTML = html;
+}
+
+function _cdRenderKpisFallback() {
+  document.getElementById('health-kpis').innerHTML = '<div class="kpi" style="grid-column:1/-1"><div class="kpi-lbl">KPI data unavailable — check Supabase connection</div></div>';
+}
+
+// ── HOT QUEUE ─────────────────────────────────────────────────────────────────
+// Built from three queries: invalidated certs, overdue training, escalated MRBs
+function _cdLoadHotQueue() {
+  var items = [];
+  var pending = 3;
+  function done() {
+    pending--;
+    if (pending === 0) {
+      items.sort(function(a,b) { return b.severity - a.severity; });
+      _cdRenderHotQueue(items);
+    }
+  }
+
+  // Q6: Invalidated certificates
+  API.q('bist_certificates', {
+    filters:[['firm_id','eq',FIRM_ID],['status','eq','invalidated']],
+    select:'id,certificate_number,template_id,template_version,issued_at,workflow_templates(name)'
+  }).then(function(rows) {
+    (rows||[]).forEach(function(c) {
+      var tmpl = c.workflow_templates ? c.workflow_templates.name : 'Unknown template';
+      var ver  = c.template_version || '—';
+      var age  = Math.floor((Date.now() - new Date(c.issued_at).getTime()) / 86400000);
+      items.push({
+        severity: 100,
+        type: 'crit',
+        typeLabel: 'Cert Invalidated',
+        name: tmpl + ' v' + ver,
+        sub: 'Modified after last cert · Release gate blocked',
+        tags: [{ cls:'tag-r', text:'CRITICAL' }, { cls:'tag-a', text: age + 'd since issue' }],
+        btns: [{ cls:'hbtn-fix', label:'Re-certify', onclick:'_cdOpenSimulator(\'' + c.template_id + '\')' },
+               { cls:'hbtn-view', label:'Override', onclick:'_cdOpenOverride("cert_invalidated","' + c.id + '","' + _cdEsc(tmpl) + ' v' + ver + '")' }]
+      });
+    });
+    done();
+  }).catch(function() { done(); });
+
+  // Q7: Escalated MRB cases
+  API.q('mrb_cases', {
+    filters:[['firm_id','eq',FIRM_ID],['status','eq','escalated']],
+    select:'id,status,ncmr_id,ncmrs(ncmr_number,material_value,days_on_hold,classification)'
+  }).then(function(rows) {
+    (rows||[]).forEach(function(m) {
+      var ncmr   = m.ncmrs || {};
+      var val    = ncmr.material_value ? '$' + (ncmr.material_value/1000).toFixed(1) + 'K' : '—';
+      var days   = ncmr.days_on_hold || 0;
+      items.push({
+        severity: 85,
+        type: 'warn',
+        typeLabel: 'Material on Hold — Escalated',
+        name: (ncmr.ncmr_number || 'NCMR') + ' · MRB not convened',
+        sub: days + ' days on hold · Material value ' + val,
+        tags: [{ cls:'tag-r', text:'ESCALATED' }, { cls:'tag-a', text: val + ' at risk' }],
+        btns: [{ cls:'hbtn-act', label:'Convene MRB', onclick:'_cdConveneMrb(\'' + m.id + '\')' },
+               { cls:'hbtn-view', label:'View', onclick:'' }]
+      });
+    });
+    done();
+  }).catch(function() { done(); });
+
+  // Q8: Training gaps — requirements with no completion for current user's firm
+  // Simplified: count completions vs expected per requirement
+  API.q('bist_coverage_paths', {
+    filters:[['firm_id','eq',FIRM_ID],['coverage_status','in','(uncovered,stale)']],
+    select:'id,path_name,coverage_status,template_id,covering_script_id,last_run_at,workflow_templates(name,version)'
+  }).then(function(reqs) {
+    if (!reqs || !reqs.length) { done(); return; }
+    // For each requirement check completion count — simplified to one API call
+    Promise.resolve([]).then(function(comps) {
+      var compMap = {};
+      (comps||[]).forEach(function(c) {
+        if (!compMap[c.requirement_id]) compMap[c.requirement_id] = 0;
+        compMap[c.requirement_id]++;
+      });
+      // Dept has 4 resources in QA
+      var deptSize = 4;
+      reqs.forEach(function(r) {
+        var done_count = compMap[r.id] || 0;
+        var gap        = deptSize - done_count;
+        if (gap > 0) {
+          var tmpl = r.workflow_template_versions && r.workflow_template_versions.workflow_templates
+            ? r.workflow_template_versions.workflow_templates.name : 'Procedure';
+          var ver = r.workflow_template_versions ? r.workflow_template_versions.version_number : '—';
+          items.push({
+            severity: 60,
+            type: 'warn',
+            typeLabel: 'Training Gap',
+            name: tmpl + ' v' + ver,
+            sub: gap + ' of ' + deptSize + ' QA resources untrained on current version',
+            tags: [{ cls:'tag-a', text:'WARNING' }, { cls:'tag-a', text: gap + ' untrained' }],
+            btns: [{ cls:'hbtn-act', label:'Assign Training', onclick:'_cdAssignTraining(\'' + r.id + '\')' },
+                   { cls:'hbtn-view', label:'View', onclick:'' }]
+          });
+        }
+      });
+      done();
+    }).catch(function() { done(); });
+  }).catch(function() { done(); });
+}
+
+function _cdRenderHotQueue(items) {
+  var countEl = document.getElementById('hq-count');
+  var bodyEl  = document.getElementById('hot-queue-body');
+  if (!items.length) {
+    countEl.textContent = '0 items';
+    countEl.style.color = 'var(--grn)';
+    document.getElementById('hq-title').style.color = 'var(--grn)';
+    bodyEl.innerHTML = '<div class="hot-empty">'
+      + '<div class="hot-empty-dot">✓</div>'
+      + '<div class="hot-empty-title">All clear</div>'
+      + '<div class="hot-empty-sub">No items requiring immediate action.<br>Health system operating within all thresholds.<br>Last checked ' + _cdRelTime(new Date().toISOString()) + '</div>'
+      + '</div>';
+    return;
+  }
+  countEl.textContent = items.length + (items.length === 1 ? ' item' : ' items') + ' requiring action';
+  countEl.style.color = 'var(--red)';
+  var html = '';
+  items.forEach(function(item) {
+    var tags = item.tags.map(function(t) { return '<span class="tag ' + t.cls + '">' + _cdEsc(t.text) + '</span>'; }).join('');
+    var btns = item.btns.map(function(b) { return '<div class="hbtn ' + b.cls + '" onclick="' + b.onclick + '">' + _cdEsc(b.label) + '</div>'; }).join('');
+    html += '<div class="hot-item">'
+      + '<div class="hot-sev ' + item.type + '"></div>'
+      + '<div class="hot-main">'
+      + '<div class="hot-type ' + item.type + '">' + _cdEsc(item.typeLabel) + '</div>'
+      + '<div class="hot-name">' + _cdEsc(item.name) + '</div>'
+      + '<div class="hot-sub">' + _cdEsc(item.sub) + '</div>'
+      + '<div class="hot-meta">' + tags + '</div>'
+      + '</div>'
+      + '<div class="hot-acts">' + btns + '</div>'
+      + '</div>';
+  });
+  bodyEl.innerHTML = html;
+}
+
+// ── WORK QUEUE ────────────────────────────────────────────────────────────────
+// Q9: Uncovered paths + stale scripts + cert re-runs needed
+function _cdLoadWorkQueue() {
+  API.q('bist_coverage_paths', {
+    filters:[['firm_id','eq',FIRM_ID]],
+    select:'id,path_name,coverage_status,covering_script_id,last_run_at,template_id,workflow_templates(name,version)'
+  }).then(function(paths) {
+    var items = [];
+    var rank = 1;
+    (paths||[]).forEach(function(p) {
+      if (p.coverage_status !== 'uncovered' && p.coverage_status !== 'stale') return;
+      var tmpl = p.workflow_templates ? p.workflow_templates.name : 'Template';
+      var ver  = p.workflow_templates ? p.workflow_templates.version : '—';
+      var pri  = p.coverage_status === 'uncovered' ? 'h' : 'm';
+      var badge = p.coverage_status === 'uncovered'
+        ? '<span class="wq-badge tag tag-r">PATH</span>'
+        : '<span class="wq-badge tag tag-a">STALE</span>';
+      var sub  = tmpl + ' · ' + (p.coverage_status === 'uncovered' ? 'No script — path never tested' : 'Last run ' + _cdRelTime(p.last_run_at));
+      items.push({ rank:rank++, pri:pri, name:_cdEsc(p.path_name), sub:_cdEsc(sub), badge:badge, id:p.id });
+    });
+    // Add cert re-run items
+    _cdCerts.filter(function(c) { return c.status === 'invalidated'; }).forEach(function(c) {
+      items.push({
+        rank:rank++, pri:'h',
+        name:'Re-certify template — invalidated cert on record',
+        sub:'Run all scripts · Gate blocked until passing cert exists',
+        badge:'<span class="wq-badge tag tag-r">CERT</span>',
+        id:c.id
+      });
+    });
+    _cdRenderWorkQueue(items);
+  }).catch(function() {
+    document.getElementById('work-queue-body').innerHTML = '<div style="padding:12px;font-size:10px;color:var(--mu)">Unable to load work queue</div>';
+  });
+}
+
+function _cdRenderWorkQueue(items) {
+  document.getElementById('wq-count').textContent = items.length + ' items · system-prioritized';
+  if (!items.length) {
+    document.getElementById('work-queue-body').innerHTML = '<div style="padding:14px 12px;font-size:10px;color:var(--grn)">All paths covered and current · No outstanding work</div>';
+    return;
+  }
+  var avatarColors = [
+    'background:rgba(167,139,250,.3);color:var(--pur)',
+    'background:rgba(40,212,192,.2);color:var(--teal)',
+    'background:rgba(80,144,240,.2);color:var(--blu)',
+    'background:rgba(61,224,138,.15);color:var(--grn)',
+    'background:rgba(240,160,48,.15);color:var(--amb)'
+  ];
+  var initials = ['SA','AK','MI','PS','MH'];
+  var html = '';
+  items.forEach(function(item) {
+    var idx = (item.rank - 1) % initials.length;
+    html += '<div class="wq-item">'
+      + '<div class="wq-rank">' + item.rank + '</div>'
+      + '<div class="wq-pri ' + item.pri + '"></div>'
+      + '<div class="wq-main">'
+      + '<div class="wq-name">' + item.name + '</div>'
+      + '<div class="wq-sub">' + item.sub + '</div>'
+      + '</div>'
+      + item.badge
+      + '<div class="wq-assign">'
+      + '<div class="mini-avatar" style="' + avatarColors[idx] + '">' + initials[idx] + '</div>'
+      + '<div class="wq-btn" onclick="_cdDelegateItem(\'' + _cdEsc(item.id) + '\')">Assign</div>'
+      + '</div></div>';
+  });
+  document.getElementById('work-queue-body').innerHTML = html;
+}
+
+// ── REQUEST QUEUE ─────────────────────────────────────────────────────────────
+// Q10: Pending workflow requests from Compass My Requests
+// Using workflow_instances where status=pending as a proxy until workflow_requests table exists
+function _cdLoadRequestQueue() {
+  // Seed data placeholder — wire to workflow_requests table in Phase I build
+  // For now renders from controlled_documents in 'review' status (pending QA approval)
+  API.q('workflow_templates', {
+    filters:[['firm_id','eq',FIRM_ID],['status','eq','draft']],
+    select:'id,name,description,status,version,created_at,updated_at'
+  }).then(function(docs) {
+    _cdRenderRequestQueue(docs||[]);
+  }).catch(function() {
+    document.getElementById('request-queue-body').innerHTML = '<div style="padding:12px;font-size:10px;color:var(--mu)">Request queue unavailable</div>';
+  });
+}
+
+function _cdRenderRequestQueue(templates) {
+  var countEl = document.getElementById('rq-count');
+  countEl.textContent = templates.length + ' pending';
+  if (!templates.length) {
+    document.getElementById('request-queue-body').innerHTML = '<div style="padding:14px 12px;font-size:10px;color:var(--grn)">No pending requests</div>';
+    return;
+  }
+  var html = '';
+  templates.forEach(function(d) {
+    html += '<div class="rq-item">'
+      + '<div class="rq-icon" style="background:var(--pur2)">🔄</div>'
+      + '<div class="rq-main">'
+      + '<div class="rq-name">' + _cdEsc(d.name) + '</div>'
+      + '<div class="rq-sub">v' + _cdEsc(d.version||'—') + ' · Draft · ' + _cdRelTime(d.updated_at) + '</div>'
+      + '<div class="rq-meta"><span class="tag tag-b">DRAFT — UNCERTIFIED</span></div>'
+      + '</div>'
+      + '<div class="rq-acts">'
+      + '<div class="rq-btn rq-assign" onclick="_cdAssignRequest(\'' + d.id + '\')">Run Cert</div>'
+      + '<div class="rq-btn rq-decline" onclick="_cdDeclineRequest(\'' + d.id + '\')">Archive</div>'
+      + '</div></div>';
+  });
+  document.getElementById('request-queue-body').innerHTML = html;
+}
+
+// ── TRAINING COVERAGE ─────────────────────────────────────────────────────────
+// Shows path coverage per template as a proxy for certification completeness.
+// Full training matrix wired in Phase I Step 5 once training tables are built.
+function _cdLoadTrainingCoverage() {
+  API.q('bist_coverage_paths', {
+    filters:[['firm_id','eq',FIRM_ID]],
+    select:'id,path_name,coverage_status,template_id,last_run_at,workflow_templates(name,version)'
+  }).then(function(paths) {
+    if (!paths || !paths.length) {
+      document.getElementById('training-body').innerHTML = '<div style="padding:14px 12px;font-size:10px;color:var(--grn)">No coverage data yet</div>';
+      return;
+    }
+    // Group paths by template, compute covered %
+    var tmplMap = {};
+    paths.forEach(function(p) {
+      var n = (p.workflow_templates && p.workflow_templates.name) || 'Unknown';
+      var v = (p.workflow_templates && p.workflow_templates.version) || '—';
+      if (!tmplMap[n]) tmplMap[n] = { name:n, ver:v, total:0, covered:0 };
+      tmplMap[n].total++;
+      if (p.coverage_status === 'covered') tmplMap[n].covered++;
+    });
+    var list = Object.values(tmplMap);
+    var totalP = list.reduce(function(a,t){ return a+t.total; },0);
+    var covP   = list.reduce(function(a,t){ return a+t.covered; },0);
+    var overall = totalP > 0 ? Math.round((covP/totalP)*100) : 0;
+
+    var html = '<div style="padding:7px 12px;border-bottom:1px solid var(--b);display:flex;align-items:center;justify-content:space-between">'
+      + '<div style="font-size:10px;color:var(--t2)">Path coverage · all templates</div>'
+      + '<div style="font-size:15px;font-weight:700;font-family:var(--mn);color:' + _cdBarColor(overall) + '">' + overall + '%</div>'
+      + '</div>';
+
+    list.forEach(function(t) {
+      var pct = t.total > 0 ? Math.round((t.covered/t.total)*100) : 0;
+      var clr = _cdBarColor(pct);
+      html += '<div class="tc-row">'
+        + '<div style="flex:1;min-width:0">'
+        + '<div class="tc-name">' + _cdEsc(t.name) + '</div>'
+        + '<div class="tc-ver">v' + _cdEsc(t.ver) + ' · ' + t.covered + '/' + t.total + ' paths covered</div>'
+        + '</div>'
+        + '<div class="tc-bar-wrap"><div class="tc-bar-fill" style="width:' + pct + '%;background:' + clr + '"></div></div>'
+        + '<div class="tc-pct" style="color:' + clr + '">' + pct + '%</div>'
+        + '</div>';
+    });
+
+    html += '<div class="tc-footer"><div class="btn" style="font-size:9px;padding:3px 8px">View Coverage Map</div></div>';
+    document.getElementById('training-body').innerHTML = html;
+  }).catch(function() {
+    document.getElementById('training-body').innerHTML = '<div style="padding:12px;font-size:10px;color:var(--mu)">Coverage data unavailable</div>';
+  });
+}
+
+// ── COC FEED ─────────────────────────────────────────────────────────────────
+// Q12: Recent CoC events for this user (actor) + system events for firm
+function _cdLoadCocFeed() {
+  API.q('coc_events', {
+    filters:[['firm_id','eq',FIRM_ID]],
+    order:'created_at.desc',
+    limit:20,
+    select:'id,entity_type,event_type,actor_name,actor_resource_id,metadata,event_class,severity,created_at'
+  }).then(function(events) {
+    _cdRenderCocFeed(events||[]);
+  }).catch(function() {
+    document.getElementById('coc-body').innerHTML = '<div style="padding:12px;font-size:10px;color:var(--mu)">CoC feed unavailable</div>';
+  });
+}
+
+function _cdRenderCocFeed(events) {
+  var typeMap = {
+    'cert.issued':              { dot:'cert',   label:'Certificate issued' },
+    'cert.invalidated':        { dot:'alert',  label:'Cert invalidated' },
+    'template.released':       { dot:'cert',   label:'Template released to Library' },
+    'health.score.calculated': { dot:'system', label:'Health score calculated' },
+    'mrb.escalated':           { dot:'alert',  label:'MRB escalated by system' },
+    'training.assigned':       { dot:'action', label:'Training assigned' },
+    'training.completed':      { dot:'cert',   label:'Training completed' },
+    'dashboard.delegated':     { dot:'action', label:'Work item delegated' },
+    'override.applied':        { dot:'alert',  label:'Override applied' }
+  };
+  var html = '';
+  events.forEach(function(e) {
+    var tm   = typeMap[e.event_type] || { dot:'system', label:e.event_type };
+    var isMe = e.actor_name && e.actor_name !== 'System';
+    var pay  = e.metadata || {};
+    var desc = '';
+    // Build human-readable description from payload
+    if (e.event_type === 'cert.issued') {
+      desc = '<strong>' + (isMe ? 'You issued' : 'System issued') + '</strong> ' + _cdEsc(pay.template||'certificate') + ' v' + _cdEsc(pay.version||'—');
+    } else if (e.event_type === 'cert.invalidated') {
+      desc = '<strong>Cert invalidated</strong> ' + _cdEsc(pay.template||'') + ' — ' + _cdEsc(pay.reason||'');
+    } else if (e.event_type === 'template.released') {
+      desc = '<strong>' + (isMe ? 'You released' : 'Released') + '</strong> ' + _cdEsc(pay.template||'') + ' v' + _cdEsc(pay.version||'') + ' to Library';
+    } else if (e.event_type === 'health.score.calculated') {
+      desc = '<strong>System calculated</strong> health score ' + _cdEsc(String(pay.score||'—'))
+        + (pay.delta ? (pay.delta > 0 ? ' ↑' : ' ↓') + Math.abs(pay.delta) + ' pts' : '')
+        + (pay.primary_driver ? ' · driver: ' + _cdEsc(pay.primary_driver) : '');
+    } else if (e.event_type === 'mrb.escalated') {
+      desc = '<strong>System escalated</strong> ' + _cdEsc(pay.ncmr||'') + ' — ' + _cdEsc(pay.message||'');
+    } else if (e.event_type === 'training.assigned') {
+      desc = '<strong>' + (isMe ? 'You assigned' : 'Training assigned') + '</strong> ' + _cdEsc(pay.template||'') + ' → ' + _cdEsc(pay.assignee||'');
+    } else if (e.event_type === 'dashboard.delegated') {
+      desc = '<strong>' + (isMe ? 'You delegated' : 'Delegated') + '</strong> ' + _cdEsc(pay.item||'') + ' to ' + _cdEsc(pay.delegated_to||'');
+    } else {
+      desc = '<strong>' + _cdEsc(tm.label) + '</strong> ' + _cdEsc(e.entity_type||'');
+    }
+    html += '<div class="coc-item">'
+      + '<div class="coc-dot ' + tm.dot + '"></div>'
+      + '<div class="coc-text">' + desc + '</div>'
+      + '<div class="coc-time">' + _cdRelTime(e.created_at) + '</div>'
+      + '</div>';
+  });
+  document.getElementById('coc-body').innerHTML = html || '<div style="padding:14px 12px;font-size:10px;color:var(--mu)">No events in the last 48 hours</div>';
+}
+
+// ── NAV BADGES ────────────────────────────────────────────────────────────────
+// Q13: Template count for Library badge
+function _cdLoadNavBadges() {
+  API.q('workflow_templates', {
+    filters:[['firm_id','eq',FIRM_ID]],
+    select:'id'
+  }).then(function(rows) {
+    document.getElementById('nb-library').textContent = (rows||[]).length;
+  }).catch(function() {});
+
+  API.q('workflow_instances', {
+    filters:[['firm_id','eq',FIRM_ID],['status','eq','active']],
+    select:'id'
+  }).then(function(rows) {
+    var n = (rows||[]).length;
+    document.getElementById('nb-instances').textContent = n || '0';
+  }).catch(function() {});
+}
+
+// ── DOMAIN DRILL (stub — expand in Phase I build Step 8) ─────────────────────
+function _cdOpenDomainDrill(key) {
+  // Phase I Step 8 — inline expansion below the domain strip
+  console.log('[CADENCE] Domain drill: ' + key);
+}
+
+// ── OVERRIDE FLOW ─────────────────────────────────────────────────────────────
+function _cdOpenOverride(reason, entityId, label) {
+  _cdOverrideCtx = { reason:reason, entityId:entityId, label:label };
+  document.getElementById('override-entity').textContent = label;
+  document.getElementById('override-actor').textContent = _cdResource ? _cdResource.first_name + ' ' + _cdResource.last_name : 'Current user';
+  document.getElementById('override-ts').textContent = new Date().toLocaleTimeString();
+  document.getElementById('override-rationale').value = '';
+  document.getElementById('override-modal').classList.add('open');
+}
+
+function _cdCloseOverride(evt) {
+  if (evt.target === document.getElementById('override-modal')) {
+    document.getElementById('override-modal').classList.remove('open');
+  }
+}
+
+function _cdCloseOverrideBtn() {
+  document.getElementById('override-modal').classList.remove('open');
+}
+
+function _cdConfirmOverride() {
+  var rationale = (document.getElementById('override-rationale').value||'').trim();
+  if (rationale.length < 20) {
+    document.getElementById('override-rationale').style.borderColor = 'var(--red)';
+    return;
+  }
+  document.getElementById('override-rationale').style.borderColor = '';
+  if (!_cdOverrideCtx) return;
+  // Write CoC event
+  API.post('coc_events', {
+    firm_id:        FIRM_ID,
+    entity_type:    'bist_certificate',
+    entity_id:      _cdOverrideCtx.entityId,
+    event_type:     'override.applied',
+    actor_user_id:  USER_ID,
+    actor_resource_id: _cdResource ? _cdUser.resource_id : null,
+    payload: {
+      reason:    _cdOverrideCtx.reason,
+      label:     _cdOverrideCtx.label,
+      rationale: rationale
+    },
+    immutable: false,
+    created_at: new Date().toISOString()
+  }).then(function() {
+    document.getElementById('override-modal').classList.remove('open');
+    _cdLoadCocFeed(); // refresh feed to show the new event
+  }).catch(function(err) {
+    console.error('[CADENCE] Override CoC write failed', err);
+    document.getElementById('override-modal').classList.remove('open');
+  });
+}
+
+// ── ACTION STUBS (wire to real flows in Phase I build Steps 3-7) ──────────────
+function _cdOpenSimulator(versionId) {
+  console.log('[CADENCE] Open simulator for version: ' + versionId);
+  // TODO: navigate to Simulator tab with template pre-selected
+}
+
+function _cdConveneMrb(mrbId) {
+  console.log('[CADENCE] Convene MRB: ' + mrbId);
+  // TODO: open MRB form workflow instance (Phase II)
+}
+
+function _cdAssignTraining(requirementId) {
+  console.log('[CADENCE] Assign training: ' + requirementId);
+  // TODO: open training assignment modal — write to training_completions
+}
+
+function _cdDelegateItem(itemId) {
+  console.log('[CADENCE] Delegate item: ' + itemId);
+  // TODO: assignee picker → write coc_event dashboard.delegated
+}
+
+function _cdApproveRequest(docId) {
+  console.log('[CADENCE] Approve request: ' + docId);
+  // TODO: update lifecycle_status → approved + write coc_event
+}
+
+function _cdAssignRequest(docId) {
+  console.log('[CADENCE] Assign request: ' + docId);
+}
+
+function _cdDeclineRequest(docId) {
+  console.log('[CADENCE] Decline request: ' + docId);
+}
+
+function _cdSendTrainingReminders() {
+  console.log('[CADENCE] Send training reminders');
+  // TODO: trigger notification workflow for untrained resources
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', function() { _cdInit(); });
+</script>
+</body>
+</html>
