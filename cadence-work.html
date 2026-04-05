@@ -2936,6 +2936,691 @@ async function _s9LoadSimScripts(templateId, version) {
 }
 
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// S9.55 — Coverage Tab
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Sub-tab switcher ───────────────────────────────────────────────────────────
+function _s9SwitchSimSubTab(tab) {
+  _s9SimSubTab = tab;
+
+  // Update tab strip styles
+  ['scripts','coverage','history'].forEach(function(t) {
+    var el = document.getElementById('s9-simsubtab-' + t);
+    if (!el) return;
+    var isAct = (t === tab);
+    el.style.borderBottom = '2px solid ' + (isAct ? '#5fd4c8' : 'transparent');
+    el.style.color = isAct ? '#5fd4c8' : 'rgba(255,255,255,.3)';
+  });
+
+  // Show/hide panels
+  var panels = ['scripts','coverage','history'];
+  panels.forEach(function(t) {
+    var el = document.getElementById('s9-subtab-' + t);
+    if (el) el.style.display = (t === tab) ? 'flex' : 'none';
+  });
+
+  // Render content on first switch
+  if (tab === 'coverage') {
+    var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+    if (tmpl && tmpl.id) {
+      _s9LoadCoverageData(tmpl.id, tmpl.version || '0.0.0');
+    } else {
+      var body = document.getElementById('s9-coverage-body');
+      if (body) body.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;' +
+        'color:rgba(255,255,255,.3);padding:40px;text-align:center;width:100%">' +
+        'Select a workflow to view coverage.</div>';
+    }
+  }
+  if (tab === 'history') {
+    _s9RenderHistoryStub();
+  }
+}
+
+// ── Coverage data loader ───────────────────────────────────────────────────────
+async function _s9LoadCoverageData(templateId, version) {
+  var body = document.getElementById('s9-coverage-body');
+  if (!body) return;
+  body.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;' +
+    'color:rgba(255,255,255,.3);padding:40px;text-align:center;width:100%">Loading coverage data…</div>';
+
+  try {
+    var firmId = await _s9WaitForFirmId();
+
+    // Fetch scripts for this template
+    var scripts = await API.get(
+      'bist_test_scripts?firm_id=eq.' + firmId +
+      '&template_id=eq.' + templateId +
+      '&order=created_at.asc'
+    ).catch(function() { return []; });
+
+    // Fetch recent runs for these scripts
+    var runs = [];
+    if (scripts && scripts.length) {
+      var ids = scripts.map(function(s) { return s.id; }).join(',');
+      runs = await API.get(
+        'bist_runs?firm_id=eq.' + firmId +
+        '&script_id=in.(' + ids + ')&order=run_at.desc&limit=200'
+      ).catch(function() { return []; });
+    }
+
+    // Fetch template steps
+    var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+    var steps = (tmpl && Array.isArray(tmpl.steps)) ? tmpl.steps : [];
+    if (!steps.length && templateId) {
+      var stepRows = await API.get(
+        'workflow_steps?template_id=eq.' + templateId + '&order=seq.asc'
+      ).catch(function() { return []; });
+      steps = stepRows || [];
+    }
+
+    _s9RenderCoverageTab(body, scripts || [], runs || [], steps, version);
+
+  } catch(e) {
+    if (body) body.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;' +
+      'color:#f06060;padding:40px;text-align:center;width:100%">Error loading coverage data.</div>';
+  }
+}
+
+// ── Coverage tab renderer ──────────────────────────────────────────────────────
+function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
+  var FA  = 'font-family:Arial,sans-serif;';
+  var F10 = FA + 'font-size:10px;';
+  var F11 = FA + 'font-size:11px;';
+  var F12 = FA + 'font-size:12px;';
+
+  // ── Stale threshold (default 7d — configurable in future) ──
+  var STALE_DAYS = 7;
+  var NOW = Date.now();
+
+  // ── Per-script: last run + status ──
+  var lastRunMap = {};  // scriptId -> run
+  (runs || []).forEach(function(r) {
+    if (!lastRunMap[r.script_id]) lastRunMap[r.script_id] = r;
+  });
+
+  // ── Compute path status per script ──
+  // Status: 'covered' | 'stale' | 'uncovered'
+  function scriptStatus(sc) {
+    var r = lastRunMap[sc.id];
+    if (!r) return 'uncovered';
+    var daysSince = (NOW - new Date(r.run_at).getTime()) / 86400000;
+    if (daysSince > STALE_DAYS) return 'stale';
+    var passing = (r.result === 'pass' || r.passing_count > 0);
+    return passing ? 'covered' : 'stale';
+  }
+
+  // ── Composite score calculation ──
+  var total   = scripts.length;
+  var covered = 0, stale = 0, uncovered = 0;
+  scripts.forEach(function(sc) {
+    var s = scriptStatus(sc);
+    if (s === 'covered')   covered++;
+    else if (s === 'stale') stale++;
+    else uncovered++;
+  });
+
+  // Path coverage: covered=1pt, stale=0.5pt
+  var pathScore = total > 0 ? Math.round((covered + stale * 0.5) / total * 100) : 0;
+  // Step coverage: all steps touched by at least 1 script
+  var stepScore = steps.length > 0 ? (scripts.length > 0 ? 100 : 0) : 0;
+  // Assertion density: avg assertions per script step (estimated)
+  var totalAsserts = scripts.reduce(function(acc, sc) {
+    var spec = (typeof sc.script === 'string') ? JSON.parse(sc.script || '{}') : (sc.script || {});
+    var stps = Array.isArray(spec.steps) ? spec.steps : [];
+    return acc + stps.reduce(function(a2, stp) {
+      return a2 + (Array.isArray(stp.asserts) ? stp.asserts.length : 0);
+    }, 0);
+  }, 0);
+  var totalStepSlots = scripts.reduce(function(acc, sc) {
+    var spec = (typeof sc.script === 'string') ? JSON.parse(sc.script || '{}') : (sc.script || {});
+    return acc + (Array.isArray(spec.steps) ? spec.steps.length : 0);
+  }, 0);
+  var assertScore = totalStepSlots > 0 ? Math.min(100, Math.round(totalAsserts / totalStepSlots * 50)) : 0;
+  // Freshness: scripts run since last version commit
+  var freshScore = total > 0 ? Math.round((covered + stale * 0.5) / total * 100) : 0;
+  // Composite
+  var composite = total > 0
+    ? Math.round((pathScore * 0.4) + (stepScore * 0.3) + (assertScore * 0.15) + (freshScore * 0.15))
+    : 0;
+
+  // ── Color helpers ──
+  function scoreColor(v) {
+    if (v >= 80) return '#3de08a';
+    if (v >= 50) return '#f0a030';
+    return '#f06060';
+  }
+  var compositeColor = scoreColor(composite);
+
+  // ── Status pill HTML ──
+  function statusPill(s) {
+    var cfg = {
+      covered:   { bg:'rgba(61,224,138,.12)',  border:'rgba(61,224,138,.35)',  color:'#3de08a', label:'Covered' },
+      stale:     { bg:'rgba(240,160,48,.12)',  border:'rgba(240,160,48,.35)',  color:'#f0a030', label:'Stale'   },
+      uncovered: { bg:'rgba(240,96,96,.12)',   border:'rgba(240,96,96,.35)',   color:'#f06060', label:'Uncovered'},
+    }[s] || { bg:'rgba(255,255,255,.06)', border:'rgba(255,255,255,.15)', color:'rgba(255,255,255,.4)', label:'Unknown' };
+    return '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:3px;' +
+      'background:' + cfg.bg + ';border:1px solid ' + cfg.border + ';' +
+      F10 + 'font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:' + cfg.color + '">' +
+      '<span style="width:5px;height:5px;border-radius:50%;background:' + cfg.color + ';display:inline-block"></span>' +
+      cfg.label + '</span>';
+  }
+
+  // ── Score bar row with tooltip ──
+  function scoreBar(label, val, color, tipHtml) {
+    return '<div style="position:relative;cursor:help;margin-bottom:8px" ' +
+      'onmouseenter="_s9CovTipShow(this)" onmouseleave="_s9CovTipHide()"' +
+      ' data-tip="' + _s9EscHtml(tipHtml) + '">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:3px">' +
+        '<span style="' + F11 + 'color:rgba(255,255,255,.55)">' + label + '</span>' +
+        '<span style="' + F11 + 'font-weight:700;font-family:monospace;color:' + color + '">' + val + '%</span>' +
+      '</div>' +
+      '<div style="height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden">' +
+        '<div style="height:100%;width:' + val + '%;background:' + color + ';border-radius:2px;transition:width .5s ease"></div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // ── Uncovered count ──
+  var uncoveredCount = uncovered;
+
+  // ── Script rows for sidebar ──
+  var scriptSidebarRows = scripts.map(function(sc) {
+    var s = scriptStatus(sc);
+    var r = lastRunMap[sc.id];
+    var dotColor = s === 'covered' ? '#3de08a' : s === 'stale' ? '#f0a030' : '#f06060';
+    var lastRunStr = r ? _s9FmtCovDate(r.run_at) : 'Never';
+    var spec = {};
+    try { spec = typeof sc.script === 'string' ? JSON.parse(sc.script || '{}') : (sc.script || {}); } catch(e) {}
+    var stepCount = Array.isArray(spec.steps) ? spec.steps.length : 0;
+    var barW = s === 'covered' ? 100 : s === 'stale' ? 75 : 0;
+    var barColor = dotColor;
+    return '<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer" ' +
+      'onclick="_s9OpenScriptEditor(\'' + sc.id + '\')">' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">' +
+        '<span style="width:7px;height:7px;border-radius:50%;background:' + dotColor + ';flex-shrink:0;display:inline-block"></span>' +
+        '<span style="' + F11 + 'color:rgba(255,255,255,.85);flex:1;line-height:1.3">' + _s9EscHtml(sc.name || 'Unnamed') + '</span>' +
+      '</div>' +
+      '<div style="' + F10 + 'color:rgba(255,255,255,.3);margin-left:13px;margin-bottom:3px">' +
+        stepCount + ' steps · ' + lastRunStr +
+      '</div>' +
+      '<div style="margin-left:13px;height:2px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden">' +
+        '<div style="height:100%;width:' + barW + '%;background:' + barColor + ';border-radius:1px"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  // ── Path list rows ──
+  function pathRows() {
+    if (!scripts.length) return '<tr><td colspan="6" style="' + F11 +
+      'color:rgba(255,255,255,.25);padding:12px 16px;text-align:center">No test scripts yet</td></tr>';
+    return scripts.map(function(sc, i) {
+      var s = scriptStatus(sc);
+      var r = lastRunMap[sc.id];
+      var spec = {};
+      try { spec = typeof sc.script === 'string' ? JSON.parse(sc.script || '{}') : (sc.script || {}); } catch(e) {}
+      var stps = Array.isArray(spec.steps) ? spec.steps : [];
+      var assertCount = stps.reduce(function(a, stp) {
+        return a + (Array.isArray(stp.asserts) ? stp.asserts.length : 0);
+      }, 0);
+      var lastRunStr = r ? _s9FmtCovDate(r.run_at) : 'Never';
+      var dotColor = s === 'covered' ? '#3de08a' : s === 'stale' ? '#f0a030' : '#f06060';
+      return '<tr style="border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer" ' +
+        'onclick="_s9OpenScriptEditor(\'' + sc.id + '\')" ' +
+        'onmouseenter="this.style.background=\'rgba(255,255,255,.03)\'" ' +
+        'onmouseleave="this.style.background=\'\'">' +
+        '<td style="padding:7px 16px;' + F11 + '">' +
+          '<span style="width:6px;height:6px;border-radius:50%;background:' + dotColor +
+            ';display:inline-block;margin-right:6px;vertical-align:middle"></span>' +
+          _s9EscHtml(sc.name || 'Unnamed') +
+        '</td>' +
+        '<td style="padding:7px 16px;' + F11 + 'color:rgba(255,255,255,.5);font-family:monospace">' + stps.length + '</td>' +
+        '<td style="padding:7px 16px;' + F11 + 'color:rgba(255,255,255,.5);font-family:monospace">' + assertCount + '</td>' +
+        '<td style="padding:7px 16px;' + F11 + 'color:rgba(255,255,255,.5);font-family:monospace">' + lastRunStr + '</td>' +
+        '<td style="padding:7px 16px">' +
+          '<span style="' + F10 + 'color:#28d4c0;cursor:pointer;text-decoration:underline" ' +
+            'onclick="event.stopPropagation();_s9OpenScriptEditor(\'' + sc.id + '\')">' +
+            _s9EscHtml(sc.name || 'Script') +
+          '</span>' +
+        '</td>' +
+        '<td style="padding:7px 16px">' + statusPill(s) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  // ── DAG paths ──
+  function dagPaths() {
+    if (!scripts.length) {
+      return '<div style="' + F12 + 'color:rgba(255,255,255,.25);padding:20px;text-align:center">' +
+        'No test scripts yet — create scripts to see path coverage.' +
+      '</div>';
+    }
+    return scripts.map(function(sc) {
+      var s = scriptStatus(sc);
+      var spec = {};
+      try { spec = typeof sc.script === 'string' ? JSON.parse(sc.script || '{}') : (sc.script || {}); } catch(e) {}
+      var stps = Array.isArray(spec.steps) ? spec.steps : [];
+      var borderColor = s === 'covered' ? '#3de08a' : s === 'stale' ? '#f0a030' : '#f06060';
+      var bgColor     = s === 'covered' ? 'rgba(61,224,138,.06)' : s === 'stale' ? 'rgba(240,160,48,.06)' : 'rgba(240,96,96,.06)';
+      var labelColor  = s === 'covered' ? '#3de08a' : s === 'stale' ? '#f0a030' : '#f06060';
+
+      // Path section label
+      var sectionLabel = s === 'uncovered'
+        ? '<span style="color:#f06060">⚠ Uncovered — ' + _s9EscHtml(sc.name) + '</span>'
+        : _s9EscHtml(sc.name);
+
+      // Build node chain
+      var nodes = stps.map(function(stp, idx) {
+        var nodeType  = stp.action || 'step';
+        var nodeName  = stp.params && stp.params.title
+          ? stp.params.title.replace(/\s*—\s*\{timestamp\}/, '').trim()
+          : ('Step ' + (idx + 1));
+        var assertCnt = Array.isArray(stp.asserts) ? stp.asserts.length : 0;
+        var typeColor = nodeType === 'launch'   ? '#f0a030'
+                      : nodeType === 'complete_step' ? '#5fd4c8'
+                      : nodeType === 'assert_only'   ? '#a78bfa'
+                      : '#28d4c0';
+        var nodeHtml =
+          '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">' +
+            '<div style="width:110px;border:1px solid ' + borderColor + ';border-radius:4px;' +
+              'padding:7px 8px;background:' + bgColor + ';cursor:pointer" ' +
+              'onclick="_s9OpenScriptEditor(\'' + sc.id + '\')">' +
+              '<div style="' + F10 + 'font-weight:700;text-transform:uppercase;letter-spacing:.06em;' +
+                'color:' + typeColor + ';opacity:.8;margin-bottom:2px">' + _s9EscHtml(nodeType.replace('_',' ')) + '</div>' +
+              '<div style="' + F11 + 'font-weight:700;color:rgba(255,255,255,.9);line-height:1.3;' +
+                'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:94px" title="' + _s9EscHtml(nodeName) + '">' +
+                _s9EscHtml(nodeName) + '</div>' +
+              (assertCnt > 0
+                ? '<div style="' + F10 + 'color:rgba(255,255,255,.3);margin-top:3px">' + assertCnt + ' assert' + (assertCnt !== 1 ? 's' : '') + '</div>'
+                : '') +
+              '<div style="' + F10 + 'color:' + labelColor + ';margin-top:3px;font-weight:700">' +
+                (s === 'covered' ? '✓' : s === 'stale' ? '~ stale' : '✗ untested') + '</div>' +
+            '</div>' +
+          '</div>';
+        var arrow = idx < stps.length - 1
+          ? '<div style="display:flex;align-items:center;width:36px;flex-shrink:0">' +
+              '<div style="flex:1;height:1px;background:' + borderColor + '"></div>' +
+              '<span style="color:' + borderColor + ';font-size:10px">▶</span>' +
+            '</div>'
+          : '';
+        return nodeHtml + arrow;
+      }).join('');
+
+      // Uncovered CTA
+      var cta = s === 'uncovered'
+        ? '<div style="margin-left:16px;display:flex;align-items:center">' +
+            '<span style="' + F10 + 'color:#5fd4c8;cursor:pointer;text-decoration:underline" ' +
+              'onclick="_s9CovCreateScript(\'' + _s9EscHtml(sc.name) + '\')">' +
+              '+ Create covering script →' +
+            '</span>' +
+          '</div>'
+        : '';
+
+      return '<div style="margin-bottom:20px">' +
+        // Section label
+        '<div style="' + F10 + 'font-weight:700;letter-spacing:.08em;text-transform:uppercase;' +
+          'color:rgba(255,255,255,.3);margin-bottom:8px;display:flex;align-items:center;gap:8px">' +
+          sectionLabel +
+          '<div style="flex:1;height:1px;background:rgba(255,255,255,.06)"></div>' +
+        '</div>' +
+        // Node row
+        '<div style="display:flex;align-items:center;gap:0;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px">' +
+          nodes + cta +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // ── Matrix ──
+  function matrixView() {
+    if (!scripts.length || !steps.length) {
+      return '<div style="' + F12 + 'color:rgba(255,255,255,.25);padding:20px;text-align:center">' +
+        'Matrix requires both workflow steps and test scripts.' +
+      '</div>';
+    }
+
+    var thStyle = 'padding:6px 10px;' + F10 + 'font-weight:700;letter-spacing:.07em;text-transform:uppercase;' +
+      'color:#5fd4c8;background:#111520;border:1px solid rgba(255,255,255,.06);white-space:nowrap;';
+    var tdLabel = 'padding:5px 10px;' + F10 + 'color:rgba(255,255,255,.55);background:#0d1017;' +
+      'border:1px solid rgba(255,255,255,.06);white-space:nowrap;position:sticky;left:0;z-index:1;';
+
+    var headers = '<th style="' + thStyle + 'position:sticky;top:0;left:0;z-index:3;min-width:160px;text-align:left">Step / Outcome</th>' +
+      scripts.map(function(sc) {
+        var words = (sc.name || '').split(' ');
+        var short = words.slice(0, 3).join(' ') + (words.length > 3 ? '…' : '');
+        var s = scriptStatus(sc);
+        var c = s === 'covered' ? '#3de08a' : s === 'stale' ? '#f0a030' : '#f06060';
+        return '<th style="' + thStyle + 'position:sticky;top:0;z-index:2;min-width:90px">' +
+          '<span style="color:' + c + '">' + _s9EscHtml(short) + '</span></th>';
+      }).join('');
+
+    var rows = steps.map(function(stp) {
+      var cells = scripts.map(function(sc) {
+        var s = scriptStatus(sc);
+        var spec = {};
+        try { spec = typeof sc.script === 'string' ? JSON.parse(sc.script || '{}') : (sc.script || {}); } catch(e) {}
+        var stps = Array.isArray(spec.steps) ? spec.steps : [];
+        // Check if this script touches this step (by seq or name match)
+        var touches = stps.some(function(st) {
+          return st.tmpl_seq === stp.seq ||
+            (st.params && st.params.title &&
+              st.params.title.toLowerCase().indexOf((stp.name || '').toLowerCase().slice(0,8)) !== -1);
+        });
+        if (!touches) {
+          return '<td style="padding:0;border:1px solid rgba(255,255,255,.04)">' +
+            '<div style="width:90px;height:34px;background:#0d0f16"></div></td>';
+        }
+        var bg = s === 'covered'   ? 'rgba(61,224,138,.10)'
+               : s === 'stale'    ? 'rgba(240,160,48,.10)'
+               : 'rgba(240,96,96,.10)';
+        var color = s === 'covered' ? '#3de08a' : s === 'stale' ? '#f0a030' : '#f06060';
+        var label = s === 'covered' ? '✓' : s === 'stale' ? '~' : '✗';
+        return '<td style="padding:0;border:1px solid rgba(255,255,255,.06)">' +
+          '<div style="width:90px;height:34px;background:' + bg + ';display:flex;align-items:center;' +
+            'justify-content:center;' + F10 + 'font-weight:700;color:' + color + ';cursor:pointer" ' +
+            'title="' + _s9EscHtml(sc.name) + ' — ' + s + '" ' +
+            'onclick="_s9OpenScriptEditor(\'' + sc.id + '\')">' +
+            label +
+          '</div></td>';
+      }).join('');
+      return '<tr>' +
+        '<td style="' + tdLabel + '">' + _s9EscHtml(stp.name || 'Step') + '</td>' +
+        cells +
+      '</tr>';
+    }).join('');
+
+    return '<div style="overflow:auto;flex:1">' +
+      '<table style="border-collapse:collapse;font-family:Arial,sans-serif;min-width:100%">' +
+        '<thead><tr>' + headers + '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>' +
+      '<div style="margin-top:14px;display:flex;gap:12px;align-items:center;padding:0 4px;flex-wrap:wrap">' +
+        '<span style="' + F10 + 'color:rgba(255,255,255,.3);font-weight:700;letter-spacing:.06em;text-transform:uppercase">Legend:</span>' +
+        _s9MatLegend('rgba(61,224,138,.10)','#3de08a','Covered — passing') +
+        _s9MatLegend('rgba(240,160,48,.10)','#f0a030','Stale — needs re-run') +
+        _s9MatLegend('rgba(240,96,96,.10)','#f06060','Uncovered') +
+        _s9MatLegend('#0d0f16','rgba(255,255,255,.15)','N/A — not on this path') +
+      '</div>' +
+    '</div>';
+  }
+
+  // ── Stale warning banner ──
+  var staleScript = scripts.find(function(sc) { return scriptStatus(sc) === 'stale'; });
+  var staleBanner = staleScript
+    ? '<div style="background:rgba(90,64,16,.6);border-bottom:1px solid rgba(240,160,48,.4);' +
+        'padding:5px 16px;' + F10 + 'color:#f0a030;display:flex;align-items:center;gap:8px;flex-shrink:0">' +
+        '⚠ <b style="color:#fff">1 script</b> last ran more than ' + STALE_DAYS + ' days ago — ' +
+        'coverage data may not reflect current template state.' +
+        '<span style="margin-left:auto;cursor:pointer;text-decoration:underline" ' +
+          'onclick="_s9LaunchSimulator()">Re-run stale scripts →</span>' +
+      '</div>'
+    : '';
+
+  // ── View toggle state ──
+  var _covView = window._s9CovView || 'flow';
+
+  // ── Full HTML ──
+  container.innerHTML =
+
+    // Stale banner
+    staleBanner +
+
+    // Outer flex row: sidebar + center
+    '<div style="display:flex;flex:1;min-height:0;overflow:hidden">' +
+
+      // ── SCORE SIDEBAR ──
+      '<div style="width:220px;flex-shrink:0;background:#0c0f18;border-right:1px solid rgba(255,255,255,.06);' +
+        'display:flex;flex-direction:column;overflow-y:auto">' +
+
+        // Coverage Score section
+        '<div style="padding:12px;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<div style="' + F10 + 'font-weight:700;letter-spacing:.1em;text-transform:uppercase;' +
+            'color:#5fd4c8;margin-bottom:10px">Coverage Score</div>' +
+
+          // Ring
+          '<div style="display:flex;flex-direction:column;align-items:center;padding:6px 0 4px">' +
+            '<div style="position:relative;width:90px;height:90px">' +
+              '<svg width="90" height="90" viewBox="0 0 90 90" style="transform:rotate(-90deg)">' +
+                '<circle cx="45" cy="45" r="38" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="7"/>' +
+                '<circle cx="45" cy="45" r="38" fill="none" stroke="' + compositeColor + '" stroke-width="7" ' +
+                  'stroke-dasharray="' + Math.round(composite * 2.39) + ' 239" stroke-linecap="round"/>' +
+              '</svg>' +
+              '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);' +
+                F10 + 'font-size:22px;font-weight:700;color:' + compositeColor + ';font-family:monospace">' +
+                composite + '%</div>' +
+            '</div>' +
+            '<div style="' + F10 + 'color:rgba(255,255,255,.3);margin-top:6px;text-align:center">Composite Coverage</div>' +
+          '</div>' +
+
+          // Score bars with tooltips
+          '<div style="margin-top:10px">' +
+            scoreBar('Path coverage', pathScore, scoreColor(pathScore),
+              'Path coverage: ' + covered + ' covered + ' + stale + ' stale + ' + uncovered + ' uncovered of ' + total + ' scripts. Stale counts as 0.5. Formula: (covered + 0.5×stale) ÷ total') +
+            scoreBar('Step coverage', stepScore, scoreColor(stepScore),
+              'Step coverage: whether every workflow step is touched by at least one script. ' + steps.length + ' total steps. ' + (scripts.length > 0 ? 'All steps reachable.' : 'No scripts yet.')) +
+            scoreBar('Assertion density', assertScore, scoreColor(assertScore),
+              'Assertion density: how deeply each step is verified. ' + totalAsserts + ' total assertions across ' + totalStepSlots + ' step slots. Target: ≥2 per step. Score capped at 100%.') +
+            scoreBar('Freshness', freshScore, scoreColor(freshScore),
+              'Freshness: scripts run since last commit. Stale threshold: ' + STALE_DAYS + ' days (configurable per template). Stale scripts decay at 0.5 weight.') +
+          '</div>' +
+        '</div>' +
+
+        // Status legend
+        '<div style="padding:12px;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<div style="' + F10 + 'font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5fd4c8;margin-bottom:8px">Path Status</div>' +
+          _s9LegendRow('#3de08a', 'Covered — passing', covered) +
+          _s9LegendRow('#f0a030', 'Covered — stale', stale) +
+          _s9LegendRow('#f06060', 'Uncovered — no script', uncovered) +
+        '</div>' +
+
+        // Scripts list
+        '<div style="padding:12px;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<div style="' + F10 + 'font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5fd4c8;margin-bottom:8px">Scripts</div>' +
+          (scriptSidebarRows || '<div style="' + F11 + 'color:rgba(255,255,255,.25);font-style:italic">No scripts yet</div>') +
+        '</div>' +
+
+        // Uncovered alert
+        (uncoveredCount > 0
+          ? '<div style="padding:12px">' +
+              '<div style="' + F10 + 'font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#f06060;margin-bottom:6px">⚠ Uncovered Paths</div>' +
+              '<div style="' + F10 + 'color:rgba(255,255,255,.45);line-height:1.6">' +
+                '<div style="color:#f06060;font-weight:700;margin-bottom:4px">' + uncoveredCount + ' path' + (uncoveredCount !== 1 ? 's have' : ' has') + ' no test coverage</div>' +
+                'Scripts without a passing run leave routing paths unverified.' +
+              '</div>' +
+            '</div>'
+          : '') +
+
+      '</div>' +
+
+      // ── CENTER ──
+      '<div style="flex:1;display:flex;flex-direction:column;overflow:hidden;background:#080a0f">' +
+
+        // View toggle bar
+        '<div style="background:#0c0f18;border-bottom:1px solid rgba(255,255,255,.06);' +
+          'display:flex;align-items:center;padding:5px 16px;gap:6px;flex-shrink:0">' +
+          '<button id="s9-cov-btn-flow" onclick="_s9CovSetView(\'flow\')" style="' + F10 + 'font-weight:700;' +
+            'letter-spacing:.05em;text-transform:uppercase;cursor:pointer;border-radius:3px;' +
+            'padding:3px 10px;border:1px solid;' +
+            'background:' + (_covView==='flow' ? '#161b28' : 'transparent') + ';' +
+            'border-color:' + (_covView==='flow' ? '#5fd4c8' : 'rgba(255,255,255,.1)') + ';' +
+            'color:' + (_covView==='flow' ? '#5fd4c8' : 'rgba(255,255,255,.3)') + '">⬡ Flow + Path List</button>' +
+          '<button id="s9-cov-btn-matrix" onclick="_s9CovSetView(\'matrix\')" style="' + F10 + 'font-weight:700;' +
+            'letter-spacing:.05em;text-transform:uppercase;cursor:pointer;border-radius:3px;' +
+            'padding:3px 10px;border:1px solid;' +
+            'background:' + (_covView==='matrix' ? '#161b28' : 'transparent') + ';' +
+            'border-color:' + (_covView==='matrix' ? '#5fd4c8' : 'rgba(255,255,255,.1)') + ';' +
+            'color:' + (_covView==='matrix' ? '#5fd4c8' : 'rgba(255,255,255,.3)') + '">▦ Matrix</button>' +
+          '<span style="margin-left:auto;' + F10 + 'color:rgba(255,255,255,.2)">' +
+            (scripts.length) + ' scripts · ' + steps.length + ' steps · ' +
+            'Last analyzed ' + (runs.length ? _s9FmtCovDate(runs[0].run_at) : 'never') +
+          '</span>' +
+        '</div>' +
+
+        // Flow view
+        '<div id="s9-cov-flow" style="display:' + (_covView==='flow' ? 'flex' : 'none') + ';' +
+          'flex-direction:column;flex:1;overflow:hidden">' +
+
+          // DAG scroll area
+          '<div style="flex:1;overflow-y:auto;padding:20px 16px" id="s9-cov-dag">' +
+            dagPaths() +
+          '</div>' +
+
+          // Path list table
+          '<div style="border-top:1px solid rgba(255,255,255,.06);flex-shrink:0;' +
+            'max-height:200px;overflow-y:auto;background:#0c0f18">' +
+            '<table style="width:100%;border-collapse:collapse">' +
+              '<thead style="position:sticky;top:0;background:#111520;z-index:2">' +
+                '<tr>' +
+                  '<th style="padding:6px 16px;' + F10 + 'font-weight:700;letter-spacing:.08em;' +
+                    'text-transform:uppercase;color:#5fd4c8;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)">Routing Path</th>' +
+                  '<th style="padding:6px 16px;' + F10 + 'font-weight:700;letter-spacing:.08em;' +
+                    'text-transform:uppercase;color:#5fd4c8;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)">Steps</th>' +
+                  '<th style="padding:6px 16px;' + F10 + 'font-weight:700;letter-spacing:.08em;' +
+                    'text-transform:uppercase;color:#5fd4c8;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)">Asserts</th>' +
+                  '<th style="padding:6px 16px;' + F10 + 'font-weight:700;letter-spacing:.08em;' +
+                    'text-transform:uppercase;color:#5fd4c8;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)">Last Run</th>' +
+                  '<th style="padding:6px 16px;' + F10 + 'font-weight:700;letter-spacing:.08em;' +
+                    'text-transform:uppercase;color:#5fd4c8;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)">Script</th>' +
+                  '<th style="padding:6px 16px;' + F10 + 'font-weight:700;letter-spacing:.08em;' +
+                    'text-transform:uppercase;color:#5fd4c8;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)">Status</th>' +
+                '</tr>' +
+              '</thead>' +
+              '<tbody>' + pathRows() + '</tbody>' +
+            '</table>' +
+          '</div>' +
+
+        '</div>' +
+
+        // Matrix view
+        '<div id="s9-cov-matrix" style="display:' + (_covView==='matrix' ? 'flex' : 'none') + ';' +
+          'flex:1;overflow:auto;padding:20px">' +
+          matrixView() +
+        '</div>' +
+
+      '</div>' +
+
+    '</div>';  // end outer flex row
+
+  // Tooltip system
+  window._s9CovTipEl = null;
+}
+
+// ── Coverage helper functions ──────────────────────────────────────────────────
+function _s9FmtCovDate(ts) {
+  if (!ts) return 'Never';
+  var d = new Date(ts);
+  var now = new Date();
+  var diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 8)  return diffDays + 'd ago';
+  return (d.getMonth()+1) + '/' + d.getDate();
+}
+
+function _s9LegendRow(color, label, count) {
+  return '<div style="display:flex;align-items:center;gap:8px;font-family:Arial,sans-serif;' +
+    'font-size:11px;color:rgba(255,255,255,.5);margin-bottom:5px">' +
+    '<span style="width:10px;height:10px;border-radius:2px;background:' + color +
+      ';display:inline-block;flex-shrink:0"></span>' +
+    label +
+    '<span style="margin-left:auto;font-family:monospace;font-weight:700;color:' + color + '">' + count + '</span>' +
+  '</div>';
+}
+
+function _s9MatLegend(bg, border, label) {
+  return '<div style="display:flex;align-items:center;gap:5px;font-family:Arial,sans-serif;font-size:10px">' +
+    '<div style="width:14px;height:14px;background:' + bg + ';border:1px solid ' + border +
+      ';border-radius:2px;flex-shrink:0"></div>' +
+    '<span style="color:rgba(255,255,255,.45)">' + label + '</span>' +
+  '</div>';
+}
+
+function _s9CovSetView(v) {
+  window._s9CovView = v;
+  var flow   = document.getElementById('s9-cov-flow');
+  var matrix = document.getElementById('s9-cov-matrix');
+  var btnF   = document.getElementById('s9-cov-btn-flow');
+  var btnM   = document.getElementById('s9-cov-btn-matrix');
+  if (flow)   flow.style.display   = (v === 'flow')   ? 'flex' : 'none';
+  if (matrix) matrix.style.display = (v === 'matrix') ? 'flex' : 'none';
+  if (btnF) {
+    btnF.style.background   = (v === 'flow') ? '#161b28' : 'transparent';
+    btnF.style.borderColor  = (v === 'flow') ? '#5fd4c8' : 'rgba(255,255,255,.1)';
+    btnF.style.color        = (v === 'flow') ? '#5fd4c8' : 'rgba(255,255,255,.3)';
+  }
+  if (btnM) {
+    btnM.style.background   = (v === 'matrix') ? '#161b28' : 'transparent';
+    btnM.style.borderColor  = (v === 'matrix') ? '#5fd4c8' : 'rgba(255,255,255,.1)';
+    btnM.style.color        = (v === 'matrix') ? '#5fd4c8' : 'rgba(255,255,255,.3)';
+  }
+}
+
+function _s9CovTipShow(el) {
+  var tip = document.getElementById('s9-cov-tooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 's9-cov-tooltip';
+    tip.style.cssText = 'position:fixed;background:#1a1f2e;border:1px solid rgba(255,255,255,.12);' +
+      'border-radius:4px;padding:10px 12px;font-family:Arial,sans-serif;font-size:11px;' +
+      'color:rgba(255,255,255,.85);z-index:9999;pointer-events:none;min-width:220px;max-width:280px;' +
+      'box-shadow:0 8px 24px rgba(0,0,0,.6);line-height:1.5;display:none';
+    document.body.appendChild(tip);
+  }
+  var raw = el.getAttribute('data-tip') || '';
+  // Split on colon for title/body
+  var parts = raw.split(':');
+  var title = parts[0] || '';
+  var body  = parts.slice(1).join(':').trim();
+  tip.innerHTML = '<div style="font-weight:700;color:#5fd4c8;margin-bottom:5px;font-size:11px">' +
+    title + '</div><div style="color:rgba(255,255,255,.55);font-size:10px">' + body + '</div>';
+  tip.style.display = 'block';
+  window._s9CovTipEl = el;
+  el.addEventListener('mousemove', _s9CovTipMove);
+}
+
+function _s9CovTipMove(e) {
+  var tip = document.getElementById('s9-cov-tooltip');
+  if (tip) {
+    tip.style.left = (e.clientX + 14) + 'px';
+    tip.style.top  = (e.clientY - 10) + 'px';
+  }
+}
+
+function _s9CovTipHide() {
+  var tip = document.getElementById('s9-cov-tooltip');
+  if (tip) tip.style.display = 'none';
+  if (window._s9CovTipEl) {
+    window._s9CovTipEl.removeEventListener('mousemove', _s9CovTipMove);
+    window._s9CovTipEl = null;
+  }
+}
+
+function _s9CovCreateScript(pathName) {
+  // Switch to Scripts tab and open new script editor
+  _s9SwitchSimSubTab('scripts');
+  if (typeof seNewScript === 'function') {
+    setTimeout(function() { seNewScript(); }, 150);
+  }
+}
+
+// ── History tab stub ──────────────────────────────────────────────────────────
+function _s9RenderHistoryStub() {
+  var body = document.getElementById('s9-history-body');
+  if (!body) return;
+  body.innerHTML =
+    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+      'flex:1;padding:40px;text-align:center;gap:16px">' +
+      '<div style="font-size:32px;opacity:.2">📈</div>' +
+      '<div style="font-family:Arial,sans-serif;font-size:14px;font-weight:700;' +
+        'color:rgba(255,255,255,.4)">History</div>' +
+      '<div style="font-family:Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.2);' +
+        'max-width:320px;line-height:1.7">' +
+        'Suite pass rate trends, run log, health calendar, and event markers — coming next.' +
+      '</div>' +
+    '</div>';
+}
+
 function _s9GoToLibrary() { _s9Switch("library"); }
 function _s9LaunchSimulator() {
   var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
@@ -3093,8 +3778,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-documents.js?v=20260403-S9"></script>
 <script src="/js/cdn-dag-viewer.js?v=20260403-S9"></script>
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
-<script src="/js/cdn-bist.js?v=20260404-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260404-SE23"></script>
+<script src="/js/cdn-bist.js?v=20260405-BQ"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE28"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
