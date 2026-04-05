@@ -980,7 +980,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.66 — Fix dismiss onclick · Cache-buster SE30a','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.67 — Default to Dashboard · Cache-buster SE30b','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -3746,11 +3746,11 @@ function _s9RouteDashboard() {
 
 async function _s9RenderDashboard(panel) {
   var FA  = 'font-family:Arial,sans-serif;';
-  var F9  = FA + 'font-size:9px;';
-  var F10 = FA + 'font-size:10px;';
-  var F11 = FA + 'font-size:11px;';
+  var F9  = FA + 'font-size:12px;';
+  var F10 = FA + 'font-size:12px;';
+  var F11 = FA + 'font-size:12px;';
   var F12 = FA + 'font-size:12px;';
-  var MN  = 'font-family:monospace;font-size:11px;';
+  var MN  = 'font-family:monospace;font-size:13px;';
 
   panel.style.cssText = 'display:flex;width:100%;height:100%;overflow:hidden;background:#080a10;flex-direction:column';
 
@@ -3762,7 +3762,7 @@ async function _s9RenderDashboard(panel) {
 
       // Workflow selector
       '<select id="s9-dash-wf-select" onchange="_s9DashFilterWf(this.value)" ' +
-        'style="' + FA + 'font-size:11px;background:#1a1f2e;border:1px solid rgba(255,255,255,.1);' +
+        'style="' + FA + 'font-size:12px;background:#1a1f2e;border:1px solid rgba(255,255,255,.1);' +
         'border-radius:4px;color:rgba(255,255,255,.75);padding:3px 8px;height:24px;' +
         'cursor:pointer;outline:none;min-width:200px">' +
         '<option value="all">All Workflows — Firm Portfolio</option>' +
@@ -3775,7 +3775,7 @@ async function _s9RenderDashboard(panel) {
         ['7d','30d','90d','All time'].map(function(r, i) {
           var isAct = r === '30d';
           return '<button onclick="_s9DashSetRange(this,\'' + r + '\')" ' +
-            'style="' + FA + 'font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;' +
+            'style="' + FA + 'font-size:12px;font-weight:700;padding:2px 8px;border-radius:3px;' +
             'cursor:pointer;border:1px solid;letter-spacing:.04em;' +
             (isAct ? 'background:#161b28;border-color:#5fd4c8;color:#5fd4c8'
                    : 'background:transparent;border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.3)') +
@@ -3783,9 +3783,9 @@ async function _s9RenderDashboard(panel) {
         }).join('') +
       '</div>' +
 
-      '<div style="' + FA + 'font-size:10px;color:rgba(255,255,255,.25);font-family:monospace">2026-03-05</div>' +
-      '<div style="' + FA + 'font-size:10px;color:rgba(255,255,255,.2)">→</div>' +
-      '<div style="' + FA + 'font-size:10px;color:rgba(255,255,255,.25);font-family:monospace">2026-04-04</div>' +
+      '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.25);font-family:monospace">2026-03-05</div>' +
+      '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.2)">→</div>' +
+      '<div style="' + FA + 'font-size:13px;color:rgba(255,255,255,.25);font-family:monospace">2026-04-04</div>' +
 
       '<div style="width:1px;height:18px;background:rgba(255,255,255,.06);margin:0 2px"></div>' +
 
@@ -3795,7 +3795,7 @@ async function _s9RenderDashboard(panel) {
           var isAct = v[0] === 'all';
           return '<button onclick="_s9DashSetView(this,\'' + v[0] + '\')" ' +
             'id="s9-dvb-' + v[0] + '" ' +
-            'style="' + FA + 'font-size:10px;font-weight:700;padding:2px 9px;border-radius:3px;' +
+            'style="' + FA + 'font-size:12px;font-weight:700;padding:2px 9px;border-radius:3px;' +
             'cursor:pointer;border:1px solid;letter-spacing:.04em;' +
             (isAct ? 'background:#161b28;border-color:#5fd4c8;color:#5fd4c8'
                    : 'background:transparent;border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.3)') +
@@ -3816,7 +3816,7 @@ async function _s9RenderDashboard(panel) {
       'color:#f06060;flex-shrink:0;flex-direction:row;align-items:center;gap:8px">' +
       '<span>✗</span>' +
       '<span id="s9-dash-alert-msg"></span>' +
-      '<span id="s9-dash-alert-link" style="color:#5fd4c8;cursor:pointer;text-decoration:underline;font-size:10px"></span>' +
+      '<span id="s9-dash-alert-link" style="color:#5fd4c8;cursor:pointer;text-decoration:underline;font-size:12px"></span>' +
       '<span onclick="document.getElementById(\'s9-dash-alert\').style.display=\'none\'" ' +
         'style="margin-left:auto;cursor:pointer;color:rgba(255,255,255,.3);font-size:16px;line-height:1">×</span>' +
     '</div>' +
@@ -3859,7 +3859,7 @@ async function _s9RenderDashboard(panel) {
               _s9DashTrendSvg() +
               '<div id="s9-dash-evtip" style="position:absolute;display:none;background:#1a1f2e;' +
                 'border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:8px 10px;' +
-                'font-size:10px;font-family:monospace;color:rgba(255,255,255,.85);' +
+                'font-size:12px;font-family:monospace;color:rgba(255,255,255,.85);' +
                 'min-width:190px;z-index:50;pointer-events:none;' +
                 'box-shadow:0 6px 20px rgba(0,0,0,.5)"></div>' +
             '</div>' +
@@ -3900,7 +3900,7 @@ async function _s9RenderDashboard(panel) {
           '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:14px;font-style:italic">Loading…</div>' +
         '</div>' +
         '<div id="s9-cert-col-footer" style="padding:8px 14px;border-top:1px solid rgba(255,255,255,.06);' +
-          'flex-shrink:0;font-family:monospace;font-size:10px;line-height:1.8;color:rgba(255,255,255,.35)">' +
+          'flex-shrink:0;font-family:monospace;font-size:13px;line-height:1.8;color:rgba(255,255,255,.35)">' +
         '</div>' +
       '</div>' +
 
@@ -4043,7 +4043,7 @@ function _s9DashRenderBroken(templates, health) {
   });
 
   if (!broken.length) {
-    el.innerHTML = '<div style="' + FA + 'font-size:11px;color:#3de08a;padding:12px 14px;' +
+    el.innerHTML = '<div style="' + FA + 'font-size:12px;color:#3de08a;padding:12px 14px;' +
       'display:flex;align-items:center;gap:7px">' +
       '<span style="font-size:14px">✓</span> All workflows passing — nothing needs attention</div>';
     return;
@@ -4067,11 +4067,11 @@ function _s9DashRenderBroken(templates, health) {
         '<span style="' + FA + 'font-size:12px;color:' + color + ';font-weight:700">' + icon + '</span>' +
         '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.85);font-weight:700">' +
           _s9EscHtml(t.name) + '</span>' +
-        '<span style="' + FA + 'font-size:10px;color:rgba(255,255,255,.3);font-family:monospace">v' + _s9EscHtml(t.version || '—') + '</span>' +
+        '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);font-family:monospace">v' + _s9EscHtml(t.version || '—') + '</span>' +
       '</div>' +
       '<div style="display:flex;align-items:center;justify-content:space-between">' +
-        '<span style="' + FA + 'font-size:11px;color:' + color + '">' + msg + '</span>' +
-        '<span style="' + FA + 'font-size:10px;color:#5fd4c8;text-decoration:underline;' +
+        '<span style="' + FA + 'font-size:13px;color:' + color + '">' + msg + '</span>' +
+        '<span style="' + FA + 'font-size:12px;color:#5fd4c8;text-decoration:underline;' +
           'cursor:pointer">Open Simulator →</span>' +
       '</div>' +
     '</div>';
@@ -4086,7 +4086,7 @@ function _s9DashRenderCards(templates, health, scripts, lastRunMap) {
   var FA = 'font-family:Arial,sans-serif;';
 
   if (!templates.length) {
-    el.innerHTML = '<div style="' + FA + 'font-size:11px;color:rgba(255,255,255,.25);' +
+    el.innerHTML = '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.25);' +
       'font-style:italic">No workflow templates yet.</div>';
     return;
   }
@@ -4124,10 +4124,10 @@ function _s9DashRenderCards(templates, health, scripts, lastRunMap) {
             '<span style="' + FA + 'font-size:12px;font-weight:700;color:rgba(255,255,255,.92);' +
               'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _s9EscHtml(t.name) + '</span>' +
           '</div>' +
-          '<span style="' + FA + 'font-size:10px;color:rgba(255,255,255,.28);font-family:monospace">' +
+          '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.28);font-family:monospace">' +
             'v' + _s9EscHtml(t.version || '—') + ' · ' + _s9EscHtml(t.status || 'draft') + '</span>' +
         '</div>' +
-        '<span style="' + FA + 'font-size:10px;font-weight:700;color:' + statusColor + ';' +
+        '<span style="' + FA + 'font-size:13px;font-weight:700;color:' + statusColor + ';' +
           'flex-shrink:0;margin-left:10px;padding:2px 8px;border-radius:3px;' +
           'background:' + statusColor + '18;border:1px solid ' + statusColor + '44">' + statusLabel + '</span>' +
       '</div>' +
@@ -4138,9 +4138,9 @@ function _s9DashRenderCards(templates, health, scripts, lastRunMap) {
       '</div>' +
 
       '<div style="display:flex;align-items:center;justify-content:space-between">' +
-        '<span style="' + FA + 'font-size:10px;color:rgba(255,255,255,.3);font-family:monospace">' +
+        '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3);font-family:monospace">' +
           h.passing + ' passing · ' + h.failing + ' failing · ' + h.notRun + ' not run</span>' +
-        '<span style="' + FA + 'font-size:10px;color:#5fd4c8;cursor:pointer;' +
+        '<span style="' + FA + 'font-size:13px;color:#5fd4c8;cursor:pointer;' +
           'text-decoration:underline;text-underline-offset:2px">Open Simulator →</span>' +
       '</div>' +
 
@@ -4162,7 +4162,7 @@ function _s9DashRenderQueue(tickets) {
   // Fallback inline renderer
   var FA = 'font-family:Arial,sans-serif;';
   if (!tickets || !tickets.length) {
-    el.innerHTML = '<div style="' + FA + 'font-size:11px;color:rgba(255,255,255,.25);' +
+    el.innerHTML = '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.25);' +
       'padding:12px 14px;font-style:italic">Queue is clear — no open tickets</div>';
     return;
   }
@@ -4187,14 +4187,14 @@ function _s9DashRenderQueue(tickets) {
       'onmouseover="this.style.background=\'rgba(255,255,255,.03)\'" ' +
       'onmouseout="this.style.background=\'\'">' +
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">' +
-        '<span style="' + FA + 'font-size:10px;font-weight:700;color:' + typeColor + '">' +
+        '<span style="' + FA + 'font-size:12px;font-weight:700;color:' + typeColor + '">' +
           (isBug ? '⚠ BUG' : '◈ ENH') + '</span>' +
-        (isBug ? '<span style="' + FA + 'font-size:10px;font-weight:700;color:' + sev.color + '">' +
+        (isBug ? '<span style="' + FA + 'font-size:12px;font-weight:700;color:' + sev.color + '">' +
           sev.icon + ' ' + sev.color.toUpperCase().slice(1, 4) + '</span>' : '') +
-        '<span style="' + FA + 'font-size:10px;color:rgba(255,255,255,.3)">' + ageStr + '</span>' +
-        (!t.assigned_to ? '<span style="' + FA + 'font-size:10px;color:#f0a030">⚠ Unassigned</span>' : '') +
+        '<span style="' + FA + 'font-size:12px;color:rgba(255,255,255,.3)">' + ageStr + '</span>' +
+        (!t.assigned_to ? '<span style="' + FA + 'font-size:12px;color:#f0a030">⚠ Unassigned</span>' : '') +
       '</div>' +
-      '<div style="' + FA + 'font-size:11px;color:rgba(255,255,255,.8);' +
+      '<div style="' + FA + 'font-size:12px;color:rgba(255,255,255,.8);' +
         'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _s9EscHtml(t.title) + '</div>' +
     '</div>';
   }).join('');
@@ -4207,7 +4207,7 @@ function _s9DashQueueFilters() {
     var val = i === 0 ? 'all' : i === 1 ? 'bug' : 'enhancement';
     var isAct = i === 0;
     return '<span id="s9-qf-' + val + '" onclick="_s9DashQueueFilter(\'' + val + '\')" ' +
-      'style="' + FA + 'font-size:10px;font-weight:700;cursor:pointer;padding:1px 7px;' +
+      'style="' + FA + 'font-size:12px;font-weight:700;cursor:pointer;padding:1px 7px;' +
       'border-radius:3px;' +
       (isAct ? 'color:#5fd4c8;background:rgba(95,212,200,.12);border:1px solid rgba(95,212,200,.3)' :
                'color:rgba(255,255,255,.3);background:transparent;border:1px solid transparent') +
@@ -4274,12 +4274,12 @@ function _s9DashSparkline() {
 function _s9DashKpiCell(id, label, val, sub) {
   var FA = 'font-family:Arial,sans-serif;';
   return '<div style="flex:1;padding:8px 12px;border-right:1px solid rgba(255,255,255,.06)">' +
-    '<div style="font-size:8px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;' +
+    '<div style="font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;' +
       'color:#5fd4c8;' + FA + 'margin-bottom:2px">' + label + '</div>' +
     '<div id="' + id + '-val" style="font-size:20px;font-weight:700;font-family:monospace;' +
       'color:rgba(255,255,255,.5);line-height:1.1">' + val + '</div>' +
-    '<div id="' + id + '-sub" style="font-size:9px;color:rgba(255,255,255,.28);' + FA + 'margin-top:2px">' + sub + '</div>' +
-    '<div id="' + id + '-delta" style="font-size:9px;font-weight:700;' + FA + 'margin-top:1px"></div>' +
+    '<div id="' + id + '-sub" style="font-size:13px;color:rgba(255,255,255,.28);' + FA + 'margin-top:2px">' + sub + '</div>' +
+    '<div id="' + id + '-delta" style="font-size:12px;font-weight:700;' + FA + 'margin-top:1px"></div>' +
   '</div>';
 }
 
@@ -4288,7 +4288,7 @@ function _s9DashLegendItem(color, type, label) {
   var icon = type === 'line'
     ? '<div style="width:18px;height:2px;background:' + color + ';border-radius:1px"></div>'
     : '<div style="width:8px;height:8px;border-radius:50%;background:' + color + '"></div>';
-  return '<div style="display:flex;align-items:center;gap:4px;font-size:9px;' +
+  return '<div style="display:flex;align-items:center;gap:4px;font-size:12px;' +
     'color:rgba(255,255,255,.3);' + FA + '">' + icon + label + '</div>';
 }
 
@@ -4360,7 +4360,7 @@ function _s9DashCalHtml() {
 
   var dayLabels = '<div style="display:flex;flex-direction:column;gap:2px;margin-right:4px;padding-top:14px">' +
     ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(function(d) {
-      return '<div style="font-size:8px;color:rgba(255,255,255,.25);height:11px;display:flex;' +
+      return '<div style="font-size:12px;color:rgba(255,255,255,.25);height:11px;display:flex;' +
         'align-items:center;' + FA + '">' + d + '</div>';
     }).join('') + '</div>';
 
@@ -4385,7 +4385,7 @@ function _s9DashCalHtml() {
 
   var legend = '<div style="display:flex;gap:12px;margin-top:7px;align-items:center">' +
     cls.map(function(c, i) {
-      return '<div style="display:flex;align-items:center;gap:4px;font-size:9px;' +
+      return '<div style="display:flex;align-items:center;gap:4px;font-size:12px;' +
         'color:rgba(255,255,255,.3);' + FA + '">' +
         '<div style="width:9px;height:9px;border-radius:2px;background:' + c + '"></div>' +
         lbl[i] + '</div>';
@@ -4396,22 +4396,22 @@ function _s9DashCalHtml() {
 
 function _s9DashRunLogHtml() {
   var FA  = 'font-family:Arial,sans-serif;';
-  var F10 = FA + 'font-size:10px;';
-  var F11 = FA + 'font-size:11px;';
-  var MN  = 'font-family:monospace;font-size:10px;';
+  var F10 = FA + 'font-size:12px;';
+  var F11 = FA + 'font-size:12px;';
+  var MN  = 'font-family:monospace;font-size:13px;';
 
   function pill(pass) {
     return pass
       ? '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:3px;' +
-          'font-size:9px;font-weight:700;background:rgba(61,224,138,.1);color:#3de08a;' +
+          'font-size:13px;font-weight:700;background:rgba(61,224,138,.1);color:#3de08a;' +
           'border:1px solid rgba(61,224,138,.25);' + FA + '">✓ PASSING</span>'
       : '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:3px;' +
-          'font-size:9px;font-weight:700;background:rgba(240,96,96,.1);color:#f06060;' +
+          'font-size:12px;font-weight:700;background:rgba(240,96,96,.1);color:#f06060;' +
           'border:1px solid rgba(240,96,96,.25);' + FA + '">✗ FAILING</span>';
   }
   function wftag(code, label) {
     return '<span style="display:inline-flex;align-items:center;padding:1px 5px;border-radius:2px;' +
-      'font-size:8px;font-weight:700;background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);' +
+      'font-size:12px;font-weight:700;background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);' +
       'border:1px solid rgba(255,255,255,.1);margin-right:4px;font-family:monospace">' + code + '</span>' +
       '<span style="' + F11 + 'color:rgba(255,255,255,.75)">' + label + '</span>';
   }
@@ -4421,7 +4421,7 @@ function _s9DashRunLogHtml() {
     }).join('');
   }
   function evtBadge(color, label) {
-    return '<span style="display:inline-flex;padding:2px 7px;border-radius:3px;font-size:9px;' +
+    return '<span style="display:inline-flex;padding:2px 7px;border-radius:3px;font-size:12px;' +
       'font-weight:700;background:' + color + '18;color:' + color + ';' +
       'border:1px solid ' + color + '44;' + FA + '">' + label + '</span>';
   }
@@ -4430,7 +4430,7 @@ function _s9DashRunLogHtml() {
       '<td colspan="8" style="padding:4px 14px;border-top:1px solid rgba(255,255,255,.05);' +
         'border-bottom:1px solid rgba(255,255,255,.05)">' +
         '<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:3px;' +
-          'font-size:9px;font-weight:700;' + FA + 'background:' + color + '18;color:' + color + ';' +
+          'font-size:12px;font-weight:700;' + FA + 'background:' + color + '18;color:' + color + ';' +
           'border:1px solid ' + color + '44">' + text + '</span>' +
       '</td>' +
     '</tr>';
@@ -4451,7 +4451,7 @@ function _s9DashRunLogHtml() {
   }
 
   var G = '#3de08a', R = '#f06060';
-  var thStyle = 'padding:5px 14px;font-size:8px;font-weight:700;letter-spacing:.08em;' +
+  var thStyle = 'padding:5px 14px;font-size:12px;font-weight:700;letter-spacing:.08em;' +
     'text-transform:uppercase;color:#5fd4c8;' + FA + 'border-bottom:1px solid rgba(255,255,255,.06);text-align:left';
 
   return '<div id="s9-dash-log-wrap" style="overflow-x:auto">' +
@@ -4492,9 +4492,9 @@ function _s9DashRenderCertCards(templates, health) {
   if (!el) return;
 
   var FA  = 'font-family:Arial,sans-serif;';
-  var F9  = FA + 'font-size:9px;';
-  var F10 = FA + 'font-size:10px;';
-  var F11 = FA + 'font-size:11px;';
+  var F9  = FA + 'font-size:12px;';
+  var F10 = FA + 'font-size:12px;';
+  var F11 = FA + 'font-size:12px;';
 
   var certified = 0, failing = 0, aging = 0;
 
@@ -4533,7 +4533,7 @@ function _s9DashRenderCertCards(templates, health) {
       '</div>' +
 
       '<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:3px;' +
-        'font-size:9px;font-weight:700;' + FA + 'background:' + statusCls + ';color:' + statusColor + ';' +
+        'font-size:12px;font-weight:700;' + FA + 'background:' + statusCls + ';color:' + statusColor + ';' +
         'margin-bottom:6px">' + statusIcon + ' ' + statusLabel + '</div>' +
 
       (isFailing
@@ -4553,14 +4553,14 @@ function _s9DashRenderCertCards(templates, health) {
 
       '<div style="display:flex;gap:4px">' +
         '<button onclick="event.stopPropagation();_s9DashOpenSimulator(\'' + t.id + '\')" ' +
-          'style="' + FA + 'font-size:9px;font-weight:700;padding:2px 8px;border-radius:3px;' +
+          'style="' + FA + 'font-size:12px;font-weight:700;padding:2px 8px;border-radius:3px;' +
           'border:1px solid rgba(40,212,192,.3);background:rgba(40,212,192,.08);color:#28d4c0;' +
           'cursor:pointer;letter-spacing:.04em">' +
           (isFailing ? '⊙ Fix Now' : '⊙ Simulator') +
         '</button>' +
         (isFailing
           ? '<button onclick="event.stopPropagation()" ' +
-              'style="' + FA + 'font-size:9px;font-weight:700;padding:2px 8px;border-radius:3px;' +
+              'style="' + FA + 'font-size:12px;font-weight:700;padding:2px 8px;border-radius:3px;' +
               'border:1px solid rgba(255,255,255,.1);background:transparent;' +
               'color:rgba(255,255,255,.35);cursor:pointer">Override…</button>'
           : '') +
@@ -4773,8 +4773,8 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
   // Set the source bar DOM (it's empty until a source is registered)
   
-  // Start on Library tab — sync filter pills and topbar
-  _s9Switch('library');
+  // Start on Dashboard tab
+  _s9Switch('dashboard');
   // Mark initial filter pill active
   var fp = document.getElementById('s9-fp-all');
   if (fp) fp.classList.add('active');
@@ -4791,7 +4791,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-support.js?v=20260405-SUP1"></script>
 <script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE30a"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE30c"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
