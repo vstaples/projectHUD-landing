@@ -467,7 +467,7 @@ html,body{height:100%;background:var(--bg0);color:var(--t);font-family:var(--sn)
 <script>
 // ── CONFIG ─────────────────────────────────────────────────────────────────────
 // Replace with your actual Supabase project values
-var SUPA_URL = 'https://abcdefghijklmnop.supabase.co';
+var SUPA_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
 var SUPA_KEY = 'sb_publishable_1EOfIYerLiE3syHLc9zfKw__72o8fmx';
 var FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
 var USER_ID  = '57b93738-6a2a-4098-ba12-bfffd1f7dd07'; // Vaughn Staples
@@ -616,19 +616,25 @@ function _cdLoadFirmAndUser() {
     filters:[['id','eq',USER_ID]],
     select:'id,email,role,resource_id,resources(first_name,last_name,name,department_id)'
   }).then(function(rows) {
-    if (!rows || !rows.length) return;
-    _cdUser = rows[0];
-    _cdResource = rows[0].resources;
-    if (_cdResource) {
-      var fn = _cdResource.first_name || (_cdResource.name||'?').split(' ')[0];
-    var ln = _cdResource.last_name || (_cdResource.name||'?').split(' ').slice(-1)[0];
-    var initials = fn[0] + ln[0];
-      document.getElementById('user-avatar').textContent = initials.toUpperCase();
+    console.log('[CADENCE] Q2 users result:', rows);
+    if (rows && rows.length) {
+      _cdUser = rows[0];
+      _cdResource = rows[0].resources;
+      if (_cdResource) {
+        var fn = _cdResource.first_name || (_cdResource.name||'?').split(' ')[0];
+        var ln = _cdResource.last_name || (_cdResource.name||'?').split(' ').slice(-1)[0];
+        var initials = fn[0] + ln[0];
+        document.getElementById('user-avatar').textContent = initials.toUpperCase();
+      }
+    } else {
+      console.warn('[CADENCE] User not found for USER_ID — proceeding anyway');
+      document.getElementById('user-avatar').textContent = 'VS';
     }
-    // Now load all dashboard data in parallel
+    // Always load panels regardless of user query result
     _cdLoadAllPanels();
-  }).catch(function() {
-    document.getElementById('user-avatar').textContent = 'PS';
+  }).catch(function(err) {
+    console.error('[CADENCE] Q2 users error:', err);
+    document.getElementById('user-avatar').textContent = 'VS';
     _cdLoadAllPanels();
   });
 }
@@ -1330,7 +1336,37 @@ function _cdSendTrainingReminders() {
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', function() { _cdInit(); });
+var _cdVersion = 'CADENCE-DASH v1.0.4 · 2026-04-06';
+
+window.addEventListener('DOMContentLoaded', function() {
+  // ── Diagnostic banner — visible in console on every load ──
+  console.log('%c ' + _cdVersion + ' ', 'background:#c47d18;color:#000;font-weight:700;font-size:13px;padding:2px 6px;border-radius:3px');
+  console.log('%cConfig', 'font-weight:700;color:#c47d18', {
+    SUPA_URL: SUPA_URL,
+    SUPA_KEY: SUPA_KEY.slice(0,24) + '…',
+    FIRM_ID:  FIRM_ID,
+    USER_ID:  USER_ID
+  });
+
+  // ── Connectivity probe — fire before _cdInit to confirm Supabase reachable ──
+  var probeUrl = SUPA_URL + '/rest/v1/firms?id=eq.' + FIRM_ID + '&select=id,name';
+  console.log('%cProbing Supabase…', 'color:#7a9bbf', probeUrl);
+  fetch(probeUrl, {
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+  }).then(function(r) {
+    console.log('%cProbe response', 'color:#7a9bbf', 'HTTP ' + r.status, r.url);
+    return r.json();
+  }).then(function(data) {
+    console.log('%cProbe data', 'color:#2a9d40', data);
+    if (!data || !data.length) {
+      console.warn('[CADENCE] Probe returned empty — firm_id not found or RLS blocking. Check FIRM_ID and RLS policies.');
+    }
+  }).catch(function(err) {
+    console.error('[CADENCE] Probe FAILED — Supabase unreachable', err);
+  });
+
+  _cdInit();
+});
 </script>
 </body>
 </html>
