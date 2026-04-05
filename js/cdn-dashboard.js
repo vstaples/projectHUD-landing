@@ -187,7 +187,7 @@
     + '.cd-tip-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;\n'
     + '  color:var(--cyan);font-family:Arial,sans-serif;margin-bottom:7px}\n'
     + '.cd-tip-row{display:flex;justify-content:space-between;gap:16px;\n'
-    + '  font-size:13px;font-family:Arial,sans-serif;color:rgba(255,255,255,.55);\n'
+    + '  font-size:13px;font-family:Arial,sans-serif;color:rgba(255,255,255,.80);\n'
     + '  padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)}\n'
     + '.cd-tip-row:last-child{border-bottom:none}\n'
     + '.cd-tip-row span:last-child{color:#fff;font-weight:600;text-align:right}\n'
