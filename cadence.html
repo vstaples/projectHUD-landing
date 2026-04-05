@@ -980,7 +980,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.62 — Dashboard + Support Queue · Cache-buster SE29','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.63 — Dashboard visual rebuild · Cache-buster SE29a','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -3746,109 +3746,141 @@ function _s9RouteDashboard() {
 
 async function _s9RenderDashboard(panel) {
   var FA  = 'font-family:Arial,sans-serif;';
+  var F9  = FA + 'font-size:9px;';
   var F10 = FA + 'font-size:10px;';
   var F11 = FA + 'font-size:11px;';
   var F12 = FA + 'font-size:12px;';
-  var F13 = FA + 'font-size:13px;';
+  var MN  = 'font-family:monospace;';
+
+  panel.style.cssText = 'display:flex;width:100%;height:100%;overflow:hidden;background:#080a10;flex-direction:column';
 
   panel.innerHTML =
-    '<div style="display:flex;width:100%;height:100%;overflow:hidden;background:#080a10">' +
+    // ── TOP: Uptime signal strip ──
+    '<div style="display:flex;align-items:stretch;background:#0c0f18;' +
+      'border-bottom:2px solid rgba(255,255,255,.06);flex-shrink:0;min-height:72px">' +
 
-      // ── MAIN COLUMN ──
+      // Uptime ring + label
+      '<div style="padding:12px 20px;border-right:1px solid rgba(255,255,255,.06);' +
+        'display:flex;align-items:center;gap:14px;min-width:200px">' +
+        '<div style="position:relative;width:52px;height:52px;flex-shrink:0">' +
+          '<svg width="52" height="52" viewBox="0 0 52 52" style="transform:rotate(-90deg)">' +
+            '<circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="5"/>' +
+            '<circle id="s9-uptime-ring" cx="26" cy="26" r="22" fill="none" stroke="#3de08a" stroke-width="5" ' +
+              'stroke-dasharray="0 138" stroke-linecap="round" style="transition:stroke-dasharray .8s ease"/>' +
+          '</svg>' +
+          '<div id="s9-uptime-pct" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);' +
+            FA + 'font-size:11px;font-weight:700;font-family:monospace;color:#3de08a">—</div>' +
+        '</div>' +
+        '<div>' +
+          '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
+            'color:#28d4c0;margin-bottom:3px">Portfolio Uptime</div>' +
+          '<div id="s9-uptime-sub" style="' + F11 + 'color:rgba(255,255,255,.5)">Loading…</div>' +
+          '<div id="s9-uptime-trend" style="' + F9 + 'color:rgba(255,255,255,.25);margin-top:2px"></div>' +
+        '</div>' +
+      '</div>' +
+
+      // Certified
+      '<div style="padding:12px 18px;border-right:1px solid rgba(255,255,255,.06);' +
+        'display:flex;flex-direction:column;justify-content:center;min-width:110px">' +
+        '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
+          'color:#28d4c0;margin-bottom:4px">Certified</div>' +
+        '<div id="s9-cert-count" style="' + FA + 'font-size:26px;font-weight:700;' +
+          'font-family:monospace;color:rgba(255,255,255,.3);line-height:1">—</div>' +
+        '<div id="s9-cert-sub" style="' + F9 + 'color:rgba(255,255,255,.3);margin-top:2px">workflows</div>' +
+      '</div>' +
+
+      // Failing
+      '<div style="padding:12px 18px;border-right:1px solid rgba(255,255,255,.06);' +
+        'display:flex;flex-direction:column;justify-content:center;min-width:110px">' +
+        '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
+          'color:#28d4c0;margin-bottom:4px">Failing Now</div>' +
+        '<div id="s9-fail-count" style="' + FA + 'font-size:26px;font-weight:700;' +
+          'font-family:monospace;color:rgba(255,255,255,.3);line-height:1">—</div>' +
+        '<div style="' + F9 + 'color:rgba(255,255,255,.3);margin-top:2px">test scripts</div>' +
+      '</div>' +
+
+      // Open tickets
+      '<div style="padding:12px 18px;border-right:1px solid rgba(255,255,255,.06);' +
+        'display:flex;flex-direction:column;justify-content:center;min-width:120px">' +
+        '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
+          'color:#28d4c0;margin-bottom:4px">Open Tickets</div>' +
+        '<div id="s9-ticket-count" style="' + FA + 'font-size:26px;font-weight:700;' +
+          'font-family:monospace;color:rgba(255,255,255,.3);line-height:1">—</div>' +
+        '<div style="' + F9 + 'color:rgba(255,255,255,.3);margin-top:2px">bugs + enhancements</div>' +
+      '</div>' +
+
+      // Sparkline
+      '<div style="flex:1;padding:12px 20px;display:flex;flex-direction:column;justify-content:center">' +
+        '<div style="' + F9 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
+          'color:#28d4c0;margin-bottom:8px">7-Day Portfolio Trend</div>' +
+        '<div id="s9-sparkline" style="height:34px">' + _s9DashSparkline() + '</div>' +
+      '</div>' +
+
+      // Report issue button
+      '<div style="padding:12px 16px;display:flex;align-items:center;border-left:1px solid rgba(255,255,255,.06)">' +
+        '<button onclick="typeof supOpenModal==='function' && supOpenModal({module:'cadencehud'})" ' +
+          'style="' + FA + 'font-size:11px;font-weight:700;padding:6px 14px;border-radius:4px;' +
+          'border:1px solid rgba(80,144,240,.4);background:rgba(80,144,240,.1);color:#5090f0;' +
+          'cursor:pointer;letter-spacing:.04em;white-space:nowrap">⚑ Report Issue</button>' +
+      '</div>' +
+
+    '</div>' +
+
+    // ── BODY ──
+    '<div style="display:flex;flex:1;min-height:0;overflow:hidden">' +
+
+      // ── LEFT: Needs Attention + Work Queue ──
+      '<div style="width:360px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.06);' +
+        'display:flex;flex-direction:column;overflow:hidden;background:#0a0c14">' +
+
+        // Needs Attention header
+        '<div style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;' +
+          'display:flex;align-items:center;justify-content:space-between;background:#0c0f18">' +
+          '<span style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
+            'color:#5fd4c8">⚠ Needs Attention</span>' +
+          '<span id="s9-attn-count" style="' + F9 + 'color:rgba(255,255,255,.25);' + MN + '"></span>' +
+        '</div>' +
+        '<div id="s9-dash-broken" style="flex-shrink:0;max-height:220px;overflow-y:auto;' +
+          'border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:14px;font-style:italic">Loading…</div>' +
+        '</div>' +
+
+        // Work Queue header
+        '<div style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;' +
+          'display:flex;align-items:center;justify-content:space-between;background:#0c0f18">' +
+          '<span style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
+            'color:#5fd4c8">Work Queue</span>' +
+          '<div style="display:flex;align-items:center;gap:5px">' +
+            '<span id="s9-queue-count" style="' + F9 + 'color:rgba(255,255,255,.25);' + MN + '"></span>' +
+            '<span style="' + F9 + 'color:rgba(255,255,255,.15)">|</span>' +
+            _s9DashQueueFilters() +
+          '</div>' +
+        '</div>' +
+        '<div id="s9-dash-queue" style="flex:1;overflow-y:auto">' +
+          '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:14px;font-style:italic">Loading…</div>' +
+        '</div>' +
+
+      '</div>' +
+
+      // ── RIGHT: Workflow Portfolio ──
       '<div style="flex:1;display:flex;flex-direction:column;overflow:hidden">' +
 
-        // ── UPTIME SIGNAL BAR ──
-        '<div id="s9-dash-uptime" style="display:flex;align-items:center;gap:0;' +
-          'background:#0c0f18;border-bottom:1px solid rgba(255,255,255,.06);' +
-          'flex-shrink:0;padding:0">' +
-          // Uptime metric
-          '<div style="padding:10px 20px;border-right:1px solid rgba(255,255,255,.06)">' +
-            '<div style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-              'color:#28d4c0;margin-bottom:2px">Portfolio Uptime</div>' +
-            '<div id="s9-uptime-val" style="' + FA + 'font-size:22px;font-weight:700;' +
-              'font-family:monospace;color:#3de08a">—</div>' +
-            '<div id="s9-uptime-sub" style="' + F10 + 'color:rgba(255,255,255,.3);margin-top:1px">loading…</div>' +
-          '</div>' +
-          // Certified count
-          '<div style="padding:10px 20px;border-right:1px solid rgba(255,255,255,.06)">' +
-            '<div style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-              'color:#28d4c0;margin-bottom:2px">Certified</div>' +
-            '<div id="s9-cert-count" style="' + FA + 'font-size:22px;font-weight:700;' +
-              'font-family:monospace;color:#3de08a">—</div>' +
-            '<div id="s9-cert-sub" style="' + F10 + 'color:rgba(255,255,255,.3);margin-top:1px">workflows</div>' +
-          '</div>' +
-          // Failing
-          '<div style="padding:10px 20px;border-right:1px solid rgba(255,255,255,.06)">' +
-            '<div style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-              'color:#28d4c0;margin-bottom:2px">Failing Now</div>' +
-            '<div id="s9-fail-count" style="' + FA + 'font-size:22px;font-weight:700;' +
-              'font-family:monospace;color:rgba(255,255,255,.4)">—</div>' +
-            '<div id="s9-fail-sub" style="' + F10 + 'color:rgba(255,255,255,.3);margin-top:1px">tests</div>' +
-          '</div>' +
-          // Open tickets
-          '<div style="padding:10px 20px;border-right:1px solid rgba(255,255,255,.06)">' +
-            '<div style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-              'color:#28d4c0;margin-bottom:2px">Open Tickets</div>' +
-            '<div id="s9-ticket-count" style="' + FA + 'font-size:22px;font-weight:700;' +
-              'font-family:monospace;color:rgba(255,255,255,.4)">—</div>' +
-            '<div style="' + F10 + 'color:rgba(255,255,255,.3);margin-top:1px">bugs + enhancements</div>' +
-          '</div>' +
-          // Sparkline placeholder — trend 7d
-          '<div style="flex:1;padding:10px 20px;display:flex;flex-direction:column;justify-content:center">' +
-            '<div style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-              'color:#28d4c0;margin-bottom:6px">7-Day Trend</div>' +
-            '<div id="s9-sparkline" style="height:30px">' +
-              _s9DashSparkline() +
-            '</div>' +
-          '</div>' +
+        // Portfolio header
+        '<div style="padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;' +
+          'display:flex;align-items:center;justify-content:space-between;background:#0c0f18">' +
+          '<span style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
+            'color:#5fd4c8">Workflow Portfolio</span>' +
+          '<span id="s9-portfolio-count" style="' + F9 + 'color:rgba(255,255,255,.25);' + MN + '"></span>' +
         '</div>' +
 
-        // ── MAIN BODY (needs attention + workflow cards) ──
-        '<div style="display:flex;flex:1;min-height:0;overflow:hidden">' +
-
-          // ── NEEDS ATTENTION (left, dominant) ──
-          '<div style="width:400px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.06);' +
-            'display:flex;flex-direction:column;overflow:hidden;background:#0c0f18">' +
-
-            // Broken section
-            '<div style="padding:9px 14px 7px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;' +
-              'display:flex;align-items:center;justify-content:space-between">' +
-              '<span style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-                'color:#5fd4c8">Needs Attention</span>' +
-              '<span id="s9-attn-count" style="' + F10 + 'color:rgba(255,255,255,.3);font-family:monospace">loading…</span>' +
-            '</div>' +
-            '<div id="s9-dash-broken" style="overflow-y:auto;max-height:240px;flex-shrink:0">' +
-              '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:12px 14px;font-style:italic">Loading…</div>' +
-            '</div>' +
-
-            // Support queue section
-            '<div style="padding:9px 14px 7px;border-bottom:1px solid rgba(255,255,255,.06);' +
-              'border-top:1px solid rgba(255,255,255,.06);flex-shrink:0;' +
-              'display:flex;align-items:center;justify-content:space-between">' +
-              '<span style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-                'color:#5fd4c8">Work Queue</span>' +
-              '<div style="display:flex;align-items:center;gap:6px">' +
-                '<span id="s9-queue-count" style="' + F10 + 'color:rgba(255,255,255,.3);font-family:monospace"></span>' +
-                '<span style="' + F10 + 'color:rgba(255,255,255,.2)">|</span>' +
-                _s9DashQueueFilters() +
-              '</div>' +
-            '</div>' +
-            '<div id="s9-dash-queue" style="overflow-y:auto;flex:1">' +
-              '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:12px 14px;font-style:italic">Loading…</div>' +
-            '</div>' +
-
-          '</div>' +
-
-          // ── WORKFLOW CARDS (right) ──
-          '<div style="flex:1;overflow-y:auto;padding:14px;background:#080a10">' +
-            '<div style="' + F10 + 'font-weight:700;letter-spacing:.10em;text-transform:uppercase;' +
-              'color:#5fd4c8;margin-bottom:10px">Workflow Portfolio</div>' +
-            '<div id="s9-dash-cards" style="display:flex;flex-direction:column;gap:8px">' +
-              '<div style="' + F11 + 'color:rgba(255,255,255,.2);font-style:italic">Loading workflows…</div>' +
-            '</div>' +
-          '</div>' +
-
+        // Cards grid
+        '<div id="s9-dash-cards" style="flex:1;overflow-y:auto;padding:12px;' +
+          'display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));' +
+          'grid-auto-rows:min-content;gap:10px;align-content:start">' +
+          '<div style="' + F11 + 'color:rgba(255,255,255,.2);padding:14px;font-style:italic;' +
+            'grid-column:1/-1">Loading workflows…</div>' +
         '</div>' +
+
       '</div>' +
 
     '</div>';
@@ -3870,7 +3902,7 @@ async function _s9DashLoadData() {
       API.get('bist_test_scripts?firm_id=eq.' + firmId +
         '&select=id,name,template_id').catch(function() { return []; }),
       API.get('bist_runs?firm_id=eq.' + firmId +
-        '&order=run_at.desc&limit=100&select=id,script_id,status,run_at,passing_count,failing_count').catch(function() { return []; }),
+        '&order=run_at.desc&limit=100&select=id,script_id,status,steps_passed,steps_failed,run_at,duration_ms').catch(function() { return []; }),
       API.get('support_tickets?firm_id=eq.' + firmId +
         '&deleted_at=is.null&status=in.(open,in_progress)&select=id,ticket_type,severity,status,title,assigned_to,created_at,module').catch(function() { return []; }),
     ]);
@@ -3894,8 +3926,9 @@ async function _s9DashLoadData() {
       tmplScripts.forEach(function(s) {
         var r = lastRunMap[s.id];
         if (!r) { notRun++; }
-        else if (r.status === 'passed' || (r.passing_count > 0 && r.failing_count === 0)) { passing++; }
-        else { failing++; }
+        else if (r.status === 'passed') { passing++; }
+        else if (r.status === 'failed' || r.status === 'error') { failing++; }
+        else { notRun++; } // 'running' or unknown
       });
       tmplHealth[t.id] = {
         total: tmplScripts.length,
@@ -3913,20 +3946,32 @@ async function _s9DashLoadData() {
     var uptimePct = totalWf > 0 ? Math.round(healthyWf / totalWf * 100) : 0;
     var uptimeColor = uptimePct === 100 ? '#3de08a' : uptimePct >= 75 ? '#f0a030' : '#f06060';
 
-    var uptimeEl = document.getElementById('s9-uptime-val');
+    // ── Uptime ring animation ──
+    var ring = document.getElementById('s9-uptime-ring');
+    var pctEl = document.getElementById('s9-uptime-pct');
+    var circ = 2 * Math.PI * 22; // 138.2
+    if (ring) {
+      ring.style.stroke = uptimeColor;
+      ring.setAttribute('stroke-dasharray', (uptimePct / 100 * circ).toFixed(1) + ' ' + circ.toFixed(1));
+    }
+    if (pctEl) { pctEl.textContent = uptimePct + '%'; pctEl.style.color = uptimeColor; }
+
     var uptimeSubEl = document.getElementById('s9-uptime-sub');
-    if (uptimeEl) { uptimeEl.textContent = uptimePct + '%'; uptimeEl.style.color = uptimeColor; }
-    if (uptimeSubEl) uptimeSubEl.textContent = healthyWf + ' of ' + totalWf + ' workflows healthy';
+    var uptimeTrendEl = document.getElementById('s9-uptime-trend');
+    if (uptimeSubEl) uptimeSubEl.textContent = healthyWf + ' of ' + totalWf + ' workflows passing';
+    if (uptimeTrendEl) uptimeTrendEl.textContent = failingWf > 0
+      ? failingWf + ' workflow' + (failingWf > 1 ? 's' : '') + ' need attention'
+      : 'All workflows healthy';
 
     var certCountEl = document.getElementById('s9-cert-count');
-    var certSubEl   = document.getElementById('s9-cert-sub');
     if (certCountEl) { certCountEl.textContent = healthyWf; certCountEl.style.color = uptimeColor; }
-    if (certSubEl)   certSubEl.textContent = 'of ' + totalWf + ' total';
+    var certSubEl = document.getElementById('s9-cert-sub');
+    if (certSubEl) certSubEl.textContent = 'of ' + totalWf + ' total';
 
     var failEl = document.getElementById('s9-fail-count');
     if (failEl) {
       failEl.textContent = failingWf;
-      failEl.style.color = failingWf > 0 ? '#f06060' : 'rgba(255,255,255,.4)';
+      failEl.style.color = failingWf > 0 ? '#f06060' : '#3de08a';
     }
 
     var ticketCountEl = document.getElementById('s9-ticket-count');
@@ -3936,9 +3981,17 @@ async function _s9DashLoadData() {
     }
 
     var attnCountEl = document.getElementById('s9-attn-count');
-    if (attnCountEl) attnCountEl.textContent = failingWf + ' workflow' + (failingWf !== 1 ? 's' : '');
+    if (attnCountEl) {
+      var brokenCount = templates.filter(function(t) {
+        var h = tmplHealth[t.id]; return h && (h.failing > 0 || h.total === 0);
+      }).length;
+      attnCountEl.textContent = brokenCount > 0 ? brokenCount + ' issue' + (brokenCount > 1 ? 's' : '') : 'clear';
+      attnCountEl.style.color = brokenCount > 0 ? '#f06060' : '#3de08a';
+    }
 
-    // ── Queue count ──
+    var portCountEl = document.getElementById('s9-portfolio-count');
+    if (portCountEl) portCountEl.textContent = totalWf + ' workflow' + (totalWf !== 1 ? 's' : '');
+
     var qCountEl = document.getElementById('s9-queue-count');
     if (qCountEl) qCountEl.textContent = tickets.length + ' open';
 
@@ -4018,49 +4071,55 @@ function _s9DashRenderCards(templates, health, scripts, lastRunMap) {
 
   el.innerHTML = templates.map(function(t) {
     var h = health[t.id] || { total:0, passing:0, failing:0, notRun:0, healthy:false };
-    var statusColor = h.total === 0    ? 'rgba(255,255,255,.2)'
-                    : h.failing > 0   ? '#f06060'
-                    : h.notRun > 0    ? '#f0a030'
+    var statusColor = h.total === 0  ? '#4a5568'
+                    : h.failing > 0 ? '#f06060'
+                    : h.notRun > 0  ? '#f0a030'
                     : '#3de08a';
-    var statusLabel = h.total === 0    ? 'No scripts'
-                    : h.failing > 0   ? h.failing + ' failing'
-                    : h.notRun > 0    ? 'Not run'
+    var statusLabel = h.total === 0  ? 'No scripts'
+                    : h.failing > 0 ? h.failing + ' failing'
+                    : h.notRun > 0  ? 'Not run'
                     : 'All passing';
-    var statusIcon  = h.total === 0    ? '○'
-                    : h.failing > 0   ? '✗'
-                    : h.notRun > 0    ? '◌'
+    var statusIcon  = h.total === 0  ? '○'
+                    : h.failing > 0 ? '✗'
+                    : h.notRun > 0  ? '◌'
                     : '✓';
-
-    // Mini bar
-    var barPct = h.total > 0 ? Math.round(h.passing / h.total * 100) : 0;
+    var barPct   = h.total > 0 ? Math.round(h.passing / h.total * 100) : 0;
     var barColor = h.failing > 0 ? '#f06060' : h.notRun > 0 ? '#f0a030' : '#3de08a';
+    var bgColor  = h.failing > 0 ? 'rgba(240,96,96,.04)' : 'rgba(255,255,255,.02)';
+    var FA = 'font-family:Arial,sans-serif;';
 
-    return '<div style="background:#0c0f18;border:1px solid rgba(255,255,255,.07);border-radius:4px;' +
-      'padding:10px 12px;cursor:pointer;transition:border-color .15s;' +
-      'border-left:3px solid ' + statusColor + '" ' +
-      'onmouseover="this.style.borderColor=\'rgba(255,255,255,.15)\'" ' +
-      'onmouseout="this.style.borderColor=\'rgba(255,255,255,.07)\'" ' +
+    return '<div style="background:' + bgColor + ';border:1px solid rgba(255,255,255,.08);' +
+      'border-left:3px solid ' + statusColor + ';border-radius:4px;' +
+      'padding:12px 14px;cursor:pointer;transition:all .15s" ' +
+      'onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" ' +
+      'onmouseout="this.style.background=\'' + bgColor + '\'" ' +
       'onclick="_s9DashOpenSimulator(\'' + t.id + '\')">' +
 
-      // Row 1: name + status
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
-        '<div style="display:flex;align-items:center;gap:7px;min-width:0">' +
-          '<span style="color:' + statusColor + ';font-size:13px">' + statusIcon + '</span>' +
-          '<span style="' + FA + 'font-size:12px;font-weight:700;color:rgba(255,255,255,.9);' +
-            'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _s9EscHtml(t.name) + '</span>' +
-          '<span style="' + FA + 'font-size:10px;color:rgba(255,255,255,.3);font-family:monospace;flex-shrink:0">v' + _s9EscHtml(t.version || '—') + '</span>' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">' +
+        '<div style="min-width:0;flex:1">' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">' +
+            '<span style="color:' + statusColor + ';font-size:14px;line-height:1">' + statusIcon + '</span>' +
+            '<span style="' + FA + 'font-size:12px;font-weight:700;color:rgba(255,255,255,.92);' +
+              'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _s9EscHtml(t.name) + '</span>' +
+          '</div>' +
+          '<span style="' + FA + 'font-size:10px;color:rgba(255,255,255,.28);font-family:monospace">' +
+            'v' + _s9EscHtml(t.version || '—') + ' · ' + _s9EscHtml(t.status || 'draft') + '</span>' +
         '</div>' +
-        '<span style="' + FA + 'font-size:10px;font-weight:700;color:' + statusColor + ';flex-shrink:0;margin-left:8px">' + statusLabel + '</span>' +
+        '<span style="' + FA + 'font-size:10px;font-weight:700;color:' + statusColor + ';' +
+          'flex-shrink:0;margin-left:10px;padding:2px 8px;border-radius:3px;' +
+          'background:' + statusColor + '18;border:1px solid ' + statusColor + '44">' + statusLabel + '</span>' +
       '</div>' +
 
-      // Row 2: health bar + counts
-      '<div style="display:flex;align-items:center;gap:8px">' +
-        '<div style="flex:1;height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden">' +
-          '<div style="height:100%;width:' + barPct + '%;background:' + barColor + ';border-radius:2px;transition:width .4s"></div>' +
-        '</div>' +
-        '<span style="' + FA + 'font-size:10px;color:rgba(255,255,255,.3);font-family:monospace;flex-shrink:0">' +
-          h.passing + '/' + h.total + ' scripts</span>' +
-        '<span style="' + FA + 'font-size:10px;color:#5fd4c8;text-decoration:underline;cursor:pointer;flex-shrink:0">→</span>' +
+      '<div style="height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;margin-bottom:8px">' +
+        '<div style="height:100%;width:' + barPct + '%;background:' + barColor + ';' +
+          'border-radius:2px;transition:width .6s ease"></div>' +
+      '</div>' +
+
+      '<div style="display:flex;align-items:center;justify-content:space-between">' +
+        '<span style="' + FA + 'font-size:10px;color:rgba(255,255,255,.3);font-family:monospace">' +
+          h.passing + ' passing · ' + h.failing + ' failing · ' + h.notRun + ' not run</span>' +
+        '<span style="' + FA + 'font-size:10px;color:#5fd4c8;cursor:pointer;' +
+          'text-decoration:underline;text-underline-offset:2px">Open Simulator →</span>' +
       '</div>' +
 
     '</div>';
@@ -4346,7 +4405,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-support.js?v=20260405-SUP1"></script>
 <script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE28f"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE29a"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
