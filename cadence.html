@@ -964,7 +964,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.56 — Coverage fix · Cache-buster SE28a','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.57 — Coverage DOM fix · Cache-buster SE28b','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -2965,27 +2965,38 @@ function _s9SwitchSimSubTab(tab) {
     if (el) el.style.display = (t === tab) ? 'flex' : 'none';
   });
 
-  // Render content on first switch
+  // Render content on first switch — defer one tick to let DOM settle
   if (tab === 'coverage') {
-    var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
-    if (tmpl && tmpl.id) {
-      _s9LoadCoverageData(tmpl.id, tmpl.version || '0.0.0');
-    } else {
+    setTimeout(function() {
       var body = document.getElementById('s9-coverage-body');
-      if (body) body.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;' +
-        'color:rgba(255,255,255,.3);padding:40px;text-align:center;width:100%">' +
-        'Select a workflow to view coverage.</div>';
-    }
+      console.log('[S9 Coverage] body el:', body, 'subtab:', document.getElementById('s9-subtab-coverage'));
+      var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+      if (tmpl && tmpl.id) {
+        _s9LoadCoverageData(tmpl.id, tmpl.version || '0.0.0');
+      } else {
+        if (body) body.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;' +
+          'color:rgba(255,255,255,.3);padding:40px;text-align:center;width:100%">' +
+          'Select a workflow to view coverage.</div>';
+      }
+    }, 50);
   }
   if (tab === 'history') {
-    _s9RenderHistoryStub();
+    setTimeout(function() { _s9RenderHistoryStub(); }, 50);
   }
 }
 
 // ── Coverage data loader ───────────────────────────────────────────────────────
 async function _s9LoadCoverageData(templateId, version) {
+  // Wait up to 500ms for DOM element to appear (panel may still be rendering)
   var body = document.getElementById('s9-coverage-body');
-  if (!body) return;
+  if (!body) {
+    await new Promise(function(res) { setTimeout(res, 100); });
+    body = document.getElementById('s9-coverage-body');
+  }
+  if (!body) {
+    console.warn('[S9 Coverage] s9-coverage-body not found in DOM');
+    return;
+  }
   body.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;' +
     'color:rgba(255,255,255,.3);padding:40px;text-align:center;width:100%">Loading coverage data…</div>';
 
@@ -3807,7 +3818,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-dag-viewer.js?v=20260403-S9"></script>
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE28a"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE28b"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
