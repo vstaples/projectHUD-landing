@@ -964,7 +964,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.55 — Coverage Tab · Cache-buster SE28','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.56 — Coverage fix · Cache-buster SE28a','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'library';          // 'library' | 'simulator' | 'instances'
@@ -2833,6 +2833,10 @@ async function _s9LoadSimScripts(templateId, version) {
       if (stepsEl) stepsEl.textContent = stepCount || '—';
     }
 
+    // Cache for Coverage tab reuse
+    window._s9CachedScripts = scripts;
+    window._s9CachedRuns    = runs;
+
     if (!scripts.length) return;
 
     // runs already fetched above
@@ -2986,40 +2990,44 @@ async function _s9LoadCoverageData(templateId, version) {
     'color:rgba(255,255,255,.3);padding:40px;text-align:center;width:100%">Loading coverage data…</div>';
 
   try {
-    var firmId = await _s9WaitForFirmId();
+    // Use cached data from Scripts tab if available — avoids redundant fetch
+    var scripts = window._s9CachedScripts || null;
+    var runs    = window._s9CachedRuns    || null;
 
-    // Fetch scripts for this template
-    var scripts = await API.get(
-      'bist_test_scripts?firm_id=eq.' + firmId +
-      '&template_id=eq.' + templateId +
-      '&order=created_at.asc'
-    ).catch(function() { return []; });
-
-    // Fetch recent runs for these scripts
-    var runs = [];
-    if (scripts && scripts.length) {
-      var ids = scripts.map(function(s) { return s.id; }).join(',');
-      runs = await API.get(
-        'bist_runs?firm_id=eq.' + firmId +
-        '&script_id=in.(' + ids + ')&order=run_at.desc&limit=200'
+    // Only re-fetch if cache is empty or for a different template
+    if (!scripts) {
+      var firmId = await _s9WaitForFirmId();
+      scripts = await API.get(
+        'bist_test_scripts?firm_id=eq.' + firmId +
+        '&template_id=eq.' + templateId +
+        '&order=created_at.asc'
       ).catch(function() { return []; });
+      if (!Array.isArray(scripts)) scripts = [];
+
+      if (scripts.length) {
+        var ids = scripts.map(function(s) { return s.id; }).join(',');
+        runs = await API.get(
+          'bist_runs?firm_id=eq.' + firmId +
+          '&script_id=in.(' + ids + ')&order=run_at.desc&limit=200'
+        ).catch(function() { return []; });
+        if (!Array.isArray(runs)) runs = [];
+      } else {
+        runs = [];
+      }
     }
 
-    // Fetch template steps
-    var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+    // Template steps — always from _selectedTmpl first
+    var tmpl  = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
     var steps = (tmpl && Array.isArray(tmpl.steps)) ? tmpl.steps : [];
-    if (!steps.length && templateId) {
-      var stepRows = await API.get(
-        'workflow_steps?template_id=eq.' + templateId + '&order=seq.asc'
-      ).catch(function() { return []; });
-      steps = stepRows || [];
-    }
 
+    console.log('[S9 Coverage] scripts:', scripts.length, 'runs:', (runs||[]).length, 'steps:', steps.length);
     _s9RenderCoverageTab(body, scripts || [], runs || [], steps, version);
 
   } catch(e) {
+    console.error('[S9 Coverage] Load failed:', e);
     if (body) body.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;' +
-      'color:#f06060;padding:40px;text-align:center;width:100%">Error loading coverage data.</div>';
+      'color:#f06060;padding:40px;text-align:center;width:100%">Error loading coverage data: ' +
+      (e && e.message ? e.message : String(e)) + '</div>';
   }
 }
 
@@ -3132,7 +3140,12 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
     var dotColor = s === 'covered' ? '#3de08a' : s === 'stale' ? '#f0a030' : '#f06060';
     var lastRunStr = r ? _s9FmtCovDate(r.run_at) : 'Never';
     var spec = {};
-    try { spec = typeof sc.script === 'string' ? JSON.parse(sc.script || '{}') : (sc.script || {}); } catch(e) {}
+    try {
+      var raw = sc.script;
+      if (typeof raw === 'string') spec = JSON.parse(raw || '{}');
+      else if (raw && typeof raw === 'object') spec = raw;
+      else spec = {};
+    } catch(e) { spec = {}; }
     var stepCount = Array.isArray(spec.steps) ? spec.steps.length : 0;
     var barW = s === 'covered' ? 100 : s === 'stale' ? 75 : 0;
     var barColor = dotColor;
@@ -3159,7 +3172,12 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       var s = scriptStatus(sc);
       var r = lastRunMap[sc.id];
       var spec = {};
-      try { spec = typeof sc.script === 'string' ? JSON.parse(sc.script || '{}') : (sc.script || {}); } catch(e) {}
+      try {
+      var raw = sc.script;
+      if (typeof raw === 'string') spec = JSON.parse(raw || '{}');
+      else if (raw && typeof raw === 'object') spec = raw;
+      else spec = {};
+    } catch(e) { spec = {}; }
       var stps = Array.isArray(spec.steps) ? spec.steps : [];
       var assertCount = stps.reduce(function(a, stp) {
         return a + (Array.isArray(stp.asserts) ? stp.asserts.length : 0);
@@ -3199,7 +3217,12 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
     return scripts.map(function(sc) {
       var s = scriptStatus(sc);
       var spec = {};
-      try { spec = typeof sc.script === 'string' ? JSON.parse(sc.script || '{}') : (sc.script || {}); } catch(e) {}
+      try {
+      var raw = sc.script;
+      if (typeof raw === 'string') spec = JSON.parse(raw || '{}');
+      else if (raw && typeof raw === 'object') spec = raw;
+      else spec = {};
+    } catch(e) { spec = {}; }
       var stps = Array.isArray(spec.steps) ? spec.steps : [];
       var borderColor = s === 'covered' ? '#3de08a' : s === 'stale' ? '#f0a030' : '#f06060';
       var bgColor     = s === 'covered' ? 'rgba(61,224,138,.06)' : s === 'stale' ? 'rgba(240,160,48,.06)' : 'rgba(240,96,96,.06)';
@@ -3299,7 +3322,12 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       var cells = scripts.map(function(sc) {
         var s = scriptStatus(sc);
         var spec = {};
-        try { spec = typeof sc.script === 'string' ? JSON.parse(sc.script || '{}') : (sc.script || {}); } catch(e) {}
+        try {
+      var raw = sc.script;
+      if (typeof raw === 'string') spec = JSON.parse(raw || '{}');
+      else if (raw && typeof raw === 'object') spec = raw;
+      else spec = {};
+    } catch(e) { spec = {}; }
         var stps = Array.isArray(spec.steps) ? spec.steps : [];
         // Check if this script touches this step (by seq or name match)
         var touches = stps.some(function(st) {
@@ -3779,7 +3807,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-dag-viewer.js?v=20260403-S9"></script>
 <script src="/js/cdn-template-editor.js?v=20260403-S9"></script>
 <script src="/js/cdn-bist.js?v=20260405-BQ"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE28"></script>
+<script src="/js/cdn-script-editor.js?v=20260405-SE28a"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
