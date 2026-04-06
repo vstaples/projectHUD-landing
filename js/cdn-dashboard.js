@@ -45,7 +45,7 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-wf-r2{display:grid;grid-template-columns:140px 8px 160px 8px 220px 8px 1fr;align-items:center;margin-bottom:5px}\n'
     + '.cd-wf-r2-cell{font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
     + '.cd-wf-r2-sep{color:rgba(255,255,255,.18);font-size:11pt;text-align:center}\n'
-    + '.cd-wf-r2-bar{display:flex;align-items:center;gap:7px}\n'
+    + '.cd-wf-r2-bar{display:flex;align-items:center;gap:7px;min-width:0}\n'
     + '.cd-wf-name{font-size:12pt;font-weight:700;color:#ffffff;font-family:Arial,sans-serif}\n'
     + '.cd-wf-ver{font-size:11pt;color:rgba(255,255,255,.7);margin-top:1px;font-family:Arial,sans-serif}\n'
     + '.cd-pill{font-size:10pt;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.04em;flex-shrink:0;font-family:Arial,sans-serif}\n'
@@ -70,7 +70,7 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-wf-btn:hover{border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.85)}\n'
     + '.cd-wf-btn.primary{background:rgba(0,201,201,.12);border-color:rgba(0,201,201,.4);color:var(--cad,#00c9c9)}\n'
     + '.cd-wf-btn.danger{background:rgba(220,60,60,.12);border-color:rgba(220,60,60,.35);color:var(--cd-red)}\n'
-    + '.cd-port-count{font-size:9px;color:rgba(255,255,255,.35);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase}\n'+ '.cd-controls{display:flex;align-items:center;padding:5px 14px;gap:10px;background:#0d1017;border-bottom:1px solid #1e2535;flex-shrink:0;flex-wrap:wrap}\n'
+    + '.cd-port-count{font-size:10px;color:var(--cd-teal);font-weight:700;margin-bottom:8px;letter-spacing:.09em;text-transform:uppercase}\n'+ '.cd-controls{display:flex;align-items:center;padding:5px 14px;gap:10px;background:#0d1017;border-bottom:1px solid #1e2535;flex-shrink:0;flex-wrap:wrap}\n'
     + '.cd-ctrl-lbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35)}\n'
     + '.cd-range-btn{padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;cursor:pointer;border:1px solid #252d3f;color:rgba(255,255,255,.4);background:transparent}\n'
     + '.cd-range-btn.active,.cd-range-btn:hover{background:#161b28;border-color:var(--cd-teal);color:var(--cd-teal)}\n'
@@ -244,7 +244,7 @@ function _cdRenderShell(panel){
         '<div class="cd-view-hint" id="cd-view-hint">Showing all templates</div>'+
       '</div>'+
       '<div id="cd-portfolio-panel" style="overflow-y:auto;padding:14px 16px">'+
-        '<div id="cd-port-count" style="font-size:9px;color:rgba(255,255,255,.35);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase"></div>'+
+        '<div id="cd-port-count" style="font-size:10px;color:var(--cd-teal);font-weight:700;margin-bottom:8px;letter-spacing:.09em;text-transform:uppercase"></div>'+
         '<div id="cd-port-grid" style="display:flex;flex-direction:column;gap:8px">'+
           '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:24px;text-align:center">Loading portfolio...</div>'+
         '</div>'+
@@ -369,31 +369,50 @@ function _cdRenderHeatmap(runs){
   var dayMap={};
   (runs||[]).forEach(function(r){if(!r.run_at)return;var dk=new Date(r.run_at).toDateString();if(!dayMap[dk])dayMap[dk]={p:0,f:0};if(r.status==='passed')dayMap[dk].p++;else dayMap[dk].f++;});
   var today=new Date();today.setHours(0,0,0,0);
-  // Build 30 days back — one column per day, 5 rows of blocks per column
-  var ROWS=5,DAYS=30;
   var clr={p:'#3de08a',f:'#e84040',a:'#f5c842',n:'#161b28'};
   var lbl={p:'All passing',f:'Failing',a:'Partial passes',n:'No run'};
-  var cols=[];
-  for(var i=DAYS-1;i>=0;i--){
-    var d=new Date(today);d.setDate(today.getDate()-i);
-    var dk=d.toDateString();
-    var m=d.getMonth()+1,dy=d.getDate();
+  // Build a 5-row (Mon-Fri) x 5-col (week) grid
+  // Find the most recent Monday on or before today
+  var dow=today.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  var daysToMon=dow===0?6:dow-1;
+  var thisMonday=new Date(today);thisMonday.setDate(today.getDate()-daysToMon);
+  // 5 weeks = columns 0..4, week 4 = most recent (rightmost)
+  var weeks=[];
+  for(var w=4;w>=0;w--){
+    var weekStart=new Date(thisMonday);weekStart.setDate(thisMonday.getDate()-(w*7));
+    // Column date label = Monday of this week
+    var m=weekStart.getMonth()+1,dy=weekStart.getDate();
     var dateStr=(m<10?'0'+m:m)+'/'+(dy<10?'0'+dy:dy);
-    var st='n';
-    if(dayMap[dk]){st=dayMap[dk].f>0?(dayMap[dk].p>0?'a':'f'):'p';}
-    cols.push({st:st,dateStr:dateStr,title:lbl[st]+' — '+d.toLocaleDateString('en-US',{month:'short',day:'numeric'})});
+    var days=[];
+    for(var d2=0;d2<5;d2++){ // Mon=0..Fri=4
+      var dd=new Date(weekStart);dd.setDate(weekStart.getDate()+d2);
+      var dk=dd.toDateString();
+      var st=dd>today?'n':(dayMap[dk]?dayMap[dk].f>0?(dayMap[dk].p>0?'a':'f'):'p':'n');
+      var ttl=lbl[st]+' — '+dd.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      days.push({st:st,title:ttl});
+    }
+    weeks.push({dateStr:dateStr,days:days});
   }
-  // Render: date label on top, then 5 stacked blocks below
-  grid.innerHTML='<div style="display:flex;gap:4px;align-items:flex-end">'+
-    cols.map(function(col){
-      var blocks='';
-      for(var r=0;r<ROWS;r++) blocks+='<div style="width:12px;height:8px;border-radius:1px;background:'+clr[col.st]+';margin-bottom:1px" title="'+col.title+'"></div>';
-      return '<div style="display:flex;flex-direction:column;align-items:center">'+
-        '<div style="font-size:8px;color:rgba(255,255,255,.3);font-family:monospace;margin-bottom:2px;writing-mode:vertical-lr;transform:rotate(180deg);height:22px;line-height:1">'+col.dateStr+'</div>'+
-        '<div style="display:flex;flex-direction:column-reverse">'+blocks+'</div>'+
-      '</div>';
-    }).join('')+
-  '</div>';
+  var DOW_LABELS=['M','T','W','T','F'];
+  // Render: row-prefix column + 5 week-columns
+  var html='<div style="display:flex;gap:10px;align-items:flex-start;margin-top:4px">';
+  // Left label column (Mon-Fri prefix)
+  html+='<div style="display:flex;flex-direction:column;gap:3px;padding-top:18px">';
+  for(var di=0;di<5;di++) html+='<div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.35);height:11px;line-height:11px;font-family:monospace">'+DOW_LABELS[di]+'</div>';
+  html+='</div>';
+  // 5 week columns
+  weeks.forEach(function(wk){
+    html+='<div style="display:flex;flex-direction:column;align-items:center;gap:3px">';
+    // Date label on top
+    html+='<div style="font-size:9px;color:rgba(255,255,255,.35);font-family:monospace;white-space:nowrap;margin-bottom:3px">'+wk.dateStr+'</div>';
+    // 5 day blocks (Mon top, Fri bottom)
+    wk.days.forEach(function(day){
+      html+='<div style="width:18px;height:11px;border-radius:2px;background:'+clr[day.st]+'" title="'+day.title+'"></div>';
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  grid.innerHTML=html;
   var ageEl=document.getElementById('cd-cert-age-lbl');
   if(ageEl)ageEl.textContent=runs&&runs.length?'last run '+_cdRelTime(runs[0].run_at):'never run';
 }
@@ -1054,9 +1073,9 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
         '<span class="cd-wf-r2-cell">'+_cdEsc(lastRunLine)+'</span>'+
         '<span class="cd-wf-r2-sep">|</span>'+
         '<div class="cd-wf-r2-bar">'+
-          '<div class="cd-cov-bar" style="flex:1"><div class="cd-cov-fill" style="width:'+covPct+'%;background:'+covClr+'"></div></div>'+
-          '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap">'+covPct+'%</span>'+
-          '<span style="font-size:11pt;color:rgba(255,255,255,.45);white-space:nowrap">'+_cdEsc(suiteLine)+'</span>'+
+          '<div class="cd-cov-bar" style="flex:1;min-width:40px"><div class="cd-cov-fill" style="width:'+covPct+'%;background:'+covClr+'"></div></div>'+
+          '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:38px;text-align:right">'+covPct+'%</span>'+
+          '<span style="font-size:11pt;color:rgba(255,255,255,.45);white-space:nowrap;width:160px;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(suiteLine)+'</span>'+
         '</div>'+
       '</div>'+
       '<div class="cd-wf-expand" id="cd-wf-exp-'+t.id+'" style="display:none"></div>'+
