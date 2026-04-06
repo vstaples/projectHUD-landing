@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD12 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD13 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -42,12 +42,7 @@ console.log('%c[cdn-dashboard] v20260407-CD12 — composite dashboard','backgrou
     + '.cd-wf-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}\n'
     + '.cd-wf-r1{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}\n'
     + '.cd-wf-r1-right{display:flex;align-items:center;gap:6px;flex-shrink:0}\n'
-    + '.cd-wf-r2{display:grid;grid-template-columns:130px 8px 150px 8px 200px;align-items:center;margin-bottom:4px}\n'
-    + '.cd-wf-r3{display:flex;align-items:center;gap:8px;margin-top:2px}\n'
-    + '.cd-wf-r3-cov{font-size:10pt;white-space:nowrap;flex-shrink:0;width:180px;text-align:right}\n'
-    + '.cd-wf-r3-bar{flex:1;min-width:0;height:4px;background:#1e2535;border-radius:2px;overflow:hidden;cursor:help;max-width:340px}\n'
-    + '.cd-wf-r3-pct{font-size:11pt;font-weight:500;font-family:var(--font-mono,monospace);white-space:nowrap;width:34px;text-align:right;flex-shrink:0}\n'
-    + '.cd-wf-r3-suite{font-size:11pt;color:rgba(255,255,255,.5);white-space:nowrap;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;max-width:200px}\n'
+    + '.cd-wf-r2{display:grid;grid-template-columns:130px 8px 150px 8px 200px;align-items:center;margin-bottom:2px}\n'
     + '.cd-wf-r2-cell{font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
     + '.cd-wf-r2-sep{color:rgba(255,255,255,.18);font-size:11pt;text-align:center}\n'
     
@@ -1117,15 +1112,16 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
       (function(){
         var pathTotal=tmplPaths.total,pathCov=tmplPaths.covered;
         var covTestClr=pathTotal===0?'rgba(255,255,255,.3)':pathCov===pathTotal?'var(--cd-grn)':pathCov>0?'var(--cd-amb)':'rgba(255,255,255,.3)';
-        if(pathTotal>0) covTestLbl=pathCov+'/'+pathTotal+' Coverage Path'+(pathTotal===1?'':'s')+' Defined';
-        else covTestLbl='No Coverage Paths Defined';
-        return '<div class="cd-wf-r3">'+
-          '<span class="cd-wf-r3-cov" style="color:'+covTestClr+'">'+covTestLbl+'</span>'+
-          '<div class="cd-wf-r3-bar" onmouseenter="_cdCovTipShow(event,\''+t.id+'\')" onmouseleave="_cdCovTipHide()">'+
-            '<div style="height:100%;width:'+(covPct||0)+'%;background:'+covClr+';border-radius:2px;transition:width .3s"></div>'+
+        var covTestLbl=pathTotal>0?(pathCov+'/'+pathTotal+' Coverage Path'+(pathTotal===1?'':'s')+' Defined'):'No Coverage Paths Defined';
+        return '<div style="display:flex;align-items:center;gap:8px;margin-top:3px">'+
+          '<div style="position:relative;flex:1;min-width:0;max-width:340px;padding-top:14px">'+
+            '<div style="position:absolute;top:0;left:0;font-size:9pt;white-space:nowrap;color:'+covTestClr+'">'+covTestLbl+'</div>'+
+            '<div style="height:4px;background:#1e2535;border-radius:2px;overflow:hidden;cursor:help" onmouseenter="_cdCovTipShow(event,\''+t.id+'\')" onmouseleave="_cdCovTipHide()">'+
+              '<div style="height:100%;width:'+(covPct||0)+'%;background:'+covClr+';border-radius:2px;transition:width .3s"></div>'+
+            '</div>'+
           '</div>'+
-          '<span class="cd-wf-r3-pct" style="color:'+covClr+'">'+covLabel+'</span>'+
-          '<span class="cd-wf-r3-suite">'+_cdEsc(suiteLine)+'</span>'+
+          '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:34px;text-align:right">'+covLabel+'</span>'+
+          '<span style="font-size:11pt;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">'+_cdEsc(suiteLine)+'</span>'+
         '</div>';
       })()+
 
