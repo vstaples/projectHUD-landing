@@ -42,7 +42,7 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-wf-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}\n'
     + '.cd-wf-r1{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}\n'
     + '.cd-wf-r1-right{display:flex;align-items:center;gap:6px;flex-shrink:0}\n'
-    + '.cd-wf-r2{display:grid;grid-template-columns:140px 8px 160px 8px 220px 8px 1fr;align-items:center;margin-bottom:5px}\n'
+    + '.cd-wf-r2{display:grid;grid-template-columns:130px 8px 150px 8px 200px 8px 1fr;align-items:center;margin-bottom:5px}\n'
     + '.cd-wf-r2-cell{font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
     + '.cd-wf-r2-sep{color:rgba(255,255,255,.18);font-size:11pt;text-align:center}\n'
     + '.cd-wf-r2-bar{display:flex;align-items:center;gap:7px;min-width:0}\n'
@@ -1058,11 +1058,11 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
 
     var suiteLine;
     if (scriptCt) {
-      suiteLine = passCt+'/'+scriptCt+' passing'+(failCt?' · '+failCt+' failing':'');
+      suiteLine = passCt+'/'+scriptCt+' Custom test scripts passing'+(failCt?' · '+failCt+' failing':'');
     } else if (cert && (cert.status==='valid'||cert.status==='active'||(!cert.status.match(/invalidat|revok/)))) {
-      suiteLine = 'Certified — add scripts to maintain coverage';
+      suiteLine = 'Certified — add custom test scripts';
     } else {
-      suiteLine = '0 scripts — no test coverage';
+      suiteLine = 'No custom test scripts';
     }
     var certDateLine = cert && cert.issued_at ? 'Cert issued '+_cdRelTime(cert.issued_at) : 'Never certified';
     var lastRun = tmplRuns[0];
@@ -1112,8 +1112,8 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
         '<div class="cd-wf-r2-bar">'+
           '<div class="cd-cov-bar" style="flex:1;min-width:40px;cursor:help" '+            'onmouseenter="_cdCovTipShow(event,\''+t.id+'\')" '+            'onmouseleave="_cdCovTipHide()">'+            '<div class="cd-cov-fill" style="width:'+(covPct||0)+'%;background:'+covClr+'"></div>'+          '</div>'+
           
-          '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:38px;text-align:right">'+covLabel+'</span>'+
-          '<span style="font-size:11pt;color:rgba(255,255,255,.45);white-space:nowrap;width:160px;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(suiteLine)+'</span>'+
+          '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:34px;text-align:right">'+covLabel+'</span>'+
+          '<span style="font-size:11pt;color:rgba(255,255,255,.45);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(suiteLine)+'</span>'+
         '</div>'+
       '</div>'+
       '<div class="cd-wf-expand" id="cd-wf-exp-'+t.id+'" style="display:none"></div>'+
@@ -1205,7 +1205,7 @@ function _cdCovTipShow(e, tmplId) {
     +scriptRows
     +'<div style="margin-top:12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:5px">Next Steps</div>'
     +todoHtml
-    +'<div style="margin-top:12px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(255,255,255,.3);line-height:1.55">Scripts prove each scenario works. Path coverage confirms every routing branch has a script. A template can be certified with partial path coverage.</div>';
+    +'<div style="margin-top:12px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08);font-size:13px;color:rgba(255,255,255,.35);line-height:1.55">Scripts prove each scenario works. Path coverage confirms every routing branch has a script. A template can be certified with partial path coverage.</div>';
 
   panel.style.display='block';
   panel.style.width='520px';
