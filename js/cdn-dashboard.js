@@ -40,6 +40,12 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-wf.wf-uncov{border-left:3px solid #4a5568}\n'
     + '.cd-wf.wf-cert{border-left:3px solid var(--cd-grn)}\n'
     + '.cd-wf-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}\n'
+    + '.cd-wf-r1{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}\n'
+    + '.cd-wf-r1-right{display:flex;align-items:center;gap:6px;flex-shrink:0}\n'
+    + '.cd-wf-r2{display:flex;align-items:center;gap:0;flex-wrap:wrap}\n'
+    + '.cd-wf-r2-cell{font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;padding:0 10px;white-space:nowrap}\n'
+    + '.cd-wf-r2-cell:first-child{padding-left:0}\n'
+    + '.cd-wf-r2-sep{color:rgba(255,255,255,.2);font-size:11pt;flex-shrink:0}\n'
     + '.cd-wf-name{font-size:12pt;font-weight:700;color:#ffffff;font-family:Arial,sans-serif}\n'
     + '.cd-wf-ver{font-size:11pt;color:rgba(255,255,255,.7);margin-top:1px;font-family:Arial,sans-serif}\n'
     + '.cd-pill{font-size:10pt;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.04em;flex-shrink:0;font-family:Arial,sans-serif}\n'
@@ -52,9 +58,9 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-cov-fill{height:100%;border-radius:2px;transition:width .3s}\n'
     + '.cd-cov-pct{font-size:14pt;font-weight:700;min-width:40px;text-align:right;font-family:monospace}\n'
     + '.cd-cov-suite{font-size:11pt;color:rgba(255,255,255,.75);white-space:nowrap;font-family:Arial,sans-serif}\n'
-    + '.cd-wf-dates{display:flex;gap:14px;margin-bottom:5px}\n'
+    
     + '.cd-wf-date{font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif}\n'
-    + '.cd-wf-acts{display:flex;gap:6px;flex-wrap:wrap}\n'
+    
     + '.cd-wf-expand{padding:0 2px}\n'
     + '.cd-wf button.cd-wf-btn{font-size:11pt;font-weight:600;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.85);cursor:pointer;font-family:Arial,sans-serif}\n'
     + '.cd-wf button.cd-wf-btn:hover{border-color:rgba(255,255,255,.5);color:#ffffff;background:rgba(255,255,255,.06)}\n'
@@ -954,6 +960,16 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
   }
   if (countEl) countEl.textContent = tmpls.length+' template'+(tmpls.length>1?'s':'');
 
+  // Sort: cert-invalid first, then not-covered/uncertified, then stale, then certified
+  var sortPriority = function(t) {
+    var c = certByTmpl[t.id];
+    if (!c || c.status==='revoked') return scriptsByTmpl[t.id] ? 2 : 1;
+    if (c.status==='invalidated') return 0;
+    var age = _cdDaysAgo(c.issued_at)||0;
+    return age>30 ? 3 : 4;
+  };
+  tmpls = tmpls.slice().sort(function(a,b){ return sortPriority(a)-sortPriority(b); });
+
   gridEl.innerHTML = tmpls.map(function(t){
     var cert      = certByTmpl[t.id] || null;
     var tmplRuns  = runsByTmpl[t.id] || [];
@@ -983,7 +999,14 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     var suiteLine = scriptCt ? passCt+'/'+scriptCt+' passing'+(failCt?' · '+failCt+' failing':'') : '0 scripts — no test coverage';
     var certDateLine = cert && cert.issued_at ? 'Cert issued '+_cdRelTime(cert.issued_at) : 'Never certified';
     var lastRun = tmplRuns[0];
-    var lastRunLine = lastRun ? 'Last run '+_cdRelTime(lastRun.run_at) : 'Never run';
+    var lastRunLine;
+    if (lastRun) {
+      lastRunLine = 'Last run '+_cdRelTime(lastRun.run_at);
+    } else if (cert && cert.issued_at) {
+      lastRunLine = 'Last run ~'+_cdRelTime(cert.issued_at)+' (cert date)';
+    } else {
+      lastRunLine = 'Never run';
+    }
 
     // Per-status buttons — each targets a distinct action
     var actBtns;
@@ -1005,17 +1028,24 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     }
 
     return '<div class="cd-wf '+statusCls+'" id="cd-wf-'+t.id+'" data-tid="'+t.id+'" onclick="_cdPortToggle(this.dataset.tid)">'+
-      '<div class="cd-wf-hdr">'+
-        '<div><div class="cd-wf-name">'+_cdEsc(t.name)+'</div><div class="cd-wf-ver">v'+_cdEsc(t.version||'—')+' · '+_cdEsc(t.status||'draft')+'</div></div>'+
-        '<span class="cd-pill '+statusPillCls+'">'+statusLabel+'</span>'+
+      '<div class="cd-wf-r1">'+
+        '<div class="cd-wf-name">'+_cdEsc(t.name)+'</div>'+
+        '<div class="cd-wf-r1-right">'+
+          actBtns+
+          '<span class="cd-pill '+statusPillCls+'">'+statusLabel+'</span>'+
+        '</div>'+
       '</div>'+
-      '<div class="cd-wf-cov">'+
-        '<div class="cd-cov-bar"><div class="cd-cov-fill" style="width:'+covPct+'%;background:'+covClr+'"></div></div>'+
-        '<div class="cd-cov-pct" style="color:'+covClr+'">'+covPct+'%</div>'+
-        '<div class="cd-cov-suite cd-t2">'+_cdEsc(suiteLine)+'</div>'+
+      '<div class="cd-wf-r2">'+
+        '<span class="cd-wf-r2-cell">v'+_cdEsc(t.version||'—')+' · '+_cdEsc(t.status||'draft')+'</span>'+
+        '<span class="cd-wf-r2-sep">|</span>'+
+        '<span class="cd-wf-r2-cell">'+_cdEsc(certDateLine)+'</span>'+
+        '<span class="cd-wf-r2-sep">|</span>'+
+        '<span class="cd-wf-r2-cell">'+_cdEsc(lastRunLine)+'</span>'+
+        '<span class="cd-wf-r2-sep">|</span>'+
+        '<div class="cd-cov-bar" style="display:inline-flex;vertical-align:middle;width:60px"><div class="cd-cov-fill" style="width:'+covPct+'%;background:'+covClr+'"></div></div>'+
+        '<span class="cd-wf-r2-cell" style="color:'+covClr+';font-family:var(--font-mono,monospace)">'+covPct+'%</span>'+
+        '<span class="cd-wf-r2-cell cd-t2">'+_cdEsc(suiteLine)+'</span>'+
       '</div>'+
-      '<div class="cd-wf-dates"><span class="cd-wf-date">'+_cdEsc(certDateLine)+'</span><span class="cd-wf-date">'+_cdEsc(lastRunLine)+'</span></div>'+
-      '<div class="cd-wf-acts">'+actBtns+'</div>'+
       '<div class="cd-wf-expand" id="cd-wf-exp-'+t.id+'" style="display:none"></div>'+
     '</div>';
   }).join('');
