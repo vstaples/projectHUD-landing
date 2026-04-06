@@ -247,7 +247,7 @@ function _cdRenderShell(panel){
         '<button class="cd-vbtn" id="cd-vbtn-history" onclick="_cdSwitchView(\'history\')">Run History</button>'+
         '<div class="cd-view-hint" id="cd-view-hint">Showing all templates</div>'+
       '</div>'+
-      '<div id="cd-cov-tip-panel" style="display:none;position:fixed;z-index:9999;background:#131820;border:1px solid #252d3f;border-radius:6px;padding:14px 16px;width:320px;box-shadow:0 8px 28px rgba(0,0,0,.7);pointer-events:none;font-family:Arial,sans-serif"></div>'+
+      '<div id="cd-cov-tip-panel" style="display:none;position:fixed;z-index:9999;background:#131820;border:1px solid #252d3f;border-radius:6px;padding:14px 16px;width:520px;box-shadow:0 8px 28px rgba(0,0,0,.7);pointer-events:none;font-family:Arial,sans-serif"></div>'+
       '<div id="cd-portfolio-panel" style="overflow-y:auto;padding:14px 16px">'+
         '<div id="cd-port-count" style="font-size:10px;color:var(--cd-teal);font-weight:700;margin-bottom:8px;letter-spacing:.09em;text-transform:uppercase"></div>'+
         '<div id="cd-port-grid" style="display:flex;flex-direction:column;gap:8px">'+
@@ -1130,63 +1130,94 @@ function _cdCovTipShow(e, tmplId) {
   var paths    = (d.pathsByTmpl||{})[tmplId] || {total:0,covered:0};
   var cert     = (d.certByTmpl||{})[tmplId] || null;
 
-  // Latest run per script
   var latestByScript = {};
   allRuns.forEach(function(r){ if(r.script_id && !latestByScript[r.script_id]) latestByScript[r.script_id]=r; });
 
-  var passCt = 0, failCt = 0;
-  scripts.forEach(function(s){ var r=latestByScript[s.id]; if(r){ if(r.status==='passed')passCt++; else failCt++; } });
+  var passCt=0, failCt=0, notRunCt=0;
+  scripts.forEach(function(s){
+    var r=latestByScript[s.id];
+    if(!r) notRunCt++; else if(r.status==='passed') passCt++; else failCt++;
+  });
 
-  // Coverage sentence
-  var covLine = paths.total > 0
-    ? (Math.round((paths.covered/paths.total)*100))+'% of '+paths.total+' routing paths covered ('+paths.covered+' covered).'
-    : 'No routing path analysis yet.';
+  var covLine='';
+  if (paths.total>0) {
+    var covPct2=Math.round((paths.covered/paths.total)*100);
+    covLine='Routing Path Coverage: '+paths.covered+' of '+paths.total+' paths covered ('+covPct2+'%) — this is what the progress bar shows.';
+  } else {
+    covLine='Routing path analysis not yet run. Progress bar reflects script pass rate.';
+  }
 
-  // Script rows
-  var scriptRows = '';
+  var scriptRows='';
   if (scripts.length) {
     scriptRows = scripts.map(function(s) {
-      var r = latestByScript[s.id];
-      var dot = !r ? '#4a5568' : r.status==='passed' ? '#3de08a' : '#e84040';
-      var when = r ? _cdRelTime(r.run_at) : 'Never run';
-      var status = !r ? 'Not run' : r.status==='passed' ? 'Passed' : 'Failed';
-      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
-        +'<div style="width:7px;height:7px;border-radius:50%;background:'+dot+';flex-shrink:0"></div>'
-        +'<div style="flex:1;font-size:11px;color:rgba(255,255,255,.8)">'+_cdEsc(s.name)+'</div>'
-        +'<div style="font-size:10px;color:rgba(255,255,255,.4);white-space:nowrap">'+status+' · '+when+'</div>'
+      var r=latestByScript[s.id];
+      var dot=!r?'#4a5568':r.status==='passed'?'#3de08a':'#e84040';
+      var when=r?_cdRelTime(r.run_at):'Never run';
+      var statusLbl=!r?'Not run':r.status==='passed'?'Passed':'Failed';
+      var statusClr=!r?'rgba(255,255,255,.35)':r.status==='passed'?'#3de08a':'#e84040';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        +'<div style="width:8px;height:8px;border-radius:50%;background:'+dot+';flex-shrink:0"></div>'
+        +'<div style="flex:1;font-size:13px;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(s.name)+'</div>'
+        +'<div style="font-size:12px;font-weight:600;color:'+statusClr+';white-space:nowrap;min-width:50px;text-align:right">'+statusLbl+'</div>'
+        +'<div style="font-size:11px;color:rgba(255,255,255,.35);white-space:nowrap;min-width:70px;text-align:right">'+when+'</div>'
         +'</div>';
     }).join('');
   } else {
-    scriptRows = '<div style="font-size:11px;color:rgba(255,255,255,.35);padding:4px 0">No test scripts written yet.</div>';
+    scriptRows='<div style="font-size:13px;color:rgba(255,255,255,.35);padding:6px 0">No test scripts written yet.</div>';
   }
 
-  // What still needs to be done
-  var todo = [];
-  if (!scripts.length) todo.push('Write test scripts to begin certification process.');
-  if (failCt>0) todo.push(failCt+' script'+(failCt>1?'s':'')+' failing — run simulator to diagnose and fix.');
-  if (paths.total>0 && paths.covered<paths.total) todo.push((paths.total-paths.covered)+' routing path'+(paths.total-paths.covered>1?'s':'')+' uncovered — add scripts to cover remaining branches.');
-  if (!cert) todo.push('No certificate issued — run all scripts to generate Routing Proof Certificate.');
-  if (cert && cert.status==='invalidated') todo.push('Certificate invalidated — re-certify after fixing failing scripts.');
-  if (!todo.length) todo.push('All paths covered and scripts passing. Maintain by re-running after any template changes.');
+  var todo=[];
+  if (!scripts.length) {
+    todo.push('Write test scripts — each script simulates a unique routing scenario through the workflow.');
+  }
+  if (failCt>0) {
+    todo.push(failCt+' of '+scripts.length+' scripts failing — open Simulator, select this template, and run the failing scripts to see assertion errors.');
+  }
+  if (notRunCt>0 && scripts.length>0) {
+    todo.push(notRunCt+' script'+(notRunCt>1?'s':'')+' never run — run the full suite to get a current result.');
+  }
+  if (paths.total>0 && paths.covered<paths.total) {
+    var uncov=paths.total-paths.covered;
+    todo.push(paths.covered+' of '+paths.total+' routing paths covered — '+uncov+' path'+(uncov>1?'s':'')+' still need a script. Open Coverage tab in Simulator to see which branches are missing.');
+  } else if (paths.total===0 && scripts.length>0) {
+    todo.push('Run Generate All Paths in the Simulator to analyze which routing branches exist and which are covered.');
+  }
+  if (!cert) {
+    todo.push('No Routing Proof Certificate issued — all scripts must pass at least once to generate a certificate.');
+  }
+  if (cert && cert.status==='invalidated') {
+    todo.push('Certificate invalidated — re-run all scripts. All must pass to issue a new certificate.');
+  }
+  if (!todo.length) {
+    todo.push('All '+paths.total+' paths covered, all '+scripts.length+' scripts passing. Re-run after template changes to keep the certificate current.');
+  }
 
-  var todoHtml = todo.map(function(t){ return '<div style="display:flex;gap:6px;padding:3px 0"><span style="color:var(--cd-amb);flex-shrink:0">›</span><span style="font-size:11px;color:rgba(255,255,255,.65)">'+_cdEsc(t)+'</span></div>'; }).join('');
+  var todoHtml=todo.map(function(t){
+    return '<div style="display:flex;gap:8px;padding:4px 0">'
+      +'<span style="color:var(--cd-amb);flex-shrink:0;font-size:14px;line-height:1.4">›</span>'
+      +'<span style="font-size:12px;color:rgba(255,255,255,.7);line-height:1.5">'+_cdEsc(t)+'</span>'
+      +'</div>';
+  }).join('');
 
   panel.innerHTML =
-    '<div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--cd-teal);margin-bottom:8px">'+_cdEsc(covLine)+'</div>'
-    +'<div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:6px">Test Scripts ('+scripts.length+')</div>'
+    '<div style="font-size:13px;font-weight:700;color:var(--cd-teal);margin-bottom:10px;line-height:1.4">'+_cdEsc(covLine)+'</div>'
+    +'<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:6px">Test Scripts ('+scripts.length+')</div>'
     +scriptRows
-    +'<div style="margin-top:10px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:4px">Next Steps</div>'
+    +'<div style="margin-top:12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:5px">Next Steps</div>'
     +todoHtml
-    +'<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);font-size:10px;color:rgba(255,255,255,.3);line-height:1.5">Scripts prove scenarios work. Path coverage confirms every routing branch has a script. These are independent metrics.</div>';
+    +'<div style="margin-top:12px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(255,255,255,.3);line-height:1.55">Scripts prove each scenario works. Path coverage confirms every routing branch has a script. A template can be certified with partial path coverage.</div>';
 
-  panel.style.display = 'block';
-  var rect = e.currentTarget.getBoundingClientRect();
-  var pw = 320, ph = panel.offsetHeight;
-  var left = Math.min(rect.left, window.innerWidth - pw - 12);
-  var top  = rect.top - ph - 10;
-  if (top < 8) top = rect.bottom + 8;
-  panel.style.left = left+'px';
-  panel.style.top  = top+'px';
+  panel.style.display='block';
+  panel.style.width='520px';
+  var rect=e.currentTarget.getBoundingClientRect();
+  var pw=520;
+  var left=Math.min(rect.left, window.innerWidth-pw-12);
+  if(left<8) left=8;
+  var ph=panel.offsetHeight;
+  var top=rect.top-ph-10;
+  if(top<8) top=rect.bottom+8;
+  panel.style.left=left+'px';
+  panel.style.top=top+'px';
 }
 window._cdCovTipShow = _cdCovTipShow;
 
