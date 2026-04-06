@@ -247,6 +247,7 @@ function _cdRenderShell(panel){
         '<button class="cd-vbtn" id="cd-vbtn-history" onclick="_cdSwitchView(\'history\')">Run History</button>'+
         '<div class="cd-view-hint" id="cd-view-hint">Showing all templates</div>'+
       '</div>'+
+      '<div id="cd-cov-tip-panel" style="display:none;position:fixed;z-index:9999;background:#131820;border:1px solid #252d3f;border-radius:6px;padding:14px 16px;width:320px;box-shadow:0 8px 28px rgba(0,0,0,.7);pointer-events:none;font-family:Arial,sans-serif"></div>'+
       '<div id="cd-portfolio-panel" style="overflow-y:auto;padding:14px 16px">'+
         '<div id="cd-port-count" style="font-size:10px;color:var(--cd-teal);font-weight:700;margin-bottom:8px;letter-spacing:.09em;text-transform:uppercase"></div>'+
         '<div id="cd-port-grid" style="display:flex;flex-direction:column;gap:8px">'+
@@ -1042,11 +1043,18 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
       else        { statusCls='wf-cert';  statusPillCls='cd-pill-cert'; }
     }
     // Override pill color: no scripts = white/dim, partial = amber, problem = red, clean = green
-    if (statusCls==='wf-fail') { statusPillCls='cd-pill-cert-red'; }
-    else if (statusCls==='wf-uncov') { statusPillCls='cd-pill-cert-dim'; }
-    else if (failCt>0 || (statusCls==='wf-stale')) { statusPillCls='cd-pill-cert-amb'; }
-    else if (scriptCt===0) { statusPillCls='cd-pill-cert-dim'; }
-    else { statusPillCls='cd-pill-cert-grn'; }
+    // Badge color: RED=problem, AMBER=partially tested, WHITE=no scripts/cert, GREEN=certified
+    if (statusCls==='wf-fail') {
+      statusPillCls='cd-pill-cert-red';   // cert invalid — problem
+    } else if (statusCls==='wf-uncov') {
+      statusPillCls='cd-pill-cert-dim';   // no cert — white/dim
+    } else if (failCt>0) {
+      statusPillCls='cd-pill-cert-amb';   // has cert but scripts failing — partial
+    } else if (statusCls==='wf-stale') {
+      statusPillCls='cd-pill-cert-amb';   // cert stale — partial/warning
+    } else {
+      statusPillCls='cd-pill-cert-grn';   // certified (with or without scripts)
+    }
 
     var suiteLine;
     if (scriptCt) {
@@ -1102,7 +1110,7 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
         '<span class="cd-wf-r2-cell">'+_cdEsc(lastRunLine)+'</span>'+
         '<span class="cd-wf-r2-sep">|</span>'+
         '<div class="cd-wf-r2-bar">'+
-          (function(){var _covTip='Coverage: '+(tmplPaths.total>0?covLabel+' of '+tmplPaths.total+' routing paths covered. ':'No path analysis yet. ')+(scriptCt>0?passCt+'/'+scriptCt+' scripts passing. ':'No test scripts. ')+'Scripts and coverage paths are independent metrics: scripts prove scenarios work; path coverage confirms every routing branch has a script.';return '<div class="cd-cov-bar" style="flex:1;min-width:40px;cursor:help" title="'+_cdEsc(_covTip)+'"><div class="cd-cov-fill" style="width:'+(covPct||0)+'%;background:'+covClr+'"></div></div>';})()+
+          '<div class="cd-cov-bar" style="flex:1;min-width:40px;cursor:help" '+            'onmouseenter="_cdCovTipShow(event,\''+t.id+'\')" '+            'onmouseleave="_cdCovTipHide()">'+            '<div class="cd-cov-fill" style="width:'+(covPct||0)+'%;background:'+covClr+'"></div>'+          '</div>'+
           
           '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:38px;text-align:right">'+covLabel+'</span>'+
           '<span style="font-size:11pt;color:rgba(255,255,255,.45);white-space:nowrap;width:160px;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(suiteLine)+'</span>'+
@@ -1114,6 +1122,81 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
 }
 
 // ── Portfolio card interactions ────────────────────────────────────────────────
+function _cdCovTipShow(e, tmplId) {
+  var panel = document.getElementById('cd-cov-tip-panel'); if (!panel) return;
+  var d = window._cdPortData || {};
+  var scripts  = (d.scriptObjsByTmpl||{})[tmplId] || [];
+  var allRuns  = (d.runsByTmpl||{})[tmplId] || [];
+  var paths    = (d.pathsByTmpl||{})[tmplId] || {total:0,covered:0};
+  var cert     = (d.certByTmpl||{})[tmplId] || null;
+
+  // Latest run per script
+  var latestByScript = {};
+  allRuns.forEach(function(r){ if(r.script_id && !latestByScript[r.script_id]) latestByScript[r.script_id]=r; });
+
+  var passCt = 0, failCt = 0;
+  scripts.forEach(function(s){ var r=latestByScript[s.id]; if(r){ if(r.status==='passed')passCt++; else failCt++; } });
+
+  // Coverage sentence
+  var covLine = paths.total > 0
+    ? (Math.round((paths.covered/paths.total)*100))+'% of '+paths.total+' routing paths covered ('+paths.covered+' covered).'
+    : 'No routing path analysis yet.';
+
+  // Script rows
+  var scriptRows = '';
+  if (scripts.length) {
+    scriptRows = scripts.map(function(s) {
+      var r = latestByScript[s.id];
+      var dot = !r ? '#4a5568' : r.status==='passed' ? '#3de08a' : '#e84040';
+      var when = r ? _cdRelTime(r.run_at) : 'Never run';
+      var status = !r ? 'Not run' : r.status==='passed' ? 'Passed' : 'Failed';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        +'<div style="width:7px;height:7px;border-radius:50%;background:'+dot+';flex-shrink:0"></div>'
+        +'<div style="flex:1;font-size:11px;color:rgba(255,255,255,.8)">'+_cdEsc(s.name)+'</div>'
+        +'<div style="font-size:10px;color:rgba(255,255,255,.4);white-space:nowrap">'+status+' · '+when+'</div>'
+        +'</div>';
+    }).join('');
+  } else {
+    scriptRows = '<div style="font-size:11px;color:rgba(255,255,255,.35);padding:4px 0">No test scripts written yet.</div>';
+  }
+
+  // What still needs to be done
+  var todo = [];
+  if (!scripts.length) todo.push('Write test scripts to begin certification process.');
+  if (failCt>0) todo.push(failCt+' script'+(failCt>1?'s':'')+' failing — run simulator to diagnose and fix.');
+  if (paths.total>0 && paths.covered<paths.total) todo.push((paths.total-paths.covered)+' routing path'+(paths.total-paths.covered>1?'s':'')+' uncovered — add scripts to cover remaining branches.');
+  if (!cert) todo.push('No certificate issued — run all scripts to generate Routing Proof Certificate.');
+  if (cert && cert.status==='invalidated') todo.push('Certificate invalidated — re-certify after fixing failing scripts.');
+  if (!todo.length) todo.push('All paths covered and scripts passing. Maintain by re-running after any template changes.');
+
+  var todoHtml = todo.map(function(t){ return '<div style="display:flex;gap:6px;padding:3px 0"><span style="color:var(--cd-amb);flex-shrink:0">›</span><span style="font-size:11px;color:rgba(255,255,255,.65)">'+_cdEsc(t)+'</span></div>'; }).join('');
+
+  panel.innerHTML =
+    '<div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--cd-teal);margin-bottom:8px">'+_cdEsc(covLine)+'</div>'
+    +'<div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:6px">Test Scripts ('+scripts.length+')</div>'
+    +scriptRows
+    +'<div style="margin-top:10px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:4px">Next Steps</div>'
+    +todoHtml
+    +'<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);font-size:10px;color:rgba(255,255,255,.3);line-height:1.5">Scripts prove scenarios work. Path coverage confirms every routing branch has a script. These are independent metrics.</div>';
+
+  panel.style.display = 'block';
+  var rect = e.currentTarget.getBoundingClientRect();
+  var pw = 320, ph = panel.offsetHeight;
+  var left = Math.min(rect.left, window.innerWidth - pw - 12);
+  var top  = rect.top - ph - 10;
+  if (top < 8) top = rect.bottom + 8;
+  panel.style.left = left+'px';
+  panel.style.top  = top+'px';
+}
+window._cdCovTipShow = _cdCovTipShow;
+
+function _cdCovTipHide() {
+  var panel = document.getElementById('cd-cov-tip-panel');
+  if (panel) panel.style.display = 'none';
+}
+window._cdCovTipHide = _cdCovTipHide;
+
+
 function _cdPortToggle(tmplId) {
   var exp = document.getElementById('cd-wf-exp-'+tmplId);
   if (!exp) return;
