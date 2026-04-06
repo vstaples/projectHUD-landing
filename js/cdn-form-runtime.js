@@ -393,6 +393,140 @@ function _renderDataEntryFields(fields, activeStage, resps, formDef) {
       i++; continue;
     }
 
+    // system — read-only auto-populated
+    if (field.system) {
+      var sysVal = resp.value || field.hint || '(auto)';
+      html += '<div>' +
+        '<label class="config-label" style="display:flex;align-items:center;gap:4px">' +
+          escHtml(field.label) +
+          '<span style="font-size:9px;color:var(--muted);background:var(--surf2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;margin-left:4px">auto</span>' +
+        '</label>' +
+        '<input class="config-input" type="text" style="font-size:11px;margin-top:3px;color:var(--muted);cursor:default" ' +
+          'value="' + escHtml(sysVal) + '" readonly/>' +
+      '</div>';
+      i++; continue;
+    }
+
+    // dropdown
+    if (field.type === 'dropdown') {
+      var opts = (field.options || []);
+      var selVal = resp.value || '';
+      var optHtml = '<option value="">— Select —</option>';
+      opts.forEach(function(o) { optHtml += '<option value="' + escHtml(o) + '"' + (o === selVal ? ' selected' : '') + '>' + escHtml(o) + '</option>'; });
+      html += '<div>' +
+        '<label class="config-label" style="display:flex;align-items:center;gap:4px">' +
+          escHtml(field.label) + (field.required ? '<span style="color:var(--red)">*</span>' : '') +
+        '</label>' +
+        '<select class="config-input" style="font-size:11px;margin-top:3px;cursor:pointer" ' +
+          'data-fid="' + field.id + '" ' +
+          'onchange="_formUpdateValue(\'' + field.id + '\',this.value);_frtCheckConditionals()">' +
+          optHtml +
+        '</select>' +
+      '</div>';
+      i++; continue;
+    }
+
+    // currency
+    if (field.type === 'currency') {
+      html += '<div>' +
+        '<label class="config-label" style="display:flex;align-items:center;gap:4px">' +
+          escHtml(field.label) + (field.required ? '<span style="color:var(--red)">*</span>' : '') +
+        '</label>' +
+        '<div style="display:flex;align-items:center;gap:4px;margin-top:3px">' +
+          '<span style="font-size:12px;color:var(--muted);font-family:var(--font-mono)">$</span>' +
+          '<input class="config-input" type="number" step="0.01" min="0" ' +
+            'style="font-size:13px;font-family:var(--font-mono);margin-top:0" ' +
+            'value="' + escHtml(resp.value || '') + '" placeholder="0.00" ' +
+            'oninput="_formUpdateValue(\'" + field.id + "\',this.value)"/>' +
+        '</div>' +
+      '</div>';
+      i++; continue;
+    }
+
+    // expense_grid
+    if (field.type === 'expense_grid') {
+      var gridVal = {};
+      try { gridVal = JSON.parse(resp.value || '{}'); } catch(e2) {}
+      var cats = field.categories || [];
+      var gridDates = [];
+      var gd = new Date(); gd.setHours(0,0,0,0);
+      for (var gi=0;gi<7;gi++) { gridDates.push(new Date(gd)); gd.setDate(gd.getDate()+1); }
+      var dayNms=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      var monNms=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var catGrps={meals:['Breakfast','Lunch','Dinner','Entertainment'],travel:['Airfare','Lodging','Car Rental','Mileage (mi)','Parking / Tolls','Taxi / Rideshare'],other:['Phone / Internet','Corporate Card']};
+      var grpLabels={meals:'Meals & Entertainment',travel:'Transportation & Lodging',other:'Other'};
+      var thRow = '<th style="text-align:left;min-width:140px;position:sticky;left:0;background:var(--surf2);padding:5px 8px;font-size:9px;font-weight:600;color:var(--muted);border:0.5px solid var(--border)">Category</th>';
+      gridDates.forEach(function(d) {
+        var dn = dayNms[d.getDay()]+' '+monNms[d.getMonth()]+' '+d.getDate();
+        thRow += '<th style="padding:5px 6px;font-size:10px;font-weight:500;color:var(--muted);border:0.5px solid var(--border);text-align:center;min-width:72px;white-space:nowrap">'+dn+'</th>';
+      });
+      thRow += '<th style="padding:5px 6px;font-size:10px;font-weight:500;color:var(--text);border:0.5px solid var(--border);position:sticky;right:0;background:var(--surf3)">Total</th>';
+      var tbRows = '';
+      var lastGrp2 = '';
+      cats.forEach(function(cat) {
+        var grp2 = 'other';
+        Object.keys(catGrps).forEach(function(g) { if (catGrps[g].indexOf(cat)!==-1) grp2=g; });
+        if (grp2 !== lastGrp2) {
+          lastGrp2 = grp2;
+          tbRows += '<tr><td colspan="'+(gridDates.length+2)+'" style="padding:3px 8px;font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);background:var(--surf3);border:0.5px solid var(--border)">'+(grpLabels[grp2]||grp2)+'</td></tr>';
+        }
+        var catKey = cat.toLowerCase().replace(/[^a-z0-9]/g,'_');
+        tbRows += '<tr><td style="text-align:left;padding:3px 8px;font-size:12px;color:var(--text);position:sticky;left:0;background:var(--surf1);border:0.5px solid var(--border);white-space:nowrap">'+escHtml(cat)+'</td>';
+        gridDates.forEach(function(d) {
+          var dk = d.toISOString().slice(0,10);
+          var cellKey = catKey+'|'+dk;
+          var cv = gridVal[cellKey] || '';
+          tbRows += '<td style="border:0.5px solid var(--border);padding:0"><input type="number" step="0.01" min="0" placeholder="0.00" style="width:68px;border:none;background:transparent;color:var(--text);text-align:right;font-family:var(--font-mono);font-size:12px;padding:4px;outline:none" value="'+escHtml(String(cv))+'" data-grid="'+field.id+'" data-cat="'+catKey+'" data-dk="'+dk+'" oninput="_frtGridUpdate(\''+field.id+'\')"></td>';
+        });
+        tbRows += '<td class="frt-eg-row-'+field.id+'-'+catKey+'" style="text-align:right;padding:4px 8px;font-family:var(--font-mono);font-size:12px;font-weight:500;position:sticky;right:0;background:var(--surf2);border:0.5px solid var(--border)">—</td></tr>';
+      });
+      tbRows += '<tr><td style="text-align:left;padding:5px 8px;font-size:12px;font-weight:600;color:var(--text);position:sticky;left:0;background:var(--surf2);border:0.5px solid var(--border)">Grand Total</td>';
+      gridDates.forEach(function(d){ var dk=d.toISOString().slice(0,10); tbRows+='<td id="frt-eg-col-'+field.id+'-'+dk+'" style="text-align:right;padding:4px 6px;font-family:var(--font-mono);font-size:12px;font-weight:500;background:var(--surf2);border:0.5px solid var(--border)">—</td>'; });
+      tbRows += '<td id="frt-eg-grand-'+field.id+'" style="text-align:right;padding:4px 8px;font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--green);position:sticky;right:0;background:var(--surf2);border:0.5px solid var(--border)">$0.00</td></tr>';
+      html += '<div style="margin-bottom:4px"><label class="config-label" style="margin-bottom:4px">'+escHtml(field.label)+'</label>'+(field.hint?'<div style="font-size:10px;color:var(--muted);margin-bottom:4px">'+escHtml(field.hint)+'</div>':'')+'<div style="overflow-x:auto;border:0.5px solid var(--border);border-radius:5px"><table style="border-collapse:collapse;min-width:100%"><thead><tr>'+thRow+'</tr></thead><tbody>'+tbRows+'</tbody></table></div></div>';
+      i++; continue;
+    }
+
+    // line_items
+    if (field.type === 'line_items') {
+      var liRows2 = [];
+      try { liRows2 = JSON.parse(resp.value || '[]'); } catch(e3) {}
+      if (!liRows2.length) liRows2 = [{}];
+      var liCols2 = field.columns || ['Description','Date','Amount'];
+      var payOpts2 = field.payment_type_options || [];
+      var hasPay2 = payOpts2.length > 0;
+      var liId2 = 'frtli-'+field.id;
+      var thCols2 = liCols2.map(function(c){ return '<th style="padding:4px 7px;font-size:10px;font-weight:500;color:var(--muted);border:0.5px solid var(--border);text-align:left;background:var(--surf2);white-space:nowrap">'+escHtml(c)+'</th>'; }).join('');
+      if (hasPay2) thCols2 += '<th style="padding:4px 7px;font-size:10px;font-weight:500;color:var(--muted);border:0.5px solid var(--border);background:var(--surf2)">Payment Type</th>';
+      thCols2 += '<th style="padding:4px;border:0.5px solid var(--border);background:var(--surf2);width:24px"></th>';
+      var tdRows2 = liRows2.map(function(row2, ri2) {
+        var cells2 = liCols2.map(function(c2) {
+          var ck2 = c2.toLowerCase().replace(/[^a-z0-9]/g,'_');
+          var v2 = row2[ck2] || '';
+          var isDate2 = c2.toLowerCase()==='date';
+          var isAmt2  = c2.toLowerCase()==='amount';
+          var isRec2  = c2.toLowerCase()==='receipt';
+          if (isRec2) return '<td style="border:0.5px solid var(--border);padding:2px 4px"><input type="file" accept="image/*,.pdf" style="font-size:10px;width:100%" data-li="'+field.id+'" data-row="'+ri2+'" data-col="'+ck2+'"></td>';
+          return '<td style="border:0.5px solid var(--border);padding:0"><input type="'+(isDate2?'date':isAmt2?'number':'text')+'" '+(isAmt2?'step="0.01" min="0" ':'')+'placeholder="'+escHtml(c2)+'" value="'+escHtml(String(v2))+'" style="width:100%;border:none;background:transparent;color:var(--text);padding:4px 6px;font-family:'+(isAmt2?'var(--font-mono)':'inherit')+';font-size:12px;outline:none;'+(isAmt2?'text-align:right':'')+'" data-li="'+field.id+'" data-row="'+ri2+'" data-col="'+ck2+'" oninput="_frtLineItemUpdate(\''+field.id+'\')"></td>';
+        }).join('');
+        var paySel2 = '';
+        if (hasPay2) {
+          var payVal2 = row2['payment_type'] || '';
+          var payOptH2 = payOpts2.map(function(o2){ return '<option value="'+escHtml(o2)+'"'+(o2===payVal2?' selected':'')+'>'+escHtml(o2)+'</option>'; }).join('');
+          paySel2 = '<td style="border:0.5px solid var(--border);padding:0"><select style="width:100%;border:none;background:transparent;color:var(--text);padding:4px 5px;font-size:11px;cursor:pointer" data-li="'+field.id+'" data-row="'+ri2+'" data-col="payment_type" onchange="_frtLineItemUpdate(\''+field.id+'\')"><option value="">— Type —</option>'+payOptH2+'</select></td>';
+        }
+        return '<tr id="'+liId2+'-row-'+ri2+'">'+cells2+paySel2+'<td style="border:0.5px solid var(--border);padding:2px;text-align:center"><button style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 5px" onclick="_frtLineItemDel(\''+field.id+'\','+ri2+')">✕</button></td></tr>';
+      }).join('');
+      html += '<div style="margin-bottom:4px"><label class="config-label" style="margin-bottom:4px">'+escHtml(field.label)+'</label>'+(field.hint?'<div style="font-size:10px;color:var(--muted);margin-bottom:4px">'+escHtml(field.hint)+'</div>':'')+'<div style="overflow-x:auto;border:0.5px solid var(--border);border-radius:5px"><table id="'+liId2+'-table" style="border-collapse:collapse;width:100%"><thead><tr>'+thCols2+'</tr></thead><tbody id="'+liId2+'-body">'+tdRows2+'</tbody></table></div><button style="margin-top:5px;font-size:11px;padding:3px 9px;border-radius:4px;border:0.5px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer" onclick="_frtLineItemAdd(\''+field.id+'\')">+ Add row</button></div>';
+      i++; continue;
+    }
+
+    // settlement_summary — computed read-only block
+    if (field.type === 'settlement_summary') {
+      html += '<div id="frt-settlement-'+field.id+'" style="background:var(--surf2);border:0.5px solid var(--border);border-radius:6px;padding:10px 12px"><div style="font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Settlement Summary</div>'+(field.line_items||[]).map(function(li2){ var clr=li2.highlight==='green'?'var(--green)':li2.highlight==='amber'?'var(--amber)':'var(--text)'; return '<div id="frt-sli-'+field.id+'-'+li2.id+'" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:0.5px solid var(--border)"><span style="font-size:12px;color:var(--text2)">'+escHtml(li2.label)+'</span><span style="font-family:var(--font-mono);font-size:13px;font-weight:500;color:'+clr+'">$0.00</span></div>'; }).join('')+'</div>';
+      i++; continue;
+    }
+
     // textarea
     if (field.type === 'textarea') {
       html += `
@@ -944,6 +1078,145 @@ function _attachFormFillEvents(stepId, formDef, inst, activeStage) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Store reference to original submitComplete
+// ── New field type helpers ────────────────────────────────────────────────────
+
+function _frtGridUpdate(fieldId) {
+  var inputs = document.querySelectorAll('[data-grid="'+fieldId+'"]');
+  var catTots = {}, colTots = {}, grand = 0;
+  inputs.forEach(function(inp) {
+    var v = parseFloat(inp.value) || 0;
+    var cat = inp.dataset.cat, dk = inp.dataset.dk;
+    catTots[cat] = (catTots[cat] || 0) + v;
+    colTots[dk]  = (colTots[dk]  || 0) + v;
+    grand += v;
+  });
+  Object.keys(catTots).forEach(function(cat) {
+    var el = document.querySelector('.frt-eg-row-'+fieldId+'-'+cat);
+    if (el) el.textContent = catTots[cat] ? '$'+catTots[cat].toFixed(2) : '—';
+  });
+  Object.keys(colTots).forEach(function(dk) {
+    var el = document.getElementById('frt-eg-col-'+fieldId+'-'+dk);
+    if (el) el.textContent = colTots[dk] ? '$'+colTots[dk].toFixed(2) : '—';
+  });
+  var gel = document.getElementById('frt-eg-grand-'+fieldId);
+  if (gel) gel.textContent = '$'+grand.toFixed(2);
+  // Serialize grid to response
+  var gridVal = {};
+  inputs.forEach(function(inp) {
+    var v = parseFloat(inp.value) || 0;
+    if (v) gridVal[inp.dataset.cat+'|'+inp.dataset.dk] = v;
+  });
+  _formUpdateValue(fieldId, JSON.stringify(gridVal));
+  _frtUpdateSettlement();
+}
+
+function _frtLineItemUpdate(fieldId) {
+  var tbody = document.getElementById('frtli-'+fieldId+'-body');
+  if (!tbody) return;
+  var rows = tbody.querySelectorAll('tr');
+  var data = [];
+  rows.forEach(function(tr) {
+    var obj = {};
+    tr.querySelectorAll('[data-col]').forEach(function(el) {
+      if (el.tagName === 'INPUT' || el.tagName === 'SELECT') obj[el.dataset.col] = el.value;
+    });
+    if (Object.values(obj).some(function(v){return v;})) data.push(obj);
+  });
+  _formUpdateValue(fieldId, JSON.stringify(data));
+  _frtUpdateSettlement();
+}
+
+function _frtLineItemAdd(fieldId) {
+  var tbody = document.getElementById('frtli-'+fieldId+'-body');
+  if (!tbody) return;
+  var ri = tbody.querySelectorAll('tr').length;
+  var tr = document.createElement('tr');
+  tr.id = 'frtli-'+fieldId+'-row-'+ri;
+  // Clone structure from first row but clear values
+  var first = tbody.querySelector('tr');
+  if (first) {
+    tr.innerHTML = first.innerHTML.replace(/value="[^"]*"/g,'value=""').replace(/selected/g,'');
+  } else {
+    tr.innerHTML = '<td colspan="4" style="padding:6px;font-size:11px;color:var(--muted)">New row</td>';
+  }
+  // Update row index on data attrs
+  tr.querySelectorAll('[data-row]').forEach(function(el){ el.dataset.row = ri; });
+  // Re-wire delete button
+  var delBtn = tr.querySelector('button');
+  if (delBtn) delBtn.setAttribute('onclick', '_frtLineItemDel(\'' + fieldId + '\',' + ri + ')');
+  tbody.appendChild(tr);
+}
+
+function _frtLineItemDel(fieldId, rowIdx) {
+  var tr = document.getElementById('frtli-'+fieldId+'-row-'+rowIdx);
+  var tbody = document.getElementById('frtli-'+fieldId+'-body');
+  if (!tbody || tbody.querySelectorAll('tr').length <= 1) return;
+  if (tr) tr.remove();
+  _frtLineItemUpdate(fieldId);
+}
+
+function _frtCheckConditionals() {
+  // Re-render conditional fields by toggling their wrapper visibility
+  document.querySelectorAll('[data-fid]').forEach(function(sel) {
+    var fid = sel.dataset.fid;
+    var val = sel.value;
+    // Find all elements with data-cond-field matching fid
+    document.querySelectorAll('[data-cond-field="'+fid+'"]').forEach(function(wrapper) {
+      var vals = (wrapper.dataset.condVals || '').split('|');
+      wrapper.style.display = vals.indexOf(val) !== -1 ? '' : 'none';
+    });
+  });
+}
+
+function _frtUpdateSettlement() {
+  // Sum all grid + line item values and update settlement_summary display
+  var totals = { total:0, out_of_pocket:0, company_paid:0, billable:0 };
+
+  // Grid totals
+  document.querySelectorAll('[data-grid]').forEach(function(inp) {
+    totals.total += parseFloat(inp.value) || 0;
+  });
+
+  // Line item totals — parse payment_type per row
+  document.querySelectorAll('[data-col="payment_type"]').forEach(function(sel) {
+    var tr = sel.closest('tr');
+    var amtInp = tr ? tr.querySelector('[data-col="amount"]') : null;
+    var amt = amtInp ? parseFloat(amtInp.value) || 0 : 0;
+    totals.total += amt;
+    var pt = sel.value;
+    if (pt === 'Out of Pocket')      totals.out_of_pocket += amt;
+    if (pt === 'Company Card')       totals.company_paid  += amt;
+    if (pt === 'Billable — Client')   totals.billable      += amt;
+  });
+
+  var net = totals.total - totals.company_paid;
+
+  var map = {
+    total_expenses:    totals.total,
+    out_of_pocket:     totals.out_of_pocket,
+    company_paid:      totals.company_paid,
+    net_due_employee:  Math.max(0, net),
+    billable_to_client:totals.billable
+  };
+
+  Object.keys(map).forEach(function(key) {
+    document.querySelectorAll('[id^="frt-sli-"]').forEach(function(el) {
+      if (el.id.endsWith('-'+key)) {
+        var span = el.querySelector('span:last-child');
+        if (span) span.textContent = '$'+map[key].toFixed(2);
+      }
+    });
+  });
+}
+
+window._frtGridUpdate       = _frtGridUpdate;
+window._frtLineItemUpdate   = _frtLineItemUpdate;
+window._frtLineItemAdd      = _frtLineItemAdd;
+window._frtLineItemDel      = _frtLineItemDel;
+window._frtCheckConditionals= _frtCheckConditionals;
+window._frtUpdateSettlement = _frtUpdateSettlement;
+
+
 const _origSubmitComplete = typeof submitComplete === 'function' ? submitComplete : null;
 if (_origSubmitComplete) {
   window.submitComplete = async function(instId, stepId) {
