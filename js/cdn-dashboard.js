@@ -42,10 +42,10 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-wf-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}\n'
     + '.cd-wf-r1{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}\n'
     + '.cd-wf-r1-right{display:flex;align-items:center;gap:6px;flex-shrink:0}\n'
-    + '.cd-wf-r2{display:flex;align-items:center;gap:0;flex-wrap:wrap}\n'
-    + '.cd-wf-r2-cell{font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;padding:0 10px;white-space:nowrap}\n'
-    + '.cd-wf-r2-cell:first-child{padding-left:0}\n'
-    + '.cd-wf-r2-sep{color:rgba(255,255,255,.2);font-size:11pt;flex-shrink:0}\n'
+    + '.cd-wf-r2{display:grid;grid-template-columns:140px 8px 160px 8px 220px 8px 1fr;align-items:center;margin-bottom:5px}\n'
+    + '.cd-wf-r2-cell{font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
+    + '.cd-wf-r2-sep{color:rgba(255,255,255,.18);font-size:11pt;text-align:center}\n'
+    + '.cd-wf-r2-bar{display:flex;align-items:center;gap:7px}\n'
     + '.cd-wf-name{font-size:12pt;font-weight:700;color:#ffffff;font-family:Arial,sans-serif}\n'
     + '.cd-wf-ver{font-size:11pt;color:rgba(255,255,255,.7);margin-top:1px;font-family:Arial,sans-serif}\n'
     + '.cd-pill{font-size:10pt;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.04em;flex-shrink:0;font-family:Arial,sans-serif}\n'
@@ -369,20 +369,31 @@ function _cdRenderHeatmap(runs){
   var dayMap={};
   (runs||[]).forEach(function(r){if(!r.run_at)return;var dk=new Date(r.run_at).toDateString();if(!dayMap[dk])dayMap[dk]={p:0,f:0};if(r.status==='passed')dayMap[dk].p++;else dayMap[dk].f++;});
   var today=new Date();today.setHours(0,0,0,0);
-  var startDay=new Date(today);startDay.setDate(today.getDate()-41);
-  var weeks=[],week=[];
-  for(var i=0;i<42;i++){
-    var d=new Date(startDay);d.setDate(startDay.getDate()+i);
-    var dk=d.toDateString();var st='n';
-    if(d>today)st='n';
-    else if(dayMap[dk]){st=dayMap[dk].f>0?(dayMap[dk].p>0?'a':'f'):'p';}
-    week.push({st:st,lbl:d.toLocaleDateString('en-US',{month:'short',day:'numeric'})});
-    if(week.length===7){weeks.push(week);week=[];}
-  }
-  if(week.length)weeks.push(week);
+  // Build 30 days back — one column per day, 5 rows of blocks per column
+  var ROWS=5,DAYS=30;
   var clr={p:'#3de08a',f:'#e84040',a:'#f5c842',n:'#161b28'};
   var lbl={p:'All passing',f:'Failing',a:'Partial passes',n:'No run'};
-  grid.innerHTML=weeks.map(function(w){return '<div class="cd-hm-week">'+w.map(function(d){return '<div class="cd-hm-day" style="background:'+clr[d.st]+'" title="'+lbl[d.st]+' &#x2014; '+d.lbl+'"></div>';}).join('')+'</div>';}).join('');
+  var cols=[];
+  for(var i=DAYS-1;i>=0;i--){
+    var d=new Date(today);d.setDate(today.getDate()-i);
+    var dk=d.toDateString();
+    var m=d.getMonth()+1,dy=d.getDate();
+    var dateStr=(m<10?'0'+m:m)+'/'+(dy<10?'0'+dy:dy);
+    var st='n';
+    if(dayMap[dk]){st=dayMap[dk].f>0?(dayMap[dk].p>0?'a':'f'):'p';}
+    cols.push({st:st,dateStr:dateStr,title:lbl[st]+' — '+d.toLocaleDateString('en-US',{month:'short',day:'numeric'})});
+  }
+  // Render: date label on top, then 5 stacked blocks below
+  grid.innerHTML='<div style="display:flex;gap:4px;align-items:flex-end">'+
+    cols.map(function(col){
+      var blocks='';
+      for(var r=0;r<ROWS;r++) blocks+='<div style="width:12px;height:8px;border-radius:1px;background:'+clr[col.st]+';margin-bottom:1px" title="'+col.title+'"></div>';
+      return '<div style="display:flex;flex-direction:column;align-items:center">'+
+        '<div style="font-size:8px;color:rgba(255,255,255,.3);font-family:monospace;margin-bottom:2px;writing-mode:vertical-lr;transform:rotate(180deg);height:22px;line-height:1">'+col.dateStr+'</div>'+
+        '<div style="display:flex;flex-direction:column-reverse">'+blocks+'</div>'+
+      '</div>';
+    }).join('')+
+  '</div>';
   var ageEl=document.getElementById('cd-cert-age-lbl');
   if(ageEl)ageEl.textContent=runs&&runs.length?'last run '+_cdRelTime(runs[0].run_at):'never run';
 }
@@ -1042,9 +1053,11 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
         '<span class="cd-wf-r2-sep">|</span>'+
         '<span class="cd-wf-r2-cell">'+_cdEsc(lastRunLine)+'</span>'+
         '<span class="cd-wf-r2-sep">|</span>'+
-        '<div class="cd-cov-bar" style="display:inline-flex;vertical-align:middle;width:60px"><div class="cd-cov-fill" style="width:'+covPct+'%;background:'+covClr+'"></div></div>'+
-        '<span class="cd-wf-r2-cell" style="color:'+covClr+';font-family:var(--font-mono,monospace)">'+covPct+'%</span>'+
-        '<span class="cd-wf-r2-cell cd-t2">'+_cdEsc(suiteLine)+'</span>'+
+        '<div class="cd-wf-r2-bar">'+
+          '<div class="cd-cov-bar" style="flex:1"><div class="cd-cov-fill" style="width:'+covPct+'%;background:'+covClr+'"></div></div>'+
+          '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap">'+covPct+'%</span>'+
+          '<span style="font-size:11pt;color:rgba(255,255,255,.45);white-space:nowrap">'+_cdEsc(suiteLine)+'</span>'+
+        '</div>'+
       '</div>'+
       '<div class="cd-wf-expand" id="cd-wf-exp-'+t.id+'" style="display:none"></div>'+
     '</div>';
