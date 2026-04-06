@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD15 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD16 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1098,27 +1098,23 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
       '<div class="cd-wf-r1">'+
         '<div class="cd-wf-name" style="color:'+( statusCls==="wf-fail" ? "#e84040" : statusCls==="wf-cert" ? "#3de08a" : statusCls==="wf-stale" ? "#3de08a" : "#ffffff" )+'">'+_cdEsc(t.name)+'</div>'+
         '<div class="cd-wf-r1-right">'+
+          (function(){var pt=tmplPaths.total,pc=tmplPaths.covered;var cc=pt===0?'rgba(255,255,255,.3)':pc===pt?'var(--cd-grn)':pc>0?'var(--cd-amb)':'rgba(255,255,255,.3)';var cl=pt>0?(pc+'/'+pt+' Coverage Path'+(pt===1?'':'s')+' Defined'):'No Coverage Paths Defined';return '<span style="font-size:9pt;color:'+cc+';white-space:nowrap;margin-right:12px">'+cl+'</span>';})()+
           actBtns+
           '<span class="cd-pill '+statusPillCls+'">'+statusLabel+'</span>'+
         '</div>'+
       '</div>'+
-      '<div class="cd-wf-r2">'+
-        '<span class="cd-wf-r2-cell">v'+_cdEsc(t.version||'—')+' · '+_cdEsc(t.status||'draft')+'</span>'+
-        '<span class="cd-wf-r2-sep">|</span>'+
-        '<span class="cd-wf-r2-cell">'+_cdEsc(certDateLine)+'</span>'+
-        '<span class="cd-wf-r2-sep">|</span>'+
-        '<span class="cd-wf-r2-cell">'+_cdEsc(lastRunLine)+'</span>'+
-        '<span></span>'+
-        (function(){var pathTotal=tmplPaths.total,pathCov=tmplPaths.covered;var covTestClr=pathTotal===0?'rgba(255,255,255,.3)':pathCov===pathTotal?'var(--cd-grn)':pathCov>0?'var(--cd-amb)':'rgba(255,255,255,.3)';var covTestLbl=pathTotal>0?(pathCov+'/'+pathTotal+' Coverage Path'+(pathTotal===1?'':'s')+' Defined'):'No Coverage Paths Defined';return '<span style="font-size:9pt;color:'+covTestClr+';white-space:nowrap">'+covTestLbl+'</span>';})()+
-      '</div>'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-top:3px">'+
-        '<div style="width:340px;flex-shrink:0;height:4px;background:#1e2535;border-radius:2px;overflow:hidden;cursor:help" onmouseenter="_cdCovTipShow(event,\''+t.id+'\')" onmouseleave="_cdCovTipHide()">'+
+      '<div style="display:flex;align-items:center;gap:0;margin-top:4px">'+
+        '<span style="font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;width:130px">v'+_cdEsc(t.version||'—')+' · '+_cdEsc(t.status||'draft')+'</span>'+
+        '<span style="color:rgba(255,255,255,.18);width:8px;text-align:center">|</span>'+
+        '<span style="font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;width:150px">'+_cdEsc(certDateLine)+'</span>'+
+        '<span style="color:rgba(255,255,255,.18);width:8px;text-align:center">|</span>'+
+        '<span style="font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;width:200px">'+_cdEsc(lastRunLine)+'</span>'+
+        '<div style="width:220px;flex-shrink:0;height:4px;background:#1e2535;border-radius:2px;overflow:hidden;cursor:help;margin-right:6px" onmouseenter="_cdCovTipShow(event,\''+t.id+'\')" onmouseleave="_cdCovTipHide()">'+
           '<div style="height:100%;width:'+(covPct||0)+'%;background:'+covClr+';border-radius:2px;transition:width .3s"></div>'+
         '</div>'+
-        '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:34px;text-align:right;flex-shrink:0">'+covLabel+'</span>'+
-        '<span style="font-size:11pt;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(suiteLine)+'</span>'+
+        '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:34px;text-align:right;flex-shrink:0;margin-right:8px">'+covLabel+'</span>'+
+        '<span style="font-size:11pt;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">'+_cdEsc(suiteLine)+'</span>'+
       '</div>'+
-
       '<div class="cd-wf-expand" id="cd-wf-exp-'+t.id+'" style="display:none"></div>'+
     '</div>';
   }).join('');
