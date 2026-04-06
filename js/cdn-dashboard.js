@@ -11,7 +11,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260406-CD7 — KPI hover tooltips','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260406-CD7 — KPI floating hover tooltips','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -130,7 +130,16 @@ console.log('%c[cdn-dashboard] v20260406-CD7 — KPI hover tooltips','background
     + '.cd-coc-text{font-size:10px;color:rgba(255,255,255,.5);font-family:var(--font-mono,"Courier New",monospace);flex:1;line-height:1.5}\n'
     + '.cd-coc-text strong{color:#e2e8f0;font-weight:700}\n'
     + '.cd-coc-time{font-size:9px;color:rgba(255,255,255,.3);font-family:var(--font-mono,"Courier New",monospace);flex-shrink:0;margin-top:3px}\n'
-    // KPI tooltips\n+ '.cd-kpi{position:relative;cursor:default}\n'\n+ '.cd-kpi-tip{display:none;position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px;z-index:9999;min-width:210px;max-width:270px;background:#1a1f2e;border:1px solid rgba(255,255,255,.14);border-radius:4px;padding:10px 12px;pointer-events:none;box-shadow:0 8px 28px rgba(0,0,0,.7)}\n'\n+ '.cd-kpi:hover .cd-kpi-tip{display:block}\n'\n+ '.cd-kpi-tip-title{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--cd-teal);font-family:var(--font-mono,\'Courier New\',monospace);margin-bottom:6px}\n'\n+ '.cd-kpi-tip-row{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:rgba(255,255,255,.65);padding:2px 0;border-bottom:1px solid rgba(255,255,255,.05)}\n'\n+ '.cd-kpi-tip-row:last-child{border-bottom:none}\n'\n+ '.cd-kpi-tip-row span:last-child{color:#fff;font-weight:600;text-align:right}\n'\n+ '.cd-kpi-tip-formula{font-size:10px;color:rgba(255,255,255,.4);margin-top:6px;line-height:1.5;border-top:1px solid rgba(255,255,255,.06);padding-top:6px}\n'\n    // Shimmer\n    + '@keyframes cd-shimmer{0%,100%{opacity:.35}50%{opacity:.7}}\n'
+    // KPI floating tooltip singleton
++ '#cd-kpi-tooltip{display:none;position:fixed;z-index:9999;min-width:220px;max-width:280px;background:#1a1f2e;border:1px solid rgba(255,255,255,.14);border-radius:4px;padding:10px 12px;pointer-events:none;box-shadow:0 8px 28px rgba(0,0,0,.7)}\n'
++ '#cd-kpi-tooltip .ct-title{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--cd-teal);font-family:var(--font-mono,"Courier New",monospace);margin-bottom:7px}\n'
++ '#cd-kpi-tooltip .ct-row{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:rgba(255,255,255,.65);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)}\n'
++ '#cd-kpi-tooltip .ct-row:last-of-type{border-bottom:none}\n'
++ '#cd-kpi-tooltip .ct-row span:last-child{color:#fff;font-weight:600;text-align:right;max-width:130px}\n'
++ '#cd-kpi-tooltip .ct-formula{font-size:10px;color:rgba(255,255,255,.4);margin-top:7px;line-height:1.55;border-top:1px solid rgba(255,255,255,.06);padding-top:7px}\n'
++ '.cd-kpi{cursor:default}\n'
+    // Shimmer
+    + '@keyframes cd-shimmer{0%,100%{opacity:.35}50%{opacity:.7}}\n'
     + '.cd-skel{background:#1a1f2e;border-radius:3px;animation:cd-shimmer 1.4s ease-in-out infinite}\n'
     // Colour utils
     + '.cd-grn{color:var(--cd-grn)} .cd-amb{color:var(--cd-amb)} .cd-red{color:var(--cd-red)} .cd-t2{color:rgba(255,255,255,.45)}\n'
@@ -154,6 +163,45 @@ console.log('%c[cdn-dashboard] v20260406-CD7 — KPI hover tooltips','background
   ;
   document.head.appendChild(s);
 })();
+
+// ── KPI Tooltip singleton ────────────────────────────────────────────────────
+(function() {
+  if (document.getElementById('cd-kpi-tooltip')) return;
+  var el = document.createElement('div');
+  el.id = 'cd-kpi-tooltip';
+  document.body.appendChild(el);
+})();
+
+function _cdKpiTip(e, idx) {
+  var tips = window._cdKpiTips;
+  if (!tips || !tips[idx]) return;
+  var t = tips[idx];
+  var el = document.getElementById('cd-kpi-tooltip');
+  if (!el) return;
+
+  var rows = (t.rows||[]).map(function(r){
+    return '<div class="ct-row"><span>'+r[0]+'</span><span>'+r[1]+'</span></div>';
+  }).join('');
+  el.innerHTML = '<div class="ct-title">'+t.title+'</div>'+rows+
+    (t.formula ? '<div class="ct-formula">'+t.formula+'</div>' : '');
+
+  // Position: above the KPI cell, centered, clamped to viewport
+  var rect = e.currentTarget.getBoundingClientRect();
+  el.style.display = 'block';
+  var tw = el.offsetWidth, th = el.offsetHeight;
+  var vw = window.innerWidth;
+  var left = rect.left + rect.width/2 - tw/2;
+  left = Math.max(8, Math.min(left, vw - tw - 8));
+  var top = rect.top - th - 8;
+  if (top < 8) top = rect.bottom + 8; // flip below if no room above
+  el.style.left = left + 'px';
+  el.style.top  = top + 'px';
+}
+
+function _cdKpiHide() {
+  var el = document.getElementById('cd-kpi-tooltip');
+  if (el) el.style.display = 'none';
+}
 
 // ── Override modal HTML ────────────────────────────────────────────────────────
 (function() {
@@ -358,8 +406,7 @@ function _cdRenderKpis(runs, certs, hs) {
   });
 
   function _tip(rows, formula) {
-    var r = rows.map(function(row){ return '<div class="cd-kpi-tip-row"><span>'+row[0]+'</span><span>'+row[1]+'</span></div>'; }).join('');
-    return '<div class="cd-kpi-tip">'+r+(formula?'<div class="cd-kpi-tip-formula">'+formula+'</div>':'')+'</div>';
+    return { rows: rows, formula: formula || null };
   }
 
   var kpis = [
@@ -396,15 +443,17 @@ function _cdRenderKpis(runs, certs, hs) {
       tip: _tip([['Source','bist_certificates · valid'],['Oldest cert',oldest+'d ago'],['Threshold',thresh+'d (firm-configurable)'],['Amber zone','>'+(Math.round(thresh*.7))+'d'],['Red zone','>'+thresh+'d']],'Days since the oldest valid certificate was issued. Certs older than the stale threshold should be refreshed to confirm the workflow still behaves as certified.') }
   ];
 
-  el.innerHTML = kpis.map(function(k){
-    return '<div class="cd-kpi">' +
-      (k.tip || '') +
+  el.innerHTML = kpis.map(function(k, ki){
+    return '<div class="cd-kpi" data-tip-idx="'+ki+'" ' +
+      'onmouseenter="_cdKpiTip(event,'+ki+')" onmouseleave="_cdKpiHide()">' +
       '<div class="cd-kpi-lbl">'+_cdEsc(k.lbl)+'</div>' +
       '<div class="cd-kpi-val" style="color:'+k.vc+'">'+k.val+'</div>' +
       '<div class="cd-kpi-sub">'+_cdEsc(k.sub)+'</div>' +
       '<div class="cd-kpi-delta" style="color:'+k.dc+'">'+_cdEsc(k.delta)+'</div>' +
       '</div>';
   }).join('');
+  // Store tip data on window for hover handler
+  window._cdKpiTips = kpis.map(function(k){ return k.tip ? Object.assign({title: k.lbl}, k.tip) : null; });
 }
 
 function _cdRenderHealthScore(hRows) {
