@@ -40,9 +40,9 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-wf.wf-uncov{border-left:3px solid #4a5568}\n'
     + '.cd-wf.wf-cert{border-left:3px solid var(--cd-grn)}\n'
     + '.cd-wf-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:7px}\n'
-    + '.cd-wf-name{font-size:13px;font-weight:700;color:rgba(255,255,255,.9);font-family:Arial,sans-serif}\n'
-    + '.cd-wf-ver{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px}\n'
-    + '.cd-pill{font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:.05em;flex-shrink:0;margin-top:2px}\n'
+    + '.cd-wf-name{font-size:13pt;font-weight:700;color:#ffffff;font-family:Arial,sans-serif}\n'
+    + '.cd-wf-ver{font-size:12pt;color:rgba(255,255,255,.7);margin-top:2px;font-family:Arial,sans-serif}\n'
+    + '.cd-pill{font-size:11pt;font-weight:700;padding:3px 10px;border-radius:10px;letter-spacing:.04em;flex-shrink:0;font-family:Arial,sans-serif}\n'
     + '.cd-pill-cert{background:rgba(95,212,100,.15);color:var(--cd-grn);border:1px solid rgba(95,212,100,.3)}\n'
     + '.cd-pill-fail{background:rgba(220,60,60,.15);color:var(--cd-red);border:1px solid rgba(220,60,60,.3)}\n'
     + '.cd-pill-stale{background:rgba(240,180,0,.12);color:var(--cd-amb);border:1px solid rgba(240,180,0,.25)}\n'
@@ -50,14 +50,14 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-wf-cov{display:flex;align-items:center;gap:8px;margin-bottom:6px}\n'
     + '.cd-cov-bar{flex:1;height:4px;background:#1e2535;border-radius:2px;overflow:hidden}\n'
     + '.cd-cov-fill{height:100%;border-radius:2px;transition:width .3s}\n'
-    + '.cd-cov-pct{font-size:11px;font-weight:700;min-width:32px;text-align:right;font-family:monospace}\n'
-    + '.cd-cov-suite{font-size:10px;color:rgba(255,255,255,.4);white-space:nowrap}\n'
+    + '.cd-cov-pct{font-size:14pt;font-weight:700;min-width:40px;text-align:right;font-family:monospace}\n'
+    + '.cd-cov-suite{font-size:12pt;color:rgba(255,255,255,.75);white-space:nowrap;font-family:Arial,sans-serif}\n'
     + '.cd-wf-dates{display:flex;gap:14px;margin-bottom:8px}\n'
-    + '.cd-wf-date{font-size:10px;color:rgba(255,255,255,.35)}\n'
+    + '.cd-wf-date{font-size:12pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif}\n'
     + '.cd-wf-acts{display:flex;gap:6px;flex-wrap:wrap}\n'
     + '.cd-wf-expand{padding:0 2px}\n'
-    + '.cd-wf button.cd-wf-btn{font-size:10px;font-weight:600;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.55);cursor:pointer;letter-spacing:.03em;font-family:inherit}\n'
-    + '.cd-wf button.cd-wf-btn:hover{border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.85)}\n'
+    + '.cd-wf button.cd-wf-btn{font-size:12pt;font-weight:600;padding:4px 11px;border-radius:4px;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.85);cursor:pointer;font-family:Arial,sans-serif}\n'
+    + '.cd-wf button.cd-wf-btn:hover{border-color:rgba(255,255,255,.5);color:#ffffff;background:rgba(255,255,255,.06)}\n'
     + '.cd-wf button.cd-wf-btn.primary{background:rgba(0,201,201,.12);border-color:rgba(0,201,201,.4);color:var(--cad,#00c9c9)}\n'
     + '.cd-wf button.cd-wf-btn.danger{background:rgba(220,60,60,.12);border-color:rgba(220,60,60,.35);color:var(--cd-red)}\n'
     + '.cd-wf-btn{font-size:10px;font-weight:600;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.55);cursor:pointer;letter-spacing:.03em}\n'
@@ -1026,6 +1026,7 @@ function _cdPortToggle(tmplId) {
 
 function _cdPortExpand(tmplId) {
   var exp = document.getElementById('cd-wf-exp-'+tmplId); if (!exp) return;
+  if (exp.style.display !== 'none') { exp.style.display='none'; return; }
   var d = window._cdPortData || {};
   var cert    = (d.certByTmpl||{})[tmplId] || null;
   var scripts = (d.scriptObjsByTmpl||{})[tmplId] || [];
@@ -1073,17 +1074,31 @@ function _cdPortExpand(tmplId) {
 }
 
 function _cdPortRunSuite(tmplId) {
-  // Activate Suite Runner in right panel pre-filtered to this template
   _cdSwitchView('history');
   setTimeout(function(){
-    var startBtn = document.getElementById('cd-hm-start-btn');
-    if (startBtn) startBtn.click();
-  }, 150);
+    if (typeof _cdHmStartAll === 'function') _cdHmStartAll();
+    else { var b=document.getElementById('cd-hm-start-btn'); if(b) b.click(); }
+  }, 300);
 }
 
 function _cdPortRunScript(scriptId, tmplId) {
-  // Switch to Simulator with template pre-selected, script pre-selected
   _s9DashOpenSimulator(tmplId);
+}
+
+function _cdPortSimulate(tmplId) {
+  _s9DashOpenSimulator(tmplId);
+  setTimeout(function(){
+    var existing = document.getElementById('cd-sim-hint');
+    if (existing) return;
+    var hint = document.createElement('div');
+    hint.id = 'cd-sim-hint';
+    hint.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:8000;background:#1a2236;border:1px solid var(--cad,#00c9c9);border-radius:6px;padding:10px 18px;font-size:12px;font-family:Arial,sans-serif;color:rgba(255,255,255,.9);display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,.6);max-width:520px';
+    hint.innerHTML = '<div style="color:var(--cad,#00c9c9);font-size:16px;flex-shrink:0">&#9432;</div>'
+      + '<div><strong>Template pre-selected.</strong> Choose a test script from the left panel, then click <strong>Run Script</strong> to simulate. Watch the DAG animate step-by-step.</div>'
+      + '<div style="cursor:pointer;color:rgba(255,255,255,.4);font-size:16px;flex-shrink:0" onclick="this.parentElement.remove()">&#215;</div>';
+    document.body.appendChild(hint);
+    setTimeout(function(){ if(hint.parentElement) hint.remove(); }, 8000);
+  }, 600);
 }
 
 function _cdPortWriteScripts(tmplId) {
@@ -1097,6 +1112,7 @@ window._cdPortExpand     = _cdPortExpand;
 window._cdPortRunSuite   = _cdPortRunSuite;
 window._cdPortRunScript  = _cdPortRunScript;
 window._cdPortWriteScripts = _cdPortWriteScripts;
+window._cdPortSimulate = _cdPortSimulate;
 
 // ── Request Queue
 
