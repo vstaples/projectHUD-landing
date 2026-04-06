@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD12 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
