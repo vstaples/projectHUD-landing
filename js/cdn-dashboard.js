@@ -11,7 +11,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260406-CD8 — KPI drill-down · cert count fix','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260406-CD9 — cert count grounded to template count','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -389,14 +389,16 @@ async function _cdLoadKpiAndHealth(firmId) {
     var results = await Promise.all([
       _cdQ('bist_runs', { filters:[['firm_id','eq',firmId]], order:'run_at.desc', limit:100, select:'id,status,run_at,duration_ms,script_id' }),
       _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]], order:'issued_at.desc', select:'id,status,issued_at,expires_at,template_id,template_version' }),
-      _cdQ('health_scores', { filters:[['firm_id','eq',firmId]], order:'calculated_at.desc', limit:7, select:'id,composite_score,domain_scores,calculated_at' })
+      _cdQ('health_scores', { filters:[['firm_id','eq',firmId]], order:'calculated_at.desc', limit:7, select:'id,composite_score,domain_scores,calculated_at' }),
+      _cdQ('workflow_templates', { filters:[['firm_id','eq',firmId]], select:'id' })
     ]);
-    var runs  = results[0] || [];
-    var certs = results[1] || [];
-    var hRows = results[2] || [];
+    var runs   = results[0] || [];
+    var certs  = results[1] || [];
+    var hRows  = results[2] || [];
+    var tmpls  = results[3] || [];
     _cdCerts = certs;
     _cdRuns  = runs;
-    _cdRenderKpis(runs, certs, hRows[0] || null);
+    _cdRenderKpis(runs, certs, hRows[0] || null, tmpls.length);
     _cdRenderHealthScore(hRows);
   } catch(e) {
     console.warn('[CD] KPI/Health load failed:', e);
@@ -485,14 +487,11 @@ function _cdKpiDrill(idx) {
   panel.style.display = 'block';
 }
 
-function _cdRenderKpis(runs, certs, hs) {
+function _cdRenderKpis(runs, certs, hs, tmplCount) {
   var el = document.getElementById('cd-kpi-strip'); if (!el) return;
   var now = Date.now(), thirty = 30*86400*1000;
   var r30     = runs.filter(function(r){ return r.run_at && (now - new Date(r.run_at).getTime()) < thirty; });
-  // Ground cert counts to workflow_templates (via _cdPortfolioTmpls) to avoid
-  // counting multiple cert rows per template. Falls back to cert rows if no template data.
-  var _allTmplIds = (window._cdPortfolioTmpls || []).map(function(t){ return t.id; });
-  var _tmplTotal  = _allTmplIds.length || certs.length;
+  // Count valid/invalidated by distinct template_id — one cert per template
   var _validTmplIds = {};
   certs.filter(function(c){ return c.status==='valid'; }).forEach(function(c){ _validTmplIds[c.template_id]=true; });
   var _invalidTmplIds = {};
@@ -500,7 +499,7 @@ function _cdRenderKpis(runs, certs, hs) {
     if (!_validTmplIds[c.template_id]) _invalidTmplIds[c.template_id]=true;
   });
   var valid   = Object.keys(_validTmplIds).length;
-  var total   = _tmplTotal;
+  var total   = tmplCount != null ? tmplCount : (window._cdPortfolioTmpls || []).length || certs.length;
   var failing = Object.keys(_invalidTmplIds).length;
   var passed  = r30.filter(function(r){ return r.status === 'passed'; });
   var failed  = r30.filter(function(r){ return r.status === 'failed'; });
