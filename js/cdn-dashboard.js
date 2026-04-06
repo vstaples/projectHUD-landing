@@ -11,7 +11,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260406-CD7 — KPI floating hover tooltips','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260406-CD8 — KPI drill-down · cert count fix','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -138,6 +138,21 @@ console.log('%c[cdn-dashboard] v20260406-CD7 — KPI floating hover tooltips','b
 + '#cd-kpi-tooltip .ct-row span:last-child{color:#fff;font-weight:600;text-align:right;max-width:130px}\n'
 + '#cd-kpi-tooltip .ct-formula{font-size:10px;color:rgba(255,255,255,.4);margin-top:7px;line-height:1.55;border-top:1px solid rgba(255,255,255,.06);padding-top:7px}\n'
 + '.cd-kpi{cursor:default}\n'
+    // KPI drill-down panel
++ '#cd-kpi-drill{display:none;border-bottom:1px solid #1e2535;background:#0a0c14;flex-shrink:0}\n'
++ '.cd-drill-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #1e2535}\n'
++ '.cd-drill-title{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--cd-teal)}\n'
++ '.cd-drill-close{font-size:12px;color:rgba(255,255,255,.35);cursor:pointer;padding:2px 6px;border-radius:3px}\n'
++ '.cd-drill-close:hover{color:#fff;background:rgba(255,255,255,.06)}\n'
++ '.cd-drill-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0;max-height:220px;overflow-y:auto}\n'
++ '.cd-drill-row{display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.04);border-right:1px solid rgba(255,255,255,.04)}\n'
++ '.cd-drill-row:hover{background:rgba(255,255,255,.02)}\n'
++ '.cd-drill-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}\n'
++ '.cd-drill-name{font-size:11px;color:rgba(255,255,255,.8);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
++ '.cd-drill-meta{font-size:10px;color:rgba(255,255,255,.4);font-family:var(--font-mono,"Courier New",monospace);flex-shrink:0}\n'
++ '.cd-drill-act{font-size:10px;padding:2px 7px;border-radius:3px;border:1px solid #2a3347;background:transparent;color:rgba(255,255,255,.45);cursor:pointer;font-family:var(--font-mono,"Courier New",monospace);white-space:nowrap}\n'
++ '.cd-drill-act:hover{border-color:#3a4557;color:#fff}\n'
++ '.cd-kpi.active{background:rgba(95,212,200,.06);border-bottom:2px solid var(--cd-teal)}\n'
     // Shimmer
     + '@keyframes cd-shimmer{0%,100%{opacity:.35}50%{opacity:.7}}\n'
     + '.cd-skel{background:#1a1f2e;border-radius:3px;animation:cd-shimmer 1.4s ease-in-out infinite}\n'
@@ -302,6 +317,8 @@ function _cdRenderShell(panel) {
             '<div class="cd-skel" style="height:9px;width:80px"></div></div>';
         }).join('') +
       '</div>' +
+      // KPI drill-down panel
+      '<div id="cd-kpi-drill"></div>' +
       // Body
       '<div class="cd-body" id="cd-body">' +
         // Left main
@@ -386,13 +403,105 @@ async function _cdLoadKpiAndHealth(firmId) {
   }
 }
 
+// ── KPI Drill-down ────────────────────────────────────────────────────────────
+var _cdActiveDrill = -1;
+
+function _cdKpiDrill(idx) {
+  var panel = document.getElementById('cd-kpi-drill');
+  var strip = document.getElementById('cd-kpi-strip');
+  if (!panel) return;
+
+  // Toggle off if same KPI clicked again
+  if (_cdActiveDrill === idx) {
+    _cdActiveDrill = -1;
+    panel.style.display = 'none';
+    if (strip) Array.from(strip.querySelectorAll('.cd-kpi')).forEach(function(el){ el.classList.remove('active'); });
+    return;
+  }
+  _cdActiveDrill = idx;
+
+  // Highlight active KPI
+  if (strip) {
+    Array.from(strip.querySelectorAll('.cd-kpi')).forEach(function(el, i){
+      el.classList.toggle('active', i === idx);
+    });
+  }
+
+  var tmpls = window._cdPortfolioTmpls || [];
+  var certs = window._cdPortfolioCerts || [];
+
+  // Build cert lookup by template_id
+  var certByTmpl = {};
+  certs.forEach(function(c){ if (!certByTmpl[c.template_id]) certByTmpl[c.template_id] = c; });
+
+  var rows = [];
+
+  if (idx === 1) {
+    // Workflows Certified — show all templates with cert status
+    tmpls.forEach(function(t) {
+      var c = certByTmpl[t.id];
+      var status = !c ? 'no cert' : c.status === 'valid' ? 'certified' : c.status;
+      var dot = !c ? '#4a5568' : c.status==='valid' ? 'var(--cd-grn)' : c.status==='invalidated' ? 'var(--cd-red)' : '#4a5568';
+      var meta = c && c.issued_at ? _cdRelTime(c.issued_at) : 'never';
+      var act = c && c.status==='invalidated'
+        ? '<button class="cd-drill-act" onclick="_s9DashOpenSimulator(\''+t.id+'\')">Re-certify</button>'
+        : !c ? '<button class="cd-drill-act" onclick="_s9DashOpenSimulator(\''+t.id+'\')">Run tests</button>'
+        : '<button class="cd-drill-act" onclick="_s9DashOpenSimulator(\''+t.id+'\')">View</button>';
+      rows.push({ name: t.name+' v'+(t.version||'—'), dot: dot, meta: status+' · '+meta, act: act });
+    });
+  } else if (idx === 2) {
+    // Failing Tests — show only templates with invalidated certs
+    var shown = 0;
+    tmpls.forEach(function(t) {
+      var c = certByTmpl[t.id];
+      if (!c || c.status !== 'invalidated') return;
+      shown++;
+      rows.push({
+        name: t.name+' v'+(t.version||'—'),
+        dot: 'var(--cd-red)',
+        meta: 'invalidated · '+_cdRelTime(c.issued_at),
+        act: '<button class="cd-drill-act" onclick="_s9DashOpenSimulator(\''+t.id+'\')">Re-certify</button>'
+      });
+    });
+    if (!shown) rows.push({ name:'All certs valid — no failing tests', dot:'var(--cd-grn)', meta:'', act:'' });
+  }
+
+  var rowHtml = rows.map(function(r){
+    return '<div class="cd-drill-row">' +
+      '<div class="cd-drill-dot" style="background:'+r.dot+'"></div>' +
+      '<div class="cd-drill-name">'+_cdEsc(r.name)+'</div>' +
+      '<div class="cd-drill-meta">'+_cdEsc(r.meta)+'</div>' +
+      r.act +
+      '</div>';
+  }).join('');
+
+  var titles = {1:'Workflows Certified', 2:'Failing Tests — Invalidated Certs'};
+  panel.innerHTML =
+    '<div class="cd-drill-header">' +
+      '<div class="cd-drill-title">'+_cdEsc(titles[idx]||'')+'</div>' +
+      '<div class="cd-drill-close" onclick="_cdKpiDrill('+idx+')">✕</div>' +
+    '</div>' +
+    '<div class="cd-drill-body">'+rowHtml+'</div>';
+  panel.style.display = 'block';
+}
+
 function _cdRenderKpis(runs, certs, hs) {
   var el = document.getElementById('cd-kpi-strip'); if (!el) return;
   var now = Date.now(), thirty = 30*86400*1000;
   var r30     = runs.filter(function(r){ return r.run_at && (now - new Date(r.run_at).getTime()) < thirty; });
-  var valid   = certs.filter(function(c){ return c.status === 'valid'; }).length;
-  var total   = certs.length;
-  var failing = certs.filter(function(c){ return c.status === 'invalidated'; }).length;
+  // Ground cert counts to workflow_templates (via _cdPortfolioTmpls) to avoid
+  // counting multiple cert rows per template. Falls back to cert rows if no template data.
+  var _allTmplIds = (window._cdPortfolioTmpls || []).map(function(t){ return t.id; });
+  var _tmplTotal  = _allTmplIds.length || certs.length;
+  var _validTmplIds = {};
+  certs.filter(function(c){ return c.status==='valid'; }).forEach(function(c){ _validTmplIds[c.template_id]=true; });
+  var _invalidTmplIds = {};
+  certs.filter(function(c){ return c.status==='invalidated'; }).forEach(function(c){
+    if (!_validTmplIds[c.template_id]) _invalidTmplIds[c.template_id]=true;
+  });
+  var valid   = Object.keys(_validTmplIds).length;
+  var total   = _tmplTotal;
+  var failing = Object.keys(_invalidTmplIds).length;
   var passed  = r30.filter(function(r){ return r.status === 'passed'; });
   var failed  = r30.filter(function(r){ return r.status === 'failed'; });
   var passRate= r30.length ? Math.round((passed.length / r30.length)*100) : null;
@@ -443,10 +552,13 @@ function _cdRenderKpis(runs, certs, hs) {
       tip: _tip([['Source','bist_certificates · valid'],['Oldest cert',oldest+'d ago'],['Threshold',thresh+'d (firm-configurable)'],['Amber zone','>'+(Math.round(thresh*.7))+'d'],['Red zone','>'+thresh+'d']],'Days since the oldest valid certificate was issued. Certs older than the stale threshold should be refreshed to confirm the workflow still behaves as certified.') }
   ];
 
+  var drillable = {1:true, 2:true}; // Workflows Certified, Failing Tests
   el.innerHTML = kpis.map(function(k, ki){
+    var clickable = drillable[ki];
     return '<div class="cd-kpi" data-tip-idx="'+ki+'" ' +
+      (clickable ? 'onclick="_cdKpiDrill('+ki+')" style="cursor:pointer" ' : '') +
       'onmouseenter="_cdKpiTip(event,'+ki+')" onmouseleave="_cdKpiHide()">' +
-      '<div class="cd-kpi-lbl">'+_cdEsc(k.lbl)+'</div>' +
+      '<div class="cd-kpi-lbl">'+_cdEsc(k.lbl)+(clickable ? ' <span style="font-size:9px;opacity:.5">▾</span>' : '')+'</div>' +
       '<div class="cd-kpi-val" style="color:'+k.vc+'">'+k.val+'</div>' +
       '<div class="cd-kpi-sub">'+_cdEsc(k.sub)+'</div>' +
       '<div class="cd-kpi-delta" style="color:'+k.dc+'">'+_cdEsc(k.delta)+'</div>' +
@@ -627,6 +739,8 @@ async function _cdLoadPortfolio(firmId) {
       } catch(e) { runs = []; }
     }
 
+    window._cdPortfolioTmpls  = tmpls;
+    window._cdPortfolioCerts  = certs;
     _cdRenderPortfolio(tmpls, certs, scripts, runs, paths);
   } catch(e) {
     console.warn('[CD] Portfolio load failed:', e);
