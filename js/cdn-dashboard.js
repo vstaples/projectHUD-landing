@@ -11,7 +11,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260406-CD6 — latest-run-per-script pass counts','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260406-CD7 — KPI hover tooltips','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -130,8 +130,7 @@ console.log('%c[cdn-dashboard] v20260406-CD6 — latest-run-per-script pass coun
     + '.cd-coc-text{font-size:10px;color:rgba(255,255,255,.5);font-family:var(--font-mono,"Courier New",monospace);flex:1;line-height:1.5}\n'
     + '.cd-coc-text strong{color:#e2e8f0;font-weight:700}\n'
     + '.cd-coc-time{font-size:9px;color:rgba(255,255,255,.3);font-family:var(--font-mono,"Courier New",monospace);flex-shrink:0;margin-top:3px}\n'
-    // Shimmer
-    + '@keyframes cd-shimmer{0%,100%{opacity:.35}50%{opacity:.7}}\n'
+    // KPI tooltips\n+ '.cd-kpi{position:relative;cursor:default}\n'\n+ '.cd-kpi-tip{display:none;position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px;z-index:9999;min-width:210px;max-width:270px;background:#1a1f2e;border:1px solid rgba(255,255,255,.14);border-radius:4px;padding:10px 12px;pointer-events:none;box-shadow:0 8px 28px rgba(0,0,0,.7)}\n'\n+ '.cd-kpi:hover .cd-kpi-tip{display:block}\n'\n+ '.cd-kpi-tip-title{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--cd-teal);font-family:var(--font-mono,\'Courier New\',monospace);margin-bottom:6px}\n'\n+ '.cd-kpi-tip-row{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:rgba(255,255,255,.65);padding:2px 0;border-bottom:1px solid rgba(255,255,255,.05)}\n'\n+ '.cd-kpi-tip-row:last-child{border-bottom:none}\n'\n+ '.cd-kpi-tip-row span:last-child{color:#fff;font-weight:600;text-align:right}\n'\n+ '.cd-kpi-tip-formula{font-size:10px;color:rgba(255,255,255,.4);margin-top:6px;line-height:1.5;border-top:1px solid rgba(255,255,255,.06);padding-top:6px}\n'\n    // Shimmer\n    + '@keyframes cd-shimmer{0%,100%{opacity:.35}50%{opacity:.7}}\n'
     + '.cd-skel{background:#1a1f2e;border-radius:3px;animation:cd-shimmer 1.4s ease-in-out infinite}\n'
     // Colour utils
     + '.cd-grn{color:var(--cd-grn)} .cd-amb{color:var(--cd-amb)} .cd-red{color:var(--cd-red)} .cd-t2{color:rgba(255,255,255,.45)}\n'
@@ -358,17 +357,48 @@ function _cdRenderKpis(runs, certs, hs) {
     if (a > oldest) oldest = a;
   });
 
+  function _tip(rows, formula) {
+    var r = rows.map(function(row){ return '<div class="cd-kpi-tip-row"><span>'+row[0]+'</span><span>'+row[1]+'</span></div>'; }).join('');
+    return '<div class="cd-kpi-tip">'+r+(formula?'<div class="cd-kpi-tip-formula">'+formula+'</div>':'')+'</div>';
+  }
+
   var kpis = [
-    { lbl:'Suite Pass Rate',     val: passRate !== null ? passRate+'%' : '—', sub:'last 30 days · '+r30.length+' runs', delta: passRate !== null ? (passRate>=90?'↑ healthy':'↓ review needed') : 'No runs yet', dc: passRate === null ? 'rgba(255,255,255,.35)' : passRate>=90 ? 'var(--cd-grn)' : 'var(--cd-amb)', vc: passRate === null ? 'rgba(255,255,255,.45)' : passRate>=90 ? 'var(--cd-grn)' : 'var(--cd-amb)' },
-    { lbl:'Workflows Certified', val: valid+'/'+total,  sub: total ? (valid===total?'All workflows valid':failing+' invalidated') : 'No templates', delta: valid===total?'↑ All valid':'↓ '+failing+' blocked', dc: valid===total?'var(--cd-grn)':'var(--cd-red)', vc: valid===total?'var(--cd-grn)':'var(--cd-amb)' },
-    { lbl:'Failing Tests',       val: failing || '0',  sub: failing ? 'Release gate blocked' : 'All gates clear', delta: failing ? '↓ Action required' : '↑ Gates clear', dc: failing ? 'var(--cd-red)' : 'var(--cd-grn)', vc: failing ? 'var(--cd-red)' : 'var(--cd-grn)' },
-    { lbl:'Mean Time to Detect', val: mttd ? mttd+'m' : '—',  sub:'failure → discovery', delta:'Last 30 days', dc:'rgba(255,255,255,.35)', vc:'var(--cd-amb)' },
-    { lbl:'Suite Runs (30d)',    val: r30.length, sub: passed.length+' passed · '+failed.length+' failed', delta: r30.length ? 'Active certification' : 'No runs this period', dc:'rgba(255,255,255,.35)', vc:'rgba(255,255,255,.85)' },
-    { lbl:'Oldest Cert Age',     val: oldest+'d', sub:'threshold: '+thresh+'d', delta: oldest > thresh ? '↓ Stale — re-certify' : oldest > thresh*.7 ? '↓ Approaching threshold' : '↑ Within threshold', dc: oldest > thresh ? 'var(--cd-red)' : oldest > thresh*.7 ? 'var(--cd-amb)' : 'var(--cd-grn)', vc: oldest > thresh ? 'var(--cd-red)' : oldest > thresh*.7 ? 'var(--cd-amb)' : 'var(--cd-grn)' }
+    { lbl:'Suite Pass Rate', val: passRate !== null ? passRate+'%' : '—',
+      sub:'last 30 days · '+r30.length+' runs',
+      delta: passRate !== null ? (passRate>=90?'\u2191 healthy':'\u2193 review needed') : 'No runs yet',
+      dc: passRate === null ? 'rgba(255,255,255,.35)' : passRate>=90 ? 'var(--cd-grn)' : 'var(--cd-amb)',
+      vc: passRate === null ? 'rgba(255,255,255,.45)' : passRate>=90 ? 'var(--cd-grn)' : 'var(--cd-amb)',
+      tip: _tip([['Source','bist_runs · last 30d'],['Passed',passed.length+' runs'],['Failed',failed.length+' runs'],['Total',r30.length+' runs'],['Green threshold','\u2265 90%'],['Amber threshold','\u2265 75%']],'Passed runs \u00f7 total runs \u00d7 100. Counts every script run, not just latest per script.') },
+    { lbl:'Workflows Certified', val: valid+'/'+total,
+      sub: total ? (valid===total?'All workflows valid':failing+' invalidated') : 'No templates',
+      delta: valid===total?'\u2191 All valid':'\u2193 '+failing+' blocked',
+      dc: valid===total?'var(--cd-grn)':'var(--cd-red)', vc: valid===total?'var(--cd-grn)':'var(--cd-amb)',
+      tip: _tip([['Source','bist_certificates'],['Valid',valid],['Invalidated',failing],['Total templates',total],['Gate','Release blocked if cert missing or invalidated']],'A cert is issued when all test scripts pass in a single cockpit run. Modified templates auto-invalidate their cert.') },
+    { lbl:'Failing Tests', val: failing || '0',
+      sub: failing ? 'Release gate blocked' : 'All gates clear',
+      delta: failing ? '\u2193 Action required' : '\u2191 Gates clear',
+      dc: failing ? 'var(--cd-red)' : 'var(--cd-grn)', vc: failing ? 'var(--cd-red)' : 'var(--cd-grn)',
+      tip: _tip([['Source','bist_certificates · invalidated'],['Count',failing+' template'+(failing!==1?'s':'')],['Impact','Release gate blocked per template'],['Resolution','Re-run all tests in cockpit']],'Count of templates with status=invalidated. A cert is invalidated when the template is modified after certification.') },
+    { lbl:'Mean Time to Detect', val: mttd ? mttd+'m' : '\u2014',
+      sub:'failure \u2192 discovery', delta:'Last 30 days',
+      dc:'rgba(255,255,255,.35)', vc:'var(--cd-amb)',
+      tip: _tip([['Source','bist_runs · last 30d'],['Failed runs',failed.length],['Avg duration',mttd ? mttd+'m' : '\u2014'],['Scope','Includes all script types']],'Average duration_ms of failed runs in last 30 days, converted to minutes. Proxy for how long it takes a broken workflow to be caught by the test suite.') },
+    { lbl:'Suite Runs (30d)', val: r30.length,
+      sub: passed.length+' passed \u00b7 '+failed.length+' failed',
+      delta: r30.length ? 'Active certification' : 'No runs this period',
+      dc:'rgba(255,255,255,.35)', vc:'rgba(255,255,255,.85)',
+      tip: _tip([['Source','bist_runs · last 30d'],['Passed',passed.length],['Failed',failed.length],['All firms',false ? '' : 'Firm-scoped']],'Total BIST cockpit runs in the last 30 days across all templates and scripts. Higher frequency = more confident certification coverage.') },
+    { lbl:'Oldest Cert Age', val: oldest+'d',
+      sub:'threshold: '+thresh+'d',
+      delta: oldest > thresh ? '\u2193 Stale \u2014 re-certify' : oldest > thresh*.7 ? '\u2193 Approaching threshold' : '\u2191 Within threshold',
+      dc: oldest > thresh ? 'var(--cd-red)' : oldest > thresh*.7 ? 'var(--cd-amb)' : 'var(--cd-grn)',
+      vc: oldest > thresh ? 'var(--cd-red)' : oldest > thresh*.7 ? 'var(--cd-amb)' : 'var(--cd-grn)',
+      tip: _tip([['Source','bist_certificates · valid'],['Oldest cert',oldest+'d ago'],['Threshold',thresh+'d (firm-configurable)'],['Amber zone','>'+(Math.round(thresh*.7))+'d'],['Red zone','>'+thresh+'d']],'Days since the oldest valid certificate was issued. Certs older than the stale threshold should be refreshed to confirm the workflow still behaves as certified.') }
   ];
 
   el.innerHTML = kpis.map(function(k){
     return '<div class="cd-kpi">' +
+      (k.tip || '') +
       '<div class="cd-kpi-lbl">'+_cdEsc(k.lbl)+'</div>' +
       '<div class="cd-kpi-val" style="color:'+k.vc+'">'+k.val+'</div>' +
       '<div class="cd-kpi-sub">'+_cdEsc(k.sub)+'</div>' +
