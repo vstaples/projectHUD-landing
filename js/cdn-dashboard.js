@@ -32,7 +32,7 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-hm-legend{display:flex;align-items:center;gap:5px;margin-top:5px}\n'
     + '.cd-hl-dot{width:7px;height:7px;border-radius:1px;flex-shrink:0}\n'
     + '.cd-hl-lbl{font-size:8px;color:rgba(255,255,255,.4)}\n'
-    + '.cd-controls{display:flex;align-items:center;padding:5px 14px;gap:10px;background:#0d1017;border-bottom:1px solid #1e2535;flex-shrink:0;flex-wrap:wrap}\n'
+    + '.cd-view-bar{display:flex;align-items:center;gap:6px;padding:7px 14px;background:#0b0e17;border-bottom:1px solid #1e2535;flex-shrink:0}\n'+ '.cd-vbtn{font-size:10px;font-weight:700;letter-spacing:.06em;padding:4px 12px;border-radius:4px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.4);cursor:pointer;transition:all .15s}\n'+ '.cd-vbtn.active{background:var(--cad,#00c9c9);border-color:var(--cad,#00c9c9);color:#003333}\n'+ '.cd-vbtn:hover:not(.active){border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.7)}\n'+ '.cd-view-hint{margin-left:auto;font-size:9px;color:rgba(255,255,255,.3);letter-spacing:.04em}\n'+ '.cd-controls{display:flex;align-items:center;padding:5px 14px;gap:10px;background:#0d1017;border-bottom:1px solid #1e2535;flex-shrink:0;flex-wrap:wrap}\n'
     + '.cd-ctrl-lbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35)}\n'
     + '.cd-range-btn{padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;cursor:pointer;border:1px solid #252d3f;color:rgba(255,255,255,.4);background:transparent}\n'
     + '.cd-range-btn.active,.cd-range-btn:hover{background:#161b28;border-color:var(--cd-teal);color:var(--cd-teal)}\n'
@@ -167,6 +167,7 @@ function _cdQ(table,opts){var o=opts||{};var qs=[];(o.filters||[]).forEach(funct
 var _cdCerts=[],_cdRuns=[],_cdOverrideCtx=null;
 var _cdHmState={},_cdHmTimers=[],_cdHmTipTarget=null,_cdHmTemplates=[],_cdHmScripts={};
 var _cdLastLoad=0,_cdLoadTtl=120000,_cdRange='30d';
+var _cdActiveView='portfolio';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function _cdScoreColor(n){return n>=90?'var(--cd-grn)':n>=75?'var(--cd-amb)':'var(--cd-red)';}
@@ -199,7 +200,18 @@ function _cdRenderShell(panel){
           '</div>'+
         '</div>'+
       '</div>'+
-      '<div class="cd-controls">'+
+      '<div class="cd-view-bar">'+
+        '<button class="cd-vbtn active" id="cd-vbtn-portfolio" onclick="_cdSwitchView(\'portfolio\')">Portfolio View</button>'+
+        '<button class="cd-vbtn" id="cd-vbtn-history" onclick="_cdSwitchView(\'history\')">Run History</button>'+
+        '<div class="cd-view-hint" id="cd-view-hint">Showing all templates</div>'+
+      '</div>'+
+      '<div id="cd-portfolio-panel" style="overflow-y:auto;padding:14px 16px">'+
+        '<div id="cd-port-count" style="font-size:9px;color:rgba(255,255,255,.35);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase"></div>'+
+        '<div id="cd-port-grid" style="display:flex;flex-direction:column;gap:8px">'+
+          '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:24px;text-align:center">Loading portfolio...</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="cd-controls" id="cd-history-controls" style="display:none">'+
         '<span class="cd-ctrl-lbl">Range</span>'+
         ['7d','30d','90d','All'].map(function(r,i){return '<button class="cd-range-btn'+(i===1?' active':'')+'" onclick="_cdSetRange(\''+r+'\')">'+r+'</button>';}).join('')+
         '<div class="cd-ctrl-div"></div>'+
@@ -207,7 +219,7 @@ function _cdRenderShell(panel){
         '<div id="cd-script-filters" style="display:flex;gap:5px"></div>'+
         '<div style="margin-left:auto;font-size:9px;color:rgba(255,255,255,.4)">Stale threshold: <span style="color:var(--cd-amb);font-weight:700" id="cd-stale-thresh">30d</span></div>'+
       '</div>'+
-      '<div class="cd-body">'+
+      '<div class="cd-body" id="cd-history-body" style="display:none">'+
         '<div class="cd-left">'+
           '<div class="cd-scroll">'+
             '<div class="cd-chart-sec">'+
@@ -258,6 +270,31 @@ function _cdSetRange(r){
   _cdRenderChart();_cdRenderLog();
 }
 
+window._cdSwitchView=function _cdSwitchView(view){
+  _cdActiveView=view;
+  var portPanel=document.getElementById('cd-portfolio-panel');
+  var histCtrls=document.getElementById('cd-history-controls');
+  var histBody =document.getElementById('cd-history-body');
+  var btnPort  =document.getElementById('cd-vbtn-portfolio');
+  var btnHist  =document.getElementById('cd-vbtn-history');
+  var hint     =document.getElementById('cd-view-hint');
+  if(view==='portfolio'){
+    if(portPanel)portPanel.style.display='block';
+    if(histCtrls)histCtrls.style.display='none';
+    if(histBody) histBody.style.display='none';
+    if(btnPort)  btnPort.classList.add('active');
+    if(btnHist)  btnHist.classList.remove('active');
+    if(hint)     hint.textContent='Showing all templates';
+  } else {
+    if(portPanel)portPanel.style.display='none';
+    if(histCtrls)histCtrls.style.display='flex';
+    if(histBody) histBody.style.display='flex';
+    if(btnPort)  btnPort.classList.remove('active');
+    if(btnHist)  btnHist.classList.add('active');
+    if(hint)     hint.textContent='Suite pass rate trend · run log';
+  }
+}
+
 // ── Data orchestrator ─────────────────────────────────────────────────────────
 async function _cdLoadAll(){
   var firmId;try{firmId=await _s9WaitForFirmId();}catch(e){}
@@ -284,6 +321,7 @@ async function _cdLoadAll(){
   _cdRenderChart();
   _cdRenderLog();
   _cdRenderHealthMonitor();
+  _cdLoadPortfolio(firmId);
 }
 
 
