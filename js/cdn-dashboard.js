@@ -11,7 +11,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260406-CD9 — cert count grounded to template count','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260406-CD10 — drill panel single-column layout','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -144,12 +144,12 @@ console.log('%c[cdn-dashboard] v20260406-CD9 — cert count grounded to template
 + '.cd-drill-title{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--cd-teal)}\n'
 + '.cd-drill-close{font-size:12px;color:rgba(255,255,255,.35);cursor:pointer;padding:2px 6px;border-radius:3px}\n'
 + '.cd-drill-close:hover{color:#fff;background:rgba(255,255,255,.06)}\n'
-+ '.cd-drill-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0;max-height:220px;overflow-y:auto}\n'
-+ '.cd-drill-row{display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.04);border-right:1px solid rgba(255,255,255,.04)}\n'
++ '.cd-drill-body{display:flex;flex-direction:column;max-height:240px;overflow-y:auto}\n'
++ '.cd-drill-row{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.05)}\n'
 + '.cd-drill-row:hover{background:rgba(255,255,255,.02)}\n'
 + '.cd-drill-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}\n'
-+ '.cd-drill-name{font-size:11px;color:rgba(255,255,255,.8);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
-+ '.cd-drill-meta{font-size:10px;color:rgba(255,255,255,.4);font-family:var(--font-mono,"Courier New",monospace);flex-shrink:0}\n'
++ '.cd-drill-name{font-size:12px;color:rgba(255,255,255,.85);flex:1;font-weight:500}\n'
++ '.cd-drill-meta{font-size:11px;color:rgba(255,255,255,.4);font-family:var(--font-mono,"Courier New",monospace);flex-shrink:0;min-width:180px;text-align:right}\n'
 + '.cd-drill-act{font-size:10px;padding:2px 7px;border-radius:3px;border:1px solid #2a3347;background:transparent;color:rgba(255,255,255,.45);cursor:pointer;font-family:var(--font-mono,"Courier New",monospace);white-space:nowrap}\n'
 + '.cd-drill-act:hover{border-color:#3a4557;color:#fff}\n'
 + '.cd-kpi.active{background:rgba(95,212,200,.06);border-bottom:2px solid var(--cd-teal)}\n'
