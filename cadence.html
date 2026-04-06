@@ -4105,6 +4105,14 @@ function _s9DashOpenSimulator(templateId) {
     _s9Switch('simulator');
   }
 }
+window._s9DashOpenSimulator = _s9DashOpenSimulator;
+
+function _cdConveneMrb(templateId) {
+  if (window.supOpenModal) { window.supOpenModal({ module: 'cadencehud', context: 'mrb', templateId: templateId }); }
+  else { alert('MRB convening is not yet configured.'); }
+}
+window._cdConveneMrb = _cdConveneMrb;
+
 
 // ── Sparkline (7-day composite, SVG inline) ───────────────────────────────────
 function _s9DashSparkline() {

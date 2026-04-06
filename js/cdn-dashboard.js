@@ -1000,18 +1000,18 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     var actBtns;
     if (statusCls === 'wf-fail') {
       actBtns =
-        '<div class="cd-wf-btn" onclick="event.stopPropagation()">View failure</div>' +
+        '<div class="cd-wf-btn" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">View failure</div>' +
         '<div class="cd-wf-btn danger" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">Re-certify</div>' +
         '<div class="cd-wf-btn" onclick="event.stopPropagation();_cdConveneMrb(\''+t.id+'\')">Convene MRB</div>';
     } else if (statusCls === 'wf-uncov') {
       actBtns = '<div class="cd-wf-btn primary" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">Write test scripts →</div>';
     } else if (statusCls === 'wf-stale') {
       actBtns =
-        '<div class="cd-wf-btn" onclick="event.stopPropagation()">View history</div>' +
+        '<div class="cd-wf-btn" onclick="event.stopPropagation();_cdSwitchView(\'history\')">→ Run History</div>' +
         '<div class="cd-wf-btn primary" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">Re-certify</div>';
     } else {
       actBtns =
-        '<div class="cd-wf-btn" onclick="event.stopPropagation()">View cert</div>' +
+        '<div class="cd-wf-btn" onclick="event.stopPropagation();_cdSwitchView(\'history\')">→ Run History</div>' +
         '<div class="cd-wf-btn" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">Run suite</div>' +
         '<div class="cd-wf-btn primary" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">Simulate</div>';
     }
