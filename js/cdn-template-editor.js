@@ -1,5 +1,5 @@
 // cdn-template-editor.js — Cadence: template editor, spine, step CRUD
-console.log('%c[cdn-template-editor] v20260403-D','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-template-editor] v20260406-D2','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // Depends on: cdn-dag-viewer, cdn-assignee, cdn-outcomes, cdn-documents
 // LOAD ORDER: 7th
 
@@ -1409,34 +1409,83 @@ async function _doRelease() {
 
 async function returnToDraft() {
   if (!_selectedTmpl) return;
-  const confirmed = confirm(`Return "${_selectedTmpl.name}" to Draft? It will be removed from Compass Browse until re-released.`);
-  if (!confirmed) return;
+  // Replace window.confirm with cadToast confirmation pattern via inline modal
+  _returnToDraftConfirmed();
+}
+
+function _returnToDraftConfirmed() {
+  if (!_selectedTmpl) return;
+  // Build inline confirmation toast
+  var tmplName = _selectedTmpl.name;
+  var existing = document.getElementById('_rtd-confirm');
+  if (existing) existing.remove();
+  var div = document.createElement('div');
+  div.id = '_rtd-confirm';
+  div.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);' +
+    'background:#1a1208;border:1px solid rgba(212,144,31,.5);border-radius:6px;' +
+    'padding:14px 18px;z-index:9999;font-family:Arial,sans-serif;font-size:13px;' +
+    'color:#e2d4a0;box-shadow:0 8px 32px rgba(0,0,0,.7);max-width:480px;text-align:center';
+  div.innerHTML =
+    '<div style="font-weight:700;margin-bottom:8px">Return “'+tmplName+'” to Draft?</div>' +
+    '<div style="font-size:12px;color:rgba(226,212,160,.6);margin-bottom:12px">Removes from Compass Browse · invalidates current certificate</div>' +
+    '<div style="display:flex;gap:8px;justify-content:center">' +
+      '<button onclick="_rtdCancel()" ' +
+        'style="padding:6px 16px;border-radius:3px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.6);cursor:pointer;font-family:Arial,sans-serif;font-size:12px">Cancel</button>' +
+      '<button onclick="_doReturnToDraft()" ' +
+        'style="padding:6px 16px;border-radius:3px;border:none;background:#d4900a;color:#1a0f00;cursor:pointer;font-family:Arial,sans-serif;font-size:12px;font-weight:700">Confirm</button>' +
+    '</div>';
+  document.body.appendChild(div);
+  // Auto-dismiss after 10s
+  setTimeout(function(){ var el = document.getElementById('_rtd-confirm'); if (el) el.remove(); }, 10000);
+}
+
+
+function _rtdCancel(){ var e=document.getElementById('_rtd-confirm');if(e)e.remove(); }
+async function _doReturnToDraft() {
+  var el = document.getElementById('_rtd-confirm'); if (el) el.remove();
+  if (!_selectedTmpl) return;
   const now = new Date().toISOString();
-  await API.patch(`workflow_templates?id=eq.${_selectedTmpl.id}`, {
+  const tmplId = _selectedTmpl.id;
+  const version = _selectedTmpl.version || '0.0.0';
+  const authorName = (_resources_cad || []).find(function(r){ return r.id === _myResourceId; })?.name || 'Team Member';
+
+  await API.patch('workflow_templates?id=eq.'+tmplId, {
     status:          'draft',
     compass_visible: false,
     updated_at:      now,
   });
+
   _selectedTmpl.status          = 'draft';
   _selectedTmpl.compass_visible = false;
-  const authorName = _resources_cad.find(r => r.id === _myResourceId)?.name || 'Team Member';
-  await API.post('workflow_template_coc', {
-    firm_id:         FIRM_ID_CAD,
-    template_id:     _selectedTmpl.id,
-    event_type:      'status_changed',
-    changed_by:      _myResourceId || null,
-    changed_by_name: authorName,
-    field_name:      'status',
-    old_value:       'released',
-    new_value:       'draft',
-    note:            'Returned to Draft — removed from Compass Browse',
-    version_at:      _selectedTmpl.version || '0.0.0',
-    created_at:      now,
-  }).catch(() => {});
-  cadToast('Returned to Draft — removed from Compass Browse', 'info');
-  // Re-render template detail to show draft state
-  const inner = document.getElementById('tmpl-detail-inner');
-  if (inner && typeof renderTemplateDetail === 'function') renderTemplateDetail(_selectedTmpl, inner);
+
+  // Update templates array
+  var idx = (_templates||[]).findIndex(function(t){ return t.id === tmplId; });
+  if (idx >= 0) { _templates[idx].status = 'draft'; _templates[idx].compass_visible = false; }
+
+  // Invalidate any valid cert for this version
+  API.patch(
+    'bist_certificates?firm_id=eq.'+FIRM_ID_CAD+'&template_id=eq.'+tmplId+'&template_version=eq.'+version+'&status=eq.valid',
+    { status: 'invalidated', revoked_at: now, revoke_reason: 'Template reverted to draft' }
+  ).catch(function(){});
+
+  // CoC writes
+  API.post('workflow_template_coc', {
+    firm_id: FIRM_ID_CAD, template_id: tmplId,
+    event_type: 'status_changed', changed_by: _myResourceId || null, changed_by_name: authorName,
+    field_name: 'status', old_value: 'released', new_value: 'draft',
+    note: 'Returned to Draft — removed from Compass Browse',
+    version_at: version, created_at: now,
+  }).catch(function(){});
+
+  API.post('coc_events', {
+    firm_id: FIRM_ID_CAD, entity_type: 'workflow_template', entity_id: tmplId,
+    event_type: 'template.updated', actor_name: authorName, actor_resource_id: _myResourceId || null,
+    metadata: { template: _selectedTmpl.name, version: version, status: 'draft', action: 'reverted_to_draft' },
+    event_class: 'governance', severity: 'info', occurred_at: now,
+  }).catch(function(){});
+
+  cadToast('Returned to Draft — certificate invalidated', 'info');
+  renderEditor();
 }
 
 async function commitTemplate() {
