@@ -398,13 +398,13 @@ function _cdRenderHeatmap(runs){
   var html='<div style="display:flex;gap:10px;align-items:flex-start;margin-top:4px">';
   // Left label column (Mon-Fri prefix)
   html+='<div style="display:flex;flex-direction:column;gap:3px;padding-top:18px">';
-  for(var di=0;di<5;di++) html+='<div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.35);height:11px;line-height:11px;font-family:monospace">'+DOW_LABELS[di]+'</div>';
+  for(var di=0;di<5;di++) html+='<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.55);height:13px;line-height:13px;font-family:monospace;width:14px;text-align:center">'+DOW_LABELS[di]+'</div>';
   html+='</div>';
   // 5 week columns
   weeks.forEach(function(wk){
     html+='<div style="display:flex;flex-direction:column;align-items:center;gap:3px">';
     // Date label on top
-    html+='<div style="font-size:9px;color:rgba(255,255,255,.35);font-family:monospace;white-space:nowrap;margin-bottom:3px">'+wk.dateStr+'</div>';
+    html+='<div style="font-size:11px;color:rgba(255,255,255,.55);font-family:monospace;white-space:nowrap;margin-bottom:4px;font-weight:500">'+wk.dateStr+'</div>';
     // 5 day blocks (Mon top, Fri bottom)
     wk.days.forEach(function(day){
       html+='<div style="width:18px;height:11px;border-radius:2px;background:'+clr[day.st]+'" title="'+day.title+'"></div>';
@@ -1026,7 +1026,14 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
       else        { statusCls='wf-cert';  statusPillCls='cd-pill-cert';  statusLabel='Certified'; }
     }
 
-    var suiteLine = scriptCt ? passCt+'/'+scriptCt+' passing'+(failCt?' · '+failCt+' failing':'') : '0 scripts — no test coverage';
+    var suiteLine;
+    if (scriptCt) {
+      suiteLine = passCt+'/'+scriptCt+' passing'+(failCt?' · '+failCt+' failing':'');
+    } else if (cert && (cert.status==='valid'||cert.status==='active'||(!cert.status.match(/invalidat|revok/)))) {
+      suiteLine = 'Certified — add scripts to maintain coverage';
+    } else {
+      suiteLine = '0 scripts — no test coverage';
+    }
     var certDateLine = cert && cert.issued_at ? 'Cert issued '+_cdRelTime(cert.issued_at) : 'Never certified';
     var lastRun = tmplRuns[0];
     var lastRunLine;
@@ -1059,7 +1066,7 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
 
     return '<div class="cd-wf '+statusCls+'" id="cd-wf-'+t.id+'" data-tid="'+t.id+'" onclick="_cdPortToggle(this.dataset.tid)">'+
       '<div class="cd-wf-r1">'+
-        '<div class="cd-wf-name">'+_cdEsc(t.name)+'</div>'+
+        '<div class="cd-wf-name" style="color:'+( statusCls==="wf-fail" ? "#e84040" : statusCls==="wf-uncov" ? "#f5c842" : statusCls==="wf-stale" ? "#f5c842" : "#3de08a" )+'">'+_cdEsc(t.name)+'</div>'+
         '<div class="cd-wf-r1-right">'+
           actBtns+
           '<span class="cd-pill '+statusPillCls+'">'+statusLabel+'</span>'+
