@@ -50,9 +50,9 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-li{display:flex;align-items:center;gap:3px;font-size:9px;color:rgba(255,255,255,.4)}\n'
     + '.cd-lline{width:14px;height:2px;border-radius:1px}\n'
     + '.cd-ldot{width:6px;height:6px;border-radius:50%}\n'
-    + '.cd-log-hdr{display:grid;grid-template-columns:1fr 76px 56px 56px 52px 80px 70px;padding:5px 14px;background:#111520;border-bottom:1px solid #1e2535;position:sticky;top:0;z-index:5}\n'
+    + '.cd-log-hdr{display:grid;grid-template-columns:minmax(140px,2fr) 90px 60px 70px 50px 100px 70px;padding:5px 14px;background:#111520;border-bottom:1px solid #1e2535;position:sticky;top:0;z-index:5}\n'
     + '.cd-lh{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--cd-teal)}\n'
-    + '.cd-log-row{display:grid;grid-template-columns:1fr 76px 56px 56px 52px 80px 70px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;cursor:pointer;transition:background .1s}\n'
+    + '.cd-log-row{display:grid;grid-template-columns:minmax(140px,2fr) 90px 60px 70px 50px 100px 70px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;cursor:pointer;transition:background .1s}\n'
     + '.cd-log-row:hover{background:#111520}\n'
     + '.cd-lc{font-size:10px;color:rgba(255,255,255,.4);font-family:var(--font-mono,"Courier New",monospace)}\n'
     + '.cd-lc-main{font-size:10px;color:#e2e8f0}\n'
@@ -117,6 +117,16 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '@keyframes cd-shimmer{0%,100%{opacity:.35}50%{opacity:.7}}\n'
     + '.cd-skel{background:#1a1f2e;border-radius:3px;animation:cd-shimmer 1.4s ease-in-out infinite}\n'
     + '.cd-grn{color:var(--cd-grn)} .cd-amb{color:var(--cd-amb)} .cd-red{color:var(--cd-red)} .cd-t2{color:rgba(255,255,255,.45)}\n'
+    // Typography rules
+    + '.cd-brief *{font-family:Arial,sans-serif}\n'
+    + '.cd-brief .cd-kpi-lbl,.cd-brief .cd-ctrl-lbl,.cd-brief .cd-lh,.cd-brief .cd-hm-badge,.cd-brief .cd-hc{font-size:10px!important;color:var(--cd-teal);font-weight:700;letter-spacing:.08em}\n'
+    + '.cd-brief .cd-kpi-val{font-size:18px!important;font-family:var(--font-mono,"Courier New",monospace)!important}\n'
+    + '.cd-brief .cd-kpi-sub,.cd-brief .cd-kpi-delta{font-size:12px!important}\n'
+    + '.cd-brief .cd-lc,.cd-brief .cd-lc-main,.cd-brief .cd-r-result{font-size:12px!important}\n'
+    + '.cd-brief .cd-r-name,.cd-brief .cd-hm-title{font-size:12px!important}\n'
+    + '.cd-brief .cd-lc{font-family:var(--font-mono,"Courier New",monospace)!important;font-size:12px!important}\n'
+    + '.cd-brief .cd-sp{font-size:11px!important}\n'
+    + '.cd-brief .cd-hl-lbl{font-size:9px!important}\n'
     + '.cd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:9000}\n'
     + '.cd-overlay.open{display:flex}\n'
     + '.cd-modal{background:#0d1017;border:1px solid #252d3f;border-radius:6px;width:440px;overflow:hidden}\n'
@@ -490,15 +500,24 @@ function _cdResizeStart(e) {
 document.addEventListener('mousemove', function(e) {
   if (!_cdResizing) return;
   var pane = document.getElementById('cd-right-pane'); if (!pane) return;
-  var delta = _cdResizeStartX - e.clientX; // dragging left edge leftward = wider
+  var delta = _cdResizeStartX - e.clientX;
   var newW = Math.max(220, Math.min(520, _cdResizeStartW + delta));
   pane.style.width = newW + 'px';
+  // Show width popup
+  var tip = document.getElementById('cd-resize-tip');
+  if (!tip) { tip=document.createElement('div'); tip.id='cd-resize-tip'; tip.style.cssText='position:fixed;z-index:9999;background:#0d1017;border:1px solid var(--cd-teal);border-radius:3px;padding:3px 8px;font-size:11px;font-weight:700;color:var(--cd-teal);pointer-events:none;font-family:"Courier New",monospace'; document.body.appendChild(tip); }
+  tip.textContent = newW+'px';
+  tip.style.left = (e.clientX-40)+'px';
+  tip.style.top  = (e.clientY-28)+'px';
+  tip.style.display = 'block';
 });
 document.addEventListener('mouseup', function() {
   if (!_cdResizing) return;
   _cdResizing = false;
   document.body.style.cursor = '';
   document.body.style.userSelect = '';
+  var tip = document.getElementById('cd-resize-tip');
+  if (tip) tip.style.display = 'none';
 });
 
 // ── KPI Drill-down ────────────────────────────────────────────────────────────
@@ -647,20 +666,31 @@ function _cdRenderKpis(runs, certs, hs, tmplCount) {
       tip: _tip([['Source','bist_certificates · valid'],['Oldest cert',oldest+'d ago'],['Threshold',thresh+'d (firm-configurable)'],['Amber zone','>'+(Math.round(thresh*.7))+'d'],['Red zone','>'+thresh+'d']],'Days since the oldest valid certificate was issued. Certs older than the stale threshold should be refreshed to confirm the workflow still behaves as certified.') }
   ];
 
-  var drillable = {1:true, 2:true}; // Workflows Certified, Failing Tests
-  el.innerHTML = kpis.map(function(k, ki){
+  var drillable = {1:true, 2:true};
+  // Update only the 5 metric cells — do NOT replace the whole strip (would nuke heatmap cell)
+  var cells = el.querySelectorAll('.cd-kpi:not(.wide)');
+  kpis.forEach(function(k, ki) {
+    var cell = cells[ki];
+    if (!cell) {
+      // Cell doesn't exist yet — insert before the wide heatmap cell
+      cell = document.createElement('div');
+      cell.className = 'cd-kpi';
+      var wide = el.querySelector('.cd-kpi.wide');
+      if (wide) el.insertBefore(cell, wide); else el.appendChild(cell);
+    }
     var clickable = drillable[ki];
-    return '<div class="cd-kpi" data-tip-idx="'+ki+'" ' +
-      (clickable ? 'onclick="_cdKpiDrill('+ki+')" style="cursor:pointer" ' : '') +
-      'onmouseenter="_cdKpiTip(event,'+ki+')" onmouseleave="_cdKpiHide()">' +
-      '<div class="cd-kpi-lbl">'+_cdEsc(k.lbl)+(clickable ? ' <span style="font-size:9px;opacity:.5">▾</span>' : '')+'</div>' +
-      '<div class="cd-kpi-val" style="color:'+k.vc+'">'+k.val+'</div>' +
-      '<div class="cd-kpi-sub">'+_cdEsc(k.sub)+'</div>' +
-      '<div class="cd-kpi-delta" style="color:'+k.dc+'">'+_cdEsc(k.delta)+'</div>' +
-      '</div>';
-  }).join('');
-  // Store tip data on window for hover handler
-  window._cdKpiTips = kpis.map(function(k){ return k.tip ? Object.assign({title: k.lbl}, k.tip) : null; });
+    cell.setAttribute('data-tip-idx', ki);
+    cell.style.cursor = clickable ? 'pointer' : '';
+    cell.onclick = clickable ? function(idx){ return function(){ _cdKpiDrill(idx); }; }(ki) : null;
+    cell.onmouseenter = function(idx){ return function(e){ _cdKpiTip(e, idx); }; }(ki);
+    cell.onmouseleave = _cdKpiHide;
+    cell.innerHTML =
+      '<div class="cd-kpi-lbl">'+_cdEsc(k.lbl)+(clickable?' <span style="font-size:9px;opacity:.5">&#x25BE;</span>':'')+'</div>'+
+      '<div class="cd-kpi-val" style="color:'+k.vc+'">'+k.val+'</div>'+
+      '<div class="cd-kpi-sub">'+_cdEsc(k.sub)+'</div>'+
+      '<div class="cd-kpi-delta" style="color:'+k.dc+'">'+_cdEsc(k.delta)+'</div>';
+  });
+  window._cdKpiTips = kpis.map(function(k){ return k.tip ? Object.assign({title:k.lbl}, k.tip) : null; });
 }
 
 async function _cdLoadHotQueue(firmId) {
