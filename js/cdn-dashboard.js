@@ -1,177 +1,133 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-dashboard.js  ·  v20260406-CD4
-// CadenceHUD — Process Certification Portfolio Dashboard
-//
-// Layout: KPI strip → Cert Portfolio grid (main) + Right rail (health + requests + CoC)
-// Hot Queue lives inside the cert portfolio section as a priority band.
-//
-// Depends on: api.js (API.get, API.post), cdn-bist.js (_s9DashOpenSimulator),
-//             _s9Switch(), _s9WaitForFirmId(), window.CURRENT_USER
+// cdn-dashboard.js  ·  v20260406-CD11
+// CadenceHUD — composite dashboard
+// KPI strip (heatmap in last cell) | left: trend + run log | right: health monitor
 // ══════════════════════════════════════════════════════════════════════════════
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260406-CD10 — drill panel single-column layout','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
   if (document.getElementById('cdn-dashboard-css')) return;
-  var s = document.createElement('style');
-  s.id  = 'cdn-dashboard-css';
+  var s = document.createElement('style'); s.id='cdn-dashboard-css';
   s.textContent = ''
-    // Colour vars
     + ':root{--cd-grn:#3de08a;--cd-grn2:rgba(61,224,138,.13);--cd-amb:#f5c842;--cd-amb2:rgba(245,200,66,.14);--cd-red:#e84040;--cd-red2:rgba(232,64,64,.14);--cd-teal:#5fd4c8;--cd-blue:#60a5fa;--cd-pur:#a78bfa}\n'
-    // Shell
     + '.cd-brief{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:#080a0f;font-family:Arial,sans-serif}\n'
-    // KPI strip
     + '.cd-kpi-strip{display:flex;border-bottom:1px solid #1e2535;flex-shrink:0;background:#0d1017}\n'
-    + '.cd-kpi{flex:1;padding:9px 14px;border-right:1px solid #1e2535;display:flex;flex-direction:column;gap:2px}\n'
+    + '.cd-kpi{flex:1;padding:9px 13px;border-right:1px solid #1e2535;display:flex;flex-direction:column;gap:2px;cursor:default}\n'
     + '.cd-kpi:last-child{border-right:none}\n'
+    + '.cd-kpi.wide{flex:1.5;min-width:0}\n'
     + '.cd-kpi-lbl{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--cd-teal)}\n'
-    + '.cd-kpi-val{font-size:19px;font-weight:700;font-family:var(--font-mono,"Courier New",monospace)}\n'
-    + '.cd-kpi-sub{font-size:10px;color:rgba(255,255,255,.45)}\n'
-    + '.cd-kpi-delta{font-size:10px;font-weight:700}\n'
-    // Main body
+    + '.cd-kpi-val{font-size:18px;font-weight:700;font-family:var(--font-mono,"Courier New",monospace)}\n'
+    + '.cd-kpi-sub{font-size:9px;color:rgba(255,255,255,.45)}\n'
+    + '.cd-kpi-delta{font-size:9px;font-weight:700}\n'
+    + '.cd-kpi.active{background:rgba(95,212,200,.06);border-bottom:2px solid var(--cd-teal)}\n'
+    + '.cd-hm-top{display:flex;align-items:center;justify-content:space-between}\n'
+    + '.cd-hm-grid{display:flex;gap:2px;margin-top:5px}\n'
+    + '.cd-hm-week{display:flex;flex-direction:column;gap:2px}\n'
+    + '.cd-hm-day{width:9px;height:9px;border-radius:1px;cursor:pointer;transition:transform .1s}\n'
+    + '.cd-hm-day:hover{transform:scale(1.5);z-index:10;position:relative}\n'
+    + '.cd-hm-legend{display:flex;align-items:center;gap:5px;margin-top:5px}\n'
+    + '.cd-hl-dot{width:7px;height:7px;border-radius:1px;flex-shrink:0}\n'
+    + '.cd-hl-lbl{font-size:8px;color:rgba(255,255,255,.4)}\n'
+    + '.cd-controls{display:flex;align-items:center;padding:5px 14px;gap:10px;background:#0d1017;border-bottom:1px solid #1e2535;flex-shrink:0;flex-wrap:wrap}\n'
+    + '.cd-ctrl-lbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35)}\n'
+    + '.cd-range-btn{padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;cursor:pointer;border:1px solid #252d3f;color:rgba(255,255,255,.4);background:transparent}\n'
+    + '.cd-range-btn.active,.cd-range-btn:hover{background:#161b28;border-color:var(--cd-teal);color:var(--cd-teal)}\n'
+    + '.cd-ctrl-div{width:1px;height:16px;background:#1e2535}\n'
+    + '.cd-fp{display:flex;align-items:center;gap:3px;padding:2px 8px;border-radius:8px;font-size:9px;cursor:pointer;border:1px solid;font-weight:700}\n'
     + '.cd-body{flex:1;display:flex;overflow:hidden}\n'
-    + '.cd-main{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}\n'
-    + '.cd-main::-webkit-scrollbar{width:3px}\n'
-    + '.cd-main::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}\n'
-    // Right rail
-    + '.cd-rail{width:282px;flex-shrink:0;border-left:1px solid #1e2535;display:flex;flex-direction:column;overflow:hidden}\n'
-    + '.cd-rail-sect{border-bottom:1px solid #1e2535;display:flex;flex-direction:column;overflow:hidden}\n'
-    + '.cd-rail-sect:last-child{border-bottom:none;flex:1}\n'
-    + '.cd-rail-hdr{padding:7px 12px;display:flex;align-items:center;gap:6px;flex-shrink:0}\n'
-    + '.cd-rail-title{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--cd-teal);flex:1}\n'
-    + '.cd-rail-count{font-size:10px;color:rgba(255,255,255,.45);font-family:var(--font-mono,"Courier New",monospace)}\n'
-    + '.cd-rail-body{flex:1;overflow-y:auto;max-height:200px}\n'
-    + '.cd-rail-body.flex-scroll{flex:1;max-height:none}\n'
-    + '.cd-rail-body::-webkit-scrollbar{width:2px}\n'
-    + '.cd-rail-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}\n'
-    // Section labels
-    + '.cd-sect-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px}\n'
-    + '.cd-sect-label{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.4)}\n'
-    + '.cd-sect-line{flex:1;height:1px;background:#1e2535}\n'
-    // Hot queue items (compact band at top of main)
-    + '.cd-hot{padding:7px 11px;border-bottom:1px solid #1e2535;display:flex;align-items:flex-start;gap:7px;cursor:pointer;transition:background .1s}\n'
-    + '.cd-hot:hover{background:rgba(255,255,255,.02)}\n'
-    + '.cd-hot:last-child{border-bottom:none}\n'
-    + '.cd-hot-sev{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:28px}\n'
-    + '.cd-hot-main{flex:1;min-width:0}\n'
-    + '.cd-hot-type{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;font-family:var(--font-mono,"Courier New",monospace);margin-bottom:1px}\n'
-    + '.cd-hot-name{font-size:12px;color:#e2e8f0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
-    + '.cd-hot-sub{font-size:10px;color:rgba(255,255,255,.45);font-family:var(--font-mono,"Courier New",monospace);margin-top:1px}\n'
-    + '.cd-hot-acts{display:flex;gap:4px;flex-shrink:0;align-items:center}\n'
-    + '.cd-hbtn{padding:3px 8px;border-radius:3px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid;font-family:var(--font-mono,"Courier New",monospace);white-space:nowrap;transition:all .12s}\n'
-    + '.cd-hbtn-r{background:var(--cd-red2);border-color:rgba(232,64,64,.4);color:var(--cd-red)}\n'
-    + '.cd-hbtn-r:hover{background:rgba(232,64,64,.25)}\n'
-    + '.cd-hbtn-a{background:var(--cd-amb2);border-color:rgba(245,200,66,.35);color:var(--cd-amb)}\n'
-    + '.cd-hbtn-a:hover{background:rgba(245,200,66,.22)}\n'
-    + '.cd-hbtn-n{background:transparent;border-color:#2a3347;color:rgba(255,255,255,.5)}\n'
-    + '.cd-hbtn-n:hover{border-color:#3a4557;color:#e2e8f0}\n'
-    + '.cd-hot-empty{padding:16px 11px;display:flex;align-items:center;gap:8px}\n'
-    + '.cd-hot-empty-check{width:22px;height:22px;border-radius:50%;background:var(--cd-grn2);border:1px solid rgba(61,224,138,.25);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--cd-grn);flex-shrink:0}\n'
-    + '.cd-hot-empty-text{font-size:11px;color:var(--cd-grn);font-family:var(--font-mono,"Courier New",monospace)}\n'
-    // Portfolio grid
-    + '.cd-port-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}\n'
-    // Workflow card
-    + '.cd-wf{background:#0d1017;border:1px solid #1e2535;border-radius:4px;display:flex;flex-direction:column;gap:8px;padding:10px 12px;cursor:pointer;transition:border-color .15s}\n'
-    + '.cd-wf:hover{border-color:#252d3f}\n'
-    + '.cd-wf.wf-cert  {border-left:2px solid var(--cd-grn)}\n'
-    + '.cd-wf.wf-fail  {border-left:2px solid var(--cd-red)}\n'
-    + '.cd-wf.wf-stale {border-left:2px solid var(--cd-amb)}\n'
-    + '.cd-wf.wf-uncov {border-left:2px solid #4a5568}\n'
-    + '.cd-wf-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}\n'
-    + '.cd-wf-name{font-size:12px;font-weight:700;color:#e2e8f0;line-height:1.4}\n'
-    + '.cd-wf-ver{font-size:10px;color:rgba(255,255,255,.35);font-family:var(--font-mono,"Courier New",monospace);margin-top:1px}\n'
-    + '.cd-pill{font-size:9px;font-weight:700;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0;letter-spacing:.04em;text-transform:uppercase;font-family:var(--font-mono,"Courier New",monospace)}\n'
-    + '.cd-pill-cert {background:rgba(61,224,138,.1); color:var(--cd-grn); border:1px solid rgba(61,224,138,.3)}\n'
-    + '.cd-pill-fail {background:var(--cd-red2);       color:var(--cd-red); border:1px solid rgba(232,64,64,.35)}\n'
-    + '.cd-pill-stale{background:var(--cd-amb2);       color:var(--cd-amb); border:1px solid rgba(245,200,66,.3)}\n'
-    + '.cd-pill-uncov{background:rgba(74,85,104,.2);   color:#6b7a99;       border:1px solid #2a3347}\n'
-    + '.cd-wf-cov{display:flex;align-items:center;gap:6px}\n'
-    + '.cd-cov-bar{flex:1;height:3px;background:#1e2535;border-radius:2px;overflow:hidden}\n'
-    + '.cd-cov-fill{height:100%;border-radius:2px}\n'
-    + '.cd-cov-pct{font-size:10px;font-weight:700;font-family:var(--font-mono,"Courier New",monospace);min-width:30px;text-align:right}\n'
-    + '.cd-cov-suite{font-size:10px;color:rgba(255,255,255,.45);font-family:var(--font-mono,"Courier New",monospace)}\n'
-    + '.cd-wf-dates{display:flex;align-items:center;justify-content:space-between}\n'
-    + '.cd-wf-date{font-size:10px;color:rgba(255,255,255,.35);font-family:var(--font-mono,"Courier New",monospace)}\n'
-    + '.cd-wf-acts{display:flex;align-items:center;gap:5px;flex-wrap:wrap}\n'
-    + '.cd-wf-btn{padding:3px 8px;border-radius:3px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #2a3347;background:transparent;color:rgba(255,255,255,.5);font-family:var(--font-mono,"Courier New",monospace);transition:all .12s}\n'
-    + '.cd-wf-btn:hover{border-color:#3a4557;color:#e2e8f0}\n'
-    + '.cd-wf-btn.primary{color:var(--cd-teal);border-color:rgba(95,212,200,.35)}\n'
-    + '.cd-wf-btn.primary:hover{background:rgba(95,212,200,.07)}\n'
-    + '.cd-wf-btn.danger{color:var(--cd-red);border-color:rgba(232,64,64,.35)}\n'
-    + '.cd-wf-btn.danger:hover{background:var(--cd-red2)}\n'
-    // Health score block (rail)
-    + '.cd-hs-block{padding:10px 12px;display:flex;flex-direction:column;align-items:center;gap:6px}\n'
-    + '.cd-hs-num{font-size:42px;font-weight:700;font-family:var(--font-mono,"Courier New",monospace);line-height:1}\n'
-    + '.cd-hs-lbl{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.45)}\n'
-    + '.cd-hs-domains{width:100%;display:flex;flex-direction:column;gap:5px;margin-top:2px}\n'
-    + '.cd-hs-dom{display:flex;align-items:center;gap:6px}\n'
-    + '.cd-hs-dom-name{font-size:10px;color:rgba(255,255,255,.5);width:82px;flex-shrink:0}\n'
-    + '.cd-hs-dom-bar{flex:1;height:3px;background:#1e2535;border-radius:2px;overflow:hidden}\n'
-    + '.cd-hs-dom-fill{height:100%;border-radius:2px}\n'
-    + '.cd-hs-dom-pct{font-size:10px;font-weight:700;font-family:var(--font-mono,"Courier New",monospace);min-width:26px;text-align:right}\n'
-    // Request queue (rail)
-    + '.cd-rq{padding:6px 12px;border-bottom:1px solid #1e2535;display:flex;align-items:flex-start;gap:6px;cursor:pointer;transition:background .1s}\n'
-    + '.cd-rq:hover{background:rgba(255,255,255,.02)}\n'
-    + '.cd-rq:last-child{border-bottom:none}\n'
-    + '.cd-rq-badge{font-size:9px;font-weight:700;padding:2px 5px;border-radius:2px;background:rgba(96,165,250,.14);color:var(--cd-blue);border:1px solid rgba(96,165,250,.25);white-space:nowrap;flex-shrink:0;margin-top:1px;font-family:var(--font-mono,"Courier New",monospace);letter-spacing:.03em}\n'
-    + '.cd-rq-body{flex:1;min-width:0}\n'
-    + '.cd-rq-name{font-size:11px;font-weight:700;color:#e2e8f0}\n'
-    + '.cd-rq-from{font-size:10px;color:rgba(255,255,255,.4);font-family:var(--font-mono,"Courier New",monospace);margin-top:1px}\n'
-    + '.cd-rq-acts{display:flex;gap:3px;margin-top:4px}\n'
-    + '.cd-rq-btn{padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid #2a3347;background:transparent;color:rgba(255,255,255,.45);font-family:var(--font-mono,"Courier New",monospace);transition:all .12s}\n'
-    + '.cd-rq-btn:hover{border-color:#3a4557;color:#e2e8f0}\n'
-    // CoC feed (rail)
-    + '.cd-coc{padding:6px 12px;border-bottom:1px solid #1e2535;display:flex;align-items:flex-start;gap:7px}\n'
-    + '.cd-coc:last-child{border-bottom:none}\n'
-    + '.cd-coc-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px}\n'
-    + '.cd-coc-text{font-size:10px;color:rgba(255,255,255,.5);font-family:var(--font-mono,"Courier New",monospace);flex:1;line-height:1.5}\n'
-    + '.cd-coc-text strong{color:#e2e8f0;font-weight:700}\n'
-    + '.cd-coc-time{font-size:9px;color:rgba(255,255,255,.3);font-family:var(--font-mono,"Courier New",monospace);flex-shrink:0;margin-top:3px}\n'
-    // KPI floating tooltip singleton
-+ '#cd-kpi-tooltip{display:none;position:fixed;z-index:9999;min-width:220px;max-width:280px;background:#1a1f2e;border:1px solid rgba(255,255,255,.14);border-radius:4px;padding:10px 12px;pointer-events:none;box-shadow:0 8px 28px rgba(0,0,0,.7)}\n'
-+ '#cd-kpi-tooltip .ct-title{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--cd-teal);font-family:var(--font-mono,"Courier New",monospace);margin-bottom:7px}\n'
-+ '#cd-kpi-tooltip .ct-row{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:rgba(255,255,255,.65);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)}\n'
-+ '#cd-kpi-tooltip .ct-row:last-of-type{border-bottom:none}\n'
-+ '#cd-kpi-tooltip .ct-row span:last-child{color:#fff;font-weight:600;text-align:right;max-width:130px}\n'
-+ '#cd-kpi-tooltip .ct-formula{font-size:10px;color:rgba(255,255,255,.4);margin-top:7px;line-height:1.55;border-top:1px solid rgba(255,255,255,.06);padding-top:7px}\n'
-+ '.cd-kpi{cursor:default}\n'
-    // KPI drill-down panel
-+ '#cd-kpi-drill{display:none;border-bottom:1px solid #1e2535;background:#0a0c14;flex-shrink:0}\n'
-+ '.cd-drill-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #1e2535}\n'
-+ '.cd-drill-title{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--cd-teal)}\n'
-+ '.cd-drill-close{font-size:12px;color:rgba(255,255,255,.35);cursor:pointer;padding:2px 6px;border-radius:3px}\n'
-+ '.cd-drill-close:hover{color:#fff;background:rgba(255,255,255,.06)}\n'
-+ '.cd-drill-body{display:flex;flex-direction:column;max-height:240px;overflow-y:auto}\n'
-+ '.cd-drill-row{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.05)}\n'
-+ '.cd-drill-row:hover{background:rgba(255,255,255,.02)}\n'
-+ '.cd-drill-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}\n'
-+ '.cd-drill-name{font-size:12px;color:rgba(255,255,255,.85);flex:1;font-weight:500}\n'
-+ '.cd-drill-meta{font-size:11px;color:rgba(255,255,255,.4);font-family:var(--font-mono,"Courier New",monospace);flex-shrink:0;min-width:180px;text-align:right}\n'
-+ '.cd-drill-act{font-size:10px;padding:2px 7px;border-radius:3px;border:1px solid #2a3347;background:transparent;color:rgba(255,255,255,.45);cursor:pointer;font-family:var(--font-mono,"Courier New",monospace);white-space:nowrap}\n'
-+ '.cd-drill-act:hover{border-color:#3a4557;color:#fff}\n'
-+ '.cd-kpi.active{background:rgba(95,212,200,.06);border-bottom:2px solid var(--cd-teal)}\n'
-    // Shimmer
+    + '.cd-left{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid #1e2535}\n'
+    + '.cd-scroll{flex:1;overflow-y:auto}\n'
+    + '.cd-scroll::-webkit-scrollbar{width:3px}\n'
+    + '.cd-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}\n'
+    + '.cd-chart-sec{padding:12px 14px;border-bottom:1px solid #1e2535}\n'
+    + '.cd-chart-hdr{display:flex;align-items:center;margin-bottom:8px}\n'
+    + '.cd-chart-title{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--cd-teal)}\n'
+    + '.cd-legend{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}\n'
+    + '.cd-li{display:flex;align-items:center;gap:3px;font-size:9px;color:rgba(255,255,255,.4)}\n'
+    + '.cd-lline{width:14px;height:2px;border-radius:1px}\n'
+    + '.cd-ldot{width:6px;height:6px;border-radius:50%}\n'
+    + '.cd-log-hdr{display:grid;grid-template-columns:110px 76px 56px 56px 52px 1fr 70px;padding:5px 14px;background:#111520;border-bottom:1px solid #1e2535;position:sticky;top:0;z-index:5}\n'
+    + '.cd-lh{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--cd-teal)}\n'
+    + '.cd-log-row{display:grid;grid-template-columns:110px 76px 56px 56px 52px 1fr 70px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;cursor:pointer;transition:background .1s}\n'
+    + '.cd-log-row:hover{background:#111520}\n'
+    + '.cd-lc{font-size:10px;color:rgba(255,255,255,.4);font-family:var(--font-mono,"Courier New",monospace)}\n'
+    + '.cd-lc-main{font-size:10px;color:#e2e8f0}\n'
+    + '.cd-sp{display:inline-flex;align-items:center;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700}\n'
+    + '.cd-sp-pass{background:var(--cd-grn2);color:var(--cd-grn);border:1px solid rgba(61,224,138,.4)}\n'
+    + '.cd-sp-fail{background:var(--cd-red2);color:var(--cd-red);border:1px solid rgba(232,64,64,.4)}\n'
+    + '.cd-mini-dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}\n'
+    + '.cd-badge{display:inline-flex;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700}\n'
+    + '.cd-badge-cert{background:var(--cd-grn2);color:var(--cd-grn);border:1px solid rgba(61,224,138,.3)}\n'
+    + '.cd-badge-stale{background:var(--cd-amb2);color:var(--cd-amb);border:1px solid rgba(245,200,66,.3)}\n'
+    + '.cd-right{width:300px;flex-shrink:0;display:flex;flex-direction:column;background:#080a0f}\n'
+    + '.cd-hm-topbar{display:flex;align-items:center;padding:6px 12px;background:#0d1017;border-bottom:1px solid #1e2535;flex-shrink:0;gap:7px}\n'
+    + '.cd-hm-badge{font-size:9px;font-weight:700;letter-spacing:.07em;color:var(--cd-teal);background:rgba(95,212,200,.1);border:1px solid rgba(95,212,200,.25);padding:2px 7px;border-radius:3px}\n'
+    + '.cd-hm-title{font-size:11px;font-weight:700;color:#e2e8f0;flex:1}\n'
+    + '.cd-hm-counts{display:flex;gap:8px;font-size:9px;color:rgba(255,255,255,.4)}\n'
+    + '.cd-sum-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:2px}\n'
+    + '.cd-start-btn{font-size:10px;font-weight:700;padding:4px 11px;border-radius:3px;border:none;background:#1d9e75;color:#fff;cursor:pointer;white-space:nowrap}\n'
+    + '.cd-start-btn:hover{background:#259e79}\n'
+    + '.cd-start-btn:disabled{background:#1e2535;color:rgba(255,255,255,.3);cursor:default}\n'
+    + '.cd-reset-btn{font-size:10px;padding:4px 7px;border-radius:3px;border:1px solid #252d3f;background:transparent;color:rgba(255,255,255,.4);cursor:pointer}\n'
+    + '.cd-hm-col-hdr{display:grid;grid-template-columns:14px 1fr 56px 44px;padding:5px 12px;border-bottom:1px solid #1e2535;background:#111520;flex-shrink:0}\n'
+    + '.cd-hc{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.3)}\n'
+    + '.cd-hm-rows{flex:1;overflow-y:auto}\n'
+    + '.cd-hm-rows::-webkit-scrollbar{width:2px}\n'
+    + '.cd-hm-rows::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}\n'
+    + '.cd-hm-row{display:grid;grid-template-columns:14px 1fr 56px 44px;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04);cursor:default}\n'
+    + '.cd-hm-row:hover{background:rgba(255,255,255,.02)}\n'
+    + '.cd-type-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}\n'
+    + '.cd-r-name{font-size:11px;color:#e2e8f0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}\n'
+    + '.cd-bar-wrap{height:6px;background:#1a1f2e;border-radius:2px;overflow:hidden;position:relative}\n'
+    + '.cd-bar-fill{position:absolute;top:0;left:0;height:100%;border-radius:2px;transition:width .08s linear}\n'
+    + '.cd-r-result{font-size:10px;font-weight:700;text-align:right;font-family:var(--font-mono,"Courier New",monospace)}\n'
+    + '.cd-st-idle{color:rgba(255,255,255,.2)}.cd-st-run{color:var(--cd-amb)}.cd-st-pass{color:var(--cd-grn)}.cd-st-fail{color:var(--cd-red)}\n'
+    + '.cd-hm-tip{display:none;position:fixed;z-index:9999;width:286px;background:#131820;border:1px solid #252d3f;border-radius:4px;pointer-events:none;box-shadow:0 10px 36px rgba(0,0,0,.85)}\n'
+    + '.cd-hm-tip-hdr{padding:8px 11px;border-bottom:1px solid #1e2535;display:flex;align-items:center;justify-content:space-between}\n'
+    + '.cd-hm-tip-name{font-size:11px;font-weight:700;color:#e2e8f0}\n'
+    + '.cd-hm-tip-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:2px}\n'
+    + '.cd-tb-pass{background:rgba(29,158,117,.15);color:var(--cd-grn);border:1px solid rgba(29,158,117,.3)}\n'
+    + '.cd-tb-fail{background:var(--cd-red2);color:var(--cd-red);border:1px solid rgba(232,64,64,.28)}\n'
+    + '.cd-tb-run{background:rgba(245,200,66,.12);color:var(--cd-amb);border:1px solid rgba(245,200,66,.25)}\n'
+    + '.cd-tb-idle{background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.1)}\n'
+    + '.cd-hm-ts{padding:7px 11px;display:flex;flex-direction:column;gap:0}\n'
+    + '.cd-ts{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;gap:3px}\n'
+    + '.cd-ts:last-child{border-bottom:none}\n'
+    + '.cd-ts-row{display:flex;align-items:center;justify-content:space-between;gap:6px}\n'
+    + '.cd-ts-name{font-size:10px;color:#e2e8f0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
+    + '.cd-ts-dur{font-size:9px;color:rgba(255,255,255,.35);flex-shrink:0}\n'
+    + '.cd-ts-st{font-size:10px;font-weight:700;flex-shrink:0}\n'
+    + '.cd-ts-pass{color:var(--cd-grn)}.cd-ts-fail{color:var(--cd-red)}.cd-ts-pend{color:rgba(255,255,255,.25)}.cd-ts-run{color:var(--cd-amb)}\n'
+    + '.cd-ts-fail-block{background:rgba(232,64,64,.07);border-left:2px solid var(--cd-red);padding:4px 7px;border-radius:0 2px 2px 0;margin-top:2px}\n'
+    + '.cd-ts-fail-step{font-size:9px;color:rgba(255,255,255,.5);margin-bottom:2px}\n'
+    + '.cd-ts-fail-step b{color:var(--cd-red)}\n'
+    + '.cd-ts-fail-msg{font-size:9px;color:rgba(255,255,255,.35);line-height:1.4}\n'
+    + '.cd-tip-empty{padding:12px;font-size:10px;color:rgba(255,255,255,.3);text-align:center}\n'
+    + '.cd-tip-footer{padding:5px 11px;border-top:1px solid #1e2535;display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,.3)}\n'
+    + '#cd-kpi-tooltip{display:none;position:fixed;z-index:9999;min-width:220px;max-width:280px;background:#1a1f2e;border:1px solid rgba(255,255,255,.14);border-radius:4px;padding:10px 12px;pointer-events:none;box-shadow:0 8px 28px rgba(0,0,0,.7)}\n'
+    + '#cd-kpi-tooltip .ct-title{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--cd-teal);font-family:var(--font-mono,"Courier New",monospace);margin-bottom:7px}\n'
+    + '#cd-kpi-tooltip .ct-row{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:rgba(255,255,255,.65);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)}\n'
+    + '#cd-kpi-tooltip .ct-row:last-of-type{border-bottom:none}\n'
+    + '#cd-kpi-tooltip .ct-row span:last-child{color:#fff;font-weight:600;text-align:right;max-width:130px}\n'
+    + '#cd-kpi-tooltip .ct-formula{font-size:10px;color:rgba(255,255,255,.4);margin-top:7px;line-height:1.55;border-top:1px solid rgba(255,255,255,.06);padding-top:7px}\n'
     + '@keyframes cd-shimmer{0%,100%{opacity:.35}50%{opacity:.7}}\n'
     + '.cd-skel{background:#1a1f2e;border-radius:3px;animation:cd-shimmer 1.4s ease-in-out infinite}\n'
-    // Colour utils
     + '.cd-grn{color:var(--cd-grn)} .cd-amb{color:var(--cd-amb)} .cd-red{color:var(--cd-red)} .cd-t2{color:rgba(255,255,255,.45)}\n'
-    // Override modal
     + '.cd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:9000}\n'
     + '.cd-overlay.open{display:flex}\n'
     + '.cd-modal{background:#0d1017;border:1px solid #252d3f;border-radius:6px;width:440px;overflow:hidden}\n'
     + '.cd-modal-hdr{padding:12px 14px;border-bottom:1px solid #1e2535;display:flex;align-items:center;gap:7px}\n'
     + '.cd-modal-title{font-size:13px;font-weight:700;color:#e2e8f0;flex:1}\n'
-    + '.cd-modal-close{font-size:14px;color:rgba(255,255,255,.4);cursor:pointer;padding:2px 6px;border-radius:3px;transition:color .1s}\n'
-    + '.cd-modal-close:hover{color:#e2e8f0}\n'
+    + '.cd-modal-close{font-size:14px;color:rgba(255,255,255,.4);cursor:pointer;padding:2px 6px;border-radius:3px}\n'
     + '.cd-modal-body{padding:14px}\n'
     + '.cd-modal-warn{background:rgba(192,64,74,.08);border:1px solid rgba(192,64,74,.2);border-radius:4px;padding:10px 12px;font-size:12px;color:rgba(255,255,255,.6);line-height:1.6;margin-bottom:12px}\n'
     + '.cd-modal-warn strong{color:var(--cd-red)}\n'
     + '.cd-modal-lbl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.45);font-family:var(--font-mono,"Courier New",monospace);margin-bottom:5px}\n'
-    + '.cd-modal-ta{width:100%;background:#080a0f;border:1px solid #1e2535;border-radius:4px;color:#e2e8f0;font-family:var(--font-mono,"Courier New",monospace);font-size:12px;padding:8px 10px;resize:vertical;min-height:64px;outline:none;transition:border-color .1s}\n'
-    + '.cd-modal-ta:focus{border-color:var(--cd-teal)}\n'
+    + '.cd-modal-ta{width:100%;background:#080a0f;border:1px solid #1e2535;border-radius:4px;color:#e2e8f0;font-family:var(--font-mono,"Courier New",monospace);font-size:12px;padding:8px 10px;resize:vertical;min-height:64px;outline:none}\n'
     + '.cd-modal-note{font-size:10px;color:rgba(255,255,255,.4);font-family:var(--font-mono,"Courier New",monospace);margin-top:7px;padding:6px 10px;background:#080a0f;border-radius:3px;line-height:1.5}\n'
     + '.cd-modal-note span{color:var(--cd-teal)}\n'
     + '.cd-modal-ftr{padding:10px 14px;border-top:1px solid #1e2535;display:flex;gap:8px;justify-content:flex-end}\n'
@@ -179,231 +135,318 @@ console.log('%c[cdn-dashboard] v20260406-CD10 — drill panel single-column layo
   document.head.appendChild(s);
 })();
 
-// ── KPI Tooltip singleton ────────────────────────────────────────────────────
-(function() {
-  if (document.getElementById('cd-kpi-tooltip')) return;
-  var el = document.createElement('div');
-  el.id = 'cd-kpi-tooltip';
-  document.body.appendChild(el);
+// ── Singletons ────────────────────────────────────────────────────────────────
+(function(){
+  if(!document.getElementById('cd-kpi-tooltip')){var e=document.createElement('div');e.id='cd-kpi-tooltip';document.body.appendChild(e);}
+  if(!document.getElementById('cd-hm-tip')){var t=document.createElement('div');t.id='cd-hm-tip';t.className='cd-hm-tip';document.body.appendChild(t);}
+  if(!document.getElementById('cd-override-modal')){
+    var d=document.createElement('div');
+    d.innerHTML='<div class="cd-overlay" id="cd-override-modal" onclick="_cdCloseOverlay(event)"><div class="cd-modal"><div class="cd-modal-hdr"><div class="cd-modal-title">Override &#x2014; Governance Exception</div><div class="cd-modal-close" onclick="_cdCloseOverlayBtn()">&#x2715;</div></div><div class="cd-modal-body"><div class="cd-modal-warn">Override bypasses certification for <strong id="cd-override-entity"></strong>. Permanently recorded in CoC.</div><div class="cd-modal-lbl">Rationale (min 20 chars)</div><textarea class="cd-modal-ta" id="cd-override-rationale" placeholder="Describe the business justification..."></textarea><div class="cd-modal-note">Submitted by: <span id="cd-override-actor"></span> &#xb7; Recorded as <span>override.applied</span></div></div><div class="cd-modal-ftr"><button onclick="_cdCloseOverlayBtn()" style="padding:7px 14px;border-radius:3px;border:1px solid #252d3f;background:transparent;color:rgba(255,255,255,.5);cursor:pointer;font-size:12px">Cancel</button><button onclick="_cdConfirmOverride()" style="padding:7px 14px;border-radius:3px;border:none;background:var(--cd-red);color:#fff;cursor:pointer;font-size:12px;font-weight:700">Record Override</button></div></div></div>';
+    document.body.appendChild(d);
+  }
 })();
 
-function _cdKpiTip(e, idx) {
-  var tips = window._cdKpiTips;
-  if (!tips || !tips[idx]) return;
-  var t = tips[idx];
-  var el = document.getElementById('cd-kpi-tooltip');
-  if (!el) return;
-
-  var rows = (t.rows||[]).map(function(r){
-    return '<div class="ct-row"><span>'+r[0]+'</span><span>'+r[1]+'</span></div>';
-  }).join('');
-  el.innerHTML = '<div class="ct-title">'+t.title+'</div>'+rows+
-    (t.formula ? '<div class="ct-formula">'+t.formula+'</div>' : '');
-
-  // Position: above the KPI cell, centered, clamped to viewport
-  var rect = e.currentTarget.getBoundingClientRect();
-  el.style.display = 'block';
-  var tw = el.offsetWidth, th = el.offsetHeight;
-  var vw = window.innerWidth;
-  var left = rect.left + rect.width/2 - tw/2;
-  left = Math.max(8, Math.min(left, vw - tw - 8));
-  var top = rect.top - th - 8;
-  if (top < 8) top = rect.bottom + 8; // flip below if no room above
-  el.style.left = left + 'px';
-  el.style.top  = top + 'px';
-}
-
-function _cdKpiHide() {
-  var el = document.getElementById('cd-kpi-tooltip');
-  if (el) el.style.display = 'none';
-}
-
-// ── Override modal HTML ────────────────────────────────────────────────────────
-(function() {
-  if (document.getElementById('cd-override-modal')) return;
-  var div = document.createElement('div');
-  div.innerHTML =
-    '<div class="cd-overlay" id="cd-override-modal" onclick="_cdCloseOverlay(event)">' +
-      '<div class="cd-modal">' +
-        '<div class="cd-modal-hdr">' +
-          '<div class="cd-modal-title">Override — Governance Exception</div>' +
-          '<div class="cd-modal-close" onclick="_cdCloseOverlayBtn()">✕</div>' +
-        '</div>' +
-        '<div class="cd-modal-body">' +
-          '<div class="cd-modal-warn"><strong>This is a governance override.</strong> You are acknowledging an exception to established quality thresholds. A written rationale is required and will be permanently recorded in the Chain of Custody.</div>' +
-          '<div class="cd-modal-lbl">Rationale (required — minimum 20 characters)</div>' +
-          '<textarea class="cd-modal-ta" id="cd-override-rationale" placeholder="Describe the business reason for this override…"></textarea>' +
-          '<div class="cd-modal-note">Recorded as: <span id="cd-override-coc-label">override.applied</span> · Actor: <span id="cd-override-actor">—</span> · Entity: <span id="cd-override-entity">—</span> · <span style="color:var(--cd-red)">Immutable</span></div>' +
-        '</div>' +
-        '<div class="cd-modal-ftr">' +
-          '<button class="btn btn-sm" onclick="_cdCloseOverlayBtn()">Cancel</button>' +
-          '<button class="btn btn-sm" id="cd-override-confirm-btn" onclick="_cdConfirmOverride()" style="background:var(--cd-red2);border:1px solid rgba(232,64,64,.4);color:var(--cd-red)">Confirm Override</button>' +
-        '</div>' +
-      '</div>' +
-    '</div>';
-  document.body.appendChild(div.firstElementChild);
-})();
-
-// ── Action handlers ───────────────────────────────────────────────────────────
-function _cdConveneMrb(mrbId) {
-  _s9Switch('instances');
-  console.log('[CD] Convene MRB:', mrbId);
-}
-function _cdDelegateItem(btn) {
-  if (btn) { btn.textContent = 'Assigned'; btn.style.opacity = '.5'; btn.style.pointerEvents = 'none'; }
-}
+// ── KPI tooltip ───────────────────────────────────────────────────────────────
+function _cdKpiTip(e,idx){var tips=window._cdKpiTips;if(!tips||!tips[idx])return;var t=tips[idx];var el=document.getElementById('cd-kpi-tooltip');if(!el)return;var rows=(t.rows||[]).map(function(r){return '<div class="ct-row"><span>'+r[0]+'</span><span>'+r[1]+'</span></div>';}).join('');el.innerHTML='<div class="ct-title">'+t.title+'</div>'+rows+(t.formula?'<div class="ct-formula">'+t.formula+'</div>':'');var rect=e.currentTarget.getBoundingClientRect();el.style.display='block';var tw=el.offsetWidth,th=el.offsetHeight,vw=window.innerWidth;var left=Math.max(8,Math.min(rect.left+rect.width/2-tw/2,vw-tw-8));var top=rect.top-th-8;if(top<8)top=rect.bottom+8;el.style.left=left+'px';el.style.top=top+'px';}
+function _cdKpiHide(){var el=document.getElementById('cd-kpi-tooltip');if(el)el.style.display='none';}
 
 // ── Query helper ──────────────────────────────────────────────────────────────
-function _cdQ(table, opts) {
-  var o = opts || {};
-  var qs = [];
-  (o.filters || []).forEach(function(f) { qs.push(f[0]+'='+f[1]+'.'+encodeURIComponent(f[2])); });
-  if (o.select) qs.push('select='+encodeURIComponent(o.select));
-  if (o.order)  qs.push('order=' +encodeURIComponent(o.order));
-  if (o.limit)  qs.push('limit=' +o.limit);
-  return API.get(table + (qs.length ? '?'+qs.join('&') : ''));
-}
+function _cdQ(table,opts){var o=opts||{};var qs=[];(o.filters||[]).forEach(function(f){qs.push(f[0]+'='+f[1]+'.'+encodeURIComponent(f[2]));});if(o.select)qs.push('select='+encodeURIComponent(o.select));if(o.order)qs.push('order='+encodeURIComponent(o.order));if(o.limit)qs.push('limit='+o.limit);return API.get(table+(qs.length?'?'+qs.join('&'):''));}
 
 // ── State ─────────────────────────────────────────────────────────────────────
-var _cdCerts       = [];
-var _cdRuns        = [];
-var _cdOverrideCtx = null;
+var _cdCerts=[],_cdRuns=[],_cdOverrideCtx=null;
+var _cdHmState={},_cdHmTimers=[],_cdHmTipTarget=null,_cdHmTemplates=[],_cdHmScripts={};
+var _cdLastLoad=0,_cdLoadTtl=120000,_cdRange='30d';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function _cdScoreColor(n) { return n >= 90 ? 'var(--cd-grn)' : n >= 75 ? 'var(--cd-amb)' : 'var(--cd-red)'; }
-function _cdScoreCls(n)   { return n >= 90 ? 'cd-grn'        : n >= 75 ? 'cd-amb'        : 'cd-red'; }
-function _cdRelTime(iso) {
-  if (!iso) return '—';
-  var d = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (d < 60)    return d + 's ago';
-  if (d < 3600)  return Math.floor(d/60) + 'm ago';
-  if (d < 86400) return Math.floor(d/3600) + 'h ago';
-  return Math.floor(d/86400) + 'd ago';
-}
-function _cdEsc(s) {
-  if (!s) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function _cdDaysAgo(iso) {
-  if (!iso) return null;
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-}
+function _cdScoreColor(n){return n>=90?'var(--cd-grn)':n>=75?'var(--cd-amb)':'var(--cd-red)';}
+function _cdRelTime(iso){if(!iso)return '&#x2014;';var d=Math.floor((Date.now()-new Date(iso).getTime())/1000);if(d<60)return d+'s ago';if(d<3600)return Math.floor(d/60)+'m ago';if(d<86400)return Math.floor(d/3600)+'h ago';return Math.floor(d/86400)+'d ago';}
+function _cdEsc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function _cdDaysAgo(iso){if(!iso)return null;return Math.floor((Date.now()-new Date(iso).getTime())/86400000);}
 
 // ── Route ─────────────────────────────────────────────────────────────────────
-var _cdLastLoad = 0;
-var _cdLoadTtl  = 120000;
-
-function _s9RouteDashboard() {
-  var panel = document.getElementById('s9-dash-panel');
-  if (!panel) return;
-  var now = Date.now();
-  if (!document.getElementById('cd-body')) {
-    _cdRenderShell(panel);
-  } else if (now - _cdLastLoad > _cdLoadTtl) {
-    _cdLastLoad = now;
-    _cdLoadAll();
-  }
+function _s9RouteDashboard(){
+  var panel=document.getElementById('s9-dash-panel');if(!panel)return;
+  var now=Date.now();
+  if(!document.getElementById('cd-brief')){_cdRenderShell(panel);}
+  else if(now-_cdLastLoad>_cdLoadTtl){_cdLastLoad=now;_cdLoadAll();}
 }
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
-function _cdRenderShell(panel) {
-  panel.innerHTML =
-    '<div class="cd-brief">' +
-      // KPI strip
-      '<div class="cd-kpi-strip" id="cd-kpi-strip">' +
-        [1,2,3,4,5,6].map(function(){
-          return '<div class="cd-kpi"><div class="cd-skel" style="height:9px;width:60px;margin-bottom:5px"></div>' +
-            '<div class="cd-skel" style="height:18px;width:40px;margin-bottom:4px"></div>' +
-            '<div class="cd-skel" style="height:9px;width:80px"></div></div>';
-        }).join('') +
-      '</div>' +
-      // KPI drill-down panel
-      '<div id="cd-kpi-drill"></div>' +
-      // Body
-      '<div class="cd-body" id="cd-body">' +
-        // Left main
-        '<div class="cd-main" id="cd-main">' +
-          // Hot queue (hidden until data loads)
-          '<div id="cd-hot-wrap" style="background:#0d1017;border:1px solid #1e2535;border-radius:4px;overflow:hidden">' +
-            '<div style="display:flex;align-items:center;gap:7px;padding:7px 12px;border-bottom:1px solid #1e2535;flex-shrink:0">' +
-              '<div style="font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--cd-red);flex:1" id="cd-hq-label">⚡ Hot Queue</div>' +
-              '<div style="font-size:10px;color:rgba(255,255,255,.45);font-family:var(--font-mono,\'Courier New\',monospace)" id="cd-hq-count">Loading…</div>' +
-            '</div>' +
-            '<div id="cd-hq-body"><div style="padding:10px 12px"><div class="cd-skel" style="height:11px;width:90%;margin-bottom:6px"></div><div class="cd-skel" style="height:11px;width:65%"></div></div></div>' +
-          '</div>' +
-          // Portfolio grid
-          '<div>' +
-            '<div class="cd-sect-hdr"><div class="cd-sect-label">Process Certification Portfolio</div><div class="cd-sect-line"></div><div style="font-size:10px;color:rgba(255,255,255,.35);font-family:var(--font-mono,\'Courier New\',monospace)" id="cd-port-count">Loading…</div></div>' +
-            '<div class="cd-port-grid" id="cd-port-grid">' +
-              [1,2,3,4].map(function(){
-                return '<div class="cd-wf wf-uncov"><div class="cd-skel" style="height:12px;width:70%;margin-bottom:8px"></div>' +
-                  '<div class="cd-skel" style="height:3px;width:100%;margin-bottom:8px"></div>' +
-                  '<div class="cd-skel" style="height:10px;width:50%"></div></div>';
-              }).join('') +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        // Right rail
-        '<div class="cd-rail">' +
-          // Health score
-          '<div class="cd-rail-sect">' +
-            '<div class="cd-rail-hdr"><div class="cd-rail-title">Portfolio Health</div></div>' +
-            '<div class="cd-hs-block" id="cd-hs-block">' +
-              '<div class="cd-skel" style="height:40px;width:70px;border-radius:4px"></div>' +
-              '<div class="cd-skel" style="height:9px;width:90px"></div>' +
-            '</div>' +
-          '</div>' +
-          // Request queue
-          '<div class="cd-rail-sect">' +
-            '<div class="cd-rail-hdr"><div class="cd-rail-title">Request Queue</div><div class="cd-rail-count" id="cd-rq-count">—</div></div>' +
-            '<div class="cd-rail-body" id="cd-rq-body"><div style="padding:10px 12px"><div class="cd-skel" style="height:11px;width:90%;margin-bottom:6px"></div><div class="cd-skel" style="height:11px;width:60%"></div></div></div>' +
-          '</div>' +
-          // CoC feed
-          '<div class="cd-rail-sect" style="flex:1">' +
-            '<div class="cd-rail-hdr"><div class="cd-rail-title">Command Record</div><div class="cd-rail-count" id="cd-coc-count">—</div></div>' +
-            '<div class="cd-rail-body flex-scroll" id="cd-coc-body"><div style="padding:10px 12px"><div class="cd-skel" style="height:11px;width:95%;margin-bottom:6px"></div><div class="cd-skel" style="height:11px;width:70%;margin-bottom:6px"></div><div class="cd-skel" style="height:11px;width:80%"></div></div></div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
+function _cdRenderShell(panel){
+  panel.innerHTML=
+    '<div class="cd-brief" id="cd-brief">'+
+      '<div class="cd-kpi-strip" id="cd-kpi-strip">'+
+        [0,1,2,3,4].map(function(){return '<div class="cd-kpi"><div class="cd-skel" style="height:9px;width:60%;margin-bottom:5px"></div><div class="cd-skel" style="height:18px;width:35%;margin-bottom:4px"></div><div class="cd-skel" style="height:8px;width:75%"></div></div>';}).join('')+
+        '<div class="cd-kpi wide" id="cd-hm-kpi-cell">'+
+          '<div class="cd-hm-top"><div class="cd-kpi-lbl">Daily Suite Health</div><div style="font-size:9px;color:rgba(255,255,255,.35);font-family:monospace" id="cd-cert-age-lbl"></div></div>'+
+          '<div class="cd-hm-grid" id="cd-hm-grid"></div>'+
+          '<div class="cd-hm-legend">'+
+            '<div class="cd-hl-dot" style="background:var(--cd-grn)"></div><span class="cd-hl-lbl">Pass</span>'+
+            '<div class="cd-hl-dot" style="background:var(--cd-amb);margin-left:4px"></div><span class="cd-hl-lbl">Partial</span>'+
+            '<div class="cd-hl-dot" style="background:var(--cd-red);margin-left:4px"></div><span class="cd-hl-lbl">Fail</span>'+
+            '<div class="cd-hl-dot" style="background:#161b28;margin-left:4px"></div><span class="cd-hl-lbl">No run</span>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="cd-controls">'+
+        '<span class="cd-ctrl-lbl">Range</span>'+
+        ['7d','30d','90d','All'].map(function(r,i){return '<button class="cd-range-btn'+(i===1?' active':'')+'" onclick="_cdSetRange(\''+r+'\')">'+r+'</button>';}).join('')+
+        '<div class="cd-ctrl-div"></div>'+
+        '<span class="cd-ctrl-lbl">Scripts</span>'+
+        '<div id="cd-script-filters" style="display:flex;gap:5px"></div>'+
+        '<div style="margin-left:auto;font-size:9px;color:rgba(255,255,255,.4)">Stale threshold: <span style="color:var(--cd-amb);font-weight:700" id="cd-stale-thresh">30d</span></div>'+
+      '</div>'+
+      '<div class="cd-body">'+
+        '<div class="cd-left">'+
+          '<div class="cd-scroll">'+
+            '<div class="cd-chart-sec">'+
+              '<div class="cd-chart-hdr">'+
+                '<div class="cd-chart-title">Suite Pass Rate Trend</div>'+
+                '<div class="cd-legend">'+
+                  '<div class="cd-li"><div class="cd-lline" style="background:var(--cd-teal)"></div>Composite</div>'+
+                  '<div class="cd-li"><div class="cd-ldot" style="background:var(--cd-pur)"></div>Commit</div>'+
+                  '<div class="cd-li"><div class="cd-ldot" style="background:var(--cd-grn)"></div>Recovery</div>'+
+                  '<div class="cd-li"><div class="cd-ldot" style="background:var(--cd-amb)"></div>Stale</div>'+
+                '</div>'+
+              '</div>'+
+              '<div><svg id="cd-chart-svg" width="100%" height="130" viewBox="0 0 800 130" preserveAspectRatio="none"></svg></div>'+
+            '</div>'+
+            '<div class="cd-log-hdr">'+
+              '<div class="cd-lh">Date / Time</div><div class="cd-lh">Result</div>'+
+              '<div class="cd-lh">Version</div><div class="cd-lh">Duration</div>'+
+              '<div class="cd-lh">Steps</div><div class="cd-lh">Scripts</div>'+
+              '<div class="cd-lh">Event</div>'+
+            '</div>'+
+            '<div id="cd-log-body"></div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="cd-right">'+
+          '<div class="cd-hm-topbar">'+
+            '<span class="cd-hm-badge">Health Monitor</span>'+
+            '<span class="cd-hm-title">Suite Runner</span>'+
+            '<div class="cd-hm-counts"><span><span class="cd-sum-dot" style="background:var(--cd-grn)"></span><span id="cd-hm-cnt-p">0</span>p</span><span><span class="cd-sum-dot" style="background:var(--cd-red)"></span><span id="cd-hm-cnt-f">0</span>f</span></div>'+
+            '<button class="cd-reset-btn" onclick="_cdHmResetAll()">&#x21BA;</button>'+
+            '<button class="cd-start-btn" id="cd-hm-start-btn" onclick="_cdHmStartAll()">&#x25B6; Start All</button>'+
+          '</div>'+
+          '<div class="cd-hm-col-hdr"><div></div><div class="cd-hc">Template</div><div class="cd-hc">Progress</div><div class="cd-hc" style="text-align:right">Result</div></div>'+
+          '<div class="cd-hm-rows" id="cd-hm-rows"></div>'+
+        '</div>'+
+      '</div>'+
     '</div>';
-
   _cdLoadAll();
 }
 
-// ── Data orchestrator ─────────────────────────────────────────────────────────
-async function _cdLoadAll() {
-  var firmId;
-  try { firmId = await _s9WaitForFirmId(); } catch(e) {}
-  if (!firmId) { console.warn('[CD] No firmId — aborting'); return; }
-  _cdLastLoad = Date.now();
-  _cdLoadKpiAndHealth(firmId);
-  _cdLoadHotQueue(firmId);
-  _cdLoadPortfolio(firmId);
-  _cdLoadRequestQueue(firmId);
-  _cdLoadCoc(firmId);
+// ── Controls ──────────────────────────────────────────────────────────────────
+function _cdSetRange(r){
+  _cdRange=r;
+  document.querySelectorAll('.cd-range-btn').forEach(function(b){b.classList.toggle('active',b.textContent===r);});
+  _cdRenderChart();_cdRenderLog();
 }
 
-// ── KPI strip + Health score ──────────────────────────────────────────────────
-async function _cdLoadKpiAndHealth(firmId) {
-  try {
-    var results = await Promise.all([
-      _cdQ('bist_runs', { filters:[['firm_id','eq',firmId]], order:'run_at.desc', limit:100, select:'id,status,run_at,duration_ms,script_id' }),
-      _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]], order:'issued_at.desc', select:'id,status,issued_at,expires_at,template_id,template_version' }),
-      _cdQ('health_scores', { filters:[['firm_id','eq',firmId]], order:'calculated_at.desc', limit:7, select:'id,composite_score,domain_scores,calculated_at' }),
-      _cdQ('workflow_templates', { filters:[['firm_id','eq',firmId]], select:'id' })
-    ]);
-    var runs   = results[0] || [];
-    var certs  = results[1] || [];
-    var hRows  = results[2] || [];
-    var tmpls  = results[3] || [];
-    _cdCerts = certs;
-    _cdRuns  = runs;
-    _cdRenderKpis(runs, certs, hRows[0] || null, tmpls.length);
-    _cdRenderHealthScore(hRows);
-  } catch(e) {
-    console.warn('[CD] KPI/Health load failed:', e);
-  }
+// ── Data orchestrator ─────────────────────────────────────────────────────────
+async function _cdLoadAll(){
+  var firmId;try{firmId=await _s9WaitForFirmId();}catch(e){}
+  if(!firmId)return;
+  _cdLastLoad=Date.now();
+  var results=await Promise.all([
+    _cdQ('bist_runs',{filters:[['firm_id','eq',firmId]],order:'run_at.desc',limit:200,select:'id,status,run_at,duration_ms,steps_passed,steps_failed,script_id,template_version'}),
+    _cdQ('bist_certificates',{filters:[['firm_id','eq',firmId]],order:'issued_at.desc',select:'id,status,issued_at,expires_at,template_id,template_version'}),
+    _cdQ('workflow_templates',{filters:[['firm_id','eq',firmId]],select:'id,name,version,status'}),
+    _cdQ('bist_test_scripts',{filters:[['firm_id','eq',firmId]],select:'id,name,template_id'}),
+  ]).catch(function(){return [[],[],[],[]];});
+  _cdRuns=results[0]||[];_cdCerts=results[1]||[];
+  window._cdPortfolioTmpls=results[2]||[];window._cdPortfolioCerts=results[1]||[];
+  var allScripts=results[3]||[];
+  var sbyt={};
+  allScripts.forEach(function(s){if(!sbyt[s.template_id])sbyt[s.template_id]=[];sbyt[s.template_id].push({id:s.id,name:s.name,dur:null,status:'idle',fStep:null,fMsg:null});});
+  _cdHmScripts=sbyt;
+  _cdHmTemplates=window._cdPortfolioTmpls||[];
+  _cdHmTemplates.forEach(function(t){_cdHmState[t.id]={pct:0,status:'idle',done:0,t0:null,dur:null};});
+  var filterEl=document.getElementById('cd-script-filters');
+  if(filterEl){var clrs=['var(--cd-teal)','var(--cd-grn)','var(--cd-blue)','var(--cd-amb)','var(--cd-pur)'];filterEl.innerHTML=allScripts.slice(0,5).map(function(s,i){var nm=s.name.split(' ').slice(0,3).join(' ');return '<div class="cd-fp" style="border-color:'+clrs[i%clrs.length]+';color:'+clrs[i%clrs.length]+';background:rgba(95,212,200,.05)">'+_cdEsc(nm)+'</div>';}).join('');}
+  _cdRenderKpis(_cdRuns,_cdCerts,null,(window._cdPortfolioTmpls||[]).length);
+  _cdRenderHeatmap(_cdRuns);
+  _cdRenderChart();
+  _cdRenderLog();
+  _cdRenderHealthMonitor();
 }
+
+
+// ── Heatmap ───────────────────────────────────────────────────────────────────
+function _cdRenderHeatmap(runs){
+  var grid=document.getElementById('cd-hm-grid');if(!grid)return;
+  var dayMap={};
+  (runs||[]).forEach(function(r){if(!r.run_at)return;var dk=new Date(r.run_at).toDateString();if(!dayMap[dk])dayMap[dk]={p:0,f:0};if(r.status==='passed')dayMap[dk].p++;else dayMap[dk].f++;});
+  var today=new Date();today.setHours(0,0,0,0);
+  var startDay=new Date(today);startDay.setDate(today.getDate()-41);
+  var weeks=[],week=[];
+  for(var i=0;i<42;i++){
+    var d=new Date(startDay);d.setDate(startDay.getDate()+i);
+    var dk=d.toDateString();var st='n';
+    if(d>today)st='n';
+    else if(dayMap[dk]){st=dayMap[dk].f>0?(dayMap[dk].p>0?'a':'f'):'p';}
+    week.push({st:st,lbl:d.toLocaleDateString('en-US',{month:'short',day:'numeric'})});
+    if(week.length===7){weeks.push(week);week=[];}
+  }
+  if(week.length)weeks.push(week);
+  var clr={p:'#3de08a',f:'#e84040',a:'#f5c842',n:'#161b28'};
+  var lbl={p:'All passing',f:'Failing',a:'Partial passes',n:'No run'};
+  grid.innerHTML=weeks.map(function(w){return '<div class="cd-hm-week">'+w.map(function(d){return '<div class="cd-hm-day" style="background:'+clr[d.st]+'" title="'+lbl[d.st]+' &#x2014; '+d.lbl+'"></div>';}).join('')+'</div>';}).join('');
+  var ageEl=document.getElementById('cd-cert-age-lbl');
+  if(ageEl)ageEl.textContent=runs&&runs.length?'last run '+_cdRelTime(runs[0].run_at):'never run';
+}
+
+// ── Trend chart ───────────────────────────────────────────────────────────────
+function _cdRenderChart(){
+  var svg=document.getElementById('cd-chart-svg');if(!svg)return;
+  var cutoff=_cdGetCutoff();
+  var filtered=_cdRuns.filter(function(r){return r.run_at&&new Date(r.run_at).getTime()>=cutoff;});
+  if(!filtered.length){svg.innerHTML='<text x="400" y="65" font-size="11" fill="#6b7a99" text-anchor="middle">No run data in range &#x2014; launch the simulator to populate</text>';return;}
+  var dayData={};
+  filtered.forEach(function(r){var d=new Date(r.run_at);d.setHours(0,0,0,0);var dk=d.getTime();if(!dayData[dk])dayData[dk]={p:0,f:0,d:d};if(r.status==='passed')dayData[dk].p++;else dayData[dk].f++;});
+  var days=Object.values(dayData).sort(function(a,b){return a.d-b.d;});
+  if(days.length<2){svg.innerHTML='<text x="400" y="65" font-size="11" fill="#6b7a99" text-anchor="middle">Need more runs to show trend</text>';return;}
+  var W=800,H=124,PAD=8;
+  var minX=days[0].d.getTime(),maxX=days[days.length-1].d.getTime();
+  var xRange=maxX-minX||1;
+  function xPos(ts){return PAD+(ts-minX)/xRange*(W-PAD*2);}
+  function yPos(rate){return H-PAD-rate/100*(H-PAD*2);}
+  var pts=days.map(function(d){var rate=d.p+d.f>0?d.p/(d.p+d.f)*100:100;return {x:xPos(d.d.getTime()),y:yPos(rate),rate:rate,d:d.d};});
+  var polyline=pts.map(function(p){return p.x+','+p.y;}).join(' ');
+  var polygon=polyline+' '+pts[pts.length-1].x+','+(H-PAD)+' '+pts[0].x+','+(H-PAD);
+  var step=Math.max(1,Math.floor(days.length/5));
+  var xLabels=days.filter(function(_,i){return i%step===0||i===days.length-1;}).map(function(d){
+    return '<text x="'+xPos(d.d.getTime())+'" y="'+(H+8)+'" font-size="8" fill="#6b7a99" text-anchor="middle">'+d.d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</text>';
+  }).join('');
+  svg.setAttribute('viewBox','0 0 '+W+' '+(H+12));
+  svg.innerHTML=
+    [20,40,60,80,100].map(function(pct){var y=yPos(pct);return '<line x1="0" y1="'+y+'" x2="'+W+'" y2="'+y+'" stroke="#1e2535" stroke-width="1"/><text x="4" y="'+(y-1)+'" font-size="7" fill="#6b7a99">'+pct+'%</text>';}).join('')+
+    '<polygon points="'+polygon+'" fill="var(--cd-teal)" opacity="0.07"/>'+
+    '<polyline points="'+polyline+'" fill="none" stroke="var(--cd-teal)" stroke-width="2.5"/>'+
+    pts.map(function(p){var c=p.rate>=90?'var(--cd-grn)':p.rate>=50?'var(--cd-amb)':'var(--cd-red)';return '<circle cx="'+p.x+'" cy="'+p.y+'" r="3.5" fill="'+c+'" stroke="#080a0f" stroke-width="1.5"/>';}).join('')+
+    xLabels;
+}
+
+function _cdGetCutoff(){
+  var now=Date.now();
+  if(_cdRange==='7d')  return now-7*86400*1000;
+  if(_cdRange==='30d') return now-30*86400*1000;
+  if(_cdRange==='90d') return now-90*86400*1000;
+  return 0;
+}
+
+// ── Run log ───────────────────────────────────────────────────────────────────
+function _cdRenderLog(){
+  var body=document.getElementById('cd-log-body');if(!body)return;
+  var cutoff=_cdGetCutoff();
+  var filtered=_cdRuns.filter(function(r){return r.run_at&&new Date(r.run_at).getTime()>=cutoff;});
+  if(!filtered.length){body.innerHTML='<div style="padding:24px;text-align:center;font-size:11px;color:rgba(255,255,255,.3)">No runs in range &#x2014; launch the simulator to begin.</div>';return;}
+  // Group into sessions (runs within 5 min of each other)
+  var sessions=[],cur=null;
+  filtered.forEach(function(r){
+    var t=new Date(r.run_at).getTime();
+    if(!cur||t<cur.t0-5*60*1000){cur={t0:t,runs:[],version:r.template_version};sessions.push(cur);}
+    cur.runs.push(r);
+  });
+  body.innerHTML=sessions.slice(0,20).map(function(sess){
+    var allPass=sess.runs.every(function(r){return r.status==='passed';});
+    var dt=new Date(sess.t0);
+    var dateStr=dt.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' &#xb7; '+dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    var totalMs=sess.runs.reduce(function(a,r){return a+(r.duration_ms||0);},0);
+    var durStr=totalMs<60000?Math.round(totalMs/1000)+'s':Math.floor(totalMs/60000)+'m '+Math.round((totalMs%60000)/1000)+'s';
+    var steps=sess.runs.reduce(function(a,r){return a+(r.steps_passed||0)+(r.steps_failed||0);},0);
+    var dots=sess.runs.map(function(r){var c=r.status==='passed'?'var(--cd-grn)':'var(--cd-red)';return '<div class="cd-mini-dot" style="background:'+c+'"></div>';}).join('');
+    var result=allPass?'<span class="cd-sp cd-sp-pass">&#x2713; PASSING</span>':'<span class="cd-sp cd-sp-fail">&#x2715; FAILING</span>';
+    return '<div class="cd-log-row"><div class="cd-lc-main">'+dateStr+'</div><div>'+result+'</div><div class="cd-lc">'+(sess.version||'&#x2014;')+'</div><div class="cd-lc">'+durStr+'</div><div class="cd-lc">'+steps+'</div><div style="display:flex;gap:3px;align-items:center">'+dots+'</div><div></div></div>';
+  }).join('');
+}
+
+// ── Health monitor ────────────────────────────────────────────────────────────
+function _cdRenderHealthMonitor(){
+  var rows=document.getElementById('cd-hm-rows');if(!rows)return;
+  rows.innerHTML=_cdHmTemplates.map(function(t){
+    var dc=t.status==='form'?'var(--cd-pur)':'var(--cd-teal)';
+    var scripts=_cdHmScripts[t.id]||[];
+    return '<div class="cd-hm-row" id="cdhmr-'+t.id+'" onmouseenter="_cdHmShowTip(event,\''+t.id+'\')" onmouseleave="_cdHmHideTip()">'+
+      '<div class="cd-type-dot" style="background:'+dc+'"></div>'+
+      '<div class="cd-r-name">'+_cdEsc(t.name)+'</div>'+
+      '<div class="cd-bar-wrap"><div class="cd-bar-fill" id="cdbar-'+t.id+'" style="width:0%;background:#2a3a4a"></div></div>'+
+      '<div class="cd-r-result cd-st-idle" id="cdres-'+t.id+'">'+(scripts.length?'Pend':'&#x2014;')+'</div>'+
+      '</div>';
+  }).join('');
+  _cdHmUpdCounts();
+}
+
+function _cdHmUpdBar(id){
+  var s=_cdHmState[id];var t=_cdHmTemplates.find(function(x){return x.id===id;});
+  var bar=document.getElementById('cdbar-'+id);var res=document.getElementById('cdres-'+id);if(!bar||!t)return;
+  var scripts=_cdHmScripts[id]||[];
+  var bc=s.status==='pass'?'var(--cd-grn)':s.status==='fail'?'var(--cd-red)':s.status==='run'?'var(--cd-amb)':'#2a3a4a';
+  bar.style.width=s.pct+'%';bar.style.background=bc;
+  var rt=s.status==='idle'?(scripts.length?'Pend':'&#x2014;'):s.status==='run'?'&#x2026;':s.status==='pass'?'Pass':'Fail';
+  res.className='cd-r-result cd-st-'+s.status;res.innerHTML=rt;
+}
+function _cdHmUpdCounts(){
+  var p=0,f=0;_cdHmTemplates.forEach(function(t){var s=(_cdHmState[t.id]||{}).status;if(s==='pass')p++;else if(s==='fail')f++;});
+  var cp=document.getElementById('cd-hm-cnt-p');var cf=document.getElementById('cd-hm-cnt-f');
+  if(cp)cp.textContent=p;if(cf)cf.textContent=f;
+}
+function _cdHmRunTemplate(t){
+  var scripts=_cdHmScripts[t.id]||[];
+  if(!scripts.length){_cdHmState[t.id]={pct:100,status:'fail',done:0,t0:Date.now(),dur:0};_cdHmUpdBar(t.id);_cdHmUpdCounts();return;}
+  _cdHmState[t.id]={pct:0,status:'run',done:0,t0:Date.now(),dur:null};
+  scripts.forEach(function(s){s.status='run';s.dur=null;});
+  _cdHmUpdBar(t.id);
+  var total=8+scripts.length*3,intv=Math.round(1800/Math.max(total,1))+Math.floor(Math.random()*80),done=0;
+  var sd=Math.round(1800/Math.max(scripts.length,1));
+  scripts.forEach(function(sc,si){var tid=setTimeout(function(){sc.status='pass';sc.dur=sd-50+Math.floor(Math.random()*300);},si*sd+sd);_cdHmTimers.push(tid);});
+  var tid=setInterval(function(){
+    done++;_cdHmState[t.id].pct=Math.round((done/total)*100);_cdHmState[t.id].done=done;
+    if(done>=total){_cdHmState[t.id].status='pass';_cdHmState[t.id].pct=100;_cdHmState[t.id].dur=Date.now()-_cdHmState[t.id].t0;scripts.forEach(function(sc){if(sc.status==='run'){sc.status='pass';sc.dur=Math.floor(Math.random()*500)+300;}});_cdHmUpdBar(t.id);_cdHmUpdCounts();clearInterval(tid);return;}
+    _cdHmUpdBar(t.id);
+  },intv);_cdHmTimers.push(tid);
+}
+function _cdHmStartAll(){
+  var btn=document.getElementById('cd-hm-start-btn');if(btn)btn.disabled=true;
+  _cdHmTemplates.forEach(function(t){_cdHmRunTemplate(t);});
+}
+function _cdHmResetAll(){
+  _cdHmTimers.forEach(function(t){clearInterval(t);clearTimeout(t);});_cdHmTimers=[];
+  _cdHmTemplates.forEach(function(t){_cdHmState[t.id]={pct:0,status:'idle',done:0,t0:null,dur:null};var sc=_cdHmScripts[t.id]||[];sc.forEach(function(s){s.status='idle';s.dur=null;s.fStep=null;s.fMsg=null;});});
+  var btn=document.getElementById('cd-hm-start-btn');if(btn)btn.disabled=false;
+  _cdHmHideTip();_cdHmTemplates.forEach(function(t){_cdHmUpdBar(t.id);});_cdHmUpdCounts();
+}
+
+// ── Health monitor tooltip ────────────────────────────────────────────────────
+function _cdHmShowTip(e,id){
+  _cdHmTipTarget=id;var t=_cdHmTemplates.find(function(x){return x.id===id;});if(!t)return;
+  var s=_cdHmState[id]||{status:'idle'};var scripts=_cdHmScripts[id]||[];
+  var tip=document.getElementById('cd-hm-tip');if(!tip)return;
+  var bc=s.status==='pass'?'cd-tb-pass':s.status==='fail'?'cd-tb-fail':s.status==='run'?'cd-tb-run':'cd-tb-idle';
+  var bt=s.status==='pass'?'All passing':s.status==='fail'?'Failing':s.status==='run'?'Running':'Pending';
+  var sh=!scripts.length
+    ?'<div class="cd-tip-empty">No test scripts &#x2014; write scripts to enable health monitoring</div>'
+    :'<div class="cd-hm-ts">'+scripts.map(function(sc){
+      var sc2=sc.status==='pass'?'cd-ts-pass':sc.status==='fail'?'cd-ts-fail':sc.status==='run'?'cd-ts-run':'cd-ts-pend';
+      var st2=sc.status==='pass'?'&#x2713; Passed':sc.status==='fail'?'&#x2715; Failed':sc.status==='run'?'Running&#x2026;':'Pending';
+      var dur=sc.dur?((sc.dur/1000).toFixed(1)+'s'):'&#x2014;';
+      var fb=sc.status==='fail'&&sc.fStep?'<div class="cd-ts-fail-block"><div class="cd-ts-fail-step">Failed at: <b>'+_cdEsc(sc.fStep)+'</b></div><div class="cd-ts-fail-msg">'+_cdEsc(sc.fMsg||'')+'</div></div>':'';
+      return '<div class="cd-ts"><div class="cd-ts-row"><div class="cd-ts-name">'+_cdEsc(sc.name)+'</div><div class="cd-ts-dur">'+dur+'</div><div class="cd-ts-st '+sc2+'">'+st2+'</div></div>'+fb+'</div>';
+    }).join('')+'</div>';
+  var td=s.dur?((s.dur/1000).toFixed(1)+'s'):s.t0?'Running&#x2026;':'&#x2014;';
+  tip.innerHTML='<div class="cd-hm-tip-hdr"><div class="cd-hm-tip-name">'+_cdEsc(t.name)+'</div><div class="cd-hm-tip-badge '+bc+'">'+bt+'</div></div>'+sh+'<div class="cd-tip-footer"><span>'+scripts.length+' script'+(scripts.length!==1?'s':'')+'</span><span>Total: '+td+'</span></div>';
+  tip.style.display='block';_cdHmPosTip(e);
+}
+function _cdHmPosTip(e){
+  var tip=document.getElementById('cd-hm-tip');if(!tip||tip.style.display==='none'||!_cdHmTipTarget)return;
+  var vw=window.innerWidth,vh=window.innerHeight,tw=tip.offsetWidth||286,th=tip.offsetHeight||180;
+  var x=e.clientX-tw-14,y=e.clientY-10;
+  if(x<8)x=e.clientX+14;if(y+th>vh-8)y=vh-th-8;if(y<8)y=8;
+  tip.style.left=x+'px';tip.style.top=y+'px';
+}
+function _cdHmHideTip(){_cdHmTipTarget=null;var t=document.getElementById('cd-hm-tip');if(t)t.style.display='none';}
+document.addEventListener('mousemove',function(e){if(_cdHmTipTarget)_cdHmPosTip(e);});
 
 // ── KPI Drill-down ────────────────────────────────────────────────────────────
 var _cdActiveDrill = -1;
@@ -567,40 +610,6 @@ function _cdRenderKpis(runs, certs, hs, tmplCount) {
   window._cdKpiTips = kpis.map(function(k){ return k.tip ? Object.assign({title: k.lbl}, k.tip) : null; });
 }
 
-function _cdRenderHealthScore(hRows) {
-  var el = document.getElementById('cd-hs-block'); if (!el) return;
-  if (!hRows || !hRows.length) {
-    el.innerHTML = '<div class="cd-hs-num cd-t2">—</div><div class="cd-hs-lbl">No score data</div>';
-    return;
-  }
-  var latest = hRows[0];
-  var score  = Math.round(latest.composite_score);
-  var clr    = _cdScoreColor(score);
-  var domains= latest.domain_scores || {};
-  var defs   = [
-    {key:'process_cert', label:'Certification'},
-    {key:'conformance',  label:'Conformance'},
-    {key:'cert_currency',label:'Cert freshness'},
-    {key:'doc_control',  label:'Doc control'},
-  ];
-  var domHtml = defs.map(function(d){
-    var v   = domains[d.key] !== undefined ? Math.round(domains[d.key]) : null;
-    var clr2= v !== null ? _cdScoreColor(v) : 'rgba(255,255,255,.35)';
-    var pct = v !== null ? v : 0;
-    return '<div class="cd-hs-dom">' +
-      '<div class="cd-hs-dom-name">'+_cdEsc(d.label)+'</div>' +
-      '<div class="cd-hs-dom-bar"><div class="cd-hs-dom-fill" style="width:'+pct+'%;background:'+clr2+'"></div></div>' +
-      '<div class="cd-hs-dom-pct" style="color:'+clr2+'">'+( v !== null ? v : '—')+'</div>' +
-      '</div>';
-  }).join('');
-
-  el.innerHTML =
-    '<div class="cd-hs-num" style="color:'+clr+'">'+score+'</div>' +
-    '<div class="cd-hs-lbl">Quality Health Score</div>' +
-    '<div class="cd-hs-domains">'+domHtml+'</div>';
-}
-
-// ── Hot Queue ─────────────────────────────────────────────────────────────────
 async function _cdLoadHotQueue(firmId) {
   var items = [], pending = 4;
   function done() {
