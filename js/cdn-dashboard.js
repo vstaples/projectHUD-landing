@@ -50,9 +50,9 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-li{display:flex;align-items:center;gap:3px;font-size:9px;color:rgba(255,255,255,.4)}\n'
     + '.cd-lline{width:14px;height:2px;border-radius:1px}\n'
     + '.cd-ldot{width:6px;height:6px;border-radius:50%}\n'
-    + '.cd-log-hdr{display:grid;grid-template-columns:110px 76px 56px 56px 52px 1fr 70px;padding:5px 14px;background:#111520;border-bottom:1px solid #1e2535;position:sticky;top:0;z-index:5}\n'
+    + '.cd-log-hdr{display:grid;grid-template-columns:1fr 76px 56px 56px 52px 80px 70px;padding:5px 14px;background:#111520;border-bottom:1px solid #1e2535;position:sticky;top:0;z-index:5}\n'
     + '.cd-lh{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--cd-teal)}\n'
-    + '.cd-log-row{display:grid;grid-template-columns:110px 76px 56px 56px 52px 1fr 70px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;cursor:pointer;transition:background .1s}\n'
+    + '.cd-log-row{display:grid;grid-template-columns:1fr 76px 56px 56px 52px 80px 70px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;cursor:pointer;transition:background .1s}\n'
     + '.cd-log-row:hover{background:#111520}\n'
     + '.cd-lc{font-size:10px;color:rgba(255,255,255,.4);font-family:var(--font-mono,"Courier New",monospace)}\n'
     + '.cd-lc-main{font-size:10px;color:#e2e8f0}\n'
@@ -63,7 +63,7 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-badge{display:inline-flex;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700}\n'
     + '.cd-badge-cert{background:var(--cd-grn2);color:var(--cd-grn);border:1px solid rgba(61,224,138,.3)}\n'
     + '.cd-badge-stale{background:var(--cd-amb2);color:var(--cd-amb);border:1px solid rgba(245,200,66,.3)}\n'
-    + '.cd-right{width:300px;flex-shrink:0;display:flex;flex-direction:column;background:#080a0f}\n'
+    + '.cd-right{width:300px;flex-shrink:0;display:flex;flex-direction:column;background:#080a0f;position:relative;min-width:220px;max-width:500px}\n'    + '.cd-resize-handle-line{position:absolute;left:0;top:0;bottom:0;width:1px;background:rgba(95,212,200,.25);pointer-events:none;transition:background .15s}\n'    + '#cd-resize-handle:hover .cd-resize-handle-line{background:rgba(95,212,200,.6)}\n'
     + '.cd-hm-topbar{display:flex;align-items:center;padding:6px 12px;background:#0d1017;border-bottom:1px solid #1e2535;flex-shrink:0;gap:7px}\n'
     + '.cd-hm-badge{font-size:9px;font-weight:700;letter-spacing:.07em;color:var(--cd-teal);background:rgba(95,212,200,.1);border:1px solid rgba(95,212,200,.25);padding:2px 7px;border-radius:3px}\n'
     + '.cd-hm-title{font-size:11px;font-weight:700;color:#e2e8f0;flex:1}\n'
@@ -213,15 +213,16 @@ function _cdRenderShell(panel){
               '<div><svg id="cd-chart-svg" width="100%" height="130" viewBox="0 0 800 130" preserveAspectRatio="none"></svg></div>'+
             '</div>'+
             '<div class="cd-log-hdr">'+
-              '<div class="cd-lh">Date / Time</div><div class="cd-lh">Result</div>'+
+              '<div class="cd-lh">Template</div><div class="cd-lh">Result</div>'+
               '<div class="cd-lh">Version</div><div class="cd-lh">Duration</div>'+
-              '<div class="cd-lh">Steps</div><div class="cd-lh">Scripts</div>'+
-              '<div class="cd-lh">Event</div>'+
+              '<div class="cd-lh">Steps</div><div class="cd-lh">Date / Time</div>'+
+              '<div class="cd-lh">Scripts</div>'+
             '</div>'+
             '<div id="cd-log-body"></div>'+
           '</div>'+
         '</div>'+
-        '<div class="cd-right">'+
+        '<div id="cd-right-pane" class="cd-right">'+
+        '<div id="cd-resize-handle" style="position:absolute;left:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:10;background:transparent" onmousedown="_cdResizeStart(event)"></div>'+
           '<div class="cd-hm-topbar">'+
             '<span class="cd-hm-badge">Health Monitor</span>'+
             '<span class="cd-hm-title">Suite Runner</span>'+
@@ -234,6 +235,9 @@ function _cdRenderShell(panel){
         '</div>'+
       '</div>'+
     '</div>';
+  // Render heatmap immediately with empty data (shows grid structure)
+  // Real data renders once _cdLoadAll completes
+  setTimeout(function(){ _cdRenderHeatmap([]); }, 0);
   _cdLoadAll();
 }
 
@@ -342,6 +346,13 @@ function _cdRenderLog(){
   var cutoff=_cdGetCutoff();
   var filtered=_cdRuns.filter(function(r){return r.run_at&&new Date(r.run_at).getTime()>=cutoff;});
   if(!filtered.length){body.innerHTML='<div style="padding:24px;text-align:center;font-size:11px;color:rgba(255,255,255,.3)">No runs in range &#x2014; launch the simulator to begin.</div>';return;}
+  // Build script→template lookup
+  var scriptTmplMap={};
+  Object.keys(_cdHmScripts).forEach(function(tmplId){
+    (_cdHmScripts[tmplId]||[]).forEach(function(sc){ scriptTmplMap[sc.id]=tmplId; });
+  });
+  var tmplNameMap={};
+  (_cdHmTemplates||[]).forEach(function(t){ tmplNameMap[t.id]=t.name; });
   // Group into sessions (runs within 5 min of each other)
   var sessions=[],cur=null;
   filtered.forEach(function(r){
@@ -358,7 +369,23 @@ function _cdRenderLog(){
     var steps=sess.runs.reduce(function(a,r){return a+(r.steps_passed||0)+(r.steps_failed||0);},0);
     var dots=sess.runs.map(function(r){var c=r.status==='passed'?'var(--cd-grn)':'var(--cd-red)';return '<div class="cd-mini-dot" style="background:'+c+'"></div>';}).join('');
     var result=allPass?'<span class="cd-sp cd-sp-pass">&#x2713; PASSING</span>':'<span class="cd-sp cd-sp-fail">&#x2715; FAILING</span>';
-    return '<div class="cd-log-row"><div class="cd-lc-main">'+dateStr+'</div><div>'+result+'</div><div class="cd-lc">'+(sess.version||'&#x2014;')+'</div><div class="cd-lc">'+durStr+'</div><div class="cd-lc">'+steps+'</div><div style="display:flex;gap:3px;align-items:center">'+dots+'</div><div></div></div>';
+    // Resolve template name from first run's script_id
+    var firstScriptId=sess.runs[0]&&sess.runs[0].script_id;
+    var tmplId=firstScriptId&&scriptTmplMap[firstScriptId];
+    var tmplName=tmplId&&tmplNameMap[tmplId];
+    // Unique template names in this session
+    var tmplNames={};
+    sess.runs.forEach(function(r){ var tid=r.script_id&&scriptTmplMap[r.script_id]; if(tid&&tmplNameMap[tid])tmplNames[tmplNameMap[tid]]=true; });
+    var tmplLabel=Object.keys(tmplNames).join(', ')||'&#x2014;';
+    return '<div class="cd-log-row">'+
+      '<div class="cd-lc-main" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_cdEsc(Object.keys(tmplNames).join(', '))+'">'+_cdEsc(Object.keys(tmplNames)[0]||'&#x2014;')+'</div>'+
+      '<div>'+result+'</div>'+
+      '<div class="cd-lc">'+(sess.version||'&#x2014;')+'</div>'+
+      '<div class="cd-lc">'+durStr+'</div>'+
+      '<div class="cd-lc">'+steps+'</div>'+
+      '<div class="cd-lc">'+dateStr+'</div>'+
+      '<div style="display:flex;gap:3px;align-items:center">'+dots+'</div>'+
+      '</div>';
   }).join('');
 }
 
@@ -447,6 +474,32 @@ function _cdHmPosTip(e){
 }
 function _cdHmHideTip(){_cdHmTipTarget=null;var t=document.getElementById('cd-hm-tip');if(t)t.style.display='none';}
 document.addEventListener('mousemove',function(e){if(_cdHmTipTarget)_cdHmPosTip(e);});
+
+
+// ── Health monitor resize ─────────────────────────────────────────────────────
+var _cdResizing = false, _cdResizeStartX = 0, _cdResizeStartW = 0;
+function _cdResizeStart(e) {
+  var pane = document.getElementById('cd-right-pane'); if (!pane) return;
+  _cdResizing = true;
+  _cdResizeStartX = e.clientX;
+  _cdResizeStartW = pane.offsetWidth;
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  e.preventDefault();
+}
+document.addEventListener('mousemove', function(e) {
+  if (!_cdResizing) return;
+  var pane = document.getElementById('cd-right-pane'); if (!pane) return;
+  var delta = _cdResizeStartX - e.clientX; // dragging left edge leftward = wider
+  var newW = Math.max(220, Math.min(520, _cdResizeStartW + delta));
+  pane.style.width = newW + 'px';
+});
+document.addEventListener('mouseup', function() {
+  if (!_cdResizing) return;
+  _cdResizing = false;
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+});
 
 // ── KPI Drill-down ────────────────────────────────────────────────────────────
 var _cdActiveDrill = -1;
