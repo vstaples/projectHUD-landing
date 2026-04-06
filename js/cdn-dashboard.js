@@ -42,10 +42,15 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-wf-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}\n'
     + '.cd-wf-r1{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}\n'
     + '.cd-wf-r1-right{display:flex;align-items:center;gap:6px;flex-shrink:0}\n'
-    + '.cd-wf-r2{display:grid;grid-template-columns:130px 8px 150px 8px 200px 8px 1fr;align-items:center;margin-bottom:5px}\n'
+    + '.cd-wf-r2{display:grid;grid-template-columns:130px 8px 150px 8px 200px;align-items:center;margin-bottom:4px}\n'
+    + '.cd-wf-r3{display:flex;align-items:center;gap:8px;margin-top:2px}\n'
+    + '.cd-wf-r3-cov{font-size:10pt;white-space:nowrap;flex-shrink:0;width:180px;text-align:right}\n'
+    + '.cd-wf-r3-bar{flex:1;min-width:0;height:4px;background:#1e2535;border-radius:2px;overflow:hidden;cursor:help;max-width:340px}\n'
+    + '.cd-wf-r3-pct{font-size:11pt;font-weight:500;font-family:var(--font-mono,monospace);white-space:nowrap;width:34px;text-align:right;flex-shrink:0}\n'
+    + '.cd-wf-r3-suite{font-size:11pt;color:rgba(255,255,255,.5);white-space:nowrap;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;max-width:200px}\n'
     + '.cd-wf-r2-cell{font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
     + '.cd-wf-r2-sep{color:rgba(255,255,255,.18);font-size:11pt;text-align:center}\n'
-    + '.cd-wf-r2-bar{display:flex;align-items:center;gap:7px;min-width:0}\n'
+    
     + '.cd-wf-name{font-size:12pt;font-weight:700;color:#ffffff;font-family:Arial,sans-serif}\n'
     + '.cd-wf-ver{font-size:11pt;color:rgba(255,255,255,.7);margin-top:1px;font-family:Arial,sans-serif}\n'
     + '.cd-pill{font-size:10pt;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.04em;flex-shrink:0;font-family:Arial,sans-serif}\n'
@@ -1108,14 +1113,22 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
         '<span class="cd-wf-r2-cell">'+_cdEsc(certDateLine)+'</span>'+
         '<span class="cd-wf-r2-sep">|</span>'+
         '<span class="cd-wf-r2-cell">'+_cdEsc(lastRunLine)+'</span>'+
-        '<span class="cd-wf-r2-sep">|</span>'+
-        '<div class="cd-wf-r2-bar">'+
-          '<div class="cd-cov-bar" style="flex:1;min-width:40px;cursor:help" '+            'onmouseenter="_cdCovTipShow(event,\''+t.id+'\')" '+            'onmouseleave="_cdCovTipHide()">'+            '<div class="cd-cov-fill" style="width:'+(covPct||0)+'%;background:'+covClr+'"></div>'+          '</div>'+
-          
-          '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:34px;text-align:right">'+covLabel+'</span>'+
-          '<span style="font-size:11pt;color:rgba(255,255,255,.45);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(suiteLine)+'</span>'+
-        '</div>'+
       '</div>'+
+      (function(){
+        var pathTotal=tmplPaths.total,pathCov=tmplPaths.covered;
+        var covTestClr=pathTotal===0?'rgba(255,255,255,.3)':pathCov===pathTotal?'var(--cd-grn)':pathCov>0?'var(--cd-amb)':'rgba(255,255,255,.3)';
+        if(pathTotal>0) covTestLbl=pathCov+'/'+pathTotal+' Coverage Path'+(pathTotal===1?'':'s')+' Defined';
+        else covTestLbl='No Coverage Paths Defined';
+        return '<div class="cd-wf-r3">'+
+          '<span class="cd-wf-r3-cov" style="color:'+covTestClr+'">'+covTestLbl+'</span>'+
+          '<div class="cd-wf-r3-bar" onmouseenter="_cdCovTipShow(event,\''+t.id+'\')" onmouseleave="_cdCovTipHide()">'+
+            '<div style="height:100%;width:'+(covPct||0)+'%;background:'+covClr+';border-radius:2px;transition:width .3s"></div>'+
+          '</div>'+
+          '<span class="cd-wf-r3-pct" style="color:'+covClr+'">'+covLabel+'</span>'+
+          '<span class="cd-wf-r3-suite">'+_cdEsc(suiteLine)+'</span>'+
+        '</div>';
+      })()+
+
       '<div class="cd-wf-expand" id="cd-wf-exp-'+t.id+'" style="display:none"></div>'+
     '</div>';
   }).join('');
