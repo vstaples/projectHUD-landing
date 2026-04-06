@@ -1,31 +1,37 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-conformance.js  ·  v20260406-CF1
-// CadenceHUD — Process Conformance Engine (Phase 1)
+// cdn-conformance.js  ·  v20260406-CF2
+// CadenceHUD — Process Conformance Engine (Phase 2)
 //
-// What it does:
-//   Scans live workflow_step_instances against the certified routing paths
-//   encoded in bist_test_scripts for each template. When a step completion
-//   carries an outcome that was never exercised in any certified test script
-//   for that template, it writes a conformance.exception to coc_events.
-//
-// Depends on: api.js (API.get, API.post), FIRM_ID_CAD, CURRENT_USER
+// Changes from Phase 1:
+//   - Writes to dedicated conformance_exceptions table (not coc_events)
+//   - Dedup by step_event_id across all scans
+//   - Severity: critical if template released, warning if draft
+//   - Auto-escalates critical open exceptions > 14 days
+//   - MRB case creation on escalation
+//   - Dashboard reads conformance_exceptions directly
+//   - CoC event written per exception for feed visibility
 //
 // Entry points:
-//   _cdnConformanceRun(firmId)  — full scan, returns exception count
-//   _cdnConformanceScan()       — called automatically on load + on a timer
+//   _cdnConformanceScan()            — auto-called on load + every 10 min
+//   _cdnConformanceRun(firmId)       — full scan, returns {created, escalated}
+//   _cdnConformanceCount()           — cached open exception count
+//   _cdnConformanceExceptions()      — cached open exceptions array
+//   _cdnConformanceResolve(id, note) — mark resolved
+//   _cdnConformanceAcknowledge(id)   — mark acknowledged
+//
+// Depends on: api.js, FIRM_ID_CAD, CURRENT_USER
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-conformance] v20260406-CF1 — Phase 1 conformance engine','background:#5a1e6a;color:#d4a8f0;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-conformance] v20260406-CF2 — Phase 2 · dedicated table · severity · escalation','background:#5a1e6a;color:#d4a8f0;font-weight:700;padding:2px 8px;border-radius:3px');
 
-// ── State ─────────────────────────────────────────────────────────────────────
-var _cdnConfLastRun    = 0;
-var _cdnConfRunning    = false;
-var _cdnConfExceptions = [];  // last scan results, readable by dashboard
-var _cdnConfInterval   = null;
+// State
+var _cdnConfRunning          = false;
+var _cdnConfExceptions       = [];
+var _cdnConfInterval         = null;
+var _cdnConfEscThresholdDays = 14;
 
-// ── Auto-scan on load + every 10 minutes ─────────────────────────────────────
+// Auto-scan on load + every 10 minutes
 (function _cdnAutoScan() {
-  // Defer first run until FIRM_ID_CAD is available
   var _tries = 0;
   function _tryStart() {
     var fid = (typeof FIRM_ID_CAD !== 'undefined' && FIRM_ID_CAD) ? FIRM_ID_CAD : null;
@@ -36,10 +42,9 @@ var _cdnConfInterval   = null;
       setTimeout(_tryStart, 1000);
     }
   }
-  setTimeout(_tryStart, 3000); // wait 3s for page bootstrap
+  setTimeout(_tryStart, 3000);
 })();
 
-// ── Public entry ──────────────────────────────────────────────────────────────
 function _cdnConformanceScan() {
   var fid = (typeof FIRM_ID_CAD !== 'undefined' && FIRM_ID_CAD) ? FIRM_ID_CAD : null;
   if (!fid) return;
@@ -47,33 +52,37 @@ function _cdnConformanceScan() {
 }
 
 async function _cdnConformanceRun(firmId) {
-  if (_cdnConfRunning) return _cdnConfExceptions.length;
+  if (_cdnConfRunning) return { created:0, escalated:0 };
   _cdnConfRunning = true;
-  _cdnConfLastRun = Date.now();
 
   try {
-    // 1. Load all templates with a valid cert (only certified templates are in scope)
+    // 1. Valid certs
     var certs = await API.get(
       'bist_certificates?firm_id=eq.'+firmId+'&status=eq.valid&order=issued_at.desc&select=id,template_id,template_version,issued_at'
     ).catch(function(){ return []; });
 
     if (!certs || !certs.length) {
-      _cdnConfExceptions = [];
+      await _cdnLoadOpenExceptions(firmId);
       _cdnConfRunning = false;
-      return 0;
+      return { created:0, escalated:0 };
     }
 
-    // Dedupe — one cert per template (latest)
     var certByTmpl = {};
     certs.forEach(function(c){ if (!certByTmpl[c.template_id]) certByTmpl[c.template_id] = c; });
     var certedTmplIds = Object.keys(certByTmpl);
 
-    // 2. Load all test scripts for those templates
+    // 2. Template metadata (for severity)
+    var templates = await API.get(
+      'workflow_templates?firm_id=eq.'+firmId+'&id=in.('+certedTmplIds.join(',')+')&select=id,name,status'
+    ).catch(function(){ return []; });
+    var tmplMeta = {};
+    (templates||[]).forEach(function(t){ tmplMeta[t.id] = t; });
+
+    // 3. Build certified outcome map from test scripts
     var scripts = await API.get(
       'bist_test_scripts?firm_id=eq.'+firmId+'&template_id=in.('+certedTmplIds.join(',')+')'
     ).catch(function(){ return []; });
 
-    // 3. Build certified outcome map: { templateId: { step_seq: Set(outcomes) } }
     var certifiedOutcomes = {};
     (scripts||[]).forEach(function(s) {
       var tmplId = s.template_id;
@@ -91,8 +100,8 @@ async function _cdnConformanceRun(firmId) {
       });
     });
 
-    // 4. Load recent live step completions (last 7 days, active instances only)
-    var since = new Date(Date.now() - 7*86400*1000).toISOString();
+    // 4. Recent step completions (14 days)
+    var since = new Date(Date.now() - 14*86400*1000).toISOString();
     var stepEvents = await API.get(
       'workflow_step_instances?firm_id=eq.'+firmId+
       '&event_type=eq.step_completed'+
@@ -102,137 +111,190 @@ async function _cdnConformanceRun(firmId) {
     ).catch(function(){ return []; });
 
     if (!stepEvents || !stepEvents.length) {
-      _cdnConfExceptions = [];
+      await _cdnLoadOpenExceptions(firmId);
       _cdnConfRunning = false;
-      return 0;
+      return { created:0, escalated:0 };
     }
 
-    // 5. Load template_step → seq mapping for steps that appeared in events
-    var stepIds = [...new Set((stepEvents||[]).map(function(e){ return e.template_step_id; }).filter(Boolean))];
-    var tmplSteps = stepIds.length ? await API.get(
-      'workflow_template_steps?id=in.('+stepIds.join(',')+')'+'&select=id,template_id,sequence_order,name'
+    // 5. Template step metadata
+    var stepIds = []; var seenIds = {};
+    (stepEvents||[]).forEach(function(e){ if (e.template_step_id && !seenIds[e.template_step_id]){ stepIds.push(e.template_step_id); seenIds[e.template_step_id]=true; } });
+    var tmplStepsArr = stepIds.length ? await API.get(
+      'workflow_template_steps?id=in.('+stepIds.join(',')+')&select=id,template_id,sequence_order,name'
     ).catch(function(){ return []; }) : [];
     var stepMeta = {};
-    (tmplSteps||[]).forEach(function(s){ stepMeta[s.id] = s; });
+    (tmplStepsArr||[]).forEach(function(s){ stepMeta[s.id] = s; });
 
-    // 6. Load instances to get template_id per instance
-    var instanceIds = [...new Set((stepEvents||[]).map(function(e){ return e.instance_id; }).filter(Boolean))];
-    var instances = instanceIds.length ? await API.get(
-      'workflow_instances?id=in.('+instanceIds.join(',')+')'+'&select=id,template_id,status'
+    // 6. Instance metadata
+    var instIds = []; var seenInst = {};
+    (stepEvents||[]).forEach(function(e){ if (e.instance_id && !seenInst[e.instance_id]){ instIds.push(e.instance_id); seenInst[e.instance_id]=true; } });
+    var instances = instIds.length ? await API.get(
+      'workflow_instances?id=in.('+instIds.join(',')+')&select=id,template_id,status'
     ).catch(function(){ return []; }) : [];
     var instMeta = {};
     (instances||[]).forEach(function(i){ instMeta[i.id] = i; });
 
-    // 7. Load already-recorded exceptions (to avoid duplicate writes)
-    var existingExcs = await API.get(
-      'coc_events?firm_id=eq.'+firmId+'&event_type=eq.conformance.exception&created_at=gte.'+since+
-      '&select=id,entity_id,metadata'
+    // 7. Existing exceptions — dedup by step_event_id
+    var existingRows = await API.get(
+      'conformance_exceptions?firm_id=eq.'+firmId+'&created_at=gte.'+since+'&select=id,step_event_id'
     ).catch(function(){ return []; });
     var existingKeys = {};
-    (existingExcs||[]).forEach(function(e){
-      var m = e.metadata || {};
-      if (m.step_event_id) existingKeys[m.step_event_id] = true;
-    });
+    (existingRows||[]).forEach(function(r){ if (r.step_event_id) existingKeys[r.step_event_id] = true; });
 
-    // 8. Detect exceptions
-    var newExceptions = [];
-    var newCocWrites  = [];
-
-    (stepEvents||[]).forEach(function(ev) {
-      var inst   = instMeta[ev.instance_id];
-      if (!inst) return;
-      var tmplId = inst.template_id;
-      if (!certByTmpl[tmplId]) return;  // template not certified — skip
-      var meta   = stepMeta[ev.template_step_id];
-      if (!meta) return;
-      var seq     = String(meta.sequence_order);
-      var outcome = ev.outcome || null;
-      if (!outcome) return;  // no outcome — skip (can't evaluate)
-
-      var certedForSeq = certifiedOutcomes[tmplId] && certifiedOutcomes[tmplId][seq];
-      if (!certedForSeq) return;  // step not in any test script — skip
-
-      // Check: is this outcome certified?
-      var isCertified = certedForSeq['__any__'] || certedForSeq[outcome];
-      if (isCertified) return;
-
-      // Skip if already written
-      if (existingKeys[ev.id]) return;
-
-      var exc = {
-        step_event_id:   ev.id,
-        instance_id:     ev.instance_id,
-        template_id:     tmplId,
-        template_name:   meta.name || ev.step_name || 'Unknown step',
-        step_seq:        seq,
-        outcome:         outcome,
-        actor:           ev.actor_name || '—',
-        occurred_at:     ev.created_at,
-        cert_id:         certByTmpl[tmplId].id,
-        severity:        'warning',
-      };
-      newExceptions.push(exc);
-
-      // Queue CoC write
-      newCocWrites.push(exc);
-    });
-
-    // 9. Write new exceptions to coc_events
+    // 8. Detect and write new exceptions
     var actorName = (window.CURRENT_USER && window.CURRENT_USER.name) || 'System';
     var actorId   = (window.CURRENT_USER && window.CURRENT_USER.resource_id) || null;
+    var created = 0;
 
-    for (var i = 0; i < newCocWrites.length; i++) {
-      var exc = newCocWrites[i];
-      await API.post('coc_events', {
+    for (var i = 0; i < stepEvents.length; i++) {
+      var ev   = stepEvents[i];
+      var inst = instMeta[ev.instance_id];
+      if (!inst) continue;
+      var tmplId = inst.template_id;
+      if (!certByTmpl[tmplId]) continue;
+      var meta = stepMeta[ev.template_step_id];
+      if (!meta) continue;
+      var seq     = String(meta.sequence_order);
+      var outcome = ev.outcome || null;
+      if (!outcome) continue;
+      var certedForSeq = certifiedOutcomes[tmplId] && certifiedOutcomes[tmplId][seq];
+      if (!certedForSeq) continue;
+      if (certedForSeq['__any__'] || certedForSeq[outcome]) continue;
+      if (existingKeys[ev.id]) continue;
+
+      var tmpl     = tmplMeta[tmplId] || {};
+      var severity = (tmpl.status === 'released') ? 'critical' : 'warning';
+
+      await API.post('conformance_exceptions', {
+        firm_id:       firmId,
+        template_id:   tmplId,
+        instance_id:   ev.instance_id,
+        step_event_id: ev.id,
+        step_seq:      Number(seq),
+        outcome:       outcome,
+        actor_name:    ev.actor_name || null,
+        cert_id:       certByTmpl[tmplId].id,
+        status:        'open',
+        severity:      severity,
+        occurred_at:   ev.created_at || new Date().toISOString(),
+      }).catch(function(e){ console.warn('[CDN-CONF] Write failed:', e); });
+
+      existingKeys[ev.id] = true;
+      created++;
+
+      // CoC feed entry
+      API.post('coc_events', {
         firm_id:           firmId,
         entity_type:       'workflow_instance',
-        entity_id:         exc.instance_id,
+        entity_id:         ev.instance_id,
         event_type:        'conformance.exception',
         actor_name:        actorName,
         actor_resource_id: actorId,
         metadata: {
-          step_event_id:  exc.step_event_id,
-          template_id:    exc.template_id,
-          template_name:  exc.template_name,
-          step_seq:       exc.step_seq,
-          outcome:        exc.outcome,
-          actor:          exc.actor,
-          cert_id:        exc.cert_id,
-          description:    'Outcome "'+exc.outcome+'" on step seq '+exc.step_seq+' not exercised in any certified test script',
+          template_name: tmpl.name || '—',
+          step_seq:      seq,
+          outcome:       outcome,
+          severity:      severity,
+          description:   'Outcome "'+outcome+'" on step seq '+seq+' not in any certified test script',
         },
         event_class:  'conformance',
-        severity:     'warning',
-        occurred_at:  exc.occurred_at || new Date().toISOString(),
-      }).catch(function(e){ console.warn('[CDN-CONF] CoC write failed:', e); });
+        severity:     severity,
+        occurred_at:  ev.created_at || new Date().toISOString(),
+      }).catch(function(){});
     }
 
-    // 10. Merge into state (existing + new, last 7d)
-    _cdnConfExceptions = newExceptions;
+    // 9. Escalate stale critical exceptions
+    var escalated = await _cdnEscalateStale(firmId);
 
-    if (newExceptions.length) {
-      console.warn('%c[cdn-conformance] '+newExceptions.length+' new exception(s) detected',
+    // 10. Refresh cache
+    await _cdnLoadOpenExceptions(firmId);
+
+    if (created || escalated) {
+      console.warn('%c[cdn-conformance] '+created+' new · '+escalated+' escalated',
         'background:#5a1e6a;color:#f0c0ff;padding:2px 8px;border-radius:3px');
     } else {
-      console.log('%c[cdn-conformance] No new exceptions','background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
+      console.log('%c[cdn-conformance] Clean','background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
     }
 
     _cdnConfRunning = false;
-    return newExceptions.length;
+    return { created:created, escalated:escalated };
 
   } catch(e) {
     console.warn('[CDN-CONF] Run failed:', e);
     _cdnConfRunning = false;
-    return 0;
+    return { created:0, escalated:0 };
   }
 }
 
-// ── Dashboard integration ─────────────────────────────────────────────────────
-// Returns cached exception count for KPI strip / hot queue use
-function _cdnConformanceCount() {
-  return _cdnConfExceptions.length;
+// Escalate stale critical open exceptions
+async function _cdnEscalateStale(firmId) {
+  var threshold = new Date(Date.now() - _cdnConfEscThresholdDays*86400*1000).toISOString();
+  var stale = await API.get(
+    'conformance_exceptions?firm_id=eq.'+firmId+'&status=eq.open&severity=eq.critical&occurred_at=lte.'+threshold+'&select=id,template_id,instance_id,outcome,step_seq'
+  ).catch(function(){ return []; });
+  if (!stale || !stale.length) return 0;
+
+  var now       = new Date().toISOString();
+  var actorName = (window.CURRENT_USER && window.CURRENT_USER.name) || 'System';
+  var actorId   = (window.CURRENT_USER && window.CURRENT_USER.resource_id) || null;
+
+  for (var i = 0; i < stale.length; i++) {
+    var exc = stale[i];
+    await API.patch('conformance_exceptions?id=eq.'+exc.id, {
+      status: 'escalated', escalated_at: now
+    }).catch(function(){});
+
+    API.post('mrb_cases', {
+      firm_id: firmId, status: 'pending',
+      disposition: 'Conformance exception — outcome "'+exc.outcome+'" on step seq '+exc.step_seq+' not certified',
+      created_at: now,
+    }).catch(function(){});
+
+    API.post('coc_events', {
+      firm_id: firmId, entity_type: 'conformance_exception', entity_id: exc.id,
+      event_type: 'mrb.escalated', actor_name: actorName, actor_resource_id: actorId,
+      metadata: { exception_id: exc.id, template_id: exc.template_id, days_open: _cdnConfEscThresholdDays },
+      event_class: 'governance', severity: 'critical', occurred_at: now,
+    }).catch(function(){});
+  }
+  return stale.length;
 }
 
-// Returns exceptions array for hot queue rendering
-function _cdnConformanceExceptions() {
-  return _cdnConfExceptions.slice();
+// Load open exceptions into cache
+async function _cdnLoadOpenExceptions(firmId) {
+  var rows = await API.get(
+    'conformance_exceptions?firm_id=eq.'+firmId+
+    '&status=in.(open,acknowledged,escalated)'+
+    '&order=occurred_at.desc&limit=50'+
+    '&select=id,template_id,instance_id,step_seq,outcome,actor_name,severity,status,occurred_at'
+  ).catch(function(){ return []; });
+  _cdnConfExceptions = rows || [];
 }
+
+// Resolution actions
+async function _cdnConformanceResolve(exceptionId, note) {
+  var now   = new Date().toISOString();
+  var actId = (window.CURRENT_USER && window.CURRENT_USER.resource_id) || null;
+  await API.patch('conformance_exceptions?id=eq.'+exceptionId, {
+    status: 'resolved', resolution_note: note || null, resolved_by: actId, resolved_at: now,
+  }).catch(function(e){ console.warn('[CDN-CONF] Resolve failed:', e); });
+  _cdnConfExceptions = _cdnConfExceptions.filter(function(e){ return e.id !== exceptionId; });
+}
+
+async function _cdnConformanceAcknowledge(exceptionId) {
+  await API.patch('conformance_exceptions?id=eq.'+exceptionId, { status: 'acknowledged' })
+    .catch(function(e){ console.warn('[CDN-CONF] Acknowledge failed:', e); });
+  _cdnConfExceptions = _cdnConfExceptions.map(function(e){
+    return e.id === exceptionId ? Object.assign({}, e, {status:'acknowledged'}) : e;
+  });
+}
+
+// Public accessors
+function _cdnConformanceCount()      { return _cdnConfExceptions.length; }
+function _cdnConformanceExceptions() { return _cdnConfExceptions.slice(); }
+
+window._cdnConformanceRun         = _cdnConformanceRun;
+window._cdnConformanceResolve     = _cdnConformanceResolve;
+window._cdnConformanceAcknowledge = _cdnConformanceAcknowledge;
+window._cdnConformanceCount       = _cdnConformanceCount;
+window._cdnConformanceExceptions  = _cdnConformanceExceptions;
