@@ -55,6 +55,11 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-wf-dates{display:flex;gap:14px;margin-bottom:8px}\n'
     + '.cd-wf-date{font-size:10px;color:rgba(255,255,255,.35)}\n'
     + '.cd-wf-acts{display:flex;gap:6px;flex-wrap:wrap}\n'
+    + '.cd-wf-expand{padding:0 2px}\n'
+    + '.cd-wf button.cd-wf-btn{font-size:10px;font-weight:600;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.55);cursor:pointer;letter-spacing:.03em;font-family:inherit}\n'
+    + '.cd-wf button.cd-wf-btn:hover{border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.85)}\n'
+    + '.cd-wf button.cd-wf-btn.primary{background:rgba(0,201,201,.12);border-color:rgba(0,201,201,.4);color:var(--cad,#00c9c9)}\n'
+    + '.cd-wf button.cd-wf-btn.danger{background:rgba(220,60,60,.12);border-color:rgba(220,60,60,.35);color:var(--cd-red)}\n'
     + '.cd-wf-btn{font-size:10px;font-weight:600;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.55);cursor:pointer;letter-spacing:.03em}\n'
     + '.cd-wf-btn:hover{border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.85)}\n'
     + '.cd-wf-btn.primary{background:rgba(0,201,201,.12);border-color:rgba(0,201,201,.4);color:var(--cad,#00c9c9)}\n'
@@ -906,131 +911,194 @@ async function _cdLoadPortfolio(firmId) {
 }
 
 function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
-  var gridEl = document.getElementById('cd-port-grid'); if (!gridEl) return;
-  var countEl= document.getElementById('cd-port-count');
+  var gridEl  = document.getElementById('cd-port-grid'); if (!gridEl) return;
+  var countEl = document.getElementById('cd-port-count');
 
-  // Build lookup maps
   var certByTmpl = {};
   certs.forEach(function(c){ if (!certByTmpl[c.template_id]) certByTmpl[c.template_id] = c; });
-  var scriptsByTmpl = {};
-  // Also build script_id → template_id map for run joining
-  var tmplByScriptId = {};
+  var scriptsByTmpl = {}, scriptObjsByTmpl = {}, tmplByScriptId = {};
   scripts.forEach(function(s){
-    if (!scriptsByTmpl[s.template_id]) scriptsByTmpl[s.template_id] = 0;
+    if (!scriptsByTmpl[s.template_id]) { scriptsByTmpl[s.template_id] = 0; scriptObjsByTmpl[s.template_id] = []; }
     scriptsByTmpl[s.template_id]++;
+    scriptObjsByTmpl[s.template_id].push(s);
     tmplByScriptId[s.id] = s.template_id;
   });
-  // Build runsByTmpl via script_id join
   var runsByTmpl = {};
   runs.forEach(function(r){
-    var tmplId = r.template_id || tmplByScriptId[r.script_id];
-    if (!tmplId) return;
-    if (!runsByTmpl[tmplId]) runsByTmpl[tmplId] = [];
-    runsByTmpl[tmplId].push(r);
+    var tid = r.template_id || tmplByScriptId[r.script_id]; if (!tid) return;
+    if (!runsByTmpl[tid]) runsByTmpl[tid] = [];
+    runsByTmpl[tid].push(r);
   });
   var pathsByTmpl = {};
-  paths.forEach(function(p){ if (!pathsByTmpl[p.template_id]) pathsByTmpl[p.template_id] = {total:0,covered:0}; pathsByTmpl[p.template_id].total++; if (p.coverage_status==='covered') pathsByTmpl[p.template_id].covered++; });
+  paths.forEach(function(p){
+    if (!pathsByTmpl[p.template_id]) pathsByTmpl[p.template_id] = {total:0,covered:0};
+    pathsByTmpl[p.template_id].total++;
+    if (p.coverage_status==='covered') pathsByTmpl[p.template_id].covered++;
+  });
+
+  // Store full data on window for expand panel access
+  window._cdPortData = { certByTmpl:certByTmpl, scriptObjsByTmpl:scriptObjsByTmpl, runsByTmpl:runsByTmpl, pathsByTmpl:pathsByTmpl, tmplByScriptId:tmplByScriptId };
 
   if (!tmpls.length) {
-    gridEl.innerHTML = '<div style="grid-column:1/-1;padding:24px;text-align:center;font-size:11px;color:rgba(255,255,255,.35)">No workflow templates yet. Create your first template in Library.</div>';
+    gridEl.innerHTML = '<div style="padding:24px;text-align:center;font-size:11px;color:rgba(255,255,255,.35)">No workflow templates yet. Create your first template in Library.</div>';
     if (countEl) countEl.textContent = '0 templates';
     return;
   }
-
   if (countEl) countEl.textContent = tmpls.length+' template'+(tmpls.length>1?'s':'');
 
   gridEl.innerHTML = tmpls.map(function(t){
-    var cert     = certByTmpl[t.id] || null;
-    var tmplRuns = runsByTmpl[t.id] || [];
-    var tmplPaths= pathsByTmpl[t.id] || {total:0,covered:0};
-    var scriptCt = scriptsByTmpl[t.id] || 0;
-    var lastRun  = tmplRuns[0] || null;
-    // Count pass/fail from latest run per script only (not cumulative history)
+    var cert      = certByTmpl[t.id] || null;
+    var tmplRuns  = runsByTmpl[t.id] || [];
+    var tmplPaths = pathsByTmpl[t.id] || {total:0,covered:0};
+    var scriptCt  = scriptsByTmpl[t.id] || 0;
+
     var latestByScript = {};
-    tmplRuns.forEach(function(r){
-      if (!r.script_id) return;
-      if (!latestByScript[r.script_id]) latestByScript[r.script_id] = r;
-    });
+    tmplRuns.forEach(function(r){ if (r.script_id && !latestByScript[r.script_id]) latestByScript[r.script_id] = r; });
     var latestRuns = Object.values(latestByScript);
     var passCt = latestRuns.filter(function(r){ return r.status==='passed'; }).length;
     var failCt = latestRuns.filter(function(r){ return r.status==='failed'; }).length;
 
-    // Coverage
-    var covPct = tmplPaths.total > 0 ? Math.round((tmplPaths.covered / tmplPaths.total)*100) : 0;
-    var covClr = covPct >= 80 ? 'var(--cd-grn)' : covPct >= 40 ? 'var(--cd-amb)' : 'var(--cd-red)';
-    if (!tmplPaths.total) { covPct = 0; covClr = '#4a5568'; }
+    var covPct = tmplPaths.total > 0 ? Math.round((tmplPaths.covered/tmplPaths.total)*100) : 0;
+    var covClr = tmplPaths.total === 0 ? '#4a5568' : covPct>=80 ? 'var(--cd-grn)' : covPct>=40 ? 'var(--cd-amb)' : 'var(--cd-red)';
 
-    // Status
     var statusCls, statusPillCls, statusLabel;
-    if (!cert || cert.status === 'revoked') {
-      if (scriptCt === 0) {
-        statusCls = 'wf-uncov'; statusPillCls = 'cd-pill-uncov'; statusLabel = 'Not Covered';
-      } else {
-        statusCls = 'wf-uncov'; statusPillCls = 'cd-pill-uncov'; statusLabel = 'Uncertified';
-      }
-    } else if (cert.status === 'invalidated') {
-      statusCls = 'wf-fail';  statusPillCls = 'cd-pill-fail';  statusLabel = 'Cert Invalid';
+    if (!cert || cert.status==='revoked') {
+      statusCls='wf-uncov'; statusPillCls='cd-pill-uncov'; statusLabel=scriptCt?'Uncertified':'Not Covered';
+    } else if (cert.status==='invalidated') {
+      statusCls='wf-fail'; statusPillCls='cd-pill-fail'; statusLabel='Cert Invalid';
     } else {
-      // valid cert — check age
-      var age = _cdDaysAgo(cert.issued_at) || 0;
-      var thresh = 30;
-      if (age > thresh) {
-        statusCls = 'wf-stale'; statusPillCls = 'cd-pill-stale'; statusLabel = 'Cert Stale';
-      } else {
-        statusCls = 'wf-cert'; statusPillCls = 'cd-pill-cert'; statusLabel = 'Certified';
-      }
+      var age=_cdDaysAgo(cert.issued_at)||0;
+      if (age>30){ statusCls='wf-stale'; statusPillCls='cd-pill-stale'; statusLabel='Cert Stale'; }
+      else        { statusCls='wf-cert';  statusPillCls='cd-pill-cert';  statusLabel='Certified'; }
     }
 
-    // Suite line — latest run per script
-    var suiteLine = scriptCt
-      ? passCt+'/'+scriptCt+' passing'+(failCt?' · '+failCt+' failing':'')
-      : '0 scripts — no test coverage';
+    var suiteLine = scriptCt ? passCt+'/'+scriptCt+' passing'+(failCt?' · '+failCt+' failing':'') : '0 scripts — no test coverage';
+    var certDateLine = cert && cert.issued_at ? 'Cert issued '+_cdRelTime(cert.issued_at) : 'Never certified';
+    var lastRun = tmplRuns[0];
+    var lastRunLine = lastRun ? 'Last run '+_cdRelTime(lastRun.run_at) : 'Never run';
 
-    // Cert date
-    var certDateLine = cert && cert.issued_at
-      ? 'Cert issued ' + _cdRelTime(cert.issued_at)
-      : 'Never certified';
-
-    // Last run
-    var lastRunLine = lastRun
-      ? 'Last run '+_cdRelTime(lastRun.run_at)
-      : 'Never run';
-
-    // Action buttons
+    // Per-status buttons — each targets a distinct action
     var actBtns;
-    if (statusCls === 'wf-fail') {
+    if (statusCls==='wf-fail') {
       actBtns =
-        '<div class="cd-wf-btn" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">View failure</div>' +
-        '<div class="cd-wf-btn danger" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">Re-certify</div>' +
-        '<div class="cd-wf-btn" onclick="event.stopPropagation();_cdConveneMrb(\''+t.id+'\')">Convene MRB</div>';
-    } else if (statusCls === 'wf-uncov') {
-      actBtns = '<div class="cd-wf-btn primary" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">Write test scripts →</div>';
-    } else if (statusCls === 'wf-stale') {
+        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdPortExpand(''+t.id+'')">↓ Failure detail</button>'+
+        '<button class="cd-wf-btn danger" onclick="event.stopPropagation();_s9DashOpenSimulator(''+t.id+'')">Re-certify</button>'+
+        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdConveneMrb(''+t.id+'')">Convene MRB</button>';
+    } else if (statusCls==='wf-uncov') {
       actBtns =
-        '<div class="cd-wf-btn" onclick="event.stopPropagation();_cdSwitchView(\'history\')">→ Run History</div>' +
-        '<div class="cd-wf-btn primary" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">Re-certify</div>';
+        '<button class="cd-wf-btn primary" onclick="event.stopPropagation();_cdPortWriteScripts(''+t.id+'')">Write test scripts →</button>';
+    } else if (statusCls==='wf-stale') {
+      actBtns =
+        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdPortExpand(''+t.id+'')">↓ Cert detail</button>'+
+        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdPortRunSuite(''+t.id+'')">Run suite</button>'+
+        '<button class="cd-wf-btn primary" onclick="event.stopPropagation();_s9DashOpenSimulator(''+t.id+'')">Re-certify</button>';
     } else {
       actBtns =
-        '<div class="cd-wf-btn" onclick="event.stopPropagation();_cdSwitchView(\'history\')">→ Run History</div>' +
-        '<div class="cd-wf-btn" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">Run suite</div>' +
-        '<div class="cd-wf-btn primary" onclick="event.stopPropagation();_s9DashOpenSimulator(\''+t.id+'\')">Simulate</div>';
+        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdPortExpand(''+t.id+'')">↓ Detail</button>'+
+        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdPortRunSuite(''+t.id+'')">Run suite</button>'+
+        '<button class="cd-wf-btn primary" onclick="event.stopPropagation();_s9DashOpenSimulator(''+t.id+'')">Simulate</button>';
     }
 
-    return '<div class="cd-wf '+statusCls+'" onclick="_s9DashOpenSimulator(\''+t.id+'\')">' +
-      '<div class="cd-wf-hdr">' +
-        '<div><div class="cd-wf-name">'+_cdEsc(t.name)+'</div><div class="cd-wf-ver">v'+_cdEsc(t.version||'—')+' · '+_cdEsc(t.status||'draft')+'</div></div>' +
-        '<span class="cd-pill '+statusPillCls+'">'+statusLabel+'</span>' +
-      '</div>' +
-      '<div class="cd-wf-cov">' +
-        '<div class="cd-cov-bar"><div class="cd-cov-fill" style="width:'+covPct+'%;background:'+covClr+'"></div></div>' +
-        '<div class="cd-cov-pct" style="color:'+covClr+'">'+covPct+'%</div>' +
-        '<div class="cd-cov-suite cd-t2">'+_cdEsc(suiteLine)+'</div>' +
-      '</div>' +
-      '<div class="cd-wf-dates"><span class="cd-wf-date">'+_cdEsc(certDateLine)+'</span><span class="cd-wf-date">'+_cdEsc(lastRunLine)+'</span></div>' +
-      '<div class="cd-wf-acts">'+actBtns+'</div>' +
-      '</div>';
+    return '<div class="cd-wf '+statusCls+'" id="cd-wf-'+t.id+'" onclick="_cdPortToggle(''+t.id+'')">'+
+      '<div class="cd-wf-hdr">'+
+        '<div><div class="cd-wf-name">'+_cdEsc(t.name)+'</div><div class="cd-wf-ver">v'+_cdEsc(t.version||'—')+' · '+_cdEsc(t.status||'draft')+'</div></div>'+
+        '<span class="cd-pill '+statusPillCls+'">'+statusLabel+'</span>'+
+      '</div>'+
+      '<div class="cd-wf-cov">'+
+        '<div class="cd-cov-bar"><div class="cd-cov-fill" style="width:'+covPct+'%;background:'+covClr+'"></div></div>'+
+        '<div class="cd-cov-pct" style="color:'+covClr+'">'+covPct+'%</div>'+
+        '<div class="cd-cov-suite cd-t2">'+_cdEsc(suiteLine)+'</div>'+
+      '</div>'+
+      '<div class="cd-wf-dates"><span class="cd-wf-date">'+_cdEsc(certDateLine)+'</span><span class="cd-wf-date">'+_cdEsc(lastRunLine)+'</span></div>'+
+      '<div class="cd-wf-acts">'+actBtns+'</div>'+
+      '<div class="cd-wf-expand" id="cd-wf-exp-'+t.id+'" style="display:none"></div>'+
+    '</div>';
   }).join('');
 }
+
+// ── Portfolio card interactions ────────────────────────────────────────────────
+function _cdPortToggle(tmplId) {
+  var exp = document.getElementById('cd-wf-exp-'+tmplId);
+  if (!exp) return;
+  if (exp.style.display === 'none') { _cdPortExpand(tmplId); }
+  else { exp.style.display='none'; }
+}
+
+function _cdPortExpand(tmplId) {
+  var exp = document.getElementById('cd-wf-exp-'+tmplId); if (!exp) return;
+  var d = window._cdPortData || {};
+  var cert    = (d.certByTmpl||{})[tmplId] || null;
+  var scripts = (d.scriptObjsByTmpl||{})[tmplId] || [];
+  var runs    = (d.runsByTmpl||{})[tmplId] || [];
+  var paths   = (d.pathsByTmpl||{})[tmplId] || {total:0,covered:0};
+
+  var latestByScript = {};
+  runs.forEach(function(r){ if (r.script_id && !latestByScript[r.script_id]) latestByScript[r.script_id] = r; });
+
+  var scriptRows = scripts.length
+    ? scripts.map(function(s){
+        var r = latestByScript[s.id];
+        var dot = !r ? '#4a5568' : r.status==='passed' ? 'var(--cd-grn)' : 'var(--cd-red)';
+        var lbl = !r ? 'Never run' : r.status==='passed'
+          ? '✓ Passed · '+_cdRelTime(r.run_at)
+          : '✗ Failed · '+_cdRelTime(r.run_at);
+        return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+
+          '<div style="width:7px;height:7px;border-radius:50%;background:'+dot+';flex-shrink:0"></div>'+
+          '<div style="font-size:11px;color:rgba(255,255,255,.75);flex:1">'+_cdEsc(s.name)+'</div>'+
+          '<div style="font-size:10px;color:rgba(255,255,255,.4)">'+lbl+'</div>'+
+          '<button style="font-size:9px;padding:2px 7px;border-radius:3px;border:1px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.5);cursor:pointer" onclick="event.stopPropagation();_cdPortRunScript(''+s.id+'',''+tmplId+'')">Run</button>'+
+        '</div>';
+      }).join('')
+    : '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:6px 0">No test scripts — template cannot be certified without scripts.</div>';
+
+  var certBlock = cert
+    ? '<div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:4px;border:1px solid rgba(255,255,255,.08)">'+
+        '<div style="font-size:9px;color:rgba(255,255,255,.35);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px">Certificate</div>'+
+        '<div style="display:flex;gap:16px;flex-wrap:wrap">'+
+          '<div><div style="font-size:9px;color:rgba(255,255,255,.35)">Status</div><div style="font-size:11px;color:rgba(255,255,255,.8);font-weight:700">'+_cdEsc(cert.status)+'</div></div>'+
+          '<div><div style="font-size:9px;color:rgba(255,255,255,.35)">Issued</div><div style="font-size:11px;color:rgba(255,255,255,.8)">'+_cdRelTime(cert.issued_at)+'</div></div>'+
+          '<div><div style="font-size:9px;color:rgba(255,255,255,.35)">Version</div><div style="font-size:11px;color:rgba(255,255,255,.8)">v'+_cdEsc(cert.template_version||'—')+'</div></div>'+
+          '<div><div style="font-size:9px;color:rgba(255,255,255,.35)">Coverage</div><div style="font-size:11px;color:rgba(255,255,255,.8)">'+paths.covered+'/'+paths.total+' paths</div></div>'+
+        '</div>'+
+      '</div>'
+    : '<div style="margin-top:10px;font-size:11px;color:rgba(255,255,255,.3)">No certificate issued. Run all scripts to certify.</div>';
+
+  exp.innerHTML =
+    '<div style="border-top:1px solid rgba(255,255,255,.08);margin-top:8px;padding-top:10px">'+
+      '<div style="font-size:9px;color:rgba(255,255,255,.35);letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">Test Scripts ('+scripts.length+')</div>'+
+      scriptRows+
+      certBlock+
+    '</div>';
+  exp.style.display = 'block';
+}
+
+function _cdPortRunSuite(tmplId) {
+  // Activate Suite Runner in right panel pre-filtered to this template
+  _cdSwitchView('history');
+  setTimeout(function(){
+    var startBtn = document.getElementById('cd-hm-start-btn');
+    if (startBtn) startBtn.click();
+  }, 150);
+}
+
+function _cdPortRunScript(scriptId, tmplId) {
+  // Switch to Simulator with template pre-selected, script pre-selected
+  _s9DashOpenSimulator(tmplId);
+}
+
+function _cdPortWriteScripts(tmplId) {
+  // Navigate to Library → template scripts tab
+  if (typeof selectTemplate === 'function') {
+    selectTemplate(tmplId).then(function(){ _s9Switch('library'); }).catch(function(){ _s9Switch('library'); });
+  } else { _s9Switch('library'); }
+}
+window._cdPortToggle     = _cdPortToggle;
+window._cdPortExpand     = _cdPortExpand;
+window._cdPortRunSuite   = _cdPortRunSuite;
+window._cdPortRunScript  = _cdPortRunScript;
+window._cdPortWriteScripts = _cdPortWriteScripts;
+
+// ── Request Queue
 
 // ── Request Queue ─────────────────────────────────────────────────────────────
 async function _cdLoadRequestQueue(firmId) {
