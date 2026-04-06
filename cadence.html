@@ -1015,7 +1015,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.68 — Cert persistence + PDF export · firmId fix','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.68 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -2753,41 +2753,66 @@ function _s9RenderCertBody() {
       '</div>' +
 
       // Signatures
-      '<div style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;' +
-        'color:rgba(80,60,20,.4);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid rgba(160,120,40,.14)">Authorized Signatures</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">' +
-        '<div style="border-top:1.5px solid rgba(160,120,40,.28);padding-top:8px;text-align:center">' +
-          '<div style="' + FA + 'font-size:13px;font-weight:700;color:#1a1208">' +
-            ((typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) ? _s9EscHtml(CURRENT_USER.name) : 'Administrator') +
+      (function() {
+        var cu = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER : null;
+        var sigName  = cu ? _s9EscHtml(cu.name) : 'Administrator';
+        var sigTitle = cu && cu.title ? _s9EscHtml(cu.title) : (cu && cu.department ? _s9EscHtml(cu.department) : 'Submitting Principal');
+        var dbCertId = (window._s9LastCertDbId) ? window._s9LastCertDbId : null;
+        var verifyRef = dbCertId ? dbCertId.slice(0,8)+'...'+dbCertId.slice(-4) : certId.slice(-12);
+
+        return '<div style="' + FA + 'font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;' +
+          'color:rgba(80,60,20,.4);margin-bottom:12px;padding-bottom:5px;border-bottom:1px solid rgba(160,120,40,.14)">Authorized Signatures</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:20px">' +
+
+          // Sig 1 — Submitting principal
+          '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">' +
+            '<div style="width:100%;height:40px;border-bottom:1.5px solid rgba(80,60,20,.35);margin-bottom:6px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px">' +
+              '<div style="' + FA + 'font-size:15px;font-style:italic;color:rgba(80,60,20,.55);letter-spacing:.02em">' + sigName + '</div>' +
+            '</div>' +
+            '<div style="' + FA + 'font-size:12px;font-weight:700;color:#1a1208;text-align:center">' + sigName + '</div>' +
+            '<div style="' + FA + 'font-size:11px;color:rgba(80,60,20,.45);text-align:center">' + sigTitle + '</div>' +
+            '<div style="' + FA + 'font-size:11px;color:rgba(80,60,20,.32);text-align:center">' + dateStr + ' · ' + timeStr + '</div>' +
           '</div>' +
-          '<div style="' + FA + 'font-size:12px;color:rgba(80,60,20,.42);letter-spacing:.06em;text-transform:uppercase">Platform Admin</div>' +
-          '<div style="' + FA + 'font-size:12px;color:rgba(80,60,20,.32);margin-top:2px">' + dateStr + '</div>' +
-        '</div>' +
-        '<div style="border-top:1.5px solid rgba(160,120,40,.28);padding-top:8px;text-align:center">' +
-          '<div style="' + FA + 'font-size:13px;font-weight:700;color:#1a1208">System</div>' +
-          '<div style="' + FA + 'font-size:12px;color:rgba(80,60,20,.42);letter-spacing:.06em;text-transform:uppercase">BIST Engine · Automated</div>' +
-          '<div style="' + FA + 'font-size:12px;color:rgba(80,60,20,.32);margin-top:2px">Immutable Record</div>' +
-        '</div>' +
-        '<div style="border-top:1.5px solid rgba(160,120,40,.28);padding-top:8px;text-align:center">' +
-          '<div style="' + FA + 'font-size:13px;font-weight:700;color:#1a1208">Chain of Custody</div>' +
-          '<div style="' + FA + 'font-size:12px;color:rgba(80,60,20,.42);letter-spacing:.06em;text-transform:uppercase">Events Verified</div>' +
-          '<div style="' + FA + 'font-size:12px;color:rgba(80,60,20,.32);margin-top:2px">Hash: ' + certId.slice(-8) + '…</div>' +
-        '</div>' +
-      '</div>' +
 
-      // Certificate ID
-      '<div style="background:#f0ece0;border-radius:4px;padding:10px 14px;' +
-        'border:1px solid rgba(160,120,40,.14);text-align:center;margin-bottom:16px">' +
-        '<div style="' + FA + 'font-size:12px;letter-spacing:.1em;text-transform:uppercase;' +
-          'color:rgba(80,60,20,.4);margin-bottom:4px">Certificate ID</div>' +
-        '<div style="' + FA + 'font-size:14px;font-weight:700;color:#1a1208;letter-spacing:.08em">' + certId + '</div>' +
-      '</div>' +
+          // Sig 2 — BIST Engine
+          '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">' +
+            '<div style="width:100%;height:40px;border-bottom:1.5px solid rgba(80,60,20,.35);margin-bottom:6px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px">' +
+              '<div style="' + FA + 'font-size:11px;font-weight:700;color:rgba(80,60,20,.4);letter-spacing:.08em;text-transform:uppercase">BIST Engine v1.0</div>' +
+            '</div>' +
+            '<div style="' + FA + 'font-size:12px;font-weight:700;color:#1a1208;text-align:center">Automated Validation System</div>' +
+            '<div style="' + FA + 'font-size:11px;color:rgba(80,60,20,.45);text-align:center">CadenceHUD · ProjectHUD Platform</div>' +
+            '<div style="' + FA + 'font-size:11px;color:rgba(80,60,20,.32);text-align:center">Immutable · System-signed</div>' +
+          '</div>' +
 
-      '<div style="' + FA + 'font-size:12px;color:rgba(80,60,20,.32);text-align:center;' +
-        'line-height:1.65;margin-bottom:18px">' +
-        'This certificate is permanently recorded in the Chain of Custody and constitutes proof of<br>' +
-        'workflow validation suitable for regulatory review. This record cannot be modified or deleted.' +
-      '</div>' +
+          // Sig 3 — Verification
+          '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">' +
+            '<div style="width:100%;height:40px;border-bottom:1.5px solid rgba(80,60,20,.35);margin-bottom:6px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px">' +
+              '<div style="' + FA + 'font-size:10px;font-family:monospace;color:rgba(80,60,20,.5);letter-spacing:.04em">' + verifyRef + '</div>' +
+            '</div>' +
+            '<div style="' + FA + 'font-size:12px;font-weight:700;color:#1a1208;text-align:center">Chain of Custody</div>' +
+            '<div style="' + FA + 'font-size:11px;color:rgba(80,60,20,.45);text-align:center">CoC events verified &amp; archived</div>' +
+            '<div style="' + FA + 'font-size:11px;color:rgba(80,60,20,.32);text-align:center">Cannot be modified or deleted</div>' +
+          '</div>' +
+        '</div>' +
+
+        // Certificate ID + DB reference
+        '<div style="background:#f0ece0;border-radius:4px;padding:12px 16px;' +
+          'border:1px solid rgba(160,120,40,.18);margin-bottom:14px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+            '<div style="' + FA + 'font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(80,60,20,.4)">Certificate Number</div>' +
+            (dbCertId ? '<div style="' + FA + 'font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(80,60,20,.4)">Database Record</div>' : '') +
+          '</div>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">' +
+            '<div style="' + FA + 'font-size:14px;font-weight:700;color:#1a1208;letter-spacing:.06em;font-family:monospace">' + certId + '</div>' +
+            (dbCertId ? '<div style="' + FA + 'font-size:11px;color:rgba(80,60,20,.5);font-family:monospace">' + _s9EscHtml(dbCertId) + '</div>' : '') +
+          '</div>' +
+        '</div>' +
+
+        '<div style="' + FA + 'font-size:11px;color:rgba(80,60,20,.35);text-align:center;line-height:1.7;margin-bottom:16px">' +
+          'This certificate constitutes proof of workflow validation suitable for regulatory review.<br>' +
+          'Permanently recorded in the Chain of Custody. This record cannot be modified or deleted.' +
+        '</div>';
+      })() +
 
       // Actions
       '<div style="display:flex;gap:8px;justify-content:center;padding-top:16px;border-top:1px solid rgba(160,120,40,.14)">' +
@@ -2864,7 +2889,9 @@ window._s9OnSimComplete = function(allResults) {
       severity:     'info',
       occurred_at:  now.toISOString(),
     }).catch(function(e){ console.warn('[S9] CoC cert.issued write failed:', e); });
-    console.log('%c[S9] Certificate persisted -- ' + certNum, 'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
+    var certRow = rows && rows[0];
+    if (certRow && certRow.id) window._s9LastCertDbId = certRow.id;
+    console.log('%c[S9] Certificate persisted -- ' + certNum + (certRow?' · DB:'+certRow.id.slice(0,8):''), 'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
   }).catch(function(e){ console.warn('[S9] bist_certificates write failed:', e); });
 };
 
