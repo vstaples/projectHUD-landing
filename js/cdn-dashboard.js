@@ -53,6 +53,10 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-pill-fail{background:rgba(220,60,60,.15);color:var(--cd-red);border:1px solid rgba(220,60,60,.3)}\n'
     + '.cd-pill-stale{background:rgba(240,180,0,.12);color:var(--cd-amb);border:1px solid rgba(240,180,0,.25)}\n'
     + '.cd-pill-uncov{background:rgba(255,255,255,.06);color:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.15)}\n'
+    + '.cd-pill-cert-grn{background:rgba(61,224,138,.15);color:#3de08a;border:1px solid rgba(61,224,138,.35)}\n'
+    + '.cd-pill-cert-amb{background:rgba(245,200,66,.12);color:#f5c842;border:1px solid rgba(245,200,66,.3)}\n'
+    + '.cd-pill-cert-red{background:rgba(232,64,64,.15);color:#e84040;border:1px solid rgba(232,64,64,.35)}\n'
+    + '.cd-pill-cert-dim{background:rgba(255,255,255,.05);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.12)}\n'
     + '.cd-wf-cov{display:flex;align-items:center;gap:8px;margin-bottom:6px}\n'
     + '.cd-cov-bar{flex:1;height:4px;background:#1e2535;border-radius:2px;overflow:hidden}\n'
     + '.cd-cov-fill{height:100%;border-radius:2px;transition:width .3s}\n'
@@ -1027,15 +1031,22 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     }
 
     var statusCls, statusPillCls, statusLabel;
+    statusLabel = 'Certified';
     if (!cert || cert.status==='revoked') {
-      statusCls='wf-uncov'; statusPillCls='cd-pill-uncov'; statusLabel='No Cert';
+      statusCls='wf-uncov'; statusPillCls='cd-pill-uncov';
     } else if (cert.status==='invalidated') {
-      statusCls='wf-fail'; statusPillCls='cd-pill-fail'; statusLabel='Cert Invalid';
+      statusCls='wf-fail'; statusPillCls='cd-pill-fail';
     } else {
       var age=_cdDaysAgo(cert.issued_at)||0;
-      if (age>30){ statusCls='wf-stale'; statusPillCls='cd-pill-stale'; statusLabel='Cert Stale'; }
-      else        { statusCls='wf-cert';  statusPillCls='cd-pill-cert';  statusLabel='Certified'; }
+      if (age>30){ statusCls='wf-stale'; statusPillCls='cd-pill-stale'; }
+      else        { statusCls='wf-cert';  statusPillCls='cd-pill-cert'; }
     }
+    // Override pill color: no scripts = white/dim, partial = amber, problem = red, clean = green
+    if (statusCls==='wf-fail') { statusPillCls='cd-pill-cert-red'; }
+    else if (statusCls==='wf-uncov') { statusPillCls='cd-pill-cert-dim'; }
+    else if (failCt>0 || (statusCls==='wf-stale')) { statusPillCls='cd-pill-cert-amb'; }
+    else if (scriptCt===0) { statusPillCls='cd-pill-cert-dim'; }
+    else { statusPillCls='cd-pill-cert-grn'; }
 
     var suiteLine;
     if (scriptCt) {
@@ -1091,7 +1102,8 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
         '<span class="cd-wf-r2-cell">'+_cdEsc(lastRunLine)+'</span>'+
         '<span class="cd-wf-r2-sep">|</span>'+
         '<div class="cd-wf-r2-bar">'+
-          '<div class="cd-cov-bar" style="flex:1;min-width:40px"><div class="cd-cov-fill" style="width:'+(covPct||0)+'%;background:'+covClr+'"></div></div>'+
+          (function(){var _covTip='Coverage: '+(tmplPaths.total>0?covLabel+' of '+tmplPaths.total+' routing paths covered. ':'No path analysis yet. ')+(scriptCt>0?passCt+'/'+scriptCt+' scripts passing. ':'No test scripts. ')+'Scripts and coverage paths are independent metrics: scripts prove scenarios work; path coverage confirms every routing branch has a script.';return '<div class="cd-cov-bar" style="flex:1;min-width:40px;cursor:help" title="'+_cdEsc(_covTip)+'"><div class="cd-cov-fill" style="width:'+(covPct||0)+'%;background:'+covClr+'"></div></div>';})()+
+          
           '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:38px;text-align:right">'+covLabel+'</span>'+
           '<span style="font-size:11pt;color:rgba(255,255,255,.45);white-space:nowrap;width:160px;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(suiteLine)+'</span>'+
         '</div>'+
