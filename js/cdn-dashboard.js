@@ -981,25 +981,25 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     var actBtns;
     if (statusCls==='wf-fail') {
       actBtns =
-        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdPortExpand(''+t.id+'')">↓ Failure detail</button>'+
-        '<button class="cd-wf-btn danger" onclick="event.stopPropagation();_s9DashOpenSimulator(''+t.id+'')">Re-certify</button>'+
-        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdConveneMrb(''+t.id+'')">Convene MRB</button>';
+        '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortExpand(this.dataset.tid)">↓ Failure detail</button>'+
+        '<button class="cd-wf-btn danger" data-tid="'+t.id+'" onclick="event.stopPropagation();_s9DashOpenSimulator(this.dataset.tid)">Re-certify</button>'+
+        '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdConveneMrb(this.dataset.tid)">Convene MRB</button>';
     } else if (statusCls==='wf-uncov') {
       actBtns =
-        '<button class="cd-wf-btn primary" onclick="event.stopPropagation();_cdPortWriteScripts(''+t.id+'')">Write test scripts →</button>';
+        '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';
     } else if (statusCls==='wf-stale') {
       actBtns =
-        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdPortExpand(''+t.id+'')">↓ Cert detail</button>'+
-        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdPortRunSuite(''+t.id+'')">Run suite</button>'+
-        '<button class="cd-wf-btn primary" onclick="event.stopPropagation();_s9DashOpenSimulator(''+t.id+'')">Re-certify</button>';
+        '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortExpand(this.dataset.tid)">↓ Cert detail</button>'+
+        '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortRunSuite(this.dataset.tid)">Run suite</button>'+
+        '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_s9DashOpenSimulator(this.dataset.tid)">Re-certify</button>';
     } else {
       actBtns =
-        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdPortExpand(''+t.id+'')">↓ Detail</button>'+
-        '<button class="cd-wf-btn" onclick="event.stopPropagation();_cdPortRunSuite(''+t.id+'')">Run suite</button>'+
-        '<button class="cd-wf-btn primary" onclick="event.stopPropagation();_s9DashOpenSimulator(''+t.id+'')">Simulate</button>';
+        '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortExpand(this.dataset.tid)">↓ Detail</button>'+
+        '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortRunSuite(this.dataset.tid)">Run suite</button>'+
+        '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_s9DashOpenSimulator(this.dataset.tid)">Simulate</button>';
     }
 
-    return '<div class="cd-wf '+statusCls+'" id="cd-wf-'+t.id+'" onclick="_cdPortToggle(''+t.id+'')">'+
+    return '<div class="cd-wf '+statusCls+'" id="cd-wf-'+t.id+'" data-tid="'+t.id+'" onclick="_cdPortToggle(this.dataset.tid)">'+
       '<div class="cd-wf-hdr">'+
         '<div><div class="cd-wf-name">'+_cdEsc(t.name)+'</div><div class="cd-wf-ver">v'+_cdEsc(t.version||'—')+' · '+_cdEsc(t.status||'draft')+'</div></div>'+
         '<span class="cd-pill '+statusPillCls+'">'+statusLabel+'</span>'+
@@ -1046,7 +1046,7 @@ function _cdPortExpand(tmplId) {
           '<div style="width:7px;height:7px;border-radius:50%;background:'+dot+';flex-shrink:0"></div>'+
           '<div style="font-size:11px;color:rgba(255,255,255,.75);flex:1">'+_cdEsc(s.name)+'</div>'+
           '<div style="font-size:10px;color:rgba(255,255,255,.4)">'+lbl+'</div>'+
-          '<button style="font-size:9px;padding:2px 7px;border-radius:3px;border:1px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.5);cursor:pointer" onclick="event.stopPropagation();_cdPortRunScript(''+s.id+'',''+tmplId+'')">Run</button>'+
+          '<button style="font-size:9px;padding:2px 7px;border-radius:3px;border:1px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.5);cursor:pointer" data-sid="'+s.id+'" data-tid="'+tmplId+'" onclick="event.stopPropagation();_cdPortRunScript(this.dataset.sid,this.dataset.tid)">Run</button>'+
         '</div>';
       }).join('')
     : '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:6px 0">No test scripts — template cannot be certified without scripts.</div>';
