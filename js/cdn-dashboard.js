@@ -52,7 +52,7 @@ console.log('%c[cdn-dashboard] v20260406-CD11 — composite dashboard','backgrou
     + '.cd-pill-cert{background:rgba(95,212,100,.15);color:var(--cd-grn);border:1px solid rgba(95,212,100,.3)}\n'
     + '.cd-pill-fail{background:rgba(220,60,60,.15);color:var(--cd-red);border:1px solid rgba(220,60,60,.3)}\n'
     + '.cd-pill-stale{background:rgba(240,180,0,.12);color:var(--cd-amb);border:1px solid rgba(240,180,0,.25)}\n'
-    + '.cd-pill-uncov{background:rgba(255,255,255,.05);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.1)}\n'
+    + '.cd-pill-uncov{background:rgba(255,255,255,.06);color:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.15)}\n'
     + '.cd-wf-cov{display:flex;align-items:center;gap:8px;margin-bottom:6px}\n'
     + '.cd-cov-bar{flex:1;height:4px;background:#1e2535;border-radius:2px;overflow:hidden}\n'
     + '.cd-cov-fill{height:100%;border-radius:2px;transition:width .3s}\n'
@@ -1012,12 +1012,23 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     var passCt = latestRuns.filter(function(r){ return r.status==='passed'; }).length;
     var failCt = latestRuns.filter(function(r){ return r.status==='failed'; }).length;
 
-    var covPct = tmplPaths.total > 0 ? Math.round((tmplPaths.covered/tmplPaths.total)*100) : 0;
-    var covClr = tmplPaths.total === 0 ? '#4a5568' : covPct>=80 ? 'var(--cd-grn)' : covPct>=40 ? 'var(--cd-amb)' : 'var(--cd-red)';
+    var covPct, covClr, covLabel;
+    if (tmplPaths.total > 0) {
+      covPct = Math.round((tmplPaths.covered/tmplPaths.total)*100);
+      covClr = covPct>=80 ? 'var(--cd-grn)' : covPct>=40 ? 'var(--cd-amb)' : 'var(--cd-red)';
+      covLabel = covPct+'%';
+    } else if (scriptCt > 0) {
+      // No path data yet — show script pass rate as proxy
+      covPct = scriptCt > 0 ? Math.round((passCt/scriptCt)*100) : 0;
+      covClr = covPct===100 ? 'var(--cd-grn)' : covPct>=50 ? 'var(--cd-amb)' : 'var(--cd-red)';
+      covLabel = covPct+'%';
+    } else {
+      covPct = 0; covClr = '#4a5568'; covLabel = '—';
+    }
 
     var statusCls, statusPillCls, statusLabel;
     if (!cert || cert.status==='revoked') {
-      statusCls='wf-uncov'; statusPillCls='cd-pill-uncov'; statusLabel=scriptCt?'Uncertified':'Not Covered';
+      statusCls='wf-uncov'; statusPillCls='cd-pill-uncov'; statusLabel='No Cert';
     } else if (cert.status==='invalidated') {
       statusCls='wf-fail'; statusPillCls='cd-pill-fail'; statusLabel='Cert Invalid';
     } else {
@@ -1066,7 +1077,7 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
 
     return '<div class="cd-wf '+statusCls+'" id="cd-wf-'+t.id+'" data-tid="'+t.id+'" onclick="_cdPortToggle(this.dataset.tid)">'+
       '<div class="cd-wf-r1">'+
-        '<div class="cd-wf-name" style="color:'+( statusCls==="wf-fail" ? "#e84040" : statusCls==="wf-uncov" ? "#f5c842" : statusCls==="wf-stale" ? "#f5c842" : "#3de08a" )+'">'+_cdEsc(t.name)+'</div>'+
+        '<div class="cd-wf-name" style="color:'+( statusCls==="wf-fail" ? "#e84040" : statusCls==="wf-cert" ? "#3de08a" : statusCls==="wf-stale" ? "#3de08a" : "#ffffff" )+'">'+_cdEsc(t.name)+'</div>'+
         '<div class="cd-wf-r1-right">'+
           actBtns+
           '<span class="cd-pill '+statusPillCls+'">'+statusLabel+'</span>'+
@@ -1080,8 +1091,8 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
         '<span class="cd-wf-r2-cell">'+_cdEsc(lastRunLine)+'</span>'+
         '<span class="cd-wf-r2-sep">|</span>'+
         '<div class="cd-wf-r2-bar">'+
-          '<div class="cd-cov-bar" style="flex:1;min-width:40px"><div class="cd-cov-fill" style="width:'+covPct+'%;background:'+covClr+'"></div></div>'+
-          '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:38px;text-align:right">'+covPct+'%</span>'+
+          '<div class="cd-cov-bar" style="flex:1;min-width:40px"><div class="cd-cov-fill" style="width:'+(covPct||0)+'%;background:'+covClr+'"></div></div>'+
+          '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:38px;text-align:right">'+covLabel+'</span>'+
           '<span style="font-size:11pt;color:rgba(255,255,255,.45);white-space:nowrap;width:160px;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(suiteLine)+'</span>'+
         '</div>'+
       '</div>'+
