@@ -3212,8 +3212,12 @@ function _s9SwitchSimSubTab(tab) {
     setTimeout(function() {
       var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
       if (!tmpl || !tmpl.id) return;
+      // Always refresh left pane from DB
+      if (typeof _s9LoadSimScripts === 'function') {
+        _s9LoadSimScripts(tmpl.id, tmpl.version || '0.0.0');
+      }
+      // Also reload script editor content
       if (typeof seOpenEditor === 'function') {
-        // Always clear in-memory cache so fresh DB fetch runs
         if (typeof _seScripts !== 'undefined') window._seScripts = [];
         seOpenEditor(tmpl.id, 's9-right-inner', null);
       }
@@ -3956,6 +3960,13 @@ async function _s9CovCreateScript(pathName, pathIdx) {
   window._s9CachedRuns    = null;
 
   cadToast('Script created: “' + pathName + '” — open Scripts tab to review and run', 'success');
+
+  // Always refresh the left pane script list
+  setTimeout(function() {
+    if (typeof _s9LoadSimScripts === 'function') {
+      _s9LoadSimScripts(tmpl.id, tmpl.version || '0.0.0');
+    }
+  }, 300);
 
   // Refresh coverage tab immediately with fresh data
   setTimeout(function() {
