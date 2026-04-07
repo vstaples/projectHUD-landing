@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD24 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD25 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -362,7 +362,7 @@ async function _cdLoadAll(){
   var filterEl=document.getElementById('cd-script-filters');
   if(filterEl){var clrs=['var(--cd-teal)','var(--cd-grn)','var(--cd-blue)','var(--cd-amb)','var(--cd-pur)'];filterEl.innerHTML=allScripts.slice(0,5).map(function(s,i){var nm=s.name.split(' ').slice(0,3).join(' ');return '<div class="cd-fp" style="border-color:'+clrs[i%clrs.length]+';color:'+clrs[i%clrs.length]+';background:rgba(95,212,200,.05)">'+_cdEsc(nm)+'</div>';}).join('');}
   _cdRenderKpis(_cdRuns,_cdCerts,null,(window._cdPortfolioTmpls||[]).length);
-  _cdRenderHeatmap(_cdRuns);
+  _cdRenderHeatmap(_cdCerts);
   _cdRenderChart();
   _cdRenderLog();
   _cdRenderHealthMonitor();
@@ -378,69 +378,84 @@ function _cdHmDayTip(e, dateIso, st) {
   var panel = document.getElementById('cd-hm-day-tip');
   if (!panel) return;
 
-  var runs = (_cdRuns || []).filter(function(r) {
-    return r.run_at && new Date(r.run_at).toDateString() === dateIso;
-  });
-
+  var certs  = _cdCerts || [];
+  var tmpls  = window._cdPortfolioTmpls || [];
+  var runs   = _cdRuns || [];
   var sidMap = {};
   Object.keys(_cdHmScripts || {}).forEach(function(tid) {
-    (_cdHmScripts[tid] || []).forEach(function(sc) { sidMap[sc.id] = { tid: tid, name: sc.name }; });
+    (_cdHmScripts[tid] || []).forEach(function(sc) { sidMap[sc.id] = {tid:tid, name:sc.name}; });
   });
 
-  var byTmpl = {};
-  runs.forEach(function(r) {
-    var info = sidMap[r.script_id]; if (!info) return;
-    if (!byTmpl[info.tid]) byTmpl[info.tid] = { runs: [] };
-    byTmpl[info.tid].runs.push(r);
-  });
+  // Reconstruct cert state as-of this date for each template
+  var refDate = new Date(dateIso); refDate.setHours(23,59,59,999);
+  var stateLabel = {g:'All certified',a:'Cert invalidated',r:'Cert revoked',n:'No cert'};
+  var stateClr   = {g:'#3de08a',a:'#f5a623',r:'#e84040',n:'rgba(255,255,255,.3)'};
 
-  var tmpls = window._cdPortfolioTmpls || [];
-  var totalPass = runs.filter(function(r){ return r.status==='passed'; }).length;
-  var totalFail = runs.filter(function(r){ return r.status==='failed'; }).length;
-  var summaryClr = totalFail > 0 ? '#e84040' : '#3de08a';
+  var tmplIds = {};
+  certs.forEach(function(c){ tmplIds[c.template_id]=true; });
   var rows = '';
+  var totalValid=0, totalInvalid=0, totalRevoked=0;
 
-  Object.keys(byTmpl).forEach(function(tid) {
+  Object.keys(tmplIds).forEach(function(tid) {
     var tmpl = tmpls.find(function(t){ return t.id===tid; });
-    var tmplName = tmpl ? tmpl.name : 'Unknown workflow';
-    rows += '<div style="padding:8px 12px 4px;border-bottom:1px solid #1e2535">';
-    rows += '<div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:6px">'+_cdEsc(tmplName)+'</div>';
-    byTmpl[tid].runs.forEach(function(r) {
-      var scName = (sidMap[r.script_id] && sidMap[r.script_id].name) ? sidMap[r.script_id].name : r.script_id;
-      var passed = r.steps_passed || 0, failed = r.steps_failed || 0, total = passed + failed;
-      var scoreStr = total > 0 ? (passed+'/'+total) : '—';
-      var scoreClr = r.status==='passed' ? '#3de08a' : r.status==='failed' ? '#e84040' : '#f5a623';
-      var icon = r.status==='passed' ? '✓' : r.status==='failed' ? '✗' : '○';
-      var dt = r.run_at ? new Date(r.run_at) : null;
-      var dateStr = dt ? dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
-      var timeStr = dt ? dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '—';
-      rows += '<div style="display:grid;grid-template-columns:1fr 64px 150px;align-items:center;gap:6px;padding:4px 0 4px 14px;border-bottom:1px solid rgba(255,255,255,.04)">';
-      rows += '<span style="font-size:11px;color:rgba(255,255,255,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(scName)+'</span>';
-      rows += '<span style="font-size:11px;font-weight:700;color:'+scoreClr+';font-family:monospace;text-align:right">'+_cdEsc(scoreStr)+' '+icon+'</span>';
-      rows += '<span style="font-size:11px;color:rgba(255,255,255,.3);font-family:monospace;white-space:nowrap;text-align:right">'+_cdEsc(dateStr+' '+timeStr)+'</span>';
-      rows += '</div>';
-    });
+    var tmplName = tmpl ? tmpl.name : tid;
+    var activeCert = certs.filter(function(c){
+      return c.template_id===tid && new Date(c.issued_at)<=refDate;
+    }).sort(function(a,b){ return new Date(b.issued_at)-new Date(a.issued_at); })[0];
+    if (!activeCert) return;
+
+    var certSt, certAge, certVer;
+    var revokedAt = activeCert.revoked_at ? new Date(activeCert.revoked_at) : null;
+    if (activeCert.status==='invalidated' && revokedAt && revokedAt<=refDate) {
+      certSt='a'; totalInvalid++;
+    } else if (activeCert.status==='revoked') {
+      certSt='r'; totalRevoked++;
+    } else {
+      certSt='g'; totalValid++;
+    }
+    certAge = _cdRelTime(activeCert.issued_at);
+    certVer = activeCert.template_version || '—';
+
+    // Latest run for this template on or before this date (one row only)
+    var latestRun = runs.filter(function(r){
+      return sidMap[r.script_id] && sidMap[r.script_id].tid===tid && new Date(r.run_at)<=refDate;
+    }).sort(function(a,b){ return new Date(b.run_at)-new Date(a.run_at); })[0];
+    var runStr = latestRun
+      ? (latestRun.status==='passed'?'<span style="color:#3de08a">✓</span>':'<span style="color:#e84040">✗</span>')
+        +' Last run '+_cdRelTime(latestRun.run_at)
+      : '<span style="color:rgba(255,255,255,.3)">No runs on record</span>';
+
+    rows += '<div style="padding:8px 12px;border-bottom:1px solid #1e2535;display:grid;grid-template-columns:1fr auto;gap:4px;align-items:start">';
+    rows += '<div>';
+    rows += '<div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:3px">'+_cdEsc(tmplName)+'</div>';
+    rows += '<div style="font-size:10px;color:rgba(255,255,255,.35)">'+runStr+'</div>';
+    rows += '</div>';
+    rows += '<div style="text-align:right">';
+    rows += '<div style="font-size:10px;font-weight:700;color:'+stateClr[certSt]+'">'+stateLabel[certSt]+'</div>';
+    rows += '<div style="font-size:10px;color:rgba(255,255,255,.3);font-family:monospace">v'+_cdEsc(certVer)+' &middot; '+_cdEsc(certAge)+'</div>';
+    rows += '</div>';
     rows += '</div>';
   });
 
-  if (!rows) rows = '<div style="padding:12px;font-size:11px;color:rgba(255,255,255,.35)">No run detail available</div>';
+  if (!rows) rows = '<div style="padding:12px;font-size:11px;color:rgba(255,255,255,.35)">No certification history for this date</div>';
+
+  var headerClr = st==='g'?'#3de08a':st==='a'?'#f5a623':'#e84040';
+  var headerTxt = st==='g'?'All certified':st==='a'?'Cert invalidated':'Cert revoked';
 
   panel.innerHTML =
     '<div style="padding:8px 12px;border-bottom:1px solid #252d3f;display:flex;align-items:center;justify-content:space-between">'+
       '<span style="font-size:12px;font-weight:700;color:#e2e8f0">'+_cdEsc(dateIso)+'</span>'+
-      '<span style="font-size:11px;font-weight:700;color:'+summaryClr+'">'+(totalFail>0?totalFail+' failing':'All passing')+'</span>'+
-    '</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 64px 150px;gap:6px;padding:5px 12px;background:#0d1017;border-bottom:1px solid #1e2535">'+
-      '<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase">Script</span>'+
-      '<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase;text-align:right">Steps</span>'+
-      '<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase;text-align:right">Date / Time</span>'+
+      '<span style="font-size:11px;font-weight:700;color:'+headerClr+'">'+headerTxt+'</span>'+
     '</div>'+
     rows+
-    '<div style="padding:6px 12px;background:#0d1017;font-size:10px;color:rgba(255,255,255,.3)">'+runs.length+' run'+(runs.length!==1?'s':'')+' · '+totalPass+' passed · '+totalFail+' failed</div>';
+    '<div style="padding:6px 12px;background:#0d1017;font-size:10px;color:rgba(255,255,255,.3)">'+
+      totalValid+' valid · '+totalInvalid+' invalidated · '+totalRevoked+' revoked'+
+    '</div>';
 
   panel.style.display = 'block';
   _cdHmDayTipPos(e);
 }
+
 function _cdHmDayTipPos(e) {
   var panel = document.getElementById('cd-hm-day-tip');
   if (!panel || panel.style.display==='none') return;
@@ -459,59 +474,96 @@ function _cdHmDayTipHide() {
 }
 document.addEventListener('mousemove', function(e){ if(_cdHmDayTipDate) _cdHmDayTipPos(e); });
 
-// ── Heatmap ───────────────────────────────────────────────────────────────────
+// ── Heatmap — certification health, not run frequency ────────────────────────
+// Color logic: for each calendar day, reconstruct portfolio cert state as-of that date.
+// A cert is "valid on date D" if issued_at <= D and (revoked_at is null OR revoked_at > D).
+// Green  = all workflows with any cert history had valid certs on that date
+// Amber  = one or more certs were invalidated on that date (template was edited)
+// Red    = one or more certs were revoked/expired on that date
+// Dark   = no cert history exists yet for any workflow
 function _cdRenderHeatmap(runs){
   var grid=document.getElementById('cd-hm-grid');if(!grid)return;
-  var dayMap={};
-  (runs||[]).forEach(function(r){if(!r.run_at)return;var dk=new Date(r.run_at).toDateString();if(!dayMap[dk])dayMap[dk]={p:0,f:0};if(r.status==='passed')dayMap[dk].p++;else dayMap[dk].f++;});
+  var certs = _cdCerts || [];
+  var tmpls = window._cdPortfolioTmpls || [];
+
   var today=new Date();today.setHours(0,0,0,0);
-  var clr={p:'#3de08a',f:'#e84040',a:'#f5c842',n:'#161b28'};
-  var lbl={p:'All passing',f:'Failing',a:'Partial passes',n:'No run'};
-  // Build a 5-row (Mon-Fri) x 5-col (week) grid
-  // Find the most recent Monday on or before today
-  var dow=today.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  var clr={g:'#3de08a',a:'#f5c842',r:'#e84040',n:'#161b28'};
+
+  // Build 5x5 grid
+  var dow=today.getDay();
   var daysToMon=dow===0?6:dow-1;
   var thisMonday=new Date(today);thisMonday.setDate(today.getDate()-daysToMon);
-  // 5 weeks = columns 0..4, week 4 = most recent (rightmost)
   var weeks=[];
   for(var w=4;w>=0;w--){
     var weekStart=new Date(thisMonday);weekStart.setDate(thisMonday.getDate()-(w*7));
-    // Column date label = Monday of this week
-    var m=weekStart.getMonth()+1,dy=weekStart.getDate();
-    var dateStr=(m<10?'0'+m:m)+'/'+(dy<10?'0'+dy:dy);
+    var mo=weekStart.getMonth()+1,dy=weekStart.getDate();
+    var dateStr=(mo<10?'0'+mo:mo)+'/'+(dy<10?'0'+dy:dy);
     var days=[];
-    for(var d2=0;d2<5;d2++){ // Mon=0..Fri=4
+    for(var d2=0;d2<5;d2++){
       var dd=new Date(weekStart);dd.setDate(weekStart.getDate()+d2);
+      dd.setHours(23,59,59,999); // end of that day
       var dk=dd.toDateString();
-      var st=dd>today?'n':(dayMap[dk]?dayMap[dk].f>0?(dayMap[dk].p>0?'a':'f'):'p':'n');
-      var ttl=lbl[st]+' — '+dd.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-      days.push({st:st,title:ttl,dk:dk});
+      var st, cellCerts;
+      if(dd>today){
+        st='n';
+      } else {
+        // For each template that has any cert, find its state on this date
+        var tmplIds = {};
+        certs.forEach(function(c){ tmplIds[c.template_id]=true; });
+        var ids = Object.keys(tmplIds);
+        if(!ids.length){ st='n'; }
+        else {
+          var anyInvalid=false, anyRevoked=false, anyValid=false;
+          ids.forEach(function(tid){
+            // Find the most recent cert issued on or before this date
+            var activeCert = certs.filter(function(c){
+              return c.template_id===tid && new Date(c.issued_at)<=dd;
+            }).sort(function(a,b){ return new Date(b.issued_at)-new Date(a.issued_at); })[0];
+            if(!activeCert) return; // no cert issued yet for this template by this date
+            anyValid=true;
+            if(activeCert.status==='invalidated'){
+              var revokedAt = activeCert.revoked_at ? new Date(activeCert.revoked_at) : null;
+              if(revokedAt && revokedAt<=dd) anyInvalid=true;
+            } else if(activeCert.status==='revoked'){
+              anyRevoked=true;
+            }
+          });
+          st = !anyValid ? 'n' : anyRevoked ? 'r' : anyInvalid ? 'a' : 'g';
+        }
+      }
+      // Reset dd to midnight for label
+      dd.setHours(0,0,0,0);
+      dk=dd.toDateString();
+      days.push({st:st,dk:dk});
     }
     weeks.push({dateStr:dateStr,days:days});
   }
+
   var DOW_LABELS=['M','T','W','T','F'];
-  // Render: row-prefix column + 5 week-columns
   var html='<div style="display:flex;gap:10px;align-items:flex-start;margin-top:4px">';
-  // Left label column (Mon-Fri prefix)
   html+='<div style="display:flex;flex-direction:column;gap:3px;padding-top:18px">';
   for(var di=0;di<5;di++) html+='<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.55);height:13px;line-height:13px;font-family:monospace;width:14px;text-align:center">'+DOW_LABELS[di]+'</div>';
   html+='</div>';
-  // 5 week columns
   weeks.forEach(function(wk){
     html+='<div style="display:flex;flex-direction:column;align-items:center;gap:3px">';
-    // Date label on top
     html+='<div style="font-size:11px;color:rgba(255,255,255,.55);font-family:monospace;white-space:nowrap;margin-bottom:4px;font-weight:500">'+wk.dateStr+'</div>';
-    // 5 day blocks (Mon top, Fri bottom)
     wk.days.forEach(function(day){
-      var dayIso=day.dk;
-      html+='<div style="width:18px;height:11px;border-radius:2px;background:'+clr[day.st]+';cursor:'+(day.st!=='n'?'pointer':'default')+'" onmouseenter="_cdHmDayTip(event,\''+dayIso+'\',\''+day.st+'\')" onmouseleave="_cdHmDayTipHide()"></div>';
+      var canTip = day.st!=='n';
+      html+='<div style="width:18px;height:11px;border-radius:2px;background:'+clr[day.st]+';cursor:'+(canTip?'pointer':'default')+'"'
+        +(canTip?' onmouseenter="_cdHmDayTip(event,\''+day.dk+'\',\''+day.st+'\')" onmouseleave="_cdHmDayTipHide()"':'')+
+        '></div>';
     });
     html+='</div>';
   });
   html+='</div>';
   grid.innerHTML=html;
+
+  // Update label: show most recent cert event instead of last run
   var ageEl=document.getElementById('cd-cert-age-lbl');
-  if(ageEl)ageEl.textContent=runs&&runs.length?'last run '+_cdRelTime(runs[0].run_at):'never run';
+  if(ageEl){
+    var latestCert=certs.length?certs.slice().sort(function(a,b){return new Date(b.issued_at)-new Date(a.issued_at);})[0]:null;
+    ageEl.textContent=latestCert?'last cert '+_cdRelTime(latestCert.issued_at):'no certs yet';
+  }
 }
 
 // ── Trend chart ───────────────────────────────────────────────────────────────
