@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV16
+// cdn-coverage.js  ·  v20260407-CV20
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV16 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV20 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -77,7 +77,7 @@ console.log('%c[cdn-coverage] v20260407-CV16 — live DAG coverage','background:
     '.cv-dag-row::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}',
     // DAG nodes
     '.cv-dag-node{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0}',
-    '.cv-dag-box{width:118px;border-radius:4px;padding:7px 9px;cursor:pointer;transition:transform .1s;flex-shrink:0}',
+    '.cv-dag-box{width:118px;border-radius:4px;padding:7px 9px;cursor:pointer;transition:background-color 0s,border-color 0s,transform .1s;flex-shrink:0}',
     '.cv-dag-box:hover{transform:translateY(-1px)}',
     '.cv-dag-box.covered{background:#0d2a1e;border:1px solid #3dd68c}',
     '.cv-dag-box.stale{background:#2a200a;border:1px solid #f5c842}',
@@ -246,8 +246,10 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
   // Expose pathData for _s9CovCreateScript
   window._cvLastPathData = pathData;
   window._cvLastSteps    = steps;
-  // Inject Re-run buttons on all paths that have a script (covered/stale/scripted)
-  setTimeout(function(){ _cvInjectAllRerunButtons(); }, 50);
+  // Inject Re-run buttons only when no run is active
+  setTimeout(function(){
+    if (!window._cvRunActive) _cvInjectAllRerunButtons();
+  }, 50);
 
   // ── Counts ──
   var covCt=0, staleCt=0, scriptedCt=0, uncovCt=0;
@@ -457,130 +459,58 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
     var sec = document.getElementById('cv-path-sec-'+pathIdx);
     if (!sec) return;
     var cta = document.getElementById('cv-run-cta-'+pathIdx);
-    // Look up path name from coverage data
-    var pd2 = window._cvLastPathData && window._cvLastPathData[pathIdx];
-    var displayName = pd2 ? (pd2.sc ? pd2.sc.name : ('Path '+(pathIdx+1)+': '+(pd2.path&&pd2.path.length?(pd2.path.filter(function(n){return n.requiresReset;}).length>0?pd2.path.filter(function(n){return n.requiresReset;}).length+' reset — '+(pd2.path[pd2.path.length-1].outcome||''):'Clean path — '+(pd2.path[pd2.path.length-1].outcome||'')):''))) : ('Path '+(pathIdx+1));
+    if (cta) cta.style.opacity = '0.4';
 
-    // Show inline progress overlay — grows vertically with content
+    // Display name from pathData
+    var pd2 = window._cvLastPathData && window._cvLastPathData[pathIdx];
+    var displayName = pd2 ? pathName(pd2, pathIdx) : ('Path '+(pathIdx+1));
+
+    // Progress overlay
     var overlay = document.createElement('div');
     overlay.id = 'cv-run-overlay-'+pathIdx;
     overlay.style.cssText = 'position:absolute;background:rgba(13,16,23,.95);border:1px solid #3b82f6;'+
       'border-radius:5px;padding:12px 16px;font-family:Arial,sans-serif;font-size:11px;'+
       'color:rgba(255,255,255,.7);z-index:100;min-width:320px;max-width:440px;'+
       'box-shadow:0 8px 28px rgba(0,0,0,.8)';
-    overlay.innerHTML = '<div style="font-weight:700;color:#3b82f6;margin-bottom:8px">▶ Running: '+_s9EscHtml(displayName)+'</div>'+
+    overlay.innerHTML = '<div style="font-weight:700;color:#3b82f6;margin-bottom:8px">▶ Running: '+_s9EscHtml(displayName||scriptId.slice(0,8))+'</div>'+
       '<div id="cv-run-log-'+pathIdx+'" style="font-size:11px;color:rgba(255,255,255,.55);line-height:1.8"></div>';
-
-    // Position near the CTA
     sec.style.position = 'relative';
     sec.appendChild(overlay);
-    if (cta) cta.style.opacity = '0.4';
 
     var logEl = document.getElementById('cv-run-log-'+pathIdx);
-    function log(msg, clr) {
+    var CLR = {info:'rgba(255,255,255,.45)', pass:'#3de08a', fail:'#e84040'};
+    function log(type, msg) {
       if (!logEl) return;
       var line = document.createElement('div');
-      line.style.color = clr || 'rgba(255,255,255,.45)';
+      line.style.color = CLR[type] || CLR.info;
       line.textContent = msg;
       logEl.appendChild(line);
       logEl.scrollTop = logEl.scrollHeight;
     }
 
-    if (typeof runBistScript !== 'function') {
-      log('runBistScript not available — reload page', '#e84040');
-      return;
-    }
+    // Use shared step-state model
+    var adapter = CadenceStepState.coverageAdapter(pathIdx);
+    var runner  = CadenceStepState.createRunner(scriptId, adapter);
 
-    var dagRow = document.getElementById('cv-dag-row-'+pathIdx);
-
-    // Build ordered list of (seq, nodeIdx) — handles repeated seqs in reset paths
-    var pathNodes = (window._cvLastPathData && window._cvLastPathData[pathIdx])
-      ? (window._cvLastPathData[pathIdx].path || []) : [];
-    // stepCallOrder tracks how many times each seq has been called so far
-    var stepCallCount = {};
-    // nodeSeqList[i] = seq of the i-th non-trigger dag box
-    var nodeSeqList = pathNodes.map(function(n){ return n.seq; });
-
-    function setNodeColor(stepSeq, cls) {
-      if (!dagRow) return;
-      var allBoxes = dagRow.querySelectorAll('.cv-dag-box:not(.trigger-node)');
-      // Find the next unprocessed occurrence of this seq
-      if (!stepCallCount[stepSeq]) stepCallCount[stepSeq] = 0;
-      var occurrence = stepCallCount[stepSeq];
-      var found = 0;
-      for (var ni = 0; ni < nodeSeqList.length; ni++) {
-        if (nodeSeqList[ni] === stepSeq) {
-          if (found === occurrence) {
-            if (allBoxes[ni]) {
-              allBoxes[ni].className = allBoxes[ni].className
-                .replace(/scripted|covered|uncovered|stale/g,'').trim() + ' ' + cls;
-            }
-            break;
-          }
-          found++;
-        }
-      }
-      // Only increment count on pass/fail (not start) — caller controls when
-    }
-    function advanceNodeCount(stepSeq) {
-      if (!stepCallCount[stepSeq]) stepCallCount[stepSeq] = 0;
-      stepCallCount[stepSeq]++;
-    }
-
-    runBistScript(scriptId, function(ev) {
-      if (ev.type === 'step_start') {
-        var lbl = ev.action === 'launch_instance' ? 'Launching instance...' : 'Step ' + (ev.stepSeq||ev.stepIdx) + ': running...';
-        log(lbl);
-        if (ev.stepSeq) setNodeColor(ev.stepSeq, 'stale'); // yellow = in progress
-      }
-      if (ev.type === 'step_pass') {
-        var lbl2 = ev.action === 'launch_instance' ? '✓ Instance launched' : '✓ Step ' + (ev.stepSeq||ev.stepIdx) + ' passed' + (ev.outcome ? ' (' + ev.outcome + ')' : '');
-        log(lbl2, '#3de08a');
-        if (ev.stepSeq) { setNodeColor(ev.stepSeq, 'covered'); advanceNodeCount(ev.stepSeq); }
-      }
-      if (ev.type === 'step_fail') {
-        log('✗ Step ' + (ev.stepSeq||ev.stepIdx||'?') + ' failed: ' + (ev.reason||''), '#e84040');
-        if (ev.stepSeq) { setNodeColor(ev.stepSeq, 'uncovered'); advanceNodeCount(ev.stepSeq); }
-      }
-    }).then(function(result) {
-      var passed = result && result.status === 'passed';
+    runner.run(log, function(passed, result) {
+      // Update overlay
       var clr = passed ? '#3de08a' : '#e84040';
       var icon = passed ? '✓' : '✗';
-      log(icon + ' ' + (passed ? 'All steps passed' : 'Script failed'), clr);
-
-      // Re-color any remaining scripted nodes to final state
-      if (dagRow) {
-        var remaining = dagRow.querySelectorAll('.cv-dag-box.scripted');
-        remaining.forEach(function(b) {
-          b.classList.remove('scripted');
-          b.classList.add(passed ? 'covered' : 'uncovered');
-        });
-        var arrows = dagRow.querySelectorAll('.cv-edge-arrow.scripted');
-        arrows.forEach(function(a) {
-          a.classList.remove('scripted');
-          a.classList.add(passed ? 'covered' : 'uncovered');
-        });
-      }
-
-      // Inject Re-run button to right of END block, hide CTA
-      _cvInjectRerunBtn(pathIdx, scriptId);
-      // Refresh coverage data so status pill updates (re-render will re-inject rerun buttons)
-      if (typeof _s9LoadCoverageData === 'function' && typeof _selectedTmpl !== 'undefined' && _selectedTmpl) {
-        setTimeout(function(){ _s9LoadCoverageData(_selectedTmpl.id, _selectedTmpl.version||'0.0.0'); }, 1000);
-      }
-
+      if (cta) cta.style.opacity = '1';
       // Auto-close overlay after 2s
       setTimeout(function() {
         if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       }, 2000);
-
-    }).catch(function(err) {
-      log('Error: ' + (err && err.message ? err.message : String(err)), '#e84040');
-      if (cta) cta.style.opacity = '1';
+      // Inject Re-run button
+      _cvInjectRerunBtn(pathIdx, scriptId);
+      // Refresh coverage status pills
+      if (typeof _s9LoadCoverageData === 'function' && typeof _selectedTmpl !== 'undefined' && _selectedTmpl) {
+        setTimeout(function(){ _s9LoadCoverageData(_selectedTmpl.id, _selectedTmpl.version||'0.0.0'); }, 1000);
+      }
     });
   };
 
-  // ── Reset a path back to scripted state for re-run ──────────────────────────
+
   window._cvResetPath = function(pathIdx, scriptId) {
     // Reset DAG nodes to scripted (blue)
     var dagRow = document.getElementById('cv-dag-row-'+pathIdx);
