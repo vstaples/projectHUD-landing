@@ -1,12 +1,12 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-dashboard.js  ·  v20260406-CD11
+// cdn-dashboard.js  ·  v20260407-CD37
 // CadenceHUD — composite dashboard
 // KPI strip (heatmap in last cell) | left: trend + run log | right: health monitor
 // ══════════════════════════════════════════════════════════════════════════════
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD35 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD38 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -44,11 +44,11 @@ console.log('%c[cdn-dashboard] v20260407-CD35 — composite dashboard','backgrou
     + '.cd-wf-r1{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}\n'
     + '.cd-wf-r1-right{display:flex;align-items:center;gap:6px;flex-shrink:0}\n'
     + '.cd-wf-r2{display:grid;grid-template-columns:130px 8px 150px 8px 200px 8px 1fr;align-items:center;margin-bottom:2px}\n'
-    + '.cd-wf-r2-cell{font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
-    + '.cd-wf-r2-sep{color:rgba(255,255,255,.18);font-size:11pt;text-align:center}\n'
+    + '.cd-wf-r2-cell{font-size:10pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
+    + '.cd-wf-r2-sep{color:rgba(255,255,255,.18);font-size:10pt;text-align:center}\n'
     
-    + '.cd-wf-name{font-size:12pt;font-weight:700;color:#ffffff;font-family:Arial,sans-serif}\n'
-    + '.cd-wf-ver{font-size:11pt;color:rgba(255,255,255,.7);margin-top:1px;font-family:Arial,sans-serif}\n'
+    + '.cd-wf-name{font-size:11pt;font-weight:700;color:#ffffff;font-family:Arial,sans-serif}\n'
+    + '.cd-wf-ver{font-size:10pt;color:rgba(255,255,255,.7);margin-top:1px;font-family:Arial,sans-serif}\n'
     + '.cd-pill{font-size:10pt;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.04em;flex-shrink:0;font-family:Arial,sans-serif}\n'
     + '.cd-pill-cert{background:rgba(95,212,100,.15);color:var(--cd-grn);border:1px solid rgba(95,212,100,.3)}\n'
     + '.cd-pill-fail{background:rgba(220,60,60,.15);color:var(--cd-red);border:1px solid rgba(220,60,60,.3)}\n'
@@ -61,13 +61,13 @@ console.log('%c[cdn-dashboard] v20260407-CD35 — composite dashboard','backgrou
     + '.cd-wf-cov{display:flex;align-items:center;gap:8px;margin-bottom:6px}\n'
     + '.cd-cov-bar{flex:1;height:4px;background:#1e2535;border-radius:2px;overflow:hidden}\n'
     + '.cd-cov-fill{height:100%;border-radius:2px;transition:width .3s}\n'
-    + '.cd-cov-pct{font-size:14pt;font-weight:700;min-width:40px;text-align:right;font-family:monospace}\n'
-    + '.cd-cov-suite{font-size:11pt;color:rgba(255,255,255,.75);white-space:nowrap;font-family:Arial,sans-serif}\n'
+    + '.cd-cov-pct{font-size:13pt;font-weight:700;min-width:40px;text-align:right;font-family:monospace}\n'
+    + '.cd-cov-suite{font-size:10pt;color:rgba(255,255,255,.75);white-space:nowrap;font-family:Arial,sans-serif}\n'
     
-    + '.cd-wf-date{font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif}\n'
+    + '.cd-wf-date{font-size:10pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif}\n'
     
     + '.cd-wf-expand{padding:0 2px}\n'
-    + '.cd-wf button.cd-wf-btn{font-size:11pt;font-weight:600;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.85);cursor:pointer;font-family:Arial,sans-serif}\n'
+    + '.cd-wf button.cd-wf-btn{font-size:10pt;font-weight:600;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.85);cursor:pointer;font-family:Arial,sans-serif}\n'
     + '.cd-wf button.cd-wf-btn:hover{border-color:rgba(255,255,255,.5);color:#ffffff;background:rgba(255,255,255,.06)}\n'
     + '.cd-wf button.cd-wf-btn.primary{background:rgba(0,201,201,.12);border-color:rgba(0,201,201,.4);color:var(--cad,#00c9c9)}\n'
     + '.cd-wf button.cd-wf-btn.danger{background:rgba(220,60,60,.12);border-color:rgba(220,60,60,.35);color:var(--cd-red)}\n'
@@ -1246,8 +1246,9 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
       actBtns =
         '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortDefCoverage(this.dataset.tid)">Define coverage →</button>';
     } else if (statusCls==='wf-uncov') {
-      actBtns =
-        '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';
+      actBtns = scriptCt > 0
+        ? '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortRunSuite(this.dataset.tid)">Run suite →</button>'
+        : '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';
     } else if (statusCls==='wf-stale') {
       actBtns =
         '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortRunSuite(this.dataset.tid)">Run suite</button>'+

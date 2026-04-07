@@ -1015,7 +1015,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.69 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.70 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -5053,6 +5053,14 @@ async function _s9RunAllCoveragePaths() {
     ? 'Cancelled — '+ran+' of '+scripted.length+' run'
     : (failed ? failed+' failed · '+passed+' passed' : '✓ All '+passed+' paths passed');
   titleEl.style.color = failed ? '#e84040' : '#3de08a';
+
+  // Issue cert when all coverage paths pass
+  if (!cancelled && !failed && passed > 0 && typeof window._s9OnSimComplete === 'function') {
+    var _cvSimResults = scripted.map(function(pd) {
+      return { name: pd.sc.name, status: 'passed', runId: null };
+    });
+    window._s9OnSimComplete(_cvSimResults);
+  }
 
   // Footer: close + view cert — built with DOM to avoid quote escaping issues
   if (footEl) {
