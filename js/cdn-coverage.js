@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV7
+// cdn-coverage.js  ·  v20260407-CV8
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV7 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV8 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -108,9 +108,9 @@ console.log('%c[cdn-coverage] v20260407-CV7 — live DAG coverage','background:#
     '.cv-path-list{border-top:1px solid #1e2535;flex-shrink:0;max-height:200px;overflow-y:auto;background:#0c0f18}',
     '.cv-path-list::-webkit-scrollbar{width:3px}',
     '.cv-path-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}',
-    '.cv-pl-hdr{display:grid;grid-template-columns:1fr 56px 56px 100px 200px 110px;padding:6px 16px;background:#111520;border-bottom:1px solid #1e2535;position:sticky;top:0;z-index:2}',
+    '.cv-pl-hdr{display:grid;grid-template-columns:1fr 60px 80px 120px 180px 140px;padding:6px 16px;background:#111520;border-bottom:1px solid #1e2535;position:sticky;top:0;z-index:2}',
     '.cv-pl-hc{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5fd4c8}',
-    '.cv-pl-row{display:grid;grid-template-columns:1fr 56px 56px 100px 200px 110px;padding:6px 16px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;cursor:pointer;transition:background .1s}',
+    '.cv-pl-row{display:grid;grid-template-columns:1fr 60px 80px 120px 180px 140px;padding:6px 16px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;cursor:pointer;transition:background .1s}',
     '.cv-pl-row:hover{background:rgba(255,255,255,.02)}',
     '.cv-pl-name{font-size:12px;color:#e2e8f0;display:flex;align-items:center;gap:6px}',
     '.cv-pl-cell{font-size:12px;color:rgba(255,255,255,.45);font-family:"Courier New",monospace}',
@@ -160,7 +160,7 @@ function _cvColor(v){ return v>=80?'#3dd68c':v>=50?'#f5c842':'#e84040'; }
 function _cvPill(st){
   var cfg={covered:{cls:'cv-pill-covered',lbl:'Covered'},stale:{cls:'cv-pill-stale',lbl:'Stale'},
     partial:{cls:'cv-pill-partial',lbl:'Partial'},uncovered:{cls:'cv-pill-uncovered',lbl:'Uncovered'},
-    scripted:{cls:'cv-pill-stale',lbl:'Scripted — not run'}}[st]
+    scripted:{cls:'cv-pill-stale',lbl:'Scripted'}}[st]
     ||{cls:'cv-pill-uncovered',lbl:'Uncovered'};
   return '<span class="cv-pill '+cfg.cls+'"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block"></span>'+cfg.lbl+'</span>';
 }
@@ -273,6 +273,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
     if(!spec) return;
     (spec.steps||[]).forEach(function(s){
       if(s.action==='complete_step'&&s.params&&s.params.step_seq!=null) touchedSeqs[s.params.step_seq]=true;
+      if(s.action==='launch_instance') return; // exclude infrastructure step from density
       totalSlots++;
       totalAsserts+=(s.assertions||s.asserts||[]).length;
     });
@@ -293,7 +294,11 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
   // ── DAG path name ──
   function pathName(pd, idx){
     var prefix = 'Path '+(idx+1)+': ';
-    if(pd.sc) return prefix+(pd.sc.name||('Script '+(idx+1)));
+    if(pd.sc){
+      var n = pd.sc.name||('Script '+(idx+1));
+      // Avoid double prefix if script was created via auto-generate (already prefixed)
+      return n.indexOf('Path '+(idx+1)+':')===0 ? n : prefix+n;
+    }
     if(pd.path&&pd.path.length){
       var resets = pd.path.filter(function(n){return n.requiresReset;}).length;
       var lastOut = pd.path[pd.path.length-1];
@@ -404,7 +409,9 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
               'onclick="_s9CovCreateScript(\''+_s9EscHtml(pathName(pd,pi))+'\','+pi+')">+ Create covering script &rarr;</span>'+
           '</div>'
         : status==='scripted'
-        ? '<div style="margin-left:16px;font-size:11px;color:#3b82f6">▶ Run suite to verify this path</div>'
+        ? '<div style="margin-left:16px;font-size:11px;color:#3b82f6;cursor:pointer;text-decoration:underline"'
+          + ' onclick="_s9SwitchSimSubTab(\'scripts\');setTimeout(function(){var b=document.getElementById(\'s9-run-all-btn\');if(b)b.click();},300)"'
+          + '>▶ Run suite to verify this path</div>'
         : '';
 
       return '<div class="cv-path-section">'+
