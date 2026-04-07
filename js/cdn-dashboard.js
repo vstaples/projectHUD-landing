@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD20 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD21 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -387,16 +387,20 @@ function _cdHmDayTip(e, dateIso, st) {
     return d >= dayStart && d <= dayEnd;
   });
 
-  var d = window._cdPortData || {};
-  var scriptObjsByTmpl = d.scriptObjsByTmpl || {};
-  var tmplByScriptId   = d.tmplByScriptId   || {};
+  // Build scriptId→{tid,name} map from _cdHmScripts (always populated by _cdLoadAll)
+  var sidMap = {};
+  var hmScripts = _cdHmScripts || {};
+  Object.keys(hmScripts).forEach(function(tid) {
+    (hmScripts[tid] || []).forEach(function(sc) { sidMap[sc.id] = { tid: tid, name: sc.name }; });
+  });
 
-  // Group runs by template
+  // Group runs by template using sidMap
   var byTmpl = {};
   runs.forEach(function(r) {
     var sid = r.script_id;
-    var tid = tmplByScriptId[sid];
-    if (!tid) return;
+    var info = sidMap[sid];
+    if (!info) return;
+    var tid = info.tid;
     if (!byTmpl[tid]) byTmpl[tid] = { runs: [] };
     byTmpl[tid].runs.push(r);
   });
@@ -412,7 +416,6 @@ function _cdHmDayTip(e, dateIso, st) {
   Object.keys(byTmpl).forEach(function(tid) {
     var tmpl = tmpls.find(function(t){ return t.id===tid; });
     var tmplName = tmpl ? tmpl.name : 'Unknown workflow';
-    var scripts = scriptObjsByTmpl[tid] || [];
     var tmplRuns = byTmpl[tid].runs;
 
     rows += '<div style="padding:8px 12px;border-bottom:1px solid #1e2535">';
@@ -420,8 +423,7 @@ function _cdHmDayTip(e, dateIso, st) {
 
     // Per-script rows
     tmplRuns.forEach(function(r) {
-      var sc = scripts.find(function(s){ return s.id===r.script_id; });
-      var scName = sc ? sc.name : r.script_id;
+      var scName = (sidMap[r.script_id] && sidMap[r.script_id].name) ? sidMap[r.script_id].name : r.script_id;
       var passed = r.steps_passed || 0;
       var failed = r.steps_failed || 0;
       var total  = passed + failed;
