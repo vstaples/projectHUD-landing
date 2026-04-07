@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD34 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD35 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -500,7 +500,7 @@ function _cdRenderHeatmap(runs){
     (_cdHmScripts[tid] || []).forEach(function(sc) { sidMap[sc.id] = {tid:tid, name:sc.name}; });
   });
 
-  var today=new Date();today.setHours(0,0,0,0);
+  var today=new Date();today.setHours(23,59,59,999); // end of today so current day is not treated as future
   var clr={g:'#3de08a',a:'#f5c842',r:'#e84040',n:'#161b28'};
 
   // Build 5x5 grid
@@ -518,7 +518,8 @@ function _cdRenderHeatmap(runs){
       dd.setHours(23,59,59,999); // end of that day
       var dk=dd.toDateString();
       var st, cellCerts;
-      if(dd>today){
+      var ddDay=new Date(dd); ddDay.setHours(0,0,0,0);
+      if(ddDay>today){
         st='n';
       } else {
         // For each template that has any cert, find its state on this date
