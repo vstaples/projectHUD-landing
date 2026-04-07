@@ -1015,7 +1015,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.70 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.72 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -1364,7 +1364,7 @@ function _s9RenderSimPanel(el) {
     '<div id="s9-cert-overlay" style="display:none;position:absolute;inset:0;' +
       'background:rgba(4,6,14,.88);z-index:200;align-items:center;justify-content:center;' +
       'backdrop-filter:blur(8px)" onclick="_s9HideCertOnBg(event)">' +
-      '<div id="s9-cert-wrap" style="width:680px;max-width:95vw;max-height:90vh;overflow-y:auto;' +
+      '<div id="s9-cert-wrap" style="width:780px;max-width:95vw;max-height:90vh;overflow-y:auto;' +
         'background:#faf8f2;border-radius:6px;box-shadow:0 40px 120px rgba(0,0,0,.8);' +
         'position:relative">' +
         '<button onclick="_s9HideCert()" style="position:absolute;top:12px;right:14px;' +
@@ -2590,7 +2590,7 @@ function _s9ShowCert() {
       'align-items:center;justify-content:center;backdrop-filter:blur(8px)';
     overlay.onclick = function(e) { if (e.target === overlay) _s9HideCert(); };
     var FA = 'font-family:Arial,sans-serif;';
-    overlay.innerHTML = '<div id="s9-cert-wrap" style="width:680px;max-width:95vw;max-height:90vh;overflow-y:auto;' +
+    overlay.innerHTML = '<div id="s9-cert-wrap" style="width:780px;max-width:95vw;max-height:90vh;overflow-y:auto;' +
       'background:#faf8f2;border-radius:6px;box-shadow:0 40px 120px rgba(0,0,0,.8);position:relative">' +
       '<button onclick="_s9HideCert()" style="position:absolute;top:12px;right:14px;background:none;border:none;' +
         'color:rgba(200,180,120,.4);cursor:pointer;font-size:18px;z-index:10;line-height:1;' + FA + '">✕</button>' +
@@ -2665,7 +2665,7 @@ function _s9RenderCertBody() {
 
   var routeRows = routes ? routes.map(function(r) {
     return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
-      '<span style="' + FA + 'font-size:12px;color:#2a1e08;font-weight:700;width:60px;flex-shrink:0">' + r.from + '</span>' +
+      '<span style="' + FA + 'font-size:12px;color:#2a1e08;font-weight:700;white-space:nowrap;flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;display:inline-block" title="'+r.from+'">' + r.from + '</span>' +
       '<span style="font-size:12px;color:rgba(80,60,20,.4);flex-shrink:0">' + r.arrow + '</span>' +
       '<span style="' + FA + 'font-size:13px;color:rgba(60,45,15,.7);flex:1">' + _s9EscHtml(r.desc) + '</span>' +
       '<span style="' + FA + 'font-size:12px;font-weight:700;padding:1px 7px;border-radius:8px;flex-shrink:0;' +
