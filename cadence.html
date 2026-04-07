@@ -1015,7 +1015,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.68 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.69 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -2850,6 +2850,17 @@ window._s9OnSimComplete = function(allResults) {
   }
   window._s9CertIssuingLock = true;
   setTimeout(function(){ window._s9CertIssuingLock = false; }, 60000);
+
+  // Mark all coverage paths for this template covered when full suite passes
+  (function() {
+    var _tmpl2 = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+    var _fid2  = (typeof FIRM_ID_CAD !== 'undefined') ? FIRM_ID_CAD : null;
+    if (!_tmpl2 || !_fid2) return;
+    API.patch(
+      'bist_coverage_paths?firm_id=eq.'+_fid2+'&template_id=eq.'+_tmpl2.id,
+      { coverage_status: 'covered', last_run_at: new Date().toISOString() }
+    ).catch(function(){});
+  }());
 
   var now      = new Date();
   var certNum  = 'CERT-' + now.toISOString().replace(/[-:T]/g,'').slice(0,14) + '-' +
