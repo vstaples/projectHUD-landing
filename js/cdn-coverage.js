@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV22
+// cdn-coverage.js  ·  v20260407-CV23
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV22 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV23 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -39,13 +39,13 @@ console.log('%c[cdn-coverage] v20260407-CV22 — live DAG coverage','background:
     '.cv-score-row-val{font-size:12px;font-weight:700;font-family:"Courier New",monospace}',
     '.cv-score-bar-wrap{height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}',
     '.cv-score-bar{height:100%;border-radius:2px;transition:width .5s}',
-    '.cv-score-tip{display:none;position:fixed;z-index:9999;width:230px;background:#1a1f2e;border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:10px 12px;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.7);font-family:Arial,sans-serif}',
+    '.cv-score-tip{display:none;position:fixed;z-index:9999;width:300px;background:#1a1f2e;border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:14px 16px;pointer-events:none;box-shadow:0 8px 28px rgba(0,0,0,.8);font-family:Arial,sans-serif}',
     '.cv-score-tip-wrap:hover .cv-score-tip{display:block}',
-    '.cv-stt{font-size:10px;font-weight:700;color:#5fd4c8;margin-bottom:6px}',
-    '.cv-str{display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.55);padding:2px 0;border-bottom:1px solid rgba(255,255,255,.05)}',
+    '.cv-stt{font-size:13px;font-weight:700;color:#5fd4c8;margin-bottom:8px}',
+    '.cv-str{display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.6);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)}',
     '.cv-str:last-of-type{border-bottom:none}',
     '.cv-str span:last-child{color:#fff;font-weight:700}',
-    '.cv-stf{font-size:9px;color:rgba(255,255,255,.35);margin-top:6px;border-top:1px solid rgba(255,255,255,.06);padding-top:6px;line-height:1.5}',
+    '.cv-stf{font-size:11px;color:rgba(255,255,255,.45);margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;line-height:1.6}',
     // Legend
     '.cv-leg-item{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,.5);margin-bottom:5px}',
     '.cv-leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}',
@@ -699,9 +699,9 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
               'paths with passing run ÷ total paths',
               covCt+' ÷ '+totalPaths+' = '+runScore+'%')+
             _cvScoreBar('Assertion density',assertScore,'Assertion Density',
-              [['Step actions across scripts',totalSlots],['Total assertions',totalAsserts],['Avg per step',(totalSlots?Math.round(totalAsserts/totalSlots*10)/10:0)]],
-              'assertions ÷ step actions — score capped at 100%',
-              totalAsserts+' ÷ '+totalSlots+' = '+assertScore+'%')+
+              [['Step actions across scripts',totalSlots],['Total assertions',totalAsserts],['Avg per step',(totalSlots?Math.round(totalAsserts/totalSlots*10)/10:0)],['Target avg per step','2.0'],['To reach 100%',Math.max(0,totalSlots*2-totalAsserts)+' more assertions needed']],
+              'Target: 2 assertions per step — open each script in Scripts tab and add assertions to step actions to improve this score.',
+              totalAsserts+' ÷ '+totalSlots+' × 50 = '+assertScore+'% (capped at 100%)')+
             _cvScoreBar('Freshness',freshScore,'Freshness',
               [['Scripted paths',scriptedPaths],['Passing runs',covCt],['Stale (>'+STALE_DAYS+'d)',staleCt],['Never run',scriptedCt]],
               '(passing + 0.5×stale) ÷ scripted paths',
