@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD29 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD30 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -393,7 +393,19 @@ function _cdHmDayTip(e, dateIso, st) {
   var rows = '';
   var totalValid=0, totalInvalid=0, totalNoCert=0;
 
-  // Show all templates — cert data determines what was active on each date
+  // A template "existed" on refDate if it has at least one cert issued on or before refDate.
+  // Templates with no cert at all never appear in historical cells.
+  var firstCertByTmpl = {};
+  certs.forEach(function(c) {
+    var d = new Date(c.issued_at);
+    if (!firstCertByTmpl[c.template_id] || d < firstCertByTmpl[c.template_id]) {
+      firstCertByTmpl[c.template_id] = d;
+    }
+  });
+  tmpls = tmpls.filter(function(t) {
+    var first = firstCertByTmpl[t.id];
+    return first && first <= refDate;
+  });
   tmpls.forEach(function(tmpl) {
     var tid = tmpl.id;
     var tmplName = tmpl.name;
@@ -512,7 +524,15 @@ function _cdRenderHeatmap(runs){
         st='n';
       } else {
         // For each template that has any cert, find its state on this date
-        var ids = (window._cdPortfolioTmpls||[]).map(function(t){return t.id;});
+        var firstCertByTmpl2 = {};
+        certs.forEach(function(c) {
+          var d = new Date(c.issued_at);
+          if (!firstCertByTmpl2[c.template_id] || d < firstCertByTmpl2[c.template_id]) firstCertByTmpl2[c.template_id] = d;
+        });
+        var ids = (window._cdPortfolioTmpls||[]).filter(function(t){
+          var first = firstCertByTmpl2[t.id];
+          return first && first <= dd;
+        }).map(function(t){return t.id;});
         if(!ids.length){ st='n'; }
         else {
           var anyInvalid=false, anyRevoked=false, anyValid=false;
