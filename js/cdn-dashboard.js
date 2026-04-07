@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD39 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD40 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1231,14 +1231,13 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
       var covFail     = covRuns.filter(function(r){ return r.status==='failed'; }).length;
       var custPass    = custRuns.filter(function(r){ return r.status==='passed'; }).length;
       var custFail    = custRuns.filter(function(r){ return r.status==='failed'; }).length;
-      var parts = [];
       if (covScripts.length > 0) {
-        parts.push(covPass+'/'+covScripts.length+' Coverage script'+(covScripts.length!==1?'s':'')+' passing'+(covFail?' · '+covFail+' failing':''));
+        suiteLine = covPass+'/'+covScripts.length+' Coverage script'+(covScripts.length!==1?'s':'')+' passing'+(covFail?' · '+covFail+' failing':'');
+      } else if (custScripts.length > 0) {
+        suiteLine = custPass+'/'+custScripts.length+' Custom script'+(custScripts.length!==1?'s':'')+' passing'+(custFail?' · '+custFail+' failing':'');
+      } else {
+        suiteLine = 'Define coverage paths to enable certification';
       }
-      if (custScripts.length > 0) {
-        parts.push(custPass+'/'+custScripts.length+' Custom script'+(custScripts.length!==1?'s':'')+' passing'+(custFail?' · '+custFail+' failing':''));
-      }
-      suiteLine = parts.join(' · ');
     } else if (statusCls==='wf-cert' || statusCls==='wf-stale') {
       suiteLine = 'Certified — add test scripts';
     } else {
