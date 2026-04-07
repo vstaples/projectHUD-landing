@@ -845,7 +845,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
     <!-- Top bar -->
     <div class="cad-topbar">
       <div class="cad-topbar-brand">Cadence</div>
-      <div class="cad-topbar-sub" id="cad-topbar-sub">QA Command Brief</div>
+      <div class="cad-topbar-sub" id="cad-topbar-sub">Certification Command Center</div>
       <div class="cad-topbar-actions">
         <a href="/projects.html" class="btn btn-ghost btn-sm" id="topbar-back-btn"
           style="text-decoration:none;display:none">← Dashboard</a>
@@ -1015,7 +1015,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.81 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.82 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -1094,7 +1094,7 @@ function _s9Switch(tab) {
   }
 
   // Update topbar subtitle and back button visibility per tab
-  var subLabels = {dashboard:'QA Command Brief', library:'Workflow Engine',
+  var subLabels = {dashboard:'Certification Command Center', library:'Workflow Engine',
                    simulator:'Simulator', instances:'Instances'};
   var subEl = document.getElementById('cad-topbar-sub');
   if (subEl) subEl.textContent = subLabels[tab] || 'Workflow Engine';
@@ -4089,7 +4089,7 @@ function _s9RenderHistoryStub() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── S9.62: _s9RouteDashboard, _s9RenderDashboard, _s9DashLoadData ──────────
-// These functions have been superseded by the QA Command Brief integration.
+// These functions have been superseded by the Certification Command Center integration.
 // _s9RouteDashboard is redefined below in the CD Brief block.
 // _s9RenderDashboard and _s9DashLoadData are no longer called.
 
