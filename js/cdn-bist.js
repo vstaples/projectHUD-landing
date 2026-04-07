@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260407-BQ5 — coverage gate: paths must exist + 100% covered before cert issues','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260407-BQ6 — coverage gate: paths must exist + 100% covered before cert issues','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // ── SE13 patches (2026-04-04) ───────────────────────────────────────────────
 // 1. Reverted SE12's step_route_back emission from explicit route branch.
 //    It fired before step_pass, resetting T2 cards to blue before they went green.
@@ -1453,7 +1453,7 @@ async function runAllTests() {
 // Writes:     bist_runs records (via runBistScript), workflow_template_coc cert
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function _bistLaunchCockpit(templateId, version, onProceed) {
+async function _bistLaunchCockpit(templateId, version, onProceed, filterScriptId) {
   // Close any existing gate overlay
   document.getElementById('bist-gate-overlay')?.remove();
   document.getElementById('bist-cockpit-overlay')?.remove();
@@ -1486,7 +1486,7 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
     `workflow_template_steps?template_id=eq.${templateId}&order=sequence_order.asc`
   ).catch(()=>[]) || [];
 
-  const TESTS = scripts.map(script => {
+  const TESTS = (filterScriptId ? scripts.filter(function(s){ return s.id === filterScriptId; }) : scripts).map(script => {
     const spec = typeof script.script === 'string' ? JSON.parse(script.script) : script.script;
     const nodes = [];
     const actors = [];

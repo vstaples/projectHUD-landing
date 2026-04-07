@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260407-SE31','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260407-SE32','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -1280,24 +1280,28 @@ async function seRunScript() {
   if (_seRunning) return;
   var sc = _seGetSelected(); if (!sc) return;
   if (_seDirty) await seSaveScript();
-  _seRunning = true;
-  var badge = document.getElementById('se-badge');
-  if (badge) { badge.className='se-badge se-bd-run'; badge.textContent='RUNNING…'; }
-  await runBistScript(sc.id, function(ev) {
-    // progress logging only — full visuals via Simulator tab
-    if (ev.type === 'step_fail') cadToast('Step failed: '+ev.reason, 'error');
-  });
-  // Reload runs
-  _seRecentRuns = await API.get('bist_runs?firm_id=eq.'+FIRM_ID_CAD+
-    '&template_id=eq.'+_selectedTmpl.id+'&order=run_at.desc&limit=40').catch(function(){return [];});
   _seRunning = false;
-  // Record result in session tracker so badge reflects this session's run
-  if (_seSelectedId) {
-    var freshRun = _seLastRunFor(_seSelectedId);
-    _seSessionRuns[_seSelectedId] = freshRun ? freshRun.status : 'unknown';
+  if (typeof _bistLaunchCockpit === 'function' &&
+      typeof _selectedTmpl !== 'undefined' && _selectedTmpl && _selectedTmpl.id) {
+    _bistLaunchCockpit(_selectedTmpl.id, _selectedTmpl.version || '0.0.0', null, sc.id);
+  } else {
+    // fallback: headless run if cockpit engine not available
+    _seRunning = true;
+    var badge = document.getElementById('se-badge');
+    if (badge) { badge.className='se-badge se-bd-run'; badge.textContent='RUNNING…'; }
+    await runBistScript(sc.id, function(ev) {
+      if (ev.type === 'step_fail') cadToast('Step failed: '+ev.reason, 'error');
+    });
+    _seRecentRuns = await API.get('bist_runs?firm_id=eq.'+FIRM_ID_CAD+
+      '&template_id=eq.'+_selectedTmpl.id+'&order=run_at.desc&limit=40').catch(function(){return [];});
+    _seRunning = false;
+    if (_seSelectedId) {
+      var freshRun = _seLastRunFor(_seSelectedId);
+      _seSessionRuns[_seSelectedId] = freshRun ? freshRun.status : 'unknown';
+    }
+    seRenderEditor();
+    cadToast('Run complete', 'info');
   }
-  seRenderEditor();
-  cadToast('Run complete', 'info');
 }
 
 // ── Step mutations ───────────────────────────────────────────────────────────
@@ -1682,5 +1686,5 @@ window.seShowRunHistory = function seShowRunHistory() {
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260407-SE31 — Assertion rows: 3-column label|path|eq-value per mockup',
+console.log('%c[cdn-script-editor] v20260407-SE32 — Assertion rows: 3-column label|path|eq-value per mockup',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
