@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD32 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD33 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -493,6 +493,12 @@ function _cdRenderHeatmap(runs){
   var grid=document.getElementById('cd-hm-grid');if(!grid)return;
   var certs = _cdCerts || [];
   var tmpls = window._cdPortfolioTmpls || [];
+
+  // Build sidMap: scriptId → {tid, name} for run→template lookup
+  var sidMap = {};
+  Object.keys(_cdHmScripts || {}).forEach(function(tid) {
+    (_cdHmScripts[tid] || []).forEach(function(sc) { sidMap[sc.id] = {tid:tid, name:sc.name}; });
+  });
 
   var today=new Date();today.setHours(0,0,0,0);
   var clr={g:'#3de08a',a:'#f5c842',r:'#e84040',n:'#161b28'};
