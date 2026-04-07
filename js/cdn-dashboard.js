@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD41 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD42 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1286,7 +1286,7 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
         '<div style="grid-column:6;font-size:9pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px;color:'+covClrR1+'">'+covLblR1+'</div>'+
         '<div style="grid-column:7;display:flex;align-items:center;justify-content:flex-end;gap:6px">'+
           actBtns+
-          '<span class="cd-pill '+statusPillCls+'" style="cursor:pointer" onclick="event.stopPropagation();_cdPortShowCert(\''+t.id+'\',\''+statusCls+'\')" title="'+( statusCls===\'wf-cert\' ? \'View certificate\' : \'Certified badge — click to see why cert unavailable\')+'">'+statusLabel+'</span>'+
+          '<span class="cd-pill '+statusPillCls+'" style="cursor:pointer" data-tid="'+t.id+'" data-scls="'+statusCls+'" onclick="event.stopPropagation();_cdPortShowCert(this.dataset.tid,this.dataset.scls)">'+statusLabel+'</span>'+
         '</div>'+
       '</div>'+
       '<div style="'+GRID+'">'+
