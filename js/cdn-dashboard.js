@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD27 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD28 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -443,8 +443,9 @@ function _cdHmDayTip(e, dateIso, st) {
 
   if (!rows) rows = '<div style="padding:12px;font-size:11px;color:rgba(255,255,255,.35)">No portfolio data available</div>';
 
-  var headerClr = st==='g'?'#3de08a':st==='a'?'#f5a623':'#e84040';
-  var headerTxt = st==='g'?'All certified':st==='a'?'Cert invalidated':'Cert revoked';
+  // Derive header from computed template states — not from cell st param
+  var headerClr = totalInvalid>0 ? '#f5a623' : totalValid===tmpls.length ? '#3de08a' : 'rgba(255,255,255,.5)';
+  var headerTxt = totalInvalid>0 ? 'Cert invalidated' : totalValid===tmpls.length ? 'All certified' : totalValid>0 ? totalValid+'/'+tmpls.length+' certified' : 'No certs';
 
   panel.innerHTML =
     '<div style="padding:8px 12px;border-bottom:1px solid #252d3f;display:flex;align-items:center;justify-content:space-between">'+
