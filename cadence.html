@@ -1197,8 +1197,8 @@ function _s9RenderSimPanel(el) {
         }).join('') +
       '</div>' +
 
-      // Gate indicator
-      '<div id="s9-sim-gate" style="display:flex;align-items:center;gap:6px;padding:3px 10px;' +
+      // Gate indicator — hidden until template selected
+      '<div id="s9-sim-gate" style="display:none;align-items:center;gap:6px;padding:3px 10px;' +
         'border-radius:3px;background:rgba(240,160,48,.1);border:1px solid rgba(240,160,48,.25);' +
         'font-size:12px;font-weight:700;color:#f0a030">○ Checking…</div>' +
 
@@ -1408,7 +1408,9 @@ function _s9RenderSimPanel(el) {
       // Reload coverage data if coverage tab is active
       if (_s9SimSubTab === 'coverage') {
         var tmpl2 = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
-        if (tmpl2 && tmpl2.id) _s9LoadCoverageData(tmpl2.id, tmpl2.version || '0.0.0');
+        setTimeout(function(){
+          _s9LoadCoverageData(tmpl2 ? tmpl2.id : null, tmpl2 ? (tmpl2.version || '0.0.0') : null);
+        }, 100);
       }
       if (_s9SimSubTab === 'history') _s9RenderHistoryStub();
     }, 100);
@@ -3089,6 +3091,8 @@ async function _s9LoadSimScripts(templateId, version) {
         gateEl.style.color = '#f0a030'; gateEl.style.background = 'rgba(240,160,48,.1)'; gateEl.style.borderColor = 'rgba(240,160,48,.25)';
         gateEl.style.cursor = 'default'; gateEl.onclick = null;
         gateLeftEl.textContent = '○ Run tests to check gate status for v' + version;
+        var gateEl = document.getElementById('s9-sim-gate');
+        if (gateEl) gateEl.style.display = 'flex';
         gateLeftEl.style.color = '#f0a030'; gateLeftEl.style.cursor = 'default'; gateLeftEl.onclick = null;
         // No runs — cert button stays hidden
         var certBtn = document.getElementById('s9-cert-btn');
@@ -3238,6 +3242,15 @@ async function _s9LoadCoverageData(templateId, version) {
   }
   if (!body) {
     console.warn('[S9 Coverage] s9-coverage-body not found in DOM');
+    return;
+  }
+  // No template selected — show empty state, not spinner
+  if (!templateId) {
+    body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;width:100%;padding:60px;text-align:center;gap:16px">' +
+      '<div style="font-size:48px;opacity:.15">◎</div>' +
+      '<div style="font-family:Arial,sans-serif;font-size:22px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.02em">Select a workflow to view coverage.</div>' +
+      '<div style="font-family:Arial,sans-serif;font-size:13px;color:rgba(255,255,255,.3);max-width:360px;line-height:1.7">Choose a workflow from the dropdown above to see routing paths, coverage status, and test scripts.</div>' +
+      '</div>';
     return;
   }
   body.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;' +
