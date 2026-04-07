@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260407-SE30','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260407-SE31','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -1265,9 +1265,14 @@ async function seDeleteScriptConfirm() {
   _seDirty = false;
   if (tmplId && typeof seOpenEditor === 'function') {
     await seOpenEditor(tmplId, editorElId, null);
-    // After reload, deselect to show empty state (don't auto-jump to first script)
+    // After reload, deselect to show empty state
     _seSelectedId = null;
     seRenderEditor();
+  }
+  // Refresh the left pane script list (rendered independently by _s9LoadSimScripts)
+  if (tmplId && typeof _s9LoadSimScripts === 'function') {
+    var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+    _s9LoadSimScripts(tmplId, tmpl ? (tmpl.version || '0.0.0') : '0.0.0');
   }
 }
 
@@ -1677,5 +1682,5 @@ window.seShowRunHistory = function seShowRunHistory() {
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260407-SE30 — Assertion rows: 3-column label|path|eq-value per mockup',
+console.log('%c[cdn-script-editor] v20260407-SE31 — Assertion rows: 3-column label|path|eq-value per mockup',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
