@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV2
+// cdn-coverage.js  ·  v20260407-CV3
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV2 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV3 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -29,14 +29,14 @@ console.log('%c[cdn-coverage] v20260407-CV2 — live DAG coverage','background:#
     '.cv-sidebar::-webkit-scrollbar{width:3px}',
     '.cv-sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}',
     '.cv-sb-sect{padding:12px;border-bottom:1px solid #1e2535}',
-    '.cv-sb-lbl{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5fd4c8;margin-bottom:10px}',
+    '.cv-sb-lbl{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5fd4c8;margin-bottom:10px}',
     '.cv-ring-wrap{display:flex;flex-direction:column;align-items:center;padding:4px 0 6px}',
-    '.cv-ring-lbl{font-size:10px;color:rgba(255,255,255,.35);margin-top:5px;text-align:center}',
+    '.cv-ring-lbl{font-size:11px;color:rgba(255,255,255,.35);margin-top:5px;text-align:center}',
     // Score bars
     '.cv-score-tip-wrap{position:relative;cursor:help;margin-bottom:9px}',
     '.cv-score-row{display:flex;justify-content:space-between;margin-bottom:3px}',
-    '.cv-score-row-label{font-size:11px;color:rgba(255,255,255,.55)}',
-    '.cv-score-row-val{font-size:11px;font-weight:700;font-family:"Courier New",monospace}',
+    '.cv-score-row-label{font-size:12px;color:rgba(255,255,255,.55)}',
+    '.cv-score-row-val{font-size:12px;font-weight:700;font-family:"Courier New",monospace}',
     '.cv-score-bar-wrap{height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}',
     '.cv-score-bar{height:100%;border-radius:2px;transition:width .5s}',
     '.cv-score-tip{display:none;position:fixed;z-index:9999;width:230px;background:#1a1f2e;border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:10px 12px;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.7);font-family:Arial,sans-serif}',
@@ -47,7 +47,7 @@ console.log('%c[cdn-coverage] v20260407-CV2 — live DAG coverage','background:#
     '.cv-str span:last-child{color:#fff;font-weight:700}',
     '.cv-stf{font-size:9px;color:rgba(255,255,255,.35);margin-top:6px;border-top:1px solid rgba(255,255,255,.06);padding-top:6px;line-height:1.5}',
     // Legend
-    '.cv-leg-item{display:flex;align-items:center;gap:8px;font-size:11px;color:rgba(255,255,255,.5);margin-bottom:5px}',
+    '.cv-leg-item{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,.5);margin-bottom:5px}',
     '.cv-leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}',
     '.cv-leg-count{margin-left:auto;font-family:"Courier New",monospace;font-weight:700}',
     // Scripts list
@@ -83,6 +83,7 @@ console.log('%c[cdn-coverage] v20260407-CV2 — live DAG coverage','background:#
     '.cv-dag-box.stale{background:#2a200a;border:1px solid #f5c842}',
     '.cv-dag-box.partial{background:#1a1a2e;border:1px solid #a78bfa}',
     '.cv-dag-box.uncovered{background:#5a1a1a;border:1px solid #e84040}',
+    '.cv-dag-box.scripted{background:#0d2340;border:1px solid #3b82f6}',
     '.cv-dag-box.trigger-node{background:#161b28;border:1px solid #252d3f}',
     '.cv-dag-box-type{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px;opacity:.8}',
     '.cv-dag-box-name{font-weight:700;color:#e2e8f0;font-size:11px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
@@ -99,6 +100,7 @@ console.log('%c[cdn-coverage] v20260407-CV2 — live DAG coverage','background:#
     '.cv-edge-arrow.stale{background:#f5c842}',
     '.cv-edge-arrow.stale::after{color:#f5c842}',
     '.cv-edge-arrow.uncovered{background:#e84040}',
+    '.cv-edge-arrow.scripted{background:#3b82f6}',
     '.cv-edge-arrow.uncovered::after{color:#e84040}',
     '.cv-edge-arrow.none{background:#252d3f}',
     '.cv-edge-arrow.none::after{color:#252d3f}',
@@ -157,7 +159,8 @@ function _cvColor(v){ return v>=80?'#3dd68c':v>=50?'#f5c842':'#e84040'; }
 // ── Status pill ───────────────────────────────────────────────────────────────
 function _cvPill(st){
   var cfg={covered:{cls:'cv-pill-covered',lbl:'Covered'},stale:{cls:'cv-pill-stale',lbl:'Stale'},
-    partial:{cls:'cv-pill-partial',lbl:'Partial'},uncovered:{cls:'cv-pill-uncovered',lbl:'Uncovered'}}[st]
+    partial:{cls:'cv-pill-partial',lbl:'Partial'},uncovered:{cls:'cv-pill-uncovered',lbl:'Uncovered'},
+    scripted:{cls:'cv-pill-stale',lbl:'Scripted — not run'}}[st]
     ||{cls:'cv-pill-uncovered',lbl:'Uncovered'};
   return '<span class="cv-pill '+cfg.cls+'"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block"></span>'+cfg.lbl+'</span>';
 }
@@ -204,7 +207,8 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
 
   // ── Script status ──
   function scriptStatus(sc){
-    var r = lastRunMap[sc.id]; if(!r) return 'uncovered';
+    var r = lastRunMap[sc.id];
+    if(!r) return 'scripted'; // has script, not yet run
     var days = (NOW-new Date(r.run_at).getTime())/86400000;
     if(days>STALE_DAYS) return 'stale';
     return (r.status==='passed') ? 'covered' : 'stale';
@@ -279,7 +283,10 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
 
   // Composite
   var composite = Math.round(pathScore*0.4 + stepScore*0.3 + assertScore*0.15 + freshScore*0.15);
+  // Path coverage is the primary headline — composite is secondary
+  var ringScore = pathScore; var ringLabel = 'Path Coverage';
   var compColor = _cvColor(composite);
+  var ringColor  = _cvColor(ringScore);
 
   // ── Stale check ──
   var staleScript = scripts.find(function(sc){ return scriptStatus(sc)==='stale'; });
@@ -339,6 +346,8 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       var status = pd.status;
       var lbl = status==='uncovered'
         ? '<span style="color:#e84040">&#x26A0; Uncovered &#x2014; '+_s9EscHtml(pathName(pd,pi))+'</span>'
+        : status==='scripted'
+        ? '<span style="color:#3b82f6">▶ Scripted, not yet run &#x2014; '+_s9EscHtml(pathName(pd,pi))+'</span>'
         : _s9EscHtml(pathName(pd,pi));
       var scriptName = pd.sc ? pd.sc.name : '';
 
@@ -368,7 +377,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
           connector(pd.path[pd.path.length-1].outcome||'', status)+
           '<div class="cv-dag-node">'+
             '<div class="cv-dag-box '+status+'" style="width:60px;text-align:center">'+
-              '<div class="cv-dag-box-name" style="font-size:10px">'+(status==='uncovered'?'? UNK':'&#x2713; END')+'</div>'+
+              '<div class="cv-dag-box-name" style="font-size:10px">'+(status==='uncovered'?'END':'&#x2713; END')+'</div>'+
             '</div>'+
           '</div>';
       } else if(pd._scriptFallback) {
@@ -393,6 +402,8 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
             '<span style="font-size:11px;color:#5fd4c8;cursor:pointer;text-decoration:underline" '+
               'onclick="_s9CovCreateScript(\''+_s9EscHtml(pathName(pd,pi))+'\','+pi+')">+ Create covering script &rarr;</span>'+
           '</div>'
+        : status==='scripted'
+        ? '<div style="margin-left:16px;font-size:11px;color:#3b82f6">▶ Run suite to verify this path</div>'
         : '';
 
       return '<div class="cv-path-section">'+
@@ -404,7 +415,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
 
   // ── Path list table ──
   function pathListHtml(){
-    if(!pathData.length) return '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:12px 16px">No paths enumerated.</div>';
+    if(!pathData.length) return '<div style="font-size:12px;color:rgba(255,255,255,.3);padding:12px 16px">No paths enumerated.</div>';
     return '<div class="cv-pl-hdr">'+
       '<div class="cv-pl-hc">Routing Path</div>'+
       '<div class="cv-pl-hc">Steps</div>'+
@@ -420,7 +431,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       var stpCt = spec&&Array.isArray(spec.steps)?spec.steps.length:(pd.path?pd.path.length:0);
       var assertCt = spec&&Array.isArray(spec.steps)?spec.steps.reduce(function(a,s){return a+(s.assertions||s.asserts||[]).length;},0):0;
       var lastRunStr = r ? _s9FmtCovDate(r.run_at) : 'Never';
-      var scName = sc ? (sc.name||'Unnamed') : '&#x2014;';
+      var scName = sc ? (sc.name||'Unnamed') : '—';
       var dotClr = pd.status==='covered'?'#3dd68c':pd.status==='stale'?'#f5c842':pd.status==='partial'?'#a78bfa':'#e84040';
       return '<div class="cv-pl-row"'+
         (sc?' onclick="_s9OpenScriptEditor(\''+sc.id+'\')"':'')+'>'+
@@ -431,7 +442,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
         '<div class="cv-pl-cell">'+stpCt+'</div>'+
         '<div class="cv-pl-cell">'+assertCt+'</div>'+
         '<div class="cv-pl-cell">'+lastRunStr+'</div>'+
-        '<div style="font-size:10px;color:#5fd4c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_s9EscHtml(scName)+'</div>'+
+        '<div style="font-size:12px;color:#5fd4c8;white-space:nowrap;min-width:160px">'+_s9EscHtml(scName)+'</div>'+
         '<div>'+_cvPill(pd.status)+'</div>'+
       '</div>';
     }).join('');
@@ -495,11 +506,11 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
             '<div style="position:relative;width:90px;height:90px">'+
               '<svg width="90" height="90" viewBox="0 0 90 90" style="transform:rotate(-90deg)">'+
                 '<circle cx="45" cy="45" r="38" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="7"/>'+
-                '<circle cx="45" cy="45" r="38" fill="none" stroke="'+compColor+'" stroke-width="7" stroke-dasharray="'+Math.round(composite*2.39)+' 239" stroke-linecap="round"/>'+
+                '<circle cx="45" cy="45" r="38" fill="none" stroke="'+ringColor+'" stroke-width="7" stroke-dasharray="'+Math.round(ringScore*2.39)+' 239" stroke-linecap="round"/>'+
               '</svg>'+
-              '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px;font-weight:700;color:'+compColor+';font-family:\'Courier New\',monospace">'+composite+'%</div>'+
+              '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px;font-weight:700;color:'+ringColor+';font-family:\'Courier New\',monospace">'+ringScore+'%</div>'+
             '</div>'+
-            '<div class="cv-ring-lbl">Composite Coverage</div>'+
+            '<div class="cv-ring-lbl">Path Coverage</div>'+
           '</div>'+
           '<div style="margin-top:10px">'+
             _cvScoreBar('Path coverage',pathScore,'Path Coverage',
