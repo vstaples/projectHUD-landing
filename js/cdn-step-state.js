@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-step-state.js  ·  v20260407-SS1
+// cdn-step-state.js  ·  v20260407-SS2
 // Shared step-state manager — consumed by both the cockpit (cdn-bist.js)
 // and the coverage inline runner (cdn-coverage.js).
 //
@@ -19,7 +19,7 @@
 //   CadenceStepState.cockpitAdapter()         — (stub) routes to cockpit fn
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-step-state] v20260407-SS1 — shared step state model','background:#1a4a2a;color:#3de08a;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-step-state] v20260407-SS2 — shared step state model','background:#1a4a2a;color:#3de08a;font-weight:700;padding:2px 8px;border-radius:3px');
 
 var CadenceStepState = (function() {
 
@@ -73,8 +73,15 @@ var CadenceStepState = (function() {
 
       setDone: function(seq, outcome) {
         setClass(seq, 'covered'); // green = passed
-        // Advance occurrence counter so next visit of same seq targets next node
         callCount[seq] = (callCount[seq] || 0) + 1;
+        // If this was the last node in the path, color the END box green too
+        if (dagRow && nodeSeqList.length && nodeSeqList[nodeSeqList.length-1] === seq) {
+          var allBoxes = dagRow.querySelectorAll('.cv-dag-box:not(.trigger-node)');
+          var endBox = allBoxes[allBoxes.length-1];
+          if (endBox && (endBox.className.includes('scripted') || endBox.className.includes('stale'))) {
+            endBox.className = endBox.className.replace(/scripted|stale/g,'').trim()+' covered';
+          }
+        }
       },
 
       setFailed: function(seq, reason) {
@@ -111,6 +118,16 @@ var CadenceStepState = (function() {
             .trim() + ' scripted';
         });
         callCount = {};
+      },
+
+      finalizeAll: function(passed) {
+        if (!dagRow) return;
+        var cls = passed ? 'covered' : 'uncovered';
+        dagRow.querySelectorAll('.cv-dag-box:not(.trigger-node)').forEach(function(b) {
+          if (b.className.indexOf('scripted') >= 0 || b.className.indexOf('stale') >= 0) {
+            b.className = b.className.replace(/\\bscripted\\b|\\bstale\\b/g, '').trim() + ' ' + cls;
+          }
+        });
       }
     };
   }
@@ -171,6 +188,7 @@ var CadenceStepState = (function() {
           var passed = result && result.status === 'passed';
           if (onLog) onLog(passed ? 'pass' : 'fail',
             passed ? '\u2713 All steps passed' : '\u2717 Script failed');
+          if (typeof adapter.finalizeAll === 'function') adapter.finalizeAll(passed);
           if (onComplete) onComplete(passed, result);
           return result;
         }).catch(function(err) {

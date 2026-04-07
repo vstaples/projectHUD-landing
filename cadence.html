@@ -2843,6 +2843,14 @@ window._s9OnSimComplete = function(allResults) {
   var allPass = results.length > 0 && results.every(function(r){ return r.status === 'passed'; });
   if (!allPass) return;
 
+  // Idempotency guard — prevent duplicate certs within 60 seconds
+  if (window._s9CertIssuingLock) {
+    console.warn('[S9] Cert issuance already in progress — skipping duplicate');
+    return;
+  }
+  window._s9CertIssuingLock = true;
+  setTimeout(function(){ window._s9CertIssuingLock = false; }, 60000);
+
   var now      = new Date();
   var certNum  = 'CERT-' + now.toISOString().replace(/[-:T]/g,'').slice(0,14) + '-' +
                  Math.floor(Math.random()*9000+1000);
@@ -2893,6 +2901,7 @@ window._s9OnSimComplete = function(allResults) {
     }).catch(function(e){ console.warn('[S9] CoC cert.issued write failed:', e); });
     var certRow = rows && rows[0];
     if (certRow && certRow.id) window._s9LastCertDbId = certRow.id;
+    window._s9CertIssuingLock = false;
     console.log('%c[S9] Certificate persisted -- ' + certNum + (certRow?' · DB:'+certRow.id.slice(0,8):''), 'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
   }).catch(function(e){ console.warn('[S9] bist_certificates write failed:', e); });
 };
@@ -4887,6 +4896,7 @@ function _s9DashBindEventMarkers() {
 
 function _s9GoToLibrary() { _s9Switch("library"); }
 function _s9LaunchSimulator() {
+  if (window._cvRunActive) { cadToast('Run already in progress', 'warn'); return; }
   var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
   if (!tmpl || !tmpl.id) {
     alert('No template selected. Please open a workflow in the Library first.');
@@ -4910,6 +4920,8 @@ async function _s9RunAllCoveragePaths() {
 
   var scripted = pathData.filter(function(pd){ return pd.sc; });
   if (!scripted.length) { cadToast('No scripted paths to run', 'warn'); return; }
+  // Capture template NOW — _selectedTmpl may change if user navigates away
+  var _runTmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
 
   // ── Build progress panel ─────────────────────────────────────────────────
   var existingPanel = document.getElementById('cv-runall-panel');
@@ -4979,6 +4991,7 @@ async function _s9RunAllCoveragePaths() {
   });
 
   // ── Run each scripted path sequentially ──────────────────────────────────
+  window._cvRunActive = true;
   window._cvRunAllCancelled = false;
   var passed = 0, failed = 0, ran = 0;
 
@@ -5022,6 +5035,7 @@ async function _s9RunAllCoveragePaths() {
   }
 
   // ── Completion ────────────────────────────────────────────────────────────
+  window._cvRunActive = false;
   var cancelled = window._cvRunAllCancelled;
   if (barEl) { barEl.style.width = '100%'; barEl.style.background = failed ? '#e84040' : '#3de08a'; }
   if (titleEl) titleEl.textContent = cancelled
@@ -5059,7 +5073,7 @@ async function _s9RunAllCoveragePaths() {
         // Fetch latest cert from DB so cert modal shows real data
         try {
           var firmId = await _s9WaitForFirmId();
-          var tmplId = _selectedTmpl && _selectedTmpl.id;
+          var tmplId = (_runTmpl && _runTmpl.id) || (_selectedTmpl && _selectedTmpl.id);
           if (firmId && tmplId) {
             var certs = await API.get(
               'bist_certificates?firm_id=eq.'+firmId+
@@ -5090,8 +5104,8 @@ async function _s9RunAllCoveragePaths() {
   }
 
   // Refresh coverage
-  if (!cancelled && typeof _s9LoadCoverageData === 'function' && _selectedTmpl) {
-    setTimeout(function(){ _s9LoadCoverageData(_selectedTmpl.id, _selectedTmpl.version||'0.0.0'); }, 1000);
+  if (!cancelled && typeof _s9LoadCoverageData === 'function' && _runTmpl) {
+    setTimeout(function(){ _s9LoadCoverageData(_runTmpl.id, _runTmpl.version||'0.0.0'); }, 1000);
   }
 }
 
