@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD23 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD24 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -378,95 +378,65 @@ function _cdHmDayTip(e, dateIso, st) {
   var panel = document.getElementById('cd-hm-day-tip');
   if (!panel) return;
 
-  // Get all runs for this date from _cdRuns (already loaded globally)
-  // Match by local date string — same method the heatmap dayMap uses
-  // Reconstruct local toDateString() key from dayIso (e.g. '2026-04-06')
-  var _isoP=dateIso.split('-');
-  var _refDate=new Date(parseInt(_isoP[0]),parseInt(_isoP[1])-1,parseInt(_isoP[2]));
-  var _refStr=_refDate.toDateString();
-  var _refStr  = _refDate.toDateString();
   var runs = (_cdRuns || []).filter(function(r) {
-    if (!r.run_at) return false;
-    return new Date(r.run_at).toDateString() === _refStr;
+    return r.run_at && new Date(r.run_at).toDateString() === dateIso;
   });
 
-  // Build scriptId→{tid,name} map from _cdHmScripts (always populated by _cdLoadAll)
   var sidMap = {};
-  var hmScripts = _cdHmScripts || {};
-  Object.keys(hmScripts).forEach(function(tid) {
-    (hmScripts[tid] || []).forEach(function(sc) { sidMap[sc.id] = { tid: tid, name: sc.name }; });
+  Object.keys(_cdHmScripts || {}).forEach(function(tid) {
+    (_cdHmScripts[tid] || []).forEach(function(sc) { sidMap[sc.id] = { tid: tid, name: sc.name }; });
   });
 
-  // Group runs by template using sidMap
   var byTmpl = {};
   runs.forEach(function(r) {
-    var sid = r.script_id;
-    var info = sidMap[sid];
-    if (!info) return;
-    var tid = info.tid;
-    if (!byTmpl[tid]) byTmpl[tid] = { runs: [] };
-    byTmpl[tid].runs.push(r);
+    var info = sidMap[r.script_id]; if (!info) return;
+    if (!byTmpl[info.tid]) byTmpl[info.tid] = { runs: [] };
+    byTmpl[info.tid].runs.push(r);
   });
 
-  var dateLabel = _refDate.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
-  var totalRuns = runs.length;
+  var tmpls = window._cdPortfolioTmpls || [];
   var totalPass = runs.filter(function(r){ return r.status==='passed'; }).length;
   var totalFail = runs.filter(function(r){ return r.status==='failed'; }).length;
-
+  var summaryClr = totalFail > 0 ? '#e84040' : '#3de08a';
   var rows = '';
-  var tmpls = window._cdPortfolioTmpls || [];
 
   Object.keys(byTmpl).forEach(function(tid) {
     var tmpl = tmpls.find(function(t){ return t.id===tid; });
     var tmplName = tmpl ? tmpl.name : 'Unknown workflow';
-    var tmplRuns = byTmpl[tid].runs;
-
-    rows += '<div style="padding:8px 12px;border-bottom:1px solid #1e2535">';
-    rows += '<div style="font-size:11px;font-weight:700;color:#e2e8f0;margin-bottom:5px">'+_cdEsc(tmplName)+'</div>';
-
-    // Per-script rows
-    tmplRuns.forEach(function(r) {
+    rows += '<div style="padding:8px 12px 4px;border-bottom:1px solid #1e2535">';
+    rows += '<div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:6px">'+_cdEsc(tmplName)+'</div>';
+    byTmpl[tid].runs.forEach(function(r) {
       var scName = (sidMap[r.script_id] && sidMap[r.script_id].name) ? sidMap[r.script_id].name : r.script_id;
-      var passed = r.steps_passed || 0;
-      var failed = r.steps_failed || 0;
-      var total  = passed + failed;
+      var passed = r.steps_passed || 0, failed = r.steps_failed || 0, total = passed + failed;
       var scoreStr = total > 0 ? (passed+'/'+total) : '—';
       var scoreClr = r.status==='passed' ? '#3de08a' : r.status==='failed' ? '#e84040' : '#f5a623';
-      var statusIcon = r.status==='passed' ? '✓' : r.status==='failed' ? '✗' : '○';
-      var timeStr = r.run_at ? new Date(r.run_at).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' }) : '—';
-      // Performed by — use coc_events lookup if available, else fall back to dim placeholder
-      var perfBy = (r.performed_by_name) ? r.performed_by_name : '—';
-      rows += '<div style="display:grid;grid-template-columns:1fr 52px 80px 60px;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)">';
-      rows += '<span style="font-size:10px;color:rgba(255,255,255,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(scName)+'</span>';
-      rows += '<span style="font-size:10px;font-weight:700;color:'+scoreClr+';font-family:monospace;text-align:center">'+statusIcon+' '+_cdEsc(scoreStr)+'</span>';
-      rows += '<span style="font-size:10px;color:rgba(255,255,255,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(perfBy)+'</span>';
-      rows += '<span style="font-size:10px;color:rgba(255,255,255,.3);font-family:monospace;white-space:nowrap">'+_cdEsc(timeStr)+'</span>';
+      var icon = r.status==='passed' ? '✓' : r.status==='failed' ? '✗' : '○';
+      var dt = r.run_at ? new Date(r.run_at) : null;
+      var dateStr = dt ? dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+      var timeStr = dt ? dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '—';
+      rows += '<div style="display:grid;grid-template-columns:1fr 64px 150px;align-items:center;gap:6px;padding:4px 0 4px 14px;border-bottom:1px solid rgba(255,255,255,.04)">';
+      rows += '<span style="font-size:11px;color:rgba(255,255,255,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(scName)+'</span>';
+      rows += '<span style="font-size:11px;font-weight:700;color:'+scoreClr+';font-family:monospace;text-align:right">'+_cdEsc(scoreStr)+' '+icon+'</span>';
+      rows += '<span style="font-size:11px;color:rgba(255,255,255,.3);font-family:monospace;white-space:nowrap;text-align:right">'+_cdEsc(dateStr+' '+timeStr)+'</span>';
       rows += '</div>';
     });
-
     rows += '</div>';
   });
 
-  if (!rows) {
-    rows = '<div style="padding:12px;font-size:10px;color:rgba(255,255,255,.35)">No run detail available</div>';
-  }
-
-  var summaryClr = totalFail > 0 ? '#e84040' : '#3de08a';
-  var summaryTxt = totalFail > 0 ? totalFail+' failing' : 'All passing';
+  if (!rows) rows = '<div style="padding:12px;font-size:11px;color:rgba(255,255,255,.35)">No run detail available</div>';
 
   panel.innerHTML =
-    '<div style="padding:8px 12px;border-bottom:1px solid #252d3f;display:flex;align-items:center;justify-content:space-between">' +
-      '<span style="font-size:11px;font-weight:700;color:#e2e8f0">'+_cdEsc(dateLabel)+'</span>' +
-      '<span style="font-size:10px;font-weight:700;color:'+summaryClr+'">'+_cdEsc(summaryTxt)+'</span>' +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 52px 80px 60px;gap:6px;padding:5px 12px;background:#0d1017;border-bottom:1px solid #1e2535">' +
-      '<span style="font-size:9px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase">Script</span>' +
-      '<span style="font-size:9px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase;text-align:center">Steps</span>' +
-      '<span style="font-size:9px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase">Performed by</span>' +
-      '<span style="font-size:9px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase">Time</span>' +
-    '</div>' +
-    rows +
-    '<div style="padding:6px 12px;background:#0d1017;font-size:9px;color:rgba(255,255,255,.3)">'+totalRuns+' run'+(totalRuns!==1?'s':'')+' · '+totalPass+' passed · '+totalFail+' failed</div>';
+    '<div style="padding:8px 12px;border-bottom:1px solid #252d3f;display:flex;align-items:center;justify-content:space-between">'+
+      '<span style="font-size:12px;font-weight:700;color:#e2e8f0">'+_cdEsc(dateIso)+'</span>'+
+      '<span style="font-size:11px;font-weight:700;color:'+summaryClr+'">'+(totalFail>0?totalFail+' failing':'All passing')+'</span>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 64px 150px;gap:6px;padding:5px 12px;background:#0d1017;border-bottom:1px solid #1e2535">'+
+      '<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase">Script</span>'+
+      '<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase;text-align:right">Steps</span>'+
+      '<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase;text-align:right">Date / Time</span>'+
+    '</div>'+
+    rows+
+    '<div style="padding:6px 12px;background:#0d1017;font-size:10px;color:rgba(255,255,255,.3)">'+runs.length+' run'+(runs.length!==1?'s':'')+' · '+totalPass+' passed · '+totalFail+' failed</div>';
 
   panel.style.display = 'block';
   _cdHmDayTipPos(e);
