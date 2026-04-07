@@ -147,6 +147,22 @@ async function _cvSyncPathsToDB(pathData, pathNames, steps, version) {
     var existingSigs = {};
     (existing||[]).forEach(function(r){ if(r._path_sig) existingSigs[r._path_sig] = true; });
 
+    // Delete stale DB paths whose sig is no longer in the current enumeration
+    var currentSigs = {};
+    pathData.forEach(function(pd){ if(pd.sig) currentSigs[pd.sig] = true; });
+    var staleSigs = Object.keys(existingSigs).filter(function(sig){ return !currentSigs[sig]; });
+    for (var si = 0; si < staleSigs.length; si++) {
+      await API.del(
+        'bist_coverage_paths?firm_id=eq.'+firmId+'&template_id=eq.'+templateId+'&_path_sig=eq.'+encodeURIComponent(staleSigs[si])
+      ).catch(function(){});
+    }
+    // Also delete no-sig legacy rows when current enumeration has sigs
+    if (pathData.some(function(pd){ return pd.sig; })) {
+      await API.del(
+        'bist_coverage_paths?firm_id=eq.'+firmId+'&template_id=eq.'+templateId+'&_path_sig=is.null'
+      ).catch(function(){});
+    }
+
     // Insert any paths not yet in DB
     var stepBySeq = {};
     (steps||[]).forEach(function(s){ stepBySeq[s.sequence_order||s.seq] = s; });
