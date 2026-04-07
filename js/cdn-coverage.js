@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV9
+// cdn-coverage.js  ·  v20260407-CV10
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV9 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV10 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -458,22 +458,59 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       return;
     }
 
+    // Add node IDs to DAG boxes so we can target them during run
+    var dagRow = document.getElementById('cv-dag-row-'+pathIdx);
+    if (dagRow) {
+      var boxes = dagRow.querySelectorAll('.cv-dag-box');
+      boxes.forEach(function(b, bi) {
+        if (!b.id) b.id = 'cv-dag-box-'+pathIdx+'-'+bi;
+      });
+    }
+
+    function setNodeColor(stepSeq, cls) {
+      if (!dagRow) return;
+      // Nodes are rendered in path order — seq maps to node index (skip trigger at 0)
+      var allBoxes = dagRow.querySelectorAll('.cv-dag-box:not(.trigger-node)');
+      // Find the box whose seq matches
+      allBoxes.forEach(function(b) {
+        var seqLabel = b.querySelector('.cv-dag-box-name');
+        // Match by step seq label embedded in the node subtitle
+        if (seqLabel && seqLabel.textContent && parseInt(b.dataset.seq) === stepSeq) {
+          b.className = b.className.replace(/scripted|covered|uncovered/g, '').trim() + ' ' + cls;
+        }
+      });
+      // Fallback: match by position (stepSeq-1 = index into non-trigger boxes)
+      if (stepSeq && allBoxes[stepSeq-1]) {
+        var tgt = allBoxes[stepSeq-1];
+        tgt.className = tgt.className.replace(/scripted|covered|uncovered/g, '').trim() + ' ' + cls;
+      }
+    }
+
     runBistScript(scriptId, function(ev) {
-      if (ev.type === 'step_start')  log('Step ' + ev.seq + ': ' + (ev.name||'') + '...');
-      if (ev.type === 'step_pass')   log('✓ Step ' + ev.seq + ' passed', '#3de08a');
-      if (ev.type === 'step_fail')   log('✗ Step ' + ev.seq + ' failed: ' + (ev.reason||''), '#e84040');
-      if (ev.type === 'assert_fail') log('  ✕ Assert failed: ' + (ev.check||''), '#f5a623');
+      if (ev.type === 'step_start') {
+        var lbl = ev.action === 'launch_instance' ? 'Launching instance...' : 'Step ' + (ev.stepSeq||ev.stepIdx) + ': running...';
+        log(lbl);
+        if (ev.stepSeq) setNodeColor(ev.stepSeq, 'stale'); // yellow = in progress
+      }
+      if (ev.type === 'step_pass') {
+        var lbl2 = ev.action === 'launch_instance' ? '✓ Instance launched' : '✓ Step ' + (ev.stepSeq||ev.stepIdx) + ' passed' + (ev.outcome ? ' (' + ev.outcome + ')' : '');
+        log(lbl2, '#3de08a');
+        if (ev.stepSeq) setNodeColor(ev.stepSeq, 'covered'); // green = passed
+      }
+      if (ev.type === 'step_fail') {
+        log('✗ Step ' + (ev.stepSeq||ev.stepIdx||'?') + ' failed: ' + (ev.reason||''), '#e84040');
+        if (ev.stepSeq) setNodeColor(ev.stepSeq, 'uncovered'); // red = failed
+      }
     }).then(function(result) {
       var passed = result && result.status === 'passed';
       var clr = passed ? '#3de08a' : '#e84040';
       var icon = passed ? '✓' : '✗';
       log(icon + ' ' + (passed ? 'All steps passed' : 'Script failed'), clr);
 
-      // Re-color DAG nodes for this path
-      var dagRow = document.getElementById('cv-dag-row-'+pathIdx);
+      // Re-color any remaining scripted nodes to final state
       if (dagRow) {
-        var boxes = dagRow.querySelectorAll('.cv-dag-box.scripted');
-        boxes.forEach(function(b) {
+        var remaining = dagRow.querySelectorAll('.cv-dag-box.scripted');
+        remaining.forEach(function(b) {
           b.classList.remove('scripted');
           b.classList.add(passed ? 'covered' : 'uncovered');
         });
