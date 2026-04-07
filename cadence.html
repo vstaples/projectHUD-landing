@@ -1015,7 +1015,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.79 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.80 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -2596,30 +2596,28 @@ function _s9CloseScriptEditor() {
 }
 
 function _s9ShowCert() {
-  // Ensure overlay exists at body level — not buried inside sim panel
-  var overlay = document.getElementById('s9-cert-overlay');
-  if (!overlay) {
-    // Create it fresh at body level
-    overlay = document.createElement('div');
-    overlay.id = 's9-cert-overlay';
-    overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(4,6,14,.88);z-index:9000;' +
-      'align-items:center;justify-content:center;backdrop-filter:blur(8px)';
-    overlay.onclick = function(e) { if (e.target === overlay) _s9HideCert(); };
-    var FA = 'font-family:Arial,sans-serif;';
-    overlay.innerHTML = '<div id="s9-cert-wrap" style="width:780px;max-width:95vw;max-height:90vh;overflow-y:auto;' +
-      'background:#faf8f2;border-radius:6px;box-shadow:0 40px 120px rgba(0,0,0,.8);position:relative">' +
-      '<button onclick="_s9HideCert()" style="position:absolute;top:12px;right:14px;background:none;border:none;' +
-        'color:rgba(200,180,120,.4);cursor:pointer;font-size:18px;z-index:10;line-height:1;' + FA + '">✕</button>' +
-      '<div style="position:absolute;inset:10px;border:1.5px solid rgba(160,120,40,.28);' +
-        'border-radius:3px;pointer-events:none;z-index:0"></div>' +
-      '<div id="s9-cert-body" style="position:relative;z-index:1">' +
-        '<div style="' + FA + 'font-size:12px;color:rgba(80,60,20,.5);padding:40px;text-align:center">' +
-          'Run the simulator to generate a certificate.' +
-        '</div>' +
+  // Always destroy and recreate at body level — prevents stale collapsed overlay bug
+  var _stale = document.getElementById('s9-cert-overlay');
+  if (_stale) _stale.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 's9-cert-overlay';
+  overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(4,6,14,.88);z-index:9000;' +
+    'align-items:center;justify-content:center;backdrop-filter:blur(8px)';
+  overlay.onclick = function(e) { if (e.target === overlay) _s9HideCert(); };
+  var FA = 'font-family:Arial,sans-serif;';
+  overlay.innerHTML = '<div id="s9-cert-wrap" style="width:780px;max-width:95vw;max-height:90vh;overflow-y:auto;' +
+    'background:#faf8f2;border-radius:6px;box-shadow:0 40px 120px rgba(0,0,0,.8);position:relative">' +
+    '<button onclick="_s9HideCert()" style="position:absolute;top:12px;right:14px;background:none;border:none;' +
+      'color:rgba(200,180,120,.4);cursor:pointer;font-size:18px;z-index:10;line-height:1;' + FA + '">✕</button>' +
+    '<div style="position:absolute;inset:10px;border:1.5px solid rgba(160,120,40,.28);' +
+      'border-radius:3px;pointer-events:none;z-index:0"></div>' +
+    '<div id="s9-cert-body" style="position:relative;z-index:1">' +
+      '<div style="' + FA + 'font-size:12px;color:rgba(80,60,20,.5);padding:40px;text-align:center">' +
+        'Run the simulator to generate a certificate.' +
       '</div>' +
-    '</div>';
-    document.body.appendChild(overlay);
-  }
+    '</div>' +
+  '</div>';
+  document.body.appendChild(overlay);
   overlay.style.display = 'flex';
   _s9RenderCertBody();
 }
