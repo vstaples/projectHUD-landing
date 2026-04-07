@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD40 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD41 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1286,7 +1286,7 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
         '<div style="grid-column:6;font-size:9pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px;color:'+covClrR1+'">'+covLblR1+'</div>'+
         '<div style="grid-column:7;display:flex;align-items:center;justify-content:flex-end;gap:6px">'+
           actBtns+
-          '<span class="cd-pill '+statusPillCls+'">'+statusLabel+'</span>'+
+          '<span class="cd-pill '+statusPillCls+'" style="cursor:pointer" onclick="event.stopPropagation();_cdPortShowCert(\''+t.id+'\',\''+statusCls+'\')" title="'+( statusCls===\'wf-cert\' ? \'View certificate\' : \'Certified badge — click to see why cert unavailable\')+'">'+statusLabel+'</span>'+
         '</div>'+
       '</div>'+
       '<div style="'+GRID+'">'+
@@ -1502,12 +1502,56 @@ function _cdPortWriteScripts(tmplId) {
     selectTemplate(tmplId).then(function(){ _s9Switch('library'); }).catch(function(){ _s9Switch('library'); });
   } else { _s9Switch('library'); }
 }
+async function _cdPortShowCert(tmplId, statusCls) {
+  if (statusCls !== 'wf-cert') {
+    var msgs = {
+      'wf-nocov':  'No coverage paths defined — define coverage paths first.',
+      'wf-uncov':  'No certificate issued — run all test scripts to certify.',
+      'wf-stale':  'Certificate exists but coverage is incomplete or expired — re-run the suite to renew.',
+      'wf-fail':   'Certificate invalidated — re-certify to issue a new one.',
+    };
+    if (typeof cadToast === 'function') cadToast(msgs[statusCls] || 'No valid certificate for this workflow.', 'warn');
+    return;
+  }
+  try {
+    var firmId = (typeof FIRM_ID_CAD !== 'undefined') ? FIRM_ID_CAD : null;
+    if (!firmId) return;
+    var certs = await API.get('bist_certificates?firm_id=eq.'+firmId+'&template_id=eq.'+tmplId+'&order=issued_at.desc&limit=1');
+    if (!certs || !certs[0]) {
+      if (typeof cadToast === 'function') cadToast('Certificate record not found in database.', 'warn');
+      return;
+    }
+    var cert = certs[0];
+    window._s9LastCertDbId = cert.id;
+    window._s9LastCertId   = cert.certificate_number || cert.id;
+    window._s9LastCertTs   = cert.issued_at;
+    // Build CertResults and CertRoutes from coverage paths
+    var covPaths = await API.get('bist_coverage_paths?firm_id=eq.'+firmId+'&template_id=eq.'+tmplId+'&select=path_name,coverage_status&order=created_at.asc');
+    window._s9CertResults = (covPaths||[]).map(function(cp) {
+      return { name: cp.path_name, status: cp.coverage_status === 'covered' ? 'passed' : 'failed' };
+    });
+    window._s9CertRoutes = (covPaths||[]).map(function(cp) {
+      return { from: cp.path_name, arrow: '→', desc: 'Coverage path verified via BIST', verified: cp.coverage_status === 'covered' };
+    });
+    // Load template name into simulator context so cert modal header is correct
+    var tmpls = (typeof window._cdPortfolioTmpls !== 'undefined') ? window._cdPortfolioTmpls : [];
+    var tmpl = tmpls.find(function(t){ return t.id === tmplId; });
+    if (tmpl && typeof _selectedTmpl !== 'undefined') {
+      window._selectedTmpl = tmpl;
+    }
+    if (typeof _s9ShowCert === 'function') _s9ShowCert();
+  } catch(e) {
+    if (typeof cadToast === 'function') cadToast('Could not load certificate: '+e.message, 'error');
+  }
+}
+
 window._cdPortToggle     = _cdPortToggle;
 window._cdPortExpand     = _cdPortExpand;
 window._cdPortRunSuite   = _cdPortRunSuite;
 window._cdPortRunScript  = _cdPortRunScript;
 window._cdPortWriteScripts = _cdPortWriteScripts;
-window._cdPortSimulate = _cdPortSimulate;
+window._cdPortSimulate   = _cdPortSimulate;
+window._cdPortShowCert   = _cdPortShowCert;
 
 // ── Request Queue
 
