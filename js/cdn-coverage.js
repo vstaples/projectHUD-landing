@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV15
+// cdn-coverage.js  ·  v20260407-CV16
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV15 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV16 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -582,31 +582,23 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
 
   // ── Reset a path back to scripted state for re-run ──────────────────────────
   window._cvResetPath = function(pathIdx, scriptId) {
-    // Reset DAG nodes back to scripted (blue)
+    // Reset DAG nodes to scripted (blue)
     var dagRow = document.getElementById('cv-dag-row-'+pathIdx);
     if (dagRow) {
       dagRow.querySelectorAll('.cv-dag-box:not(.trigger-node)').forEach(function(b){
-        b.className = b.className.replace(/covered|uncovered|stale/g,'').trim()+' scripted';
+        b.className = b.className.replace(/\bcovered\b|\buncovered\b|\bstale\b/g,'').trim()+' scripted';
       });
-      dagRow.querySelectorAll('.cv-edge-arrow:not(.trigger-node)').forEach(function(a){
-        a.className = a.className.replace(/covered|uncovered|stale/g,'').trim()+' scripted';
+      dagRow.querySelectorAll('.cv-edge-arrow').forEach(function(a){
+        a.className = a.className.replace(/\bcovered\b|\buncovered\b|\bstale\b/g,'').trim()+' scripted';
       });
     }
-    // Remove rerun btn and restore CTA
-    var rerunBtn = document.getElementById('cv-rerun-btn-'+pathIdx);
-    if (rerunBtn && rerunBtn.parentNode) rerunBtn.parentNode.removeChild(rerunBtn);
-    var cta = document.getElementById('cv-run-cta-'+pathIdx);
-    if (cta) {
-      cta.style.display = '';
-      cta.style.color = '#3b82f6';
-      cta.style.textDecoration = 'underline';
-      cta.style.cursor = 'pointer';
-      cta.innerHTML = '▶ Run coverage script to verify this path';
-      cta.onclick = function(){ window._cvRunPathScript(scriptId, pathIdx); };
-    }
-    // Remove any lingering overlay
+    // Remove rerun btn and overlay
+    var rb = document.getElementById('cv-rerun-btn-'+pathIdx);
+    if (rb && rb.parentNode) rb.parentNode.removeChild(rb);
     var ov = document.getElementById('cv-run-overlay-'+pathIdx);
     if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+    // Run immediately
+    window._cvRunPathScript(scriptId, pathIdx);
   };
 
   // ── Path list table ──
