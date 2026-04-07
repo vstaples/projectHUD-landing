@@ -54,6 +54,25 @@ async function renderFormFillPanel(inst, step) {
     _formRuntimeDefs[step.id]  = formDef;
     _formRuntimeResps[step.id] = existing;
 
+    // HTML form — render via iframe using signed URL
+    if (formDef.source_path && formDef.source_path.match(/\.html?$/i)) {
+      try {
+        let url;
+        try {
+          url = await _getSignedUrl(formDef.source_path);
+        } catch(e) {
+          url = `${SUPA_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${formDef.source_path}`;
+        }
+        el.innerHTML = `<div style="position:relative;width:100%;height:100%;min-height:600px">` +
+          `<iframe src="${url}" style="width:100%;height:100%;min-height:600px;border:none;border-radius:6px" ` +
+          `allow="same-origin" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>` +
+          `</div>`;
+      } catch(e) {
+        el.innerHTML = `<div style="font-size:11px;color:var(--red);padding:8px 0">Could not load form: ${escHtml(e.message)}</div>`;
+      }
+      return;
+    }
+
     // Determine which stage is active for this user
     const activeStage = _resolveActiveStage(formDef, inst, step);
 

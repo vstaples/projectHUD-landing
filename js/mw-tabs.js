@@ -938,6 +938,31 @@ function _myrRenderHistory() {
 // ── LAUNCH ────────────────────────────────────────────────────────────────────
 window.myrLaunchRequest = async function(type, templateId) {
   if (type === 'form') {
+    // Load form definition and render HTML form if source_path is an HTML file
+    try {
+      const firmId = _mwFirmId();
+      const formRows = await API.get(
+        `workflow_form_definitions?id=eq.${templateId}&firm_id=eq.${firmId}&select=id,source_name,source_path,version,state&limit=1`
+      ).catch(() => []);
+      const formDef = formRows?.[0];
+      if (formDef && formDef.source_path && formDef.source_path.match(/\.html?$/i)) {
+        // Fetch signed URL and open in overlay
+        let url;
+        try {
+          if (typeof _getSignedUrl === 'function') {
+            url = await _getSignedUrl(formDef.source_path);
+          } else {
+            const SUPA = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '';
+            const BKT  = typeof STORAGE_BUCKET !== 'undefined' ? STORAGE_BUCKET : 'form-assets';
+            url = `${SUPA}/storage/v1/object/public/${BKT}/${formDef.source_path}`;
+          }
+        } catch(e) { url = null; }
+        if (url) {
+          _myrOpenHtmlFormOverlay(formDef.source_name || 'Form', url);
+          return;
+        }
+      }
+    } catch(e) { console.warn('[myrLaunchRequest] form load error:', e); }
     compassToast('Form submission coming soon — build in progress.', 3000);
     return;
   }
@@ -1000,6 +1025,26 @@ window.myrLaunchRequest = async function(type, templateId) {
     compassToast('Launch failed — ' + (e.message||'check console'), 4000);
   }
 };
+
+function _myrOpenHtmlFormOverlay(title, url) {
+  var existing = document.getElementById('myr-html-form-overlay');
+  if (existing) existing.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'myr-html-form-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  overlay.innerHTML =
+    '<div style="width:90vw;max-width:1000px;height:90vh;background:var(--color-background-primary);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.6)">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:#00c9c9;flex-shrink:0">' +
+        '<span style="font-family:Arial,sans-serif;font-size:14px;font-weight:500;color:#003333">' + title + '</span>' +
+        '<button onclick="var o=document.getElementById(this.dataset.oid);if(o)o.remove();" data-oid="myr-html-form-overlay" ' +
+          'style="background:none;border:none;color:#003333;font-size:18px;cursor:pointer;line-height:1;padding:0 4px">✕</button>' +
+      '</div>' +
+      '<iframe src="' + url + '" style="flex:1;width:100%;border:none" ' +
+        'allow="same-origin" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>' +
+    '</div>';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
 
 function _myrLaunchModal(tmpl) {
   return new Promise(resolve => {
