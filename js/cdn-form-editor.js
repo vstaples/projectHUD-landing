@@ -1,5 +1,5 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-console.log('%c[cdn-form-editor] v20260403-A','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE33 8px;border-radius:3px');
 // VERSION: 20260401-230000
 console.log('%c[cdn-form-editor] v20260401-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
@@ -2265,8 +2265,31 @@ async function _formSelect(formId) {
       cadToast('Could not load document: ' + e.message, 'error');
     }
   } else {
-    console.warn('[formSelect] no source_path on form:', form.id);
-    cadToast('No document stored for this form', 'info');
+    // No PDF — render a blank A4 canvas so field-based forms display correctly
+    console.warn('[formSelect] no source_path on form:', form.id, '— rendering blank canvas');
+    const canvas  = document.getElementById('form-pdf-canvas');
+    const overlay = document.getElementById('form-field-overlay');
+    const W = Math.round(816 * (window._pdfScale || 1));  // 8.5in @ 96dpi
+    const H = Math.round(1056 * (window._pdfScale || 1)); // 11in @ 96dpi
+    if (canvas) {
+      canvas.width  = W; canvas.height = H;
+      canvas.style.width = W+'px'; canvas.style.height = H+'px';
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+      // Subtle grid lines for visual reference
+      ctx.strokeStyle = 'rgba(0,0,0,.04)';
+      ctx.lineWidth = 1;
+      for (var gx = 0; gx < W; gx += 48) { ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+      for (var gy = 0; gy < H; gy += 48) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
+    }
+    if (overlay) {
+      overlay.setAttribute('width', W+'px'); overlay.setAttribute('height', H+'px');
+      overlay.style.width = W+'px'; overlay.style.height = H+'px';
+    }
+    _pdfTotalPages = 1; _pdfPage = 1;
+    if (typeof _renderFieldOverlays === 'function') _renderFieldOverlays();
+    if (typeof _updatePageIndicator === 'function') _updatePageIndicator();
   }
 }
 
