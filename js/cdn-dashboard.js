@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD19 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD20 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -38,6 +38,7 @@ console.log('%c[cdn-dashboard] v20260407-CD19 — composite dashboard','backgrou
     + '.cd-wf.wf-fail{border-left:3px solid var(--cd-red)}\n'
     + '.cd-wf.wf-stale{border-left:3px solid var(--cd-amb)}\n'
     + '.cd-wf.wf-uncov{border-left:3px solid #4a5568}\n'
+    + '.cd-wf.wf-nocov{border-left:3px solid #2a3040}\n'
     + '.cd-wf.wf-cert{border-left:3px solid var(--cd-grn)}\n'
     + '.cd-wf-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}\n'
     + '.cd-wf-r1{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}\n'
@@ -234,6 +235,7 @@ function _cdRenderShell(panel){
         '<div class="cd-kpi wide" id="cd-hm-kpi-cell">'+
           '<div class="cd-hm-top"><div class="cd-kpi-lbl">Daily Suite Health</div><div style="font-size:9px;color:rgba(255,255,255,.35);font-family:monospace" id="cd-cert-age-lbl"></div></div>'+
           '<div class="cd-hm-grid" id="cd-hm-grid"></div>'+
+          '<div id="cd-hm-day-tip" style="display:none;position:fixed;z-index:9999;background:#131820;border:1px solid #252d3f;border-radius:5px;padding:0;width:420px;box-shadow:0 8px 28px rgba(0,0,0,.8);pointer-events:none;font-family:Arial,sans-serif"></div>'+
           '<div class="cd-hm-legend">'+
             '<div class="cd-hl-dot" style="background:var(--cd-grn)"></div><span class="cd-hl-lbl">Pass</span>'+
             '<div class="cd-hl-dot" style="background:var(--cd-amb);margin-left:4px"></div><span class="cd-hl-lbl">Partial</span>'+
@@ -368,6 +370,120 @@ async function _cdLoadAll(){
 }
 
 
+// ── Heatmap day tooltip ───────────────────────────────────────────────────────
+var _cdHmDayTipDate = null;
+function _cdHmDayTip(e, dateIso, st) {
+  if (st === 'n') return;
+  _cdHmDayTipDate = dateIso;
+  var panel = document.getElementById('cd-hm-day-tip');
+  if (!panel) return;
+
+  // Get all runs for this date from _cdRuns (already loaded globally)
+  var dayStart = new Date(dateIso + 'T00:00:00');
+  var dayEnd   = new Date(dateIso + 'T23:59:59');
+  var runs = (_cdRuns || []).filter(function(r) {
+    if (!r.run_at) return false;
+    var d = new Date(r.run_at);
+    return d >= dayStart && d <= dayEnd;
+  });
+
+  var d = window._cdPortData || {};
+  var scriptObjsByTmpl = d.scriptObjsByTmpl || {};
+  var tmplByScriptId   = d.tmplByScriptId   || {};
+
+  // Group runs by template
+  var byTmpl = {};
+  runs.forEach(function(r) {
+    var sid = r.script_id;
+    var tid = tmplByScriptId[sid];
+    if (!tid) return;
+    if (!byTmpl[tid]) byTmpl[tid] = { runs: [] };
+    byTmpl[tid].runs.push(r);
+  });
+
+  var dateLabel = dayStart.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  var totalRuns = runs.length;
+  var totalPass = runs.filter(function(r){ return r.status==='passed'; }).length;
+  var totalFail = runs.filter(function(r){ return r.status==='failed'; }).length;
+
+  var rows = '';
+  var tmpls = window._cdPortfolioTmpls || [];
+
+  Object.keys(byTmpl).forEach(function(tid) {
+    var tmpl = tmpls.find(function(t){ return t.id===tid; });
+    var tmplName = tmpl ? tmpl.name : 'Unknown workflow';
+    var scripts = scriptObjsByTmpl[tid] || [];
+    var tmplRuns = byTmpl[tid].runs;
+
+    rows += '<div style="padding:8px 12px;border-bottom:1px solid #1e2535">';
+    rows += '<div style="font-size:11px;font-weight:700;color:#e2e8f0;margin-bottom:5px">'+_cdEsc(tmplName)+'</div>';
+
+    // Per-script rows
+    tmplRuns.forEach(function(r) {
+      var sc = scripts.find(function(s){ return s.id===r.script_id; });
+      var scName = sc ? sc.name : r.script_id;
+      var passed = r.steps_passed || 0;
+      var failed = r.steps_failed || 0;
+      var total  = passed + failed;
+      var scoreStr = total > 0 ? (passed+'/'+total) : '—';
+      var scoreClr = r.status==='passed' ? '#3de08a' : r.status==='failed' ? '#e84040' : '#f5a623';
+      var statusIcon = r.status==='passed' ? '✓' : r.status==='failed' ? '✗' : '○';
+      var timeStr = r.run_at ? new Date(r.run_at).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' }) : '—';
+      // Performed by — use coc_events lookup if available, else fall back to dim placeholder
+      var perfBy = (r.performed_by_name) ? r.performed_by_name : '—';
+      rows += '<div style="display:grid;grid-template-columns:1fr 52px 80px 60px;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)">';
+      rows += '<span style="font-size:10px;color:rgba(255,255,255,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(scName)+'</span>';
+      rows += '<span style="font-size:10px;font-weight:700;color:'+scoreClr+';font-family:monospace;text-align:center">'+statusIcon+' '+_cdEsc(scoreStr)+'</span>';
+      rows += '<span style="font-size:10px;color:rgba(255,255,255,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_cdEsc(perfBy)+'</span>';
+      rows += '<span style="font-size:10px;color:rgba(255,255,255,.3);font-family:monospace;white-space:nowrap">'+_cdEsc(timeStr)+'</span>';
+      rows += '</div>';
+    });
+
+    rows += '</div>';
+  });
+
+  if (!rows) {
+    rows = '<div style="padding:12px;font-size:10px;color:rgba(255,255,255,.35)">No run detail available</div>';
+  }
+
+  var summaryClr = totalFail > 0 ? '#e84040' : '#3de08a';
+  var summaryTxt = totalFail > 0 ? totalFail+' failing' : 'All passing';
+
+  panel.innerHTML =
+    '<div style="padding:8px 12px;border-bottom:1px solid #252d3f;display:flex;align-items:center;justify-content:space-between">' +
+      '<span style="font-size:11px;font-weight:700;color:#e2e8f0">'+_cdEsc(dateLabel)+'</span>' +
+      '<span style="font-size:10px;font-weight:700;color:'+summaryClr+'">'+_cdEsc(summaryTxt)+'</span>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 52px 80px 60px;gap:6px;padding:5px 12px;background:#0d1017;border-bottom:1px solid #1e2535">' +
+      '<span style="font-size:9px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase">Script</span>' +
+      '<span style="font-size:9px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase;text-align:center">Steps</span>' +
+      '<span style="font-size:9px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase">Performed by</span>' +
+      '<span style="font-size:9px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.07em;text-transform:uppercase">Time</span>' +
+    '</div>' +
+    rows +
+    '<div style="padding:6px 12px;background:#0d1017;font-size:9px;color:rgba(255,255,255,.3)">'+totalRuns+' run'+(totalRuns!==1?'s':'')+' · '+totalPass+' passed · '+totalFail+' failed</div>';
+
+  panel.style.display = 'block';
+  _cdHmDayTipPos(e);
+}
+function _cdHmDayTipPos(e) {
+  var panel = document.getElementById('cd-hm-day-tip');
+  if (!panel || panel.style.display==='none') return;
+  var vw=window.innerWidth, vh=window.innerHeight;
+  var pw=panel.offsetWidth||420, ph=panel.offsetHeight||200;
+  var x=e.clientX-pw-14, y=e.clientY-10;
+  if (x<8) x=e.clientX+14;
+  if (y+ph>vh-8) y=vh-ph-8;
+  if (y<8) y=8;
+  panel.style.left=x+'px'; panel.style.top=y+'px';
+}
+function _cdHmDayTipHide() {
+  _cdHmDayTipDate=null;
+  var panel=document.getElementById('cd-hm-day-tip');
+  if (panel) panel.style.display='none';
+}
+document.addEventListener('mousemove', function(e){ if(_cdHmDayTipDate) _cdHmDayTipPos(e); });
+
 // ── Heatmap ───────────────────────────────────────────────────────────────────
 function _cdRenderHeatmap(runs){
   var grid=document.getElementById('cd-hm-grid');if(!grid)return;
@@ -412,7 +528,8 @@ function _cdRenderHeatmap(runs){
     html+='<div style="font-size:11px;color:rgba(255,255,255,.55);font-family:monospace;white-space:nowrap;margin-bottom:4px;font-weight:500">'+wk.dateStr+'</div>';
     // 5 day blocks (Mon top, Fri bottom)
     wk.days.forEach(function(day){
-      html+='<div style="width:18px;height:11px;border-radius:2px;background:'+clr[day.st]+'" title="'+day.title+'"></div>';
+      var dayIso=dd.toISOString().slice(0,10);
+      html+='<div style="width:18px;height:11px;border-radius:2px;background:'+clr[day.st]+';cursor:'+(day.st!=='n'?'pointer':'default')+'" onmouseenter="_cdHmDayTip(event,\"'+dayIso+'\",\"'+day.st+'\")" onmouseleave="_cdHmDayTipHide()"></div>';
     });
     html+='</div>';
   });
@@ -1033,33 +1150,29 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
 
     var statusCls, statusPillCls, statusLabel;
     statusLabel = 'Certified';
-    if (!cert || cert.status==='revoked') {
-      statusCls='wf-uncov'; statusPillCls='cd-pill-uncov';
+    // Gate 1: no coverage paths defined — cannot be certified regardless of cert record
+    if (tmplPaths.total === 0) {
+      statusCls='wf-nocov'; statusPillCls='cd-pill-cert-dim';
+    } else if (!cert || cert.status==='revoked') {
+      // Gate 2: paths exist but no valid cert
+      statusCls='wf-uncov'; statusPillCls='cd-pill-cert-dim';
     } else if (cert.status==='invalidated') {
-      statusCls='wf-fail'; statusPillCls='cd-pill-fail';
+      statusCls='wf-fail'; statusPillCls='cd-pill-cert-red';
+    } else if (tmplPaths.covered < tmplPaths.total) {
+      // Gate 3: cert exists but coverage is incomplete — treat as stale/partial
+      statusCls='wf-stale'; statusPillCls='cd-pill-cert-amb';
     } else {
       var age=_cdDaysAgo(cert.issued_at)||0;
-      if (age>30){ statusCls='wf-stale'; statusPillCls='cd-pill-stale'; }
-      else        { statusCls='wf-cert';  statusPillCls='cd-pill-cert'; }
-    }
-    // Override pill color: no scripts = white/dim, partial = amber, problem = red, clean = green
-    // Badge color: RED=problem, AMBER=partially tested, WHITE=no scripts/cert, GREEN=certified
-    if (statusCls==='wf-fail') {
-      statusPillCls='cd-pill-cert-red';   // cert invalid — problem
-    } else if (statusCls==='wf-uncov') {
-      statusPillCls='cd-pill-cert-dim';   // no cert — white/dim
-    } else if (failCt>0) {
-      statusPillCls='cd-pill-cert-amb';   // has cert but scripts failing — partial
-    } else if (statusCls==='wf-stale') {
-      statusPillCls='cd-pill-cert-amb';   // cert stale — partial/warning
-    } else {
-      statusPillCls='cd-pill-cert-grn';   // certified (with or without scripts)
+      if (age>30){ statusCls='wf-stale'; statusPillCls='cd-pill-cert-amb'; }
+      else        { statusCls='wf-cert';  statusPillCls= failCt>0 ? 'cd-pill-cert-amb' : 'cd-pill-cert-grn'; }
     }
 
     var suiteLine;
-    if (scriptCt) {
-      suiteLine = passCt+'/'+scriptCt+' Custom test scripts passing'+(failCt?' · '+failCt+' failing':'');
-    } else if (cert && (cert.status==='valid'||cert.status==='active'||(!cert.status.match(/invalidat|revok/)))) {
+    if (statusCls==='wf-nocov') {
+      suiteLine = 'Define coverage paths to enable certification';
+    } else if (scriptCt) {
+      suiteLine = passCt+'/'+scriptCt+' Custom test script'+(scriptCt!==1?'s':'')+' passing'+(failCt?' · '+failCt+' failing':'');
+    } else if (statusCls==='wf-cert' || statusCls==='wf-stale') {
       suiteLine = 'Certified — add custom test scripts';
     } else {
       suiteLine = 'No custom test scripts';
@@ -1080,6 +1193,9 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     if (statusCls==='wf-fail') {
       actBtns =
         '<button class="cd-wf-btn danger" data-tid="'+t.id+'" onclick="event.stopPropagation();_s9DashOpenSimulator(this.dataset.tid)">Re-certify</button>';
+    } else if (statusCls==='wf-nocov') {
+      actBtns =
+        '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortDefCoverage(this.dataset.tid)">Define coverage →</button>';
     } else if (statusCls==='wf-uncov') {
       actBtns =
         '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';

@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260406-BQ4 — cert-gated release · Supabase persist · cert invalidation on draft revert','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260407-BQ5 — coverage gate: paths must exist + 100% covered before cert issues','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // ── SE13 patches (2026-04-04) ───────────────────────────────────────────────
 // 1. Reverted SE12's step_route_back emission from explicit route branch.
 //    It fired before step_pass, resetting T2 cards to blue before they went green.
@@ -1652,6 +1652,25 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
   }
 
   if (allPass) {
+    // ── Certification gate: coverage paths must exist and be 100% covered ──
+    var covPaths = [];
+    try { covPaths = await API.get('bist_coverage_paths?firm_id=eq.'+FIRM_ID_CAD+'&template_id=eq.'+templateId+'&select=id,coverage_status') || []; } catch(e) { covPaths = []; }
+    var totalPaths  = covPaths.length;
+    var coveredPaths = covPaths.filter(function(p){ return p.coverage_status === 'covered'; }).length;
+    var covGatePassed = totalPaths > 0 && coveredPaths === totalPaths;
+
+    if (!covGatePassed) {
+      var gateMsg = totalPaths === 0
+        ? 'Tests passed but NO CERTIFICATE issued — no coverage paths defined. Define routing coverage paths in the Coverage tab before certification is possible.'
+        : 'Tests passed but NO CERTIFICATE issued — ' + (totalPaths - coveredPaths) + ' of ' + totalPaths + ' coverage paths are not yet exercised. All paths must be covered before a certificate can be issued.';
+      _bistCkAnnounce('ALL TESTS PASSED — COVERAGE GATE BLOCKED', true);
+      _bistCkRadio('ground', '✓ Flight recorder archived.');
+      await new Promise(r => setTimeout(r, 700));
+      _bistCkRadio('reject', 'TOWER: ' + gateMsg);
+      _bistCkShowFooter(false, onProceed);
+      return;
+    }
+
     _bistCkAnnounce('ALL TESTS PASSED — CLEARED FOR RELEASE', true);
     _bistCkRadio('ground', '✓ Flight recorder archived.');
     await new Promise(r => setTimeout(r, 700));
@@ -1669,8 +1688,8 @@ async function _bistLaunchCockpit(templateId, version, onProceed) {
       event_type: 'bist_certified',
       changed_by: _myResourceId || null,
       changed_by_name: authorName,
-      field_name: `BIST Suite — ${TESTS.length} tests`,
-      note: `All ${TESTS.length} validation tests passed — ${certId}`,
+      field_name: `BIST Suite — ${TESTS.length} tests (${coveredPaths}/${totalPaths} paths covered)`,
+      note: `All ${TESTS.length} validation tests passed, all ${totalPaths} coverage paths covered — ${certId}`,
       version_at: version, created_at: new Date().toISOString(),
     }).catch(()=>{});
 
