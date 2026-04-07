@@ -1015,7 +1015,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.74 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.76 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -1204,10 +1204,9 @@ function _s9RenderSimPanel(el) {
 
       // Right side buttons
       '<div style="margin-left:auto;display:flex;align-items:center;gap:7px">' +
-        '<button id="s9-cert-btn" onclick="_s9ShowCert()" style="' + FA + 'font-size:12px;font-weight:700;' +
-          'padding:4px 12px;border-radius:3px;border:1px solid rgba(40,212,192,.3);' +
-          'background:rgba(40,212,192,.08);color:#28d4c0;cursor:pointer;letter-spacing:.04em;' +
-          'display:none">⬡ Certificate</button>' +
+        '<button id="s9-cert-btn" onclick="if(window._s9LastCertTs){_s9ShowCert();}else{cadToast(\'Run All Tests to generate a certificate — individual script runs do not qualify.\',\'warn\');}" style="' + FA + 'font-size:12px;font-weight:700;' +
+          'padding:4px 12px;border-radius:3px;border:1px solid rgba(255,255,255,.15);' +
+          'background:rgba(255,255,255,.04);color:rgba(255,255,255,.3);cursor:default;letter-spacing:.04em">○ Certificate</button>' +
         '<button onclick="_s9LaunchSimulator()" style="' + FA + 'font-size:12px;font-weight:700;' +
           'padding:4px 14px;border-radius:3px;border:none;' +
           'background:#1D9E75;color:#fff;cursor:pointer;letter-spacing:.04em">' +
@@ -2541,6 +2540,18 @@ async function _s9OnTemplateSelect(templateId) {
     ).catch(function(){ return []; });
     tmplRow.steps = Array.isArray(steps) ? steps : [];
     window._selectedTmpl = tmplRow;
+    // Reset suite cert state when template changes
+    window._s9LastCertTs  = null;
+    window._s9LastCertId  = null;
+    window._s9CertResults = null;
+    var _certBtnReset = document.getElementById('s9-cert-btn');
+    if (_certBtnReset) {
+      _certBtnReset.style.borderColor = 'rgba(255,255,255,.15)';
+      _certBtnReset.style.background  = 'rgba(255,255,255,.04)';
+      _certBtnReset.style.color       = 'rgba(255,255,255,.3)';
+      _certBtnReset.style.cursor      = 'default';
+      _certBtnReset.textContent       = '○ Certificate';
+    }
   }
 
   // Sync Simulator source globals from whatever selectTemplate set
@@ -2621,10 +2632,11 @@ function _s9RenderCertBody() {
   var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
   var FA = 'font-family:Arial,sans-serif;';
   var now = new Date();
-  var dateStr = now.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
-  var timeStr = now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  var certId = 'CERT-' + now.toISOString().replace(/[-:T]/g,'').slice(0,14) + '-' +
-    Math.floor(Math.random()*9000+1000);
+  var certTs = window._s9LastCertTs ? new Date(window._s9LastCertTs) : now;
+  var dateStr = certTs.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  var timeStr = certTs.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var certId = window._s9LastCertId || ('CERT-' + now.toISOString().replace(/[-:T]/g,'').slice(0,14) + '-' +
+    Math.floor(Math.random()*9000+1000));
 
   // Collect results from _s9CertResults if available (set by launcher on completion)
   var results = window._s9CertResults || [];
@@ -2836,7 +2848,14 @@ function _s9RenderCertBody() {
 window._s9OnSimComplete = function(allResults) {
   window._s9CertResults = allResults || [];
   var btn = document.getElementById('s9-cert-btn');
-  if (btn) btn.style.display = '';
+  if (btn) {
+    btn.style.display = '';
+    btn.style.borderColor = 'rgba(40,212,192,.3)';
+    btn.style.background  = 'rgba(40,212,192,.08)';
+    btn.style.color       = '#28d4c0';
+    btn.style.cursor      = 'pointer';
+    btn.textContent       = '⬡ Certificate';
+  }
 
   // Persist only when all tests pass
   var results = allResults || [];
@@ -3124,9 +3143,16 @@ async function _s9LoadSimScripts(templateId, version) {
         gateEl.style.cursor = 'default'; gateEl.onclick = null;
         gateLeftEl.textContent = '✓ All tests passing — cleared for release';
         gateLeftEl.style.color = '#3de08a'; gateLeftEl.style.cursor = 'default'; gateLeftEl.onclick = null;
-        // All pass — show certificate button
+        // All pass — only show cert button if a suite-level cert was issued this session
         var certBtn = document.getElementById('s9-cert-btn');
-        if (certBtn) certBtn.style.display = '';
+        if (certBtn) {
+          var hasSuiteCert = !!(window._s9LastCertTs);
+          certBtn.style.display = hasSuiteCert ? '' : 'none';
+          certBtn.style.borderColor = hasSuiteCert ? 'rgba(40,212,192,.3)' : 'rgba(255,255,255,.15)';
+          certBtn.style.background  = hasSuiteCert ? 'rgba(40,212,192,.08)' : 'rgba(255,255,255,.04)';
+          certBtn.style.color       = hasSuiteCert ? '#28d4c0' : 'rgba(255,255,255,.3)';
+          certBtn.style.cursor      = hasSuiteCert ? 'pointer' : 'default';
+        }
       } else {
         // Failing — make gate clickable to open failing script
         var firstFailId = failingScripts.length ? failingScripts[0].id : null;
