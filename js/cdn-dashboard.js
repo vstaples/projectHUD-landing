@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD38 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD39 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1099,7 +1099,7 @@ async function _cdLoadPortfolio(firmId) {
       _cdQ('workflow_templates', { filters:[['firm_id','eq',firmId]], select:'id,name,version,status,updated_at,created_at' }),
       _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]], order:'issued_at.desc', select:'id,status,template_id,template_version,issued_at,expires_at' }),
       _cdQ('bist_test_scripts', { filters:[['firm_id','eq',firmId]], select:'id,template_id,name' }),
-      _cdQ('bist_coverage_paths', { filters:[['firm_id','eq',firmId]], select:'id,template_id,coverage_status' })
+      _cdQ('bist_coverage_paths', { filters:[['firm_id','eq',firmId]], select:'id,template_id,coverage_status,covering_script_id' })
     ]);
     var tmpls   = results[0] || [];
     var certs   = results[1] || [];
@@ -1146,9 +1146,10 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
   });
   var pathsByTmpl = {};
   paths.forEach(function(p){
-    if (!pathsByTmpl[p.template_id]) pathsByTmpl[p.template_id] = {total:0,covered:0};
+    if (!pathsByTmpl[p.template_id]) pathsByTmpl[p.template_id] = {total:0,covered:0,coveringScriptIds:{}};
     pathsByTmpl[p.template_id].total++;
     if (p.coverage_status==='covered') pathsByTmpl[p.template_id].covered++;
+    if (p.covering_script_id) pathsByTmpl[p.template_id].coveringScriptIds[p.covering_script_id] = true;
   });
 
   // Store full data on window for expand panel access
@@ -1220,11 +1221,28 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     if (statusCls==='wf-nocov') {
       suiteLine = 'Define coverage paths to enable certification';
     } else if (scriptCt) {
-      suiteLine = passCt+'/'+scriptCt+' Custom test script'+(scriptCt!==1?'s':'')+' passing'+(failCt?' · '+failCt+' failing':'');
+      var coveringIds = (tmplPaths.coveringScriptIds) || {};
+      var tmplScripts = scriptObjsByTmpl[t.id] || [];
+      var covScripts  = tmplScripts.filter(function(s){ return coveringIds[s.id]; });
+      var custScripts = tmplScripts.filter(function(s){ return !coveringIds[s.id]; });
+      var covRuns     = latestRuns.filter(function(r){ return coveringIds[r.script_id]; });
+      var custRuns    = latestRuns.filter(function(r){ return !coveringIds[r.script_id]; });
+      var covPass     = covRuns.filter(function(r){ return r.status==='passed'; }).length;
+      var covFail     = covRuns.filter(function(r){ return r.status==='failed'; }).length;
+      var custPass    = custRuns.filter(function(r){ return r.status==='passed'; }).length;
+      var custFail    = custRuns.filter(function(r){ return r.status==='failed'; }).length;
+      var parts = [];
+      if (covScripts.length > 0) {
+        parts.push(covPass+'/'+covScripts.length+' Coverage script'+(covScripts.length!==1?'s':'')+' passing'+(covFail?' · '+covFail+' failing':''));
+      }
+      if (custScripts.length > 0) {
+        parts.push(custPass+'/'+custScripts.length+' Custom script'+(custScripts.length!==1?'s':'')+' passing'+(custFail?' · '+custFail+' failing':''));
+      }
+      suiteLine = parts.join(' · ');
     } else if (statusCls==='wf-cert' || statusCls==='wf-stale') {
-      suiteLine = 'Certified — add custom test scripts';
+      suiteLine = 'Certified — add test scripts';
     } else {
-      suiteLine = 'No custom test scripts';
+      suiteLine = 'No test scripts';
     }
     var certDateLine = cert && cert.issued_at ? 'Cert issued '+_cdRelTime(cert.issued_at) : 'Never certified';
     var lastRun = tmplRuns[0];
