@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD16 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD17 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1079,8 +1079,7 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     var actBtns;
     if (statusCls==='wf-fail') {
       actBtns =
-        '<button class="cd-wf-btn danger" data-tid="'+t.id+'" onclick="event.stopPropagation();_s9DashOpenSimulator(this.dataset.tid)">Re-certify</button>'+
-        '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdConveneMrb(this.dataset.tid)">Convene MRB</button>';
+        '<button class="cd-wf-btn danger" data-tid="'+t.id+'" onclick="event.stopPropagation();_s9DashOpenSimulator(this.dataset.tid)">Re-certify</button>';
     } else if (statusCls==='wf-uncov') {
       actBtns =
         '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';
@@ -1103,17 +1102,17 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
           '<span class="cd-pill '+statusPillCls+'">'+statusLabel+'</span>'+
         '</div>'+
       '</div>'+
-      '<div style="display:flex;align-items:center;gap:0;margin-top:4px">'+
-        '<span style="font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;width:130px">v'+_cdEsc(t.version||'—')+' · '+_cdEsc(t.status||'draft')+'</span>'+
-        '<span style="color:rgba(255,255,255,.18);width:8px;text-align:center">|</span>'+
-        '<span style="font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;width:150px">'+_cdEsc(certDateLine)+'</span>'+
-        '<span style="color:rgba(255,255,255,.18);width:8px;text-align:center">|</span>'+
-        '<span style="font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;width:200px">'+_cdEsc(lastRunLine)+'</span>'+
-        '<div style="width:220px;flex-shrink:0;height:4px;background:#1e2535;border-radius:2px;overflow:hidden;cursor:help;margin-right:6px" onmouseenter="_cdCovTipShow(event,\''+t.id+'\')" onmouseleave="_cdCovTipHide()">'+
+      '<div style="display:flex;align-items:center;gap:0;margin-top:4px;overflow:hidden">'+
+        '<span style="font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;width:130px;flex-shrink:0">v'+_cdEsc(t.version||'—')+' · '+_cdEsc(t.status||'draft')+'</span>'+
+        '<span style="color:rgba(255,255,255,.18);width:8px;text-align:center;flex-shrink:0">|</span>'+
+        '<span style="font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;width:150px;flex-shrink:0">'+_cdEsc(certDateLine)+'</span>'+
+        '<span style="color:rgba(255,255,255,.18);width:8px;text-align:center;flex-shrink:0">|</span>'+
+        '<span style="font-size:11pt;color:rgba(255,255,255,.65);font-family:Arial,sans-serif;white-space:nowrap;width:200px;flex-shrink:0">'+_cdEsc(lastRunLine)+'</span>'+
+        '<span style="font-size:11pt;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;padding-right:8px">'+_cdEsc(suiteLine)+'</span>'+
+        '<div style="width:220px;flex-shrink:0;flex-grow:0;height:4px;background:#1e2535;border-radius:2px;overflow:hidden;cursor:help;margin-right:6px" onmouseenter="_cdCovTipShow(event,\''+t.id+'\')" onmouseleave="_cdCovTipHide()">'+
           '<div style="height:100%;width:'+(covPct||0)+'%;background:'+covClr+';border-radius:2px;transition:width .3s"></div>'+
         '</div>'+
-        '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:34px;text-align:right;flex-shrink:0;margin-right:8px">'+covLabel+'</span>'+
-        '<span style="font-size:11pt;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">'+_cdEsc(suiteLine)+'</span>'+
+        '<span style="font-size:11pt;font-weight:500;color:'+covClr+';font-family:var(--font-mono,monospace);white-space:nowrap;width:40px;text-align:right;flex-shrink:0">'+covLabel+'</span>'+
       '</div>'+
       '<div class="cd-wf-expand" id="cd-wf-exp-'+t.id+'" style="display:none"></div>'+
     '</div>';
