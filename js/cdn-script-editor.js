@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260407-SE27','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260407-SE28','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -1251,15 +1251,19 @@ function seDeleteScript() {
 async function seDeleteScriptConfirm() {
   var bar = document.getElementById('se-delete-confirm'); if (bar) bar.remove();
   var sc = _seGetSelected(); if (!sc) return;
+  var tmplId = _selectedTmpl && _selectedTmpl.id;
   await API.del('bist_test_scripts?id=eq.'+sc.id).catch(function(){});
-  _seScripts = _seScripts.filter(function(s){ return s.id !== sc.id; });
-  _seSelectedId   = _seScripts.length ? _seScripts[0].id : null;
-  _seSelectedStep = null;
-  _seDirty        = false;
-  seRenderEditor();
-  // Also refresh the scripts list panel in the simulator
-  if (typeof _s9RefreshScriptsList === 'function') _s9RefreshScriptsList();
   cadToast('Script deleted', 'info');
+  // Reload from DB — ensures left pane and memory stay in sync
+  if (tmplId && _seEditorEl && typeof seOpenEditor === 'function') {
+    await seOpenEditor(tmplId, _seEditorEl.id || 's9-script-editor-body', null);
+  } else {
+    _seScripts = _seScripts.filter(function(s){ return s.id !== sc.id; });
+    _seSelectedId   = _seScripts.length ? _seScripts[0].id : null;
+    _seSelectedStep = null;
+    _seDirty        = false;
+    seRenderEditor();
+  }
 }
 
 async function seRunScript() {
@@ -1668,5 +1672,5 @@ window.seShowRunHistory = function seShowRunHistory() {
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260407-SE27 — Assertion rows: 3-column label|path|eq-value per mockup',
+console.log('%c[cdn-script-editor] v20260407-SE28 — Assertion rows: 3-column label|path|eq-value per mockup',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
