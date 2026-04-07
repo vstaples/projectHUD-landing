@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD25 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD26 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -386,37 +386,40 @@ function _cdHmDayTip(e, dateIso, st) {
     (_cdHmScripts[tid] || []).forEach(function(sc) { sidMap[sc.id] = {tid:tid, name:sc.name}; });
   });
 
-  // Reconstruct cert state as-of this date for each template
   var refDate = new Date(dateIso); refDate.setHours(23,59,59,999);
-  var stateLabel = {g:'All certified',a:'Cert invalidated',r:'Cert revoked',n:'No cert'};
-  var stateClr   = {g:'#3de08a',a:'#f5a623',r:'#e84040',n:'rgba(255,255,255,.3)'};
+  var stateLabel = {g:'Certified',a:'Invalidated',r:'Revoked',n:'No cert'};
+  var stateClr   = {g:'#3de08a',  a:'#f5a623',   r:'#e84040',n:'rgba(255,255,255,.3)'};
 
-  var tmplIds = {};
-  certs.forEach(function(c){ tmplIds[c.template_id]=true; });
   var rows = '';
-  var totalValid=0, totalInvalid=0, totalRevoked=0;
+  var totalValid=0, totalInvalid=0, totalNoCert=0;
 
-  Object.keys(tmplIds).forEach(function(tid) {
-    var tmpl = tmpls.find(function(t){ return t.id===tid; });
-    var tmplName = tmpl ? tmpl.name : tid;
+  // Iterate ALL templates — not just those with certs
+  tmpls.forEach(function(tmpl) {
+    var tid = tmpl.id;
+    var tmplName = tmpl.name;
+
     var activeCert = certs.filter(function(c){
       return c.template_id===tid && new Date(c.issued_at)<=refDate;
     }).sort(function(a,b){ return new Date(b.issued_at)-new Date(a.issued_at); })[0];
-    if (!activeCert) return;
 
     var certSt, certAge, certVer;
-    var revokedAt = activeCert.revoked_at ? new Date(activeCert.revoked_at) : null;
-    if (activeCert.status==='invalidated' && revokedAt && revokedAt<=refDate) {
+    if (!activeCert) {
+      certSt='n'; certAge=''; certVer=''; totalNoCert++;
+    } else if (activeCert.status==='invalidated') {
+      // revoked_at is not reliably written — use status alone
       certSt='a'; totalInvalid++;
+      certAge = _cdRelTime(activeCert.issued_at);
+      certVer = activeCert.template_version || '—';
     } else if (activeCert.status==='revoked') {
-      certSt='r'; totalRevoked++;
+      certSt='r'; totalInvalid++;
+      certAge = _cdRelTime(activeCert.issued_at);
+      certVer = activeCert.template_version || '—';
     } else {
       certSt='g'; totalValid++;
+      certAge = _cdRelTime(activeCert.issued_at);
+      certVer = activeCert.template_version || '—';
     }
-    certAge = _cdRelTime(activeCert.issued_at);
-    certVer = activeCert.template_version || '—';
 
-    // Latest run for this template on or before this date (one row only)
     var latestRun = runs.filter(function(r){
       return sidMap[r.script_id] && sidMap[r.script_id].tid===tid && new Date(r.run_at)<=refDate;
     }).sort(function(a,b){ return new Date(b.run_at)-new Date(a.run_at); })[0];
@@ -432,12 +435,12 @@ function _cdHmDayTip(e, dateIso, st) {
     rows += '</div>';
     rows += '<div style="text-align:right">';
     rows += '<div style="font-size:10px;font-weight:700;color:'+stateClr[certSt]+'">'+stateLabel[certSt]+'</div>';
-    rows += '<div style="font-size:10px;color:rgba(255,255,255,.3);font-family:monospace">v'+_cdEsc(certVer)+' &middot; '+_cdEsc(certAge)+'</div>';
+    if (certVer) rows += '<div style="font-size:10px;color:rgba(255,255,255,.3);font-family:monospace">v'+_cdEsc(certVer)+' · '+_cdEsc(certAge)+'</div>';
     rows += '</div>';
     rows += '</div>';
   });
 
-  if (!rows) rows = '<div style="padding:12px;font-size:11px;color:rgba(255,255,255,.35)">No certification history for this date</div>';
+  if (!rows) rows = '<div style="padding:12px;font-size:11px;color:rgba(255,255,255,.35)">No portfolio data available</div>';
 
   var headerClr = st==='g'?'#3de08a':st==='a'?'#f5a623':'#e84040';
   var headerTxt = st==='g'?'All certified':st==='a'?'Cert invalidated':'Cert revoked';
@@ -449,7 +452,7 @@ function _cdHmDayTip(e, dateIso, st) {
     '</div>'+
     rows+
     '<div style="padding:6px 12px;background:#0d1017;font-size:10px;color:rgba(255,255,255,.3)">'+
-      totalValid+' valid · '+totalInvalid+' invalidated · '+totalRevoked+' revoked'+
+      totalValid+' certified · '+totalInvalid+' invalidated · '+totalNoCert+' uncertified'+
     '</div>';
 
   panel.style.display = 'block';
@@ -508,9 +511,7 @@ function _cdRenderHeatmap(runs){
         st='n';
       } else {
         // For each template that has any cert, find its state on this date
-        var tmplIds = {};
-        certs.forEach(function(c){ tmplIds[c.template_id]=true; });
-        var ids = Object.keys(tmplIds);
+        var ids = (window._cdPortfolioTmpls||[]).map(function(t){return t.id;});
         if(!ids.length){ st='n'; }
         else {
           var anyInvalid=false, anyRevoked=false, anyValid=false;
@@ -522,8 +523,7 @@ function _cdRenderHeatmap(runs){
             if(!activeCert) return; // no cert issued yet for this template by this date
             anyValid=true;
             if(activeCert.status==='invalidated'){
-              var revokedAt = activeCert.revoked_at ? new Date(activeCert.revoked_at) : null;
-              if(revokedAt && revokedAt<=dd) anyInvalid=true;
+              anyInvalid=true;
             } else if(activeCert.status==='revoked'){
               anyRevoked=true;
             }
