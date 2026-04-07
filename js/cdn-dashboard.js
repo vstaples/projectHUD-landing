@@ -529,7 +529,7 @@ function _cdRenderHeatmap(runs){
     // 5 day blocks (Mon top, Fri bottom)
     wk.days.forEach(function(day){
       var dayIso=dd.toISOString().slice(0,10);
-      html+='<div style="width:18px;height:11px;border-radius:2px;background:'+clr[day.st]+';cursor:'+(day.st!=='n'?'pointer':'default')+'" onmouseenter="_cdHmDayTip(event,\"'+dayIso+'\",\"'+day.st+'\")" onmouseleave="_cdHmDayTipHide()"></div>';
+      html+='<div style="width:18px;height:11px;border-radius:2px;background:'+clr[day.st]+';cursor:'+(day.st!=='n'?'pointer':'default')+'" onmouseenter="_cdHmDayTip(event,\''+dayIso+'\',\''+day.st+'\')" onmouseleave="_cdHmDayTipHide()"></div>';
     });
     html+='</div>';
   });
