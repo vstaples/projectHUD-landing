@@ -3931,15 +3931,20 @@ async function _s9CovCreateScript(pathName, pathIdx) {
 
   if (!row || !row[0]) return;
 
-  cadToast('Script created: ' + pathName, 'success');
+  // Show confirmation toast with action link — don't auto-switch
+  cadToast('Script created: “' + pathName + '” — open Scripts tab to review and run', 'success');
 
-  // Switch to Scripts tab and pre-select the new script
-  _s9SwitchSimSubTab('scripts');
+  // Pre-load the script editor in the background so it’s ready when user navigates
   setTimeout(function() {
     if (typeof seOpenEditor === 'function') {
       seOpenEditor(tmpl.id, 's9-scripts-body', row[0].id);
     }
-  }, 200);
+  }, 300);
+
+  // Refresh coverage tab after a moment so coverage score updates
+  setTimeout(function() {
+    if (typeof _s9RenderSimTab === 'function') _s9RenderSimTab();
+  }, 500);
 }
 
 function _s9CovDefaultOutcome(node, steps) {
