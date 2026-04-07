@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV14
+// cdn-coverage.js  ·  v20260407-CV15
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV14 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV15 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -246,8 +246,8 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
   // Expose pathData for _s9CovCreateScript
   window._cvLastPathData = pathData;
   window._cvLastSteps    = steps;
-  // Re-apply re-run buttons after re-render (paths completed this session)
-  setTimeout(function(){ _cvRestoreRerunButtons(); }, 50);
+  // Inject Re-run buttons on all paths that have a script (covered/stale/scripted)
+  setTimeout(function(){ _cvInjectAllRerunButtons(); }, 50);
 
   // ── Counts ──
   var covCt=0, staleCt=0, scriptedCt=0, uncovCt=0;
@@ -425,13 +425,12 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
   }
 
   // ── Inline path script runner ────────────────────────────────────────────────
-  // Session store: pathIdx → scriptId for completed runs
-  if (!window._cvCompletedRuns) window._cvCompletedRuns = {};
-
-  window._cvRestoreRerunButtons = function() {
-    Object.keys(window._cvCompletedRuns).forEach(function(pi) {
-      var sid = window._cvCompletedRuns[pi];
-      _cvInjectRerunBtn(pi, sid);
+  window._cvInjectAllRerunButtons = function() {
+    var pd = window._cvLastPathData || [];
+    pd.forEach(function(p, pi) {
+      if (p.sc && (p.status === 'covered' || p.status === 'stale' || p.status === 'scripted')) {
+        _cvInjectRerunBtn(pi, p.sc.id);
+      }
     });
   };
 
@@ -565,10 +564,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
 
       // Inject Re-run button to right of END block, hide CTA
       _cvInjectRerunBtn(pathIdx, scriptId);
-      // Store this completion so re-run button survives re-renders
-      if (!window._cvCompletedRuns) window._cvCompletedRuns = {};
-      window._cvCompletedRuns[pathIdx] = scriptId;
-      // Refresh coverage data so status pill updates
+      // Refresh coverage data so status pill updates (re-render will re-inject rerun buttons)
       if (typeof _s9LoadCoverageData === 'function' && typeof _selectedTmpl !== 'undefined' && _selectedTmpl) {
         setTimeout(function(){ _s9LoadCoverageData(_selectedTmpl.id, _selectedTmpl.version||'0.0.0'); }, 1000);
       }
@@ -586,8 +582,6 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
 
   // ── Reset a path back to scripted state for re-run ──────────────────────────
   window._cvResetPath = function(pathIdx, scriptId) {
-    // Remove from completed store so button clears
-    if (window._cvCompletedRuns) delete window._cvCompletedRuns[pathIdx];
     // Reset DAG nodes back to scripted (blue)
     var dagRow = document.getElementById('cv-dag-row-'+pathIdx);
     if (dagRow) {
