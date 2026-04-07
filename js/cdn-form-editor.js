@@ -1,5 +1,5 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-console.log('%c[cdn-form-editor] v20260407-SE33 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE34 8px;border-radius:3px');
 // VERSION: 20260401-230000
 console.log('%c[cdn-form-editor] v20260401-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
@@ -2288,6 +2288,17 @@ async function _formSelect(formId) {
       overlay.style.width = W+'px'; overlay.style.height = H+'px';
     }
     _pdfTotalPages = 1; _pdfPage = 1;
+    // Auto-layout fields that have no meaningful position (all at 0,0)
+    var MARGIN = 32, LABEL_H = 14, FIELD_H = 28, GAP = 12;
+    var FIELD_W = Math.round((W / _pdfScale) - MARGIN * 2);
+    var curY = MARGIN;
+    (_formFields || []).forEach(function(field) {
+      var r = field.rect || { x: 0, y: 0, w: 80, h: 18 };
+      if (r.x === 0 && r.y === 0) {
+        field.rect = { x: MARGIN, y: curY, w: FIELD_W, h: FIELD_H };
+        curY += FIELD_H + GAP;
+      }
+    });
     if (typeof _renderFieldOverlays === 'function') _renderFieldOverlays();
     if (typeof _updatePageIndicator === 'function') _updatePageIndicator();
   }
