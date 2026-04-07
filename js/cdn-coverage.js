@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV20
+// cdn-coverage.js  ·  v20260407-CV21
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV20 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV21 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -132,6 +132,50 @@ console.log('%c[cdn-coverage] v20260407-CV20 — live DAG coverage','background:
   document.head.appendChild(s);
 })();
 
+// ── Sync enumerated paths to bist_coverage_paths ─────────────────────────────
+async function _cvSyncPathsToDB(pathData, steps, version) {
+  try {
+    var firmId = await _s9WaitForFirmId();
+    var tmpl   = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+    if (!firmId || !tmpl || !tmpl.id) return;
+    var templateId = tmpl.id;
+
+    // Fetch existing path sigs for this template
+    var existing = await API.get(
+      'bist_coverage_paths?firm_id=eq.'+firmId+'&template_id=eq.'+templateId+'&select=_path_sig'
+    ).catch(function(){ return []; });
+    var existingSigs = {};
+    (existing||[]).forEach(function(r){ if(r._path_sig) existingSigs[r._path_sig] = true; });
+
+    // Insert any paths not yet in DB
+    var stepBySeq = {};
+    (steps||[]).forEach(function(s){ stepBySeq[s.sequence_order||s.seq] = s; });
+
+    for (var i = 0; i < pathData.length; i++) {
+      var pd = pathData[i];
+      if (!pd.sig || existingSigs[pd.sig]) continue;
+      var stepSeq = (pd.path||[]).map(function(n){
+        var s = stepBySeq[n.seq];
+        return (s ? s.name : ('Step '+n.seq)) + (n.outcome ? '→'+n.outcome : '');
+      });
+      await API.post('bist_coverage_paths', {
+        firm_id:          firmId,
+        template_id:      templateId,
+        template_version: version || tmpl.version || '0.0.0',
+        path_name:        pathName(pd, i),
+        step_sequence:    stepSeq,
+        coverage_status:  pd.status === 'covered' ? 'covered' : pd.status === 'stale' ? 'stale' : 'uncovered',
+        covering_script_id: pd.sc ? pd.sc.id : null,
+        _path_sig:        pd.sig,
+        created_at:       new Date().toISOString()
+      }).catch(function(){});
+      existingSigs[pd.sig] = true;
+    }
+  } catch(e) {
+    console.warn('[CV] _cvSyncPathsToDB failed:', e);
+  }
+}
+
 // ── Path signature (mirrors cdn-script-generator.js) ─────────────────────────
 function _cvPathSig(path) {
   return path.map(function(n){ return n.seq+':'+n.outcome; }).join('|');
@@ -246,6 +290,8 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
   // Expose pathData for _s9CovCreateScript
   window._cvLastPathData = pathData;
   window._cvLastSteps    = steps;
+  // Upsert enumerated paths to bist_coverage_paths (async, non-blocking)
+  _cvSyncPathsToDB(pathData, steps, version);
   // Inject Re-run buttons only when no run is active
   setTimeout(function(){
     if (!window._cvRunActive) _cvInjectAllRerunButtons();
@@ -493,9 +539,6 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
     var runner  = CadenceStepState.createRunner(scriptId, adapter);
 
     runner.run(log, function(passed, result) {
-      // Update overlay
-      var clr = passed ? '#3de08a' : '#e84040';
-      var icon = passed ? '✓' : '✗';
       if (cta) cta.style.opacity = '1';
       // Auto-close overlay after 2s
       setTimeout(function() {
@@ -503,7 +546,21 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       }, 2000);
       // Inject Re-run button
       _cvInjectRerunBtn(pathIdx, scriptId);
-      // Refresh coverage status pills
+      // Update coverage_status in DB if passed
+      if (passed) {
+        var pd3 = window._cvLastPathData && window._cvLastPathData[pathIdx];
+        if (pd3 && pd3.sig) {
+          _s9WaitForFirmId().then(function(firmId){
+            var tmpl3 = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+            if (!firmId || !tmpl3) return;
+            API.patch(
+              'bist_coverage_paths?firm_id=eq.'+firmId+'&template_id=eq.'+tmpl3.id+'&_path_sig=eq.'+pd3.sig,
+              { coverage_status: 'covered', covering_script_id: scriptId, last_run_at: new Date().toISOString() }
+            ).catch(function(){});
+          });
+        }
+      }
+      // Refresh coverage status pills and dashboard
       if (typeof _s9LoadCoverageData === 'function' && typeof _selectedTmpl !== 'undefined' && _selectedTmpl) {
         setTimeout(function(){ _s9LoadCoverageData(_selectedTmpl.id, _selectedTmpl.version||'0.0.0'); }, 1000);
       }
