@@ -4892,10 +4892,62 @@ function _s9LaunchSimulator() {
     alert('No template selected. Please open a workflow in the Library first.');
     return;
   }
+  // On Coverage tab: run all coverage paths sequentially
+  if (window._s9SimSubTab === 'coverage' && typeof CadenceStepState !== 'undefined') {
+    _s9RunAllCoveragePaths();
+    return;
+  }
   if (typeof _bistLaunchCockpit === 'function') {
     _bistLaunchCockpit(tmpl.id, tmpl.version || '0.0.0', null);
   } else {
     alert('Simulator engine not loaded. Please refresh and try again.');
+  }
+}
+
+async function _s9RunAllCoveragePaths() {
+  var pathData = window._cvLastPathData || [];
+  if (!pathData.length) { cadToast('No coverage paths loaded', 'warn'); return; }
+
+  // Reset all scripted paths to blue
+  pathData.forEach(function(pd, pi) {
+    if (!pd.sc) return;
+    var dagRow = document.getElementById('cv-dag-row-'+pi);
+    if (dagRow) {
+      dagRow.querySelectorAll('.cv-dag-box:not(.trigger-node)').forEach(function(b){
+        b.className = b.className.replace(/covered|uncovered|stale/g,'').trim()+' scripted';
+      });
+    }
+    var rb = document.getElementById('cv-rerun-btn-'+pi);
+    if (rb && rb.parentNode) rb.parentNode.removeChild(rb);
+    var ov = document.getElementById('cv-run-overlay-'+pi);
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  });
+
+  // Run each scripted path sequentially
+  var passed = 0, failed = 0;
+  for (var i = 0; i < pathData.length; i++) {
+    var pd = pathData[i];
+    if (!pd.sc) continue;
+    await new Promise(function(resolve) {
+      var idx = i;
+      var adapter = CadenceStepState.coverageAdapter(idx);
+      var runner  = CadenceStepState.createRunner(pd.sc.id, adapter);
+      runner.run(null, function(ok) {
+        if (ok) passed++; else failed++;
+        if (typeof window._cvInjectRerunBtn === 'function') {
+          window._cvInjectRerunBtn(idx, pd.sc.id);
+        }
+        resolve();
+      });
+    });
+  }
+
+  // Toast summary
+  cadToast(passed+' passed · '+failed+' failed', failed ? 'error' : 'success');
+
+  // Refresh coverage
+  if (typeof _s9LoadCoverageData === 'function' && _selectedTmpl) {
+    setTimeout(function(){ _s9LoadCoverageData(_selectedTmpl.id, _selectedTmpl.version||'0.0.0'); }, 1000);
   }
 }
 
@@ -5050,7 +5102,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-conformance.js?v=20260406-CF2"></script>
 <script src="/js/cdn-script-generator.js?v=20260406-SG1"></script>
 <script src="/js/cdn-step-state.js?v=20260407-SS1"></script>
-<script src="/js/cdn-coverage.js?v=20260407-CV23"></script>
+<script src="/js/cdn-coverage.js?v=20260407-CV25"></script>
 <script src="/js/cdn-script-editor.js?v=20260407-SE31"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>

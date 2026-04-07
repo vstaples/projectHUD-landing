@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV23
+// cdn-coverage.js  ·  v20260407-CV25
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV23 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV25 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -317,20 +317,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
   // Run coverage: % of paths with a PASSING run (covered only)
   var runScore = Math.round(covCt / totalPaths * 100);
 
-  // Assertion density: avg assertions per step across all scripts
-  var totalAsserts=0, totalSlots=0;
-  var touchedSeqs = {};
-  scripts.forEach(function(sc){
-    var spec=null; try{spec=typeof sc.script==='string'?JSON.parse(sc.script):sc.script;}catch(e){}
-    if(!spec) return;
-    (spec.steps||[]).forEach(function(s){
-      if(s.action==='complete_step'&&s.params&&s.params.step_seq!=null) touchedSeqs[s.params.step_seq]=true;
-      if(s.action==='launch_instance') return; // exclude infrastructure step from density
-      totalSlots++;
-      totalAsserts+=(s.assertions||s.asserts||[]).length;
-    });
-  });
-  var assertScore = totalSlots ? Math.min(100,Math.round(totalAsserts/totalSlots*50)) : 0;
+
 
   // Freshness: % of scripted paths run within stale window
   var freshScore = scriptedPaths ? Math.round((covCt+staleCt*0.5)/scriptedPaths*100) : 0;
@@ -484,7 +471,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
     });
   };
 
-  function _cvInjectRerunBtn(pi, sid) {
+  window._cvInjectRerunBtn = function _cvInjectRerunBtn(pi, sid) {
     // Remove existing rerun btn if present
     var existing = document.getElementById('cv-rerun-btn-'+pi);
     if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
@@ -501,7 +488,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       '<span style="font-size:11px;color:#3b82f6;cursor:pointer;text-decoration:underline" '+
       'onclick="_cvResetPath('+pi+',\''+sid+'\')">&#x21ba; Re-run</span>';
     dagRow.appendChild(btn);
-  }
+  };
 
   window._cvRunPathScript = function(scriptId, pathIdx) {
     var sec = document.getElementById('cv-path-sec-'+pathIdx);
@@ -698,10 +685,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
               [['Total paths',totalPaths],['Paths with passing run',covCt],['Scripted not run',scriptedCt],['Stale (>'+STALE_DAYS+'d)',staleCt]],
               'paths with passing run ÷ total paths',
               covCt+' ÷ '+totalPaths+' = '+runScore+'%')+
-            _cvScoreBar('Assertion density',assertScore,'Assertion Density',
-              [['Step actions across scripts',totalSlots],['Total assertions',totalAsserts],['Avg per step',(totalSlots?Math.round(totalAsserts/totalSlots*10)/10:0)],['Target avg per step','2.0'],['To reach 100%',Math.max(0,totalSlots*2-totalAsserts)+' more assertions needed']],
-              'Target: 2 assertions per step — open each script in Scripts tab and add assertions to step actions to improve this score.',
-              totalAsserts+' ÷ '+totalSlots+' × 50 = '+assertScore+'% (capped at 100%)')+
+
             _cvScoreBar('Freshness',freshScore,'Freshness',
               [['Scripted paths',scriptedPaths],['Passing runs',covCt],['Stale (>'+STALE_DAYS+'d)',staleCt],['Never run',scriptedCt]],
               '(passing + 0.5×stale) ÷ scripted paths',
