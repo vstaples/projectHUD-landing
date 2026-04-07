@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV4
+// cdn-coverage.js  ·  v20260407-CV6
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV4 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV6 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -248,44 +248,43 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
   window._cvLastSteps    = steps;
 
   // ── Counts ──
-  var covCt=0, staleCt=0, partialCt=0, uncovCt=0;
+  var covCt=0, staleCt=0, scriptedCt=0, uncovCt=0;
   pathData.forEach(function(p){
-    if(p.status==='covered')   covCt++;
+    if(p.status==='covered')      covCt++;
     else if(p.status==='stale')   staleCt++;
-    else if(p.status==='partial') partialCt++;
+    else if(p.status==='scripted') scriptedCt++;
     else uncovCt++;
   });
-  var totalPaths = pathData.length || scripts.length || 1;
+  var totalPaths = pathData.length || 1;
 
   // ── Scores ──
-  var pathScore = Math.round((covCt + staleCt*0.5 + partialCt*0.25) / totalPaths * 100);
+  // Path coverage: % of paths that have ANY script (scripted + covered + stale)
+  var scriptedPaths = covCt + staleCt + scriptedCt;
+  var pathScore = Math.round(scriptedPaths / totalPaths * 100);
 
-  // Step coverage: unique steps touched across all scripts
+  // Run coverage: % of paths with a PASSING run (covered only)
+  var runScore = Math.round(covCt / totalPaths * 100);
+
+  // Assertion density: avg assertions per step across all scripts
+  var totalAsserts=0, totalSlots=0;
   var touchedSeqs = {};
   scripts.forEach(function(sc){
     var spec=null; try{spec=typeof sc.script==='string'?JSON.parse(sc.script):sc.script;}catch(e){}
     if(!spec) return;
-    (spec.steps||[]).forEach(function(s){ if(s.action==='complete_step'&&s.params&&s.params.step_seq!=null) touchedSeqs[s.params.step_seq]=true; });
-  });
-  var stepScore = steps.length ? Math.round(Object.keys(touchedSeqs).length/steps.length*100) : (scripts.length?100:0);
-
-  // Assertion density
-  var totalAsserts=0, totalSlots=0;
-  scripts.forEach(function(sc){
-    var spec=null; try{spec=typeof sc.script==='string'?JSON.parse(sc.script):sc.script;}catch(e){}
-    if(!spec) return;
-    (spec.steps||[]).forEach(function(s){ totalSlots++; totalAsserts+=(s.assertions||s.asserts||[]).length; });
+    (spec.steps||[]).forEach(function(s){
+      if(s.action==='complete_step'&&s.params&&s.params.step_seq!=null) touchedSeqs[s.params.step_seq]=true;
+      totalSlots++;
+      totalAsserts+=(s.assertions||s.asserts||[]).length;
+    });
   });
   var assertScore = totalSlots ? Math.min(100,Math.round(totalAsserts/totalSlots*50)) : 0;
 
-  // Freshness
-  var freshScore = totalPaths ? Math.round((covCt+staleCt*0.5)/totalPaths*100) : 0;
+  // Freshness: % of scripted paths run within stale window
+  var freshScore = scriptedPaths ? Math.round((covCt+staleCt*0.5)/scriptedPaths*100) : 0;
 
-  // Composite
-  var composite = Math.round(pathScore*0.4 + stepScore*0.3 + assertScore*0.15 + freshScore*0.15);
-  // Path coverage is the primary headline — composite is secondary
-  var ringScore = pathScore; var ringLabel = 'Path Coverage';
-  var compColor = _cvColor(composite);
+  // Ring shows path coverage (scripts exist) — most actionable for QA manager
+  var ringScore = pathScore;
+  var compColor = _cvColor(runScore);
   var ringColor  = _cvColor(ringScore);
 
   // ── Stale check ──
@@ -293,13 +292,15 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
 
   // ── DAG path name ──
   function pathName(pd, idx){
-    if(pd.sc) return pd.sc.name||('Script '+(idx+1));
+    var prefix = 'Path '+(idx+1)+': ';
+    if(pd.sc) return prefix+(pd.sc.name||('Script '+(idx+1)));
     if(pd.path&&pd.path.length){
       var resets = pd.path.filter(function(n){return n.requiresReset;}).length;
       var lastOut = pd.path[pd.path.length-1];
-      return resets>0 ? resets+' reset'+(resets>1?'s':'')+' — '+(lastOut&&lastOut.outcome||'') : 'Clean path — '+(lastOut&&lastOut.outcome||'');
+      var base = resets>0 ? resets+' reset'+(resets>1?'s':'')+' — '+(lastOut&&lastOut.outcome||'') : 'Clean path — '+(lastOut&&lastOut.outcome||'');
+      return prefix+base;
     }
-    return 'Path '+(idx+1);
+    return prefix;
   }
 
   // ── DAG node for a template step ──
@@ -514,21 +515,21 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
           '</div>'+
           '<div style="margin-top:10px">'+
             _cvScoreBar('Path coverage',pathScore,'Path Coverage',
-              [['Total paths',totalPaths],['Covered (passing)',covCt],['Covered (stale)',staleCt],['Uncovered',uncovCt]],
-              'covered + 0.5&#xd7;stale &#xf7; total paths<br>stale counts at 50% weight',
-              '('+(covCt)+' + '+(staleCt*0.5)+') &#xf7; '+totalPaths+' = '+pathScore+'%')+
-            _cvScoreBar('Step coverage',stepScore,'Step Coverage',
-              [['Total template steps',steps.length],['Steps touched &#x2265;1 script',Object.keys(touchedSeqs).length],['Steps with no coverage',steps.length-Object.keys(touchedSeqs).length]],
-              'steps touched &#xf7; total steps<br>any script touching a step counts',
-              Object.keys(touchedSeqs).length+' &#xf7; '+steps.length+' = '+stepScore+'%')+
+              [['Total paths',totalPaths],['Scripted (any run status)',scriptedPaths],['Passing runs',covCt],['No script yet',uncovCt]],
+              'paths with a script ÷ total paths',
+              scriptedPaths+' ÷ '+totalPaths+' = '+pathScore+'%')+
+            _cvScoreBar('Run coverage',runScore,'Run Coverage',
+              [['Total paths',totalPaths],['Paths with passing run',covCt],['Scripted not run',scriptedCt],['Stale (>'+STALE_DAYS+'d)',staleCt]],
+              'paths with passing run ÷ total paths',
+              covCt+' ÷ '+totalPaths+' = '+runScore+'%')+
             _cvScoreBar('Assertion density',assertScore,'Assertion Density',
-              [['Total step-script intersections',totalSlots],['Intersections with &#x2265;1 assertion',totalAsserts],['Avg assertions per step',(totalSlots?Math.round(totalAsserts/totalSlots*10)/10:0)]],
-              'asserted intersections &#xf7; total<br>target: &#x2265;2 assertions per step<br>score capped at 100%',
-              totalAsserts+' &#xf7; '+totalSlots+' = '+assertScore+'%')+
+              [['Step actions across scripts',totalSlots],['Total assertions',totalAsserts],['Avg per step',(totalSlots?Math.round(totalAsserts/totalSlots*10)/10:0)]],
+              'assertions ÷ step actions — score capped at 100%',
+              totalAsserts+' ÷ '+totalSlots+' = '+assertScore+'%')+
             _cvScoreBar('Freshness',freshScore,'Freshness',
-              [['Total scripts',scripts.length],['Run recently (passing)',covCt],['Stale (>'+STALE_DAYS+'d)',staleCt],['Stale threshold',STALE_DAYS+' days']],
-              '(passing + 0.5&#xd7;stale) &#xf7; total<br>stale scripts decay at 50% weight',
-              '('+(covCt)+' + '+(staleCt*0.5)+') &#xf7; '+scripts.length+' = '+freshScore+'%')+
+              [['Scripted paths',scriptedPaths],['Passing runs',covCt],['Stale (>'+STALE_DAYS+'d)',staleCt],['Never run',scriptedCt]],
+              '(passing + 0.5×stale) ÷ scripted paths',
+              '('+(covCt)+' + '+(staleCt*0.5)+') ÷ '+scriptedPaths+' = '+freshScore+'%')+
           '</div>'+
         '</div>'+
 
