@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV10
+// cdn-coverage.js  ·  v20260407-CV11
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV10 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV11 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -427,16 +427,19 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
     var sec = document.getElementById('cv-path-sec-'+pathIdx);
     if (!sec) return;
     var cta = document.getElementById('cv-run-cta-'+pathIdx);
+    // Look up path name from coverage data
+    var pd2 = window._cvLastPathData && window._cvLastPathData[pathIdx];
+    var displayName = pd2 ? (pd2.sc ? pd2.sc.name : ('Path '+(pathIdx+1)+': '+(pd2.path&&pd2.path.length?(pd2.path.filter(function(n){return n.requiresReset;}).length>0?pd2.path.filter(function(n){return n.requiresReset;}).length+' reset — '+(pd2.path[pd2.path.length-1].outcome||''):'Clean path — '+(pd2.path[pd2.path.length-1].outcome||'')):''))) : ('Path '+(pathIdx+1));
 
-    // Show inline progress overlay
+    // Show inline progress overlay — grows vertically with content
     var overlay = document.createElement('div');
     overlay.id = 'cv-run-overlay-'+pathIdx;
-    overlay.style.cssText = 'position:absolute;background:rgba(13,16,23,.92);border:1px solid #252d3f;'+
+    overlay.style.cssText = 'position:absolute;background:rgba(13,16,23,.95);border:1px solid #3b82f6;'+
       'border-radius:5px;padding:12px 16px;font-family:Arial,sans-serif;font-size:11px;'+
-      'color:rgba(255,255,255,.7);z-index:100;min-width:280px;max-width:400px;'+
-      'box-shadow:0 8px 28px rgba(0,0,0,.7)';
-    overlay.innerHTML = '<div style="font-weight:700;color:#3b82f6;margin-bottom:8px">▶ Running: '+_s9EscHtml(scriptId.slice(0,8))+'...</div>'+
-      '<div id="cv-run-log-'+pathIdx+'" style="font-size:10px;color:rgba(255,255,255,.45);line-height:1.7;max-height:120px;overflow-y:auto"></div>';
+      'color:rgba(255,255,255,.7);z-index:100;min-width:320px;max-width:440px;'+
+      'box-shadow:0 8px 28px rgba(0,0,0,.8)';
+    overlay.innerHTML = '<div style="font-weight:700;color:#3b82f6;margin-bottom:8px">▶ Running: '+_s9EscHtml(displayName)+'</div>'+
+      '<div id="cv-run-log-'+pathIdx+'" style="font-size:11px;color:rgba(255,255,255,.55);line-height:1.8"></div>';
 
     // Position near the CTA
     sec.style.position = 'relative';
@@ -458,31 +461,22 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       return;
     }
 
-    // Add node IDs to DAG boxes so we can target them during run
     var dagRow = document.getElementById('cv-dag-row-'+pathIdx);
-    if (dagRow) {
-      var boxes = dagRow.querySelectorAll('.cv-dag-box');
-      boxes.forEach(function(b, bi) {
-        if (!b.id) b.id = 'cv-dag-box-'+pathIdx+'-'+bi;
-      });
-    }
+
+    // Build stepSeq → node position map from the path data
+    var pathNodes = (window._cvLastPathData && window._cvLastPathData[pathIdx])
+      ? (window._cvLastPathData[pathIdx].path || []) : [];
+    var seqToNodeIdx = {};
+    pathNodes.forEach(function(node, ni) { seqToNodeIdx[node.seq] = ni; });
 
     function setNodeColor(stepSeq, cls) {
       if (!dagRow) return;
-      // Nodes are rendered in path order — seq maps to node index (skip trigger at 0)
+      // Non-trigger boxes in DOM order match pathNodes order (skip trigger-node)
       var allBoxes = dagRow.querySelectorAll('.cv-dag-box:not(.trigger-node)');
-      // Find the box whose seq matches
-      allBoxes.forEach(function(b) {
-        var seqLabel = b.querySelector('.cv-dag-box-name');
-        // Match by step seq label embedded in the node subtitle
-        if (seqLabel && seqLabel.textContent && parseInt(b.dataset.seq) === stepSeq) {
-          b.className = b.className.replace(/scripted|covered|uncovered/g, '').trim() + ' ' + cls;
-        }
-      });
-      // Fallback: match by position (stepSeq-1 = index into non-trigger boxes)
-      if (stepSeq && allBoxes[stepSeq-1]) {
-        var tgt = allBoxes[stepSeq-1];
-        tgt.className = tgt.className.replace(/scripted|covered|uncovered/g, '').trim() + ' ' + cls;
+      var nodeIdx = seqToNodeIdx[stepSeq];
+      if (nodeIdx != null && allBoxes[nodeIdx]) {
+        var tgt = allBoxes[nodeIdx];
+        tgt.className = tgt.className.replace(/scripted|covered|uncovered|stale/g, '').trim() + ' ' + cls;
       }
     }
 
