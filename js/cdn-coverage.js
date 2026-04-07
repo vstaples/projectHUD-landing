@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260406-CV1
+// cdn-coverage.js  ·  v20260407-CV2
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260406-CV1 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV2 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -239,6 +239,10 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
     return {path: Array.isArray(path)?path:[], sig:sig, status:status, sc:sc};
   });
 
+  // Expose pathData for _s9CovCreateScript
+  window._cvLastPathData = pathData;
+  window._cvLastSteps    = steps;
+
   // ── Counts ──
   var covCt=0, staleCt=0, partialCt=0, uncovCt=0;
   pathData.forEach(function(p){
@@ -387,7 +391,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       var cta = status==='uncovered'
         ? '<div style="margin-left:16px;display:flex;align-items:center">'+
             '<span style="font-size:11px;color:#5fd4c8;cursor:pointer;text-decoration:underline" '+
-              'onclick="_s9CovCreateScript(\''+_s9EscHtml(pathName(pd,pi))+'\')">+ Create covering script &rarr;</span>'+
+              'onclick="_s9CovCreateScript(\''+_s9EscHtml(pathName(pd,pi))+'\','+pi+')">+ Create covering script &rarr;</span>'+
           '</div>'
         : '';
 

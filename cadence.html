@@ -3854,12 +3854,101 @@ function _s9CovTipHide() {
   }
 }
 
-function _s9CovCreateScript(pathName) {
-  // Switch to Scripts tab and open new script editor
-  _s9SwitchSimSubTab('scripts');
-  if (typeof seNewScript === 'function') {
-    setTimeout(function() { seNewScript(); }, 150);
+async function _s9CovCreateScript(pathName, pathIdx) {
+  var tmpl = _selectedTmpl;
+  if (!tmpl) { cadToast('No template selected', 'error'); return; }
+
+  // Pull path node array from coverage engine
+  var pathData = window._cvLastPathData || [];
+  var steps    = window._cvLastSteps    || [];
+  var pd = (pathIdx != null && pathData[pathIdx]) ? pathData[pathIdx] : null;
+
+  // Build script spec skeleton
+  var defaultActor = (typeof _seDefaultActor === 'function') ? _seDefaultActor() : null;
+  var scriptSteps = [];
+
+  // Step 0: launch_instance
+  scriptSteps.push({
+    id: 's0',
+    action: 'launch_instance',
+    params: { title: 'BIST — ' + pathName + ' — {timestamp}', launched_by: defaultActor },
+    asserts: [
+      { eq: 'in_progress', check: 'instance.status' },
+      { eq: 'active',      check: 'step[1].state'   }
+    ]
+  });
+
+  // One complete_step per node in the path
+  var pathNodes = (pd && pd.path && pd.path.length) ? pd.path : [];
+  pathNodes.forEach(function(node, ni) {
+    var seq     = node.seq != null ? node.seq : (ni + 1);
+    var outcome = node.outcome || _s9CovDefaultOutcome(node, steps);
+    var sid     = 's' + (ni + 1);
+    var stp = {
+      id: sid,
+      action: 'complete_step',
+      params: { step_seq: seq, actor: defaultActor, outcome: outcome },
+      asserts: []
+    };
+    // Assert outcome recorded
+    if (outcome) stp.asserts.push({ eq: outcome, check: 'step[' + seq + '].outcome' });
+    // Assert next step active (if not last)
+    if (ni < pathNodes.length - 1) {
+      var nextSeq = pathNodes[ni + 1].seq != null ? pathNodes[ni + 1].seq : (seq + 1);
+      // Only assert next active if no reset required (linear path)
+      if (!node.requiresReset) {
+        stp.asserts.push({ eq: 'active', check: 'step[' + nextSeq + '].state' });
+      }
+    }
+    scriptSteps.push(stp);
+  });
+
+  // If no path nodes (coverage engine didn't produce them), fall back to one stub step
+  if (!pathNodes.length) {
+    scriptSteps.push({
+      id: 's1', action: 'complete_step',
+      params: { step_seq: 1, actor: defaultActor, outcome: '' },
+      asserts: []
+    });
   }
+
+  var spec = {
+    name: pathName,
+    template_version: tmpl.version || '0.0.0',
+    cleanup: 'delete',
+    _path_sig: pd ? pd.sig : '',
+    steps: scriptSteps
+  };
+
+  var row = await API.post('bist_test_scripts', {
+    firm_id: FIRM_ID_CAD,
+    template_id: tmpl.id,
+    name: pathName,
+    script: JSON.stringify(spec),
+    created_by: null,
+    created_at: new Date().toISOString()
+  }).catch(function(e) { cadToast('Failed to create script: ' + e.message, 'error'); return null; });
+
+  if (!row || !row[0]) return;
+
+  cadToast('Script created: ' + pathName, 'success');
+
+  // Switch to Scripts tab and pre-select the new script
+  _s9SwitchSimSubTab('scripts');
+  setTimeout(function() {
+    if (typeof seOpenEditor === 'function') {
+      seOpenEditor(tmpl.id, 's9-scripts-body', row[0].id);
+    }
+  }, 200);
+}
+
+function _s9CovDefaultOutcome(node, steps) {
+  // Pick the first (happy-path) outcome for the step type
+  var DEFAULTS = { form: 'submitted', approval: 'approved', signoff: 'signed', meeting: 'concluded', trigger: '' };
+  if (node.outcome) return node.outcome;
+  var tmplStep = (steps || []).find(function(s) { return s.sequence_order === node.seq; });
+  var type = tmplStep ? (tmplStep.step_type || '').toLowerCase() : '';
+  return DEFAULTS[type] || '';
 }
 
 // ── History tab stub ──────────────────────────────────────────────────────────
@@ -4898,11 +4987,11 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-dag-viewer.js?v=20260403-S9"></script>
 <script src="/js/cdn-template-editor.js?v=20260406-D2"></script>
 <script src="/js/cdn-support.js?v=20260405-SUP1"></script>
-<script src="/js/cdn-bist.js?v=20260407-BQ5"></script>
-<script src="/js/cdn-dashboard.js?v=20260407-CD30"></script>
+<script src="/js/cdn-bist.js?v=20260406-BQ4"></script>
+<script src="/js/cdn-dashboard.js?v=20260407-CD12"></script>
 <script src="/js/cdn-conformance.js?v=20260406-CF2"></script>
 <script src="/js/cdn-script-generator.js?v=20260406-SG1"></script>
-<script src="/js/cdn-coverage.js?v=20260406-CV1"></script>
+<script src="/js/cdn-coverage.js?v=20260407-CV2"></script>
 <script src="/js/cdn-script-editor.js?v=20260405-SE30e"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
