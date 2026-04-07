@@ -3208,6 +3208,17 @@ function _s9SwitchSimSubTab(tab) {
       }
     }, 50);
   }
+  if (tab === 'scripts') {
+    setTimeout(function() {
+      var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+      if (!tmpl || !tmpl.id) return;
+      var body = document.getElementById('s9-script-editor-body');
+      if (!body) return;
+      if (typeof seOpenEditor === 'function') {
+        seOpenEditor(tmpl.id, 's9-script-editor-body', null);
+      }
+    }, 50);
+  }
   if (tab === 'history') {
     setTimeout(function() { _s9RenderHistoryStub(); }, 50);
   }
@@ -5004,7 +5015,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-conformance.js?v=20260406-CF2"></script>
 <script src="/js/cdn-script-generator.js?v=20260406-SG1"></script>
 <script src="/js/cdn-coverage.js?v=20260407-CV9"></script>
-<script src="/js/cdn-script-editor.js?v=20260407-SE26"></script>
+<script src="/js/cdn-script-editor.js?v=20260407-SE27"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>

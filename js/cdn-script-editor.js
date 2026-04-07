@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260407-SE26','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260407-SE27','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -1668,5 +1668,5 @@ window.seShowRunHistory = function seShowRunHistory() {
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260407-SE26 — Assertion rows: 3-column label|path|eq-value per mockup',
+console.log('%c[cdn-script-editor] v20260407-SE27 — Assertion rows: 3-column label|path|eq-value per mockup',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
