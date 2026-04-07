@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV11
+// cdn-coverage.js  ·  v20260407-CV12
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV11 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV12 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -463,21 +463,38 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
 
     var dagRow = document.getElementById('cv-dag-row-'+pathIdx);
 
-    // Build stepSeq → node position map from the path data
+    // Build ordered list of (seq, nodeIdx) — handles repeated seqs in reset paths
     var pathNodes = (window._cvLastPathData && window._cvLastPathData[pathIdx])
       ? (window._cvLastPathData[pathIdx].path || []) : [];
-    var seqToNodeIdx = {};
-    pathNodes.forEach(function(node, ni) { seqToNodeIdx[node.seq] = ni; });
+    // stepCallOrder tracks how many times each seq has been called so far
+    var stepCallCount = {};
+    // nodeSeqList[i] = seq of the i-th non-trigger dag box
+    var nodeSeqList = pathNodes.map(function(n){ return n.seq; });
 
     function setNodeColor(stepSeq, cls) {
       if (!dagRow) return;
-      // Non-trigger boxes in DOM order match pathNodes order (skip trigger-node)
       var allBoxes = dagRow.querySelectorAll('.cv-dag-box:not(.trigger-node)');
-      var nodeIdx = seqToNodeIdx[stepSeq];
-      if (nodeIdx != null && allBoxes[nodeIdx]) {
-        var tgt = allBoxes[nodeIdx];
-        tgt.className = tgt.className.replace(/scripted|covered|uncovered|stale/g, '').trim() + ' ' + cls;
+      // Find the next unprocessed occurrence of this seq
+      if (!stepCallCount[stepSeq]) stepCallCount[stepSeq] = 0;
+      var occurrence = stepCallCount[stepSeq];
+      var found = 0;
+      for (var ni = 0; ni < nodeSeqList.length; ni++) {
+        if (nodeSeqList[ni] === stepSeq) {
+          if (found === occurrence) {
+            if (allBoxes[ni]) {
+              allBoxes[ni].className = allBoxes[ni].className
+                .replace(/scripted|covered|uncovered|stale/g,'').trim() + ' ' + cls;
+            }
+            break;
+          }
+          found++;
+        }
       }
+      // Only increment count on pass/fail (not start) — caller controls when
+    }
+    function advanceNodeCount(stepSeq) {
+      if (!stepCallCount[stepSeq]) stepCallCount[stepSeq] = 0;
+      stepCallCount[stepSeq]++;
     }
 
     runBistScript(scriptId, function(ev) {
@@ -489,11 +506,11 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       if (ev.type === 'step_pass') {
         var lbl2 = ev.action === 'launch_instance' ? '✓ Instance launched' : '✓ Step ' + (ev.stepSeq||ev.stepIdx) + ' passed' + (ev.outcome ? ' (' + ev.outcome + ')' : '');
         log(lbl2, '#3de08a');
-        if (ev.stepSeq) setNodeColor(ev.stepSeq, 'covered'); // green = passed
+        if (ev.stepSeq) { setNodeColor(ev.stepSeq, 'covered'); advanceNodeCount(ev.stepSeq); }
       }
       if (ev.type === 'step_fail') {
         log('✗ Step ' + (ev.stepSeq||ev.stepIdx||'?') + ' failed: ' + (ev.reason||''), '#e84040');
-        if (ev.stepSeq) setNodeColor(ev.stepSeq, 'uncovered'); // red = failed
+        if (ev.stepSeq) { setNodeColor(ev.stepSeq, 'uncovered'); advanceNodeCount(ev.stepSeq); }
       }
     }).then(function(result) {
       var passed = result && result.status === 'passed';
@@ -515,14 +532,20 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
         });
       }
 
-      // Update CTA text
+      // Update CTA to show result + reset button
       if (cta) {
         cta.style.opacity = '1';
         cta.style.color = clr;
         cta.style.textDecoration = 'none';
         cta.style.cursor = 'default';
-        cta.textContent = icon + ' ' + (passed ? 'Passed — path verified' : 'Failed — check script');
+        cta.innerHTML = icon + ' ' + (passed ? 'Passed — path verified' : 'Failed — check script') +
+          ' <span style="margin-left:10px;font-size:10px;color:#3b82f6;cursor:pointer;text-decoration:underline"' +
+          ' onclick="_cvResetPath('+pathIdx+',\''+scriptId+'\')">&#x21ba; Re-run</span>';
         cta.onclick = null;
+      }
+      // Refresh coverage data so status pill updates
+      if (typeof _s9LoadCoverageData === 'function' && typeof _selectedTmpl !== 'undefined' && _selectedTmpl) {
+        setTimeout(function(){ _s9LoadCoverageData(_selectedTmpl.id, _selectedTmpl.version||'0.0.0'); }, 1000);
       }
 
       // Auto-close overlay after 2s
@@ -534,6 +557,32 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       log('Error: ' + (err && err.message ? err.message : String(err)), '#e84040');
       if (cta) cta.style.opacity = '1';
     });
+  };
+
+  // ── Reset a path back to scripted state for re-run ──────────────────────────
+  window._cvResetPath = function(pathIdx, scriptId) {
+    // Reset DAG nodes back to scripted (blue)
+    var dagRow = document.getElementById('cv-dag-row-'+pathIdx);
+    if (dagRow) {
+      dagRow.querySelectorAll('.cv-dag-box:not(.trigger-node)').forEach(function(b){
+        b.className = b.className.replace(/covered|uncovered|stale/g,'').trim()+' scripted';
+      });
+      dagRow.querySelectorAll('.cv-edge-arrow:not(.trigger-node)').forEach(function(a){
+        a.className = a.className.replace(/covered|uncovered|stale/g,'').trim()+' scripted';
+      });
+    }
+    // Restore CTA to runnable state
+    var cta = document.getElementById('cv-run-cta-'+pathIdx);
+    if (cta) {
+      cta.style.color = '#3b82f6';
+      cta.style.textDecoration = 'underline';
+      cta.style.cursor = 'pointer';
+      cta.innerHTML = '▶ Run coverage script to verify this path';
+      cta.onclick = function(){ window._cvRunPathScript(scriptId, pathIdx); };
+    }
+    // Remove any lingering overlay
+    var ov = document.getElementById('cv-run-overlay-'+pathIdx);
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
   };
 
   // ── Path list table ──
