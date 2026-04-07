@@ -1,6 +1,6 @@
 // cdn-bist.js — Cadence: BIST gate checks, test plan, proceed/release
 // LOAD ORDER: 8th
-console.log('%c[cdn-bist] v20260407-BQ6 — coverage gate: paths must exist + 100% covered before cert issues','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-bist] v20260407-BQ7 — coverage gate: paths must exist + 100% covered before cert issues','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // ── SE13 patches (2026-04-04) ───────────────────────────────────────────────
 // 1. Reverted SE12's step_route_back emission from explicit route branch.
 //    It fired before step_pass, resetting T2 cards to blue before they went green.
@@ -2535,6 +2535,11 @@ function _bistCkShowFooter(allPass, onProceed) {
 
 function _bistCkShowCert(tmplName, version, results, elapsed, certId, onProceed) {
   _bistCkShowFooter(true, onProceed);
+  // Delegate to unified cert modal — _s9OnSimComplete already populated globals
+  if (typeof _s9ShowCert === 'function') {
+    setTimeout(function(){ _s9ShowCert(); }, 200);
+    return;
+  }
   // Find cockpit container — now renders into s9-sim-right
   var ov = document.getElementById('s9-sim-right') ||
            document.getElementById('s9-sim-panel') ||

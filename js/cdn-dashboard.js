@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD42 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD43 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1536,8 +1536,10 @@ async function _cdPortShowCert(tmplId, statusCls) {
     // Load template name into simulator context so cert modal header is correct
     var tmpls = (typeof window._cdPortfolioTmpls !== 'undefined') ? window._cdPortfolioTmpls : [];
     var tmpl = tmpls.find(function(t){ return t.id === tmplId; });
-    if (tmpl && typeof _selectedTmpl !== 'undefined') {
-      window._selectedTmpl = tmpl;
+    if (tmpl) {
+      if (typeof _selectedTmpl !== 'undefined') window._selectedTmpl = tmpl;
+      window._s9SimSourceName = tmpl.name || '';
+      window._s9SimSourceVer  = tmpl.version || null;
     }
     if (typeof _s9ShowCert === 'function') _s9ShowCert();
   } catch(e) {
