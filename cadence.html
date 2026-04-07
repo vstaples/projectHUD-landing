@@ -3282,9 +3282,12 @@ async function _s9LoadCoverageData(templateId, version) {
       }
     }
 
-    // Template steps — always from _selectedTmpl first
-    var tmpl  = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
-    var steps = (tmpl && Array.isArray(tmpl.steps)) ? tmpl.steps : [];
+    // Template steps — fetch from DB to get outcomes for path enumeration
+    var steps = await API.get(
+      'workflow_template_steps?template_id=eq.' + templateId +
+      '&order=sequence_order.asc'
+    ).catch(function() { return []; });
+    if (!Array.isArray(steps)) steps = [];
 
     console.log('[S9 Coverage] scripts:', scripts.length, 'runs:', (runs||[]).length, 'steps:', steps.length);
     _s9RenderCoverageTab(body, scripts || [], runs || [], steps, version);
@@ -5043,7 +5046,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-template-editor.js?v=20260406-D2"></script>
 <script src="/js/cdn-support.js?v=20260405-SUP1"></script>
 <script src="/js/cdn-bist.js?v=20260406-BQ4"></script>
-<script src="/js/cdn-dashboard.js?v=20260407-CD12"></script>
+<script src="/js/cdn-dashboard.js?v=20260407-CD32"></script>
 <script src="/js/cdn-conformance.js?v=20260406-CF2"></script>
 <script src="/js/cdn-script-generator.js?v=20260406-SG1"></script>
 <script src="/js/cdn-step-state.js?v=20260407-SS1"></script>

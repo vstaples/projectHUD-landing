@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD30 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD32 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -393,18 +393,10 @@ function _cdHmDayTip(e, dateIso, st) {
   var rows = '';
   var totalValid=0, totalInvalid=0, totalNoCert=0;
 
-  // A template "existed" on refDate if it has at least one cert issued on or before refDate.
-  // Templates with no cert at all never appear in historical cells.
-  var firstCertByTmpl = {};
-  certs.forEach(function(c) {
-    var d = new Date(c.issued_at);
-    if (!firstCertByTmpl[c.template_id] || d < firstCertByTmpl[c.template_id]) {
-      firstCertByTmpl[c.template_id] = d;
-    }
-  });
+  // A template appears in the tooltip from the date it was created
   tmpls = tmpls.filter(function(t) {
-    var first = firstCertByTmpl[t.id];
-    return first && first <= refDate;
+    var created = t.created_at ? new Date(t.created_at) : null;
+    return !created || created <= refDate;
   });
   tmpls.forEach(function(tmpl) {
     var tid = tmpl.id;
@@ -524,32 +516,34 @@ function _cdRenderHeatmap(runs){
         st='n';
       } else {
         // For each template that has any cert, find its state on this date
-        var firstCertByTmpl2 = {};
-        certs.forEach(function(c) {
-          var d = new Date(c.issued_at);
-          if (!firstCertByTmpl2[c.template_id] || d < firstCertByTmpl2[c.template_id]) firstCertByTmpl2[c.template_id] = d;
-        });
         var ids = (window._cdPortfolioTmpls||[]).filter(function(t){
-          var first = firstCertByTmpl2[t.id];
-          return first && first <= dd;
+          var created = t.created_at ? new Date(t.created_at) : null;
+          return !created || created <= dd;
         }).map(function(t){return t.id;});
         if(!ids.length){ st='n'; }
         else {
-          var anyInvalid=false, anyRevoked=false, anyValid=false;
-          ids.forEach(function(tid){
-            // Find the most recent cert issued on or before this date
-            var activeCert = certs.filter(function(c){
-              return c.template_id===tid && new Date(c.issued_at)<=dd;
-            }).sort(function(a,b){ return new Date(b.issued_at)-new Date(a.issued_at); })[0];
-            if(!activeCert) return; // no cert issued yet for this template by this date
-            anyValid=true;
-            if(activeCert.status==='invalidated'){
-              anyInvalid=true;
-            } else if(activeCert.status==='revoked'){
-              anyRevoked=true;
-            }
+          // Color by run health on this day; fall back to cert status if no runs
+          var dayStart2=new Date(dd); dayStart2.setHours(0,0,0,0);
+          var runsOnDay=(_cdRuns||[]).filter(function(r){
+            if(!r.run_at) return false;
+            var rd=new Date(r.run_at);
+            return rd>=dayStart2 && rd<=dd && ids.indexOf(sidMap[r.script_id]&&sidMap[r.script_id].tid)>=0;
           });
-          st = !anyValid ? 'n' : anyRevoked ? 'r' : anyInvalid ? 'a' : 'g';
+          if(runsOnDay.length){
+            var anyFail=runsOnDay.some(function(r){return r.status==='failed';});
+            st = anyFail ? 'a' : 'g';
+          } else {
+            var anyCert2=false, anyInv2=false, anyRev2=false;
+            ids.forEach(function(tid){
+              var ac=certs.filter(function(c){return c.template_id===tid&&new Date(c.issued_at)<=dd;})
+                .sort(function(a,b){return new Date(b.issued_at)-new Date(a.issued_at);})[0];
+              if(!ac) return;
+              anyCert2=true;
+              if(ac.status==='invalidated') anyInv2=true;
+              else if(ac.status==='revoked') anyRev2=true;
+            });
+            st = !anyCert2 ? 'n' : anyRev2 ? 'r' : anyInv2 ? 'a' : 'g';
+          }
         }
       }
       // Reset dd to midnight for label
