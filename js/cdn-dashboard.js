@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD22 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD23 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -380,7 +380,10 @@ function _cdHmDayTip(e, dateIso, st) {
 
   // Get all runs for this date from _cdRuns (already loaded globally)
   // Match by local date string — same method the heatmap dayMap uses
-  var _refDate = new Date(dateIso + 'T12:00:00'); // noon local = unambiguous local date
+  // Reconstruct local toDateString() key from dayIso (e.g. '2026-04-06')
+  var _isoP=dateIso.split('-');
+  var _refDate=new Date(parseInt(_isoP[0]),parseInt(_isoP[1])-1,parseInt(_isoP[2]));
+  var _refStr=_refDate.toDateString();
   var _refStr  = _refDate.toDateString();
   var runs = (_cdRuns || []).filter(function(r) {
     if (!r.run_at) return false;
@@ -512,7 +515,7 @@ function _cdRenderHeatmap(runs){
       var dk=dd.toDateString();
       var st=dd>today?'n':(dayMap[dk]?dayMap[dk].f>0?(dayMap[dk].p>0?'a':'f'):'p':'n');
       var ttl=lbl[st]+' — '+dd.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-      days.push({st:st,title:ttl});
+      days.push({st:st,title:ttl,dk:dk});
     }
     weeks.push({dateStr:dateStr,days:days});
   }
@@ -530,7 +533,7 @@ function _cdRenderHeatmap(runs){
     html+='<div style="font-size:11px;color:rgba(255,255,255,.55);font-family:monospace;white-space:nowrap;margin-bottom:4px;font-weight:500">'+wk.dateStr+'</div>';
     // 5 day blocks (Mon top, Fri bottom)
     wk.days.forEach(function(day){
-      var _dm=dd.getMonth()+1,_dd2=dd.getDate(),_dy=dd.getFullYear();var dayIso=_dy+'-'+(_dm<10?'0'+_dm:_dm)+'-'+(_dd2<10?'0'+_dd2:_dd2);
+      var dayIso=day.dk;
       html+='<div style="width:18px;height:11px;border-radius:2px;background:'+clr[day.st]+';cursor:'+(day.st!=='n'?'pointer':'default')+'" onmouseenter="_cdHmDayTip(event,\''+dayIso+'\',\''+day.st+'\')" onmouseleave="_cdHmDayTipHide()"></div>';
     });
     html+='</div>';
