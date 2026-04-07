@@ -1,6 +1,6 @@
 // cdn-script-editor.js — CadenceHUD Visual BIST Script Editor
 // LOAD ORDER: after cdn-bist.js
-console.log('%c[cdn-script-editor] v20260404-SE25','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-script-editor] v20260407-SE26','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _seScripts        = [];
@@ -1228,15 +1228,38 @@ async function seSaveScript() {
   cadToast('Saved', 'info');
 }
 
-async function seDeleteScript() {
+function seDeleteScript() {
   var sc = _seGetSelected(); if (!sc) return;
-  if (!confirm('Delete "'+sc.name+'"? This cannot be undone.')) return;
+  // Inline confirmation — avoid browser confirm() which may be suppressed
+  var existing = document.getElementById('se-delete-confirm');
+  if (existing) { existing.remove(); return; }
+  var bar = document.createElement('div');
+  bar.id = 'se-delete-confirm';
+  bar.style.cssText = 'position:absolute;bottom:48px;left:50%;transform:translateX(-50%);'+
+    'background:#1f242e;border:1px solid rgba(248,113,113,.5);border-radius:5px;'+
+    'padding:10px 16px;display:flex;align-items:center;gap:12px;z-index:999;'+
+    'font-family:Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.8);white-space:nowrap;'+
+    'box-shadow:0 4px 20px rgba(0,0,0,.6)';
+  bar.innerHTML = '<span>Delete “'+sc.name+'”? This cannot be undone.</span>'+
+    '<button onclick="seDeleteScriptConfirm()" style="background:#e84040;color:#fff;border:none;border-radius:3px;padding:4px 12px;cursor:pointer;font-size:12px;font-weight:700">Delete</button>'+
+    '<button onclick="document.getElementById(\'se-delete-confirm\').remove()" style="background:transparent;color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.15);border-radius:3px;padding:4px 10px;cursor:pointer;font-size:12px">Cancel</button>';
+  var root = document.getElementById('se-root');
+  if (root) { root.style.position='relative'; root.appendChild(bar); }
+  else document.body.appendChild(bar);
+}
+
+async function seDeleteScriptConfirm() {
+  var bar = document.getElementById('se-delete-confirm'); if (bar) bar.remove();
+  var sc = _seGetSelected(); if (!sc) return;
   await API.del('bist_test_scripts?id=eq.'+sc.id).catch(function(){});
   _seScripts = _seScripts.filter(function(s){ return s.id !== sc.id; });
   _seSelectedId   = _seScripts.length ? _seScripts[0].id : null;
   _seSelectedStep = null;
   _seDirty        = false;
   seRenderEditor();
+  // Also refresh the scripts list panel in the simulator
+  if (typeof _s9RefreshScriptsList === 'function') _s9RefreshScriptsList();
+  cadToast('Script deleted', 'info');
 }
 
 async function seRunScript() {
@@ -1645,5 +1668,5 @@ window.seShowRunHistory = function seShowRunHistory() {
 // Call seOpenEditor(templateId, targetElId) from anywhere.
 // The Simulator calls seOpenEditor(tmpl.id, 's9-script-editor-body').
 // The loadTmplTests hook has been removed — Tests button removed from Library.
-console.log('%c[cdn-script-editor] v20260404-SE25 — Assertion rows: 3-column label|path|eq-value per mockup',
+console.log('%c[cdn-script-editor] v20260407-SE26 — Assertion rows: 3-column label|path|eq-value per mockup',
   'background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');

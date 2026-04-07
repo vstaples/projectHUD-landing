@@ -3220,12 +3220,11 @@ async function _s9LoadCoverageData(templateId, version) {
     'color:rgba(255,255,255,.3);padding:40px;text-align:center;width:100%">Loading coverage data…</div>';
 
   try {
-    // Use cached data from Scripts tab if available — avoids redundant fetch
-    var scripts = window._s9CachedScripts || null;
-    var runs    = window._s9CachedRuns    || null;
+    // Always fetch fresh — cache invalidated after script creation/deletion
+    var scripts = null;
+    var runs    = null;
 
-    // Only re-fetch if cache is empty or for a different template
-    if (!scripts) {
+    if (true) {
       var firmId = await _s9WaitForFirmId();
       scripts = await API.get(
         'bist_test_scripts?firm_id=eq.' + firmId +
@@ -3932,19 +3931,18 @@ async function _s9CovCreateScript(pathName, pathIdx) {
   if (!row || !row[0]) return;
 
   // Show confirmation toast with action link — don't auto-switch
+  // Invalidate coverage cache so next render fetches fresh script list
+  window._s9CachedScripts = null;
+  window._s9CachedRuns    = null;
+
   cadToast('Script created: “' + pathName + '” — open Scripts tab to review and run', 'success');
 
-  // Pre-load the script editor in the background so it’s ready when user navigates
+  // Refresh coverage tab immediately with fresh data
   setTimeout(function() {
-    if (typeof seOpenEditor === 'function') {
-      seOpenEditor(tmpl.id, 's9-scripts-body', row[0].id);
+    if (typeof _s9LoadCoverageData === 'function') {
+      _s9LoadCoverageData(tmpl.id, tmpl.version || '0.0.0');
     }
-  }, 300);
-
-  // Refresh coverage tab after a moment so coverage score updates
-  setTimeout(function() {
-    if (typeof _s9RenderSimTab === 'function') _s9RenderSimTab();
-  }, 500);
+  }, 400);
 }
 
 function _s9CovDefaultOutcome(node, steps) {
@@ -4996,8 +4994,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-dashboard.js?v=20260407-CD12"></script>
 <script src="/js/cdn-conformance.js?v=20260406-CF2"></script>
 <script src="/js/cdn-script-generator.js?v=20260406-SG1"></script>
-<script src="/js/cdn-coverage.js?v=20260407-CV3"></script>
-<script src="/js/cdn-script-editor.js?v=20260405-SE30e"></script>
+<script src="/js/cdn-coverage.js?v=20260407-CV4"></script>
+<script src="/js/cdn-script-editor.js?v=20260407-SE26"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
 <script src="/js/cdn-scrubber.js?v=20260403-S9"></script>
