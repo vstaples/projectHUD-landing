@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV6
+// cdn-coverage.js  ·  v20260407-CV7
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV6 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV7 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -535,7 +535,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
 
         '<div class="cv-sb-sect">'+
           '<div class="cv-sb-lbl">Path Status</div>'+
-          [['#3dd68c','Covered &#x2014; passing',covCt],['#f5c842','Covered &#x2014; stale',staleCt],['#a78bfa','Partial &#x2014; assertions fail',partialCt],['#e84040','Uncovered &#x2014; no script',uncovCt]].map(function(r){
+          [['#3dd68c','Covered &#x2014; passing',covCt],['#f5c842','Covered &#x2014; stale',staleCt],['#3b82f6','Scripted &#x2014; not yet run',scriptedCt],['#e84040','Uncovered &#x2014; no script',uncovCt]].map(function(r){
             return '<div class="cv-leg-item"><div class="cv-leg-dot" style="background:'+r[0]+'"></div>'+r[1]+'<span class="cv-leg-count" style="color:'+r[0]+'">'+r[2]+'</span></div>';
           }).join('')+
         '</div>'+

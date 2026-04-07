@@ -1182,9 +1182,9 @@ function _s9RenderSimPanel(el) {
         '</option>' +
       '</select>' +
 
-      // Sub-tab strip: Scripts | Coverage | History
+      // Sub-tab strip: Coverage | Scripts | History
       '<div style="display:flex;margin-left:4px">' +
-        ['scripts','coverage','history'].map(function(t) {
+        ['coverage','scripts','history'].map(function(t) {
           var label = t.charAt(0).toUpperCase() + t.slice(1);
           var isAct = (_s9SimSubTab === t);
           return '<div id="s9-simsubtab-' + t + '" onclick="_s9SwitchSimSubTab(\'' + t + '\')" ' +
@@ -3193,9 +3193,18 @@ function _s9SwitchSimSubTab(tab) {
       if (tmpl && tmpl.id) {
         _s9LoadCoverageData(tmpl.id, tmpl.version || '0.0.0');
       } else {
-        if (body) body.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;' +
-          'color:rgba(255,255,255,.3);padding:40px;text-align:center;width:100%">' +
-          'Select a workflow to view coverage.</div>';
+        if (body) body.innerHTML =
+          '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+          'height:100%;padding:60px;text-align:center;gap:16px">' +
+            '<div style="font-size:48px;opacity:.15">◎</div>' +
+            '<div style="font-family:Arial,sans-serif;font-size:22px;font-weight:700;' +
+            'color:rgba(255,255,255,.7);letter-spacing:.02em">' +
+            'Select a workflow to view coverage.</div>' +
+            '<div style="font-family:Arial,sans-serif;font-size:13px;color:rgba(255,255,255,.3);' +
+            'max-width:360px;line-height:1.7">' +
+            'Choose a workflow from the dropdown above to see routing paths, coverage status, and test scripts.' +
+            '</div>' +
+          '</div>';
       }
     }, 50);
   }
@@ -4994,7 +5003,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-dashboard.js?v=20260407-CD12"></script>
 <script src="/js/cdn-conformance.js?v=20260406-CF2"></script>
 <script src="/js/cdn-script-generator.js?v=20260406-SG1"></script>
-<script src="/js/cdn-coverage.js?v=20260407-CV6"></script>
+<script src="/js/cdn-coverage.js?v=20260407-CV7"></script>
 <script src="/js/cdn-script-editor.js?v=20260407-SE26"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>
