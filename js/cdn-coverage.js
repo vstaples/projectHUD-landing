@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV8
+// cdn-coverage.js  ·  v20260407-CV9
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV8 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV9 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -409,17 +409,101 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
               'onclick="_s9CovCreateScript(\''+_s9EscHtml(pathName(pd,pi))+'\','+pi+')">+ Create covering script &rarr;</span>'+
           '</div>'
         : status==='scripted'
-        ? '<div style="margin-left:16px;font-size:11px;color:#3b82f6;cursor:pointer;text-decoration:underline"'
-          + ' onclick="_s9SwitchSimSubTab(\'scripts\');setTimeout(function(){var b=document.getElementById(\'s9-run-all-btn\');if(b)b.click();},300)"'
-          + '>▶ Run suite to verify this path</div>'
+        ? (pd.sc ? '<div style="margin-left:16px;font-size:11px;color:#3b82f6;cursor:pointer;text-decoration:underline"'
+          + ' onclick="_cvRunPathScript(\''+pd.sc.id+'\','+pi+')"'
+          + ' id="cv-run-cta-'+pi+'"'
+          + '>▶ Run coverage script to verify this path</div>' : '')
         : '';
 
-      return '<div class="cv-path-section">'+
+      return '<div class="cv-path-section" id="cv-path-sec-'+pi+'">'+
         '<div class="cv-path-label">'+lbl+'<div class="cv-path-label-line"></div></div>'+
-        '<div class="cv-dag-row">'+nodeChain+cta+'</div>'+
+        '<div class="cv-dag-row" id="cv-dag-row-'+pi+'">'+nodeChain+cta+'</div>'+
       '</div>';
     }).join('');
   }
+
+  // ── Inline path script runner ────────────────────────────────────────────────
+  window._cvRunPathScript = function(scriptId, pathIdx) {
+    var sec = document.getElementById('cv-path-sec-'+pathIdx);
+    if (!sec) return;
+    var cta = document.getElementById('cv-run-cta-'+pathIdx);
+
+    // Show inline progress overlay
+    var overlay = document.createElement('div');
+    overlay.id = 'cv-run-overlay-'+pathIdx;
+    overlay.style.cssText = 'position:absolute;background:rgba(13,16,23,.92);border:1px solid #252d3f;'+
+      'border-radius:5px;padding:12px 16px;font-family:Arial,sans-serif;font-size:11px;'+
+      'color:rgba(255,255,255,.7);z-index:100;min-width:280px;max-width:400px;'+
+      'box-shadow:0 8px 28px rgba(0,0,0,.7)';
+    overlay.innerHTML = '<div style="font-weight:700;color:#3b82f6;margin-bottom:8px">▶ Running: '+_s9EscHtml(scriptId.slice(0,8))+'...</div>'+
+      '<div id="cv-run-log-'+pathIdx+'" style="font-size:10px;color:rgba(255,255,255,.45);line-height:1.7;max-height:120px;overflow-y:auto"></div>';
+
+    // Position near the CTA
+    sec.style.position = 'relative';
+    sec.appendChild(overlay);
+    if (cta) cta.style.opacity = '0.4';
+
+    var logEl = document.getElementById('cv-run-log-'+pathIdx);
+    function log(msg, clr) {
+      if (!logEl) return;
+      var line = document.createElement('div');
+      line.style.color = clr || 'rgba(255,255,255,.45)';
+      line.textContent = msg;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    if (typeof runBistScript !== 'function') {
+      log('runBistScript not available — reload page', '#e84040');
+      return;
+    }
+
+    runBistScript(scriptId, function(ev) {
+      if (ev.type === 'step_start')  log('Step ' + ev.seq + ': ' + (ev.name||'') + '...');
+      if (ev.type === 'step_pass')   log('✓ Step ' + ev.seq + ' passed', '#3de08a');
+      if (ev.type === 'step_fail')   log('✗ Step ' + ev.seq + ' failed: ' + (ev.reason||''), '#e84040');
+      if (ev.type === 'assert_fail') log('  ✕ Assert failed: ' + (ev.check||''), '#f5a623');
+    }).then(function(result) {
+      var passed = result && result.status === 'passed';
+      var clr = passed ? '#3de08a' : '#e84040';
+      var icon = passed ? '✓' : '✗';
+      log(icon + ' ' + (passed ? 'All steps passed' : 'Script failed'), clr);
+
+      // Re-color DAG nodes for this path
+      var dagRow = document.getElementById('cv-dag-row-'+pathIdx);
+      if (dagRow) {
+        var boxes = dagRow.querySelectorAll('.cv-dag-box.scripted');
+        boxes.forEach(function(b) {
+          b.classList.remove('scripted');
+          b.classList.add(passed ? 'covered' : 'uncovered');
+        });
+        var arrows = dagRow.querySelectorAll('.cv-edge-arrow.scripted');
+        arrows.forEach(function(a) {
+          a.classList.remove('scripted');
+          a.classList.add(passed ? 'covered' : 'uncovered');
+        });
+      }
+
+      // Update CTA text
+      if (cta) {
+        cta.style.opacity = '1';
+        cta.style.color = clr;
+        cta.style.textDecoration = 'none';
+        cta.style.cursor = 'default';
+        cta.textContent = icon + ' ' + (passed ? 'Passed — path verified' : 'Failed — check script');
+        cta.onclick = null;
+      }
+
+      // Auto-close overlay after 2s
+      setTimeout(function() {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }, 2000);
+
+    }).catch(function(err) {
+      log('Error: ' + (err && err.message ? err.message : String(err)), '#e84040');
+      if (cta) cta.style.opacity = '1';
+    });
+  };
 
   // ── Path list table ──
   function pathListHtml(){
