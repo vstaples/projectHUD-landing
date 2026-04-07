@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD26 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD27 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -393,7 +393,8 @@ function _cdHmDayTip(e, dateIso, st) {
   var rows = '';
   var totalValid=0, totalInvalid=0, totalNoCert=0;
 
-  // Iterate ALL templates — not just those with certs
+  // Iterate only templates that existed on or before this date
+  tmpls = tmpls.filter(function(t){ return !t.created_at || new Date(t.created_at) <= refDate; });
   tmpls.forEach(function(tmpl) {
     var tid = tmpl.id;
     var tmplName = tmpl.name;
@@ -511,7 +512,7 @@ function _cdRenderHeatmap(runs){
         st='n';
       } else {
         // For each template that has any cert, find its state on this date
-        var ids = (window._cdPortfolioTmpls||[]).map(function(t){return t.id;});
+        var ids = (window._cdPortfolioTmpls||[]).filter(function(t){return !t.created_at||new Date(t.created_at)<=dd;}).map(function(t){return t.id;});
         if(!ids.length){ st='n'; }
         else {
           var anyInvalid=false, anyRevoked=false, anyValid=false;
