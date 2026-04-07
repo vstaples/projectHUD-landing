@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV21
+// cdn-coverage.js  ·  v20260407-CV22
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV21 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV22 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -133,7 +133,7 @@ console.log('%c[cdn-coverage] v20260407-CV21 — live DAG coverage','background:
 })();
 
 // ── Sync enumerated paths to bist_coverage_paths ─────────────────────────────
-async function _cvSyncPathsToDB(pathData, steps, version) {
+async function _cvSyncPathsToDB(pathData, pathNames, steps, version) {
   try {
     var firmId = await _s9WaitForFirmId();
     var tmpl   = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
@@ -162,7 +162,7 @@ async function _cvSyncPathsToDB(pathData, steps, version) {
         firm_id:          firmId,
         template_id:      templateId,
         template_version: version || tmpl.version || '0.0.0',
-        path_name:        pathName(pd, i),
+        path_name:        pathNames[i] || ('Path '+(i+1)),
         step_sequence:    stepSeq,
         coverage_status:  pd.status === 'covered' ? 'covered' : pd.status === 'stale' ? 'stale' : 'uncovered',
         covering_script_id: pd.sc ? pd.sc.id : null,
@@ -291,7 +291,9 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
   window._cvLastPathData = pathData;
   window._cvLastSteps    = steps;
   // Upsert enumerated paths to bist_coverage_paths (async, non-blocking)
-  _cvSyncPathsToDB(pathData, steps, version);
+  // Pass path names computed here (pathName is a closure, not available async)
+  var pathNamesForSync = pathData.map(function(pd, pi){ return pathName(pd, pi); });
+  _cvSyncPathsToDB(pathData, pathNamesForSync, steps, version);
   // Inject Re-run buttons only when no run is active
   setTimeout(function(){
     if (!window._cvRunActive) _cvInjectAllRerunButtons();
