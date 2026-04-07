@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD21 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD22 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -379,12 +379,12 @@ function _cdHmDayTip(e, dateIso, st) {
   if (!panel) return;
 
   // Get all runs for this date from _cdRuns (already loaded globally)
-  var dayStart = new Date(dateIso + 'T00:00:00');
-  var dayEnd   = new Date(dateIso + 'T23:59:59');
+  // Match by local date string — same method the heatmap dayMap uses
+  var _refDate = new Date(dateIso + 'T12:00:00'); // noon local = unambiguous local date
+  var _refStr  = _refDate.toDateString();
   var runs = (_cdRuns || []).filter(function(r) {
     if (!r.run_at) return false;
-    var d = new Date(r.run_at);
-    return d >= dayStart && d <= dayEnd;
+    return new Date(r.run_at).toDateString() === _refStr;
   });
 
   // Build scriptId→{tid,name} map from _cdHmScripts (always populated by _cdLoadAll)
@@ -405,7 +405,7 @@ function _cdHmDayTip(e, dateIso, st) {
     byTmpl[tid].runs.push(r);
   });
 
-  var dateLabel = dayStart.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  var dateLabel = _refDate.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
   var totalRuns = runs.length;
   var totalPass = runs.filter(function(r){ return r.status==='passed'; }).length;
   var totalFail = runs.filter(function(r){ return r.status==='failed'; }).length;
@@ -530,7 +530,7 @@ function _cdRenderHeatmap(runs){
     html+='<div style="font-size:11px;color:rgba(255,255,255,.55);font-family:monospace;white-space:nowrap;margin-bottom:4px;font-weight:500">'+wk.dateStr+'</div>';
     // 5 day blocks (Mon top, Fri bottom)
     wk.days.forEach(function(day){
-      var dayIso=dd.toISOString().slice(0,10);
+      var _dm=dd.getMonth()+1,_dd2=dd.getDate(),_dy=dd.getFullYear();var dayIso=_dy+'-'+(_dm<10?'0'+_dm:_dm)+'-'+(_dd2<10?'0'+_dd2:_dd2);
       html+='<div style="width:18px;height:11px;border-radius:2px;background:'+clr[day.st]+';cursor:'+(day.st!=='n'?'pointer':'default')+'" onmouseenter="_cdHmDayTip(event,\''+dayIso+'\',\''+day.st+'\')" onmouseleave="_cdHmDayTipHide()"></div>';
     });
     html+='</div>';
