@@ -1019,7 +1019,7 @@ console.log('%c[cadence] S9.68 — Cert persistence + PDF export · firmId fix �
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
-var _s9SimSubTab       = 'scripts';          // 'scripts' | 'coverage' | 'history'
+var _s9SimSubTab       = 'coverage';          // 'scripts' | 'coverage' | 'history'
 var _s9LibSubFilter    = 'all';              // 'all' | 'workflows' | 'forms' | 'released' | 'draft'
 var _s9LastLibSubtype  = 'workflows';        // last explicit wf/fm selection — drives + New routing
 var _s9SimSourceType   = null;               // null | 'workflow' | 'form'
@@ -3195,7 +3195,7 @@ function _s9SwitchSimSubTab(tab) {
       } else {
         if (body) body.innerHTML =
           '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-          'height:100%;padding:60px;text-align:center;gap:16px">' +
+          'height:100%;width:100%;padding:60px;text-align:center;gap:16px">' +
             '<div style="font-size:48px;opacity:.15">◎</div>' +
             '<div style="font-family:Arial,sans-serif;font-size:22px;font-weight:700;' +
             'color:rgba(255,255,255,.7);letter-spacing:.02em">' +
@@ -5033,7 +5033,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-dashboard.js?v=20260407-CD12"></script>
 <script src="/js/cdn-conformance.js?v=20260406-CF2"></script>
 <script src="/js/cdn-script-generator.js?v=20260406-SG1"></script>
-<script src="/js/cdn-coverage.js?v=20260407-CV13"></script>
+<script src="/js/cdn-coverage.js?v=20260407-CV14"></script>
 <script src="/js/cdn-script-editor.js?v=20260407-SE31"></script>
 <script src="/js/cdn-coc.js?v=20260403-S9"></script>
 <script src="/js/cdn-meeting.js?v=20260403-S9"></script>

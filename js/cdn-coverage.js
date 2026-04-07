@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// cdn-coverage.js  ·  v20260407-CV13
+// cdn-coverage.js  ·  v20260407-CV14
 // CadenceHUD — Coverage Tab (full rebuild)
 //
 // Replaces _s9RenderCoverageTab() in cadence.html.
@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV13 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV14 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -431,15 +431,28 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
   window._cvRestoreRerunButtons = function() {
     Object.keys(window._cvCompletedRuns).forEach(function(pi) {
       var sid = window._cvCompletedRuns[pi];
-      var cta = document.getElementById('cv-run-cta-'+pi);
-      if (!cta) return;
-      cta.style.color = '#3b82f6';
-      cta.style.textDecoration = 'none';
-      cta.style.cursor = 'default';
-      cta.innerHTML = '✓ Path verified &nbsp;<span style="font-size:10px;color:#3b82f6;cursor:pointer;text-decoration:underline" onclick="_cvResetPath('+pi+',\''+sid+'\')">&#x21ba; Re-run</span>';
-      cta.onclick = null;
+      _cvInjectRerunBtn(pi, sid);
     });
   };
+
+  function _cvInjectRerunBtn(pi, sid) {
+    // Remove existing rerun btn if present
+    var existing = document.getElementById('cv-rerun-btn-'+pi);
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    // Hide the CTA (run link) since path is now complete
+    var cta = document.getElementById('cv-run-cta-'+pi);
+    if (cta) { cta.style.display = 'none'; }
+    // Inject rerun btn after END block in dag-row
+    var dagRow = document.getElementById('cv-dag-row-'+pi);
+    if (!dagRow) return;
+    var btn = document.createElement('div');
+    btn.id = 'cv-rerun-btn-'+pi;
+    btn.style.cssText = 'display:flex;align-items:center;margin-left:12px;flex-shrink:0';
+    btn.innerHTML = '<span style="font-size:11px;color:#3de08a;margin-right:8px">✓ Verified</span>'+
+      '<span style="font-size:11px;color:#3b82f6;cursor:pointer;text-decoration:underline" '+
+      'onclick="_cvResetPath('+pi+',\''+sid+'\')">&#x21ba; Re-run</span>';
+    dagRow.appendChild(btn);
+  }
 
   window._cvRunPathScript = function(scriptId, pathIdx) {
     var sec = document.getElementById('cv-path-sec-'+pathIdx);
@@ -550,17 +563,8 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
         });
       }
 
-      // Update CTA to show result + reset button
-      if (cta) {
-        cta.style.opacity = '1';
-        cta.style.color = clr;
-        cta.style.textDecoration = 'none';
-        cta.style.cursor = 'default';
-        cta.innerHTML = icon + ' ' + (passed ? 'Passed — path verified' : 'Failed — check script') +
-          ' <span style="margin-left:10px;font-size:10px;color:#3b82f6;cursor:pointer;text-decoration:underline"' +
-          ' onclick="_cvResetPath('+pathIdx+',\''+scriptId+'\')">&#x21ba; Re-run</span>';
-        cta.onclick = null;
-      }
+      // Inject Re-run button to right of END block, hide CTA
+      _cvInjectRerunBtn(pathIdx, scriptId);
       // Store this completion so re-run button survives re-renders
       if (!window._cvCompletedRuns) window._cvCompletedRuns = {};
       window._cvCompletedRuns[pathIdx] = scriptId;
@@ -594,9 +598,12 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
         a.className = a.className.replace(/covered|uncovered|stale/g,'').trim()+' scripted';
       });
     }
-    // Restore CTA to runnable state
+    // Remove rerun btn and restore CTA
+    var rerunBtn = document.getElementById('cv-rerun-btn-'+pathIdx);
+    if (rerunBtn && rerunBtn.parentNode) rerunBtn.parentNode.removeChild(rerunBtn);
     var cta = document.getElementById('cv-run-cta-'+pathIdx);
     if (cta) {
+      cta.style.display = '';
       cta.style.color = '#3b82f6';
       cta.style.textDecoration = 'underline';
       cta.style.cursor = 'pointer';
