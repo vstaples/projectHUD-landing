@@ -1015,7 +1015,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.72 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.73 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -2922,14 +2922,26 @@ function _s9ExportCertPdf() {
   if (!certWrap) return;
   // Open print dialog scoped to cert content only
   var FA = 'font-family:Arial,sans-serif;';
+  // Clone cert wrap and strip button footer before printing
+  var certClone = certWrap.cloneNode(true);
+  var footerBtns = certClone.querySelector('#s9-cert-footer-btns');
+  if (!footerBtns) {
+    // fallback: remove last child div if it contains buttons
+    var kids = certClone.children;
+    if (kids.length) {
+      var last = kids[kids.length-1];
+      if (last.querySelector('button')) last.parentNode.removeChild(last);
+    }
+  } else { footerBtns.parentNode.removeChild(footerBtns); }
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
     '<title>Validation Certificate</title>' +
     '<style>' +
       'body{margin:0;padding:20px;background:#fff}' +
       '#s9-cert-wrap{max-height:none!important;overflow:visible!important;box-shadow:none!important;width:100%!important;max-width:680px!important;margin:0 auto}' +
+      'button{display:none!important}' +
       '@media print{@page{margin:12mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}#s9-cert-wrap{max-height:none!important;overflow:visible!important}}' +
     '</style></head><body>' +
-    certWrap.outerHTML +
+    certClone.outerHTML +
     '<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script>' +
     '</body></html>';
   var win = window.open('', '_blank', 'width=740,height=800');
