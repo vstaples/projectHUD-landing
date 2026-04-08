@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE52 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE53 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -634,92 +634,48 @@ function _renderRoutingPanel(roles) {
   const isSerial = mode === 'serial';
 
   if (!roles.length) {
-    return `<div style="font-size:12px;color:var(--muted);line-height:1.8">
-              Assign roles to fields to configure routing.
-            </div>`;
+    return '<div style="font-size:12px;color:var(--muted);line-height:1.8;font-family:Arial,sans-serif">Assign roles to fields to build the approval sequence.</div>';
   }
 
   return `
-    <!-- Mode selector -->
-    <div style="margin-bottom:16px">
-      <div style="font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-                  color:var(--muted);margin-bottom:10px">Fill Order</div>
-
-      <!-- Serial radio -->
-      <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;
-                    padding:8px 10px;border-radius:5px;margin-bottom:6px;
-                    border:1px solid ${isSerial ? 'var(--cad-wire)' : 'var(--border)'};
-                    background:${isSerial ? 'var(--cad-dim)' : 'transparent'};
-                    transition:all .15s">
-        <input type="radio" name="form-routing-mode" value="serial"
-          ${isSerial ? 'checked' : ''}
-          onchange="_formSetRoutingMode('serial')"
-          style="margin-top:2px;accent-color:var(--cad);flex-shrink:0"/>
-        <div>
-          <div style="font-size:12px;font-weight:600;color:${isSerial ? 'var(--text)' : 'var(--text2)'}">
-            Serial
-          </div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;line-height:1.5">
-            Roles fill in sequence.<br/>Each is notified only after the prior role submits.
-          </div>
-        </div>
-      </label>
-
-      <!-- Parallel radio -->
-      <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;
-                    padding:8px 10px;border-radius:5px;
-                    border:1px solid ${!isSerial ? 'var(--accent)' : 'var(--border)'};
-                    background:${!isSerial ? 'rgba(79,142,247,.08)' : 'transparent'};
-                    transition:all .15s">
-        <input type="radio" name="form-routing-mode" value="parallel"
-          ${!isSerial ? 'checked' : ''}
-          onchange="_formSetRoutingMode('parallel')"
-          style="margin-top:2px;accent-color:var(--accent);flex-shrink:0"/>
-        <div>
-          <div style="font-size:12px;font-weight:600;color:${!isSerial ? 'var(--text)' : 'var(--text2)'}">
-            Parallel
-          </div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;line-height:1.5">
-            All roles notified simultaneously. Any can fill in any order.
-          </div>
-        </div>
-      </label>
+    <!-- Mode toggle pills -->
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <button onclick="_formSetRoutingMode('serial')"
+        title="Approvals happen in sequence — each notified only after the prior one submits"
+        style="font-family:Arial,sans-serif;font-size:11px;font-weight:600;padding:4px 14px;
+               border-radius:99px;border:1px solid ${isSerial ? 'var(--cad)' : 'var(--border)'};
+               background:${isSerial ? 'var(--cad-dim)' : 'transparent'};
+               color:${isSerial ? 'var(--cad)' : 'var(--muted)'};cursor:pointer;transition:all .15s">
+        ↓ Serial
+      </button>
+      <button onclick="_formSetRoutingMode('parallel')"
+        title="All approvers notified simultaneously — any can approve in any order"
+        style="font-family:Arial,sans-serif;font-size:11px;font-weight:600;padding:4px 14px;
+               border-radius:99px;border:1px solid ${!isSerial ? 'var(--accent)' : 'var(--border)'};
+               background:${!isSerial ? 'rgba(79,142,247,.1)' : 'transparent'};
+               color:${!isSerial ? 'var(--accent)' : 'var(--muted)'};cursor:pointer;transition:all .15s">
+        ⇉ Parallel
+      </button>
     </div>
 
-    <!-- Role sequence (shown always; drag handle only active in serial mode) -->
+    <!-- Required Approvals -->
     <div>
-      <div style="font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-                  color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px">
-        Roles in this form
-        ${isSerial ? `<span style="font-weight:400;color:var(--text3)">— drag to reorder</span>` : ''}
+      <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+                  color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;
+                  font-family:Arial,sans-serif">
+        Required Approvals
+        ${isSerial ? '<span style="font-weight:400;opacity:.6">— drag to reorder</span>' : ''}
       </div>
       <div id="form-role-list" style="display:flex;flex-direction:column;gap:4px">
         ${_renderRoleRows(roles, isSerial)}
       </div>
-      ${isSerial ? `
-      <div style="margin-top:10px;padding:8px 10px;border-radius:4px;
-                  background:rgba(196,125,24,.06);border:1px solid var(--cad-wire)">
-        <div style="font-size:12px;color:var(--amber);line-height:1.5">
-          ↓ Top role receives the form first. Each subsequent role is notified only after the role above submits.
-        </div>
-      </div>` : `
-      <div style="margin-top:10px;padding:8px 10px;border-radius:4px;
-                  background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.2)">
-        <div style="font-size:12px;color:var(--accent);line-height:1.5">
-          ⇉ All roles receive the form simultaneously. The form step completes when all have submitted.
-        </div>
-      </div>`}
     </div>`;
 }
 
 function _renderRoleRows(roles, isSerial) {
-  // roles is sorted by _formRouting.roles[].order when serial
   const ordered = _formRoutingRolesOrdered(roles);
-
   return ordered.map((r, idx) => {
-    const roleConf = FORM_ROLES[r.role] || { label: r.role, color: 'var(--muted)', dim: 'rgba(255,255,255,.05)' };
-    const fieldCount = (_formFields || []).filter(f => f.role === r.role).length;
-
+    const roleConf = FORM_ROLES[r.role] || { label: r.role, color: 'var(--muted)' };
     return `
       <div id="role-row-${r.role}"
         draggable="${isSerial}"
@@ -728,37 +684,17 @@ function _renderRoleRows(roles, isSerial) {
         ondragleave="${isSerial ? `_formRoleDragLeave(event)` : ''}"
         ondrop="${isSerial ? `_formRoleDrop(event,'${r.role}')` : ''}"
         ondragend="${isSerial ? `_formRoleDragEnd()` : ''}"
-        style="display:flex;align-items:center;gap:8px;padding:7px 10px;
-               border-radius:5px;border:1px solid var(--border);
+        style="display:flex;align-items:center;gap:8px;padding:5px 10px;
+               border-radius:99px;border:1px solid var(--border);
                background:var(--surf2);
                ${isSerial ? 'cursor:grab' : 'cursor:default'};
                transition:border-color .15s">
-
-        <!-- Order number (serial) or parallel indicator -->
         ${isSerial
-          ? `<span style="font-size:12px;font-weight:700;color:var(--muted);
-                         width:14px;text-align:center;flex-shrink:0">${idx + 1}</span>`
-          : `<span style="font-size:12px;color:var(--accent);flex-shrink:0">⇉</span>`}
-
-        <!-- Role colour dot + label -->
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:6px">
-            <div style="width:7px;height:7px;border-radius:50%;
-                        background:${roleConf.color};flex-shrink:0"></div>
-            <span style="font-size:12px;font-weight:600;color:${roleConf.color}">
-              ${roleConf.label}
-            </span>
-          </div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">
-            ${fieldCount} field${fieldCount !== 1 ? 's' : ''}
-          </div>
-        </div>
-
-        <!-- Drag handle (serial only) -->
-        ${isSerial
-          ? `<span style="font-size:13px;color:var(--border2);flex-shrink:0;
-                         user-select:none;line-height:1">⠿</span>`
-          : ''}
+          ? `<span style="font-size:10px;font-weight:700;color:var(--muted);width:12px;text-align:center;flex-shrink:0;font-family:Arial,sans-serif">${idx + 1}</span>`
+          : `<span style="font-size:11px;color:var(--accent);flex-shrink:0">⇉</span>`}
+        <div style="width:7px;height:7px;border-radius:50%;background:${roleConf.color};flex-shrink:0"></div>
+        <span style="font-size:12px;font-weight:600;color:${roleConf.color};flex:1;font-family:Arial,sans-serif">${roleConf.label}</span>
+        ${isSerial ? '<span style="font-size:11px;color:var(--border2);flex-shrink:0;user-select:none">⠿</span>' : ''}
       </div>`;
   }).join('');
 }
