@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE41 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE42 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -280,14 +280,14 @@ function renderFormsTab(el) {
           onmouseout="if(!window._formDragCol)this.style.background='transparent'"
           onmousedown="_formColDragStart(event,'form-lib-col','right')"></div>
         <div style="padding:10px 14px;border-bottom:1px solid var(--border);
-                    display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+                    display:flex;flex-direction:column;gap:6px;flex-shrink:0">
           <span style="font-size:12px;font-weight:600;letter-spacing:.14em;
                        text-transform:uppercase;color:var(--muted)">Form Library</span>
           <div style="display:flex;gap:6px">
             <button class="btn btn-cad btn-sm" onclick="_formUploadClick()"
-              style="font-size:14px;padding:4px 10px;font-family:Arial,sans-serif">↑ Import</button>
+              style="font-size:11px;padding:3px 10px;border-radius:99px;font-family:Arial,sans-serif">↑ Import</button>
             <button class="btn btn-cad btn-sm" onclick="_formAiGenerate()"
-              style="font-size:14px;padding:4px 10px;font-family:Arial,sans-serif">✦ Generate</button>
+              style="font-size:11px;padding:3px 10px;border-radius:99px;font-family:Arial,sans-serif">✦ Generate</button>
           </div>
         </div>
         <div id="form-list" style="flex:1;overflow-y:auto;padding:6px 0">
