@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE63 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE64 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2746,13 +2746,13 @@ async function _formCommit() {
       await API.del('workflow_template_steps?template_id=eq.' + tmplId).catch(function(){});
       var steps = [];
       steps.push(API.post('workflow_template_steps', {
-        firm_id: firmId, template_id: tmplId, name: 'Submit ' + formName,
+        template_id: tmplId, name: 'Submit ' + formName,
         step_type: 'form_submission', assignee_role: 'submitter',
         sequence_order: 1, is_start: true, created_at: new Date().toISOString()
       }));
       roles.forEach(function(r, idx) {
         steps.push(API.post('workflow_template_steps', {
-          firm_id: firmId, template_id: tmplId,
+          template_id: tmplId,
           name: (FORM_ROLES[r.role]||{label:r.role}).label + (r.parallel ? ' Approval (Parallel)' : ' Approval'),
           step_type: r.parallel ? 'parallel_approval' : 'approval',
           assignee_role: r.role, sequence_order: idx + 2,
@@ -2829,11 +2829,11 @@ function _formShowCommitModal(formName, roleNames, defaultVer, onConfirm) {
 
 // ── Version helpers ───────────────────────────────────────────────────────────
 function _verTooltipHtml() {
-  var TS = 'style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px"';
-  var THS = 'style="text-align:left;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.15);color:#8899aa;font-weight:600;font-size:10px;letter-spacing:.06em;text-transform:uppercase"';
-  var TDS = 'style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);color:#c8d4e0;font-size:11px;vertical-align:top"';
-  var TD1 = 'style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);color:#e2e8f0;font-weight:700;font-size:11px;white-space:nowrap;vertical-align:top"';
-  var TD2 = 'style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);color:#00c9c9;font-family:monospace;font-size:11px;white-space:nowrap;vertical-align:top"';
+  var TS = 'style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px"';
+  var THS = 'style="text-align:left;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.15);color:#8899aa;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase"';
+  var TDS = 'style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);color:#c8d4e0;font-size:12px;vertical-align:top"';
+  var TD1 = 'style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);color:#e2e8f0;font-weight:700;font-size:12px;white-space:nowrap;vertical-align:top"';
+  var TD2 = 'style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);color:#00c9c9;font-family:monospace;font-size:12px;white-space:nowrap;vertical-align:top"';
   var rows = [
     ['Save',       '+PATCH',       '0.1.0 → 0.1.1', 'Work in progress'],
     ['Commit',     '+MINOR',       '0.1.1 → 0.2.0', 'Ready for test'],
@@ -2848,8 +2848,8 @@ function _verTooltipHtml() {
       '<tr><th '+THS+'>Action</th><th '+THS+'>Effect</th><th '+THS+'>Example</th><th '+THS+'>Meaning</th></tr>' +
       rows +
     '</table>' +
-    '<div style="font-size:11px;color:#c8d4e0;line-height:1.6;margin-bottom:8px">Releasing locks this document and assigns a permanent version. Once released it is read-only — use <strong>Create Revision</strong> to open a new draft at the next minor version.</div>' +
-    '<div style="font-size:10px;color:#8899aa;border-top:1px solid rgba(255,255,255,.1);padding-top:8px">* The default version number may be overridden in the Commit and Release dialogs.</div>' +
+    '<div style="font-size:12px;color:#c8d4e0;line-height:1.6;margin-bottom:8px">Releasing locks this document and assigns a permanent version. Once released it is read-only — use <strong>Create Revision</strong> to open a new draft at the next minor version.</div>' +
+    '<div style="font-size:11px;color:#8899aa;border-top:1px solid rgba(255,255,255,.1);padding-top:8px">* The default version number may be overridden in the Commit and Release dialogs.</div>' +
   '</div>';
 }
 
