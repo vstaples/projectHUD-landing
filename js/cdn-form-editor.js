@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE58 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE59 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -52,11 +52,11 @@ console.log('%c[cdn-form-editor] v20260407-SE58 8px;border-radius:3px');
     var vs = document.createElement('style');
     vs.id = 'form-ver-tooltip-styles';
     vs.textContent = [
-      '.ver-tooltip-wrap{position:relative;display:inline-block}',
+      '.ver-tooltip-wrap{position:relative;display:inline-block;align-self:center}',
       '.ver-tooltip{display:none;position:absolute;bottom:calc(100% + 8px);right:0;',
       'width:380px;background:var(--bg2,#1a1f2e);border:1px solid var(--border2,rgba(255,255,255,.15));',
       'border-radius:8px;padding:14px 16px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.5);',
-      'font-family:Arial,sans-serif;pointer-events:none}',
+      'font-family:Arial,sans-serif}',
       '.ver-tooltip table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px}',
       '.ver-tooltip th{text-align:left;padding:3px 6px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:600;font-size:10px;letter-spacing:.06em;text-transform:uppercase}',
       '.ver-tooltip td{padding:4px 6px;border-bottom:0.5px solid var(--border);color:var(--text2);font-size:11px;vertical-align:top}',
@@ -2450,29 +2450,27 @@ function _formLifecycleButtons(f) {
   // ── State-specific primary actions ──────────────────────────────────────
 
   if (isEdit) {
-    if (f.category_id) {
-      // Show rejection context if applicable
-      if (state === 'rejected_review' || state === 'rejected_approval') {
-        btns.push(`<span style="font-size:12px;color:var(--red);font-family:Arial,sans-serif">
-          ✗ Rejected — revise & resubmit</span>`);
-      }
-      // Cancel Revision — only for unreleased (revision in progress, not yet submitted)
-      if (state === 'unreleased') {
-        btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formCancelRevision()"
-          style="font-size:13px;color:var(--red);border-color:rgba(248,113,113,.4)">
-          ✕ Cancel Revision</button>`);
-      }
-      // For HTML forms with source_html — show Commit button instead of Submit for Review
-      if (_selectedForm?.source_html) {
-        btns.push(`<button onclick="_formCommit()"
-          style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;
-                 background:var(--cad);color:#003333;border:none;cursor:pointer;
-                 font-family:Arial,sans-serif;line-height:1.4">
-          ⬡ Commit Form</button>`);
-      } else {
-        btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()"
-          style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
-      }
+    // Show rejection context if applicable
+    if (state === 'rejected_review' || state === 'rejected_approval') {
+      btns.push(`<span style="font-size:12px;color:var(--red);font-family:Arial,sans-serif">
+        ✗ Rejected — revise & resubmit</span>`);
+    }
+    // Cancel Revision — only for unreleased
+    if (state === 'unreleased') {
+      btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formCancelRevision()"
+        style="font-size:13px;color:var(--red);border-color:rgba(248,113,113,.4)">
+        ✕ Cancel Revision</button>`);
+    }
+    // Commit (HTML forms) or Submit for Review (PDF forms) or Release (no category gate)
+    if (_selectedForm?.source_html) {
+      btns.push(`<button onclick="_formCommit()"
+        style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;
+               background:var(--cad);color:#003333;border:none;cursor:pointer;
+               font-family:Arial,sans-serif;line-height:1.4">
+        ⬡ Commit Form</button>`);
+    } else if (f.category_id) {
+      btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()"
+        style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
     } else {
       btns.push('<div class="ver-tooltip-wrap">' +
         '<button onclick="_formReleaseDirectly()"' +
