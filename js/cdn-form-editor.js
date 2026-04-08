@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE53 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE55 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -608,7 +608,7 @@ function _renderFormEditor() {
             onmousedown="_formColDragStart(event,'form-col-routing','left')"></div>
           <div style="padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
             <span style="font-size:12px;font-weight:600;letter-spacing:.14em;
-                         text-transform:uppercase;color:var(--muted)">Fill Routing</span>
+                         text-transform:uppercase;color:var(--muted)">Routing Order</span>
           </div>
           <div style="flex:1;overflow-y:auto;padding:14px">
             ${_renderRoutingPanel(roles)}
@@ -630,71 +630,52 @@ function _renderFormEditor() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function _renderRoutingPanel(roles) {
-  const mode = _formRouting.mode || 'serial';
-  const isSerial = mode === 'serial';
-
   if (!roles.length) {
     return '<div style="font-size:12px;color:var(--muted);line-height:1.8;font-family:Arial,sans-serif">Assign roles to fields to build the approval sequence.</div>';
   }
-
   return `
-    <!-- Mode toggle pills -->
-    <div style="display:flex;gap:6px;margin-bottom:14px">
-      <button onclick="_formSetRoutingMode('serial')"
-        title="Approvals happen in sequence — each notified only after the prior one submits"
-        style="font-family:Arial,sans-serif;font-size:11px;font-weight:600;padding:4px 14px;
-               border-radius:99px;border:1px solid ${isSerial ? 'var(--cad)' : 'var(--border)'};
-               background:${isSerial ? 'var(--cad-dim)' : 'transparent'};
-               color:${isSerial ? 'var(--cad)' : 'var(--muted)'};cursor:pointer;transition:all .15s">
-        ↓ Serial
-      </button>
-      <button onclick="_formSetRoutingMode('parallel')"
-        title="All approvers notified simultaneously — any can approve in any order"
-        style="font-family:Arial,sans-serif;font-size:11px;font-weight:600;padding:4px 14px;
-               border-radius:99px;border:1px solid ${!isSerial ? 'var(--accent)' : 'var(--border)'};
-               background:${!isSerial ? 'rgba(79,142,247,.1)' : 'transparent'};
-               color:${!isSerial ? 'var(--accent)' : 'var(--muted)'};cursor:pointer;transition:all .15s">
-        ⇉ Parallel
-      </button>
-    </div>
-
-    <!-- Required Approvals -->
     <div>
       <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
                   color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;
                   font-family:Arial,sans-serif">
         Required Approvals
-        ${isSerial ? '<span style="font-weight:400;opacity:.6">— drag to reorder</span>' : ''}
+        <span style="font-weight:400;opacity:.6">— drag to reorder</span>
       </div>
-      <div id="form-role-list" style="display:flex;flex-direction:column;gap:4px">
-        ${_renderRoleRows(roles, isSerial)}
+      <div id="form-role-list" style="display:flex;flex-direction:column;gap:6px">
+        ${_renderRoleRows(roles)}
       </div>
     </div>`;
 }
 
-function _renderRoleRows(roles, isSerial) {
+function _renderRoleRows(roles) {
   const ordered = _formRoutingRolesOrdered(roles);
   return ordered.map((r, idx) => {
     const roleConf = FORM_ROLES[r.role] || { label: r.role, color: 'var(--muted)' };
+    const isParallel = r.parallel === true;
     return `
       <div id="role-row-${r.role}"
-        draggable="${isSerial}"
-        ondragstart="${isSerial ? `_formRoleDragStart(event,'${r.role}')` : ''}"
-        ondragover="${isSerial ? `_formRoleDragOver(event,'${r.role}')` : ''}"
-        ondragleave="${isSerial ? `_formRoleDragLeave(event)` : ''}"
-        ondrop="${isSerial ? `_formRoleDrop(event,'${r.role}')` : ''}"
-        ondragend="${isSerial ? `_formRoleDragEnd()` : ''}"
-        style="display:flex;align-items:center;gap:8px;padding:5px 10px;
-               border-radius:99px;border:1px solid var(--border);
-               background:var(--surf2);
-               ${isSerial ? 'cursor:grab' : 'cursor:default'};
-               transition:border-color .15s">
-        ${isSerial
-          ? `<span style="font-size:10px;font-weight:700;color:var(--muted);width:12px;text-align:center;flex-shrink:0;font-family:Arial,sans-serif">${idx + 1}</span>`
-          : `<span style="font-size:11px;color:var(--accent);flex-shrink:0">⇉</span>`}
-        <div style="width:7px;height:7px;border-radius:50%;background:${roleConf.color};flex-shrink:0"></div>
-        <span style="font-size:12px;font-weight:600;color:${roleConf.color};flex:1;font-family:Arial,sans-serif">${roleConf.label}</span>
-        ${isSerial ? '<span style="font-size:11px;color:var(--border2);flex-shrink:0;user-select:none">⠿</span>' : ''}
+        draggable="true"
+        ondragstart="_formRoleDragStart(event,'${r.role}')"
+        ondragover="_formRoleDragOver(event,'${r.role}')"
+        ondragleave="_formRoleDragLeave(event)"
+        ondrop="_formRoleDrop(event,'${r.role}')"
+        ondragend="_formRoleDragEnd()"
+        style="border:1px solid var(--border);border-radius:6px;background:var(--surf2);overflow:hidden;cursor:grab">
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px">
+          <span style="font-size:10px;font-weight:700;color:var(--muted);width:12px;text-align:center;flex-shrink:0;font-family:Arial,sans-serif">${idx + 1}</span>
+          <div style="width:7px;height:7px;border-radius:50%;background:${roleConf.color};flex-shrink:0"></div>
+          <span style="font-size:12px;font-weight:600;color:${roleConf.color};flex:1;font-family:Arial,sans-serif">${roleConf.label}</span>
+          <span style="font-size:11px;color:var(--border2);flex-shrink:0;user-select:none">⠿</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 10px 6px;border-top:1px solid var(--border)">
+          <div class="config-toggle" onclick="_formToggleRoleParallel('${r.role}')"
+            style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <div class="toggle-box${isParallel?' on':''}"></div>
+            <span style="font-size:11px;color:var(--muted);font-family:Arial,sans-serif">
+              ${isParallel ? '⇉ Parallel' : '↓ Serial'}
+            </span>
+          </div>
+        </div>
       </div>`;
   }).join('');
 }
@@ -797,6 +778,11 @@ function _formRoleDrop(event, targetRole) {
   event.currentTarget.style.borderColor = 'var(--border)';
   event.currentTarget.style.background  = 'var(--surf2)';
   _reRenderRoutingPanel();
+}
+
+function _formToggleRoleParallel(role) {
+  const r = (_formRouting.roles||[]).find(function(x){ return x.role === role; });
+  if (r) { r.parallel = !r.parallel; _reRenderRoutingPanel(); _formMarkDirty(); }
 }
 
 function _formRoleDragEnd() {
@@ -1725,39 +1711,9 @@ function _fieldConfidenceColor(field) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function _renderStageRoutingPanel() {
-  const stages = _formRouting.stages || _migrateToStages();
-  return `
-    <div>
-      <div style="font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-                  color:var(--muted);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
-        Fill Stages
-        <button onclick="_formAddStage()" class="btn btn-ghost btn-sm" style="font-size:12px;padding:2px 8px">+ Stage</button>
-      </div>
-      <div id="form-stage-list" style="display:flex;flex-direction:column;gap:8px">
-        ${stages.map((stage,si) => _renderStageRow(stage,si,stages.length)).join('')}
-      </div>
-      <div style="margin-top:12px;padding:8px 10px;border-radius:4px;background:rgba(196,125,24,.06);border:1px solid var(--cad-wire)">
-        <div style="font-size:12px;color:var(--muted);line-height:1.5">Each stage activates only after the previous stage is fully complete.</div>
-
-        <!-- CoC panel: flex sibling of columns — aligns with field headers -->
-        <div class="form-coc-panel" id="form-coc-panel">
-          <div class="form-coc-resize" id="form-coc-resize" title="Drag to resize"></div>
-          <div class="form-coc-inner">
-            <div class="form-coc-header">
-              <span class="form-coc-title">Chain of Custody</span>
-              <button onclick="_formToggleCoC()" style="background:none;border:none;
-                color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1">✕</button>
-            </div>
-            <div class="form-coc-body" id="form-coc-body">
-              <div style="font-size:12px;color:var(--muted);text-align:center;padding-top:24px;font-family:Arial,sans-serif">
-                No history yet.
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>`;
+  // Deprecated — replaced by _renderRoutingPanel. Kept as shim.
+  const roles = _deriveRoles(_formFields);
+  return _renderRoutingPanel(roles);
 }
 
 function _renderStageRow(stage, si, totalStages) {
@@ -1827,7 +1783,10 @@ function _reRenderRoutingPanel() {
   if (routingCol) {
     const inner = routingCol.querySelector('[style*="overflow-y:auto"]') ||
                   routingCol.querySelector('[style*="overflow-y: auto"]');
-    if (inner) inner.innerHTML = _renderStageRoutingPanel();
+    if (inner) {
+      const roles = _deriveRoles(_formFields);
+      inner.innerHTML = _renderRoutingPanel(roles);
+    }
   }
 }
 
@@ -2690,11 +2649,12 @@ async function _formDeleteWithConfirm(formId) {
       steps.push(API.post('workflow_template_steps', {
         firm_id:        firmId,
         template_id:    tmplId,
-        name:           (FORM_ROLES[r.role]||{label:r.role}).label + ' Approval',
-        step_type:      'approval',
+        name:           (FORM_ROLES[r.role]||{label:r.role}).label + (r.parallel ? ' Approval (Parallel)' : ' Approval'),
+        step_type:      r.parallel ? 'parallel_approval' : 'approval',
         assignee_role:  r.role,
         sequence_order: idx + 2,
         is_start:       false,
+        parallel:       r.parallel || false,
         created_at:     new Date().toISOString()
       }));
     });
