@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE74 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE75 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -502,8 +502,8 @@ function _renderFormEditor() {
                    border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
             CoC
           </button>
-          <!-- Edit Mode toggle -->
-          <button id="form-edit-mode-btn" onclick="_formToggleEditMode()" title="Toggle edit mode — click text in the form to edit it directly"
+          <!-- Edit Mode toggle — wired via addEventListener in _formWireToolbarButtons -->
+          <button id="form-edit-mode-btn" title="Toggle edit mode — click text in the form to edit it directly"
             style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
                    border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
             ✎ Edit
@@ -2605,6 +2605,14 @@ async function _formSelect(formId) {
     else if (canvas && canvas.parentElement) canvas.parentElement.appendChild(iframe);
     _pdfTotalPages = 1; _pdfPage = 1;
     if (typeof _updatePageIndicator === 'function') _updatePageIndicator();
+    // Wire toolbar buttons that can't use onclick attrs due to scope
+    setTimeout(function() {
+      var editBtn = document.getElementById('form-edit-mode-btn');
+      if (editBtn && !editBtn._wired) {
+        editBtn._wired = true;
+        editBtn.addEventListener('click', function() { _formToggleEditMode(); });
+      }
+    }, 100);
   } else {
     // No PDF — render a blank A4 canvas so field-based forms display correctly
     console.warn('[formSelect] no source_path on form:', form.id, '— rendering blank canvas');
