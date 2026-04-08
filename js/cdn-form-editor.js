@@ -1,7 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-console.log('%c[cdn-form-editor] v20260407-SE37 8px;border-radius:3px');
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260401-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE37','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
