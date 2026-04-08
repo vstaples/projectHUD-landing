@@ -1,0 +1,442 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;font-size:12px;background:var(--color-background-tertiary);padding:16px}
+.shell{max-width:960px;margin:0 auto;background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:12px;overflow:hidden}
+.hdr{padding:14px 20px 12px;background:#00c9c9;display:flex;justify-content:space-between;align-items:flex-start}
+.htitle{font-size:15px;font-weight:500;color:#003333;font-family:Arial,sans-serif}
+.hsub{font-size:10px;color:#005555;margin-top:3px}
+.rpills{display:flex;gap:5px;align-items:center}
+.rp{font-size:9px;font-weight:500;padding:2px 8px;border-radius:8px;background:rgba(0,51,51,.15);color:#003333}
+.ra{font-size:9px;color:#005555}
+.body{padding:16px 20px}
+.sec{margin-bottom:18px}
+.sec-lbl{font-size:9px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-tertiary);margin-bottom:8px;padding-bottom:4px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.f{display:flex;flex-direction:column;gap:3px}
+.f label{font-size:11px;font-weight:500;color:var(--color-text-primary)}
+.req{color:#E24B4A;margin-left:2px}
+.sys-badge{font-size:9px;color:var(--color-text-tertiary);background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:4px;padding:1px 5px;margin-left:4px}
+.f input,.f select,.f textarea{font-family:Arial,sans-serif;font-size:12px;padding:5px 8px;border:0.5px solid var(--color-border-secondary);border-radius:5px;background:var(--color-background-secondary);color:var(--color-text-primary);width:100%}
+.f input[readonly]{color:var(--color-text-tertiary);cursor:default}
+.cond-block{border:0.5px solid var(--color-border-info);border-radius:6px;padding:10px 12px;background:var(--color-background-info);margin-top:8px;display:none}
+.cond-block.visible{display:block}
+.cond-label{font-size:10px;color:var(--color-text-info);margin-bottom:6px;font-weight:500}
+.day-wrap{overflow-x:auto;border:0.5px solid var(--color-border-tertiary);border-radius:6px}
+.day-table{border-collapse:collapse;min-width:100%}
+.day-table th{background:var(--color-background-secondary);padding:5px 8px;text-align:center;border:0.5px solid var(--color-border-tertiary);color:var(--color-text-secondary);font-size:10px;font-weight:500;white-space:nowrap}
+.day-table th.cat-h{text-align:left;min-width:160px;position:sticky;left:0;z-index:2;background:var(--color-background-secondary)}
+.day-table th.total-h{background:var(--color-background-tertiary);color:var(--color-text-primary);position:sticky;right:0;z-index:2;font-weight:500}
+.day-table th.today-h{background:#E1F5EE;color:#0F6E56}
+.day-table td{border:0.5px solid var(--color-border-tertiary);padding:0;text-align:center;vertical-align:middle}
+.day-table td.cat{text-align:left;padding:4px 10px;font-size:12px;color:var(--color-text-primary);position:sticky;left:0;background:var(--color-background-primary);z-index:1;white-space:nowrap}
+.day-table td.total-cell{position:sticky;right:0;background:var(--color-background-secondary);font-family:monospace;font-size:12px;font-weight:500;color:var(--color-text-primary);padding:4px 8px;white-space:nowrap}
+.day-table td input[type=number]{width:68px;padding:4px;border:none;background:transparent;color:var(--color-text-primary);text-align:right;font-family:monospace;font-size:12px;outline:none}
+.day-table td input[type=number]:focus{background:var(--color-background-info);border-radius:3px}
+.day-table td.today-col{background:rgba(29,158,117,.04)}
+.day-table tr.sec-hdr td{background:var(--color-background-tertiary);font-size:9px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--color-text-tertiary);padding:4px 10px;text-align:left}
+.day-table tr.grand td.cat{font-weight:500;font-size:13px;background:var(--color-background-secondary)}
+.day-table tr.grand td{background:var(--color-background-secondary)}
+.day-table tr.grand td.total-cell{font-size:14px;color:#3B6D11}
+.misc-table{width:100%;border-collapse:collapse;font-size:12px}
+.misc-table th{background:var(--color-background-secondary);padding:5px 8px;text-align:left;border:0.5px solid var(--color-border-tertiary);color:var(--color-text-secondary);font-size:10px;font-weight:500}
+.misc-table td{border:0.5px solid var(--color-border-tertiary);padding:2px 4px}
+.misc-table td input,.misc-table td select{font-family:Arial,sans-serif;font-size:12px;width:100%;border:none;background:transparent;color:var(--color-text-primary);padding:3px 5px;outline:none}
+.misc-table td input[type=number]{font-family:monospace;text-align:right}
+.misc-total-row td{background:var(--color-background-secondary);font-weight:500;padding:5px 8px;font-size:11px;border:0.5px solid var(--color-border-tertiary)}
+.add-row-btn{font-size:11px;padding:4px 10px;border-radius:4px;border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;margin-top:6px;font-family:Arial,sans-serif}
+.del-btn{font-size:11px;color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;padding:2px 6px}
+.ent-table{width:100%;border-collapse:collapse;font-size:11px}
+.ent-table th{background:var(--color-background-secondary);padding:5px 8px;text-align:left;border:0.5px solid var(--color-border-tertiary);color:var(--color-text-secondary);font-size:10px;font-weight:500}
+.ent-table td{border:0.5px solid var(--color-border-tertiary);padding:2px 4px}
+.ent-table td input{font-family:Arial,sans-serif;font-size:11px;width:100%;border:none;background:transparent;color:var(--color-text-primary);padding:3px 4px;outline:none}
+.totals-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tot-block{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:6px;padding:10px 12px}
+.tot-title{font-size:9px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--color-text-tertiary);margin-bottom:8px}
+.tot-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:11px}
+.tot-row:last-child{border:none;padding-top:5px;font-weight:500}
+.tot-cat{color:var(--color-text-secondary)}
+.tot-val{font-family:monospace;font-size:12px}
+.cert-block{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:6px;padding:10px 14px}
+.sig-area{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px}
+.sig-line{border-bottom:1px solid var(--color-border-secondary);height:28px}
+.sig-lbl{font-size:9px;color:var(--color-text-tertiary);margin-top:3px}
+.ftr{padding:12px 20px;border-top:0.5px solid var(--color-border-tertiary);display:flex;justify-content:space-between;align-items:center;background:var(--color-background-secondary)}
+.btn-p{font-size:12px;font-weight:500;padding:6px 16px;border-radius:5px;border:none;background:#00c9c9;color:#003333;cursor:pointer;font-family:Arial,sans-serif}
+.btn-s{font-size:12px;padding:6px 12px;border-radius:5px;border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:Arial,sans-serif}
+</style>
+
+<div class="shell">
+  <div class="hdr">
+    <div>
+      <div class="htitle">Expense Report</div>
+      <div class="hsub">v3.1.0 · CadenceHUD / Compass</div>
+    </div>
+    <div class="rpills">
+      <div class="rp">1 · Employee</div><div class="ra">→</div>
+      <div class="rp">2 · Proj/Func. Manager</div><div class="ra">→</div>
+      <div class="rp">3 · Finance / Exec Mgmt</div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <div class="sec" data-section="employee_info">
+      <div class="sec-lbl">Employee & Trip Information</div>
+      <div class="g3" style="margin-bottom:8px">
+        <div class="f"><label>Employee Name <span class="req">*</span></label><input type="text" data-field-id="f01" data-label="Employee Name" data-required="true" data-section="employee_info" placeholder="Full legal name"></div>
+        <div class="f"><label>Employee ID <span class="sys-badge">auto</span></label><input type="text" data-field-id="f02" data-label="Employee ID" data-required="false" data-section="employee_info" readonly placeholder="Populated from system if on file"></div>
+        <div class="f"><label>Submission Date <span class="sys-badge">auto</span></label><input type="text" data-field-id="f03" data-label="Submission Date" data-required="false" data-section="employee_info" readonly id="sub-date"></div>
+      </div>
+      <div class="g2" style="margin-bottom:8px">
+        <div class="f"><label>Trip Start Date</label><input type="date" data-field-id="f04" data-label="Trip Start Date" data-required="true" data-section="employee_info" id="trip-start" oninput="onDateChange()"></div>
+        <div class="f"><label>Trip End Date</label><input type="date" data-field-id="f05" data-label="Trip End Date" data-required="true" data-section="employee_info" id="trip-end" oninput="onDateChange()"></div>
+      </div>
+      <div class="g2">
+        <div class="f">
+          <label>Business Purpose <span class="req">*</span></label>
+          <select data-field-id="f06" data-label="Business Purpose" data-required="true" data-section="employee_info" id="purpose-sel" onchange="toggleCustomer()">
+            <option value="">— Select —</option>
+            <option value="client">Client Visit</option>
+            <option value="client">Customer Meeting</option>
+            <option value="internal">Internal Meeting</option>
+            <option value="internal">Training / Seminar</option>
+            <option value="internal">Conference</option>
+            <option value="internal">Site Visit</option>
+            <option value="reimb">Consumable / Supply Reimbursement</option>
+            <option value="reimb">Equipment Purchase</option>
+            <option value="reimb">Software / Subscription</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="f"><label>Purpose Description</label><input type="text" data-field-id="f07" data-label="Purpose Description" data-required="false" data-section="employee_info" placeholder="Brief description of expenses"></div>
+      </div>
+      <div class="cond-block" id="customer-block">
+        <div class="cond-label">Client / Customer Details</div>
+        <div class="g2">
+          <div class="f"><label>Customer Name <span class="req">*</span></label><input type="text" data-field-id="f08" data-label="Customer Name" data-required="false" data-section="employee_info" placeholder="Company or individual name"></div>
+          <div class="f"><label>Customer Location <span class="req">*</span></label><input type="text" data-field-id="f09" data-label="Customer Location" data-required="false" data-section="employee_info" placeholder="City, State or Country"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" data-section="daily_expenses">
+      <div class="sec-lbl">Daily Expenses <span id="date-range-label" style="color:var(--color-text-tertiary);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px"></span></div>
+      <div class="day-wrap">
+        <table class="day-table" id="day-table">
+          <thead id="day-thead"></thead>
+          <tbody id="day-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sec" data-section="misc_expenses">
+      <div class="sec-lbl">Miscellaneous Expenses — itemized</div>
+      <table class="misc-table" id="misc-table">
+        <thead>
+          <tr>
+            <th style="width:36%">Description</th>
+            <th style="width:16%">Date</th>
+            <th style="width:18%">Type</th>
+            <th style="width:18%">Amount (USD)</th>
+            <th style="width:12%"></th>
+          </tr>
+        </thead>
+        <tbody id="misc-body"></tbody>
+        <tfoot>
+          <tr class="misc-total-row">
+            <td colspan="3">Billable: <span id="misc-bill" style="color:#3B6D11;font-family:monospace">$0.00</span> &nbsp;·&nbsp; Non-Billable: <span id="misc-nonbill" style="color:#854F0B;font-family:monospace">$0.00</span></td>
+            <td><span id="misc-total" style="font-family:monospace;color:var(--color-text-primary)">$0.00</span></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+      <button class="add-row-btn" onclick="addMiscRow()">+ Add item</button>
+    </div>
+
+    <div class="sec" data-section="entertainment">
+      <div class="sec-lbl">Entertainment Detail — required for all entertainment entries</div>
+      <table class="ent-table">
+        <thead>
+          <tr>
+            <th style="width:13%">Date</th>
+            <th style="width:16%">Type</th>
+            <th style="width:33%">Guests (name · title · company)</th>
+            <th style="width:27%">Business Purpose</th>
+            <th style="width:11%">Amount</th>
+          </tr>
+        </thead>
+        <tbody id="ent-body">
+          <tr><td><input type="date"></td><td><input type="text" placeholder="Dinner, Lunch…"></td><td><input type="text" placeholder="Name · Title · Company"></td><td><input type="text" placeholder="Purpose"></td><td><input type="number" placeholder="0.00" style="font-family:monospace;text-align:right;width:100%;border:none;background:transparent;color:var(--color-text-primary);padding:3px 4px;outline:none"></td></tr>
+          <tr><td><input type="date"></td><td><input type="text"></td><td><input type="text"></td><td><input type="text"></td><td><input type="number" placeholder="0.00" style="font-family:monospace;text-align:right;width:100%;border:none;background:transparent;color:var(--color-text-primary);padding:3px 4px;outline:none"></td></tr>
+        </tbody>
+      </table>
+      <button class="add-row-btn" onclick="addEntRow()">+ Add row</button>
+    </div>
+
+    <div class="sec" data-section="settlement">
+      <div class="sec-lbl">Settlement Summary</div>
+      <div class="totals-grid">
+        <div class="tot-block">
+          <div class="tot-title">Expense Breakdown</div>
+          <div class="tot-row"><span class="tot-cat">Meals & Entertainment</span><span class="tot-val" id="sum-meals">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Airfare</span><span class="tot-val" id="sum-air">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Lodging</span><span class="tot-val" id="sum-lodge">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Car Rental</span><span class="tot-val" id="sum-car">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Transport</span><span class="tot-val" id="sum-trans">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Miscellaneous</span><span class="tot-val" id="sum-misc">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Grand Total</span><span class="tot-val" id="sum-grand" style="font-size:14px;color:#3B6D11">$0.00</span></div>
+        </div>
+        <div class="tot-block">
+          <div class="tot-title">Settlement</div>
+          <div class="tot-row"><span class="tot-cat">Total Expenses</span><span class="tot-val" id="set-total">$0.00</span></div>
+          <div class="f" style="margin:6px 0"><label>Less: Corporate Card Charges</label><input type="number" data-field-id="f10" data-label="Corporate Card Charges" data-required="false" data-section="settlement" id="corp-card" placeholder="0.00" step="0.01" oninput="calcSettlement()" style="font-family:monospace"></div>
+          <div class="tot-row"><span class="tot-cat" style="font-weight:500">Net Due to Employee</span><span class="tot-val" id="set-due" style="color:#3B6D11;font-size:13px">$0.00</span></div>
+          <div style="border-top:0.5px solid var(--color-border-tertiary);padding-top:6px;margin-top:6px">
+            <div class="tot-row"><span class="tot-cat" style="font-weight:500">Total to Charge Company</span><span class="tot-val" id="set-charge" style="color:#854F0B;font-size:13px">$0.00</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" data-section="certification">
+      <div class="sec-lbl">Certification & Approval</div>
+      <div class="cert-block">
+        <div style="font-size:11px;color:var(--color-text-secondary);line-height:1.5;margin-bottom:10px">I certify that all expenses on this report were incurred by me in the performance of my duties for the company and are accurate and compliant with company policy.</div>
+        <div class="sig-area">
+          <div><div class="sig-line"></div><div class="sig-lbl">Employee Signature / Date</div></div>
+          <div><div class="sig-line"></div><div class="sig-lbl">Project / Functional Manager / Date</div></div>
+          <div><div class="sig-line"></div><div class="sig-lbl">Finance / Exec. Management / Date</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="ftr">
+    <div style="font-size:10px;color:var(--color-text-tertiary)">Step 1 of 3 · Employee Submission · Routes to Proj/Func. Manager then Finance/Exec. Mgmt</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-s">Save draft</button>
+      <button class="btn-p">Submit for approval →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var CATS = [
+  {id:'bkf',  label:'Breakfast',        group:'meals'},
+  {id:'lnch', label:'Lunch',            group:'meals'},
+  {id:'din',  label:'Dinner',           group:'meals'},
+  {id:'ent',  label:'Entertainment',    group:'meals'},
+  {id:'air',  label:'Airfare',          group:'travel'},
+  {id:'lodge',label:'Lodging',          group:'travel'},
+  {id:'car',  label:'Car Rental',       group:'travel'},
+  {id:'mile', label:'Mileage (mi)',     group:'travel'},
+  {id:'park', label:'Parking / Tolls',  group:'travel'},
+  {id:'taxi', label:'Taxi / Rideshare', group:'travel'},
+  {id:'phone',label:'Phone / Internet', group:'other'},
+  {id:'ccc',  label:'Corporate Card',   group:'other'},
+];
+var GROUP_LABELS = {meals:'Meals & Entertainment', travel:'Transportation & Lodging', other:'Other'};
+var savedVals = {};
+
+function fmt(n){ return '$'+n.toFixed(2); }
+function dayKey(d){ return d.toISOString().slice(0,10); }
+
+function defaultDates() {
+  var dates = [];
+  var d = new Date(); d.setHours(0,0,0,0);
+  for (var i=0;i<7;i++){
+    dates.push(new Date(d));
+    d.setDate(d.getDate()+1);
+  }
+  return dates;
+}
+
+function getDates(start, end) {
+  var dates=[], cur=new Date(start+'T00:00:00'), last=new Date(end+'T00:00:00');
+  while(cur<=last){ dates.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
+  return dates;
+}
+
+function fmtCol(d) {
+  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var mons=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return days[d.getDay()]+' '+mons[d.getMonth()]+' '+d.getDate();
+}
+
+function buildTable(dates) {
+  var todayStr = dayKey(new Date());
+  var thead = document.getElementById('day-thead');
+  var tbody = document.getElementById('day-tbody');
+
+  // Save current values before rebuild
+  document.querySelectorAll('[data-cat]').forEach(function(inp){
+    var k = inp.dataset.cat+'|'+inp.dataset.dk;
+    savedVals[k] = inp.value;
+  });
+
+  var hrow = '<tr><th class="cat-h">Category</th>';
+  dates.forEach(function(d){
+    var dk = dayKey(d);
+    var cls = dk===todayStr ? ' today-h' : '';
+    hrow += '<th class="'+cls+'" style="min-width:74px">'+fmtCol(d)+'</th>';
+  });
+  hrow += '<th class="total-h">Total</th></tr>';
+  thead.innerHTML = hrow;
+
+  var lastGroup='', rows='';
+  CATS.forEach(function(cat){
+    if(cat.group!==lastGroup){
+      lastGroup=cat.group;
+      rows += '<tr class="sec-hdr"><td colspan="'+(dates.length+2)+'">'+GROUP_LABELS[cat.group]+'</td></tr>';
+    }
+    rows += '<tr><td class="cat">'+cat.label+'</td>';
+    dates.forEach(function(d){
+      var dk = dayKey(d);
+      var k = cat.id+'|'+dk;
+      var v = savedVals[k]||'';
+      var tdcls = dk===todayStr ? ' today-col' : '';
+      rows += '<td class="'+tdcls+'"><input type="number" placeholder="0.00" step="0.01" data-cat="'+cat.id+'" data-dk="'+dk+'" value="'+v+'" oninput="recalcRow(\''+cat.id+'\')"></td>';
+    });
+    rows += '<td class="total-cell" id="rowtot-'+cat.id+'">—</td></tr>';
+  });
+
+  rows += '<tr class="grand"><td class="cat">Grand Total</td>';
+  dates.forEach(function(d){
+    var dk = dayKey(d);
+    rows += '<td class="total-cell" id="coltot-'+dk+'">—</td>';
+  });
+  rows += '<td class="total-cell" id="grandtot">$0.00</td></tr>';
+  tbody.innerHTML = rows;
+
+  // Recalc all rows after build
+  CATS.forEach(function(c){ recalcRow(c.id); });
+  updateSummary();
+}
+
+function onDateChange(){
+  var s = document.getElementById('trip-start').value;
+  var e = document.getElementById('trip-end').value;
+  var lbl = document.getElementById('date-range-label');
+
+  if(!s && !e){ buildTable(defaultDates()); lbl.textContent='— defaulting to 7 days from today · select dates to customize'; return; }
+  if(s && !e){ var dates=getDates(s,s); for(var i=1;i<7;i++){var nx=new Date(dates[dates.length-1]);nx.setDate(nx.getDate()+1);dates.push(nx);} buildTable(dates); lbl.textContent='— '+fmtCol(dates[0])+' · set end date to finalize range'; return; }
+  if(!s && e){ buildTable(defaultDates()); return; }
+  var dates=getDates(s,e);
+  if(dates.length<1){buildTable(defaultDates());return;}
+  lbl.textContent='— '+dates.length+' day'+(dates.length>1?'s':'')+' · '+fmtCol(dates[0])+' to '+fmtCol(dates[dates.length-1]);
+  buildTable(dates);
+}
+
+function recalcRow(catId){
+  var inputs = document.querySelectorAll('[data-cat="'+catId+'"]');
+  var rowTot=0;
+  var byDay={};
+  inputs.forEach(function(inp){
+    var v=parseFloat(inp.value)||0;
+    rowTot+=v;
+    byDay[inp.dataset.dk]=(byDay[inp.dataset.dk]||0)+v;
+  });
+  var el=document.getElementById('rowtot-'+catId);
+  if(el) el.textContent=rowTot?fmt(rowTot):'—';
+
+  // Recalc col totals for affected days
+  Object.keys(byDay).forEach(function(dk){
+    var colInputs=document.querySelectorAll('[data-dk="'+dk+'"]');
+    var colTot=0;
+    colInputs.forEach(function(i){colTot+=parseFloat(i.value)||0;});
+    var cel=document.getElementById('coltot-'+dk);
+    if(cel) cel.textContent=colTot?fmt(colTot):'—';
+  });
+
+  // Grand total
+  var grand=0;
+  document.querySelectorAll('[data-cat]').forEach(function(i){grand+=parseFloat(i.value)||0;});
+  var gel=document.getElementById('grandtot');
+  if(gel) gel.textContent=grand?fmt(grand):'$0.00';
+  updateSummary();
+}
+
+function getCatTotal(id){
+  var t=0; document.querySelectorAll('[data-cat="'+id+'"]').forEach(function(i){t+=parseFloat(i.value)||0;}); return t;
+}
+
+function updateSummary(){
+  var meals=['bkf','lnch','din','ent'].reduce(function(s,id){return s+getCatTotal(id);},0);
+  var air=getCatTotal('air'), lodge=getCatTotal('lodge'), car=getCatTotal('car');
+  var trans=getCatTotal('mile')+getCatTotal('park')+getCatTotal('taxi');
+  var miscText=document.getElementById('misc-total');
+  var misc=miscText?parseFloat(miscText.textContent.replace('$',''))||0:0;
+  var grand=meals+air+lodge+car+trans+misc;
+  document.getElementById('sum-meals').textContent=fmt(meals);
+  document.getElementById('sum-air').textContent=fmt(air);
+  document.getElementById('sum-lodge').textContent=fmt(lodge);
+  document.getElementById('sum-car').textContent=fmt(car);
+  document.getElementById('sum-trans').textContent=fmt(trans);
+  document.getElementById('sum-misc').textContent=fmt(misc);
+  document.getElementById('sum-grand').textContent=fmt(grand);
+  document.getElementById('set-total').textContent=fmt(grand);
+  calcSettlement();
+}
+
+function calcSettlement(){
+  var total=parseFloat((document.getElementById('sum-grand').textContent||'0').replace('$',''))||0;
+  var ccc=parseFloat(document.getElementById('corp-card').value)||0;
+  document.getElementById('set-due').textContent=fmt(Math.max(0,total-ccc));
+  document.getElementById('set-charge').textContent=fmt(Math.max(0,ccc));
+}
+
+function calcMisc(){
+  var rows=document.querySelectorAll('#misc-body tr');
+  var bill=0,nonbill=0;
+  rows.forEach(function(r){
+    var amt=parseFloat(r.querySelector('input[type=number]')?r.querySelector('input[type=number]').value:0)||0;
+    var type=r.querySelector('select')?r.querySelector('select').value:'billable';
+    if(type==='billable') bill+=amt; else nonbill+=amt;
+  });
+  document.getElementById('misc-bill').textContent=fmt(bill);
+  document.getElementById('misc-nonbill').textContent=fmt(nonbill);
+  document.getElementById('misc-total').textContent=fmt(bill+nonbill);
+  updateSummary();
+}
+
+function addMiscRow(){
+  var tbody=document.getElementById('misc-body');
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td><input type="text" placeholder="Item description"></td>'
+    +'<td><input type="date"></td>'
+    +'<td><select onchange="calcMisc()"><option value="billable">Billable</option><option value="nonbillable">Non-Billable</option></select></td>'
+    +'<td><input type="number" placeholder="0.00" step="0.01" oninput="calcMisc()" style="font-family:monospace;text-align:right;width:100%;border:none;background:transparent;color:var(--color-text-primary);padding:3px 5px;outline:none"></td>'
+    +'<td><button class="del-btn" onclick="delMiscRow(this)">✕</button></td>';
+  tbody.appendChild(tr);
+}
+
+function delMiscRow(btn){
+  if(document.querySelectorAll('#misc-body tr').length<=1) return;
+  btn.closest('tr').remove(); calcMisc();
+}
+
+function addEntRow(){
+  var tbody=document.getElementById('ent-body');
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td><input type="date"></td>'
+    +'<td><input type="text" placeholder="Dinner, Lunch…"></td>'
+    +'<td><input type="text" placeholder="Name · Title · Company"></td>'
+    +'<td><input type="text" placeholder="Purpose"></td>'
+    +'<td><input type="number" placeholder="0.00" style="font-family:monospace;text-align:right;width:100%;border:none;background:transparent;color:var(--color-text-primary);padding:3px 4px;outline:none"></td>';
+  tbody.appendChild(tr);
+}
+
+function toggleCustomer(){
+  var val=document.getElementById('purpose-sel').value;
+  document.getElementById('customer-block').classList.toggle('visible', val==='client');
+}
+
+// Init
+document.getElementById('sub-date').value=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+addMiscRow();
+buildTable(defaultDates());
+document.getElementById('date-range-label').textContent='— defaulting to 7 days from today · select dates to customize';
+</script>
