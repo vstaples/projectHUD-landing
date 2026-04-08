@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE38 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE39 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2391,7 +2391,9 @@ async function _formSelect(formId) {
     if (overlay) overlay.style.display = 'none';
     // Target form-canvas-wrap — the flex:1 scroll container
     var canvasWrap = document.getElementById('form-canvas-wrap');
+    // Hide all existing children so iframe sits at top
     if (canvasWrap) {
+      Array.from(canvasWrap.children).forEach(function(c){ c.style.display = 'none'; });
       canvasWrap.style.padding = '0';
       canvasWrap.style.display = 'flex';
       canvasWrap.style.flexDirection = 'column';
