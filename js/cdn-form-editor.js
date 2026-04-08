@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE64 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE65 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2746,17 +2746,38 @@ async function _formCommit() {
       await API.del('workflow_template_steps?template_id=eq.' + tmplId).catch(function(){});
       var steps = [];
       steps.push(API.post('workflow_template_steps', {
-        template_id: tmplId, name: 'Submit ' + formName,
-        step_type: 'form_submission', assignee_role: 'submitter',
-        sequence_order: 1, is_start: true, created_at: new Date().toISOString()
+        template_id: tmplId,
+        name: 'Submit ' + formName,
+        step_type: 'form_submission',
+        assignee_type: 'role',
+        assignee_role: 'submitter',
+        sequence_order: 1,
+        due_type: 'after_prior',
+        forward_input: true,
+        branch_conditions: [],
+        confirm_items: [],
+        attached_docs: [],
+        outcomes: [],
+        created_at: new Date().toISOString()
       }));
       roles.forEach(function(r, idx) {
         steps.push(API.post('workflow_template_steps', {
           template_id: tmplId,
-          name: (FORM_ROLES[r.role]||{label:r.role}).label + (r.parallel ? ' Approval (Parallel)' : ' Approval'),
-          step_type: r.parallel ? 'parallel_approval' : 'approval',
-          assignee_role: r.role, sequence_order: idx + 2,
-          is_start: false, parallel: r.parallel || false,
+          name: (FORM_ROLES[r.role]||{label:r.role}).label + ' Approval',
+          step_type: 'approval',
+          assignee_type: 'role',
+          assignee_role: r.role,
+          sequence_order: idx + 2,
+          parallel_required: r.parallel || false,
+          due_type: 'after_prior',
+          forward_input: true,
+          branch_conditions: [],
+          confirm_items: [],
+          attached_docs: [],
+          outcomes: [
+            {id:'approved',label:'Approved',color:'#1D9E75',isDefault:true},
+            {id:'rejected',label:'Rejected',color:'#E24B4A',isDefault:false,requiresReset:true}
+          ],
           created_at: new Date().toISOString()
         }));
       });
