@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE47 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE48 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2161,14 +2161,12 @@ HTML requirements:
 Fields array requirements — each field object must have:
 { "id": "f01", "label": "Field Name", "type": "text|date|number|select|signature|textarea", "required": true/false, "section": "section_name" }`;
 
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
+    var response = await fetch('/api/generate-form', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 8000,
         system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }]
+        prompt: prompt
       })
     });
     var data = await response.json();
