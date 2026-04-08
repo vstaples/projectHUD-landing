@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE76 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE78 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -900,6 +900,22 @@ function _formUpdateField(fieldId, key, value) {
 var _formEditModeActive = false;
 window._formToggleEditMode = _formToggleEditMode;
 window._formEditModeActive = false;
+
+// Delegated handler using pointerdown — bypasses click suppression
+document.addEventListener('pointerdown', function(e) {
+  if (e.target && e.target.id === 'form-edit-mode-btn') {
+    e.preventDefault();
+    e.stopPropagation();
+    _formToggleEditMode();
+    var b = document.getElementById('form-edit-mode-btn');
+    if (b) {
+      b.style.background = _formEditModeActive ? 'rgba(0,201,201,.15)' : '';
+      b.style.color = _formEditModeActive ? '#00c9c9' : '';
+      b.style.borderColor = _formEditModeActive ? '#00c9c9' : '';
+      b.textContent = _formEditModeActive ? '✎ Done' : '✎';
+    }
+  }
+}, true);
 
 function _formToggleEditMode() {
   _formEditModeActive = !_formEditModeActive;
