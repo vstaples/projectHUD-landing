@@ -1,5 +1,5 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-console.log('%c[cdn-form-editor] v20260407-SE34 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE36 8px;border-radius:3px');
 // VERSION: 20260401-230000
 console.log('%c[cdn-form-editor] v20260401-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
@@ -284,8 +284,12 @@ function renderFormsTab(el) {
                     display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
           <span style="font-size:12px;font-weight:600;letter-spacing:.14em;
                        text-transform:uppercase;color:var(--muted)">Form Library</span>
-          <button class="btn btn-cad btn-sm" onclick="_formUploadClick()"
-            style="font-size:14px;padding:4px 10px;font-family:Arial,sans-serif">↑ Import</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-cad btn-sm" onclick="_formUploadClick()"
+              style="font-size:14px;padding:4px 10px;font-family:Arial,sans-serif">↑ Import</button>
+            <button class="btn btn-cad btn-sm" onclick="_formAiGenerate()"
+              style="font-size:14px;padding:4px 10px;font-family:Arial,sans-serif">✦ Generate</button>
+          </div>
         </div>
         <div id="form-list" style="flex:1;overflow-y:auto;padding:6px 0">
           ${_renderFormList()}
@@ -2094,6 +2098,118 @@ function _formUploadClick() {
   document.getElementById('form-file-input')?.click();
 }
 
+// ── AI Form Generator ─────────────────────────────────────────────────────────
+function _formAiGenerate() {
+  var existing = document.getElementById('form-ai-modal');
+  if (existing) existing.remove();
+  var modal = document.createElement('div');
+  modal.id = 'form-ai-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+  var closeBtn = '<button data-dismiss="form-ai-modal" onclick="var m=document.getElementById(this.dataset.dismiss);if(m)m.remove();" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:18px;cursor:pointer;line-height:1">&#x2715;</button>';
+  var cancelBtn = '<button data-dismiss="form-ai-modal" onclick="var m=document.getElementById(this.dataset.dismiss);if(m)m.remove();" style="font-family:Arial,sans-serif;font-size:12px;padding:7px 16px;border-radius:4px;border:1px solid #1e2535;background:transparent;color:rgba(255,255,255,.5);cursor:pointer">Cancel</button>';
+  modal.innerHTML =
+    '<div style="width:560px;max-width:95vw;background:#0d1017;border:1px solid #1e2535;border-radius:8px;overflow:hidden">' +
+      '<div style="padding:14px 18px;border-bottom:1px solid #1e2535;display:flex;align-items:center;justify-content:space-between">' +
+        '<span style="font-family:Arial,sans-serif;font-size:14px;font-weight:600;color:#e2e8f0">&#x2726; Generate form with AI</span>' +
+        closeBtn +
+      '</div>' +
+      '<div style="padding:16px 18px;display:flex;flex-direction:column;gap:12px">' +
+        '<div style="font-family:Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.5)">Describe the form you need — fields, sections, calculations, and who fills each part.</div>' +
+        '<textarea id="form-ai-prompt" style="width:100%;height:120px;background:#0b0e17;border:1px solid #1e2535;border-radius:5px;color:#e2e8f0;font-family:Arial,sans-serif;font-size:13px;padding:10px;resize:vertical;outline:none" placeholder="Example: An expense report with employee info at top, a day-by-day expense table for meals/transport/hotel with auto-calculated totals, a miscellaneous items section, and a signature block. Manager approves totals, Finance reviews settlement."></textarea>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+          cancelBtn +
+          '<button id="form-ai-submit" onclick="_formAiSubmit()" style="font-family:Arial,sans-serif;font-size:12px;font-weight:600;padding:7px 16px;border-radius:4px;border:none;background:#00c9c9;color:#003333;cursor:pointer">Generate &#x2726;</button>' +
+        '</div>' +
+        '<div id="form-ai-status" style="font-family:Arial,sans-serif;font-size:11px;color:rgba(255,255,255,.4);text-align:center;display:none"></div>' +
+      '</div>' +
+    '</div>';
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+  document.body.appendChild(modal);
+  setTimeout(function(){ document.getElementById('form-ai-prompt')?.focus(); }, 50);
+}
+
+async function _formAiSubmit() {
+  var prompt = (document.getElementById('form-ai-prompt')?.value || '').trim();
+  if (!prompt) return;
+  var btn = document.getElementById('form-ai-submit');
+  var status = document.getElementById('form-ai-status');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+  if (status) { status.style.display = 'block'; status.textContent = 'Claude is designing your form…'; }
+
+  try {
+    var systemPrompt = `You are a form designer for a workflow management platform. Generate a complete, professional HTML form based on the user's description.
+
+STRICT OUTPUT RULES:
+- Return ONLY a JSON object, no markdown, no backticks, no preamble
+- JSON must have exactly two keys: "html" (string) and "fields" (array)
+
+HTML requirements:
+- Self-contained HTML fragment (no <html>/<head>/<body> tags)
+- Use inline styles only, no external CSS
+- Color scheme: background #ffffff, accent #00c9c9, text #1a1a2e
+- Every input/select/textarea must have: data-field-id="f01" (sequential), data-label="Field Name", data-required="true/false"
+- Each logical section must be wrapped in: <section data-section="section_name" style="margin-bottom:20px">
+- Section headers use: <div style="font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#666;border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:10px">
+- Use CSS grid for multi-column layouts: style="display:grid;grid-template-columns:1fr 1fr;gap:10px"
+- Calculated fields use onchange/oninput JS inline for real-time totals
+- Signature fields: <div data-field-id="fXX" data-label="Signature" data-type="signature" style="border-bottom:2px solid #333;height:40px;margin-top:8px"></div>
+
+Fields array requirements — each field object must have:
+{ "id": "f01", "label": "Field Name", "type": "text|date|number|select|signature|textarea", "required": true/false, "section": "section_name" }`;
+
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    var data = await response.json();
+    var raw = (data.content || []).map(function(c){ return c.text || ''; }).join('');
+    var clean = raw.replace(/```json|```/g, '').trim();
+    var parsed = JSON.parse(clean);
+
+    if (!parsed.html || !parsed.fields) throw new Error('Invalid response structure');
+
+    // Save to DB as new form definition
+    var firmId = (typeof FIRM_ID_CAD !== 'undefined') ? FIRM_ID_CAD : (window.CURRENT_FIRM?.id || null);
+    var formName = prompt.split(' ').slice(0, 4).map(function(w){ return w.charAt(0).toUpperCase()+w.slice(1); }).join(' ');
+    if (status) status.textContent = 'Saving form…';
+
+    var rows = await API.post('workflow_form_definitions', {
+      firm_id:     firmId,
+      source_name: formName,
+      source_html: parsed.html,
+      fields:      parsed.fields,
+      routing:     { stages: [] },
+      archetype:   'data_entry',
+      version:     '0.1.0',
+      state:       'draft',
+      page_count:  1,
+      created_at:  new Date().toISOString(),
+      updated_at:  new Date().toISOString()
+    });
+
+    if (!rows?.[0]?.id) throw new Error('Save failed');
+
+    // Reload form list and select the new form
+    _formDefs = await API.get('workflow_form_definitions?firm_id=eq.'+firmId+'&order=created_at.desc').catch(function(){ return []; }) || [];
+    var listEl = document.getElementById('form-list');
+    if (listEl) listEl.innerHTML = _renderFormList();
+    document.getElementById('form-ai-modal')?.remove();
+    await _formSelect(rows[0].id);
+    cadToast('Form generated — review and refine in the editor', 'info');
+
+  } catch(e) {
+    console.error('[formAiGenerate] failed:', e);
+    if (status) { status.textContent = 'Generation failed: ' + e.message; status.style.color = 'rgba(232,64,64,.9)'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate ✦'; }
+  }
+}
+
 async function _formFileChosen(event) {
   const file = event.target.files?.[0];
   if (!file) return;
@@ -2264,6 +2380,26 @@ async function _formSelect(formId) {
       console.error('[formSelect] PDF load failed:', e);
       cadToast('Could not load document: ' + e.message, 'error');
     }
+  } else if (form.source_html) {
+    // Rich HTML form — render in iframe preview
+    console.log('[formSelect] rendering source_html form:', form.id);
+    var previewWrap = document.getElementById('form-preview-container') || document.getElementById('cad-content');
+    var existingIframe = document.getElementById('form-html-preview');
+    if (existingIframe) existingIframe.remove();
+    var iframe = document.createElement('iframe');
+    iframe.id = 'form-html-preview';
+    iframe.style.cssText = 'width:100%;height:100%;min-height:700px;border:none;background:#fff';
+    iframe.sandbox = 'allow-scripts allow-same-origin';
+    var canvas = document.getElementById('form-pdf-canvas');
+    var overlay = document.getElementById('form-field-overlay');
+    if (canvas) canvas.style.display = 'none';
+    if (overlay) overlay.style.display = 'none';
+    var container = canvas ? canvas.parentElement : previewWrap;
+    if (container) container.appendChild(iframe);
+    var blob = new Blob([form.source_html], { type: 'text/html' });
+    iframe.src = URL.createObjectURL(blob);
+    _pdfTotalPages = 1; _pdfPage = 1;
+    if (typeof _updatePageIndicator === 'function') _updatePageIndicator();
   } else {
     // No PDF — render a blank A4 canvas so field-based forms display correctly
     console.warn('[formSelect] no source_path on form:', form.id, '— rendering blank canvas');
