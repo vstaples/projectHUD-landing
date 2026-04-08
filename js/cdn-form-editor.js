@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE80 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE81 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -905,32 +905,26 @@ window._formEditModeActive = false;
 function _formWireEditBtn() {
   var editBtn = document.getElementById('form-edit-mode-btn');
   if (!editBtn) return;
-  // Clone to remove any stale listeners
-  var newBtn = editBtn.cloneNode(true);
-  editBtn.parentNode.replaceChild(newBtn, editBtn);
-  editBtn = newBtn;
-  // Single clean mousedown handler
-  editBtn.onmousedown = function(e) {
+  // Remove existing overlay if any
+  var existingOverlay = document.getElementById('form-edit-btn-overlay');
+  if (existingOverlay) existingOverlay.remove();
+  // Place a fixed overlay div on top of the button to capture clicks
+  var r = editBtn.getBoundingClientRect();
+  var overlay = document.createElement('div');
+  overlay.id = 'form-edit-btn-overlay';
+  overlay.style.cssText = 'position:fixed;z-index:9000;cursor:pointer;' +
+    'left:' + r.left + 'px;top:' + r.top + 'px;' +
+    'width:' + r.width + 'px;height:' + r.height + 'px;' +
+    'background:transparent';
+  overlay.addEventListener('mousedown', function(e) {
     e.preventDefault();
-    e.stopPropagation();
-    if (!_formEditModeActive) {
-      _formToggleEditMode();
-      this.style.background = 'rgba(0,201,201,.15)';
-      this.style.color = '#00c9c9';
-      this.style.borderColor = '#00c9c9';
-      this.textContent = '✎ Done';
-    } else {
-      _formToggleEditMode();
-      this.style.background = '';
-      this.style.color = '';
-      this.style.borderColor = '';
-      this.textContent = '✎';
-    }
-  };
-  // Suppress all other events
-  ['mouseup','pointerup','pointerdown','click'].forEach(function(ev) {
-    editBtn.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); }, true);
+    _formToggleEditMode();
+    editBtn.style.background = _formEditModeActive ? 'rgba(0,201,201,.15)' : '';
+    editBtn.style.color = _formEditModeActive ? '#00c9c9' : '';
+    editBtn.style.borderColor = _formEditModeActive ? '#00c9c9' : '';
+    editBtn.textContent = _formEditModeActive ? '✎ Done' : '✎';
   });
+  document.body.appendChild(overlay);
 }
 
 function _formToggleEditMode() {
@@ -2638,8 +2632,10 @@ async function _formSelect(formId) {
     else if (canvas && canvas.parentElement) canvas.parentElement.appendChild(iframe);
     _pdfTotalPages = 1; _pdfPage = 1;
     if (typeof _updatePageIndicator === 'function') _updatePageIndicator();
-    // Wire edit button after render
-    setTimeout(_formWireEditBtn, 200);
+    // Wire edit button overlay after render
+    setTimeout(_formWireEditBtn, 300);
+    // Reposition on resize
+    window.addEventListener('resize', function(){ setTimeout(_formWireEditBtn, 100); });
   } else {
     // No PDF — render a blank A4 canvas so field-based forms display correctly
     console.warn('[formSelect] no source_path on form:', form.id, '— rendering blank canvas');
