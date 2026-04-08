@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE48 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE49 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -325,33 +325,22 @@ function _renderFormList() {
   }
   return _formDefs.map(f => {
     const sel = _selectedForm?.id === f.id;
-    const fieldCount = (f.fields || []).length;
+    const st  = f.state || 'draft';
+    const ver = f.version || '0.1.0';
+    const locked = st === 'released';
+    const stLabel = {released:'RELEASED',draft:'DRAFT',in_review:'IN REVIEW',approved:'APPROVED',archived:'ARCHIVED'}[st] || st.toUpperCase();
     return `
-      <div onclick="_formSelect('${f.id}')"
-        style="padding:9px 14px;cursor:pointer;border-left:2px solid ${sel ? 'var(--cad)' : 'transparent'};
-               background:${sel ? 'var(--surf3)' : 'transparent'};transition:background .1s">
-        <div style="font-size:14px;font-weight:500;color:${sel ? 'var(--text)' : 'var(--text1)'};font-family:Arial,sans-serif;
-                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+      <div class="tmpl-item status-${st}${sel?' active':''}" onclick="_formSelect('${f.id}')">
+        <div class="tmpl-item-name status-${st}" style="display:flex;align-items:center;gap:5px">
           ${escHtml(f.source_name || 'Untitled form')}
+          ${locked ? '<span style="font-size:10px;opacity:.7" title="Released">🔒</span>' : ''}
         </div>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;font-family:Arial,sans-serif">
-          <span>${fieldCount} field${fieldCount !== 1 ? 's' : ''}</span>
-          <span>${f.page_count || '?'} page${(f.page_count || 1) !== 1 ? 's' : ''}</span>
-          ${f.version ? `<span style="color:var(--muted);font-size:13px;font-family:Arial,sans-serif">${escHtml(f.version)}</span>` : ''}
+        <div class="tmpl-item-meta">
+          <span class="tmpl-status ${st}">${stLabel}</span>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${escHtml(ver)}</span>
           ${_routingBadge(f)}
-          ${f.updated_at ? `<span style="color:var(--muted);font-size:13px;font-family:Arial,sans-serif" title="${new Date(f.updated_at).toLocaleString()}">${_formRelativeTime(f.updated_at)}</span>` : ''}
-          ${f.state && f.state !== 'draft' ? `<span style="font-size:13px;padding:1px 6px;border-radius:3px;font-family:Arial,sans-serif;
-            background:${{ in_review:'rgba(79,142,247,.15)', reviewed:'rgba(196,125,24,.15)',
-              approved:'rgba(42,157,64,.15)', released:'rgba(42,157,64,.15)',
-              archived:'rgba(255,255,255,.06)', unreleased:'rgba(212,144,31,.15)',
-              rejected_review:'rgba(220,60,60,.15)', rejected_approval:'rgba(220,60,60,.15)', rejected_release:'rgba(220,60,60,.15)' }[f.state]||'transparent'};
-            color:${{ in_review:'var(--accent)', reviewed:'var(--cad)',
-              approved:'var(--green)', released:'var(--green)',
-              archived:'var(--muted)', unreleased:'var(--amber)',
-              rejected_review:'#f87171', rejected_approval:'#f87171', rejected_release:'#f87171' }[f.state]||'var(--muted)'}"
-          >${{ in_review:'● In Review', reviewed:'● Awaiting Approval', approved:'✓ Approved',
-               released:'🔒 Released', archived:'Archived', unreleased:'Unreleased',
-               rejected_review:'✗ Rejected', rejected_approval:'✗ Rejected', rejected_release:'✗ Rejected' }[f.state]||f.state}</span>` : ''}
+          ${f.updated_at ? `<span style="font-size:10px;color:var(--muted)">${_formRelativeTime(f.updated_at)}</span>` : ''}
+
         </div>
       </div>`;
   }).join('');
@@ -359,8 +348,8 @@ function _renderFormList() {
 
 function _routingBadge(form) {
   const mode = form.routing?.mode || 'serial';
-  return `<span style="color:${mode === 'parallel' ? 'var(--accent)' : 'var(--amber)'};font-size:12px">
-    ${mode === 'parallel' ? '⇉ parallel' : '↓ serial'}
+  return `<span style="color:${mode === 'parallel' ? 'var(--accent)' : 'var(--amber)'};font-size:10px;font-family:var(--font-mono)">
+    ${mode === 'parallel' ? '⇉ Parallel' : '↓ Serial'}
   </span>`;
 }
 

@@ -42,7 +42,7 @@ function renderTemplateList() {
       <div class="tmpl-item-meta">
         <span class="tmpl-status ${st}">${st.toUpperCase()}</span>
         <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${escHtml(ver)}</span>
-        <span>${t.trigger_type.replace(/_/g,' ')}</span>
+        <span>${(t.trigger_type||'').replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();})}</span>
       </div>
     </div>`;
   }).join('');

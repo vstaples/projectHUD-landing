@@ -853,7 +853,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
           onclick="_cadOpenLibrarySettings()" style="display:none"
           title="Triggers &amp; form settings">⚙ Settings</button>
         <button class="btn btn-cad btn-sm" id="topbar-new-btn"
-          onclick="_cadNewFromTopbar()">+ New</button>
+          onclick="_cadNewFlow()" style="font-size:11px;padding:3px 10px">+ New Flow</button>
+        <button class="btn btn-cad btn-sm" id="topbar-new-form-btn"
+          onclick="_cadNewForm()" style="font-size:11px;padding:3px 10px">+ New Form</button>
       </div>
     </div>
 
@@ -1015,7 +1017,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.102 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.103 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -1059,8 +1061,10 @@ function _s9Switch(tab) {
   // Topbar + New label
   var newBtn = document.getElementById('topbar-new-btn');
   if (newBtn) {
-    var labels = {library:'+ New', simulator:'', instances:''};
-    newBtn.textContent = labels[tab] || '+ New';
+    var labels = {library:'', simulator:'', instances:''};
+    if (newBtn) newBtn.style.display = tab === 'library' ? '' : 'none';
+    var newFormBtn = document.getElementById('topbar-new-form-btn');
+    if (newFormBtn) newFormBtn.style.display = tab === 'library' ? '' : 'none';
     newBtn.style.display = tab === 'library' ? 'inline-flex' : 'none';
   }
 
@@ -1167,7 +1171,7 @@ function _s9RenderFormsSection(listEl, forms) {
       '<div class="tmpl-item-meta">' +
         '<span class="tmpl-status '+st+'">'+stLabel+'</span>' +
         '<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">'+ver+'</span>' +
-        '<span style="font-size:10px;color:var(--muted)">form</span>' +
+        '<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">Form</span>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -5249,15 +5253,17 @@ function _s9LibFilter(filter) {
   _s9RouteLibrary();
 }
 
-// ── Topbar + New ───────────────────────────────────────────────────
-function _cadNewFromTopbar() {
-  if (_s9LibSubFilter === 'forms') {
-    // Open form creation if the function exists
-    if (typeof openNewFormModal === 'function') openNewFormModal();
-    else if (typeof switchTab === 'function') switchTab('forms');
-  } else {
-    if (typeof openNewTemplateModal === 'function') openNewTemplateModal();
-  }
+// ── Topbar + New Flow / + New Form ────────────────────────────────
+function _cadNewFromTopbar() { _cadNewFlow(); }
+function _cadNewFlow() {
+  _s9LibSubFilter = 'workflows';
+  _s9Switch('library');
+  setTimeout(function(){ if (typeof openNewTemplateModal === 'function') openNewTemplateModal(); }, 200);
+}
+function _cadNewForm() {
+  _s9LibSubFilter = 'forms';
+  _s9Switch('library');
+  setTimeout(function(){ if (typeof _formAiGenerate === 'function') _formAiGenerate(); }, 300);
 }
 
 // ── Topbar ⚙ Settings ─────────────────────────────────────────────
@@ -5362,7 +5368,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <script src="/js/cdn-core-state.js?v=20260403-S9"></script>
 <script src="/js/cdn-utils.js?v=20260403-S9"></script>
-<script src="/js/cdn-form-editor.js?v=20260407-SE48"></script>
+<script src="/js/cdn-form-editor.js?v=20260407-SE49"></script>
 <script src="/js/cdn-form-settings.js?v=20260403-S9"></script>
 <script src="/js/cdn-assignee.js?v=20260403-S9"></script>
 <script src="/js/cdn-outcomes.js?v=20260403-S9"></script>
