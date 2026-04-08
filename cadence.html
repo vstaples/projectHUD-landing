@@ -1015,7 +1015,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.98 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.100 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -1115,11 +1115,71 @@ function _s9RouteLibrary() {
   if (f === 'forms') {
     if (typeof switchTab === 'function') switchTab('forms');
     _s9LastLibSubtype = 'forms';
+  } else if (f === 'all') {
+    // Show workflows first, then append forms list beneath with divider
+    if (typeof switchTab === 'function') switchTab('templates');
+    _s9LastLibSubtype = 'workflows';
+    setTimeout(function() { _s9AppendFormsToList(); }, 150);
   } else {
-    // 'all', 'workflows', 'released', 'draft' — all served from templates engine
+    // 'workflows', 'released', 'draft' — templates engine only
     if (typeof switchTab === 'function') switchTab('templates');
     if (f === 'workflows') _s9LastLibSubtype = 'workflows';
   }
+}
+
+function _s9AppendFormsToList() {
+  var listEl = document.getElementById('tmpl-list');
+  if (!listEl) return;
+  // Remove any previously injected form section
+  var existing = document.getElementById('tmpl-list-forms-section');
+  if (existing) existing.remove();
+  // Get form defs
+  var forms = (typeof _formDefs !== 'undefined' && Array.isArray(_formDefs)) ? _formDefs : [];
+  // Also try window._myrFormDefs as fallback
+  if (!forms.length && window._formDefs) forms = window._formDefs;
+  if (!forms.length) {
+    // Fetch if not in memory
+    var firmId = (typeof FIRM_ID_CAD !== 'undefined') ? FIRM_ID_CAD : null;
+    if (!firmId) return;
+    API.get('workflow_form_definitions?firm_id=eq.'+firmId+'&order=created_at.desc&select=id,source_name,version,state').then(function(rows) {
+      _s9RenderFormsSection(listEl, rows || []);
+    }).catch(function(){});
+    return;
+  }
+  _s9RenderFormsSection(listEl, forms);
+}
+
+function _s9RenderFormsSection(listEl, forms) {
+  var sec = document.createElement('div');
+  sec.id = 'tmpl-list-forms-section';
+  var divider = '<div style="font-family:Arial,sans-serif;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;' +
+    'color:var(--muted);padding:10px 8px 4px;border-top:1px solid var(--border);margin-top:8px">Forms</div>';
+  var items = forms.map(function(f) {
+    var st = f.state || 'draft';
+    var ver = f.version || '0.1.0';
+    var locked = st === 'released';
+    var stLabel = {released:'RELEASED',draft:'DRAFT',in_review:'IN REVIEW',approved:'APPROVED',archived:'ARCHIVED'}[st] || st.toUpperCase();
+    return '<div class="tmpl-item status-'+st+'" onclick="_s9LibOpenForm(''+f.id+'')">' +
+      '<div class="tmpl-item-name status-'+st+'" style="display:flex;align-items:center;gap:5px">' +
+        (f.source_name||'Untitled Form') +
+        (locked ? '<span style="font-size:10px;opacity:.7" title="Released — read only">🔒</span>' : '') +
+      '</div>' +
+      '<div class="tmpl-item-meta">' +
+        '<span class="tmpl-status '+st+'">'+stLabel+'</span>' +
+        '<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">'+ver+'</span>' +
+        '<span style="font-size:10px;color:var(--muted)">form</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  sec.innerHTML = divider + items;
+  listEl.appendChild(sec);
+}
+
+function _s9LibOpenForm(formId) {
+  if (typeof switchTab === 'function') switchTab('forms');
+  setTimeout(function() {
+    if (typeof _formSelect === 'function') _formSelect(formId);
+  }, 200);
 }
 
 // ── Simulator routing ──────────────────────────────────────────────
