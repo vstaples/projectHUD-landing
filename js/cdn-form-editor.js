@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE78 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE80 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -901,21 +901,37 @@ var _formEditModeActive = false;
 window._formToggleEditMode = _formToggleEditMode;
 window._formEditModeActive = false;
 
-// Delegated handler using pointerdown — bypasses click suppression
-document.addEventListener('pointerdown', function(e) {
-  if (e.target && e.target.id === 'form-edit-mode-btn') {
+// Wire edit mode button — called after toolbar renders
+function _formWireEditBtn() {
+  var editBtn = document.getElementById('form-edit-mode-btn');
+  if (!editBtn) return;
+  // Clone to remove any stale listeners
+  var newBtn = editBtn.cloneNode(true);
+  editBtn.parentNode.replaceChild(newBtn, editBtn);
+  editBtn = newBtn;
+  // Single clean mousedown handler
+  editBtn.onmousedown = function(e) {
     e.preventDefault();
     e.stopPropagation();
-    _formToggleEditMode();
-    var b = document.getElementById('form-edit-mode-btn');
-    if (b) {
-      b.style.background = _formEditModeActive ? 'rgba(0,201,201,.15)' : '';
-      b.style.color = _formEditModeActive ? '#00c9c9' : '';
-      b.style.borderColor = _formEditModeActive ? '#00c9c9' : '';
-      b.textContent = _formEditModeActive ? '✎ Done' : '✎';
+    if (!_formEditModeActive) {
+      _formToggleEditMode();
+      this.style.background = 'rgba(0,201,201,.15)';
+      this.style.color = '#00c9c9';
+      this.style.borderColor = '#00c9c9';
+      this.textContent = '✎ Done';
+    } else {
+      _formToggleEditMode();
+      this.style.background = '';
+      this.style.color = '';
+      this.style.borderColor = '';
+      this.textContent = '✎';
     }
-  }
-}, true);
+  };
+  // Suppress all other events
+  ['mouseup','pointerup','pointerdown','click'].forEach(function(ev) {
+    editBtn.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); }, true);
+  });
+}
 
 function _formToggleEditMode() {
   _formEditModeActive = !_formEditModeActive;
@@ -2622,14 +2638,8 @@ async function _formSelect(formId) {
     else if (canvas && canvas.parentElement) canvas.parentElement.appendChild(iframe);
     _pdfTotalPages = 1; _pdfPage = 1;
     if (typeof _updatePageIndicator === 'function') _updatePageIndicator();
-    // Wire toolbar buttons that can't use onclick attrs due to scope
-    setTimeout(function() {
-      var editBtn = document.getElementById('form-edit-mode-btn');
-      if (editBtn && !editBtn._wired) {
-        editBtn._wired = true;
-        editBtn.addEventListener('click', function() { _formToggleEditMode(); });
-      }
-    }, 100);
+    // Wire edit button after render
+    setTimeout(_formWireEditBtn, 200);
   } else {
     // No PDF — render a blank A4 canvas so field-based forms display correctly
     console.warn('[formSelect] no source_path on form:', form.id, '— rendering blank canvas');
