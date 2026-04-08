@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE65 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE66 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2748,7 +2748,7 @@ async function _formCommit() {
       steps.push(API.post('workflow_template_steps', {
         template_id: tmplId,
         name: 'Submit ' + formName,
-        step_type: 'form_submission',
+        step_type: 'form',
         assignee_type: 'role',
         assignee_role: 'submitter',
         sequence_order: 1,
