@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE68 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE70 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2135,25 +2135,7 @@ async function _formAiSubmit() {
   if (status) { status.style.display = 'block'; status.textContent = 'Claude is designing your form…'; }
 
   try {
-    var systemPrompt = `You are a form designer for a workflow management platform. Generate a complete, professional HTML form based on the user's description.
-
-STRICT OUTPUT RULES:
-- Return ONLY a JSON object, no markdown, no backticks, no preamble
-- JSON must have exactly two keys: "html" (string) and "fields" (array)
-
-HTML requirements:
-- Self-contained HTML fragment (no <html>/<head>/<body> tags)
-- Use inline styles only, no external CSS
-- Color scheme: background #ffffff, accent #00c9c9, text #1a1a2e
-- Every input/select/textarea must have: data-field-id="f01" (sequential), data-label="Field Name", data-required="true/false"
-- Each logical section must be wrapped in: <section data-section="section_name" style="margin-bottom:20px">
-- Section headers use: <div style="font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#666;border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:10px">
-- Use CSS grid for multi-column layouts: style="display:grid;grid-template-columns:1fr 1fr;gap:10px"
-- Calculated fields use onchange/oninput JS inline for real-time totals
-- Signature fields: <div data-field-id="fXX" data-label="Signature" data-type="signature" style="border-bottom:2px solid #333;height:40px;margin-top:8px"></div>
-
-Fields array requirements — each field object must have:
-{ "id": "f01", "label": "Field Name", "type": "text|date|number|select|signature|textarea", "required": true/false, "section": "section_name" }`;
+    var systemPrompt = 'You are a form designer for Cadence, a professional workflow management platform. Generate a complete, polished HTML form matching the design standards below.\n\nSTRICT OUTPUT RULES:\n- Return ONLY a JSON object, no markdown, no backticks, no preamble\n- JSON must have exactly two keys: html (string) and fields (array)\n\nDESIGN STANDARD:\n- Wrapper: max-width:960px, margin:0 auto, border-radius:12px, border:0.5px solid #2a2f3e, background:#fff, overflow:hidden, font-family:Arial,sans-serif\n- Header: background:#00c9c9, padding:14px 20px, display:flex, justify-content:space-between. Title: font-size:15px, font-weight:500, color:#003333. Subtitle: font-size:10px, color:#005555. Routing pills on right showing approval sequence (e.g. 1 Employee to 2 Manager to 3 Finance): background:rgba(0,51,51,.15), color:#003333, font-size:9px, padding:2px 8px, border-radius:8px\n- Body: padding:16px 20px\n- Section label: font-size:9px, font-weight:500, letter-spacing:.08em, text-transform:uppercase, color:#6b7280, border-bottom:0.5px solid #e5e7eb, padding-bottom:4px, margin-bottom:8px, margin-top:16px\n- Field labels: font-size:11px, font-weight:500, color:#1a1a2e. Required asterisk: color:#E24B4A\n- All inputs/selects/textareas: font-family:Arial,sans-serif, font-size:12px, padding:5px 8px, border:0.5px solid #d1d5db, border-radius:5px, background:#f9fafb, color:#1a1a2e, width:100%, box-sizing:border-box\n- Readonly/calculated fields: background:#f3f4f6, color:#6b7280, cursor:default\n- 2-col grid: display:grid, grid-template-columns:1fr 1fr, gap:8px, margin-bottom:8px\n- 3-col grid: display:grid, grid-template-columns:1fr 1fr 1fr, gap:8px\n- Tables: border-collapse:collapse, width:100%; th: background:#f9fafb, padding:5px 8px, font-size:10px, font-weight:500, color:#6b7280, border:0.5px solid #e5e7eb; td: border:0.5px solid #e5e7eb, padding:2px 4px\n- Signature lines: border-bottom:1px solid #374151, height:28px, margin-top:8px\n- Certification block: background:#f9fafb, border:0.5px solid #e5e7eb, border-radius:6px, padding:10px 14px\n- Footer: padding:12px 20px, border-top:0.5px solid #e5e7eb, background:#f9fafb, display:flex, justify-content:space-between. Primary button: background:#00c9c9, color:#003333, border:none, border-radius:5px, padding:6px 16px, font-weight:500. Secondary: border:0.5px solid #d1d5db, background:transparent, border-radius:5px, padding:6px 12px\n\nDATA ATTRIBUTES on every field element: data-field-id=f01 (sequential), data-label=Field Name, data-required=true/false. Section wrappers: section element with data-section=section_name and margin-bottom:18px\n\nFUNCTIONALITY: Real-time calculations with oninput handlers. Conditional sections initially display:none, toggled by JS. Auto-populate today date and reference numbers on DOMContentLoaded.\n\nFields array each entry: id, label, type (text|date|number|select|signature|textarea), required (bool), section';
 
     var response = await fetch('/api/generate-form', {
       method: 'POST',
@@ -2731,6 +2713,15 @@ async function _formCommit() {
   var roles = _formRoutingRolesOrdered(_formRouting.roles || []);
 
   if (!roles.length) { cadToast('Add at least one role in Routing Order before committing', 'error'); return; }
+
+  // Safety check — verify form still exists in DB before any writes
+  if (_selectedForm.id && !_selectedForm._unsaved) {
+    var existing = await API.get('workflow_form_definitions?id=eq.'+_selectedForm.id+'&select=id').catch(function(){return[];});
+    if (!existing || !existing.length) {
+      cadToast('Form record not found in DB — please regenerate the form', 'error');
+      return;
+    }
+  }
 
   var roleNames = roles.map(function(r){ return (FORM_ROLES[r.role]||{label:r.role}).label; }).join(' → ');
   var defaultVer = _calcNextVersion(_selectedForm.version || '0.1.0', 'minor');
