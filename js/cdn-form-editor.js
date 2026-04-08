@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE42 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE43 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -4023,6 +4023,7 @@ async function _formSave() {
       cadToast('Form saved', 'success');
       _formDirty = false; _formUpdateSaveBtn();
       _formRefreshCoCIfOpen();
+      _formCoCWrite('form.created', _selectedForm.id, { version:_selectedForm.version, name:_selectedForm.source_name });
       _formCoCWrite('form.saved', _selectedForm.id, { version:_selectedForm.version, state:_selectedForm.state });
       const listEl = document.getElementById('form-list');
       if (listEl) listEl.innerHTML = _renderFormList();
@@ -4707,42 +4708,28 @@ function _formCoCRender(rows) {
     'form.field_modified': 'Field Modified',
   };
 
-  bodyEl.innerHTML = rows.map(e => {
-    const color = evtColor[e.event_type] || 'var(--cad)';
-    const label = evtLabel[e.event_type] || e.event_type;
-    const det   = e.details || {};
-    const lines = [];
-
-    if (det.version)   lines.push(`Version: ${det.version}`);
-    if (det.state)     lines.push(`State: ${det.state}`);
-    if (det.from && det.to) lines.push(`${det.from} → ${det.to}`);
-    if (det.note)      lines.push(det.note);
-    if (det.field_label && det.key) lines.push(`${det.field_label}: ${det.key} changed`);
-    if (det.action)    lines.push(det.action);
-
-    const noteHtml = lines.map(l =>
-      `<div style="font-size:11px;color:var(--text2);line-height:1.7;font-family:Arial,sans-serif">
-         · ${escHtml(String(l))}
-       </div>`
-    ).join('');
-
-    const who = e.actor_name || e.actor_id || 'System';
-    const ver = det.version ? `<div style="font-size:11px;color:var(--muted);font-family:Arial,sans-serif">${escHtml(det.version)}</div>` : '';
-
-    return `
-      <div class="form-coc-event">
-        <div class="form-coc-dot" style="background:${color}"></div>
-        <div style="flex:1">
-          <div style="display:flex;justify-content:space-between;align-items:baseline">
-            <div style="color:${color};font-weight:700;font-size:11px;
-              text-transform:uppercase;letter-spacing:.08em;font-family:Arial,sans-serif">${escHtml(label)}</div>
-            ${ver}
-          </div>
-          ${noteHtml}
-          <div class="form-coc-who">${escHtml(who)} · ${typeof fmtTs === 'function' ? fmtTs(e.created_at) : (e.created_at||'').slice(0,16).replace('T',' ')}</div>
-        </div>
-      </div>`;
-  }).join('');
+  // Table view: Event · User · Date/Time
+  var evtColorMap = evtColor;
+  var evtLabelMap = evtLabel;
+  bodyEl.innerHTML =
+    '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px">' +
+    '<thead><tr>' +
+      '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">Event</th>' +
+      '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">User</th>' +
+      '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">Date / Time</th>' +
+    '</tr></thead><tbody>' +
+    rows.map(function(e) {
+      var color = evtColorMap[e.event_type] || 'var(--cad)';
+      var label = evtLabelMap[e.event_type] || e.event_type.replace('form.','').replace(/_/g,' ');
+      var who   = escHtml(e.actor_name || 'System');
+      var ts    = (e.occurred_at || e.created_at || '').slice(0,16).replace('T',' ');
+      return '<tr style="border-bottom:0.5px solid var(--border)">' +
+        '<td style="padding:5px 6px;color:'+color+';font-weight:600;white-space:nowrap">'+escHtml(label)+'</td>' +
+        '<td style="padding:5px 6px;color:var(--text2);white-space:nowrap">'+who+'</td>' +
+        '<td style="padding:5px 6px;color:var(--muted);font-family:monospace;font-size:10px;white-space:nowrap">'+escHtml(ts)+'</td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table>';
 }
 
 // Refresh CoC if panel is open (called after saves/state changes)
