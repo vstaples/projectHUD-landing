@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE67 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE68 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -883,6 +883,23 @@ function _formUpdateField(fieldId, key, value) {
   if (listEl) listEl.innerHTML = _renderFieldList();
   _reRenderRoutingPanel();
   _renderFieldOverlays();
+}
+
+async function _formRefreshToolbar() {
+  if (!_selectedForm) return;
+  var f = _selectedForm;
+  var lcDiv = document.getElementById('form-lifecycle-btns');
+  if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(f);
+  var badge = document.getElementById('form-state-badge');
+  if (badge) { badge.textContent = _formStateLabel(f.state||'draft'); badge.style.color = _formStateColor(f.state||'draft'); }
+  var verEl = document.getElementById('form-version-display');
+  if (verEl) verEl.textContent = (f.version||'0.1.0') + (_formDirty?'*':'');
+  var saveEl = document.getElementById('form-save-indicator');
+  if (saveEl) { saveEl.textContent = _formDirty ? '● Unsaved' : '● Saved'; saveEl.style.color = _formDirty ? 'var(--amber)' : 'var(--green)'; }
+  var catPill = document.getElementById('form-category-pill');
+  if (catPill) catPill.innerHTML = _formCategoryPill(f);
+  var listEl = document.getElementById('form-list');
+  if (listEl) listEl.innerHTML = _renderFormList();
 }
 
 function _formAutoAddStageForRole(role) {
