@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE39 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE40 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2011,6 +2011,7 @@ function _formSelectField(fieldId) {
 
 // _renderFieldOverlays — single authoritative definition (original removed to prevent hoisting collision)
 function _renderFieldOverlays() {
+  if (document.getElementById('form-html-preview')) return; // HTML form — no overlay needed
   const svg = document.getElementById('form-field-overlay');
   if (!svg) return;
   if (_marqueeDrag?.active) return;
@@ -2051,7 +2052,7 @@ function _renderFieldOverlays() {
   }).join('');
 
   // ── Selection bounding box + T/B/L/R resize handles (inline in SVG string) ─
-  const selFields = [...sel].map(id => _formFields.find(f => f.id === id)).filter(Boolean);
+  const selFields = [...sel].map(id => _formFields.find(f => f.id === id)).filter(Boolean).filter(f => f.rect);
   if (selFields.length) {
     const minX = Math.min(...selFields.map(f => f.rect.x)) * _pdfScale;
     const minY = Math.min(...selFields.map(f => f.rect.y)) * _pdfScale;
