@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE51 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE52 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -887,11 +887,40 @@ function _formUpdateField(fieldId, key, value) {
   if (_selectedForm?.id) _formCoCWrite('form.field_modified', _selectedForm.id,
     { field_id:fieldId, field_label:field.label, key, old:oldVal, new:value });
 
+  // When role is assigned, auto-add to Fill Stages if not already present
+  if (key === 'role' && value && value !== 'assignee') {
+    _formAutoAddStageForRole(value);
+  }
+
   // Re-render the field list row and routing panel
   const listEl = document.getElementById('form-field-list');
   if (listEl) listEl.innerHTML = _renderFieldList();
   _reRenderRoutingPanel();
   _renderFieldOverlays();
+}
+
+function _formAutoAddStageForRole(role) {
+  if (!_formRouting) _formRouting = { mode: 'serial', roles: [], stages: [] };
+  if (!_formRouting.stages) _formRouting.stages = [];
+  if (!_formRouting.roles) _formRouting.roles = [];
+
+  // Skip submitter/assignee — those are implicit
+  const skipRoles = ['assignee', 'submitter'];
+  if (skipRoles.includes(role)) return;
+
+  // Already in stages?
+  if (_formRouting.stages.find(function(s){ return s.role === role; })) return;
+
+  // Add as new stage
+  const maxStage = Math.max(0, ..._formRouting.stages.map(function(s){ return s.stage || 0; }));
+  _formRouting.stages.push({ stage: maxStage + 1, role: role, parallel_within_stage: false, requires_all: true });
+
+  // Also add to roles array for routing panel
+  if (!_formRouting.roles.find(function(r){ return r.role === role; })) {
+    const maxOrder = Math.max(0, ..._formRouting.roles.map(function(r){ return r.order || 0; }));
+    _formRouting.roles.push({ role: role, order: maxOrder + 1 });
+  }
+  _formMarkDirty();
 }
 
 function _formToggleRequired(fieldId) {
@@ -1969,7 +1998,7 @@ function _formSelectField(fieldId) {
   popover.innerHTML = `
     <div style="font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
       ${isMulti ? `Edit ${_selectedFieldIds.size} Fields` : 'Edit Field'}
-      <span style="font-size:12px;color:${_fieldConfidenceColor(field)};font-weight:400">${isMulti?'multi':'${field.detection||""}'}</span>
+      <span style="font-size:12px;color:${_fieldConfidenceColor(field)};font-weight:400">${isMulti?'multi':(field.detection||'')}</span>
     </div>
     ${!isMulti?`<div style="margin-bottom:8px"><label class="config-label">Label</label>
       <input class="config-input" value="${escHtml(field.label||'')}" placeholder="Field label" style="font-size:12px" oninput="_formUpdateField('${fieldId}','label',this.value)"/></div>`:''}
