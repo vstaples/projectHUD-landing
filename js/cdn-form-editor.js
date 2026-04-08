@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE73 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE74 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -897,6 +897,8 @@ function _formUpdateField(fieldId, key, value) {
 }
 
 var _formEditModeActive = false;
+window._formToggleEditMode = _formToggleEditMode;
+window._formEditModeActive = false;
 
 function _formToggleEditMode() {
   _formEditModeActive = !_formEditModeActive;
