@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE70 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE72 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -878,11 +878,83 @@ function _formUpdateField(fieldId, key, value) {
     _formAutoAddStageForRole(value);
   }
 
+  // Sync change to source_html if this is an HTML form
+  if (_selectedForm?.source_html && (key === 'label' || key === 'required' || key === 'role')) {
+    _formSyncFieldToHtml(fieldId, key, value, field);
+  }
+
   // Re-render the field list row and routing panel
   const listEl = document.getElementById('form-field-list');
   if (listEl) listEl.innerHTML = _renderFieldList();
   _reRenderRoutingPanel();
   _renderFieldOverlays();
+}
+
+function _formSyncFieldToHtml(fieldId, key, value, field) {
+  if (!_selectedForm?.source_html) return;
+  var parser = new DOMParser();
+  var doc = parser.parseFromString(_selectedForm.source_html, 'text/html');
+
+  // Find the element by data-field-id
+  var el = doc.querySelector('[data-field-id="' + fieldId + '"]');
+  if (!el) return;
+
+  if (key === 'label') {
+    // Update data-label attribute
+    el.setAttribute('data-label', value);
+    // Find sibling or parent label element and update its text
+    var wrapper = el.closest('.f, [style*="flex-direction:column"], [style*="flex-direction: column"]') || el.parentElement;
+    if (wrapper) {
+      var labelEl = wrapper.querySelector('label');
+      if (labelEl) {
+        // Preserve required asterisk if present
+        var req = labelEl.querySelector('.req, [style*="color:#E24B4A"], [style*="color: #E24B4A"]');
+        var reqHtml = req ? req.outerHTML : (field.required ? ' <span style="color:#E24B4A">*</span>' : '');
+        labelEl.innerHTML = _escHtmlSync(value) + reqHtml;
+      }
+    }
+  } else if (key === 'required') {
+    el.setAttribute('data-required', value ? 'true' : 'false');
+    // Toggle required asterisk in label
+    var wrapper2 = el.closest('.f, [style*="flex-direction:column"], [style*="flex-direction: column"]') || el.parentElement;
+    if (wrapper2) {
+      var labelEl2 = wrapper2.querySelector('label');
+      if (labelEl2) {
+        var req2 = labelEl2.querySelector('.req, [style*="color:#E24B4A"]');
+        if (value && !req2) {
+          labelEl2.innerHTML += ' <span style="color:#E24B4A">*</span>';
+        } else if (!value && req2) {
+          req2.remove();
+        }
+      }
+    }
+  }
+
+  // Serialize back to string (body innerHTML only — no html/head wrapper)
+  _selectedForm.source_html = doc.body.innerHTML;
+
+  // Refresh iframe
+  var iframe = document.getElementById('form-html-preview');
+  if (iframe) {
+    var cssVars = _formGetCssVars();
+    var blob = new Blob([cssVars + _selectedForm.source_html], { type: 'text/html' });
+    iframe.src = URL.createObjectURL(blob);
+  }
+}
+
+function _escHtmlSync(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _formGetCssVars() {
+  return '<style>:root{' +
+    '--color-background-primary:#ffffff;--color-background-secondary:#f7f8fa;' +
+    '--color-background-tertiary:#f0f1f4;--color-background-info:#e8f0fe;' +
+    '--color-text-primary:#1a1a2e;--color-text-secondary:#4a5068;' +
+    '--color-text-tertiary:#8890a8;--color-text-info:#1a56db;' +
+    '--color-border-tertiary:rgba(0,0,0,.1);--color-border-secondary:rgba(0,0,0,.18);' +
+    '--color-border-info:#a4cafe;--font-mono:monospace' +
+  '}</style>';
 }
 
 async function _formRefreshToolbar() {
@@ -2118,7 +2190,12 @@ function _formAiGenerate() {
           cancelBtn +
           '<button id="form-ai-submit" onclick="_formAiSubmit()" style="font-family:Arial,sans-serif;font-size:12px;font-weight:600;padding:7px 16px;border-radius:4px;border:none;background:#00c9c9;color:#003333;cursor:pointer">Generate &#x2726;</button>' +
         '</div>' +
-        '<div id="form-ai-status" style="font-family:Arial,sans-serif;font-size:11px;color:rgba(255,255,255,.4);text-align:center;display:none"></div>' +
+        '<div id="form-ai-status" style="display:none;font-family:Arial,sans-serif">' +
+          '<div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:6px;text-align:center" id="form-ai-status-text">Claude is designing your form…</div>' +
+          '<div style="background:rgba(255,255,255,.1);border-radius:99px;height:4px;overflow:hidden">' +
+            '<div id="form-ai-progress-bar" style="height:100%;width:0%;background:#00c9c9;border-radius:99px;transition:width .4s ease"></div>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
     '</div>';
   modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
@@ -2132,10 +2209,36 @@ async function _formAiSubmit() {
   var btn = document.getElementById('form-ai-submit');
   var status = document.getElementById('form-ai-status');
   if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
-  if (status) { status.style.display = 'block'; status.textContent = 'Claude is designing your form…'; }
+  if (status) {
+    status.style.display = 'block';
+    // Animate progress bar over ~55 seconds
+    var _aiProgress = 0;
+    var _aiStatusMessages = [
+      'Analyzing your form requirements…',
+      'Designing layout and sections…',
+      'Building field structure…',
+      'Adding calculations and logic…',
+      'Applying Cadence design standards…',
+      'Finalizing form…',
+    ];
+    var _aiMsgIdx = 0;
+    var _aiTimer = setInterval(function() {
+      _aiProgress = Math.min(92, _aiProgress + (Math.random() * 2.5 + 0.8));
+      var bar = document.getElementById('form-ai-progress-bar');
+      if (bar) bar.style.width = _aiProgress + '%';
+      // Cycle status messages
+      var elapsed = Math.floor(_aiProgress / 16);
+      if (elapsed !== _aiMsgIdx && elapsed < _aiStatusMessages.length) {
+        _aiMsgIdx = elapsed;
+        var txt = document.getElementById('form-ai-status-text');
+        if (txt) txt.textContent = _aiStatusMessages[_aiMsgIdx];
+      }
+    }, 600);
+    window._aiProgressTimer = _aiTimer;
+  }
 
   try {
-    var systemPrompt = 'You are a form designer for Cadence, a professional workflow management platform. Generate a complete, polished HTML form matching the design standards below.\n\nSTRICT OUTPUT RULES:\n- Return ONLY a JSON object, no markdown, no backticks, no preamble\n- JSON must have exactly two keys: html (string) and fields (array)\n\nDESIGN STANDARD:\n- Wrapper: max-width:960px, margin:0 auto, border-radius:12px, border:0.5px solid #2a2f3e, background:#fff, overflow:hidden, font-family:Arial,sans-serif\n- Header: background:#00c9c9, padding:14px 20px, display:flex, justify-content:space-between. Title: font-size:15px, font-weight:500, color:#003333. Subtitle: font-size:10px, color:#005555. Routing pills on right showing approval sequence (e.g. 1 Employee to 2 Manager to 3 Finance): background:rgba(0,51,51,.15), color:#003333, font-size:9px, padding:2px 8px, border-radius:8px\n- Body: padding:16px 20px\n- Section label: font-size:9px, font-weight:500, letter-spacing:.08em, text-transform:uppercase, color:#6b7280, border-bottom:0.5px solid #e5e7eb, padding-bottom:4px, margin-bottom:8px, margin-top:16px\n- Field labels: font-size:11px, font-weight:500, color:#1a1a2e. Required asterisk: color:#E24B4A\n- All inputs/selects/textareas: font-family:Arial,sans-serif, font-size:12px, padding:5px 8px, border:0.5px solid #d1d5db, border-radius:5px, background:#f9fafb, color:#1a1a2e, width:100%, box-sizing:border-box\n- Readonly/calculated fields: background:#f3f4f6, color:#6b7280, cursor:default\n- 2-col grid: display:grid, grid-template-columns:1fr 1fr, gap:8px, margin-bottom:8px\n- 3-col grid: display:grid, grid-template-columns:1fr 1fr 1fr, gap:8px\n- Tables: border-collapse:collapse, width:100%; th: background:#f9fafb, padding:5px 8px, font-size:10px, font-weight:500, color:#6b7280, border:0.5px solid #e5e7eb; td: border:0.5px solid #e5e7eb, padding:2px 4px\n- Signature lines: border-bottom:1px solid #374151, height:28px, margin-top:8px\n- Certification block: background:#f9fafb, border:0.5px solid #e5e7eb, border-radius:6px, padding:10px 14px\n- Footer: padding:12px 20px, border-top:0.5px solid #e5e7eb, background:#f9fafb, display:flex, justify-content:space-between. Primary button: background:#00c9c9, color:#003333, border:none, border-radius:5px, padding:6px 16px, font-weight:500. Secondary: border:0.5px solid #d1d5db, background:transparent, border-radius:5px, padding:6px 12px\n\nDATA ATTRIBUTES on every field element: data-field-id=f01 (sequential), data-label=Field Name, data-required=true/false. Section wrappers: section element with data-section=section_name and margin-bottom:18px\n\nFUNCTIONALITY: Real-time calculations with oninput handlers. Conditional sections initially display:none, toggled by JS. Auto-populate today date and reference numbers on DOMContentLoaded.\n\nFields array each entry: id, label, type (text|date|number|select|signature|textarea), required (bool), section';
+    var systemPrompt = 'You are a form designer for Cadence, a professional workflow management platform. Generate a complete, polished HTML form matching the design standards below.\n\nSTRICT OUTPUT RULES:\n- Return ONLY a JSON object, no markdown, no backticks, no preamble\n- JSON must have exactly two keys: html (string) and fields (array)\n\nDESIGN STANDARD:\n- Wrapper: max-width:960px, margin:0 auto, border-radius:12px, border:0.5px solid #2a2f3e, background:#fff, overflow:hidden, font-family:Arial,sans-serif\n- Header: background:#00c9c9, padding:14px 20px, display:flex, justify-content:space-between. Title: font-size:15px, font-weight:500, color:#003333. Subtitle: font-size:10px, color:#005555. Routing pills on right showing approval sequence (e.g. 1 Submitter, 2 Project Manager, 3 Finance): each pill style: background:rgba(0,0,0,.2), color:#003333, font-size:9px, font-weight:500, padding:2px 10px, border-radius:8px, with small arrows between them\n- Body: padding:16px 20px\n- Section label: font-size:9px, font-weight:500, letter-spacing:.08em, text-transform:uppercase, color:#6b7280, border-bottom:0.5px solid #e5e7eb, padding-bottom:4px, margin-bottom:8px, margin-top:16px\n- Field labels: font-size:11px, font-weight:500, color:#1a1a2e. Required asterisk: color:#E24B4A\n- All inputs/selects/textareas: font-family:Arial,sans-serif, font-size:12px, padding:5px 8px, border:0.5px solid #d1d5db, border-radius:5px, background:#f9fafb, color:#1a1a2e, width:100%, box-sizing:border-box\n- Readonly/calculated fields: background:#f3f4f6, color:#6b7280, cursor:default\n- 2-col grid: display:grid, grid-template-columns:1fr 1fr, gap:8px, margin-bottom:8px\n- 3-col grid: display:grid, grid-template-columns:1fr 1fr 1fr, gap:8px\n- Tables: border-collapse:collapse, width:100%; th: background:#f9fafb, padding:5px 8px, font-size:10px, font-weight:500, color:#6b7280, border:0.5px solid #e5e7eb; td: border:0.5px solid #e5e7eb, padding:2px 4px\n- Signature lines: border-bottom:1px solid #374151, height:28px, margin-top:8px\n- Certification block: background:#f9fafb, border:0.5px solid #e5e7eb, border-radius:6px, padding:10px 14px\n- Footer: padding:12px 20px, border-top:0.5px solid #e5e7eb, background:#f9fafb, display:flex, justify-content:space-between. Primary button: background:#00c9c9, color:#003333, border:none, border-radius:5px, padding:6px 16px, font-weight:500. Secondary: border:0.5px solid #d1d5db, background:transparent, border-radius:5px, padding:6px 12px\n\nDATA ATTRIBUTES on every field element: data-field-id=f01 (sequential), data-label=Field Name, data-required=true/false. Section wrappers: section element with data-section=section_name and margin-bottom:18px\n\nFUNCTIONALITY: Real-time calculations with oninput handlers. Conditional sections initially display:none, toggled by JS. Auto-populate today date and reference numbers on DOMContentLoaded.\n\nFields array each entry: id, label, type (text|date|number|select|signature|textarea), required (bool), section';
 
     var response = await fetch('/api/generate-form', {
       method: 'POST',
@@ -2145,6 +2248,12 @@ async function _formAiSubmit() {
         prompt: prompt
       })
     });
+    // Complete progress bar
+    if (window._aiProgressTimer) { clearInterval(window._aiProgressTimer); window._aiProgressTimer = null; }
+    var bar = document.getElementById('form-ai-progress-bar');
+    if (bar) bar.style.width = '100%';
+    var txt = document.getElementById('form-ai-status-text');
+    if (txt) txt.textContent = 'Processing response…';
     var data = await response.json();
     var raw = (data.content || []).map(function(c){ return c.text || ''; }).join('');
     var clean = raw.replace(/```json|```/g, '').trim();
@@ -2698,7 +2807,25 @@ async function _formDeleteWithConfirm(formId) {
     _formCoCWrite('form.archived', formId, { action:'deleted', name });
   }
   _formDefs = _formDefs.filter(function(f){ return f.id !== formId; });
-  if (_selectedForm?.id === formId) { _selectedForm = null; }
+  if (_selectedForm?.id === formId) {
+    _selectedForm = null;
+    _formFields = [];
+    _formRouting = { mode: 'serial', roles: [], stages: [] };
+    // Clear canvas
+    var iframe = document.getElementById('form-html-preview');
+    if (iframe) iframe.remove();
+    var canvasWrap = document.getElementById('form-canvas-wrap');
+    if (canvasWrap) {
+      Array.from(canvasWrap.children).forEach(function(c){ c.style.display = ''; });
+    }
+    // Clear right panels
+    var fieldsCol = document.getElementById('form-col-fields');
+    var routingCol = document.getElementById('form-col-routing');
+    var toolbar = document.getElementById('form-top-toolbar');
+    if (fieldsCol) fieldsCol.style.display = 'none';
+    if (routingCol) routingCol.style.display = 'none';
+    if (toolbar) toolbar.style.display = 'none';
+  }
   const listEl = document.getElementById('form-list');
   if (listEl) listEl.innerHTML = _renderFormList();
   cadToast('Form removed', 'success');
