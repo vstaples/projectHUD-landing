@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE56 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE58 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2728,12 +2728,12 @@ function _formShowCommitModal(formName, roleNames, defaultVer, onConfirm) {
         '</div>' +
         '<div>' +
           '<label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;letter-spacing:.03em">Target Version</label>' +
-          '<input id="form-commit-ver" value="' + escHtml(defaultVer) + '" style="width:100%;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:monospace;font-size:14px;padding:8px 12px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--cad)'" onblur="this.style.borderColor='var(--border2)'">' +
+          '<input id="form-commit-ver" value="' + escHtml(defaultVer) + '" style="width:100%;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:monospace;font-size:14px;padding:8px 12px;outline:none;box-sizing:border-box">' +
           '<div style="font-size:11px;color:var(--muted);margin-top:4px">Default is next MINOR. Override if needed (e.g. 1.0.0).</div>' +
         '</div>' +
         '<div>' +
           '<label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;letter-spacing:.03em">Commit Note <span style="font-weight:400;color:var(--muted)">(optional)</span></label>' +
-          '<textarea id="form-commit-note" placeholder="What changed in this version…" style="width:100%;min-height:72px;resize:vertical;box-sizing:border-box;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:Arial,sans-serif;font-size:13px;padding:8px 12px;outline:none" onfocus="this.style.borderColor='var(--cad)'" onblur="this.style.borderColor='var(--border2)'"></textarea>' +
+          '<textarea id="form-commit-note" placeholder="What changed in this version…" style="width:100%;min-height:72px;resize:vertical;box-sizing:border-box;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:Arial,sans-serif;font-size:13px;padding:8px 12px;outline:none" ></textarea>' +
         '</div>' +
         '<div style="display:flex;gap:8px;justify-content:flex-end">' +
           '<button data-dismiss="form-commit-modal" onclick="var m=document.getElementById(this.dataset.dismiss);if(m)m.remove()" style="font-family:Arial,sans-serif;font-size:13px;padding:8px 18px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">Cancel</button>' +
@@ -2799,12 +2799,12 @@ function _formShowReleaseDirectModal(form, defaultVer) {
       '<div style="padding:20px 22px;display:flex;flex-direction:column;gap:14px">' +
         '<div>' +
           '<label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;letter-spacing:.03em">Target Version</label>' +
-          '<input id="form-rel-ver" value="' + escHtml(defaultVer) + '" style="width:100%;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:monospace;font-size:14px;padding:8px 12px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border2)'">' +
+          '<input id="form-rel-ver" value="' + escHtml(defaultVer) + '" style="width:100%;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:monospace;font-size:14px;padding:8px 12px;outline:none;box-sizing:border-box">' +
           '<div style="font-size:11px;color:var(--muted);margin-top:4px">Default is next MAJOR. Override if needed (e.g. 1.1.0).</div>' +
         '</div>' +
         '<div>' +
           '<label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;letter-spacing:.03em">Release Notes <span style="font-weight:400;color:var(--muted)">(optional)</span></label>' +
-          '<textarea id="form-rel-note" placeholder="What is included in this release…" style="width:100%;min-height:80px;resize:vertical;box-sizing:border-box;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:Arial,sans-serif;font-size:13px;padding:8px 12px;outline:none" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border2)'"></textarea>' +
+          '<textarea id="form-rel-note" placeholder="What is included in this release…" style="width:100%;min-height:80px;resize:vertical;box-sizing:border-box;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:Arial,sans-serif;font-size:13px;padding:8px 12px;outline:none" ></textarea>' +
         '</div>' +
         '<div style="display:flex;gap:8px;justify-content:flex-end">' +
           '<button data-dismiss="form-release-direct-modal" onclick="var m=document.getElementById(this.dataset.dismiss);if(m)m.remove()" style="font-family:Arial,sans-serif;font-size:13px;padding:8px 18px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">Cancel</button>' +
