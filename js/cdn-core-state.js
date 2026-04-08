@@ -238,7 +238,7 @@ function _getOutcomes(step) {
 async function loadAll() {
   try {
     const [tmpls, insts, users] = await Promise.all([
-      API.get(`workflow_templates?firm_id=eq.${FIRM_ID_CAD}&order=created_at.desc`).catch(()=>[]),
+      API.get(`workflow_templates?firm_id=eq.${FIRM_ID_CAD}&order=created_at.desc&select=*,form_driven`).catch(()=>[]),
       API.get(`workflow_instances?firm_id=eq.${FIRM_ID_CAD}&order=created_at.desc&limit=50`).catch(()=>[]),
       API.get('users?is_active=eq.true&select=id,name,title,resource_id,email').catch(()=>[]),
     ]);

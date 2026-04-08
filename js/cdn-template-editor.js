@@ -21,14 +21,15 @@ function renderTemplatesTab(el) {
 }
 
 function renderTemplateList() {
-  if (!_templates.length) {
+  var visibleTemplates = (_templates || []).filter(function(t){ return !t.form_driven; });
+  if (!visibleTemplates.length) {
     return `<div class="list-empty">
       <div class="icon">⬡</div>
       <div>No templates yet.</div>
       <div style="margin-top:8px"><button class="btn btn-cad btn-sm" onclick="openNewTemplateModal()">Create First Template</button></div>
     </div>`;
   }
-  return _templates.map(t => {
+  return visibleTemplates.map(t => {
     const ver = t.version || '0.0.0';
     const st  = t.status || 'draft';
     const locked = st === 'released';
