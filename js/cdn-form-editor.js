@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE61 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE62 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -425,30 +425,7 @@ function _renderFormEditor() {
                   border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2);
                   font-family:Arial,sans-serif;font-size:13px">
 
-        <!-- Version + dirty indicator -->
-        <span id="form-version-display"
-          style="font-family:var(--font-mono);font-size:12px;color:var(--muted);flex-shrink:0">
-          ${f.version||'0.1.0'}${_formDirty?'*':''}
-        </span>
-
-        <!-- State badge -->
-        <span id="form-state-badge"
-          style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;
-                 font-family:Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;
-                 background:${_formStateColor(f.state||'draft',true)};
-                 color:${_formStateColor(f.state||'draft')}">
-          ${_formStateLabel(f.state||'draft')}
-        </span>
-
-        <!-- Save state indicator -->
-        <span id="form-save-indicator"
-          style="font-size:12px;color:${_formDirty?'var(--amber)':'var(--green)'};flex-shrink:0">
-          ${_formDirty ? '● Unsaved' : '● Saved'}
-        </span>
-
-        <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
-
-        <!-- Editable name -->
+        <!-- Editable name — takes all available left space -->
         <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
           style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:80px;
                  background:transparent;border:none;border-bottom:1px solid transparent;
@@ -496,6 +473,23 @@ function _renderFormEditor() {
 
         <!-- Right-side action buttons matching workflow editor -->
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <!-- Version + state + save indicator -->
+          <span id="form-version-display"
+            style="font-family:var(--font-mono);font-size:12px;color:var(--muted);flex-shrink:0">
+            ${f.version||'0.1.0'}${_formDirty?'*':''}
+          </span>
+          <span id="form-state-badge"
+            style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;
+                   font-family:Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;
+                   background:${_formStateColor(f.state||'draft',true)};
+                   color:${_formStateColor(f.state||'draft')}">
+            ${_formStateLabel(f.state||'draft')}
+          </span>
+          <span id="form-save-indicator"
+            style="font-size:12px;color:${_formDirty?'var(--amber)':'var(--green)'};flex-shrink:0">
+            ${_formDirty ? '● Unsaved' : '● Saved'}
+          </span>
+          <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
           <!-- Launch (simulate) -->
           <button onclick="_formLaunchSimulate()" title="Launch simulator"
             style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
@@ -2483,6 +2477,43 @@ function _formCategoryPill(f) {
            border:1px solid rgba(255,255,255,.2);color:var(--text1);cursor:pointer">+ Category</button>`;
 }
 
+async function _formPickCategory() {
+  document.getElementById('fs-cat-picker')?.remove();
+  let cats = window.FormSettings?.getCategories?.() || [];
+  if (!cats.length && window.FormSettings?.loadCategories) {
+    await window.FormSettings.loadCategories().catch(() => {});
+    cats = window.FormSettings?.getCategories?.() || [];
+  }
+  if (!cats.length) { cadToast('No categories configured — add them in Form Settings', 'info'); return; }
+  const overlay = document.createElement('div');
+  overlay.id = 'fs-cat-picker';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9400;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center';
+  const rows = cats.map(c =>
+    `<div onclick="_formSetCategory('${c.id}');document.getElementById('fs-cat-picker')?.remove()"
+      style="padding:10px 12px;border-radius:5px;cursor:pointer;border:1px solid var(--border);margin-bottom:6px;background:var(--surf2)"
+      onmouseover="this.style.borderColor='var(--cad)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="font-size:14px;font-weight:500;color:var(--text);font-family:Arial,sans-serif">${escHtml(c.name)}</div>
+    </div>`
+  ).join('');
+  overlay.innerHTML = `<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:20px;min-width:320px;max-width:420px;box-shadow:0 16px 48px rgba(0,0,0,.7)">
+    <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;font-family:Arial,sans-serif">Assign Category</div>
+    ${rows}
+    <button onclick="document.getElementById('fs-cat-picker')?.remove()" style="margin-top:8px;width:100%;padding:7px;border-radius:999px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:Arial,sans-serif">Cancel</button>
+  </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+async function _formSetCategory(catId) {
+  if (!_selectedForm) return;
+  _selectedForm.category_id = catId;
+  _formMarkDirty();
+  const catPill = document.getElementById('form-category-pill');
+  if (catPill) catPill.innerHTML = _formCategoryPill(_selectedForm);
+  const lcDiv = document.getElementById('form-lifecycle-btns');
+  if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(_selectedForm);
+}
+
 function _formLifecycleButtons(f) {
   const state  = f.state || 'draft';
   const isEdit = ['draft','unreleased','rejected_review','rejected_approval','rejected_release'].includes(state);
@@ -2493,7 +2524,7 @@ function _formLifecycleButtons(f) {
     btns.push(`<button id="form-save-btn"
       class="${_formDirty?'btn btn-solid btn-sm':'btn btn-ghost btn-sm'}"
       onclick="_formSave()"
-      style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px">Save</button>`);
+      style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">Save</button>`);
   }
 
   // ── State-specific primary actions ──────────────────────────────────────
@@ -2816,14 +2847,18 @@ function _formShowVerTooltip(btn) {
   _formHideVerTooltip();
   var tip = document.createElement('div');
   tip.id = 'form-ver-tip';
-  tip.style.cssText = 'position:fixed;z-index:99999;width:380px;background:var(--bg2,#1a1f2e);' +
-    'border:1px solid var(--border2,rgba(255,255,255,.15));border-radius:8px;padding:14px 16px;' +
-    'box-shadow:0 8px 32px rgba(0,0,0,.5);font-family:Arial,sans-serif;pointer-events:none';
+  tip.style.cssText = 'position:fixed;z-index:99999;width:380px;background:#1a1f2e;' +
+    'border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:14px 16px;' +
+    'box-shadow:0 8px 32px rgba(0,0,0,.5);font-family:Arial,sans-serif;' +
+    'font-size:12px;color:#e2e8f0;pointer-events:none;visibility:hidden';
   tip.innerHTML = (typeof _verTooltipHtml === 'function') ? _verTooltipHtml() : '';
   document.body.appendChild(tip);
-  var r = btn.getBoundingClientRect();
-  tip.style.left = Math.max(8, r.right - 380) + 'px';
-  tip.style.top  = (r.top - tip.offsetHeight - 8) + 'px';
+  requestAnimationFrame(function() {
+    var r = btn.getBoundingClientRect();
+    tip.style.left = Math.max(8, r.right - 380) + 'px';
+    tip.style.top  = Math.max(8, r.top - tip.offsetHeight - 8) + 'px';
+    tip.style.visibility = 'visible';
+  });
 }
 
 function _formHideVerTooltip() {
