@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE45 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE47 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -4681,46 +4681,78 @@ function _formToggleCoC() {
       '</div>';
     document.body.appendChild(float);
     if (cocBtn) { cocBtn.style.color='var(--cad)'; cocBtn.style.background='var(--cad-dim,rgba(0,201,201,.1))'; }
-    // Load events into float body
+    // Load unified history: form CoC events + BIST runs + certs
     if (_selectedForm?.id) {
-      API.get('coc_events?entity_id=eq.'+_selectedForm.id+'&order=occurred_at.desc&limit=100').then(function(rows) {
+      (async function() {
         var bodyEl = document.getElementById('form-coc-float-body');
-        if (!bodyEl) return;
-        if (!rows || !rows.length) {
-          bodyEl.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:16px;font-family:Arial,sans-serif">No history yet.</div>';
-          return;
+        try {
+          var firmId = (typeof FIRM_ID_CAD !== 'undefined') ? FIRM_ID_CAD : null;
+          // 1. Form CoC events
+          var cocRows = await API.get('coc_events?entity_id=eq.'+_selectedForm.id+'&order=occurred_at.desc&limit=100').catch(function(){return[];});
+          // 2. Resolve companion template via step_id
+          var tmplId = null;
+          if (_selectedForm.step_id) {
+            var stepRows = await API.get('workflow_template_steps?id=eq.'+_selectedForm.step_id+'&select=template_id').catch(function(){return[];});
+            tmplId = stepRows?.[0]?.template_id || null;
+          }
+          var bistRows = [];
+          if (tmplId && firmId) {
+            // 3. Certs
+            var certRows = await API.get('bist_certificates?firm_id=eq.'+firmId+'&template_id=eq.'+tmplId+'&order=issued_at.desc&select=id,certificate_number,status,issued_at').catch(function(){return[];});
+            // 4. Scripts → runs
+            var scriptRows = await API.get('bist_test_scripts?firm_id=eq.'+firmId+'&template_id=eq.'+tmplId+'&select=id,name').catch(function(){return[];});
+            if (scriptRows.length) {
+              var sids = scriptRows.map(function(s){return s.id;}).join(',');
+              var scriptMap = {};
+              scriptRows.forEach(function(s){scriptMap[s.id]=s.name;});
+              var runRows = await API.get('bist_runs?firm_id=eq.'+firmId+'&script_id=in.('+sids+')&order=run_at.desc&limit=50&select=id,status,run_at,script_id,steps_passed,steps_failed').catch(function(){return[];});
+              var tmplVer = (_selectedForm?.version)||'';
+              runRows.forEach(function(r){
+                bistRows.push({ ts: r.run_at, type:'run', version:tmplVer, status:r.status, label:(r.status==='passed'?'Test passed':'Test failed')+' — '+(scriptMap[r.script_id]||'Script'), who:'BIST Engine' });
+              });
+            }
+            certRows.forEach(function(c){
+              bistRows.push({ ts: c.issued_at, type:'cert', status:c.status, version:'', label: c.status==='valid'?'Certified':'Cert invalidated', who: c.certificate_number });
+            });
+          }
+          // Merge and sort all rows chronologically ascending
+          var evtLabel = {'form.created':'Created','form.saved':'Saved','form.released':'Released','form.archived':'Archived','form.state_changed':'State Changed'};
+          var evtColor = {'form.created':'var(--cad)','form.saved':'rgba(0,201,201,.6)','form.released':'var(--green)','form.archived':'var(--muted)','form.state_changed':'var(--accent)'};
+          var allRows = [];
+          (cocRows||[]).forEach(function(e){
+            var meta = e.metadata || {};
+            allRows.push({ ts: e.occurred_at||e.created_at, version: meta.version||'', label: evtLabel[e.event_type]||e.event_type.replace('form.','').replace(/_/g,' '), who: e.actor_name||'System', color: evtColor[e.event_type]||'var(--cad)' });
+          });
+          bistRows.forEach(function(r){
+            allRows.push({ ts: r.ts, version: r.version||'', label: r.label, who: r.who, color: r.type==='cert'?(r.status==='valid'?'var(--green)':'var(--muted)'):'var(--amber)' });
+          });
+          allRows.sort(function(a,b){ return a.ts < b.ts ? -1 : 1; });
+          if (!allRows.length) {
+            bodyEl.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:16px;font-family:Arial,sans-serif">No history yet.</div>';
+            return;
+          }
+          bodyEl.innerHTML =
+            '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px">' +
+            '<thead><tr>' +
+              '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border,#1e2535);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">Version</th>' +
+              '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border,#1e2535);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">Event</th>' +
+              '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border,#1e2535);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">User / Reference</th>' +
+              '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border,#1e2535);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">Date / Time</th>' +
+            '</tr></thead><tbody>' +
+            allRows.map(function(r) {
+              var ts = (r.ts||'').slice(0,16).replace('T',' ');
+              return '<tr style="border-bottom:0.5px solid var(--border,#1e2535)">' +
+                '<td style="padding:5px 6px;color:var(--muted);font-family:monospace;font-size:10px;white-space:nowrap">'+escHtml(r.version||'—')+'</td>' +
+                '<td style="padding:5px 6px;color:'+r.color+';font-weight:600;white-space:nowrap">'+escHtml(r.label)+'</td>' +
+                '<td style="padding:5px 6px;color:var(--text2);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis">'+escHtml(r.who)+'</td>' +
+                '<td style="padding:5px 6px;color:var(--muted);font-family:monospace;font-size:10px;white-space:nowrap">'+escHtml(ts)+'</td>' +
+              '</tr>';
+            }).join('') +
+            '</tbody></table>';
+        } catch(e) {
+          if (bodyEl) bodyEl.innerHTML = '<div style="font-size:12px;color:var(--red);padding:12px;font-family:Arial,sans-serif">Failed to load history.</div>';
         }
-        var evtLabel = {
-          'form.created':'Created','form.saved':'Saved','form.released':'Released',
-          'form.archived':'Archived','form.state_changed':'State Changed','form.field_modified':'Field Modified'
-        };
-        var evtColor = {
-          'form.created':'var(--cad)','form.saved':'var(--cad)','form.released':'var(--green)',
-          'form.archived':'var(--muted)','form.state_changed':'var(--accent)','form.field_modified':'var(--text2)'
-        };
-        bodyEl.innerHTML =
-          '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px">' +
-          '<thead><tr>' +
-            '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border,#1e2535);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">Event</th>' +
-            '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border,#1e2535);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">User</th>' +
-            '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border,#1e2535);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">Date / Time</th>' +
-          '</tr></thead><tbody>' +
-          rows.map(function(e) {
-            var color = evtColor[e.event_type] || 'var(--cad)';
-            var label = evtLabel[e.event_type] || e.event_type.replace('form.','').replace(/_/g,' ');
-            var who   = e.actor_name || 'System';
-            var ts    = (e.occurred_at || e.created_at || '').slice(0,16).replace('T',' ');
-            return '<tr style="border-bottom:0.5px solid var(--border,#1e2535)">' +
-              '<td style="padding:5px 6px;color:'+color+';font-weight:600;white-space:nowrap">'+escHtml(label)+'</td>' +
-              '<td style="padding:5px 6px;color:var(--text2);white-space:nowrap">'+escHtml(who)+'</td>' +
-              '<td style="padding:5px 6px;color:var(--muted);font-family:monospace;font-size:10px;white-space:nowrap">'+escHtml(ts)+'</td>' +
-            '</tr>';
-          }).join('') +
-          '</tbody></table>';
-      }).catch(function() {
-        var bodyEl = document.getElementById('form-coc-float-body');
-        if (bodyEl) bodyEl.innerHTML = '<div style="font-size:12px;color:var(--red);padding:12px;font-family:Arial,sans-serif">Failed to load history.</div>';
-      });
+      })();
     }
     return;
   }
