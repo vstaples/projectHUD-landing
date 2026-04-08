@@ -1,5 +1,5 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-console.log('%c[cdn-form-editor] v20260407-SE36 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE37 8px;border-radius:3px');
 // VERSION: 20260401-230000
 console.log('%c[cdn-form-editor] v20260401-230000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
@@ -2383,21 +2383,28 @@ async function _formSelect(formId) {
   } else if (form.source_html) {
     // Rich HTML form — render in iframe preview
     console.log('[formSelect] rendering source_html form:', form.id);
-    var previewWrap = document.getElementById('form-preview-container') || document.getElementById('cad-content');
     var existingIframe = document.getElementById('form-html-preview');
     if (existingIframe) existingIframe.remove();
-    var iframe = document.createElement('iframe');
-    iframe.id = 'form-html-preview';
-    iframe.style.cssText = 'width:100%;height:100%;min-height:700px;border:none;background:#fff';
-    iframe.sandbox = 'allow-scripts allow-same-origin';
+    // Hide PDF canvas and overlay
     var canvas = document.getElementById('form-pdf-canvas');
     var overlay = document.getElementById('form-field-overlay');
     if (canvas) canvas.style.display = 'none';
     if (overlay) overlay.style.display = 'none';
-    var container = canvas ? canvas.parentElement : previewWrap;
-    if (container) container.appendChild(iframe);
+    // Target form-canvas-wrap — the flex:1 scroll container
+    var canvasWrap = document.getElementById('form-canvas-wrap');
+    if (canvasWrap) {
+      canvasWrap.style.padding = '0';
+      canvasWrap.style.display = 'flex';
+      canvasWrap.style.flexDirection = 'column';
+    }
+    var iframe = document.createElement('iframe');
+    iframe.id = 'form-html-preview';
+    iframe.style.cssText = 'flex:1;width:100%;min-height:700px;border:none;background:#fff';
+    iframe.sandbox = 'allow-scripts allow-same-origin';
     var blob = new Blob([form.source_html], { type: 'text/html' });
     iframe.src = URL.createObjectURL(blob);
+    if (canvasWrap) canvasWrap.appendChild(iframe);
+    else if (canvas && canvas.parentElement) canvas.parentElement.appendChild(iframe);
     _pdfTotalPages = 1; _pdfPage = 1;
     if (typeof _updatePageIndicator === 'function') _updatePageIndicator();
   } else {
