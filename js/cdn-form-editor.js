@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE59 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE60 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2461,7 +2461,7 @@ function _formLifecycleButtons(f) {
         style="font-size:13px;color:var(--red);border-color:rgba(248,113,113,.4)">
         ✕ Cancel Revision</button>`);
     }
-    // Commit (HTML forms) or Submit for Review (PDF forms) or Release (no category gate)
+    // Commit Form (HTML forms) — always show alongside Release
     if (_selectedForm?.source_html) {
       btns.push(`<button onclick="_formCommit()"
         style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;
@@ -2471,14 +2471,15 @@ function _formLifecycleButtons(f) {
     } else if (f.category_id) {
       btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()"
         style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
-    } else {
-      btns.push('<div class="ver-tooltip-wrap">' +
-        '<button onclick="_formReleaseDirectly()"' +
-        ' style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);' +
-        'color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">✓ Release</button>' +
-        _verTooltipHtml() +
-        '</div>');
     }
+    // Release — always visible in editable states
+    var _vtt = (typeof _verTooltipHtml === 'function') ? _verTooltipHtml() : '';
+    btns.push('<div class="ver-tooltip-wrap" style="align-self:center;position:relative;display:inline-block">' +
+      '<button onclick="_formReleaseDirectly()"' +
+      ' style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);' +
+      'color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">✓ Release</button>' +
+      _vtt +
+      '</div>');
   }
 
   if (state === 'in_review') {
