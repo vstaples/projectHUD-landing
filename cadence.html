@@ -39,7 +39,7 @@
   --font-hud:'Rajdhani','Inter',sans-serif;
   --font-ui:'Inter',system-ui,sans-serif;
   --font-mono:'Share Tech Mono',monospace;
-  /* CadenceHUD accent */
+  /* Cadence accent */
   --cad:#c47d18;
   --cad-dim:rgba(196,125,24,.1);
   --cad-wire:rgba(196,125,24,.3);
@@ -1015,7 +1015,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.90 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.91 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -1451,7 +1451,7 @@ function _s9RightPanelNoSource() {
     {
       tag: 'WHY IT EXISTS',
       headline: 'Prove your workflow works\nbefore anyone real touches it.',
-      body: 'Every platform lets you build workflows. Only CadenceHUD lets you prove them — running every routing path, rejection loop, and edge case in a controlled simulation before a single real form is submitted.',
+      body: 'Every platform lets you build workflows. Only Cadence lets you prove them — running every routing path, rejection loop, and edge case in a controlled simulation before a single real form is submitted.',
       illus: _s9IllusProof(),
     },
     {
@@ -1463,7 +1463,7 @@ function _s9RightPanelNoSource() {
     {
       tag: 'THE MONEY SHOT',
       headline: 'Walk into your audit with proof,\nnot documentation.',
-      body: 'When every test passes, CadenceHUD generates a Routing Proof Certificate — a signed, timestamped record that every path was tested, every routing decision verified. No competitor can produce this.',
+      body: 'When every test passes, Cadence generates a Routing Proof Certificate — a signed, timestamped record that every path was tested, every routing decision verified. No competitor can produce this.',
       illus: _s9IllusCert(),
     },
     {
@@ -1688,7 +1688,7 @@ function _s9IllusCert() {
     '<div style="background:#f5f2e8;border-radius:6px;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.65);position:relative">' +
       '<div style="position:absolute;inset:8px;border:1px solid rgba(160,120,40,.28);border-radius:4px;pointer-events:none"></div>' +
       '<div style="background:linear-gradient(135deg,#0f0c28,#0a1830);padding:20px 28px;text-align:center">' +
-        '<div style="font-size:12px;letter-spacing:.18em;color:rgba(200,180,120,.6);text-transform:uppercase;margin-bottom:6px">CadenceHUD \u00b7 ProjectHUD</div>' +
+        '<div style="font-size:12px;letter-spacing:.18em;color:rgba(200,180,120,.6);text-transform:uppercase;margin-bottom:6px">Cadence \u00b7 ProjectHUD</div>' +
         '<div style="font-size:18px;font-weight:700;color:#e8d4a0;letter-spacing:.06em">ROUTING PROOF CERTIFICATE</div>' +
       '</div>' +
       '<div style="height:2px;background:linear-gradient(90deg,transparent,rgba(220,180,80,.9) 50%,transparent)"></div>' +
@@ -2180,7 +2180,7 @@ function _s9VisCertificate() {
       '<div style="position:absolute;inset:7px;border:1px solid rgba(160,120,40,.25);border-radius:3px;pointer-events:none"></div>' +
       // Header
       '<div style="background:linear-gradient(135deg,#0f0c28,#0a1830);padding:18px 24px;text-align:center">' +
-        '<div style="font-size:11px;letter-spacing:.16em;color:rgba(200,180,120,.55);text-transform:uppercase;margin-bottom:5px">CadenceHUD · ProjectHUD</div>' +
+        '<div style="font-size:11px;letter-spacing:.16em;color:rgba(200,180,120,.55);text-transform:uppercase;margin-bottom:5px">Cadence · ProjectHUD</div>' +
         '<div style="font-size:17px;font-weight:700;color:#e8d4a0;letter-spacing:.05em">ROUTING PROOF CERTIFICATE</div>' +
         '<div style="font-size:11px;color:rgba(200,180,120,.35);margin-top:3px;letter-spacing:.08em">BUILT-IN SELF TEST · WORKFLOW VALIDATION</div>' +
       '</div>' +
@@ -2711,7 +2711,7 @@ function _s9RenderCertBody() {
     // Header
     '<div style="background:linear-gradient(135deg,#0f0c28,#0a1830);padding:28px 40px 22px;text-align:center">' +
       '<div style="' + FA + 'font-size:12px;letter-spacing:.18em;color:rgba(200,180,120,.55);' +
-        'text-transform:uppercase;margin-bottom:7px">CadenceHUD · ProjectHUD Platform</div>' +
+        'text-transform:uppercase;margin-bottom:7px">Cadence · ProjectHUD Platform</div>' +
       '<div style="' + FA + 'font-size:22px;font-weight:700;color:#e8d4a0;letter-spacing:.06em">ROUTING PROOF CERTIFICATE</div>' +
       '<div style="' + FA + 'font-size:12px;color:rgba(200,180,120,.45);letter-spacing:.1em;' +
         'text-transform:uppercase;margin-top:4px">Built-In Self Test · Workflow Validation Record</div>' +
@@ -2797,7 +2797,7 @@ function _s9RenderCertBody() {
               '<div style="' + FA + 'font-size:11px;font-weight:700;color:rgba(80,60,20,.4);letter-spacing:.08em;text-transform:uppercase">BIST Engine v1.0</div>' +
             '</div>' +
             '<div style="' + FA + 'font-size:12px;font-weight:700;color:#1a1208;text-align:center">Automated Validation System</div>' +
-            '<div style="' + FA + 'font-size:11px;color:rgba(80,60,20,.45);text-align:center">CadenceHUD · ProjectHUD Platform</div>' +
+            '<div style="' + FA + 'font-size:11px;color:rgba(80,60,20,.45);text-align:center">Cadence · ProjectHUD Platform</div>' +
             '<div style="' + FA + 'font-size:11px;color:rgba(80,60,20,.32);text-align:center">Immutable · System-signed</div>' +
           '</div>' +
 
@@ -5302,7 +5302,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <script src="/js/cdn-core-state.js?v=20260403-S9"></script>
 <script src="/js/cdn-utils.js?v=20260403-S9"></script>
-<script src="/js/cdn-form-editor.js?v=20260407-SE40"></script>
+<script src="/js/cdn-form-editor.js?v=20260407-SE41"></script>
 <script src="/js/cdn-form-settings.js?v=20260403-S9"></script>
 <script src="/js/cdn-assignee.js?v=20260403-S9"></script>
 <script src="/js/cdn-outcomes.js?v=20260403-S9"></script>
@@ -5366,11 +5366,11 @@ document.addEventListener('DOMContentLoaded', function() {
       is_external: resource?.is_external || false,
     };
 
-    console.log('%c[CadenceHUD] CURRENT_USER ready — ' + name + ' (' + userUUID + ')',
+    console.log('%c[Cadence] CURRENT_USER ready — ' + name + ' (' + userUUID + ')',
       'background:#1e3a8a;color:#93c5fd;padding:2px 8px;border-radius:3px;font-weight:600');
 
   } catch(e) {
-    console.warn('[CadenceHUD] CURRENT_USER bootstrap failed:', e.message);
+    console.warn('[Cadence] CURRENT_USER bootstrap failed:', e.message);
   }
 })();
 </script>

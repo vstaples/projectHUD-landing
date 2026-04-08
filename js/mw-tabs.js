@@ -13,7 +13,7 @@ function _mwStorageBucket(){ try { return STORAGE_BUCKET; } catch(_) { return wi
 function _mwFirmId()       { try { return FIRM_ID;        } catch(_) { return window.FIRM_ID        || 'aaaaaaaa-0001-0001-0001-000000000001'; } }
 
 // ── Email notification helper ─────────────────────────────
-// Calls /api/notify-step-activated — same endpoint CadenceHUD uses.
+// Calls /api/notify-step-activated — same endpoint Cadence uses.
 async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title, instanceId, body, stepId }) {
   if (!toEmail) return;
   try {
@@ -784,11 +784,11 @@ window.loadUserConcerns = async function() {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MY REQUESTS — CadenceHUD-backed engine  v20260403-400000
+// MY REQUESTS — Cadence-backed engine  v20260403-400000
 // Browse  = live query: workflow_templates + workflow_form_definitions (compass_visible=true)
 // Active  = live query: workflow_instances submitted by this user
 // History = completed instances
-// Instance view = full-screen overlay mounting CadenceHUD instance renderer
+// Instance view = full-screen overlay mounting Cadence instance renderer
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -846,7 +846,7 @@ function _myrRenderBrowse() {
   const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
   if (!tmpls.length && !forms.length) {
-    el.innerHTML = `<div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.3);padding:40px 0;text-align:center">No published workflows yet.<br><span style="font-size:11px;color:rgba(255,255,255,.2)">Release and publish templates in CadenceHUD to populate this library.</span></div>`;
+    el.innerHTML = `<div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.3);padding:40px 0;text-align:center">No published workflows yet.<br><span style="font-size:11px;color:rgba(255,255,255,.2)">Release and publish templates in Cadence to populate this library.</span></div>`;
     return;
   }
 
@@ -1069,13 +1069,13 @@ function _myrLaunchModal(tmpl) {
 
 // ── INSTANCE OVERLAY ──────────────────────────────────────────────────────────
 // Loads cdn-instances.js + dependencies on first call (once), then renders
-// the standard CadenceHUD instance detail view into a full-screen overlay.
+// the standard Cadence instance detail view into a full-screen overlay.
 
 var _myrCdnLoaded = false;
 
 async function _myrEnsureCdn() {
   if (_myrCdnLoaded) return;
-  // Load CadenceHUD rendering scripts in correct order
+  // Load Cadence rendering scripts in correct order
   const CDN_V = '20260401229002';
   const scripts = [
     `/js/cdn-core-state.js?v=${CDN_V}`,
@@ -1101,7 +1101,7 @@ async function _myrEnsureCdn() {
     });
   }
   _myrCdnLoaded = true;
-  // Seed required CadenceHUD globals if not already set
+  // Seed required Cadence globals if not already set
   if (typeof FIRM_ID_CAD === 'undefined') window.FIRM_ID_CAD = _mwFirmId();
   if (typeof SUPA_URL    === 'undefined') window.SUPA_URL    = typeof _mwSupaURL    === 'function' ? _mwSupaURL()    : '';
   if (typeof SUPA_KEY    === 'undefined') window.SUPA_KEY    = typeof _mwSupaKey    === 'function' ? _mwSupaKey()    : '';
@@ -1109,7 +1109,7 @@ async function _myrEnsureCdn() {
   if (!window._templates)  window._templates  = [];
   if (!window._myResourceId && _myResource?.id) window._myResourceId = _myResource.id;
   if (!window._myUserId     && _myResource?.user_id) window._myUserId = _myResource.user_id;
-  console.log('[myrEnsureCdn] CadenceHUD rendering scripts ready');
+  console.log('[myrEnsureCdn] Cadence rendering scripts ready');
 }
 
 window.myrOpenInstance = async function(instanceId) {
@@ -1140,7 +1140,7 @@ window.myrOpenInstance = async function(instanceId) {
   document.body.appendChild(overlay);
 
   try {
-    // Ensure CadenceHUD rendering scripts are loaded
+    // Ensure Cadence rendering scripts are loaded
     await _myrEnsureCdn();
 
     // Fetch instance, template steps, and CoC in parallel
@@ -1161,7 +1161,7 @@ window.myrOpenInstance = async function(instanceId) {
       ? await API.get(`workflow_templates?id=eq.${inst.template_id}&select=*&limit=1`).catch(() => [])
       : [];
 
-    // Hydrate CadenceHUD globals minimally so renderInstanceDetail works
+    // Hydrate Cadence globals minimally so renderInstanceDetail works
     inst._tmplSteps  = tmplSteps  || [];
     inst._stepInsts  = stepInstRows || [];
     inst._selectedStep = null;
@@ -1181,7 +1181,7 @@ window.myrOpenInstance = async function(instanceId) {
     const titleEl = document.getElementById('myr-inst-title');
     if (titleEl) titleEl.textContent = inst.title || 'Request';
 
-    // Mount CadenceHUD instance detail into overlay body
+    // Mount Cadence instance detail into overlay body
     const bodyEl = document.getElementById('myr-inst-body');
     if (bodyEl && typeof renderInstanceDetail === 'function') {
       renderInstanceDetail(bodyEl, inst);

@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE40 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE41 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -376,7 +376,7 @@ function _renderFormEmpty() {
       <div style="font-size:48px;opacity:.12">📄</div>
       <div style="font-size:13px;font-weight:500;color:var(--text2)">No form selected</div>
       <div style="font-size:12px;max-width:280px;text-align:center;line-height:1.7;color:var(--muted)">
-        Import a PDF or Word document — CadenceHUD will detect fields automatically.
+        Import a PDF or Word document — Cadence will detect fields automatically.
         You can then add, edit, and assign roles to each field.
       </div>
       <button class="btn btn-cad" onclick="_formUploadClick()"

@@ -1,12 +1,12 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // cdn-dashboard.js  ·  v20260407-CD37
-// CadenceHUD — composite dashboard
+// Cadence — composite dashboard
 // KPI strip (heatmap in last cell) | left: trend + run log | right: health monitor
 // ══════════════════════════════════════════════════════════════════════════════
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD43 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD44 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
