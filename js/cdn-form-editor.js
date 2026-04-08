@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE43 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE45 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -467,32 +467,36 @@ function _renderFormEditor() {
 
         <!-- ── LEFT RAIL: canvas tools ─────────────────────────── -->
         <div id="form-left-rail"
-             style="width:60px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
+             style="width:72px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
                     display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;
                     font-family:Arial,sans-serif;z-index:5">
 
-          <!-- Page navigation group -->
+          <!-- Page navigation group — horizontal row -->
+          <div style="display:flex;align-items:center;gap:1px;width:68px;justify-content:center;margin-bottom:2px">
           <button id="form-page-prev" onclick="_formPrevPage()" title="Previous page"
-            style="${_railBtn()}">‹</button>
+            style="width:22px;height:28px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text1);font-size:14px;display:flex;align-items:center;justify-content:center">‹</button>
           <span id="form-page-indicator"
-            style="font-size:11px;color:var(--muted);text-align:center;line-height:1.2;
-                   width:52px;padding:2px 0;font-family:Arial,sans-serif;white-space:nowrap">
+            style="font-size:10px;color:var(--muted);text-align:center;line-height:1;
+                   padding:0 2px;font-family:Arial,sans-serif;white-space:nowrap;min-width:24px">
             ${_pdfPage}/${_pdfTotalPages}
           </span>
           <button id="form-page-next" onclick="_formNextPage()" title="Next page"
-            style="${_railBtn()}">›</button>
+            style="width:22px;height:28px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text1);font-size:14px;display:flex;align-items:center;justify-content:center">›</button>
+          </div>
 
-          <div style="width:44px;height:1px;background:var(--border);margin:6px 0"></div>
+          <div style="width:60px;height:1px;background:var(--border);margin:4px 0"></div>
 
-          <!-- Zoom group -->
-          <button onclick="_formZoomIn()" title="Zoom in (+)"
-            style="${_railBtn()}">+</button>
-          <span id="form-zoom-label"
-            style="font-size:11px;color:var(--muted);text-align:center;cursor:pointer;
-                   width:52px;padding:2px 0;font-family:Arial,sans-serif"
-            onclick="_formZoomReset()" title="Reset to 100%">${Math.round(_pdfScale * 100 / 1.5)}%</span>
+          <!-- Zoom group — horizontal row -->
+          <div style="display:flex;align-items:center;gap:1px;width:68px;justify-content:center;margin-bottom:2px">
           <button onclick="_formZoomOut()" title="Zoom out (-)"
-            style="${_railBtn()}">−</button>
+            style="width:20px;height:28px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text1);font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
+          <span id="form-zoom-label"
+            style="font-size:10px;color:var(--muted);text-align:center;cursor:pointer;
+                   padding:0 2px;font-family:Arial,sans-serif;white-space:nowrap;min-width:28px"
+            onclick="_formZoomReset()" title="Reset to 100%">${Math.round(_pdfScale * 100 / 1.5)}%</span>
+          <button onclick="_formZoomIn()" title="Zoom in (+)"
+            style="width:20px;height:28px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text1);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>
+          </div>
           <button onclick="_formZoomFit()" title="Fit to width"
             style="${_railBtn()}">⊡</button>
           <button onclick="_formZoomReset()" title="Reset to 100%"
@@ -4656,7 +4660,71 @@ async function _formClearHistory(formId) {
 function _formToggleCoC() {
   const panel  = document.getElementById('form-coc-panel');
   const cocBtn = document.getElementById('form-coc-btn');
-  if (!panel) return;
+
+  // HTML form — panel not in DOM, use floating overlay instead
+  if (!panel) {
+    var existing = document.getElementById('form-coc-float');
+    if (existing) { existing.remove(); if (cocBtn) { cocBtn.style.color=''; cocBtn.style.background=''; } return; }
+    var float = document.createElement('div');
+    float.id = 'form-coc-float';
+    float.style.cssText = 'position:fixed;top:80px;right:20px;width:520px;max-height:70vh;' +
+      'background:var(--bg,#0d1017);border:1px solid var(--border,#1e2535);border-radius:8px;' +
+      'z-index:8000;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.5)';
+    float.innerHTML =
+      '<div style="padding:10px 14px;border-bottom:1px solid var(--border,#1e2535);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">' +
+        '<span style="font-family:Arial,sans-serif;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--cad,#00c9c9)">Form History</span>' +
+        '<button onclick="_formCoCFloatClose()" ' +
+          'style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:0">&#x2715;</button>' +
+      '</div>' +
+      '<div id="form-coc-float-body" style="flex:1;overflow-y:auto;padding:10px 14px">' +
+        '<div style="font-size:12px;color:var(--muted);text-align:center;padding:16px;font-family:Arial,sans-serif">Loading…</div>' +
+      '</div>';
+    document.body.appendChild(float);
+    if (cocBtn) { cocBtn.style.color='var(--cad)'; cocBtn.style.background='var(--cad-dim,rgba(0,201,201,.1))'; }
+    // Load events into float body
+    if (_selectedForm?.id) {
+      API.get('coc_events?entity_id=eq.'+_selectedForm.id+'&order=occurred_at.desc&limit=100').then(function(rows) {
+        var bodyEl = document.getElementById('form-coc-float-body');
+        if (!bodyEl) return;
+        if (!rows || !rows.length) {
+          bodyEl.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:16px;font-family:Arial,sans-serif">No history yet.</div>';
+          return;
+        }
+        var evtLabel = {
+          'form.created':'Created','form.saved':'Saved','form.released':'Released',
+          'form.archived':'Archived','form.state_changed':'State Changed','form.field_modified':'Field Modified'
+        };
+        var evtColor = {
+          'form.created':'var(--cad)','form.saved':'var(--cad)','form.released':'var(--green)',
+          'form.archived':'var(--muted)','form.state_changed':'var(--accent)','form.field_modified':'var(--text2)'
+        };
+        bodyEl.innerHTML =
+          '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px">' +
+          '<thead><tr>' +
+            '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border,#1e2535);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">Event</th>' +
+            '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border,#1e2535);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">User</th>' +
+            '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border,#1e2535);color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase">Date / Time</th>' +
+          '</tr></thead><tbody>' +
+          rows.map(function(e) {
+            var color = evtColor[e.event_type] || 'var(--cad)';
+            var label = evtLabel[e.event_type] || e.event_type.replace('form.','').replace(/_/g,' ');
+            var who   = e.actor_name || 'System';
+            var ts    = (e.occurred_at || e.created_at || '').slice(0,16).replace('T',' ');
+            return '<tr style="border-bottom:0.5px solid var(--border,#1e2535)">' +
+              '<td style="padding:5px 6px;color:'+color+';font-weight:600;white-space:nowrap">'+escHtml(label)+'</td>' +
+              '<td style="padding:5px 6px;color:var(--text2);white-space:nowrap">'+escHtml(who)+'</td>' +
+              '<td style="padding:5px 6px;color:var(--muted);font-family:monospace;font-size:10px;white-space:nowrap">'+escHtml(ts)+'</td>' +
+            '</tr>';
+          }).join('') +
+          '</tbody></table>';
+      }).catch(function() {
+        var bodyEl = document.getElementById('form-coc-float-body');
+        if (bodyEl) bodyEl.innerHTML = '<div style="font-size:12px;color:var(--red);padding:12px;font-family:Arial,sans-serif">Failed to load history.</div>';
+      });
+    }
+    return;
+  }
+
   const opening = !panel.classList.contains('open');
   panel.classList.toggle('open');
   if (cocBtn) {
@@ -4733,6 +4801,13 @@ function _formCoCRender(rows) {
 }
 
 // Refresh CoC if panel is open (called after saves/state changes)
+function _formCoCFloatClose() {
+  var e = document.getElementById('form-coc-float');
+  if (e) e.remove();
+  var b = document.getElementById('form-coc-btn');
+  if (b) { b.style.color = ''; b.style.background = ''; }
+}
+
 function _formRefreshCoCIfOpen() {
   if (document.getElementById('form-coc-panel')?.classList.contains('open') && _selectedForm?.id) {
     _formLoadCoC(_selectedForm.id);
