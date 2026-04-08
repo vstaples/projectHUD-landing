@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE72 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE73 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -502,6 +502,12 @@ function _renderFormEditor() {
                    border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
             CoC
           </button>
+          <!-- Edit Mode toggle -->
+          <button id="form-edit-mode-btn" onclick="_formToggleEditMode()" title="Toggle edit mode — click text in the form to edit it directly"
+            style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
+                   border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
+            ✎ Edit
+          </button>
           <!-- Delete -->
           <button onclick="_formDeleteWithConfirm('${f.id}')" title="Delete form"
             style="font-family:Arial,sans-serif;font-size:12px;padding:4px 10px;border-radius:999px;
@@ -888,6 +894,91 @@ function _formUpdateField(fieldId, key, value) {
   if (listEl) listEl.innerHTML = _renderFieldList();
   _reRenderRoutingPanel();
   _renderFieldOverlays();
+}
+
+var _formEditModeActive = false;
+
+function _formToggleEditMode() {
+  _formEditModeActive = !_formEditModeActive;
+  var btn = document.getElementById('form-edit-mode-btn');
+  var iframe = document.getElementById('form-html-preview');
+  if (!iframe) { cadToast('Open an HTML form first', 'info'); _formEditModeActive = false; return; }
+  var doc = iframe.contentDocument;
+  if (!doc) return;
+
+  if (_formEditModeActive) {
+    // Enter edit mode — make text nodes editable
+    if (btn) { btn.style.background = 'var(--cad-dim)'; btn.style.color = 'var(--cad)'; btn.style.borderColor = 'var(--cad)'; btn.textContent = '✎ Editing'; }
+    
+    // Inject edit mode styles into iframe
+    var style = doc.createElement('style');
+    style.id = '_cadEditStyles';
+    style.textContent = [
+      '[contenteditable]{outline:2px dashed rgba(0,201,201,.5)!important;border-radius:3px;cursor:text;min-width:20px;display:inline-block}',
+      '[contenteditable]:hover{outline:2px dashed #00c9c9!important;background:rgba(0,201,201,.06)!important}',
+      '[contenteditable]:focus{outline:2px solid #00c9c9!important;background:rgba(0,201,201,.08)!important}',
+      '._cad-edit-hint{position:fixed;top:8px;left:50%;transform:translateX(-50%);background:#00c9c9;color:#003333;font-family:Arial,sans-serif;font-size:11px;font-weight:600;padding:4px 14px;border-radius:99px;z-index:9999;pointer-events:none}',
+    ].join('');
+    doc.head.appendChild(style);
+
+    // Add hint banner
+    var hint = doc.createElement('div');
+    hint.className = '_cad-edit-hint';
+    hint.textContent = 'Edit mode — click any text to edit · changes auto-save on blur';
+    doc.body.appendChild(hint);
+
+    // Make text elements contenteditable
+    var editableSelectors = [
+      '.htitle', '.hsub', '.sec-lbl', 'label', 'th', '.tot-cat', '.tot-title',
+      'h1', 'h2', 'h3', 'h4', '[data-label]',
+      '.ftr div', 'p'
+    ];
+    editableSelectors.forEach(function(sel) {
+      doc.querySelectorAll(sel).forEach(function(el) {
+        // Skip elements containing inputs/selects
+        if (el.querySelector('input,select,textarea,button')) return;
+        el.contentEditable = 'true';
+        el.dataset.cadOriginal = el.innerHTML;
+        el.addEventListener('blur', function() { _formEditModeCapture(); });
+      });
+    });
+
+  } else {
+    // Exit edit mode — capture and save
+    _formEditModeCapture();
+    var s = doc.getElementById('_cadEditStyles');
+    if (s) s.remove();
+    var h = doc.querySelector('._cad-edit-hint');
+    if (h) h.remove();
+    doc.querySelectorAll('[contenteditable]').forEach(function(el) {
+      el.removeAttribute('contenteditable');
+      delete el.dataset.cadOriginal;
+    });
+    if (btn) { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; btn.textContent = '✎ Edit'; }
+    cadToast('Edit mode off — changes saved', 'success');
+  }
+}
+
+function _formEditModeCapture() {
+  var iframe = document.getElementById('form-html-preview');
+  if (!iframe || !iframe.contentDocument) return;
+  var doc = iframe.contentDocument;
+  // Remove edit UI before capturing
+  var hint = doc.querySelector('._cad-edit-hint');
+  if (hint) hint.style.display = 'none';
+  // Capture full body HTML
+  var newHtml = doc.body.innerHTML;
+  // Remove edit artifacts
+  newHtml = newHtml.replace(/ contenteditable="true"/g, '');
+  newHtml = newHtml.replace(/ data-cad-original="[^"]*"/g, '');
+  newHtml = newHtml.replace(/<style id="_cadEditStyles">[\s\S]*?<\/style>/g, '');
+  newHtml = newHtml.replace(/<div class="_cad-edit-hint"[^>]*>[\s\S]*?<\/div>/g, '');
+  if (hint) hint.style.display = '';
+  // Update source_html
+  if (_selectedForm) {
+    _selectedForm.source_html = newHtml;
+    _formMarkDirty();
+  }
 }
 
 function _formSyncFieldToHtml(fieldId, key, value, field) {
