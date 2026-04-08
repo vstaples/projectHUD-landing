@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE60 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE61 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -264,9 +264,8 @@ function _formStateLabel(state) {
            rejected_review:'Rejected — Review', rejected_approval:'Rejected — Approval', rejected_release:'Rejected — Release' }[state] || state;
 }
 
-function _formStateColor(state) {
-  // All colors are bright/vivid — no muted/dark values for legibility
-  return {
+function _formStateColor(state, bg) {
+  var colors = {
     draft:              '#a8b4c8',
     unreleased:         '#f0a030',
     in_review:          '#60a5fa',
@@ -277,7 +276,21 @@ function _formStateColor(state) {
     rejected_review:    '#f87171',
     rejected_approval:  '#f87171',
     rejected_release:   '#f87171',
-  }[state] || '#a8b4c8';
+  };
+  var bgs = {
+    draft:              'rgba(168,180,200,.12)',
+    unreleased:         'rgba(240,160,48,.15)',
+    in_review:          'rgba(96,165,250,.12)',
+    reviewed:           'rgba(240,160,48,.15)',
+    approved:           'rgba(74,222,128,.12)',
+    released:           'rgba(74,222,128,.12)',
+    archived:           'rgba(168,180,200,.1)',
+    rejected_review:    'rgba(248,113,113,.12)',
+    rejected_approval:  'rgba(248,113,113,.12)',
+    rejected_release:   'rgba(248,113,113,.12)',
+  };
+  if (bg) return bgs[state] || 'rgba(168,180,200,.12)';
+  return colors[state] || '#a8b4c8';
 }
 
 function renderFormsTab(el) {
@@ -406,15 +419,38 @@ function _renderFormEditor() {
   return `
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
 
-      <!-- ── TOP TOOLBAR: lifecycle only ──────────────────────────── -->
+      <!-- ── TOP TOOLBAR: matches workflow editor layout ─────────── -->
       <div id="form-top-toolbar"
-           style="display:flex;align-items:center;gap:8px;padding:5px 14px;
+           style="display:flex;align-items:center;gap:6px;padding:5px 14px;
                   border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2);
-                  font-family:Arial,sans-serif;font-size:14px">
+                  font-family:Arial,sans-serif;font-size:13px">
+
+        <!-- Version + dirty indicator -->
+        <span id="form-version-display"
+          style="font-family:var(--font-mono);font-size:12px;color:var(--muted);flex-shrink:0">
+          ${f.version||'0.1.0'}${_formDirty?'*':''}
+        </span>
+
+        <!-- State badge -->
+        <span id="form-state-badge"
+          style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;
+                 font-family:Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;
+                 background:${_formStateColor(f.state||'draft',true)};
+                 color:${_formStateColor(f.state||'draft')}">
+          ${_formStateLabel(f.state||'draft')}
+        </span>
+
+        <!-- Save state indicator -->
+        <span id="form-save-indicator"
+          style="font-size:12px;color:${_formDirty?'var(--amber)':'var(--green)'};flex-shrink:0">
+          ${_formDirty ? '● Unsaved' : '● Saved'}
+        </span>
+
+        <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
 
         <!-- Editable name -->
         <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
-          style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:100px;
+          style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:80px;
                  background:transparent;border:none;border-bottom:1px solid transparent;
                  outline:none;font-family:Arial,sans-serif;padding:2px 4px;transition:border-color .15s"
           onfocus="this.style.borderBottomColor='var(--cad)'"
@@ -423,16 +459,8 @@ function _renderFormEditor() {
           onkeydown="if(event.key==='Enter')this.blur()"
           title="Click to rename — press Enter to confirm"/>
 
-        <!-- State · Version · Category pills -->
-        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-          <span id="form-state-badge"
-                style="padding:4px 12px;border-radius:999px;font-size:14px;font-weight:600;font-family:Arial,sans-serif;line-height:1.4;box-shadow:0 2px 4px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08);background:var(--surf3);border:1px solid var(--border2);
-                       color:${_formStateColor(f.state||'draft')}"
-                >${_formStateLabel(f.state||'draft')}</span>
-          <span style="padding:4px 12px;border-radius:999px;font-size:14px;font-weight:600;font-family:Arial,sans-serif;line-height:1.4;box-shadow:0 2px 4px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08);background:var(--surf3);border:1px solid var(--border2);
-                       color:var(--text1)">${f.version||'0.1.0'}</span>
-          <span id="form-category-pill">${_formCategoryPill(f)}</span>
-        </div>
+        <!-- Category pill -->
+        <span id="form-category-pill" style="flex-shrink:0">${_formCategoryPill(f)}</span>
 
         <!-- H/W widget — shown when fields selected -->
         <div id="form-hw-widget" style="display:none;align-items:center;gap:4px;flex-shrink:0">
@@ -466,7 +494,28 @@ function _renderFormEditor() {
         <!-- Spacer -->
         <div style="flex:1"></div>
 
-        <!-- Lifecycle action buttons (right-justified) -->
+        <!-- Right-side action buttons matching workflow editor -->
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <!-- Launch (simulate) -->
+          <button onclick="_formLaunchSimulate()" title="Launch simulator"
+            style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
+                   border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
+            ▶ Launch
+          </button>
+          <!-- CoC history -->
+          <button id="form-coc-btn" onclick="_formToggleCoC()" title="Form history"
+            style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
+                   border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
+            CoC
+          </button>
+          <!-- Delete -->
+          <button onclick="_formDeleteWithConfirm('${f.id}')" title="Delete form"
+            style="font-family:Arial,sans-serif;font-size:12px;padding:4px 10px;border-radius:999px;
+                   border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">
+            🗑
+          </button>
+          <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
+        </div>
         <div id="form-lifecycle-btns" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           ${_formLifecycleButtons(f)}
         </div>
@@ -2439,12 +2488,12 @@ function _formLifecycleButtons(f) {
   const isEdit = ['draft','unreleased','rejected_review','rejected_approval','rejected_release'].includes(state);
   const btns   = [];
 
-  // Save button — always visible in editable states
+  // Save button
   if (isEdit) {
     btns.push(`<button id="form-save-btn"
       class="${_formDirty?'btn btn-solid btn-sm':'btn btn-ghost btn-sm'}"
       onclick="_formSave()"
-      style="font-size:13px;font-family:Arial,sans-serif">Save</button>`);
+      style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px">Save</button>`);
   }
 
   // ── State-specific primary actions ──────────────────────────────────────
@@ -2464,22 +2513,19 @@ function _formLifecycleButtons(f) {
     // Commit Form (HTML forms) — always show alongside Release
     if (_selectedForm?.source_html) {
       btns.push(`<button onclick="_formCommit()"
-        style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;
-               background:var(--cad);color:#003333;border:none;cursor:pointer;
-               font-family:Arial,sans-serif;line-height:1.4">
-        ⬡ Commit Form</button>`);
+        style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
+               border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
+        Commit</button>`);
     } else if (f.category_id) {
       btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()"
         style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
     }
     // Release — always visible in editable states
-    var _vtt = (typeof _verTooltipHtml === 'function') ? _verTooltipHtml() : '';
-    btns.push('<div class="ver-tooltip-wrap" style="align-self:center;position:relative;display:inline-block">' +
-      '<button onclick="_formReleaseDirectly()"' +
-      ' style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);' +
-      'color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">✓ Release</button>' +
-      _vtt +
-      '</div>');
+    btns.push('<button onclick="_formReleaseDirectly()"' +
+      ' onmouseenter="_formShowVerTooltip(this)"' +
+      ' onmouseleave="_formHideVerTooltip()"' +
+      ' style="font-family:Arial,sans-serif;font-size:12px;padding:4px 14px;border-radius:999px;' +
+      'background:var(--green);color:#003333;border:none;cursor:pointer;font-weight:700">Release</button>');
   }
 
   if (state === 'in_review') {
@@ -2764,6 +2810,25 @@ function _verTooltipHtml() {
     '<div class="ver-note">Releasing locks this document and assigns a permanent version. Once released it is read-only — use <strong>Create Revision</strong> to open a new draft at the next minor version.</div>' +
     '<div class="ver-caveat">* The default version number may be overridden in the Commit and Release dialogs.</div>' +
   '</div>';
+}
+
+function _formShowVerTooltip(btn) {
+  _formHideVerTooltip();
+  var tip = document.createElement('div');
+  tip.id = 'form-ver-tip';
+  tip.style.cssText = 'position:fixed;z-index:99999;width:380px;background:var(--bg2,#1a1f2e);' +
+    'border:1px solid var(--border2,rgba(255,255,255,.15));border-radius:8px;padding:14px 16px;' +
+    'box-shadow:0 8px 32px rgba(0,0,0,.5);font-family:Arial,sans-serif;pointer-events:none';
+  tip.innerHTML = (typeof _verTooltipHtml === 'function') ? _verTooltipHtml() : '';
+  document.body.appendChild(tip);
+  var r = btn.getBoundingClientRect();
+  tip.style.left = Math.max(8, r.right - 380) + 'px';
+  tip.style.top  = (r.top - tip.offsetHeight - 8) + 'px';
+}
+
+function _formHideVerTooltip() {
+  var tip = document.getElementById('form-ver-tip');
+  if (tip) tip.remove();
 }
 
 function _calcNextVersion(current, bump) {

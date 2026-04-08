@@ -42,6 +42,25 @@ function _teInjectVerTooltipStyles() {
   document.head.appendChild(s);
 }
 
+function _teShowVerTooltip(btn) {
+  _teHideVerTooltip();
+  var tip = document.createElement('div');
+  tip.id = 'te-ver-tip';
+  tip.style.cssText = 'position:fixed;z-index:99999;width:380px;background:var(--bg2,#1a1f2e);' +
+    'border:1px solid var(--border2,rgba(255,255,255,.15));border-radius:8px;padding:14px 16px;' +
+    'box-shadow:0 8px 32px rgba(0,0,0,.5);font-family:Arial,sans-serif;pointer-events:none';
+  tip.innerHTML = _teVerTooltipHtml();
+  document.body.appendChild(tip);
+  var r = btn.getBoundingClientRect();
+  tip.style.left = Math.max(8, r.right - 380) + 'px';
+  tip.style.top  = (r.top - tip.offsetHeight - 8) + 'px';
+}
+
+function _teHideVerTooltip() {
+  var tip = document.getElementById('te-ver-tip');
+  if (tip) tip.remove();
+}
+
 function _teVerTooltipHtml() {
   _teInjectVerTooltipStyles();
   return '<div class="ver-tooltip">' +
@@ -224,11 +243,9 @@ function renderEditor() {
           title="Save without version bump">Save</button>
         <button class="btn btn-ghost btn-sm" id="commit-btn" onclick="commitTemplate()"
           title="Commit changes as new version (stays Draft)">Commit</button>
-        <span class="ver-tooltip-wrap" style="display:inline-block">
-          <button class="btn btn-solid btn-sm" id="release-btn" onclick="releaseTemplate()"
-            style="background:rgba(42,157,64,.15);border-color:rgba(42,157,64,.5);color:#4ade80">Release</button>
-          ${_teVerTooltipHtml()}
-        </span>
+        <button class="btn btn-solid btn-sm" id="release-btn" onclick="releaseTemplate()"
+          style="background:rgba(42,157,64,.15);border-color:rgba(42,157,64,.5);color:#4ade80"
+          onmouseenter="_teShowVerTooltip(this)" onmouseleave="_teHideVerTooltip()">Release</button>
         ` : `
         <button class="btn btn-ghost btn-sm" onclick="returnToDraft()"
           style="font-size:11px">↩ Return to Draft</button>
