@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE66 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE67 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2795,7 +2795,7 @@ async function _formCommit() {
       _formCoCWrite('form.committed', _selectedForm.id, { version: targetVer, workflow_id: tmplId, roles: roleNames, note: note });
       const listEl = document.getElementById('form-list');
       if (listEl) listEl.innerHTML = _renderFormList();
-      _formRenderActionBtns();
+      _formRefreshToolbar();
       cadToast('Form committed at ' + targetVer, 'success');
     } catch(e) {
       console.error('[formCommit] failed:', e);
