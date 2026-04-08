@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE55 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE56 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -47,6 +47,27 @@ console.log('%c[cdn-form-editor] v20260407-SE55 8px;border-radius:3px');
 // ─────────────────────────────────────────────────────────────────────────────
 (function _injectFormCoCStyles() {
   if (document.getElementById('form-coc-styles')) return;
+  // Version tooltip styles
+  if (!document.getElementById('form-ver-tooltip-styles')) {
+    var vs = document.createElement('style');
+    vs.id = 'form-ver-tooltip-styles';
+    vs.textContent = [
+      '.ver-tooltip-wrap{position:relative;display:inline-block}',
+      '.ver-tooltip{display:none;position:absolute;bottom:calc(100% + 8px);right:0;',
+      'width:380px;background:var(--bg2,#1a1f2e);border:1px solid var(--border2,rgba(255,255,255,.15));',
+      'border-radius:8px;padding:14px 16px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.5);',
+      'font-family:Arial,sans-serif;pointer-events:none}',
+      '.ver-tooltip table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px}',
+      '.ver-tooltip th{text-align:left;padding:3px 6px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:600;font-size:10px;letter-spacing:.06em;text-transform:uppercase}',
+      '.ver-tooltip td{padding:4px 6px;border-bottom:0.5px solid var(--border);color:var(--text2);font-size:11px;vertical-align:top}',
+      '.ver-tooltip td:first-child{font-weight:700;color:var(--text);white-space:nowrap}',
+      '.ver-tooltip td:nth-child(2){color:var(--cad);font-family:monospace;white-space:nowrap}',
+      '.ver-tooltip .ver-note{font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:8px}',
+      '.ver-tooltip .ver-caveat{font-size:10px;color:var(--muted);border-top:0.5px solid var(--border);padding-top:8px;margin-top:4px}',
+      '.ver-tooltip-wrap:hover .ver-tooltip{display:block}',
+    ].join('');
+    document.head.appendChild(vs);
+  }
   const s = document.createElement('style');
   s.id = 'form-coc-styles';
   s.textContent = `
@@ -2453,10 +2474,12 @@ function _formLifecycleButtons(f) {
           style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
       }
     } else {
-      btns.push(`<button onclick="_formReleaseDirectly()"
-        style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);
-               color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">
-        ✓ Release</button>`);
+      btns.push('<div class="ver-tooltip-wrap">' +
+        '<button onclick="_formReleaseDirectly()"' +
+        ' style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);' +
+        'color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">✓ Release</button>' +
+        _verTooltipHtml() +
+        '</div>');
     }
   }
 
@@ -2592,120 +2615,218 @@ async function _formDeleteWithConfirm(formId) {
   const name = form?.source_name || 'this form';
   const inDB = form && !form._unsaved;
   const msg = inDB
-    ? `Remove "${name}" from the Form Library?\n\nThis will permanently delete the form definition from the database. The source PDF in Storage will be retained.`
-    : `Remove "${name}" from the Form Library?`;
-  if (!confirm('Commit ' + formName + '? This will auto-generate a workflow: Submitter to ' + roleNames + '. The form will be released.')) return;
-
-  try {
-    cadToast('Committing form…', 'info');
-
-    // 2. Save latest form state
-    await _formSave();
-
-    // 3. Check if companion workflow already exists
-    var existingTmpls = await API.get(
-      'workflow_templates?firm_id=eq.' + firmId + '&name=eq.' + encodeURIComponent(formName) + '&form_driven=eq.true'
-    ).catch(function(){ return []; }) || [];
-
-    var tmplId;
-    if (existingTmpls.length) {
-      tmplId = existingTmpls[0].id;
-      cadToast('Updating existing companion workflow…', 'info');
-    } else {
-      // 4. Create companion workflow template
-      var newTmpl = await API.post('workflow_templates', {
-        firm_id:      firmId,
-        name:         formName,
-        description:  'Auto-generated from form: ' + formName,
-        status:       'draft',
-        version:      _selectedForm.version || '1.0.0',
-        trigger_type: 'manual',
-        form_driven:  true,
-        created_at:   new Date().toISOString(),
-        updated_at:   new Date().toISOString()
-      });
-      tmplId = newTmpl?.[0]?.id;
-      if (!tmplId) throw new Error('Failed to create companion workflow');
-    }
-
-    // 5. Delete existing steps and recreate from roles
-    await API.del('workflow_template_steps?template_id=eq.' + tmplId).catch(function(){});
-
-    // Step 1 — Submitter (trigger)
-    var steps = [];
-    steps.push(API.post('workflow_template_steps', {
-      firm_id:        firmId,
-      template_id:    tmplId,
-      name:           'Submit ' + formName,
-      step_type:      'form_submission',
-      assignee_role:  'submitter',
-      sequence_order: 1,
-      is_start:       true,
-      created_at:     new Date().toISOString()
-    }));
-
-    // Subsequent steps from roles
-    roles.forEach(function(r, idx) {
-      steps.push(API.post('workflow_template_steps', {
-        firm_id:        firmId,
-        template_id:    tmplId,
-        name:           (FORM_ROLES[r.role]||{label:r.role}).label + (r.parallel ? ' Approval (Parallel)' : ' Approval'),
-        step_type:      r.parallel ? 'parallel_approval' : 'approval',
-        assignee_role:  r.role,
-        sequence_order: idx + 2,
-        is_start:       false,
-        parallel:       r.parallel || false,
-        created_at:     new Date().toISOString()
-      }));
-    });
-
-    var stepResults = await Promise.all(steps);
-    var submitterStepId = stepResults[0]?.[0]?.id;
-
-    // 6. Link form definition to submitter step
-    if (submitterStepId) {
-      await API.patch(
-        'workflow_form_definitions?id=eq.' + _selectedForm.id,
-        { step_id: submitterStepId, updated_at: new Date().toISOString() }
-      );
-      _selectedForm.step_id = submitterStepId;
-    }
-
-    // 7. Release the form
-    await API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id, {
-      state: 'released', updated_at: new Date().toISOString()
-    });
-    _selectedForm.state = 'released';
-
-    // 8. Write CoC event
-    _formCoCWrite('form.committed', _selectedForm.id, {
-      version: _selectedForm.version,
-      workflow_id: tmplId,
-      roles: roleNames
-    });
-
-    // 9. Refresh UI
-    const listEl = document.getElementById('form-list');
-    if (listEl) listEl.innerHTML = _renderFormList();
-    _formRenderActionBtns();
-    cadToast('Form committed — companion workflow created', 'success');
-
-  } catch(e) {
-    console.error('[formCommit] failed:', e);
-    cadToast('Commit failed: ' + e.message, 'error');
+    ? 'Remove "' + name + '" from the Form Library? This will permanently delete the form definition from the database.'
+    : 'Remove "' + name + '" from the Form Library?';
+  if (!confirm(msg)) return;
+  if (inDB) {
+    await API.del('workflow_form_definitions?id=eq.' + formId).catch(function(){});
+    _formCoCWrite('form.archived', formId, { action:'deleted', name });
   }
+  _formDefs = _formDefs.filter(function(f){ return f.id !== formId; });
+  if (_selectedForm?.id === formId) { _selectedForm = null; }
+  const listEl = document.getElementById('form-list');
+  if (listEl) listEl.innerHTML = _renderFormList();
+  cadToast('Form removed', 'success');
+}
+
+async function _formCommit() {
+  if (!_selectedForm?.id) return;
+  if (!_selectedForm.source_html) { cadToast('Only HTML forms can be committed this way', 'error'); return; }
+
+  var firmId = window.FIRM_ID || FIRM_ID_CAD;
+  var formName = _selectedForm.source_name || 'Untitled Form';
+  var roles = _formRoutingRolesOrdered(_formRouting.roles || []);
+
+  if (!roles.length) { cadToast('Add at least one role in Routing Order before committing', 'error'); return; }
+
+  var roleNames = roles.map(function(r){ return (FORM_ROLES[r.role]||{label:r.role}).label; }).join(' → ');
+  var defaultVer = _calcNextVersion(_selectedForm.version || '0.1.0', 'minor');
+
+  // Show commit modal with version override
+  _formShowCommitModal(formName, roleNames, defaultVer, async function(targetVer, note) {
+    try {
+      cadToast('Committing form…', 'info');
+      await _formSave();
+
+      var existingTmpls = await API.get(
+        'workflow_templates?firm_id=eq.' + firmId + '&name=eq.' + encodeURIComponent(formName) + '&form_driven=eq.true'
+      ).catch(function(){ return []; }) || [];
+
+      var tmplId;
+      if (existingTmpls.length) {
+        tmplId = existingTmpls[0].id;
+      } else {
+        var newTmpl = await API.post('workflow_templates', {
+          firm_id: firmId, name: formName,
+          description: 'Auto-generated from form: ' + formName,
+          status: 'draft', version: targetVer,
+          trigger_type: 'manual', form_driven: true,
+          created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+        });
+        tmplId = newTmpl?.[0]?.id;
+        if (!tmplId) throw new Error('Failed to create companion workflow');
+      }
+
+      await API.del('workflow_template_steps?template_id=eq.' + tmplId).catch(function(){});
+      var steps = [];
+      steps.push(API.post('workflow_template_steps', {
+        firm_id: firmId, template_id: tmplId, name: 'Submit ' + formName,
+        step_type: 'form_submission', assignee_role: 'submitter',
+        sequence_order: 1, is_start: true, created_at: new Date().toISOString()
+      }));
+      roles.forEach(function(r, idx) {
+        steps.push(API.post('workflow_template_steps', {
+          firm_id: firmId, template_id: tmplId,
+          name: (FORM_ROLES[r.role]||{label:r.role}).label + (r.parallel ? ' Approval (Parallel)' : ' Approval'),
+          step_type: r.parallel ? 'parallel_approval' : 'approval',
+          assignee_role: r.role, sequence_order: idx + 2,
+          is_start: false, parallel: r.parallel || false,
+          created_at: new Date().toISOString()
+        }));
+      });
+
+      var stepResults = await Promise.all(steps);
+      var submitterStepId = stepResults[0]?.[0]?.id;
+
+      if (submitterStepId) {
+        await API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id,
+          { step_id: submitterStepId, version: targetVer, updated_at: new Date().toISOString() });
+        _selectedForm.step_id = submitterStepId;
+        _selectedForm.version = targetVer;
+      }
+
+      _formCoCWrite('form.committed', _selectedForm.id, { version: targetVer, workflow_id: tmplId, roles: roleNames, note: note });
+      const listEl = document.getElementById('form-list');
+      if (listEl) listEl.innerHTML = _renderFormList();
+      _formRenderActionBtns();
+      cadToast('Form committed at ' + targetVer, 'success');
+    } catch(e) {
+      console.error('[formCommit] failed:', e);
+      cadToast('Commit failed: ' + e.message, 'error');
+    }
+  });
+}
+
+function _formShowCommitModal(formName, roleNames, defaultVer, onConfirm) {
+  document.getElementById('form-commit-modal')?.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'form-commit-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif';
+  overlay.innerHTML =
+    '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;width:480px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.7)">' +
+      '<div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">' +
+        '<div style="width:36px;height:36px;border-radius:8px;flex-shrink:0;background:rgba(0,201,201,.12);border:1px solid rgba(0,201,201,.3);display:flex;align-items:center;justify-content:center;font-size:18px">⬡</div>' +
+        '<div style="flex:1">' +
+          '<div style="font-size:16px;font-weight:700;color:var(--text)">Commit Form</div>' +
+          '<div style="font-size:13px;color:var(--muted);margin-top:2px">' + escHtml(formName) + '</div>' +
+        '</div>' +
+        '<button data-dismiss="form-commit-modal" onclick="var m=document.getElementById(this.dataset.dismiss);if(m)m.remove()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0">&#x2715;</button>' +
+      '</div>' +
+      '<div style="padding:20px 22px;display:flex;flex-direction:column;gap:14px">' +
+        '<div style="padding:10px 12px;background:var(--surf2);border-radius:6px;border-left:3px solid var(--cad)">' +
+          '<div style="font-size:12px;color:var(--text2);line-height:1.6">Workflow will be auto-generated: <strong style="color:var(--cad)">Submitter → ' + escHtml(roleNames) + '</strong></div>' +
+        '</div>' +
+        '<div>' +
+          '<label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;letter-spacing:.03em">Target Version</label>' +
+          '<input id="form-commit-ver" value="' + escHtml(defaultVer) + '" style="width:100%;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:monospace;font-size:14px;padding:8px 12px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--cad)'" onblur="this.style.borderColor='var(--border2)'">' +
+          '<div style="font-size:11px;color:var(--muted);margin-top:4px">Default is next MINOR. Override if needed (e.g. 1.0.0).</div>' +
+        '</div>' +
+        '<div>' +
+          '<label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;letter-spacing:.03em">Commit Note <span style="font-weight:400;color:var(--muted)">(optional)</span></label>' +
+          '<textarea id="form-commit-note" placeholder="What changed in this version…" style="width:100%;min-height:72px;resize:vertical;box-sizing:border-box;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:Arial,sans-serif;font-size:13px;padding:8px 12px;outline:none" onfocus="this.style.borderColor='var(--cad)'" onblur="this.style.borderColor='var(--border2)'"></textarea>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+          '<button data-dismiss="form-commit-modal" onclick="var m=document.getElementById(this.dataset.dismiss);if(m)m.remove()" style="font-family:Arial,sans-serif;font-size:13px;padding:8px 18px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">Cancel</button>' +
+          '<button id="form-commit-confirm" style="font-family:Arial,sans-serif;font-size:13px;font-weight:700;padding:8px 20px;border-radius:6px;border:none;background:var(--cad);color:#003333;cursor:pointer">⬡ Commit</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e){ if(e.target===overlay) overlay.remove(); });
+  document.getElementById('form-commit-confirm').addEventListener('click', function() {
+    var ver = (document.getElementById('form-commit-ver')?.value||'').trim() || defaultVer;
+    var note = (document.getElementById('form-commit-note')?.value||'').trim();
+    overlay.remove();
+    onConfirm(ver, note);
+  });
+}
+
+// ── Version helpers ───────────────────────────────────────────────────────────
+function _verTooltipHtml() {
+  return '<div class="ver-tooltip">' +
+    '<table>' +
+      '<tr><th>Action</th><th>Effect</th><th>Example</th><th>Meaning</th></tr>' +
+      '<tr><td>Save</td><td>+PATCH</td><td>0.1.0 → 0.1.1</td><td>Work in progress</td></tr>' +
+      '<tr><td>Commit</td><td>+MINOR</td><td>0.1.1 → 0.2.0</td><td>Ready for test</td></tr>' +
+      '<tr><td>Release</td><td>+MAJOR</td><td>0.2.0 → 1.0.0</td><td>Locked, production-ready</td></tr>' +
+      '<tr><td>Revision</td><td>+MINOR draft</td><td>1.0.0 → 1.1.0</td><td>Changes against live release</td></tr>' +
+      '<tr><td>Re-release</td><td>+MAJOR</td><td>1.1.x → 2.0.0</td><td>Breaking change published</td></tr>' +
+    '</table>' +
+    '<div class="ver-note">Releasing locks this document and assigns a permanent version. Once released it is read-only — use <strong>Create Revision</strong> to open a new draft at the next minor version.</div>' +
+    '<div class="ver-caveat">* The default version number may be overridden in the Commit and Release dialogs.</div>' +
+  '</div>';
+}
+
+function _calcNextVersion(current, bump) {
+  var parts = (current || '0.1.0').split('.').map(Number);
+  var major = parts[0]||0, minor = parts[1]||0, patch = parts[2]||0;
+  if (bump === 'major') { return (major > 0 ? major+1 : 1)+'.0.0'; }
+  if (bump === 'minor') return major+'.'+(minor+1)+'.0';
+  return major+'.'+minor+'.'+(patch+1);
 }
 
 async function _formReleaseDirectly() {
   if (!_selectedForm) return;
-  const note = prompt('Release this form? Add a release note (optional):')||'';
-  _selectedForm.state       = 'released';
-  _selectedForm.released_at = new Date().toISOString();
-  _selectedForm.review_note = note;
-  await _formSave();
-  _formCoCWrite('form.released', _selectedForm.id, { version:_selectedForm.version, note });
-  cadToast(`Released ${_selectedForm.version}`, 'success');
-  await _formRefreshUI();
+  var defaultVer = _calcNextVersion(_selectedForm.version || '0.1.0', 'major');
+  _formShowReleaseDirectModal(_selectedForm, defaultVer);
+}
+
+function _formShowReleaseDirectModal(form, defaultVer) {
+  document.getElementById('form-release-direct-modal')?.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'form-release-direct-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif';
+  overlay.innerHTML =
+    '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;width:480px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.7)">' +
+      '<div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">' +
+        '<div style="width:36px;height:36px;border-radius:8px;flex-shrink:0;background:rgba(42,157,64,.15);border:1px solid rgba(42,157,64,.3);display:flex;align-items:center;justify-content:center;font-size:18px">↑</div>' +
+        '<div style="flex:1">' +
+          '<div style="font-size:16px;font-weight:700;color:var(--text)">Release to Production</div>' +
+          '<div style="font-size:13px;color:var(--muted);margin-top:2px">' + escHtml(form.source_name) + ' <strong style="color:var(--green)">' + escHtml(form.version||'') + '</strong></div>' +
+        '</div>' +
+        '<button data-dismiss="form-release-direct-modal" onclick="var m=document.getElementById(this.dataset.dismiss);if(m)m.remove()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0">&#x2715;</button>' +
+      '</div>' +
+      '<div style="padding:20px 22px;display:flex;flex-direction:column;gap:14px">' +
+        '<div>' +
+          '<label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;letter-spacing:.03em">Target Version</label>' +
+          '<input id="form-rel-ver" value="' + escHtml(defaultVer) + '" style="width:100%;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:monospace;font-size:14px;padding:8px 12px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border2)'">' +
+          '<div style="font-size:11px;color:var(--muted);margin-top:4px">Default is next MAJOR. Override if needed (e.g. 1.1.0).</div>' +
+        '</div>' +
+        '<div>' +
+          '<label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;letter-spacing:.03em">Release Notes <span style="font-weight:400;color:var(--muted)">(optional)</span></label>' +
+          '<textarea id="form-rel-note" placeholder="What is included in this release…" style="width:100%;min-height:80px;resize:vertical;box-sizing:border-box;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:Arial,sans-serif;font-size:13px;padding:8px 12px;outline:none" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border2)'"></textarea>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+          '<button data-dismiss="form-release-direct-modal" onclick="var m=document.getElementById(this.dataset.dismiss);if(m)m.remove()" style="font-family:Arial,sans-serif;font-size:13px;padding:8px 18px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">Cancel</button>' +
+          '<button id="form-rel-confirm" style="font-family:Arial,sans-serif;font-size:13px;font-weight:700;padding:8px 20px;border-radius:6px;border:none;background:var(--green);color:white;cursor:pointer">✓ Release</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e){ if(e.target===overlay) overlay.remove(); });
+  document.getElementById('form-rel-confirm').addEventListener('click', async function() {
+    var ver = (document.getElementById('form-rel-ver')?.value||'').trim() || defaultVer;
+    var note = (document.getElementById('form-rel-note')?.value||'').trim();
+    overlay.remove();
+    _selectedForm.state = 'released';
+    _selectedForm.version = ver;
+    _selectedForm.released_at = new Date().toISOString();
+    _selectedForm.review_note = note;
+    await _formSave();
+    _formCoCWrite('form.released', _selectedForm.id, { version: ver, note });
+    cadToast('Released ' + ver, 'success');
+    await _formRefreshUI();
+  });
 }
 
 // _formRejectForm — called from reviewer (in_review) or approver (reviewed) reject buttons

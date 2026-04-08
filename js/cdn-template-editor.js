@@ -20,6 +20,44 @@ function renderTemplatesTab(el) {
   if (_selectedTmpl) renderEditor();
 }
 
+function _teInjectVerTooltipStyles() {
+  if (document.getElementById('te-ver-tooltip-styles')) return;
+  var s = document.createElement('style');
+  s.id = 'te-ver-tooltip-styles';
+  s.textContent = [
+    '.ver-tooltip-wrap{position:relative;display:inline-block}',
+    '.ver-tooltip{display:none;position:absolute;bottom:calc(100% + 8px);right:0;',
+    'width:380px;background:var(--bg2,#1a1f2e);border:1px solid var(--border2,rgba(255,255,255,.15));',
+    'border-radius:8px;padding:14px 16px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.5);',
+    'font-family:Arial,sans-serif;pointer-events:none}',
+    '.ver-tooltip table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px}',
+    '.ver-tooltip th{text-align:left;padding:3px 6px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:600;font-size:10px;letter-spacing:.06em;text-transform:uppercase}',
+    '.ver-tooltip td{padding:4px 6px;border-bottom:0.5px solid var(--border);color:var(--text2);font-size:11px;vertical-align:top}',
+    '.ver-tooltip td:first-child{font-weight:700;color:var(--text);white-space:nowrap}',
+    '.ver-tooltip td:nth-child(2){color:var(--cad);font-family:monospace;white-space:nowrap}',
+    '.ver-tooltip .ver-note{font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:8px}',
+    '.ver-tooltip .ver-caveat{font-size:10px;color:var(--muted);border-top:0.5px solid var(--border);padding-top:8px;margin-top:4px}',
+    '.ver-tooltip-wrap:hover .ver-tooltip{display:block}',
+  ].join('');
+  document.head.appendChild(s);
+}
+
+function _teVerTooltipHtml() {
+  _teInjectVerTooltipStyles();
+  return '<div class="ver-tooltip">' +
+    '<table>' +
+      '<tr><th>Action</th><th>Effect</th><th>Example</th><th>Meaning</th></tr>' +
+      '<tr><td>Save</td><td>+PATCH</td><td>0.1.0 → 0.1.1</td><td>Work in progress</td></tr>' +
+      '<tr><td>Commit</td><td>+MINOR</td><td>0.1.1 → 0.2.0</td><td>Ready for test</td></tr>' +
+      '<tr><td>Release</td><td>+MAJOR</td><td>0.2.0 → 1.0.0</td><td>Locked, production-ready</td></tr>' +
+      '<tr><td>Revision</td><td>+MINOR draft</td><td>1.0.0 → 1.1.0</td><td>Changes against live release</td></tr>' +
+      '<tr><td>Re-release</td><td>+MAJOR</td><td>1.1.x → 2.0.0</td><td>Breaking change published</td></tr>' +
+    '</table>' +
+    '<div class="ver-note">Releasing locks this document and assigns a permanent version. Once released it is read-only — use <strong>Return to Draft</strong> to open a new draft.</div>' +
+    '<div class="ver-caveat">* The default version number may be overridden in the Commit and Release dialogs.</div>' +
+  '</div>';
+}
+
 function renderTemplateList() {
   var visibleTemplates = (_templates || []).filter(function(t){ return !t.form_driven; });
   if (!visibleTemplates.length) {
@@ -186,9 +224,11 @@ function renderEditor() {
           title="Save without version bump">Save</button>
         <button class="btn btn-ghost btn-sm" id="commit-btn" onclick="commitTemplate()"
           title="Commit changes as new version (stays Draft)">Commit</button>
-        <button class="btn btn-solid btn-sm" id="release-btn" onclick="releaseTemplate()"
-          style="background:rgba(42,157,64,.15);border-color:rgba(42,157,64,.5);color:#4ade80"
-          title="Commit and release — publishes to Compass Browse">Release</button>
+        <span class="ver-tooltip-wrap" style="display:inline-block">
+          <button class="btn btn-solid btn-sm" id="release-btn" onclick="releaseTemplate()"
+            style="background:rgba(42,157,64,.15);border-color:rgba(42,157,64,.5);color:#4ade80">Release</button>
+          ${_teVerTooltipHtml()}
+        </span>
         ` : `
         <button class="btn btn-ghost btn-sm" onclick="returnToDraft()"
           style="font-size:11px">↩ Return to Draft</button>
