@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE82 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE83 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -919,10 +919,17 @@ function _formWireEditBtn() {
   overlay.addEventListener('mousedown', function(e) {
     e.preventDefault();
     _formToggleEditMode();
-    editBtn.style.background = _formEditModeActive ? 'rgba(0,201,201,.15)' : '';
-    editBtn.style.color = _formEditModeActive ? '#00c9c9' : '';
-    editBtn.style.borderColor = _formEditModeActive ? '#00c9c9' : '';
-    editBtn.textContent = _formEditModeActive ? '✎ Done' : '✎';
+    if (_formEditModeActive) {
+      editBtn.style.background = 'rgba(42,157,64,.15)';
+      editBtn.style.color = '#4ade80';
+      editBtn.style.borderColor = 'rgba(42,157,64,.4)';
+      editBtn.textContent = '✓ Done';
+    } else {
+      editBtn.style.background = '';
+      editBtn.style.color = '';
+      editBtn.style.borderColor = '';
+      editBtn.textContent = '✎';
+    }
   });
   document.body.appendChild(overlay);
 }
@@ -983,7 +990,7 @@ function _formToggleEditMode() {
       el.removeAttribute('contenteditable');
       delete el.dataset.cadOriginal;
     });
-    if (btn) { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; btn.textContent = '✎ Edit'; }
+    if (btn) { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; btn.textContent = '✎'; }
     // Auto-save source_html to DB
     if (_selectedForm?.id && _selectedForm.source_html) {
       API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id, {

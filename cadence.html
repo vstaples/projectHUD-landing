@@ -1017,7 +1017,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 // S9.0 — Three-tab controller: Library · Simulator · Instances
 // console badge: orange, version 20260403-S9
 // ═══════════════════════════════════════════════════════════════════
-console.log('%c[cadence] S9.136 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cadence] S9.137 — Cert persistence + PDF export · firmId fix · signatures polish','background:#f5820a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── State ──────────────────────────────────────────────────────────
 var _s9ActiveTab       = 'dashboard';         // 'dashboard' | 'library' | 'simulator' | 'instances'
@@ -1134,14 +1134,21 @@ function _s9RouteLibrary() {
 function _s9AppendFormsToList() {
   var firmId = (typeof FIRM_ID_CAD !== 'undefined') ? FIRM_ID_CAD : null;
   if (!firmId) return;
-  // Always fetch fresh from DB — _formDefs may not be loaded yet
-  API.get('workflow_form_definitions?firm_id=eq.'+firmId+'&order=created_at.desc&select=id,source_name,version,state').then(function(rows) {
+  // Poll until tmpl-list exists, then fetch and render
+  var attempts = 0;
+  var poll = setInterval(function() {
+    attempts++;
     var listEl = document.getElementById('tmpl-list');
-    if (!listEl) return;
-    var existing = document.getElementById('tmpl-list-forms-section');
-    if (existing) existing.remove();
-    _s9RenderFormsSection(listEl, rows || []);
-  }).catch(function(){});
+    if (listEl || attempts > 20) {
+      clearInterval(poll);
+      if (!listEl) return;
+      API.get('workflow_form_definitions?firm_id=eq.'+firmId+'&order=created_at.desc&select=id,source_name,version,state').then(function(rows) {
+        var existing = document.getElementById('tmpl-list-forms-section');
+        if (existing) existing.remove();
+        _s9RenderFormsSection(listEl, rows || []);
+      }).catch(function(){});
+    }
+  }, 150);
 }
 
 function _s9RenderFormsSection(listEl, forms) {
@@ -5372,7 +5379,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <script src="/js/cdn-core-state.js?v=20260403-S9"></script>
 <script src="/js/cdn-utils.js?v=20260403-S9"></script>
-<script src="/js/cdn-form-editor.js?v=20260407-SE82"></script>
+<script src="/js/cdn-form-editor.js?v=20260407-SE83"></script>
 <script src="/js/cdn-form-settings.js?v=20260403-S9"></script>
 <script src="/js/cdn-assignee.js?v=20260403-S9"></script>
 <script src="/js/cdn-outcomes.js?v=20260403-S9"></script>
