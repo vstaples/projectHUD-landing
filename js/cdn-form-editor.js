@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE49 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE51 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2517,8 +2517,17 @@ function _formLifecycleButtons(f) {
           style="font-size:13px;color:var(--red);border-color:rgba(248,113,113,.4)">
           ✕ Cancel Revision</button>`);
       }
-      btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()"
-        style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
+      // For HTML forms with source_html — show Commit button instead of Submit for Review
+      if (_selectedForm?.source_html) {
+        btns.push(`<button onclick="_formCommit()"
+          style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;
+                 background:var(--cad);color:#003333;border:none;cursor:pointer;
+                 font-family:Arial,sans-serif;line-height:1.4">
+          ⬡ Commit Form</button>`);
+      } else {
+        btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()"
+          style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
+      }
     } else {
       btns.push(`<button onclick="_formReleaseDirectly()"
         style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);
@@ -2661,757 +2670,105 @@ async function _formDeleteWithConfirm(formId) {
   const msg = inDB
     ? `Remove "${name}" from the Form Library?\n\nThis will permanently delete the form definition from the database. The source PDF in Storage will be retained.`
     : `Remove "${name}" from the Form Library?`;
-  if (!confirm(msg)) return;
+  if (!confirm('Commit ' + formName + '? This will auto-generate a workflow: Submitter to ' + roleNames + '. The form will be released.')) return;
 
-  if (inDB) {
-    try {
-      // Use apikey-only delete (matches RLS public role pattern)
-      const res = await fetch(`${SUPA_URL}/rest/v1/workflow_form_definitions?id=eq.${formId}`, {
-        method:'DELETE',
-        headers:{ 'apikey':SUPA_KEY, 'Authorization':'Bearer '+SUPA_KEY,
-                  'Content-Type':'application/json', 'Prefer':'return=minimal' }
+  try {
+    cadToast('Committing form…', 'info');
+
+    // 2. Save latest form state
+    await _formSave();
+
+    // 3. Check if companion workflow already exists
+    var existingTmpls = await API.get(
+      'workflow_templates?firm_id=eq.' + firmId + '&name=eq.' + encodeURIComponent(formName) + '&form_driven=eq.true'
+    ).catch(function(){ return []; }) || [];
+
+    var tmplId;
+    if (existingTmpls.length) {
+      tmplId = existingTmpls[0].id;
+      cadToast('Updating existing companion workflow…', 'info');
+    } else {
+      // 4. Create companion workflow template
+      var newTmpl = await API.post('workflow_templates', {
+        firm_id:      firmId,
+        name:         formName,
+        description:  'Auto-generated from form: ' + formName,
+        status:       'draft',
+        version:      _selectedForm.version || '1.0.0',
+        trigger_type: 'manual',
+        form_driven:  true,
+        created_at:   new Date().toISOString(),
+        updated_at:   new Date().toISOString()
       });
-      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
-      _formCoCWrite('form.archived', formId, { action:'deleted', name });
-      cadToast(`"${name}" removed from library`, 'info');
-    } catch(e) { cadToast('Delete failed: ' + e.message, 'error'); return; }
-  }
+      tmplId = newTmpl?.[0]?.id;
+      if (!tmplId) throw new Error('Failed to create companion workflow');
+    }
 
-  _formDefs = _formDefs.filter(f => f.id !== formId);
-  if (_selectedForm?.id === formId) { _selectedForm = null; _formFields = []; _pdfDoc = null; }
-  const el = document.getElementById('cad-content');
-  if (el) renderFormsTab(el);
-}
+    // 5. Delete existing steps and recreate from roles
+    await API.del('workflow_template_steps?template_id=eq.' + tmplId).catch(function(){});
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CATEGORY PICKER
-// ─────────────────────────────────────────────────────────────────────────────
-async function _formPickCategory() {
-  // Dismiss any existing picker first
-  document.getElementById('fs-cat-picker')?.remove();
+    // Step 1 — Submitter (trigger)
+    var steps = [];
+    steps.push(API.post('workflow_template_steps', {
+      firm_id:        firmId,
+      template_id:    tmplId,
+      name:           'Submit ' + formName,
+      step_type:      'form_submission',
+      assignee_role:  'submitter',
+      sequence_order: 1,
+      is_start:       true,
+      created_at:     new Date().toISOString()
+    }));
 
-  // Ensure categories are loaded — fetch fresh if empty
-  let cats = window.FormSettings?.getCategories?.() || [];
-  if (!cats.length && window.FormSettings?.loadCategories) {
-    await window.FormSettings.loadCategories().catch(() => {});
-    cats = window.FormSettings?.getCategories?.() || [];
-  }
-  if (!cats.length) {
-    cadToast('No categories configured — add them in ⚙ Form Settings', 'info');
-    return;
-  }
-
-  // Build overlay — set id BEFORE appending so onclick closures can find it
-  const overlay = document.createElement('div');
-  overlay.id = 'fs-cat-picker';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center';
-
-  const rows = cats.map(c => `
-    <div onclick="_formSetCategory('${c.id}');document.getElementById('fs-cat-picker')?.remove()"
-      style="padding:10px 12px;border-radius:5px;cursor:pointer;border:1px solid var(--border);
-             margin-bottom:6px;background:var(--surf2);transition:border-color .12s"
-      onmouseover="this.style.borderColor='var(--cad)'"
-      onmouseout="this.style.borderColor='var(--border)'">
-      <div style="font-size:14px;font-weight:500;color:var(--text);font-family:Arial,sans-serif">${escHtml(c.name)}</div>
-      ${c.description ? `<div style="font-size:13px;color:var(--muted);margin-top:2px;font-family:Arial,sans-serif">${escHtml(c.description)}</div>` : ''}
-    </div>`).join('');
-
-  overlay.innerHTML = `
-    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
-                padding:20px;min-width:320px;max-width:420px;box-shadow:0 16px 48px rgba(0,0,0,.7)">
-      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;font-family:Arial,sans-serif">
-        Assign Category
-      </div>
-      ${rows}
-      <button onclick="document.getElementById('fs-cat-picker')?.remove()"
-        style="margin-top:8px;width:100%;padding:7px;border-radius:999px;background:transparent;
-               border:1px solid var(--border);color:var(--muted);cursor:pointer;
-               font-size:14px;font-family:Arial,sans-serif">
-        Cancel
-      </button>
-    </div>`;
-
-  // Close on backdrop click
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) overlay.remove();
-  });
-
-  document.body.appendChild(overlay);
-}
-
-async function _formSetCategory(catId) {
-  if (!_selectedForm) return;
-  _selectedForm.category_id = catId;
-  const cat = window.FormSettings?.getCategoryById?.(catId);
-  // Init version format from category
-  if (cat && (!_selectedForm.version || _selectedForm.version === '0.1.0')) {
-    _selectedForm.version = _formInitVersion(cat.version_format);
-  }
-  _formMarkDirty();
-  // Refresh just the top toolbar lifecycle area — no full re-render
-  // (full re-render wipes canvas + reloads PDF which is jarring)
-  _formRefreshToolbar();
-}
-
-async function _formRefreshToolbar() {
-  if (!_selectedForm) return;
-  const f = _selectedForm;
-  // Refresh category pill / + Category button
-  const cat = window.FormSettings?.getCategoryById?.(f.category_id);
-  const topTb = document.getElementById('form-top-toolbar');
-  if (!topTb) {
-    await _formRefreshUI();
-    return;
-  }
-  // Re-render just the lifecycle buttons
-  const lcDiv = document.getElementById('form-lifecycle-btns');
-  if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(f);
-  // Refresh state badge
-  const stateBadge = document.getElementById('form-state-badge');
-  if (stateBadge) {
-    stateBadge.textContent = _formStateLabel(f.state || 'draft');
-    stateBadge.style.color = _formStateColor(f.state || 'draft');
-  }
-  // Refresh category pill — this is the one that was previously not updating
-  const catPill = document.getElementById('form-category-pill');
-  if (catPill) catPill.innerHTML = _formCategoryPill(f);
-  // Re-render form list to pick up any name/state changes
-  const listEl = document.getElementById('form-list');
-  if (listEl) listEl.innerHTML = _renderFormList();
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LIFECYCLE STATE TRANSITIONS
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ── Preview-safe refresh — stays in preview if active, otherwise full re-render
-async function _formRefreshUI() {
-  if (_formPreviewMode) {
-    _formRefreshToolbar();
-    _formRefreshRolePanel();
-    await _formShowPreviewHistoryPanel();
-    return;
-  }
-  await _formRefreshUI();
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// APPROVAL CHAIN DIALOG — shown when editor clicks Submit for Review
-// ─────────────────────────────────────────────────────────────────────────────
-async function _formSubmitForReview() {
-  if (!_selectedForm) return;
-
-  const cat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
-
-  // Resolve category reviewers + approver from resources table
-  const reviewerIds  = cat?.reviewer_ids || [];
-  const approverId   = cat?.approver_id  || null;
-
-  let reviewers = [], approver = null;
-
-  const allIds = [...new Set([...reviewerIds, ...(approverId ? [approverId] : [])])];
-  if (allIds.length) {
-    const rows = await API.get(
-      `resources?id=in.(${allIds.join(',')})&select=id,user_id,first_name,last_name,email,department,title`
-    ).catch(() => []) || [];
-    const byId = Object.fromEntries(rows.map(r => [r.id, r]));
-    reviewers = reviewerIds
-      .filter(id => byId[id])
-      .map(id => ({
-        id:      byId[id].id,
-        user_id: byId[id].user_id,
-        name:    ((byId[id].first_name||'')+' '+(byId[id].last_name||'')).trim(),
-        email:   byId[id].email || '',
-        dept:    byId[id].department || '',
-        title:   byId[id].title || '',
+    // Subsequent steps from roles
+    roles.forEach(function(r, idx) {
+      steps.push(API.post('workflow_template_steps', {
+        firm_id:        firmId,
+        template_id:    tmplId,
+        name:           (FORM_ROLES[r.role]||{label:r.role}).label + ' Approval',
+        step_type:      'approval',
+        assignee_role:  r.role,
+        sequence_order: idx + 2,
+        is_start:       false,
+        created_at:     new Date().toISOString()
       }));
-    if (approverId && byId[approverId]) {
-      const a = byId[approverId];
-      approver = {
-        id:      a.id,
-        user_id: a.user_id,
-        name:    ((a.first_name||'')+' '+(a.last_name||'')).trim(),
-        email:   a.email || '',
-        dept:    a.department || '',
-        title:   a.title || '',
-      };
+    });
+
+    var stepResults = await Promise.all(steps);
+    var submitterStepId = stepResults[0]?.[0]?.id;
+
+    // 6. Link form definition to submitter step
+    if (submitterStepId) {
+      await API.patch(
+        'workflow_form_definitions?id=eq.' + _selectedForm.id,
+        { step_id: submitterStepId, updated_at: new Date().toISOString() }
+      );
+      _selectedForm.step_id = submitterStepId;
     }
-  }
 
-  // Show the Approval Chain dialog — user can review/adjust before sending
-  _formShowApprovalChainDialog({
-    form:      _selectedForm,
-    reviewers,
-    approver,
-    onSend:    _formDoSubmitForReview,
-  });
-}
-
-function _formShowApprovalChainDialog({ form, reviewers, approver, onSend }) {
-  document.getElementById('cad-approval-chain-modal')?.remove();
-
-  // Working copies — user can add/remove before sending
-  let wReviewers = [...reviewers];
-  let wApprover  = approver ? { ...approver } : null;
-
-  const overlay = document.createElement('div');
-  overlay.id = 'cad-approval-chain-modal';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.65);' +
-    'display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif';
-
-  const personRow = (p, role, canRemove) => `
-    <div data-person-id="${p.id}" style="display:flex;align-items:center;gap:10px;
-      padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;
-        background:${{ reviewer:'rgba(196,125,24,.2)', approver:'rgba(42,157,64,.2)' }[role]||'rgba(79,142,247,.2)'};
-        border:1px solid ${{ reviewer:'var(--cad)', approver:'var(--green)' }[role]||'var(--accent)'};
-        display:flex;align-items:center;justify-content:center;
-        font-size:12px;font-weight:700;
-        color:${{ reviewer:'var(--cad)', approver:'var(--green)' }[role]||'var(--accent)'}">
-        ${p.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()}
-      </div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600;color:var(--text);font-family:Arial,sans-serif">
-          ${escHtml(p.name)}
-        </div>
-        <div style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif">
-          ${escHtml(p.email)}${p.dept ? ' · '+escHtml(p.dept) : ''}
-        </div>
-      </div>
-      <span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600;
-        background:${{ reviewer:'rgba(196,125,24,.15)', approver:'rgba(42,157,64,.15)' }[role]||'rgba(79,142,247,.15)'};
-        color:${{ reviewer:'var(--cad)', approver:'var(--green)' }[role]||'var(--accent)'}">
-        ${{ reviewer:'Reviewer', approver:'Approver', editor:'Editor' }[role]||role}
-      </span>
-      ${canRemove ? `<button onclick="_formApprovalChainRemoveReviewer('${p.id}')"
-        title="Remove reviewer"
-        style="background:none;border:none;color:var(--muted);cursor:pointer;
-               font-size:16px;padding:0 2px;line-height:1;flex-shrink:0">✕</button>` : ''}
-    </div>`;
-
-  const render = () => {
-    const box = document.getElementById('cad-ac-box');
-    if (!box) return;
-
-    const editorName = window.CURRENT_USER?.name || window.CURRENT_USER?.email || 'You (editor)';
-
-    box.innerHTML = `
-      <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);
-        display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div style="font-size:16px;font-weight:700;color:var(--text)">Submit for Review</div>
-          <div style="font-size:13px;color:var(--muted);margin-top:2px">${escHtml(form.source_name||'Untitled')} · ${escHtml(form.version||'0.1.0')}</div>
-        </div>
-        <button onclick="document.getElementById('cad-approval-chain-modal')?.remove()"
-          style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0">✕</button>
-      </div>
-
-      <div style="padding:16px 22px;overflow-y:auto;max-height:60vh">
-
-        <!-- Editor row -->
-        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-          color:var(--muted);margin-bottom:8px;font-family:Arial,sans-serif">Editor</div>
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;
-          border-bottom:1px solid var(--border);margin-bottom:16px">
-          <div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;
-            background:rgba(79,142,247,.2);border:1px solid var(--accent);
-            display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent)">
-            ${editorName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()}
-          </div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:600;color:var(--text)">${escHtml(editorName)}</div>
-            <div style="font-size:12px;color:var(--muted)">Completes draft</div>
-          </div>
-          <span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600;
-            background:rgba(79,142,247,.15);color:var(--accent)">Editor</span>
-        </div>
-
-        <!-- Reviewers -->
-        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-          color:var(--muted);margin-bottom:8px;font-family:Arial,sans-serif">
-          Reviewers <span style="font-weight:400;text-transform:none;letter-spacing:0">(all must approve)</span>
-        </div>
-        <div id="cad-ac-reviewers">
-          ${wReviewers.length
-            ? wReviewers.map(r => personRow(r, 'reviewer', true)).join('')
-            : '<div style="font-size:13px;color:var(--muted);padding:8px 0;font-family:Arial,sans-serif;font-style:italic">No reviewers assigned</div>'
-          }
-        </div>
-        <button id="cad-ac-add-reviewer"
-          style="margin-top:8px;font-size:13px;padding:5px 14px;border-radius:4px;
-            background:transparent;border:1px solid var(--border);color:var(--text2);
-            cursor:pointer;font-family:Arial,sans-serif">+ Add Reviewer</button>
-
-        <!-- Approver -->
-        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-          color:var(--muted);margin-top:18px;margin-bottom:8px;font-family:Arial,sans-serif">Approver</div>
-        <div id="cad-ac-approver">
-          ${wApprover
-            ? personRow(wApprover, 'approver', false) +
-              `<button onclick="_formApprovalChainChangeApprover()"
-                style="margin-top:6px;font-size:12px;padding:3px 10px;border-radius:4px;
-                  background:transparent;border:1px solid var(--border);color:var(--muted);
-                  cursor:pointer;font-family:Arial,sans-serif">Change Approver</button>`
-            : '<div style="font-size:13px;color:var(--amber);padding:8px 0;font-family:Arial,sans-serif">⚠ No approver assigned — form will stop at Reviewed</div>'
-          }
-        </div>
-
-        <!-- Info note -->
-        <div style="margin-top:18px;padding:10px 12px;background:var(--surf2);border-radius:6px;
-          border-left:3px solid var(--accent)">
-          <div style="font-size:12px;color:var(--text2);line-height:1.6;font-family:Arial,sans-serif">
-            Each reviewer will receive an <strong>email</strong> with a secure review link
-            and an <strong>in-app action item</strong> assigned to them.
-          </div>
-        </div>
-      </div>
-
-      <div style="padding:14px 22px;border-top:1px solid var(--border);
-        display:flex;gap:10px;justify-content:flex-end">
-        <button onclick="document.getElementById('cad-approval-chain-modal')?.remove()"
-          style="padding:8px 20px;border-radius:6px;background:transparent;
-            border:1px solid var(--border);color:var(--muted);cursor:pointer;
-            font-size:14px;font-family:Arial,sans-serif">Cancel</button>
-        <button id="cad-ac-send-btn"
-          style="padding:8px 24px;border-radius:6px;background:var(--cad);
-            border:none;color:var(--bg);cursor:pointer;font-size:14px;
-            font-weight:700;font-family:Arial,sans-serif">
-          Send for Review →
-        </button>
-      </div>`;
-
-    // Wire add reviewer button
-    document.getElementById('cad-ac-add-reviewer')?.addEventListener('click', function() {
-      window.PersonPicker?.show(this, function(person) {
-        if (!person?.id) return;
-        if (wReviewers.find(r => r.id === person.id)) return;
-        wReviewers.push({
-          id:      person.id,
-          user_id: person.user_id,
-          name:    person.name,
-          email:   person.email || '',
-          dept:    person.dept  || '',
-        });
-        render();
-      });
+    // 7. Release the form
+    await API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id, {
+      state: 'released', updated_at: new Date().toISOString()
     });
+    _selectedForm.state = 'released';
 
-    // Wire send button
-    document.getElementById('cad-ac-send-btn')?.addEventListener('click', async () => {
-      if (!wReviewers.length && !wApprover) {
-        cadToast('Add at least one reviewer or approver before sending', 'error');
-        return;
-      }
-      const btn = document.getElementById('cad-ac-send-btn');
-      if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
-      document.getElementById('cad-approval-chain-modal')?.remove();
-      await onSend({ reviewers: wReviewers, approver: wApprover });
-    });
-  };
-
-  overlay.innerHTML = `<div id="cad-ac-box"
-    style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
-      width:520px;max-width:calc(100vw - 32px);max-height:90vh;
-      display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.7)"></div>`;
-
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
-  render();
-
-  // Expose helpers for inline event handlers
-  window._formApprovalChainRemoveReviewer = (id) => {
-    wReviewers = wReviewers.filter(r => r.id !== id);
-    render();
-  };
-  window._formApprovalChainChangeApprover = () => {
-    const btn = document.getElementById('cad-ac-approver')?.querySelector('button');
-    window.PersonPicker?.show(btn || document.body, function(person) {
-      if (!person?.id) return;
-      wApprover = {
-        id:      person.id,
-        user_id: person.user_id,
-        name:    person.name,
-        email:   person.email || '',
-      };
-      render();
-    });
-  };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DO SUBMIT — called by dialog after user confirms the chain
-// ─────────────────────────────────────────────────────────────────────────────
-async function _formDoSubmitForReview({ reviewers, approver }) {
-  if (!_selectedForm) return;
-  const fromState = _selectedForm.state;
-
-  // Save current state first
-  await _formSave();
-
-  // Advance to in_review
-  _selectedForm.state                = 'in_review';
-  _selectedForm.pending_reviewer_ids = reviewers.map(r => r.id);
-  _selectedForm.reviewed_by          = [];
-  await _formSave();
-
-  // Write CoC — include version on first submission
-  const isFirstSubmit = fromState === 'draft';
-  _formCoCWrite('form.state_changed', _selectedForm.id, {
-    from:    fromState,
-    to:      'in_review',
-    version: _selectedForm.version || '0.1.0',
-    note: isFirstSubmit
-      ? `Version ${_selectedForm.version || '0.1.0'} initiated`
-      : `Re-submitted after revision`,
-  });
-
-  // Send emails via notify-form-review edge function
-  const firmId  = window.FIRM_ID || FIRM_ID_CAD;
-  const formId  = _selectedForm.id;
-  const currentUserId = window.CURRENT_USER?.id || null;
-
-  try {
-    await fetch(`${SUPA_URL}/functions/v1/notify-form-review`, {
-      method:  'POST',
-      headers: { 'Content-Type':'application/json', 'apikey':SUPA_KEY, 'Authorization':'Bearer '+SUPA_KEY },
-      body:    JSON.stringify({
-        form_def_id: formId,
-        reviewers,
-        role:    'reviewer',
-        context: 'definition',
-      }),
-    });
-  } catch(e) { console.warn('[formSubmit] email notification failed:', e); }
-
-  // Create action items for each reviewer
-  if (window.HUD?.ActionItems?.open) {
-    for (const reviewer of reviewers) {
-      // resolveResponsible: resources.id → user_id (for action_items FK)
-      const resolveResponsible = (resourceId) => {
-        return reviewers.find(r => r.id === resourceId)?.user_id || null;
-      };
-
-      window.HUD.ActionItems.open({
-        table:      'action_items',
-        firmId,
-        projectId:  formId,   // form ID as project context
-        submittedBy: currentUserId,
-        description: `Review form: "${_selectedForm.source_name}" v${_selectedForm.version||'0.1.0'}`,
-        people: [{
-          group: 'Reviewer',
-          id:    reviewer.id,
-          label: reviewer.name,
-          sub:   reviewer.email,
-        }],
-        defaultDueDays: 7,
-        resolveResponsible,
-        onSave: () => Promise.resolve(),
-        onCoCLog: async (payload) => {
-          _formCoCWrite('form.action_item_created', formId, {
-            for: reviewer.name,
-            role: 'reviewer',
-          });
-        },
-      });
-    }
-  }
-
-  cadToast(`Submitted for review — ${reviewers.length} reviewer(s) notified`, 'success');
-  await _formRefreshUI();
-}
-
-function _formShowMarkReviewedModal() {
-  document.getElementById('cad-mark-reviewed-modal')?.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'cad-mark-reviewed-modal';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.65);' +
-    'display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif';
-
-  overlay.innerHTML = `
-    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
-      width:480px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.7);overflow:hidden">
-
-      <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);
-        display:flex;align-items:flex-start;gap:12px">
-        <div style="width:36px;height:36px;border-radius:8px;flex-shrink:0;
-          background:rgba(240,160,48,.15);border:1px solid rgba(240,160,48,.3);
-          display:flex;align-items:center;justify-content:center;font-size:18px">✓</div>
-        <div style="flex:1">
-          <div style="font-size:16px;font-weight:700;color:var(--text)">Mark Reviewed</div>
-          <div style="font-size:13px;color:var(--muted);margin-top:2px">
-            ${escHtml(_selectedForm?.source_name||'')} · <span style="color:#f0a030">v${escHtml(_selectedForm?.version||'0.1.0')}</span>
-            ${(_selectedForm?.pending_reviewer_ids||[]).length > 1
-              ? ` · <span style="color:var(--muted)">Reviewer ${(_selectedForm?.reviewed_by||[]).length+1} of ${(_selectedForm?.pending_reviewer_ids||[]).length}</span>`
-              : ''}
-          </div>
-        </div>
-        <button onclick="document.getElementById('cad-mark-reviewed-modal')?.remove()"
-          style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0">✕</button>
-      </div>
-
-      <div style="padding:20px 22px">
-        <div style="padding:10px 12px;background:var(--surf2);border-radius:6px;
-          border-left:3px solid #f0a030;margin-bottom:16px">
-          <div style="font-size:12px;color:var(--text2);line-height:1.6">
-            ${(_selectedForm?.pending_reviewer_ids||[]).length > 1 &&
-              (_selectedForm?.reviewed_by||[]).length + 1 < (_selectedForm?.pending_reviewer_ids||[]).length
-              ? 'Your approval will be recorded. The form advances when <strong>all reviewers</strong> have approved.'
-              : 'This is the <strong>final review</strong>. Approving will advance the form to Approval stage.'}
-          </div>
-        </div>
-        <label style="display:block;font-size:13px;font-weight:600;color:var(--text2);
-          margin-bottom:8px">
-          Review Comments
-          <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px">(optional)</span>
-        </label>
-        <textarea id="cad-reviewed-notes"
-          placeholder="Describe what you reviewed and any observations…"
-          style="width:100%;min-height:90px;resize:vertical;box-sizing:border-box;
-            background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;
-            color:var(--text);font-family:Arial,sans-serif;font-size:14px;
-            line-height:1.6;padding:10px 12px;outline:none;transition:border-color .15s"
-          onfocus="this.style.borderColor='var(--green)'"
-          onblur="this.style.borderColor='var(--border2)'"
-        ></textarea>
-      </div>
-
-      <div style="padding:14px 22px 18px;border-top:1px solid var(--border);
-        display:flex;gap:10px;justify-content:flex-end">
-        <button onclick="document.getElementById('cad-mark-reviewed-modal')?.remove()"
-          style="padding:8px 20px;border-radius:999px;background:transparent;
-            border:1px solid var(--border);color:var(--muted);cursor:pointer;
-            font-size:14px;font-family:Arial,sans-serif">Cancel</button>
-        <button id="cad-reviewed-submit"
-          style="padding:8px 26px;border-radius:999px;background:#f0a030;
-            border:none;color:var(--bg);cursor:pointer;font-size:14px;font-weight:700;
-            font-family:Arial,sans-serif">✓ Submit Review</button>
-      </div>
-    </div>`;
-
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
-  setTimeout(() => document.getElementById('cad-reviewed-notes')?.focus(), 50);
-
-  document.getElementById('cad-reviewed-submit').onclick = async () => {
-    const note = document.getElementById('cad-reviewed-notes')?.value?.trim() || '';
-    overlay.remove();
-    await _formApproveReview(note);
-  };
-}
-
-async function _formApproveReview(reviewNote) {
-  if (!_selectedForm) return;
-
-  // ── Resolve current user identity ────────────────────────────────────────
-  // Try CURRENT_USER first, then Supabase auth, then anonymous
-  let userId = null, actorName = null;
-
-  if (window.CURRENT_USER?.id && /^[0-9a-f-]{36}$/i.test(window.CURRENT_USER.id)) {
-    userId    = window.CURRENT_USER.id;
-    actorName = window.CURRENT_USER.name || window.CURRENT_USER.email || null;
-  }
-  if (!userId) {
-    try {
-      const { data } = await (window.supabase?.auth?.getUser() || Promise.resolve({ data: null }));
-      if (data?.user?.id) {
-        userId    = data.user.id;
-        actorName = data.user.email || null;
-      }
-    } catch(e) { /* silent */ }
-  }
-  actorName = actorName || 'Reviewer';
-
-  // ── Record who approved ───────────────────────────────────────────────────
-  // Store the resolved UUID if available; also append the resource_id if different
-  const resourceId = window.CURRENT_USER?.resource_id;
-  const toAdd = [userId, resourceId].filter(id => id && /^[0-9a-f-]{36}$/i.test(id));
-  const existing = _selectedForm.reviewed_by || [];
-  _selectedForm.reviewed_by = [...new Set([...existing, ...toAdd])];
-
-  // ── Determine if all reviewers have approved ──────────────────────────────
-  // If pending_reviewer_ids is empty OR if this click is the final approval,
-  // advance to reviewed. Since CURRENT_USER may not carry resource_id yet,
-  // we also advance if the count of approvals reaches the pending count.
-  const pending = _selectedForm.pending_reviewer_ids || [];
-  const approved = _selectedForm.reviewed_by || [];
-
-  const allReviewed =
-    pending.length === 0 ||
-    pending.every(id => approved.includes(id)) ||
-    // Fallback: treat each click as one reviewer approving — advance when
-    // the number of unique approvals >= number of pending reviewers
-    approved.length >= pending.length;
-
-  if (allReviewed) {
-    _selectedForm.state = 'reviewed';
-    _formCoCWrite('form.state_changed', _selectedForm.id, {
-      from: 'in_review', to: 'reviewed',
+    // 8. Write CoC event
+    _formCoCWrite('form.committed', _selectedForm.id, {
       version: _selectedForm.version,
-      note: reviewNote || `All reviewers approved — ${actorName} was last to sign off`,
+      workflow_id: tmplId,
+      roles: roleNames
     });
-    cadToast('Review complete — awaiting final approval', 'success');
-  } else {
-    _formCoCWrite('form.state_changed', _selectedForm.id, {
-      from: 'in_review', to: 'in_review',
-      version: _selectedForm.version,
-      note: reviewNote ? `${actorName}: ${reviewNote}` : `${actorName} approved (${approved.length} of ${pending.length})`,
-    });
-    cadToast('Your review recorded', 'info');
+
+    // 9. Refresh UI
+    const listEl = document.getElementById('form-list');
+    if (listEl) listEl.innerHTML = _renderFormList();
+    _formRenderActionBtns();
+    cadToast('Form committed — companion workflow created', 'success');
+
+  } catch(e) {
+    console.error('[formCommit] failed:', e);
+    cadToast('Commit failed: ' + e.message, 'error');
   }
-
-  await _formSave();
-
-  await _formRefreshUI();
-}
-
-async function _formApproveAndRelease() {
-  if (!_selectedForm) return;
-  const cat    = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
-  // Version is NOT bumped on Approve — it bumps on Release
-  const newVer = _selectedForm.version || '0.1.0';
-
-  // Show professional approval dialog instead of prompt()
-  _formShowApproveReleaseModal({ form: _selectedForm, newVer, onSubmit: _formDoApproveAndRelease });
-}
-
-function _formShowApproveReleaseModal({ form, newVer, onSubmit }) {
-  document.getElementById('cad-approve-modal')?.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'cad-approve-modal';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.65);' +
-    'display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif';
-
-  overlay.innerHTML = `
-    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
-      width:480px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.7);overflow:hidden">
-
-      <!-- Header -->
-      <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);
-        display:flex;align-items:flex-start;gap:12px">
-        <div style="width:36px;height:36px;border-radius:8px;flex-shrink:0;
-          background:rgba(42,157,64,.15);border:1px solid rgba(42,157,64,.3);
-          display:flex;align-items:center;justify-content:center;font-size:18px">★</div>
-        <div style="flex:1">
-          <div style="font-size:16px;font-weight:700;color:var(--text)">Approve</div>
-          <div style="font-size:13px;color:var(--muted);margin-top:2px">
-            ${escHtml(form.source_name)} · <span style="color:var(--green)">v${escHtml(form.version||'0.1.0')}</span>
-          </div>
-        </div>
-        <button onclick="document.getElementById('cad-approve-modal')?.remove()"
-          style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0">✕</button>
-      </div>
-
-      <!-- Body -->
-      <div style="padding:20px 22px">
-        <label style="display:block;font-size:13px;font-weight:600;color:var(--text2);
-          margin-bottom:8px;letter-spacing:.03em">
-          Approval Notes
-          <span style="font-size:12px;font-weight:400;color:var(--muted);margin-left:4px">(optional)</span>
-        </label>
-        <textarea id="cad-approve-notes"
-          placeholder="Describe what was reviewed and any conditions of approval…"
-          style="width:100%;min-height:100px;resize:vertical;box-sizing:border-box;
-            background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;
-            color:var(--text);font-family:Arial,sans-serif;font-size:14px;
-            line-height:1.6;padding:10px 12px;outline:none;transition:border-color .15s"
-          onfocus="this.style.borderColor='var(--green)'"
-          onblur="this.style.borderColor='var(--border2)'"
-        ></textarea>
-        <div style="margin-top:12px;padding:10px 12px;background:var(--surf2);border-radius:6px;
-          border-left:3px solid var(--green)">
-          <div style="font-size:12px;color:var(--text2);line-height:1.6">
-            This form will be marked <strong>Approved</strong>. The editor can then
-            <strong>Release</strong> it for use in workflows. This action is recorded
-            in the Chain of Custody.
-          </div>
-        </div>
-      </div>
-
-      <!-- Footer -->
-      <div style="padding:14px 22px 18px;border-top:1px solid var(--border);
-        display:flex;gap:10px;justify-content:flex-end">
-        <button id="cad-approve-reject-btn"
-          style="padding:8px 20px;border-radius:6px;background:transparent;
-            border:1.5px solid var(--red);color:var(--red);cursor:pointer;
-            font-size:14px;font-weight:600;font-family:Arial,sans-serif;transition:opacity .12s"
-          onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
-          ✗ Reject
-        </button>
-        <div style="flex:1"></div>
-        <button onclick="document.getElementById('cad-approve-modal')?.remove()"
-          style="padding:8px 20px;border-radius:6px;background:transparent;
-            border:1px solid var(--border);color:var(--muted);cursor:pointer;
-            font-size:14px;font-family:Arial,sans-serif">Cancel</button>
-        <button id="cad-approve-submit-btn"
-          style="padding:8px 26px;border-radius:6px;background:var(--green);
-            border:none;color:white;cursor:pointer;font-size:14px;font-weight:700;
-            font-family:Arial,sans-serif;transition:opacity .12s"
-          onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-          ✓ Approve
-        </button>
-      </div>
-    </div>`;
-
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
-  setTimeout(() => document.getElementById('cad-approve-notes')?.focus(), 50);
-
-  // Reject button → reuse reject modal
-  document.getElementById('cad-approve-reject-btn').onclick = () => {
-    overlay.remove();
-    _formRejectForm('approval');
-  };
-
-  // Submit
-  document.getElementById('cad-approve-submit-btn').onclick = async () => {
-    const note = document.getElementById('cad-approve-notes')?.value?.trim() || '';
-    overlay.remove();
-    await onSubmit({ newVer, note });
-  };
-}
-
-async function _formDoApproveAndRelease({ newVer, note }) {
-  if (!_selectedForm) return;
-
-  // Mark prior released version as superseded
-  const priorReleased = _formDefs.find(f =>
-    f.id !== _selectedForm.id &&
-    f.state === 'released' &&
-    f.source_name === _selectedForm.source_name
-  );
-
-  // Approver approval → 'approved' state; editor clicks Release to go live
-  _selectedForm.state       = 'approved';
-  _selectedForm.version     = newVer;
-  _selectedForm.approved_by = window.CURRENT_USER?.id || null;
-  _selectedForm.review_note = note;
-
-  await _formSave();
-
-  _formCoCWrite('form.approved', _selectedForm.id, {
-    version: _selectedForm.version,
-    note,
-    approved_by: _selectedForm.approved_by
-  });
-  // Notify approver if category has one
-  try {
-    const relCat = window.FormSettings?.getCategoryById?.(_selectedForm.category_id);
-    if (relCat?.approver_id) {
-      const apRows = await API.get(`resources?id=eq.${relCat.approver_id}&select=id,first_name,last_name,email`).catch(()=>[]);
-      if (apRows?.[0]) apRows[0].full_name = ((apRows[0].first_name||'')+' '+(apRows[0].last_name||'')).trim();
-      if (apRows?.[0]) {
-        await fetch(`${SUPA_URL}/functions/v1/notify-form-review`, {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY },
-          body: JSON.stringify({ form_def_id:_selectedForm.id, reviewers:[{ id:apRows[0].id, name:apRows[0].full_name, email:apRows[0].email }], role:'approver' })
-        });
-      }
-    }
-  } catch(e) { console.warn('Approver notification failed:', e.message); }
-  cadToast('Approved — ready for release', 'success');
-  await _formRefreshUI();
 }
 
 async function _formReleaseDirectly() {
