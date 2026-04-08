@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE62 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE63 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2829,17 +2829,27 @@ function _formShowCommitModal(formName, roleNames, defaultVer, onConfirm) {
 
 // ── Version helpers ───────────────────────────────────────────────────────────
 function _verTooltipHtml() {
-  return '<div class="ver-tooltip">' +
-    '<table>' +
-      '<tr><th>Action</th><th>Effect</th><th>Example</th><th>Meaning</th></tr>' +
-      '<tr><td>Save</td><td>+PATCH</td><td>0.1.0 → 0.1.1</td><td>Work in progress</td></tr>' +
-      '<tr><td>Commit</td><td>+MINOR</td><td>0.1.1 → 0.2.0</td><td>Ready for test</td></tr>' +
-      '<tr><td>Release</td><td>+MAJOR</td><td>0.2.0 → 1.0.0</td><td>Locked, production-ready</td></tr>' +
-      '<tr><td>Revision</td><td>+MINOR draft</td><td>1.0.0 → 1.1.0</td><td>Changes against live release</td></tr>' +
-      '<tr><td>Re-release</td><td>+MAJOR</td><td>1.1.x → 2.0.0</td><td>Breaking change published</td></tr>' +
+  var TS = 'style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px"';
+  var THS = 'style="text-align:left;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.15);color:#8899aa;font-weight:600;font-size:10px;letter-spacing:.06em;text-transform:uppercase"';
+  var TDS = 'style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);color:#c8d4e0;font-size:11px;vertical-align:top"';
+  var TD1 = 'style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);color:#e2e8f0;font-weight:700;font-size:11px;white-space:nowrap;vertical-align:top"';
+  var TD2 = 'style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.08);color:#00c9c9;font-family:monospace;font-size:11px;white-space:nowrap;vertical-align:top"';
+  var rows = [
+    ['Save',       '+PATCH',       '0.1.0 → 0.1.1', 'Work in progress'],
+    ['Commit',     '+MINOR',       '0.1.1 → 0.2.0', 'Ready for test'],
+    ['Release',    '+MAJOR',       '0.2.0 → 1.0.0', 'Locked, production-ready'],
+    ['Revision',   '+MINOR draft', '1.0.0 → 1.1.0', 'Changes against live release'],
+    ['Re-release', '+MAJOR',       '1.1.x → 2.0.0', 'Breaking change published'],
+  ].map(function(r) {
+    return '<tr><td '+TD1+'>'+r[0]+'</td><td '+TD2+'>'+r[1]+'</td><td '+TD2+'>'+r[2]+'</td><td '+TDS+'>'+r[3]+'</td></tr>';
+  }).join('');
+  return '<div>' +
+    '<table '+TS+'>' +
+      '<tr><th '+THS+'>Action</th><th '+THS+'>Effect</th><th '+THS+'>Example</th><th '+THS+'>Meaning</th></tr>' +
+      rows +
     '</table>' +
-    '<div class="ver-note">Releasing locks this document and assigns a permanent version. Once released it is read-only — use <strong>Create Revision</strong> to open a new draft at the next minor version.</div>' +
-    '<div class="ver-caveat">* The default version number may be overridden in the Commit and Release dialogs.</div>' +
+    '<div style="font-size:11px;color:#c8d4e0;line-height:1.6;margin-bottom:8px">Releasing locks this document and assigns a permanent version. Once released it is read-only — use <strong>Create Revision</strong> to open a new draft at the next minor version.</div>' +
+    '<div style="font-size:10px;color:#8899aa;border-top:1px solid rgba(255,255,255,.1);padding-top:8px">* The default version number may be overridden in the Commit and Release dialogs.</div>' +
   '</div>';
 }
 
@@ -2855,8 +2865,15 @@ function _formShowVerTooltip(btn) {
   document.body.appendChild(tip);
   requestAnimationFrame(function() {
     var r = btn.getBoundingClientRect();
-    tip.style.left = Math.max(8, r.right - 380) + 'px';
-    tip.style.top  = Math.max(8, r.top - tip.offsetHeight - 8) + 'px';
+    var tipH = tip.offsetHeight;
+    var spaceAbove = r.top;
+    var spaceBelow = window.innerHeight - r.bottom;
+    // Prefer above, fall back to below if not enough space
+    var top = spaceAbove > tipH + 12
+      ? r.top - tipH - 8
+      : r.bottom + 8;
+    tip.style.left = Math.max(8, Math.min(r.right - 380, window.innerWidth - 388)) + 'px';
+    tip.style.top  = Math.max(8, top) + 'px';
     tip.style.visibility = 'visible';
   });
 }
