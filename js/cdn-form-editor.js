@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE81 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE82 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -973,7 +973,7 @@ function _formToggleEditMode() {
     });
 
   } else {
-    // Exit edit mode — capture and save
+    // Exit edit mode — capture and auto-save to DB
     _formEditModeCapture();
     var s = doc.getElementById('_cadEditStyles');
     if (s) s.remove();
@@ -984,7 +984,19 @@ function _formToggleEditMode() {
       delete el.dataset.cadOriginal;
     });
     if (btn) { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; btn.textContent = '✎ Edit'; }
-    cadToast('Edit mode off — changes saved', 'success');
+    // Auto-save source_html to DB
+    if (_selectedForm?.id && _selectedForm.source_html) {
+      API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id, {
+        source_html: _selectedForm.source_html,
+        updated_at: new Date().toISOString()
+      }).then(function() {
+        cadToast('Edits saved', 'success');
+      }).catch(function() {
+        cadToast('Edit mode off — remember to Save', 'info');
+      });
+    } else {
+      cadToast('Edit mode off — changes saved', 'success');
+    }
   }
 }
 
