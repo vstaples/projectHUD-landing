@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE75 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE76 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -496,18 +496,19 @@ function _renderFormEditor() {
                    border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
             ▶ Launch
           </button>
+          <!-- Edit Mode -->
+          <button id="form-edit-mode-btn" title="Toggle inline edit mode"
+            style="font-family:Arial,sans-serif;font-size:12px;padding:4px 10px;border-radius:999px;
+                   border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
+            ✎
+          </button>
           <!-- CoC history -->
           <button id="form-coc-btn" onclick="_formToggleCoC()" title="Form history"
             style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
                    border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
             CoC
           </button>
-          <!-- Edit Mode toggle — wired via addEventListener in _formWireToolbarButtons -->
-          <button id="form-edit-mode-btn" title="Toggle edit mode — click text in the form to edit it directly"
-            style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
-                   border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
-            ✎ Edit
-          </button>
+
           <!-- Delete -->
           <button onclick="_formDeleteWithConfirm('${f.id}')" title="Delete form"
             style="font-family:Arial,sans-serif;font-size:12px;padding:4px 10px;border-radius:999px;
