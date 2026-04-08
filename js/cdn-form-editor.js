@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE37','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE38 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2400,7 +2400,23 @@ async function _formSelect(formId) {
     iframe.id = 'form-html-preview';
     iframe.style.cssText = 'flex:1;width:100%;min-height:700px;border:none;background:#fff';
     iframe.sandbox = 'allow-scripts allow-same-origin';
-    var blob = new Blob([form.source_html], { type: 'text/html' });
+    // Inject CSS variable definitions so the form renders correctly outside Cadence's theme
+    var cssVars = '<style>:root{' +
+      '--color-background-primary:#ffffff;' +
+      '--color-background-secondary:#f7f8fa;' +
+      '--color-background-tertiary:#f0f1f4;' +
+      '--color-background-info:#e8f0fe;' +
+      '--color-text-primary:#1a1a2e;' +
+      '--color-text-secondary:#4a5068;' +
+      '--color-text-tertiary:#8890a8;' +
+      '--color-text-info:#1a56db;' +
+      '--color-border-tertiary:rgba(0,0,0,.1);' +
+      '--color-border-secondary:rgba(0,0,0,.18);' +
+      '--color-border-info:#a4cafe;' +
+      '--font-mono:monospace' +
+    '}</style>';
+    var htmlWithVars = form.source_html.replace('<style>', cssVars + '<style>');
+    var blob = new Blob([htmlWithVars], { type: 'text/html' });
     iframe.src = URL.createObjectURL(blob);
     if (canvasWrap) canvasWrap.appendChild(iframe);
     else if (canvas && canvas.parentElement) canvas.parentElement.appendChild(iframe);
