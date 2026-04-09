@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE88 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE89 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -424,9 +424,6 @@ function _renderFormEditor() {
           onkeydown="if(event.key==='Enter')this.blur()"
           title="Click to rename — press Enter to confirm"/>
 
-        <!-- Category pill -->
-        <span id="form-category-pill" style="flex-shrink:0">${_formCategoryPill(f)}</span>
-
         <!-- H/W widget — shown when fields selected -->
         <div id="form-hw-widget" style="display:none;align-items:center;gap:4px;flex-shrink:0">
           <div style="width:1px;height:18px;background:var(--border)"></div>
@@ -454,6 +451,30 @@ function _renderFormEditor() {
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Canvas controls: page nav + zoom — moved from left rail -->
+        <div style="display:flex;align-items:center;gap:4px;margin-left:10px;flex-shrink:0">
+          <button id="form-page-prev" onclick="_formPrevPage()" title="Previous page"
+            style="font-size:13px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 3px;line-height:1">‹</button>
+          <span id="form-page-indicator"
+            style="font-size:12px;color:var(--muted);white-space:nowrap;min-width:32px;text-align:center;font-family:Arial,sans-serif">
+            ${_pdfPage}/${_pdfTotalPages}
+          </span>
+          <button id="form-page-next" onclick="_formNextPage()" title="Next page"
+            style="font-size:13px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 3px;line-height:1">›</button>
+          <div style="width:1px;height:14px;background:var(--border);margin:0 3px"></div>
+          <button onclick="_formZoomOut()" title="Zoom out"
+            style="font-size:13px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 3px;line-height:1">−</button>
+          <span id="form-zoom-label"
+            style="font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;min-width:36px;text-align:center;font-family:Arial,sans-serif"
+            onclick="_formZoomReset()" title="Reset zoom">${Math.round(_pdfScale * 100 / 1.5)}%</span>
+          <button onclick="_formZoomIn()" title="Zoom in"
+            style="font-size:13px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 3px;line-height:1">+</button>
+          <button onclick="_formZoomFit()" title="Fit to width"
+            style="font-size:12px;background:transparent;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text2);padding:2px 6px;font-family:Arial,sans-serif">⊡</button>
+          <button onclick="_formZoomReset()" title="Reset to 100%"
+            style="font-size:12px;background:transparent;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text2);padding:2px 6px;font-family:Arial,sans-serif">1:1</button>
         </div>
 
         <!-- Spacer -->
@@ -490,19 +511,6 @@ function _renderFormEditor() {
                    border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
             ✎
           </button>
-          <!-- CoC history -->
-          <button id="form-coc-btn" onclick="_formToggleCoC()" title="Form history"
-            style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
-                   border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
-            CoC
-          </button>
-
-          <!-- Delete -->
-          <button onclick="_formDeleteWithConfirm('${f.id}')" title="Delete form"
-            style="font-family:Arial,sans-serif;font-size:12px;padding:4px 10px;border-radius:999px;
-                   border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">
-            🗑
-          </button>
           <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
         </div>
         <div id="form-lifecycle-btns" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
@@ -518,39 +526,6 @@ function _renderFormEditor() {
              style="width:72px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
                     display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;
                     font-family:Arial,sans-serif;z-index:5">
-
-          <!-- Page navigation group — horizontal row -->
-          <div style="display:flex;align-items:center;gap:1px;width:68px;justify-content:center;margin-bottom:2px">
-          <button id="form-page-prev" onclick="_formPrevPage()" title="Previous page"
-            style="width:22px;height:28px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text1);font-size:14px;display:flex;align-items:center;justify-content:center">‹</button>
-          <span id="form-page-indicator"
-            style="font-size:10px;color:var(--muted);text-align:center;line-height:1;
-                   padding:0 2px;font-family:Arial,sans-serif;white-space:nowrap;min-width:24px">
-            ${_pdfPage}/${_pdfTotalPages}
-          </span>
-          <button id="form-page-next" onclick="_formNextPage()" title="Next page"
-            style="width:22px;height:28px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text1);font-size:14px;display:flex;align-items:center;justify-content:center">›</button>
-          </div>
-
-          <div style="width:60px;height:1px;background:var(--border);margin:4px 0"></div>
-
-          <!-- Zoom group — horizontal row -->
-          <div style="display:flex;align-items:center;gap:1px;width:68px;justify-content:center;margin-bottom:2px">
-          <button onclick="_formZoomOut()" title="Zoom out (-)"
-            style="width:20px;height:28px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text1);font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
-          <span id="form-zoom-label"
-            style="font-size:10px;color:var(--muted);text-align:center;cursor:pointer;
-                   padding:0 2px;font-family:Arial,sans-serif;white-space:nowrap;min-width:28px"
-            onclick="_formZoomReset()" title="Reset to 100%">${Math.round(_pdfScale * 100 / 1.5)}%</span>
-          <button onclick="_formZoomIn()" title="Zoom in (+)"
-            style="width:20px;height:28px;border-radius:4px;border:none;cursor:pointer;background:transparent;color:var(--text1);font-size:14px;display:flex;align-items:center;justify-content:center">+</button>
-          </div>
-          <button onclick="_formZoomFit()" title="Fit to width"
-            style="${_railBtn()}">⊡</button>
-          <button onclick="_formZoomReset()" title="Reset to 100%"
-            style="${_railBtn()}">1:1</button>
-
-          <div style="width:44px;height:1px;background:var(--border);margin:6px 0"></div>
 
           <!-- Mode group -->
           <button id="form-mode-select" onclick="_formSetMode('select')" title="Select & move fields (S)"
@@ -612,12 +587,17 @@ function _renderFormEditor() {
         </div>
 
         <!-- ── Visibility Matrix panel ───────────────────────────── -->
-        <div id="form-col-matrix" style="width:420px;min-width:280px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);position:relative;flex-shrink:0">
+        <div id="form-col-matrix" style="width:560px;min-width:320px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);position:relative;flex-shrink:0">
+          <!-- Drag handle to resize matrix width -->
+          <div style="position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:10;background:transparent;transition:background .15s"
+            onmouseover="this.style.background='rgba(0,201,201,.25)'"
+            onmouseout="if(!window._formDragMatrix)this.style.background='transparent'"
+            onmousedown="_formMatrixDragStart(event)"></div>
           <div style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px">
-            <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:1">Visibility Matrix</span>
-            <span id="form-fill-seq" style="font-size:10px;color:var(--text3)"></span>
-            <button onclick="_formAddMatrixRole()" class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px">+ Role</button>
-            <button onclick="_formAutoRename()" class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px" title="Auto-rename">⟳</button>
+            <span style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:1">Visibility Matrix</span>
+            <span id="form-fill-seq" style="font-size:12px;color:var(--text2)"></span>
+            <button onclick="_formAddMatrixRole()" class="btn btn-ghost btn-sm" style="font-size:12px;padding:2px 8px">+ Role</button>
+            <button onclick="_formAutoRename()" class="btn btn-ghost btn-sm" style="font-size:12px;padding:2px 8px" title="Auto-rename">⟳</button>
             <span id="form-sel-count" style="font-size:12px;font-weight:600;color:var(--cad);display:none">0 selected</span>
           </div>
           <div id="form-matrix-wrap" style="flex:1;overflow:auto">
@@ -636,7 +616,7 @@ function _renderFormEditor() {
 // [original _renderFieldList removed — enhanced version is sole definition]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE88
+// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE89
 // ─────────────────────────────────────────────────────────────────────────────
 
 var _VM_STATES  = ['E','R','H'];
@@ -738,9 +718,9 @@ function _renderMatrix() {
   var BDL = BDR + 'border-left:1px solid var(--border);';
 
   out.push('<table style="width:100%;border-collapse:collapse;font-size:11px;font-family:Arial,sans-serif"><thead><tr>');
-  out.push('<th style="' + TH  + 'padding:5px 8px;text-align:left;font-size:10px;font-weight:500;color:var(--muted);min-width:160px">Field</th>');
-  out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:10px;font-weight:500;color:var(--muted);width:44px">Type</th>');
-  out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:10px;font-weight:500;color:var(--muted);width:36px">Req</th>');
+  out.push('<th style="' + TH  + 'padding:5px 8px;text-align:left;font-size:12px;font-weight:500;color:var(--muted);min-width:160px">Field</th>');
+  out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:12px;font-weight:500;color:var(--muted);width:44px">Type</th>');
+  out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:12px;font-weight:500;color:var(--muted);width:36px">Req</th>');
 
   roles.forEach(function(r) {
     var conf = FORM_ROLES[r] || { label: r, color: 'var(--muted)' };
@@ -777,13 +757,13 @@ function _renderMatrix() {
 
       // Name cell
       out.push('<td style="padding:5px 8px;' + BDR + 'color:var(--text1);max-width:160px">' +
-        '<div data-label-target="1" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+        '<div data-label-target="1" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
         escHtml(field.label || 'Unlabelled') + '</div></td>');
 
       // Type select
       out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
         '<select data-fid="' + field.id + '" data-action="type" ' +
-        'style="font-size:10px;background:var(--surf2);border:1px solid var(--border);border-radius:3px;color:var(--text2);padding:2px;cursor:pointer;width:100%;font-family:Arial,sans-serif;max-width:64px">' +
+        'style="font-size:12px;background:var(--surf2);border:1px solid var(--border);border-radius:3px;color:var(--text2);padding:2px;cursor:pointer;width:100%;font-family:Arial,sans-serif;max-width:72px">' +
         typeOpts + '</select></td>');
 
       // Required toggle
@@ -856,6 +836,30 @@ function _reRenderMatrix() {
 
 // Shim — keep existing callers working
 function _reRenderRoutingPanel() { _reRenderMatrix(); }
+
+// Matrix panel drag-to-resize
+window._formDragMatrix = false;
+function _formMatrixDragStart(e) {
+  e.preventDefault();
+  window._formDragMatrix = true;
+  var panel = document.getElementById('form-col-matrix');
+  var startX = e.clientX;
+  var startW = panel ? panel.offsetWidth : 560;
+  function onMove(ev) {
+    if (!panel) return;
+    var newW = Math.max(320, Math.min(900, startW - (ev.clientX - startX)));
+    panel.style.width = newW + 'px';
+  }
+  function onUp() {
+    window._formDragMatrix = false;
+    var handle = panel ? panel.querySelector('[onmousedown*="_formMatrixDragStart"]') : null;
+    if (handle) handle.style.background = 'transparent';
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
 
 // Delegated event handler for the entire matrix panel — avoids all inline onclick quoting issues
 document.addEventListener('click', function(e) {
