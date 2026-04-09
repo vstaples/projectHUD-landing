@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE90 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE91 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -299,7 +299,7 @@ function renderFormsTab(el) {
         <div style="position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;
                     z-index:10;background:transparent;transition:background .15s"
           onmouseover="this.style.background='rgba(196,125,24,.3)'"
-          onmouseout="if(!window._formDragCol)this.style.background='transparent'"
+          onmouseout="this.style.background='transparent'"
           onmousedown="_formColDragStart(event,'form-lib-col','right')"></div>
         <div style="padding:10px 14px;border-bottom:1px solid var(--border);
                     display:flex;flex-direction:column;gap:6px;flex-shrink:0">
@@ -581,7 +581,7 @@ function _renderFormEditor() {
           <!-- Drag handle to resize matrix width -->
           <div style="position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:10;background:transparent;transition:background .15s"
             onmouseover="this.style.background='rgba(0,201,201,.25)'"
-            onmouseout="if(!window._formDragCol)this.style.background='transparent'"
+            onmouseout="this.style.background='transparent'"
             onmousedown="_formColDragStart(event,'form-col-matrix','left')"></div>
           <div style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px">
             <span style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:1">Visibility Matrix</span>
@@ -606,7 +606,7 @@ function _renderFormEditor() {
 // [original _renderFieldList removed — enhanced version is sole definition]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE90
+// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE91
 // ─────────────────────────────────────────────────────────────────────────────
 
 var _VM_STATES  = ['E','R','H'];
@@ -1823,40 +1823,37 @@ async function _renderPdfPage(pageNum) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function _formColDragStart(event, colId, direction) {
-  const col = document.getElementById(colId);
+  var col = document.getElementById(colId);
   if (!col) return;
-  window._formDragCol    = colId;
-  window._formDragDir    = direction || 'left'; // 'left' = handle on left edge; 'right' = right edge
-  window._formDragStartX = event.clientX;
-  window._formDragStartW = col.offsetWidth;
-  document.body.style.cursor     = 'col-resize';
-  document.body.style.userSelect = 'none';
   event.preventDefault();
+  event.stopPropagation();
+  var startX = event.clientX;
+  var startW = col.offsetWidth;
+  var minW = parseInt(col.style.minWidth) || 140;
+  var maxW = parseInt(col.style.maxWidth) || 1200;
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+
+  function onMove(ev) {
+    // 'left' handle on left edge: drag LEFT = wider, drag RIGHT = narrower
+    // 'right' handle on right edge: drag RIGHT = wider, drag LEFT = narrower
+    var delta = direction === 'right'
+      ? ev.clientX - startX
+      : startX - ev.clientX;
+    var newW = Math.max(minW, Math.min(maxW, startW + delta));
+    col.style.width = newW + 'px';
+  }
+
+  function onUp() {
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.removeEventListener('mousemove', onMove, true);
+    document.removeEventListener('mouseup', onUp, true);
+  }
+
+  document.addEventListener('mousemove', onMove, true);
+  document.addEventListener('mouseup', onUp, true);
 }
-
-document.addEventListener('mousemove', e => {
-  if (!window._formDragCol) return;
-  const col = document.getElementById(window._formDragCol);
-  if (!col) return;
-  // 'left' handle: drag right → smaller; 'right' handle: drag right → wider
-  const delta  = window._formDragDir === 'right'
-    ? e.clientX - window._formDragStartX
-    : window._formDragStartX - e.clientX;
-  const minW   = parseInt(col.style.minWidth) || 140;
-  const maxW   = parseInt(col.style.maxWidth) || 480;
-  const newW   = Math.max(minW, Math.min(maxW, window._formDragStartW + delta));
-  col.style.width      = newW + 'px';
-  col.style.transition = 'none';
-});
-
-document.addEventListener('mouseup', () => {
-  if (!window._formDragCol) return;
-  const col = document.getElementById(window._formDragCol);
-  if (col) col.style.transition = '';
-  document.body.style.cursor     = '';
-  document.body.style.userSelect = '';
-  window._formDragCol = null;
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // IMPORT PROGRESS UI
@@ -5745,7 +5742,7 @@ async function _formShowPreviewHistoryPanel() {
     'cursor:col-resize;z-index:10;background:transparent;transition:background .15s',
   ].join(';');
   dragHandle.addEventListener('mouseover',  () => { dragHandle.style.background = 'rgba(196,125,24,.3)'; });
-  dragHandle.addEventListener('mouseout',   () => { if (!window._formDragCol) dragHandle.style.background = 'transparent'; });
+  dragHandle.addEventListener('mouseout',   () => { dragHandle.style.background = 'transparent'; });
   dragHandle.addEventListener('mousedown',  (e) => _formColDragStart(e, 'form-preview-history-panel', 'left'));
   panel.appendChild(dragHandle);
 
