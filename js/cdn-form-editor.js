@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE102 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE103 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -578,7 +578,7 @@ function _renderFormEditor() {
         </div>
 
         <!-- ── Visibility Matrix panel ───────────────────────────── -->
-        <div id="form-col-matrix" style="width:560px;max-width:900px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);position:relative;flex-shrink:0">
+        <div id="form-col-matrix" style="width:560px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);position:relative;flex-shrink:0">
           <div id="form-matrix-resize" class="form-matrix-resize"></div>
 
           <div style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px">
@@ -604,7 +604,7 @@ function _renderFormEditor() {
 // [original _renderFieldList removed — enhanced version is sole definition]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE102
+// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE103
 // ─────────────────────────────────────────────────────────────────────────────
 
 var _VM_STATES  = ['E','R','H'];
@@ -707,7 +707,7 @@ function _renderMatrix() {
 
   out.push('<table style="width:100%;border-collapse:collapse;font-size:11px;font-family:Arial,sans-serif"><thead><tr>');
   out.push('<th style="' + TH  + 'padding:5px 8px;text-align:left;font-size:12px;font-weight:500;color:var(--muted);min-width:160px">Field</th>');
-  out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:12px;font-weight:500;color:var(--muted);width:44px">Type</th>');
+  out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:12px;font-weight:500;color:var(--muted);width:90px">Type</th>');
   out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:12px;font-weight:500;color:var(--muted);width:36px">Req</th>');
 
   roles.forEach(function(r) {
@@ -721,17 +721,21 @@ function _renderMatrix() {
 
   var sections = _vmGroupSections(fields);
   sections.forEach(function(sec) {
-    out.push('<tr><td colspan="' + (3 + roles.length) + '" style="background:var(--bg2);padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1)">' +
-      escHtml(sec.name) + ' <span style="font-weight:400;opacity:.5">(' + sec.fields.length + ')</span>');
+    // Section header row — Field+Type+Req in first td, then one td per role with quick-apply chips
+    out.push('<tr>');
+    out.push('<td colspan="3" style="background:var(--bg2);padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:none">' +
+      escHtml(sec.name) + ' <span style="font-weight:400;opacity:.5">(' + sec.fields.length + ')</span></td>');
     roles.forEach(function(r) {
       var lbl = escHtml((FORM_ROLES[r] || { label: r }).label);
+      out.push('<td style="background:var(--bg2);padding:3px 4px;border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:1px solid var(--border);text-align:center;white-space:nowrap">');
       ['E','R','H'].forEach(function(st) {
         out.push('<span data-sec="' + sec.id + '" data-srole="' + r + '" data-sstate="' + st + '" ' +
-          'style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:2px;border:1px solid rgba(255,255,255,.1);color:var(--muted);margin-left:2px" ' +
+          'style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:2px;border:1px solid rgba(255,255,255,.1);color:var(--muted);margin-left:1px" ' +
           'title="' + (st==='H'?'Hide':st==='R'?'Read-only':'Editable') + ' all ' + lbl + '">' + (st==='H'?'—':st) + '</span>');
       });
+      out.push('</td>');
     });
-    out.push('</td></tr>');
+    out.push('</tr>');
 
     sec.fields.forEach(function(field) {
       var typeOpts = (FIELD_TYPES_FULL || ['text','date','number','checkbox','signature','textarea']).map(function(t) {
@@ -751,7 +755,7 @@ function _renderMatrix() {
       // Type select
       out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
         '<select data-fid="' + field.id + '" data-action="type" ' +
-        'style="font-size:12px;background:var(--surf2);border:1px solid var(--border);border-radius:3px;color:var(--text2);padding:2px;cursor:pointer;width:100%;font-family:Arial,sans-serif;max-width:72px">' +
+        'style="font-size:12px;background:var(--surf2);border:1px solid var(--border);border-radius:3px;color:var(--text2);padding:2px;cursor:pointer;width:100%;font-family:Arial,sans-serif">' +
         typeOpts + '</select></td>');
 
       // Required toggle
