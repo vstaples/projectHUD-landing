@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE89 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE90 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -182,16 +182,16 @@ function _railBtn(active = false) {
 
 // Updates the active state of rail mode buttons (called from _formSetMode + _formTogglePreview)
 function _formRefreshRailMode(mode) {
-  const btnMap = { select:'form-mode-select', draw:'form-mode-draw', preview:'form-mode-preview' };
-  Object.entries(btnMap).forEach(([m, id]) => {
-    const btn = document.getElementById(id);
+  var btnMap = { select:'form-mode-select', draw:'form-mode-draw', preview:'form-mode-preview' };
+  Object.entries(btnMap).forEach(function([m, id]) {
+    var btn = document.getElementById(id);
     if (!btn) return;
-    const isActive = (m === mode);
-    btn.style.background = isActive ? 'var(--cad)' : 'transparent';
-    btn.style.color      = isActive ? 'var(--bg)'  : 'var(--muted)';
+    var isActive = (m === mode);
+    btn.style.background   = isActive ? 'var(--cad)' : 'transparent';
+    btn.style.color        = isActive ? 'var(--bg)'  : 'var(--text1)';
+    btn.style.borderColor  = isActive ? 'var(--cad)' : 'var(--border)';
   });
-  // Pop-out only visible in preview mode
-  const po = document.getElementById('form-popout-btn');
+  var po = document.getElementById('form-popout-btn');
   if (po) po.style.display = (mode === 'preview') ? 'flex' : 'none';
 }
 
@@ -407,15 +407,15 @@ function _renderFormEditor() {
   return `
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
 
-      <!-- ── TOP TOOLBAR: matches workflow editor layout ─────────── -->
+      <!-- ── SINGLE CONTROL BAR ───────────────────────────────────── -->
       <div id="form-top-toolbar"
            style="display:flex;align-items:center;gap:6px;padding:5px 14px;
                   border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2);
                   font-family:Arial,sans-serif;font-size:13px">
 
-        <!-- Editable name — takes all available left space -->
+        <!-- Editable name -->
         <input id="form-name-input" value="${escHtml(f.source_name || 'Untitled')}"
-          style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:80px;
+          style="font-size:13px;font-weight:600;color:var(--text);min-width:80px;max-width:220px;
                  background:transparent;border:none;border-bottom:1px solid transparent;
                  outline:none;font-family:Arial,sans-serif;padding:2px 4px;transition:border-color .15s"
           onfocus="this.style.borderBottomColor='var(--cad)'"
@@ -424,95 +424,115 @@ function _renderFormEditor() {
           onkeydown="if(event.key==='Enter')this.blur()"
           title="Click to rename — press Enter to confirm"/>
 
+        <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
+
+        <!-- Canvas mode buttons — from left rail -->
+        <button id="form-mode-select" onclick="_formSetMode('select')" title="Select & move fields (S)"
+          style="font-size:14px;background:var(--cad);color:var(--bg);border:none;border-radius:4px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center">◈</button>
+        <button id="form-mode-draw" onclick="_formSetMode('draw')" title="Draw new field (D)"
+          style="font-size:14px;background:transparent;color:var(--text1);border:1px solid var(--border);border-radius:4px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center">✎</button>
+        <button id="form-mode-preview" onclick="_formTogglePreview()" title="Preview form (P)"
+          style="font-size:14px;background:transparent;color:var(--text1);border:1px solid var(--border);border-radius:4px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
+        <button id="form-popout-btn" onclick="_formPopOutPreview()" title="Pop-out preview"
+          style="font-size:14px;background:transparent;color:var(--text1);border:1px solid var(--border);border-radius:4px;width:28px;height:28px;cursor:pointer;display:none;align-items:center;justify-content:center">⤢</button>
+
+        <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
+
+        <!-- Page nav + zoom -->
+        <button id="form-page-prev" onclick="_formPrevPage()" title="Previous page"
+          style="font-size:14px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 2px;line-height:1">‹</button>
+        <span id="form-page-indicator"
+          style="font-size:12px;color:var(--muted);white-space:nowrap;min-width:28px;text-align:center;font-family:Arial,sans-serif">${_pdfPage}/${_pdfTotalPages}</span>
+        <button id="form-page-next" onclick="_formNextPage()" title="Next page"
+          style="font-size:14px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 2px;line-height:1">›</button>
+        <div style="width:1px;height:16px;background:var(--border);flex-shrink:0;margin:0 2px"></div>
+        <button onclick="_formZoomOut()" title="Zoom out"
+          style="font-size:14px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 2px;line-height:1">−</button>
+        <span id="form-zoom-label"
+          style="font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;min-width:34px;text-align:center;font-family:Arial,sans-serif"
+          onclick="_formZoomReset()" title="Reset zoom">${Math.round(_pdfScale * 100 / 1.5)}%</span>
+        <button onclick="_formZoomIn()" title="Zoom in"
+          style="font-size:14px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 2px;line-height:1">+</button>
+        <button onclick="_formZoomFit()" title="Fit to width"
+          style="font-size:11px;background:transparent;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text2);padding:2px 5px;font-family:Arial,sans-serif">⊡</button>
+        <button onclick="_formZoomReset()" title="Reset to 100%"
+          style="font-size:11px;background:transparent;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text2);padding:2px 5px;font-family:Arial,sans-serif">1:1</button>
+
         <!-- H/W widget — shown when fields selected -->
         <div id="form-hw-widget" style="display:none;align-items:center;gap:4px;flex-shrink:0">
           <div style="width:1px;height:18px;background:var(--border)"></div>
           <div style="display:flex;flex-direction:column;gap:2px">
             <div style="display:flex;align-items:center;gap:3px">
-              <span style="font-size:12px;color:var(--muted);width:14px;font-family:Arial,sans-serif">H</span>
+              <span style="font-size:11px;color:var(--muted);width:12px;font-family:Arial,sans-serif">H</span>
               <input id="form-hw-h" type="number" step="0.01" min="0.05"
-                style="width:58px;font-size:12px;padding:1px 4px;background:var(--bg);
-                       border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:Arial,sans-serif"
+                style="width:52px;font-size:11px;padding:1px 4px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:Arial,sans-serif"
                 onchange="_formHWChange('h',parseFloat(this.value))" onclick="this.select()"/>
-              <div style="display:flex;flex-direction:column;gap:0">
-                <button onclick="_formHWStep('h',1)"  style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-radius:2px 2px 0 0;cursor:pointer;color:var(--text2)">▲</button>
-                <button onclick="_formHWStep('h',-1)" style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-top:none;border-radius:0 0 2px 2px;cursor:pointer;color:var(--text2)">▼</button>
+              <div style="display:flex;flex-direction:column">
+                <button onclick="_formHWStep('h',1)"  style="font-size:7px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-radius:2px 2px 0 0;cursor:pointer;color:var(--text2)">▲</button>
+                <button onclick="_formHWStep('h',-1)" style="font-size:7px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-top:none;border-radius:0 0 2px 2px;cursor:pointer;color:var(--text2)">▼</button>
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:3px">
-              <span style="font-size:12px;color:var(--muted);width:14px;font-family:Arial,sans-serif">W</span>
+              <span style="font-size:11px;color:var(--muted);width:12px;font-family:Arial,sans-serif">W</span>
               <input id="form-hw-w" type="number" step="0.01" min="0.05"
-                style="width:58px;font-size:12px;padding:1px 4px;background:var(--bg);
-                       border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:Arial,sans-serif"
+                style="width:52px;font-size:11px;padding:1px 4px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:Arial,sans-serif"
                 onchange="_formHWChange('w',parseFloat(this.value))" onclick="this.select()"/>
-              <div style="display:flex;flex-direction:column;gap:0">
-                <button onclick="_formHWStep('w',1)"  style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-radius:2px 2px 0 0;cursor:pointer;color:var(--text2)">▲</button>
-                <button onclick="_formHWStep('w',-1)" style="font-size:8px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-top:none;border-radius:0 0 2px 2px;cursor:pointer;color:var(--text2)">▼</button>
+              <div style="display:flex;flex-direction:column">
+                <button onclick="_formHWStep('w',1)"  style="font-size:7px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-radius:2px 2px 0 0;cursor:pointer;color:var(--text2)">▲</button>
+                <button onclick="_formHWStep('w',-1)" style="font-size:7px;line-height:1;padding:0 3px;background:var(--surf2);border:1px solid var(--border);border-top:none;border-radius:0 0 2px 2px;cursor:pointer;color:var(--text2)">▼</button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Canvas controls: page nav + zoom — moved from left rail -->
-        <div style="display:flex;align-items:center;gap:4px;margin-left:10px;flex-shrink:0">
-          <button id="form-page-prev" onclick="_formPrevPage()" title="Previous page"
-            style="font-size:13px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 3px;line-height:1">‹</button>
-          <span id="form-page-indicator"
-            style="font-size:12px;color:var(--muted);white-space:nowrap;min-width:32px;text-align:center;font-family:Arial,sans-serif">
-            ${_pdfPage}/${_pdfTotalPages}
-          </span>
-          <button id="form-page-next" onclick="_formNextPage()" title="Next page"
-            style="font-size:13px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 3px;line-height:1">›</button>
-          <div style="width:1px;height:14px;background:var(--border);margin:0 3px"></div>
-          <button onclick="_formZoomOut()" title="Zoom out"
-            style="font-size:13px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 3px;line-height:1">−</button>
-          <span id="form-zoom-label"
-            style="font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;min-width:36px;text-align:center;font-family:Arial,sans-serif"
-            onclick="_formZoomReset()" title="Reset zoom">${Math.round(_pdfScale * 100 / 1.5)}%</span>
-          <button onclick="_formZoomIn()" title="Zoom in"
-            style="font-size:13px;background:transparent;border:none;cursor:pointer;color:var(--text2);padding:0 3px;line-height:1">+</button>
-          <button onclick="_formZoomFit()" title="Fit to width"
-            style="font-size:12px;background:transparent;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text2);padding:2px 6px;font-family:Arial,sans-serif">⊡</button>
-          <button onclick="_formZoomReset()" title="Reset to 100%"
-            style="font-size:12px;background:transparent;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text2);padding:2px 6px;font-family:Arial,sans-serif">1:1</button>
-        </div>
-
         <!-- Spacer -->
         <div style="flex:1"></div>
 
-        <!-- Right-side action buttons matching workflow editor -->
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <!-- Version + state + save indicator -->
-          <span id="form-version-display"
-            style="font-family:var(--font-mono);font-size:12px;color:var(--muted);flex-shrink:0">
-            ${f.version||'0.1.0'}${_formDirty?'*':''}
-          </span>
-          <span id="form-state-badge"
-            style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;
-                   font-family:Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;
-                   background:${_formStateColor(f.state||'draft',true)};
-                   color:${_formStateColor(f.state||'draft')}">
-            ${_formStateLabel(f.state||'draft')}
-          </span>
-          <span id="form-save-indicator"
-            style="font-size:12px;color:${_formDirty?'var(--amber)':'var(--green)'};flex-shrink:0">
-            ${_formDirty ? '● Unsaved' : '● Saved'}
-          </span>
-          <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
-          <!-- Launch (simulate) -->
-          <button onclick="_formLaunchSimulate()" title="Launch simulator"
-            style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
-                   border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
-            ▶ Launch
-          </button>
-          <!-- Edit Mode -->
-          <button id="form-edit-mode-btn" title="Toggle inline edit mode"
-            style="font-family:Arial,sans-serif;font-size:12px;padding:4px 10px;border-radius:999px;
-                   border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
-            ✎
-          </button>
-          <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
-        </div>
+        <!-- Version · state · save -->
+        <span id="form-version-display"
+          style="font-family:var(--font-mono);font-size:12px;color:var(--muted);flex-shrink:0">
+          ${f.version||'0.1.0'}${_formDirty?'*':''}
+        </span>
+        <span id="form-state-badge"
+          style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;font-family:Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;background:${_formStateColor(f.state||'draft',true)};color:${_formStateColor(f.state||'draft')}">
+          ${_formStateLabel(f.state||'draft')}
+        </span>
+        <span id="form-save-indicator"
+          style="font-size:12px;color:${_formDirty?'var(--amber)':'var(--green)'};flex-shrink:0">
+          ${_formDirty ? '● Unsaved' : '● Saved'}
+        </span>
+
+        <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
+
+        <!-- Launch · Edit Mode -->
+        <button onclick="_formLaunchSimulate()" title="Launch simulator"
+          style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
+          ▶ Launch
+        </button>
+        <button id="form-edit-mode-btn" title="Toggle inline edit mode"
+          style="font-family:Arial,sans-serif;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
+          ✎
+        </button>
+        <button onclick="_formReplacePdf()" title="Replace PDF background" id="form-replace-btn"
+          style="font-family:Arial,sans-serif;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;${'draft'===(f.state||'draft')?'':'opacity:.3;pointer-events:none'}">
+          ↺
+        </button>
+
+        <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
+
+        <!-- CoC + Delete — restored -->
+        <button onclick="_formToggleCoC()" id="form-coc-btn" title="Chain of Custody"
+          style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
+          CoC
+        </button>
+        <button onclick="_formDeleteWithConfirm('${f.id}')" title="Delete form"
+          style="font-family:Arial,sans-serif;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">
+          🗑
+        </button>
+
+        <div style="width:1px;height:16px;background:var(--border);flex-shrink:0"></div>
+
+        <!-- Lifecycle: Save · Commit · Publish -->
         <div id="form-lifecycle-btns" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           ${_formLifecycleButtons(f)}
         </div>
@@ -520,36 +540,6 @@ function _renderFormEditor() {
 
       <!-- ── Body row: left-rail + canvas + fields + routing ────── -->
       <div style="flex:1;display:flex;overflow:hidden;min-height:0" id="form-body-row">
-
-        <!-- ── LEFT RAIL: canvas tools ─────────────────────────── -->
-        <div id="form-left-rail"
-             style="width:72px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
-                    display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;
-                    font-family:Arial,sans-serif;z-index:5">
-
-          <!-- Mode group -->
-          <button id="form-mode-select" onclick="_formSetMode('select')" title="Select & move fields (S)"
-            style="${_railBtn(true)}">◈</button>
-          <button id="form-mode-draw" onclick="_formSetMode('draw')" title="Draw new field (D)"
-            style="${_railBtn()}">✎</button>
-          <button id="form-mode-preview" onclick="_formTogglePreview()" title="Preview form (P)"
-            style="${_railBtn()}">▶</button>
-          <button id="form-popout-btn" onclick="_formPopOutPreview()" title="Pop-out preview"
-            style="${_railBtn()};display:none">⤢</button>
-
-          <div style="width:44px;height:1px;background:var(--border);margin:6px 0"></div>
-
-          <!-- Form actions group -->
-          <button onclick="_formToggleCoC()" id="form-coc-btn" title="Chain of Custody"
-            style="${_railBtn()}">≡</button>
-          <button onclick="_formReplacePdf()" title="Replace PDF background"
-            id="form-replace-btn"
-            style="${_railBtn()};${'draft'===(f.state||'draft')?'':'opacity:.3;pointer-events:none'}">↺</button>
-          <button onclick="_formClearHistory('${f.id}')" title="[DEV] Clear history — reset CoC to clean state"
-            style="${_railBtn()};color:#6b7280;font-size:14px;opacity:.6" id="form-clear-history-btn">⌫</button>
-          <button onclick="_formDeleteWithConfirm('${f.id}')" title="Remove form"
-            style="${_railBtn()};color:var(--red)">🗑</button>
-        </div>
 
         <!-- ── Canvas column ────────────────────────────────────── -->
         <div style="flex:1;overflow:auto;background:var(--bg);position:relative;min-width:0"
@@ -587,12 +577,12 @@ function _renderFormEditor() {
         </div>
 
         <!-- ── Visibility Matrix panel ───────────────────────────── -->
-        <div id="form-col-matrix" style="width:560px;min-width:320px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);position:relative;flex-shrink:0">
+        <div id="form-col-matrix" style="width:560px;min-width:320px;max-width:900px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);position:relative;flex-shrink:0">
           <!-- Drag handle to resize matrix width -->
           <div style="position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:10;background:transparent;transition:background .15s"
             onmouseover="this.style.background='rgba(0,201,201,.25)'"
-            onmouseout="if(!window._formDragMatrix)this.style.background='transparent'"
-            onmousedown="_formMatrixDragStart(event)"></div>
+            onmouseout="if(!window._formDragCol)this.style.background='transparent'"
+            onmousedown="_formColDragStart(event,'form-col-matrix','left')"></div>
           <div style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px">
             <span style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:1">Visibility Matrix</span>
             <span id="form-fill-seq" style="font-size:12px;color:var(--text2)"></span>
@@ -616,7 +606,7 @@ function _renderFormEditor() {
 // [original _renderFieldList removed — enhanced version is sole definition]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE89
+// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE90
 // ─────────────────────────────────────────────────────────────────────────────
 
 var _VM_STATES  = ['E','R','H'];
@@ -837,29 +827,7 @@ function _reRenderMatrix() {
 // Shim — keep existing callers working
 function _reRenderRoutingPanel() { _reRenderMatrix(); }
 
-// Matrix panel drag-to-resize
-window._formDragMatrix = false;
-function _formMatrixDragStart(e) {
-  e.preventDefault();
-  window._formDragMatrix = true;
-  var panel = document.getElementById('form-col-matrix');
-  var startX = e.clientX;
-  var startW = panel ? panel.offsetWidth : 560;
-  function onMove(ev) {
-    if (!panel) return;
-    var newW = Math.max(320, Math.min(900, startW - (ev.clientX - startX)));
-    panel.style.width = newW + 'px';
-  }
-  function onUp() {
-    window._formDragMatrix = false;
-    var handle = panel ? panel.querySelector('[onmousedown*="_formMatrixDragStart"]') : null;
-    if (handle) handle.style.background = 'transparent';
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
-  }
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', onUp);
-}
+// Matrix drag handled by _formColDragStart — no custom function needed
 
 // Delegated event handler for the entire matrix panel — avoids all inline onclick quoting issues
 document.addEventListener('click', function(e) {
@@ -4994,9 +4962,7 @@ function _formTogglePreview() {
     // Enter preview — highlight preview button in rail
     _formRefreshRailMode('preview');
     if (hwWgt) hwWgt.style.display = 'none';
-    // Collapse left rail in preview (only SIMULATE panel on right)
-    const leftRail = document.getElementById('form-left-rail');
-    if (leftRail) leftRail.style.display = 'none';
+    // Left rail removed SE90 — no-op
     // Collapse side columns + CoC
     if (colFlds) { colFlds.style.display = 'none'; }
     if (colRout) { colRout.style.display = 'none'; }
@@ -5023,9 +4989,7 @@ function _formTogglePreview() {
     const cw = document.getElementById('form-canvas-wrap');
     if (cw) cw.querySelectorAll('div[style*="position:absolute"][style*="inset:0"]').forEach(el => el.remove());
     // 4. Reset button states — handled by _formSetMode('select') below
-    // 5. Restore side columns + left rail
-    const leftRailExit = document.getElementById('form-left-rail');
-    if (leftRailExit) leftRailExit.style.display = '';
+    // 5. Restore side columns (left rail removed SE90)
     if (colFlds) { colFlds.style.display = ''; }
     if (colRout) { colRout.style.display = ''; }
     if (cw) { const firstChild = cw.firstElementChild; if (firstChild?.id === 'form-preview-stagebar') firstChild.remove(); }
