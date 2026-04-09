@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE83 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE85 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -258,36 +258,22 @@ function _formBumpVersion(ver, fmt, type='minor') {
 }
 
 function _formStateLabel(state) {
-  return { draft:'Draft', unreleased:'Unreleased',
-           in_review:'In Review', reviewed:'Reviewed',
-           approved:'Approved', released:'Released', archived:'Archived',
+  return { draft:'Draft', certified:'Certified', published:'Published', archived:'Archived',
            rejected_review:'Rejected — Review', rejected_approval:'Rejected — Approval', rejected_release:'Rejected — Release' }[state] || state;
 }
 
 function _formStateColor(state, bg) {
   var colors = {
-    draft:              '#a8b4c8',
-    unreleased:         '#f0a030',
-    in_review:          '#60a5fa',
-    reviewed:           '#f0a030',
-    approved:           '#4ade80',
-    released:           '#4ade80',
-    archived:           '#a8b4c8',
-    rejected_review:    '#f87171',
-    rejected_approval:  '#f87171',
-    rejected_release:   '#f87171',
+    draft:      '#a8b4c8',
+    certified:  '#60a5fa',
+    published:  '#4ade80',
+    archived:   '#a8b4c8',
   };
   var bgs = {
-    draft:              'rgba(168,180,200,.12)',
-    unreleased:         'rgba(240,160,48,.15)',
-    in_review:          'rgba(96,165,250,.12)',
-    reviewed:           'rgba(240,160,48,.15)',
-    approved:           'rgba(74,222,128,.12)',
-    released:           'rgba(74,222,128,.12)',
-    archived:           'rgba(168,180,200,.1)',
-    rejected_review:    'rgba(248,113,113,.12)',
-    rejected_approval:  'rgba(248,113,113,.12)',
-    rejected_release:   'rgba(248,113,113,.12)',
+    draft:      'rgba(168,180,200,.12)',
+    certified:  'rgba(96,165,250,.12)',
+    published:  'rgba(74,222,128,.12)',
+    archived:   'rgba(168,180,200,.1)',
   };
   if (bg) return bgs[state] || 'rgba(168,180,200,.12)';
   return colors[state] || '#a8b4c8';
@@ -361,7 +347,7 @@ function _renderFormList() {
     const sel = _selectedForm?.id === f.id;
     const st  = f.state || 'draft';
     const ver = f.version || '0.1.0';
-    const locked = st === 'released';
+    const locked = st === 'certified' || st === 'published';
     const stLabel = {released:'RELEASED',draft:'DRAFT',in_review:'IN REVIEW',approved:'APPROVED',archived:'ARCHIVED'}[st] || st.toUpperCase();
     return `
       <div class="tmpl-item status-${st}${sel?' active':''}" onclick="_formSelect('${f.id}')">
@@ -581,7 +567,7 @@ function _renderFormEditor() {
             style="${_railBtn()}">≡</button>
           <button onclick="_formReplacePdf()" title="Replace PDF background"
             id="form-replace-btn"
-            style="${_railBtn()};${['draft','unreleased','rejected_review','rejected_approval','rejected_release'].includes(f.state||'draft')?'':'opacity:.3;pointer-events:none'}">↺</button>
+            style="${_railBtn()};${'draft'===(f.state||'draft')?'':'opacity:.3;pointer-events:none'}">↺</button>
           <button onclick="_formClearHistory('${f.id}')" title="[DEV] Clear history — reset CoC to clean state"
             style="${_railBtn()};color:#6b7280;font-size:14px;opacity:.6" id="form-clear-history-btn">⌫</button>
           <button onclick="_formDeleteWithConfirm('${f.id}')" title="Remove form"
@@ -2766,95 +2752,71 @@ async function _formSetCategory(catId) {
 }
 
 function _formLifecycleButtons(f) {
-  const state  = f.state || 'draft';
-  const isEdit = ['draft','unreleased','rejected_review','rejected_approval','rejected_release'].includes(state);
-  const btns   = [];
+  const state = f.state || 'draft';
+  const btns  = [];
 
-  // Save button
-  if (isEdit) {
+  // Save — only in draft
+  if (state === 'draft') {
     btns.push(`<button id="form-save-btn"
-      class="${_formDirty?'btn btn-solid btn-sm':'btn btn-ghost btn-sm'}"
       onclick="_formSave()"
-      style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">Save</button>`);
+      style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
+             border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">Save</button>`);
   }
 
-  // ── State-specific primary actions ──────────────────────────────────────
-
-  if (isEdit) {
-    // Show rejection context if applicable
-    if (state === 'rejected_review' || state === 'rejected_approval') {
-      btns.push(`<span style="font-size:12px;color:var(--red);font-family:Arial,sans-serif">
-        ✗ Rejected — revise & resubmit</span>`);
-    }
-    // Cancel Revision — only for unreleased
-    if (state === 'unreleased') {
-      btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formCancelRevision()"
-        style="font-size:13px;color:var(--red);border-color:rgba(248,113,113,.4)">
-        ✕ Cancel Revision</button>`);
-    }
-    // Commit Form (HTML forms) — always show alongside Release
-    if (_selectedForm?.source_html) {
-      btns.push(`<button onclick="_formCommit()"
-        style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
-               border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
-        Commit</button>`);
-    } else if (f.category_id) {
-      btns.push(`<button class="btn btn-cad btn-sm" onclick="_formSubmitForReview()"
-        style="font-size:13px;font-family:Arial,sans-serif">Submit for Review →</button>`);
-    }
-    // Release — always visible in editable states
-    btns.push('<button onclick="_formReleaseDirectly()"' +
-      ' onmouseenter="_formShowVerTooltip(this)"' +
-      ' onmouseleave="_formHideVerTooltip()"' +
-      ' style="font-family:Arial,sans-serif;font-size:12px;padding:4px 14px;border-radius:999px;' +
-      'background:var(--green);color:#003333;border:none;cursor:pointer;font-weight:700">Release</button>');
+  // Commit — only in draft, only for HTML forms
+  if (state === 'draft' && _selectedForm?.source_html) {
+    btns.push(`<button onclick="_formCommit()"
+      style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
+             border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
+      Commit</button>`);
   }
 
-  if (state === 'in_review') {
-    btns.push(`<span style="font-size:12px;color:var(--accent);font-family:Arial,sans-serif;
-      padding:3px 8px;background:rgba(79,142,247,.1);border-radius:4px">● In Review</span>`);
-    // Editor-side simulate approve (for testing / admin override)
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formShowMarkReviewedModal()"
-      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(42,157,64,.15);border:1px solid rgba(42,157,64,.4);color:#4ade80;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1)">✓ Mark Reviewed</button>`);
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectForm('review')"
-      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#f87171;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1)">✗ Reject</button>`);
+  // Publish — only when certified
+  if (state === 'certified') {
+    btns.push(`<button onclick="_formPublish()"
+      style="font-family:Arial,sans-serif;font-size:12px;padding:4px 14px;border-radius:999px;
+             background:var(--green);color:#003333;border:none;cursor:pointer;font-weight:700">
+      Publish</button>`);
   }
 
-  if (state === 'reviewed') {
-    btns.push(`<span style="font-size:12px;color:var(--cad);font-family:Arial,sans-serif;
-      padding:3px 8px;background:rgba(196,125,24,.1);border-radius:4px">● Awaiting Approval</span>`);
-    btns.push(`<button onclick="_formApproveAndRelease()"
-      style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);
-             color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">
-      ✓ Approve</button>`);
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formRejectForm('approval')"
-      style="font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#f87171;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1)">✗ Reject</button>`);
+  // Published state actions
+  if (state === 'published') {
+    btns.push(`<button onclick="_formUnpublish()"
+      style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
+             border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer">
+      Unpublish</button>`);
   }
 
-  if (state === 'approved') {
-    btns.push(`<span style="font-size:12px;color:var(--green);font-family:Arial,sans-serif;
-      padding:3px 8px;background:rgba(42,157,64,.1);border-radius:4px">✓ Approved</span>`);
-    btns.push(`<button onclick="_formReleaseFinal()"
-      style="font-size:14px;font-weight:700;padding:7px 18px;border-radius:999px;background:var(--green);
-             color:white;border:none;cursor:pointer;font-family:Arial,sans-serif;line-height:1.4">
-      ↑ Release</button>`);
-  }
-
-  if (state === 'released') {
-    btns.push(`<span style="font-size:12px;color:var(--green);font-family:Arial,sans-serif;
-      padding:3px 8px;background:rgba(42,157,64,.1);border-radius:4px">✓ Released</span>`);
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formCreateRevision()"
-      style="font-size:12px">Create Revision</button>`);
-    btns.push(`<button class="btn btn-ghost btn-sm" onclick="_formArchive()"
-      style="font-size:12px;color:var(--muted)">Archive</button>`);
-  }
-
+  // Archived
   if (state === 'archived') {
     btns.push(`<span style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif;
       padding:3px 8px;background:rgba(255,255,255,.04);border-radius:4px">Archived — read only</span>`);
   }
 
   return btns.join('\n');
+}
+
+async function _formPublish() {
+  if (!_selectedForm) return;
+  if (_selectedForm.state !== 'certified') { cadToast('Form must be certified before publishing', 'warn'); return; }
+  await API.patch('workflow_form_definitions?id=eq.'+_selectedForm.id, {
+    state: 'published', compass_visible: true, updated_at: new Date().toISOString()
+  });
+  _selectedForm.state = 'published';
+  _selectedForm.compass_visible = true;
+  _formRefreshToolbar();
+  cadToast('Form published — now visible in Compass Browse', 'success');
+}
+
+async function _formUnpublish() {
+  if (!_selectedForm) return;
+  await API.patch('workflow_form_definitions?id=eq.'+_selectedForm.id, {
+    state: 'certified', compass_visible: false, updated_at: new Date().toISOString()
+  });
+  _selectedForm.state = 'certified';
+  _selectedForm.compass_visible = false;
+  _formRefreshToolbar();
+  cadToast('Form unpublished — removed from Compass Browse', 'info');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2979,7 +2941,7 @@ async function _formCommit() {
   if (!_selectedForm.source_html) { cadToast('Only HTML forms can be committed this way', 'error'); return; }
 
   var firmId = window.FIRM_ID || FIRM_ID_CAD;
-  var formName = _selectedForm.source_name || 'Untitled Form';
+  var formName = (_selectedForm.source_name || 'Untitled Form').trim();
   var roles = _formRoutingRolesOrdered(_formRouting.roles || []);
 
   if (!roles.length) { cadToast('Add at least one role in Routing Order before committing', 'error'); return; }
@@ -3767,6 +3729,34 @@ function _formRenameCurrent(newName) {
   _formMarkDirty();
   const listEl = document.getElementById('form-list');
   if (listEl) listEl.innerHTML = _renderFormList();
+  // Sync companion workflow name if one exists
+  _formSyncCompanionName(name);
+}
+
+async function _formSyncCompanionName(name) {
+  if (!_selectedForm?.id) return;
+  try {
+    // Find companion workflow — form_driven=true with matching form step
+    var steps = await API.get('workflow_template_steps?select=template_id&limit=1').catch(function(){return[];});
+    // Look up by form def id via step link
+    var rows = await API.get(
+      'workflow_templates?firm_id=eq.'+FIRM_ID_CAD+'&form_driven=eq.true&select=id,name'
+    ).catch(function(){return[];});
+    // Match companion by finding one whose steps include our form def
+    for (var r of rows) {
+      var fsteps = await API.get(
+        'workflow_template_steps?template_id=eq.'+r.id+'&step_type=eq.form&select=id&limit=1'
+      ).catch(function(){return[];});
+      if (fsteps && fsteps.length) {
+        // Found companion — check if its name differs
+        if (r.name !== name) {
+          await API.patch('workflow_templates?id=eq.'+r.id, { name: name }).catch(function(){});
+          console.log('[formRename] companion workflow renamed to:', name);
+        }
+        break;
+      }
+    }
+  } catch(e) { /* silent */ }
 }
 
 async function _formToggleCompassVisible(checked) {
