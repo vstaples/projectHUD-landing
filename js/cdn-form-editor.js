@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE104 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE105 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -604,7 +604,7 @@ function _renderFormEditor() {
 // [original _renderFieldList removed — enhanced version is sole definition]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE104
+// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE105
 // ─────────────────────────────────────────────────────────────────────────────
 
 var _VM_STATES  = ['E','R','H'];
@@ -1118,7 +1118,7 @@ function _formUpdateField(fieldId, key, value) {
   }
 
   // Sync change to source_html if this is an HTML form
-  if (_selectedForm?.source_html && (key === 'label' || key === 'required' || key === 'role')) {
+  if (_selectedForm?.source_html && (key === 'label' || key === 'required' || key === 'role' || key === 'type')) {
     _formSyncFieldToHtml(fieldId, key, value, field);
   }
 
@@ -1298,6 +1298,45 @@ function _formSyncFieldToHtml(fieldId, key, value, field) {
         }
       }
     }
+  } else if (key === 'type') {
+    // Replace the input widget with the correct element for the new type
+    el.setAttribute('data-type', value);
+    var baseStyle = 'font-family:Arial,sans-serif;font-size:12px;padding:5px 8px;border:0.5px solid #d1d5db;border-radius:5px;background:#f9fafb;color:#1a1a2e;width:100%;box-sizing:border-box';
+    var fid2  = el.getAttribute('data-field-id') || fieldId;
+    var lbl2  = el.getAttribute('data-label') || '';
+    var req2  = el.getAttribute('data-required') === 'true';
+    var newW;
+    if (value === 'textarea') {
+      newW = doc.createElement('textarea');
+      newW.setAttribute('style', baseStyle + ';resize:vertical;min-height:60px');
+      newW.setAttribute('placeholder', lbl2);
+    } else if (value === 'checkbox') {
+      newW = doc.createElement('input');
+      newW.type = 'checkbox';
+      newW.setAttribute('style', 'width:16px;height:16px;cursor:pointer;accent-color:#00c9c9');
+    } else if (value === 'signature') {
+      newW = doc.createElement('div');
+      newW.setAttribute('style', 'border-bottom:1px solid #374151;height:28px;margin-top:8px;width:100%');
+    } else if (value === 'date') {
+      newW = doc.createElement('input');
+      newW.type = 'date';
+      newW.setAttribute('style', baseStyle);
+    } else if (value === 'number') {
+      newW = doc.createElement('input');
+      newW.type = 'number';
+      newW.setAttribute('style', baseStyle);
+      newW.setAttribute('placeholder', '0');
+    } else {
+      newW = doc.createElement('input');
+      newW.type = 'text';
+      newW.setAttribute('style', baseStyle);
+      newW.setAttribute('placeholder', lbl2);
+    }
+    newW.setAttribute('data-field-id', fid2);
+    newW.setAttribute('data-label', lbl2);
+    newW.setAttribute('data-required', req2 ? 'true' : 'false');
+    newW.setAttribute('data-type', value);
+    if (el.parentNode) el.parentNode.replaceChild(newW, el);
   }
 
   // Serialize back to string (body innerHTML only — no html/head wrapper)
