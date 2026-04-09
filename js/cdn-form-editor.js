@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE87 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE88 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -12,7 +12,7 @@ console.log('%c[cdn-form-editor] v20260407-SE87 8px;border-radius:3px');
   s.id = 'form-editor-font-rules';
   s.textContent = `
     /* Form editor — uniform Arial font for UI chrome only */
-    #form-col-fields *, #form-col-routing *, #form-lib-col *,
+    #form-col-fields *, #form-col-routing *, #form-col-matrix *, #form-lib-col *,
     #form-editor-main button { font-family: Arial, sans-serif !important; }
 
     /* Preview wraps — force visible, never let app CSS hide them */
@@ -135,6 +135,8 @@ let _formDefs        = [];
 let _selectedForm    = null;
 let _formFields      = [];
 let _formRouting     = { mode: 'serial', roles: [] };
+var _formVisMatrix   = {};   // { fieldId: { role: 'E'|'R'|'H' } }
+var _formMatrixRoles = [];   // ordered role keys active in the matrix
 let _formDragField   = null;
 let _formDragRole    = null;
 let _pdfDoc          = null;
@@ -609,66 +611,17 @@ function _renderFormEditor() {
           </div>
         </div>
 
-        <!-- ── Fields column ─────────────────────────────────────── -->
-        <div id="form-col-fields" style="width:240px;min-width:160px;max-width:480px;
-                    border-left:1px solid var(--border);display:flex;flex-direction:column;
-                    background:var(--bg1);position:relative;flex-shrink:0">
-          <!-- Drag handle -->
-          <div style="position:absolute;left:-3px;top:0;bottom:0;width:6px;cursor:col-resize;
-                      z-index:10;background:transparent;transition:background .15s"
-            onmouseover="this.style.background='rgba(196,125,24,.3)'"
-            onmouseout="if(!window._formDragCol)this.style.background='transparent'"
-            onmousedown="_formColDragStart(event,'form-col-fields','left')"></div>
-          <div style="padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <span style="font-size:12px;font-weight:600;letter-spacing:.08em;
-                           text-transform:uppercase;color:var(--muted)">
-                Fields <span style="font-weight:400;color:var(--text3)">(${totalFields})</span>
-              </span>
-              <div style="display:flex;align-items:center;gap:6px">
-                <button onclick="_formAutoRename()" class="btn btn-ghost btn-sm"
-                  style="font-size:11px;padding:2px 8px" title="Auto-rename all fields by type and sequence">
-                  ⟳ Rename
-                </button>
-                <span id="form-sel-count" style="font-size:12px;font-weight:600;color:var(--cad);display:none">0 selected</span>
-              </div>
-            </div>
-            <!-- Arrange toolbar — shown when 2+ fields selected -->
-            <div id="form-arrange-bar" style="display:none;flex-direction:column;gap:4px">
-              <div style="display:flex;gap:3px;flex-wrap:wrap">
-                <button onclick="_formArrange('align-left')"   title="Align Left"              class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:12px">⬤←</button>
-                <button onclick="_formArrange('align-right')"  title="Align Right"             class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">→⬤</button>
-                <button onclick="_formArrange('align-top')"    title="Align Top"               class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">⬤↑</button>
-                <button onclick="_formArrange('align-bottom')" title="Align Bottom"            class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↓⬤</button>
-                <button onclick="_formArrange('center-h')"     title="Center Horizontal"       class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↔</button>
-                <button onclick="_formArrange('center-v')"     title="Center Vertical"         class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">↕</button>
-                <button onclick="_formArrange('dist-h')"       title="Distribute Horizontally" class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">⇹H</button>
-                <button onclick="_formArrange('dist-v')"       title="Distribute Vertically"   class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px">⇹V</button>
-              </div>
-              <button onclick="_formClearSelection()" style="font-size:12px;background:none;border:none;color:var(--muted);cursor:pointer;text-align:left;padding:0">✕ Clear selection</button>
-            </div>
+        <!-- ── Visibility Matrix panel ───────────────────────────── -->
+        <div id="form-col-matrix" style="width:420px;min-width:280px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);position:relative;flex-shrink:0">
+          <div style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:1">Visibility Matrix</span>
+            <span id="form-fill-seq" style="font-size:10px;color:var(--text3)"></span>
+            <button onclick="_formAddMatrixRole()" class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px">+ Role</button>
+            <button onclick="_formAutoRename()" class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px" title="Auto-rename">⟳</button>
+            <span id="form-sel-count" style="font-size:12px;font-weight:600;color:var(--cad);display:none">0 selected</span>
           </div>
-          <div id="form-field-list" style="flex:1;overflow-y:auto;padding:4px 0">
-            ${_renderFieldList()}
-          </div>
-        </div>
-
-        <!-- ── Routing column ─────────────────────────────────────── -->
-        <div id="form-col-routing" style="width:220px;min-width:140px;max-width:400px;
-                    border-left:1px solid var(--border);display:flex;flex-direction:column;
-                    background:var(--bg1);position:relative;flex-shrink:0">
-          <!-- Drag handle -->
-          <div style="position:absolute;left:-3px;top:0;bottom:0;width:6px;cursor:col-resize;
-                      z-index:10;background:transparent;transition:background .15s"
-            onmouseover="this.style.background='rgba(196,125,24,.3)'"
-            onmouseout="if(!window._formDragCol)this.style.background='transparent'"
-            onmousedown="_formColDragStart(event,'form-col-routing','left')"></div>
-          <div style="padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
-            <span style="font-size:12px;font-weight:600;letter-spacing:.14em;
-                         text-transform:uppercase;color:var(--muted)">Routing Order</span>
-          </div>
-          <div style="flex:1;overflow-y:auto;padding:14px">
-            ${_renderRoutingPanel(roles)}
+          <div id="form-matrix-wrap" style="flex:1;overflow:auto">
+            ${_renderMatrix()}
           </div>
         </div>
 
@@ -681,6 +634,271 @@ function _renderFormEditor() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // [original _renderFieldList removed — enhanced version is sole definition]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE88
+// ─────────────────────────────────────────────────────────────────────────────
+
+var _VM_STATES  = ['E','R','H'];
+var _VM_LABELS  = {E:'E', R:'R', H:'—'};
+var _VM_CHIP_BG = {E:'rgba(42,157,64,.18)', R:'rgba(196,125,24,.18)', H:'rgba(255,255,255,.04)'};
+var _VM_CHIP_CO = {E:'#4ade80',             R:'#e3b341',              H:'rgba(255,255,255,.25)'};
+
+function _vmDefaultState(role) {
+  // Submitter edits by default; others read-only; unknown roles hidden
+  if (role === 'assignee') return 'E';
+  if (role === 'reviewer' || role === 'approver' || role === 'pm') return 'R';
+  return 'H';
+}
+
+function _vmGet(fieldId, role) {
+  if (!_formVisMatrix[fieldId]) _formVisMatrix[fieldId] = {};
+  if (_formVisMatrix[fieldId][role] === undefined)
+    _formVisMatrix[fieldId][role] = _vmDefaultState(role);
+  return _formVisMatrix[fieldId][role];
+}
+
+function _vmSet(fieldId, role, state) {
+  if (!_formVisMatrix[fieldId]) _formVisMatrix[fieldId] = {};
+  _formVisMatrix[fieldId][role] = state;
+  _formMarkDirty();
+}
+
+function _vmCycleCell(fieldId, role) {
+  var cur = _vmGet(fieldId, role);
+  var idx = _VM_STATES.indexOf(cur);
+  var next = _VM_STATES[(idx + 1) % _VM_STATES.length];
+  _vmSet(fieldId, role, next);
+  var cellEl = document.getElementById('vmc_' + fieldId + '_' + role);
+  if (cellEl) {
+    cellEl.style.background = _VM_CHIP_BG[next];
+    cellEl.innerHTML = '<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;font-size:10px;font-weight:700;color:'+_VM_CHIP_CO[next]+'">'+_VM_LABELS[next]+'</div>';
+  }
+  _vmUpdateFillSeq();
+}
+
+function _vmApplySection(secLabel, role, state) {
+  // Apply state to all fields whose label starts with the section prefix
+  (_formFields||[]).forEach(function(field) {
+    _vmSet(field.id, role, state);
+    var cellEl = document.getElementById('vmc_' + field.id + '_' + role);
+    if (cellEl) {
+      cellEl.style.background = _VM_CHIP_BG[state];
+      cellEl.innerHTML = '<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;font-size:10px;font-weight:700;color:'+_VM_CHIP_CO[state]+'">'+_VM_LABELS[state]+'</div>';
+    }
+  });
+  _vmUpdateFillSeq();
+}
+
+function _vmEnsureRoles() {
+  // Sync _formMatrixRoles from FORM_ROLES keys, preserving any existing order
+  var known = Object.keys(FORM_ROLES);
+  known.forEach(function(r) {
+    if (_formMatrixRoles.indexOf(r) < 0) _formMatrixRoles.push(r);
+  });
+  if (!_formMatrixRoles.length) _formMatrixRoles = ['assignee','reviewer','approver','pm','external'];
+}
+
+function _formAddMatrixRole() {
+  _vmEnsureRoles();
+  var all = Object.keys(FORM_ROLES);
+  var available = all.filter(function(r){ return _formMatrixRoles.indexOf(r) < 0; });
+  if (!available.length) { cadToast('All roles already added', 'info'); return; }
+  // Simple prompt-free: add first available
+  var next = available[0];
+  _formMatrixRoles.push(next);
+  _reRenderMatrix();
+}
+
+function _vmUpdateFillSeq() {
+  var seqEl = document.getElementById('form-fill-seq');
+  if (!seqEl) return;
+  _vmEnsureRoles();
+  var hasEditable = _formMatrixRoles.filter(function(r) {
+    return (_formFields||[]).some(function(f){ return _vmGet(f.id, r) === 'E'; });
+  });
+  if (!hasEditable.length) { seqEl.textContent = ''; return; }
+  var roleLabels = hasEditable.map(function(r){
+    return (FORM_ROLES[r]||{label:r}).label;
+  });
+  seqEl.textContent = 'Fill sequence: ' + roleLabels.join(' → ');
+}
+
+function _renderMatrix() {
+  _vmEnsureRoles();
+  var fields = _formFields || [];
+  if (!fields.length) {
+    return '<div style="padding:20px 14px;font-size:12px;color:var(--muted);text-align:center;font-family:Arial,sans-serif">Draw fields on the document to populate the matrix.</div>';
+  }
+  var roles = _formMatrixRoles;
+  var out = [];
+  var TH  = 'position:sticky;top:0;z-index:5;background:var(--bg2);border-bottom:1px solid var(--border);';
+  var THL = TH + 'border-left:1px solid var(--border);';
+  var BDR = 'border-bottom:1px solid var(--border);';
+  var BDL = BDR + 'border-left:1px solid var(--border);';
+
+  out.push('<table style="width:100%;border-collapse:collapse;font-size:11px;font-family:Arial,sans-serif"><thead><tr>');
+  out.push('<th style="' + TH  + 'padding:5px 8px;text-align:left;font-size:10px;font-weight:500;color:var(--muted);min-width:160px">Field</th>');
+  out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:10px;font-weight:500;color:var(--muted);width:44px">Type</th>');
+  out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:10px;font-weight:500;color:var(--muted);width:36px">Req</th>');
+
+  roles.forEach(function(r) {
+    var conf = FORM_ROLES[r] || { label: r, color: 'var(--muted)' };
+    out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:10px;font-weight:500;color:' + conf.color + ';min-width:52px;white-space:nowrap">' +
+      escHtml(conf.label) +
+      '<span data-rmrole="' + r + '" style="margin-left:3px;opacity:.4;cursor:pointer;font-size:9px" title="Remove role">✕</span>' +
+      '</th>');
+  });
+  out.push('</tr></thead><tbody>');
+
+  var sections = _vmGroupSections(fields);
+  sections.forEach(function(sec) {
+    out.push('<tr><td colspan="' + (3 + roles.length) + '" style="background:var(--bg2);padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1)">' +
+      escHtml(sec.name) + ' <span style="font-weight:400;opacity:.5">(' + sec.fields.length + ')</span>');
+    roles.forEach(function(r) {
+      var lbl = escHtml((FORM_ROLES[r] || { label: r }).label);
+      ['E','R','H'].forEach(function(st) {
+        out.push('<span data-sec="' + sec.id + '" data-srole="' + r + '" data-sstate="' + st + '" ' +
+          'style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:2px;border:1px solid rgba(255,255,255,.1);color:var(--muted);margin-left:2px" ' +
+          'title="' + (st==='H'?'Hide':st==='R'?'Read-only':'Editable') + ' all ' + lbl + '">' + (st==='H'?'—':st) + '</span>');
+      });
+    });
+    out.push('</td></tr>');
+
+    sec.fields.forEach(function(field) {
+      var typeOpts = (FIELD_TYPES_FULL || ['text','date','number','checkbox','signature','textarea']).map(function(t) {
+        var m = (FIELD_TYPE_META && FIELD_TYPE_META[t]) || { label: t };
+        return '<option value="' + t + '"' + (field.type === t ? ' selected' : '') + '>' + escHtml(m.label) + '</option>';
+      }).join('');
+      var isSelected = _selectedFieldIds && _selectedFieldIds.has(field.id);
+      var rowBg = isSelected ? 'background:var(--cad-dim)' : '';
+
+      out.push('<tr id="vmrow-' + field.id + '" data-fid="' + field.id + '" style="cursor:pointer;' + rowBg + '">');
+
+      // Name cell
+      out.push('<td style="padding:5px 8px;' + BDR + 'color:var(--text1);max-width:160px">' +
+        '<div data-label-target="1" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+        escHtml(field.label || 'Unlabelled') + '</div></td>');
+
+      // Type select
+      out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
+        '<select data-fid="' + field.id + '" data-action="type" ' +
+        'style="font-size:10px;background:var(--surf2);border:1px solid var(--border);border-radius:3px;color:var(--text2);padding:2px;cursor:pointer;width:100%;font-family:Arial,sans-serif;max-width:64px">' +
+        typeOpts + '</select></td>');
+
+      // Required toggle
+      var reqOn = field.required;
+      out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
+        '<div data-fid="' + field.id + '" data-action="req" style="cursor:pointer;display:flex;justify-content:center">' +
+        '<div class="toggle-box' + (reqOn ? ' on' : '') + '" style="width:24px;height:13px;transform:scale(.85)"></div>' +
+        '</div></td>');
+
+      // Role cells
+      roles.forEach(function(r) {
+        var s = _vmGet(field.id, r);
+        out.push('<td id="vmc_' + field.id + '_' + r + '" ' +
+          'data-fid="' + field.id + '" data-role="' + r + '" data-action="cell" ' +
+          'style="padding:3px 4px;' + BDL + 'text-align:center;cursor:pointer;background:' + _VM_CHIP_BG[s] + ';transition:filter .1s" ' +
+          'title="Click to cycle E\u2192R\u2192\u2014">' +
+          '<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;font-size:10px;font-weight:700;color:' + _VM_CHIP_CO[s] + '">' +
+          _VM_LABELS[s] + '</div></td>');
+      });
+
+      out.push('</tr>');
+    });
+  });
+
+  out.push('</tbody></table>');
+  setTimeout(_vmUpdateFillSeq, 0);
+  return out.join('');
+}
+
+function _vmGroupSections(fields) {
+  // Group fields by HTML section if form has source_html sections,
+  // otherwise use a single "All Fields" group
+  var groups = {};
+  var order  = [];
+  fields.forEach(function(field) {
+    var sec = field.section || 'Fields';
+    if (!groups[sec]) { groups[sec] = []; order.push(sec); }
+    groups[sec].push(field);
+  });
+  return order.map(function(name) {
+    return { id: name.replace(/\W/g,'_'), name: name, fields: groups[name] };
+  });
+}
+
+function _vmApplySec(secId, role, state) {
+  var fields = _formFields || [];
+  fields.forEach(function(field) {
+    var sec = (field.section || 'Fields').replace(/\W/g,'_');
+    if (sec !== secId) return;
+    _vmSet(field.id, role, state);
+    var cellEl = document.getElementById('vmc_'+field.id+'_'+role);
+    if (cellEl) {
+      cellEl.style.background = _VM_CHIP_BG[state];
+      cellEl.innerHTML = '<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;font-size:10px;font-weight:700;color:'+_VM_CHIP_CO[state]+'">'+_VM_LABELS[state]+'</div>';
+    }
+  });
+  _vmUpdateFillSeq();
+}
+
+function _vmRemoveRole(role) {
+  _formMatrixRoles = _formMatrixRoles.filter(function(r){ return r !== role; });
+  _reRenderMatrix();
+}
+
+function _reRenderMatrix() {
+  var wrap = document.getElementById('form-matrix-wrap');
+  if (wrap) wrap.innerHTML = _renderMatrix();
+  _vmUpdateFillSeq();
+}
+
+// Shim — keep existing callers working
+function _reRenderRoutingPanel() { _reRenderMatrix(); }
+
+// Delegated event handler for the entire matrix panel — avoids all inline onclick quoting issues
+document.addEventListener('click', function(e) {
+  var t = e.target;
+
+  // Remove role column
+  var rmRole = t.closest('[data-rmrole]');
+  if (rmRole) { e.stopPropagation(); _vmRemoveRole(rmRole.dataset.rmrole); return; }
+
+  // Quick-apply section chips
+  if (t.dataset.sec && t.dataset.srole && t.dataset.sstate) {
+    e.stopPropagation();
+    _vmApplySec(t.dataset.sec, t.dataset.srole, t.dataset.sstate);
+    return;
+  }
+
+  // Cell cycle
+  var cell = t.closest('[data-action="cell"]');
+  if (cell) { e.stopPropagation(); _vmCycleCell(cell.dataset.fid, cell.dataset.role); return; }
+
+  // Type select (change event — handled separately below)
+
+  // Required toggle
+  var reqDiv = t.closest('[data-action="req"]');
+  if (reqDiv) { e.stopPropagation(); _formToggleRequired(reqDiv.dataset.fid); return; }
+
+  // Row click — select field + inline label edit
+  var row = t.closest('[data-fid]');
+  if (row && !t.closest('[data-action]') && !t.closest('select')) {
+    _formFieldListClick(e, row.dataset.fid);
+  }
+});
+
+document.addEventListener('change', function(e) {
+  var t = e.target;
+  if (t.dataset.action === 'type' && t.dataset.fid) {
+    _formUpdateField(t.dataset.fid, 'type', t.value);
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTING PANEL (Column 3) — the key UI you described
@@ -877,8 +1095,7 @@ function _formUpdateField(fieldId, key, value) {
   }
 
   // Re-render the field list row and routing panel
-  const listEl = document.getElementById('form-field-list');
-  if (listEl) listEl.innerHTML = _renderFieldList();
+  _reRenderMatrix();
   _reRenderRoutingPanel();
   _renderFieldOverlays();
 }
@@ -1129,15 +1346,13 @@ function _formToggleRequired(fieldId) {
   field.required = !field.required;
   const toggle = document.getElementById('fedit-req-toggle');
   if (toggle) toggle.className = 'toggle-box' + (field.required ? ' on' : '');
-  const listEl = document.getElementById('form-field-list');
-  if (listEl) listEl.innerHTML = _renderFieldList();
+  _reRenderMatrix();
 }
 
 function _formRemoveField(fieldId) {
   _undoPush();
   _formFields = _formFields.filter(f => f.id !== fieldId);
-  const listEl = document.getElementById('form-field-list');
-  if (listEl) listEl.innerHTML = _renderFieldList();
+  _reRenderMatrix();
   _reRenderRoutingPanel();
   _renderFieldOverlays();
   document.getElementById('field-edit-popover')?.remove();
@@ -1163,8 +1378,7 @@ function _undoPop() {
   _formMarkDirty();
   _formUpdateSelectionUI();
   _renderFieldOverlays();
-  const listEl = document.getElementById('form-field-list');
-  if (listEl) listEl.innerHTML = _renderFieldList();
+  _reRenderMatrix();
   _updateHWWidget();
 }
 
@@ -1431,8 +1645,7 @@ function _formSvgMouseUp(event) {
         required: false, detection: 'manual',
       });
       _renderFieldOverlays();
-      const listEl = document.getElementById('form-field-list');
-      if (listEl) listEl.innerHTML = _renderFieldList();
+      _reRenderMatrix();
       _reRenderRoutingPanel();
       setTimeout(() => _formSelectField(fieldId), 50);
     }
@@ -1478,8 +1691,7 @@ function _formSvgMouseUp(event) {
       // Move case: positions already updated live during mousemove — nothing extra needed
 
       _renderFieldOverlays();
-      const listEl = document.getElementById('form-field-list');
-      if (listEl) listEl.innerHTML = _renderFieldList();
+      _reRenderMatrix();
     } else {
       // No movement — single click = select, double-click = open popover
       const group = event.target.closest('.field-rect-group');
@@ -1965,8 +2177,7 @@ function _addApprovalSignatureField() {
     const maxOrder = Math.max(0,...(_formRouting.stages||[]).map(s=>s.stage||0));
     _formRouting.stages.push({ stage:maxOrder+1, role:'reviewer', parallel_within_stage:true, requires_all:true });
   }
-  const listEl = document.getElementById('form-field-list');
-  if (listEl) listEl.innerHTML = _renderFieldList();
+  _reRenderMatrix();
   _reRenderRoutingPanel();
   _renderFieldOverlays();
   cadToast('Approval signature field added', 'success');
@@ -2057,15 +2268,7 @@ function _formToggleStageParallel(stageNum) {
 }
 
 function _reRenderRoutingPanel() {
-  const routingCol = document.querySelector('#form-col-routing');
-  if (routingCol) {
-    const inner = routingCol.querySelector('[style*="overflow-y:auto"]') ||
-                  routingCol.querySelector('[style*="overflow-y: auto"]');
-    if (inner) {
-      const roles = _deriveRoles(_formFields);
-      inner.innerHTML = _renderRoutingPanel(roles);
-    }
-  }
+  _reRenderMatrix();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2113,13 +2316,13 @@ function _renderFieldList() {
       'border-left:3px solid '+(isSelected?'var(--cad)':roleConf.color)+'"'+
       ' onmouseenter="if(!_selectedFieldIds.has(\''+field.id+'\'))this.style.background=\'var(--surf2)\'"'+
       ' onmouseleave="if(!_selectedFieldIds.has(\''+field.id+'\'))this.style.background=\'\'"'+
-      ' onclick="_formFieldListClick(event,\''+field.id+'\')">'+
+      ' data-fid="'+field.id+'" data-action="row">'+
 
       // Row 1: confidence dot + label + remove btn
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'+
         '<div style="width:5px;height:5px;border-radius:50%;background:'+confColor+';flex-shrink:0" title="Detection: '+(field.detection||'unknown')+'"></div>'+
         '<div data-label-target="1" style="font-size:12px;color:var(--text1);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(field.label||'Unlabelled')+'</div>'+
-        '<button onclick="event.stopPropagation();_formRemoveField(\''+field.id+'\');"'+
+        '<button data-fid="'+field.id+'" data-action="remove"'+
           ' style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0;opacity:0;transition:opacity .15s;flex-shrink:0;line-height:1"'+
           ' onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0" title="Remove">✕</button>'+
       '</div>'+
@@ -2132,7 +2335,7 @@ function _renderFieldList() {
         '<select style="font-size:11px;background:'+roleConf.dim+';border:1px solid var(--border2);border-radius:3px;color:'+roleConf.color+';padding:2px 4px;cursor:pointer;flex:1;min-width:0;font-family:Arial,sans-serif"'+
           ' onchange="_formUpdateField(\''+field.id+'\',\'role\',this.value)"'+
           ' title="Fill role">'+roleOpts+'</select>'+
-        '<div onclick="_formToggleRequired(\''+field.id+'\');"'+
+        '<div data-fid="'+field.id+'" data-action="req"'+
           ' title="Toggle required"'+
           ' style="display:flex;align-items:center;gap:3px;cursor:pointer;flex-shrink:0;padding:2px 4px;border-radius:3px;border:1px solid var(--border2)">'+
           '<div class="toggle-box'+reqOn+'" style="width:22px;height:12px;transform:scale(.9)"></div>'+
@@ -2955,8 +3158,8 @@ async function _formDeleteWithConfirm(formId) {
       Array.from(canvasWrap.children).forEach(function(c){ c.style.display = ''; });
     }
     // Clear right panels
-    var fieldsCol = document.getElementById('form-col-fields');
-    var routingCol = document.getElementById('form-col-routing');
+    var fieldsCol = document.getElementById('form-col-matrix');
+    var routingCol = null;
     var toolbar = document.getElementById('form-top-toolbar');
     if (fieldsCol) fieldsCol.style.display = 'none';
     if (routingCol) routingCol.style.display = 'none';
@@ -4029,8 +4232,7 @@ function _formClearSelection() {
   _selectedFieldIds.clear();
   _formUpdateSelectionUI();
   _renderFieldOverlays();
-  const listEl = document.getElementById('form-field-list');
-  if (listEl) listEl.innerHTML = _renderFieldList();
+  _reRenderMatrix();
 }
 
 function _formUpdateSelectionUI() {
@@ -4039,8 +4241,7 @@ function _formUpdateSelectionUI() {
   const barEl = document.getElementById('form-arrange-bar');
   if (cntEl) { cntEl.textContent = `${count} selected`; cntEl.style.display = count > 0 ? '' : 'none'; }
   if (barEl) barEl.style.display = count >= 2 ? 'flex' : 'none';
-  const listEl = document.getElementById('form-field-list');
-  if (listEl) listEl.innerHTML = _renderFieldList();
+  _reRenderMatrix();
   _updateHWWidget();
 }
 
@@ -4051,8 +4252,7 @@ function _formUpdateMulti(key, value) {
     const f = _formFields.find(f => f.id === id);
     if (f) f[key] = value;
   });
-  const listEl = document.getElementById('form-field-list');
-  if (listEl) listEl.innerHTML = _renderFieldList();
+  _reRenderMatrix();
   _reRenderRoutingPanel();
   _renderFieldOverlays();
 }
@@ -4066,8 +4266,7 @@ function _formToggleRequiredMulti() {
   sel.forEach(f => f.required = newVal);
   const toggle = document.getElementById('fedit-req-toggle');
   if (toggle) toggle.className = 'toggle-box' + (newVal ? ' on' : '');
-  const listEl = document.getElementById('form-field-list');
-  if (listEl) listEl.innerHTML = _renderFieldList();
+  _reRenderMatrix();
   _renderFieldOverlays();
 }
 
@@ -4098,8 +4297,7 @@ function _formAutoRename() {
   });
   _formMarkDirty();
   _renderFieldOverlays();
-  const listEl = document.getElementById('form-field-list');
-  if (listEl) listEl.innerHTML = _renderFieldList();
+  _reRenderMatrix();
   cadToast(`Renamed ${_formFields.length} fields`, 'info');
 }
 
@@ -4291,7 +4489,7 @@ document.addEventListener('keydown', e => {
     _undoPush();
     _selectedFieldIds.forEach(id => { _formFields = _formFields.filter(f=>f.id!==id); });
     _selectedFieldIds.clear(); _formUpdateSelectionUI(); _renderFieldOverlays();
-    const listEl=document.getElementById('form-field-list'); if(listEl) listEl.innerHTML=_renderFieldList();
+    _reRenderMatrix();
   }
 });
 
@@ -4785,8 +4983,8 @@ function _formTogglePreview() {
   }
 
   const hwWgt   = document.getElementById('form-hw-widget');
-  const colFlds = document.getElementById('form-col-fields');
-  const colRout = document.getElementById('form-col-routing');
+  const colFlds = null;
+  const colRout = null;
 
   if (_formPreviewMode) {
     // Enter preview — highlight preview button in rail
