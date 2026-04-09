@@ -870,13 +870,17 @@ function _myrRenderBrowse() {
     html += `</div>`;
   }
 
-  if (forms.length) {
+  // Only show form defs that don't already have a workflow template with the same name
+  const tmplNames = new Set(tmpls.map(t => (t.name||'').trim().toLowerCase()));
+  const uniqueForms = forms.filter(f => !tmplNames.has((f.source_name||'').trim().toLowerCase()));
+
+  if (uniqueForms.length) {
     html += `<div class="myr-cat-label"><div class="myr-cat-line"></div>FORMS<div class="myr-cat-line"></div></div><div class="wf-catalog-grid">`;
-    forms.forEach(f => {
+    uniqueForms.forEach(f => {
       const certBadge = f.state === 'published'
-        ? `<span style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:rgba(0,201,201,.15);color:#00c9c9;border:1px solid rgba(0,201,201,.35)">CADENCE ✓</span>`
+        ? `<span style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:rgba(61,224,138,.15);color:#3de08a;border:1px solid rgba(61,224,138,.35)">Certified ✓</span>`
         : f.state === 'certified'
-        ? `<span style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:rgba(0,201,201,.08);color:rgba(0,201,201,.6);border:1px solid rgba(0,201,201,.2)">CADENCE</span>`
+        ? `<span style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:rgba(61,224,138,.08);color:rgba(61,224,138,.5);border:1px solid rgba(61,224,138,.2)">Certified</span>`
         : '';
       html += `<div class="wf-card" onclick="myrLaunchRequest('form','${f.id}')">
         <div class="wf-card-top">
