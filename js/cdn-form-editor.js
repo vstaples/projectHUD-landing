@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE92 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE93 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -603,7 +603,7 @@ function _renderFormEditor() {
 // [original _renderFieldList removed — enhanced version is sole definition]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE92
+// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE93
 // ─────────────────────────────────────────────────────────────────────────────
 
 var _VM_STATES  = ['E','R','H'];
@@ -826,29 +826,33 @@ function _reRenderRoutingPanel() { _reRenderMatrix(); }
 
 // Matrix drag handled by _formColDragStart — wired after render
 function _formWireMatrixHandle() {
-  var handle = document.getElementById('form-matrix-drag-handle');
-  if (!handle) return;
-  handle.onmouseover = function() { handle.style.background = 'rgba(0,201,201,.25)'; };
-  handle.onmouseout  = function() { handle.style.background = 'transparent'; };
-  handle.onmousedown = function(event) {
+  var existing = document.getElementById('form-matrix-drag-overlay');
+  if (existing) existing.remove();
+  var panel = document.getElementById('form-col-matrix');
+  if (!panel) return;
+  var r = panel.getBoundingClientRect();
+  var overlay = document.createElement('div');
+  overlay.id = 'form-matrix-drag-overlay';
+  overlay.style.cssText = 'position:fixed;z-index:9999;cursor:col-resize;background:transparent;' +
+    'left:' + (r.left - 4) + 'px;top:' + r.top + 'px;width:8px;height:' + r.height + 'px';
+  overlay.addEventListener('mouseover', function() { overlay.style.background = 'rgba(0,201,201,.35)'; });
+  overlay.addEventListener('mouseout',  function() { overlay.style.background = 'transparent'; });
+  overlay.addEventListener('mousedown', function(event) {
     event.preventDefault();
     event.stopPropagation();
-    var panel = document.getElementById('form-col-matrix');
-    if (!panel) return;
     var startX = event.clientX;
     var startW = panel.offsetWidth;
-    var minW = 320;
-    var maxW = 900;
-    handle.style.background = 'rgba(0,201,201,.5)';
+    overlay.style.background = 'rgba(0,201,201,.6)';
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
     function onMove(ev) {
-      // left-edge handle: drag LEFT = wider, drag RIGHT = narrower
-      var newW = Math.max(minW, Math.min(maxW, startW + (startX - ev.clientX)));
+      var newW = Math.max(320, Math.min(900, startW + (startX - ev.clientX)));
       panel.style.width = newW + 'px';
+      var pr = panel.getBoundingClientRect();
+      overlay.style.left = (pr.left - 4) + 'px';
     }
     function onUp() {
-      handle.style.background = 'transparent';
+      overlay.style.background = 'transparent';
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       document.removeEventListener('mousemove', onMove);
@@ -856,10 +860,10 @@ function _formWireMatrixHandle() {
     }
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  };
+  });
+  document.body.appendChild(overlay);
 }
 
-// Delegated event handler for the entire matrix panel — avoids all inline onclick quoting issues
 document.addEventListener('click', function(e) {
   var t = e.target;
 
