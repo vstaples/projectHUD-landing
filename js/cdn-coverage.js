@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV285 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV29 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -66,13 +66,13 @@ console.log('%c[cdn-coverage] v20260407-CV285 — live DAG coverage','background
     '.cv-toggle-meta{margin-left:auto;font-size:10px;color:rgba(255,255,255,.25)}',
     // Flow view
     '.cv-flow{display:flex;flex-direction:column;flex:1;overflow:hidden}',
-    '.cv-dag-scroll{flex:1;overflow-y:auto;padding:20px 16px}',
+    '.cv-dag-scroll{flex:1;overflow-y:auto;overflow-x:auto;padding:20px 16px}',
     '.cv-dag-scroll::-webkit-scrollbar{width:3px}',
     '.cv-dag-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}',
     '.cv-path-section{margin-bottom:24px}',
     '.cv-path-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:8px;display:flex;align-items:center;gap:8px}',
     '.cv-path-label-line{flex:1;height:1px;background:rgba(255,255,255,.06)}',
-    '.cv-dag-row{display:flex;align-items:center;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;gap:0}',
+    '.cv-dag-row{display:flex;align-items:center;flex-wrap:nowrap;overflow-x:visible;padding-bottom:4px;gap:0;min-width:max-content}',
     '.cv-dag-row::-webkit-scrollbar{height:3px}',
     '.cv-dag-row::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}',
     // DAG nodes
@@ -470,8 +470,14 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
           + '>▶ Run coverage script to verify this path</div>' : '')
         : '';
 
+      // Also put CTA in path list for accessibility when DAG is too wide
+      var listCta = status==='uncovered'
+        ? '<span style="font-size:11px;color:#5fd4c8;cursor:pointer;text-decoration:underline;margin-left:8px" '+
+            'onclick="_s9CovCreateScript(\''+_s9EscHtml(pathName(pd,pi))+'\','+pi+')">+ Create script</span>'
+        : '';
+
       return '<div class="cv-path-section" id="cv-path-sec-'+pi+'">'+
-        '<div class="cv-path-label">'+lbl+'<div class="cv-path-label-line"></div></div>'+
+        '<div class="cv-path-label">'+lbl+listCta+'<div class="cv-path-label-line"></div></div>'+
         '<div class="cv-dag-row" id="cv-dag-row-'+pi+'">'+nodeChain+cta+'</div>'+
       '</div>';
     }).join('');
