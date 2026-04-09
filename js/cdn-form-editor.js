@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE103 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE104 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -604,7 +604,7 @@ function _renderFormEditor() {
 // [original _renderFieldList removed — enhanced version is sole definition]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE103
+// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE104
 // ─────────────────────────────────────────────────────────────────────────────
 
 var _VM_STATES  = ['E','R','H'];
@@ -727,13 +727,14 @@ function _renderMatrix() {
       escHtml(sec.name) + ' <span style="font-weight:400;opacity:.5">(' + sec.fields.length + ')</span></td>');
     roles.forEach(function(r) {
       var lbl = escHtml((FORM_ROLES[r] || { label: r }).label);
-      out.push('<td style="background:var(--bg2);padding:3px 4px;border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:1px solid var(--border);text-align:center;white-space:nowrap">');
+      out.push('<td style="background:var(--bg2);padding:3px 2px;border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:1px solid var(--border);text-align:center">');
+      out.push('<div style="display:flex;justify-content:center;align-items:center;gap:2px">');
       ['E','R','H'].forEach(function(st) {
         out.push('<span data-sec="' + sec.id + '" data-srole="' + r + '" data-sstate="' + st + '" ' +
-          'style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:2px;border:1px solid rgba(255,255,255,.1);color:var(--muted);margin-left:1px" ' +
+          'style="cursor:pointer;font-size:9px;padding:1px 5px;border-radius:2px;border:1px solid rgba(255,255,255,.1);color:var(--muted);flex:1;text-align:center" ' +
           'title="' + (st==='H'?'Hide':st==='R'?'Read-only':'Editable') + ' all ' + lbl + '">' + (st==='H'?'—':st) + '</span>');
       });
-      out.push('</td>');
+      out.push('</div></td>');
     });
     out.push('</tr>');
 
@@ -1315,6 +1316,30 @@ function _escHtmlSync(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Live-update the iframe DOM without reloading the blob — for fast required toggle
+function _formSyncFieldToIframe(fieldId, key, value) {
+  var iframe = document.getElementById('form-html-preview');
+  if (!iframe || !iframe.contentDocument) return;
+  var doc = iframe.contentDocument;
+  var el = doc.querySelector('[data-field-id="' + fieldId + '"]');
+  if (!el) return;
+  if (key === 'required') {
+    el.setAttribute('data-required', value ? 'true' : 'false');
+    var wrapper = el.closest('[style*="flex-direction"]') || el.parentElement;
+    if (wrapper) {
+      var labelEl = wrapper.querySelector('label');
+      if (labelEl) {
+        var req = labelEl.querySelector('[style*="#E24B4A"]');
+        if (value && !req) {
+          labelEl.innerHTML += ' <span style="color:#E24B4A">*</span>';
+        } else if (!value && req) {
+          req.remove();
+        }
+      }
+    }
+  }
+}
+
 function _formGetCssVars() {
   return '<style>:root{' +
     '--color-background-primary:#ffffff;--color-background-secondary:#f7f8fa;' +
@@ -1373,7 +1398,11 @@ function _formToggleRequired(fieldId) {
   field.required = !field.required;
   const toggle = document.getElementById('fedit-req-toggle');
   if (toggle) toggle.className = 'toggle-box' + (field.required ? ' on' : '');
+  // Sync required asterisk in source_html and live iframe preview
+  _formSyncFieldToHtml(fieldId, 'required', field.required, field);
+  _formSyncFieldToIframe(fieldId, 'required', field.required);
   _reRenderMatrix();
+  _formMarkDirty();
 }
 
 function _formRemoveField(fieldId) {
