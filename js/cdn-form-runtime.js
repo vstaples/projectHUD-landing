@@ -1,4 +1,5 @@
-// cdn-form-runtime.js — Cadence: runtime form fill panel for form-type steps
+// cdn-form-runtime.js
+console.log('[cdn-form-runtime] v20260407-FRT2');
 // Renders the fillable form inside the instance step panel.
 // Handles response persistence, gate check, and evidence PDF generation.
 //
@@ -38,7 +39,6 @@ async function renderFormFillPanel(inst, step) {
   el.innerHTML = `<div style="font-size:11px;color:var(--muted);padding:8px 0">Loading form…</div>`;
 
   try {
-    // Load form definition for this step
     const formDef = await _loadFormDef(step.id);
     if (!formDef) {
       el.innerHTML = `<div style="font-size:11px;color:var(--muted);padding:8px 0">
@@ -49,36 +49,19 @@ async function renderFormFillPanel(inst, step) {
       return;
     }
 
-    // Load existing responses for this instance+step
     const existing = await _loadFormResponses(inst.id, step.id);
     _formRuntimeDefs[step.id]  = formDef;
     _formRuntimeResps[step.id] = existing;
 
-    // HTML form — render via iframe using signed URL
-    if (formDef.source_path && formDef.source_path.match(/\.html?$/i)) {
-      try {
-        let url;
-        try {
-          url = await _getSignedUrl(formDef.source_path);
-        } catch(e) {
-          url = `${SUPA_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${formDef.source_path}`;
-        }
-        el.innerHTML = `<div style="position:relative;width:100%;height:100%;min-height:600px">` +
-          `<iframe src="${url}" style="width:100%;height:100%;min-height:600px;border:none;border-radius:6px" ` +
-          `allow="same-origin" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>` +
-          `</div>`;
-      } catch(e) {
-        el.innerHTML = `<div style="font-size:11px;color:var(--red);padding:8px 0">Could not load form: ${escHtml(e.message)}</div>`;
-      }
+    // HTML form — render in iframe with submit overlay
+    if (formDef.source_html) {
+      _renderHtmlFormFillPanel(el, formDef, step, inst, existing);
       return;
     }
 
-    // Determine which stage is active for this user
+    // Generic field renderer
     const activeStage = _resolveActiveStage(formDef, inst, step);
-
     el.innerHTML = _renderFormFill(formDef, step, inst, activeStage);
-
-    // Attach events after render
     _attachFormFillEvents(step.id, formDef, inst, activeStage);
 
   } catch(e) {
@@ -86,6 +69,111 @@ async function renderFormFillPanel(inst, step) {
       Form load failed: ${escHtml(e.message)}
     </div>`;
   }
+}
+
+function _renderHtmlFormFillPanel(el, formDef, step, inst, existing) {
+  var cssVars = '<style>:root{' +
+    '--color-background-primary:#ffffff;--color-background-secondary:#f7f8fa;' +
+    '--color-background-tertiary:#f0f1f4;--color-background-info:#e8f0fe;' +
+    '--color-text-primary:#1a1a2e;--color-text-secondary:#4a5068;' +
+    '--color-text-tertiary:#8890a8;--color-border-tertiary:rgba(0,0,0,.1);' +
+    '--color-border-secondary:rgba(0,0,0,.18);--font-mono:monospace' +
+  '}</style>';
+
+  // Pre-fill existing responses into HTML
+  var html = formDef.source_html;
+  if (existing && Object.keys(existing).length) {
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(html, 'text/html');
+    Object.keys(existing).forEach(function(fieldId) {
+      var el2 = doc.querySelector('[data-field-id="'+fieldId+'"]');
+      if (el2 && existing[fieldId].value) {
+        if (el2.tagName === 'SELECT') {
+          el2.value = existing[fieldId].value;
+        } else if (el2.tagName === 'TEXTAREA') {
+          el2.textContent = existing[fieldId].value;
+        } else if (el2.tagName === 'INPUT') {
+          el2.value = existing[fieldId].value;
+        }
+      }
+    });
+    html = doc.body.innerHTML;
+  }
+
+  var blob = new Blob([cssVars + html], { type: 'text/html' });
+  var iframeId = 'frt-iframe-' + step.id;
+
+  el.innerHTML =
+    '<div style="position:relative;width:100%;border:1px solid var(--border);border-radius:8px;overflow:hidden">' +
+      '<iframe id="' + iframeId + '" sandbox="allow-scripts allow-same-origin"' +
+        ' style="width:100%;min-height:600px;border:none;display:block"></iframe>' +
+      '<div style="padding:10px 14px;border-top:1px solid var(--border);background:var(--bg2);' +
+              'display:flex;justify-content:space-between;align-items:center">' +
+        '<span id="frt-status-' + step.id + '" style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif"></span>' +
+        '<button id="frt-submit-' + step.id + '"' +
+          ' style="font-family:Arial,sans-serif;font-size:13px;font-weight:600;padding:7px 20px;' +
+          'border-radius:5px;border:none;background:#00c9c9;color:#003333;cursor:pointer">' +
+          'Submit →' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+
+  // Load iframe
+  var iframe = document.getElementById(iframeId);
+  iframe.src = URL.createObjectURL(blob);
+
+  // Wire submit button
+  var submitBtn = document.getElementById('frt-submit-' + step.id);
+  var statusEl  = document.getElementById('frt-status-' + step.id);
+  submitBtn.addEventListener('click', async function() {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving…';
+    try {
+      // Collect field values from iframe
+      var iframeDoc = iframe.contentDocument;
+      var responses = [];
+      if (iframeDoc) {
+        iframeDoc.querySelectorAll('[data-field-id]').forEach(function(inp) {
+          var fieldId = inp.getAttribute('data-field-id');
+          var label   = inp.getAttribute('data-label') || fieldId;
+          var val = '';
+          if (inp.tagName === 'SELECT') val = inp.value;
+          else if (inp.tagName === 'TEXTAREA') val = inp.value;
+          else if (inp.tagName === 'INPUT') val = inp.value;
+          else val = inp.textContent;
+          if (fieldId) responses.push({ fieldId: fieldId, label: label, value: val });
+        });
+      }
+
+      // Write to workflow_form_responses
+      var firmId = window.FIRM_ID || window.FIRM_ID_CAD;
+      await Promise.all(responses.map(function(r) {
+        return API.post('workflow_form_responses', {
+          instance_id: inst.id,
+          step_id:     step.id,
+          form_def_id: formDef.id,
+          stage:       1,
+          field_id:    r.fieldId,
+          value:       r.value,
+          filled_at:   new Date().toISOString()
+        }).catch(function(){});
+      }));
+
+      if (statusEl) statusEl.textContent = responses.length + ' fields saved ✓';
+      submitBtn.textContent = 'Submitted ✓';
+      submitBtn.style.background = 'var(--green)';
+
+      // Trigger step completion if available
+      if (typeof _handleFormStepSubmit === 'function') {
+        await _handleFormStepSubmit(inst, step, formDef);
+      }
+
+    } catch(e) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit →';
+      if (statusEl) statusEl.textContent = 'Error: ' + e.message;
+    }
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
