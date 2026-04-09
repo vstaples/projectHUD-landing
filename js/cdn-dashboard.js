@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD44 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD46 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1261,7 +1261,7 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
         '<button class="cd-wf-btn danger" data-tid="'+t.id+'" onclick="event.stopPropagation();_s9DashOpenSimulator(this.dataset.tid)">Re-certify</button>';
     } else if (statusCls==='wf-nocov') {
       actBtns =
-        '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortDefCoverage(this.dataset.tid)">Define coverage →</button>';
+        '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';
     } else if (statusCls==='wf-uncov') {
       actBtns = scriptCt > 0
         ? '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortRunSuite(this.dataset.tid)">Run suite →</button>'
@@ -1480,6 +1480,29 @@ function _cdPortRunScript(scriptId, tmplId) {
   _s9DashOpenSimulator(tmplId);
 }
 
+function _cdPortDefCoverage(tmplId) {
+  // Navigate to Simulator → Coverage tab for this template
+  if (typeof _s9DashOpenSimulator === 'function') {
+    _s9DashOpenSimulator(tmplId);
+  } else if (typeof _s9Switch === 'function') {
+    _s9Switch('simulator');
+  }
+  // Switch to Coverage tab after simulator loads
+  setTimeout(function() {
+    // Set simulator source to this template
+    if (typeof _s9SetSimSource === 'function') {
+      _s9SetSimSource(tmplId);
+    }
+    // Click Coverage tab if available
+    var covTab = document.querySelector('[onclick*="switchTab('coverage')"], [onclick*="coverage"]');
+    if (covTab) {
+      covTab.click();
+    } else if (typeof switchTab === 'function') {
+      switchTab('coverage');
+    }
+  }, 500);
+}
+
 function _cdPortSimulate(tmplId) {
   _s9DashOpenSimulator(tmplId);
   setTimeout(function(){
@@ -1497,10 +1520,17 @@ function _cdPortSimulate(tmplId) {
 }
 
 function _cdPortWriteScripts(tmplId) {
-  // Navigate to Library → template scripts tab
-  if (typeof selectTemplate === 'function') {
-    selectTemplate(tmplId).then(function(){ _s9Switch('library'); }).catch(function(){ _s9Switch('library'); });
-  } else { _s9Switch('library'); }
+  // Navigate to Simulator → Coverage tab with this template selected
+  _s9DashOpenSimulator(tmplId);
+  // Switch to Coverage tab after simulator loads
+  setTimeout(function() {
+    var covBtn = document.querySelector('[data-tab="coverage"], [onclick*="coverage"]');
+    if (covBtn) {
+      covBtn.click();
+    } else if (typeof switchTab === 'function') {
+      switchTab('coverage');
+    }
+  }, 600);
 }
 async function _cdPortShowCert(tmplId, statusCls) {
   if (statusCls !== 'wf-cert') {
