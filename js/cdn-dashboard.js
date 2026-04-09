@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD48 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD49 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1264,7 +1264,9 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
       actBtns =
         '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';
     } else if (statusCls==='wf-uncov') {
-      actBtns = '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';
+      actBtns = (tmplPaths.scripted||0) >= tmplPaths.total && tmplPaths.total > 0
+        ? '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortRunAll(this.dataset.tid)">Run All Tests →</button>'
+        : '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';
     } else if (statusCls==='wf-stale') {
       actBtns =
         '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_s9DashOpenSimulator(this.dataset.tid)">Re-certify</button>';
@@ -1514,6 +1516,15 @@ function _cdPortSimulate(tmplId) {
     document.body.appendChild(hint);
     setTimeout(function(){ if(hint.parentElement) hint.remove(); }, 8000);
   }, 600);
+}
+
+function _cdPortRunAll(tmplId) {
+  _s9DashOpenSimulator(tmplId);
+  setTimeout(function() {
+    var runAllBtn = document.getElementById('s9-run-all-btn');
+    if (runAllBtn) runAllBtn.click();
+    else if (typeof _s9RunAllTests === 'function') _s9RunAllTests();
+  }, 800);
 }
 
 function _cdPortWriteScripts(tmplId) {
