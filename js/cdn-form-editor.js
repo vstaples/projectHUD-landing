@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE86 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE87 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -2072,44 +2072,75 @@ function _reRenderRoutingPanel() {
 // ENHANCED FIELD LIST (with confidence dots + stage badge)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// _renderFieldList — sole authoritative definition
+// _renderFieldList — sole authoritative definition (SE87: inline controls, no popover)
 function _renderFieldList() {
   if (!_formFields.length) {
     return `<div style="padding:16px 14px;font-size:12px;color:var(--muted);line-height:1.8;text-align:center">
               No fields detected yet.<br/>Draw rectangles on the document<br/>to add fields manually.
             </div>`;
   }
-  return _formFields.map((field) => {
-    const roleConf   = FORM_ROLES[field.role] || FORM_ROLES.assignee;
-    const typeMeta   = FIELD_TYPE_META[field.type] || FIELD_TYPE_META.text;
-    const confColor  = _fieldConfidenceColor(field);
-    const isSelected = _selectedFieldIds.has(field.id);
-    return `
-      <div id="frow-${field.id}"
-        style="padding:7px 12px;border-bottom:1px solid var(--border);
-               display:flex;align-items:flex-start;gap:8px;cursor:pointer;
-               transition:background .1s;
-               background:${isSelected?'var(--cad-dim)':'transparent'};
-               border-left:3px solid ${isSelected?'var(--cad)':roleConf.color}"
-        onmouseenter="if(!_selectedFieldIds.has('${field.id}'))this.style.background='var(--surf2)'"
-        onmouseleave="if(!_selectedFieldIds.has('${field.id}'))this.style.background=''"
-        onclick="_formFieldListClick(event,'${field.id}')">
-        <div style="width:6px;height:6px;border-radius:50%;background:${confColor};flex-shrink:0;margin-top:5px" title="Detection: ${field.detection||'unknown'}"></div>
-        <div style="flex-shrink:0;width:20px;height:20px;border-radius:3px;background:rgba(255,255,255,.05);border:1px solid var(--border2);
-                    display:flex;align-items:center;justify-content:center;font-size:12px;color:${typeMeta.color};margin-top:1px">${typeMeta.icon}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:12px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">${escHtml(field.label||'Unlabelled')}</div>
-          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-            <span style="font-size:12px;padding:1px 5px;border-radius:3px;background:${roleConf.dim};color:${roleConf.color}">${roleConf.label}</span>
-            <span style="font-size:12px;color:var(--muted)">${typeMeta.label}</span>
-            ${field.required?`<span style="font-size:12px;color:var(--red)">req</span>`:''}
-            ${field.stage?`<span style="font-size:12px;color:var(--muted)">S${field.stage}</span>`:''}
-          </div>
-        </div>
-        <button onclick="event.stopPropagation();_formRemoveField('${field.id}')"
-          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;opacity:0;transition:opacity .15s;flex-shrink:0"
-          onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0" title="Remove field">✕</button>
-      </div>`;
+  var typeOptions = (FIELD_TYPES_FULL||['text','date','number','checkbox','signature','textarea','review','doc_ref','attendees']).map(function(t){
+    var meta = (FIELD_TYPE_META&&FIELD_TYPE_META[t])||{label:t};
+    return '<option value="'+t+'">'+escHtml(meta.label||t)+'</option>';
+  }).join('');
+
+  var roleOptions = Object.entries(FORM_ROLES).map(function(entry){
+    return '<option value="'+entry[0]+'">'+escHtml(entry[1].label)+'</option>';
+  }).join('');
+
+  return _formFields.map(function(field) {
+    var roleConf  = FORM_ROLES[field.role] || FORM_ROLES.assignee;
+    var typeMeta  = (FIELD_TYPE_META&&FIELD_TYPE_META[field.type]) || FIELD_TYPE_META.text;
+    var confColor = _fieldConfidenceColor(field);
+    var isSelected = _selectedFieldIds.has(field.id);
+
+    var typeOpts = (FIELD_TYPES_FULL||['text','date','number','checkbox','signature','textarea','review','doc_ref','attendees']).map(function(t){
+      var meta = (FIELD_TYPE_META&&FIELD_TYPE_META[t])||{label:t};
+      return '<option value="'+t+'"'+(field.type===t?' selected':'')+'>'+escHtml(meta.label||t)+'</option>';
+    }).join('');
+
+    var roleOpts = Object.entries(FORM_ROLES).map(function(entry){
+      return '<option value="'+entry[0]+'"'+(field.role===entry[0]?' selected':'')+'>'+escHtml(entry[1].label)+'</option>';
+    }).join('');
+
+    var reqOn = field.required ? ' on' : '';
+    var reqColor = field.required ? 'var(--red)' : 'var(--muted)';
+
+    return '<div id="frow-'+field.id+'"'+
+      ' style="padding:7px 10px 8px;border-bottom:1px solid var(--border);'+
+      'transition:background .1s;'+
+      'background:'+(isSelected?'var(--cad-dim)':'transparent')+';'+
+      'border-left:3px solid '+(isSelected?'var(--cad)':roleConf.color)+'"'+
+      ' onmouseenter="if(!_selectedFieldIds.has(\''+field.id+'\'))this.style.background=\'var(--surf2)\'"'+
+      ' onmouseleave="if(!_selectedFieldIds.has(\''+field.id+'\'))this.style.background=\'\'"'+
+      ' onclick="_formFieldListClick(event,\''+field.id+'\')">'+
+
+      // Row 1: confidence dot + label + remove btn
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'+
+        '<div style="width:5px;height:5px;border-radius:50%;background:'+confColor+';flex-shrink:0" title="Detection: '+(field.detection||'unknown')+'"></div>'+
+        '<div data-label-target="1" style="font-size:12px;color:var(--text1);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(field.label||'Unlabelled')+'</div>'+
+        '<button onclick="event.stopPropagation();_formRemoveField(\''+field.id+'\');"'+
+          ' style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0;opacity:0;transition:opacity .15s;flex-shrink:0;line-height:1"'+
+          ' onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0" title="Remove">✕</button>'+
+      '</div>'+
+
+      // Row 2: Type select + Role select + Required toggle — all inline
+      '<div style="display:flex;align-items:center;gap:5px" onclick="event.stopPropagation()">'+
+        '<select style="font-size:11px;background:var(--surf2);border:1px solid var(--border2);border-radius:3px;color:var(--text2);padding:2px 4px;cursor:pointer;flex:1;min-width:0;font-family:Arial,sans-serif"'+
+          ' onchange="_formUpdateField(\''+field.id+'\',\'type\',this.value)"'+
+          ' title="Field type">'+typeOpts+'</select>'+
+        '<select style="font-size:11px;background:'+roleConf.dim+';border:1px solid var(--border2);border-radius:3px;color:'+roleConf.color+';padding:2px 4px;cursor:pointer;flex:1;min-width:0;font-family:Arial,sans-serif"'+
+          ' onchange="_formUpdateField(\''+field.id+'\',\'role\',this.value)"'+
+          ' title="Fill role">'+roleOpts+'</select>'+
+        '<div onclick="_formToggleRequired(\''+field.id+'\');"'+
+          ' title="Toggle required"'+
+          ' style="display:flex;align-items:center;gap:3px;cursor:pointer;flex-shrink:0;padding:2px 4px;border-radius:3px;border:1px solid var(--border2)">'+
+          '<div class="toggle-box'+reqOn+'" style="width:22px;height:12px;transform:scale(.9)"></div>'+
+          '<span style="font-size:10px;color:'+reqColor+';line-height:1">req</span>'+
+        '</div>'+
+      '</div>'+
+
+    '</div>';
   }).join('');
 }
 
@@ -3957,9 +3988,40 @@ function _formFieldListClick(event, fieldId) {
     _renderFieldOverlays();
   } else {
     _formClearSelection();
+    _selectedFieldIds.add(fieldId);
     _formRevealField(fieldId);
-    _formSelectField(fieldId);
+    _formUpdateSelectionUI();
+    _renderFieldOverlays();
+    _formInlineLabelEdit(fieldId);
   }
+}
+
+// Inline label edit — click field label to rename in place
+function _formInlineLabelEdit(fieldId) {
+  var row = document.getElementById('frow-'+fieldId);
+  if (!row) return;
+  var field = _formFields.find(function(f){return f.id===fieldId;});
+  if (!field) return;
+  var labelDiv = row.querySelector('[data-label-target]');
+  if (!labelDiv || labelDiv.querySelector('input')) return;
+  var current = field.label || '';
+  var inp = document.createElement('input');
+  inp.value = current;
+  inp.style.cssText = 'font-size:12px;background:transparent;border:none;border-bottom:1px solid var(--cad);color:var(--text1);width:100%;outline:none;font-family:Arial,sans-serif;padding:0';
+  labelDiv.innerHTML = '';
+  labelDiv.appendChild(inp);
+  inp.focus(); inp.select();
+  function commit() {
+    var val = inp.value.trim() || current;
+    _formUpdateField(fieldId, 'label', val);
+  }
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', function(e){
+    if (e.key==='Enter'){e.preventDefault();inp.blur();}
+    if (e.key==='Escape'){inp.value=current;inp.blur();}
+    e.stopPropagation();
+  });
+  inp.addEventListener('click', function(e){e.stopPropagation();});
 }
 
 function _formClearSelection() {
