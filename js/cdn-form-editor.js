@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE85 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE86 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3033,6 +3033,10 @@ async function _formCommit() {
       }
 
       _formCoCWrite('form.committed', _selectedForm.id, { version: targetVer, workflow_id: tmplId, roles: roleNames, note: note });
+      // Also patch companion workflow version to match
+      await API.patch('workflow_templates?id=eq.'+tmplId, { version: targetVer, updated_at: new Date().toISOString() }).catch(function(){});
+      // Reload form defs so Library reflects new version
+      await _formLoadDefs().catch(function(){});
       const listEl = document.getElementById('form-list');
       if (listEl) listEl.innerHTML = _renderFormList();
       _formRefreshToolbar();
@@ -3142,6 +3146,25 @@ function _formShowVerTooltip(btn) {
 function _formHideVerTooltip() {
   var tip = document.getElementById('form-ver-tip');
   if (tip) tip.remove();
+}
+
+async function _formSyncCompanionVersion(version) {
+  if (!_selectedForm?.id || !version) return;
+  try {
+    var rows = await API.get(
+      'workflow_templates?firm_id=eq.'+FIRM_ID_CAD+'&form_driven=eq.true&select=id,version,name'
+    ).catch(function(){return[];});
+    for (var r of rows) {
+      var fsteps = await API.get(
+        'workflow_template_steps?template_id=eq.'+r.id+'&step_type=eq.form&select=id&limit=1'
+      ).catch(function(){return[];});
+      if (fsteps && fsteps.length && r.version !== version) {
+        await API.patch('workflow_templates?id=eq.'+r.id, { version: version }).catch(function(){});
+        console.log('[formSync] companion version synced to:', version);
+        break;
+      }
+    }
+  } catch(e) { /* silent */ }
 }
 
 function _calcNextVersion(current, bump) {
@@ -3890,6 +3913,9 @@ async function _formSave() {
     _formCoCWrite('form.saved', _selectedForm.id, { version:_selectedForm.version, state:_selectedForm.state });
     const listEl = document.getElementById('form-list');
     if (listEl) listEl.innerHTML = _renderFormList();
+    // Sync name + version to companion workflow
+    _formSyncCompanionName(_selectedForm.source_name);
+    _formSyncCompanionVersion(_selectedForm.version);
   }
 }
 
