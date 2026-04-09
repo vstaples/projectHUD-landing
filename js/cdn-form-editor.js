@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE91 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE92 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -579,10 +579,7 @@ function _renderFormEditor() {
         <!-- ── Visibility Matrix panel ───────────────────────────── -->
         <div id="form-col-matrix" style="width:560px;min-width:320px;max-width:900px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);position:relative;flex-shrink:0">
           <!-- Drag handle to resize matrix width -->
-          <div style="position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:10;background:transparent;transition:background .15s"
-            onmouseover="this.style.background='rgba(0,201,201,.25)'"
-            onmouseout="this.style.background='transparent'"
-            onmousedown="_formColDragStart(event,'form-col-matrix','left')"></div>
+          <div id="form-matrix-drag-handle" style="position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:10;background:transparent"></div>
           <div style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px">
             <span style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:1">Visibility Matrix</span>
             <span id="form-fill-seq" style="font-size:12px;color:var(--text2)"></span>
@@ -606,7 +603,7 @@ function _renderFormEditor() {
 // [original _renderFieldList removed — enhanced version is sole definition]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE91
+// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE92
 // ─────────────────────────────────────────────────────────────────────────────
 
 var _VM_STATES  = ['E','R','H'];
@@ -827,7 +824,40 @@ function _reRenderMatrix() {
 // Shim — keep existing callers working
 function _reRenderRoutingPanel() { _reRenderMatrix(); }
 
-// Matrix drag handled by _formColDragStart — no custom function needed
+// Matrix drag handled by _formColDragStart — wired after render
+function _formWireMatrixHandle() {
+  var handle = document.getElementById('form-matrix-drag-handle');
+  if (!handle) return;
+  handle.onmouseover = function() { handle.style.background = 'rgba(0,201,201,.25)'; };
+  handle.onmouseout  = function() { handle.style.background = 'transparent'; };
+  handle.onmousedown = function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    var panel = document.getElementById('form-col-matrix');
+    if (!panel) return;
+    var startX = event.clientX;
+    var startW = panel.offsetWidth;
+    var minW = 320;
+    var maxW = 900;
+    handle.style.background = 'rgba(0,201,201,.5)';
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    function onMove(ev) {
+      // left-edge handle: drag LEFT = wider, drag RIGHT = narrower
+      var newW = Math.max(minW, Math.min(maxW, startW + (startX - ev.clientX)));
+      panel.style.width = newW + 'px';
+    }
+    function onUp() {
+      handle.style.background = 'transparent';
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+}
 
 // Delegated event handler for the entire matrix panel — avoids all inline onclick quoting issues
 document.addEventListener('click', function(e) {
@@ -2842,7 +2872,7 @@ async function _formSelect(formId) {
     if (typeof _updatePageIndicator === 'function') _updatePageIndicator();
     // Wire edit button overlay after render
     setTimeout(_formWireEditBtn, 300);
-    // Reposition on resize
+    setTimeout(_formWireMatrixHandle, 100);
     window.addEventListener('resize', function(){ setTimeout(_formWireEditBtn, 100); });
   } else {
     // No PDF — render a blank A4 canvas so field-based forms display correctly
