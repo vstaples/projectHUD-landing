@@ -14,7 +14,7 @@
 //             _s9WaitForFirmId, _selectedTmpl, _s9FmtCovDate)
 // ══════════════════════════════════════════════════════════════════════════════
 
-console.log('%c[cdn-coverage] v20260407-CV29 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-coverage] v20260407-CV30 — live DAG coverage','background:#1a3a6a;color:#a0c8f8;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function(){
@@ -67,6 +67,10 @@ console.log('%c[cdn-coverage] v20260407-CV29 — live DAG coverage','background:
     // Flow view
     '.cv-flow{display:flex;flex-direction:column;flex:1;overflow:hidden}',
     '.cv-dag-scroll{flex:1;overflow-y:auto;overflow-x:auto;padding:20px 16px}',
+    '.cv-dag-scroll::-webkit-scrollbar{height:8px;width:8px}',
+    '.cv-dag-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,.04);border-radius:4px}',
+    '.cv-dag-scroll::-webkit-scrollbar-thumb{background:rgba(0,201,201,.4);border-radius:4px}',
+    '.cv-dag-scroll::-webkit-scrollbar-thumb:hover{background:rgba(0,201,201,.7)}',
     '.cv-dag-scroll::-webkit-scrollbar{width:3px}',
     '.cv-dag-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}',
     '.cv-path-section{margin-bottom:24px}',
