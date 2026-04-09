@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE96 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE98 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -579,7 +579,7 @@ function _renderFormEditor() {
         </div>
 
         <!-- ── Visibility Matrix panel ───────────────────────────── -->
-        <div id="form-col-matrix" style="width:560px;min-width:320px;max-width:900px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);position:relative;flex-shrink:0">
+        <div id="form-col-matrix" style="width:560px;max-width:900px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);position:relative;flex-shrink:0">
           <div id="form-matrix-resize" class="form-matrix-resize"></div>
 
           <div style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px">
@@ -605,7 +605,7 @@ function _renderFormEditor() {
 // [original _renderFieldList removed — enhanced version is sole definition]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE96
+// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE98
 // ─────────────────────────────────────────────────────────────────────────────
 
 var _VM_STATES  = ['E','R','H'];
@@ -829,14 +829,31 @@ function _reRenderRoutingPanel() { _reRenderMatrix(); }
 function _formWireMatrixHandle() {
   const handle = document.getElementById('form-matrix-resize');
   const panel  = document.getElementById('form-col-matrix');
-  if (!handle || !panel || handle._wired) return;
-  handle._wired = true;
-  handle.addEventListener('mousedown', ev => {
+  const canvas = document.getElementById('form-canvas-wrap');
+  const body   = document.getElementById('form-body-row');
+  if (!handle || !panel || !canvas) return;
+  const fresh = handle.cloneNode(true);
+  fresh.classList.remove('dragging');
+  handle.parentNode.replaceChild(fresh, handle);
+  fresh.addEventListener('mousedown', function(ev) {
     ev.preventDefault();
-    handle.classList.add('dragging');
-    const startX = ev.clientX, startW = panel.offsetWidth;
-    const onMove = e => { panel.style.width = Math.max(320, startW + startX - e.clientX) + 'px'; };
-    const onUp   = () => { handle.classList.remove('dragging'); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    fresh.classList.add('dragging');
+    var startX     = ev.clientX;
+    var startPanelW = panel.offsetWidth;
+    var bodyW      = body ? body.offsetWidth : window.innerWidth;
+    function onMove(e) {
+      var delta    = startX - e.clientX;
+      var newPanelW = Math.max(220, Math.min(bodyW - 200, startPanelW + delta));
+      var newCanvasW = bodyW - newPanelW;
+      panel.style.width  = newPanelW  + 'px';
+      canvas.style.width = newCanvasW + 'px';
+      canvas.style.flex  = 'none';
+    }
+    function onUp() {
+      fresh.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
