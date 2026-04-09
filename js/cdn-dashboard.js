@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD46 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD47 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1263,16 +1263,12 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
       actBtns =
         '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';
     } else if (statusCls==='wf-uncov') {
-      actBtns = scriptCt > 0
-        ? '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortRunSuite(this.dataset.tid)">Run suite →</button>'
-        : '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';
+      actBtns = '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortWriteScripts(this.dataset.tid)">Write test scripts →</button>';
     } else if (statusCls==='wf-stale') {
       actBtns =
-        '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortRunSuite(this.dataset.tid)">Run suite</button>'+
         '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_s9DashOpenSimulator(this.dataset.tid)">Re-certify</button>';
     } else {
       actBtns =
-        '<button class="cd-wf-btn" data-tid="'+t.id+'" onclick="event.stopPropagation();_cdPortRunSuite(this.dataset.tid)">Run suite</button>'+
         '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_s9DashOpenSimulator(this.dataset.tid)">Simulate</button>';
     }
 
