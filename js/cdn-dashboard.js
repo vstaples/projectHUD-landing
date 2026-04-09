@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD47 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260407-CD48 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1146,9 +1146,10 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
   });
   var pathsByTmpl = {};
   paths.forEach(function(p){
-    if (!pathsByTmpl[p.template_id]) pathsByTmpl[p.template_id] = {total:0,covered:0,coveringScriptIds:{}};
+    if (!pathsByTmpl[p.template_id]) pathsByTmpl[p.template_id] = {total:0,covered:0,scripted:0,coveringScriptIds:{}};
     pathsByTmpl[p.template_id].total++;
     if (p.coverage_status==='covered') pathsByTmpl[p.template_id].covered++;
+    if (p.coverage_status==='scripted'||p.coverage_status==='covered') pathsByTmpl[p.template_id].scripted++;
     if (p.covering_script_id) pathsByTmpl[p.template_id].coveringScriptIds[p.covering_script_id] = true;
   });
 
@@ -1201,7 +1202,7 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     var statusCls, statusPillCls, statusLabel;
     statusLabel = 'Certified';
     // Gate 1: no coverage paths defined — cannot be certified regardless of cert record
-    if (tmplPaths.total === 0) {
+    if (tmplPaths.total === 0 || (tmplPaths.scripted||0) === 0) {
       statusCls='wf-nocov'; statusPillCls='cd-pill-cert-dim';
     } else if (!cert || cert.status==='revoked') {
       // Gate 2: paths exist but no valid cert
@@ -1273,8 +1274,8 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     }
 
     var nameClr = statusCls==='wf-fail'?'#e84040':statusCls==='wf-cert'?'#3de08a':statusCls==='wf-stale'?'#3de08a':'#ffffff';
-    var covClrR1 = (function(){var pt=tmplPaths.total,pc=tmplPaths.covered;return pt===0?'rgba(255,255,255,.3)':pc===pt?'var(--cd-grn)':pc>0?'var(--cd-amb)':'rgba(255,255,255,.3)';}());
-    var covLblR1 = (function(){var pt=tmplPaths.total,pc=tmplPaths.covered;return pt>0?(pc+'/'+pt+' Coverage Path'+(pt===1?'':'s')+' Defined'):'No Coverage Paths Defined';}());
+    var covClrR1 = (function(){var pt=tmplPaths.total,pc=tmplPaths.scripted||tmplPaths.covered;return pt===0?'rgba(255,255,255,.3)':pc===pt?'var(--cd-grn)':pc>0?'var(--cd-amb)':'rgba(255,255,255,.3)';}());
+    var covLblR1 = (function(){var pt=tmplPaths.total,pc=tmplPaths.scripted||tmplPaths.covered;return pt>0?(pc+'/'+pt+' Coverage Path'+(pt===1?'':'s')+' Defined'):'No Coverage Paths Defined';}());
     var GRID = 'display:grid;grid-template-columns:130px 8px 150px 8px 200px 660px 1fr;align-items:center;';
     return '<div class="cd-wf '+statusCls+'" id="cd-wf-'+t.id+'" data-tid="'+t.id+'" onclick="_cdPortToggle(this.dataset.tid)">'+
       '<div style="'+GRID+'margin-bottom:2px;align-items:end">'+
