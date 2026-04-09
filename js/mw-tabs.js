@@ -852,9 +852,19 @@ function _myrRenderBrowse() {
 
   let html = '';
 
+  // Build a name→state map from form defs for badge lookup on workflow cards
+  const formStateByName = {};
+  forms.forEach(f => { formStateByName[(f.source_name||'').trim().toLowerCase()] = f.state; });
+
   if (tmpls.length) {
     html += `<div class="myr-cat-label"><div class="myr-cat-line"></div>WORKFLOWS<div class="myr-cat-line"></div></div><div class="wf-catalog-grid">`;
     tmpls.forEach(t => {
+      const fState = formStateByName[(t.name||'').trim().toLowerCase()];
+      const certBadge = fState === 'published'
+        ? `<span style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:rgba(61,224,138,.15);color:#3de08a;border:1px solid rgba(61,224,138,.35)">Certified ✓</span>`
+        : fState === 'certified'
+        ? `<span style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:rgba(61,224,138,.08);color:rgba(61,224,138,.5);border:1px solid rgba(61,224,138,.2)">Certified</span>`
+        : '';
       html += `<div class="wf-card" onclick="myrLaunchRequest('workflow','${t.id}')">
         <div class="wf-card-top">
           <div class="wf-icon" style="background:rgba(0,210,255,.1);color:#00D2FF">
@@ -863,7 +873,10 @@ function _myrRenderBrowse() {
           <div class="wf-card-title">${esc(t.name)}</div>
         </div>
         <div class="wf-card-desc">${esc(t.description||'')}</div>
-        <div class="wf-card-meta"><span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">v${esc(t.version||'1.0.0')}</span></div>
+        <div class="wf-card-meta" style="display:flex;align-items:center;gap:6px">
+          <span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">v${esc(t.version||'1.0.0')}</span>
+          ${certBadge}
+        </div>
         <button class="wf-card-submit" onclick="event.stopPropagation();myrLaunchRequest('workflow','${t.id}')">Submit &#8594;</button>
       </div>`;
     });
