@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE93 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260407-SE96 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -84,6 +84,8 @@ console.log('%c[cdn-form-editor] v20260407-SE93 8px;border-radius:3px');
       cursor: col-resize; background: transparent; transition: background .15s; z-index: 10;
     }
     .form-coc-resize:hover, .form-coc-resize.dragging { background: var(--cad-wire); }
+    .form-matrix-resize { position:absolute;left:0;top:0;bottom:0;width:6px;cursor:col-resize;background:transparent;transition:background .15s;z-index:10; }
+    .form-matrix-resize:hover, .form-matrix-resize.dragging { background: rgba(0,201,201,.3); }
     .form-coc-inner { display: flex; flex-direction: column; height: 100%; overflow: hidden; padding-left: 4px; }
     .form-coc-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -578,8 +580,8 @@ function _renderFormEditor() {
 
         <!-- ── Visibility Matrix panel ───────────────────────────── -->
         <div id="form-col-matrix" style="width:560px;min-width:320px;max-width:900px;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);position:relative;flex-shrink:0">
-          <!-- Drag handle to resize matrix width -->
-          <div id="form-matrix-drag-handle" style="position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:10;background:transparent"></div>
+          <div id="form-matrix-resize" class="form-matrix-resize"></div>
+
           <div style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px">
             <span style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:1">Visibility Matrix</span>
             <span id="form-fill-seq" style="font-size:12px;color:var(--text2)"></span>
@@ -603,7 +605,7 @@ function _renderFormEditor() {
 // [original _renderFieldList removed — enhanced version is sole definition]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE93
+// VISIBILITY MATRIX (replaces Fields column + Routing Order column)  SE96
 // ─────────────────────────────────────────────────────────────────────────────
 
 var _VM_STATES  = ['E','R','H'];
@@ -824,44 +826,20 @@ function _reRenderMatrix() {
 // Shim — keep existing callers working
 function _reRenderRoutingPanel() { _reRenderMatrix(); }
 
-// Matrix drag handled by _formColDragStart — wired after render
 function _formWireMatrixHandle() {
-  var existing = document.getElementById('form-matrix-drag-overlay');
-  if (existing) existing.remove();
-  var panel = document.getElementById('form-col-matrix');
-  if (!panel) return;
-  var r = panel.getBoundingClientRect();
-  var overlay = document.createElement('div');
-  overlay.id = 'form-matrix-drag-overlay';
-  overlay.style.cssText = 'position:fixed;z-index:9999;cursor:col-resize;background:transparent;' +
-    'left:' + (r.left - 4) + 'px;top:' + r.top + 'px;width:8px;height:' + r.height + 'px';
-  overlay.addEventListener('mouseover', function() { overlay.style.background = 'rgba(0,201,201,.35)'; });
-  overlay.addEventListener('mouseout',  function() { overlay.style.background = 'transparent'; });
-  overlay.addEventListener('mousedown', function(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    var startX = event.clientX;
-    var startW = panel.offsetWidth;
-    overlay.style.background = 'rgba(0,201,201,.6)';
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    function onMove(ev) {
-      var newW = Math.max(320, Math.min(900, startW + (startX - ev.clientX)));
-      panel.style.width = newW + 'px';
-      var pr = panel.getBoundingClientRect();
-      overlay.style.left = (pr.left - 4) + 'px';
-    }
-    function onUp() {
-      overlay.style.background = 'transparent';
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    }
+  const handle = document.getElementById('form-matrix-resize');
+  const panel  = document.getElementById('form-col-matrix');
+  if (!handle || !panel || handle._wired) return;
+  handle._wired = true;
+  handle.addEventListener('mousedown', ev => {
+    ev.preventDefault();
+    handle.classList.add('dragging');
+    const startX = ev.clientX, startW = panel.offsetWidth;
+    const onMove = e => { panel.style.width = Math.max(320, startW + startX - e.clientX) + 'px'; };
+    const onUp   = () => { handle.classList.remove('dragging'); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
-  document.body.appendChild(overlay);
 }
 
 document.addEventListener('click', function(e) {
@@ -2876,7 +2854,7 @@ async function _formSelect(formId) {
     if (typeof _updatePageIndicator === 'function') _updatePageIndicator();
     // Wire edit button overlay after render
     setTimeout(_formWireEditBtn, 300);
-    setTimeout(_formWireMatrixHandle, 100);
+    setTimeout(_formWireMatrixHandle, 150);
     window.addEventListener('resize', function(){ setTimeout(_formWireEditBtn, 100); });
   } else {
     // No PDF — render a blank A4 canvas so field-based forms display correctly
