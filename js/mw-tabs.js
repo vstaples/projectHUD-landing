@@ -812,7 +812,7 @@ window.loadUserRequests = async function() {
     const firmId = _mwFirmId();
     const [wfTmpls, formDefs, instances] = await Promise.all([
       API.get(`workflow_templates?compass_visible=eq.true&status=eq.released&firm_id=eq.${firmId}&order=name.asc&select=id,name,description,status,version,trigger_type`).catch(() => []),
-      API.get(`workflow_form_definitions?compass_visible=eq.true&state=eq.released&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id`).catch(() => []),
+      API.get(`workflow_form_definitions?compass_visible=eq.true&state=in.(certified,published)&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id`).catch(() => []),
       resId ? API.get(`workflow_instances?submitted_by_resource_id=eq.${resId}&order=created_at.desc&limit=100&select=id,title,status,current_step_name,workflow_type,template_id,created_at,updated_at`).catch(() => []) : [],
     ]);
     window._myrTemplates = wfTmpls  || [];
@@ -873,6 +873,11 @@ function _myrRenderBrowse() {
   if (forms.length) {
     html += `<div class="myr-cat-label"><div class="myr-cat-line"></div>FORMS<div class="myr-cat-line"></div></div><div class="wf-catalog-grid">`;
     forms.forEach(f => {
+      const certBadge = f.state === 'published'
+        ? `<span style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:rgba(0,201,201,.15);color:#00c9c9;border:1px solid rgba(0,201,201,.35)">CADENCE ✓</span>`
+        : f.state === 'certified'
+        ? `<span style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:rgba(0,201,201,.08);color:rgba(0,201,201,.6);border:1px solid rgba(0,201,201,.2)">CADENCE</span>`
+        : '';
       html += `<div class="wf-card" onclick="myrLaunchRequest('form','${f.id}')">
         <div class="wf-card-top">
           <div class="wf-icon" style="background:rgba(29,158,117,.1);color:#1D9E75">
@@ -881,7 +886,10 @@ function _myrRenderBrowse() {
           <div class="wf-card-title">${esc(f.source_name||'Form')}</div>
         </div>
         <div class="wf-card-desc">Fill and submit for review and approval.</div>
-        <div class="wf-card-meta"><span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">v${esc(f.version||'0.1.0')}</span></div>
+        <div class="wf-card-meta" style="display:flex;align-items:center;gap:6px">
+          <span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">v${esc(f.version||'0.1.0')}</span>
+          ${certBadge}
+        </div>
         <button class="wf-card-submit" onclick="event.stopPropagation();myrLaunchRequest('form','${f.id}')">Open &#8594;</button>
       </div>`;
     });
