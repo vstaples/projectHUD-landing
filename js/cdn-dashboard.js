@@ -1494,7 +1494,7 @@ function _cdPortDefCoverage(tmplId) {
       _s9SetSimSource(tmplId);
     }
     // Click Coverage tab if available
-    var covTab = document.querySelector('[onclick*="switchTab('coverage')"], [onclick*="coverage"]');
+    var covTab = document.querySelector('[data-tab="coverage"]') || document.querySelector('[onclick*="coverage"]');
     if (covTab) {
       covTab.click();
     } else if (typeof switchTab === 'function') {
