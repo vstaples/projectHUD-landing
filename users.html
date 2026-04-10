@@ -1080,7 +1080,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM11','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM12','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -2923,19 +2923,38 @@ function _ocNodeHtml(r, children, depth) {
   html += '</div>';
 
   if (hasKids && !collapsed) {
-    html += '<div style="width:1px;height:16px;background:var(--border)"></div>';
-    var childFlex = kids.length > 3 ? 'flex-direction:column;align-items:center' : 'flex-wrap:wrap;justify-content:center';
-    html += '<div style="display:flex;' + childFlex + ';gap:12px;position:relative;padding-top:16px">';
-    if (kids.length > 1 && kids.length <= 3) {
-      html += '<div style="position:absolute;top:0;left:70px;right:70px;height:1px;background:var(--border)"></div>';
+    if (kids.length <= 4) {
+      // Horizontal fan — vertical drop then horizontal bar, branches down to each card
+      html += '<div style="width:1px;height:16px;background:var(--border)"></div>';
+      html += '<div style="display:flex;flex-wrap:nowrap;gap:12px;position:relative;padding-top:16px;justify-content:center">';
+      if (kids.length > 1) {
+        html += '<div style="position:absolute;top:0;left:calc(50% - ' + ((kids.length-1)*76) + 'px);right:calc(50% - ' + ((kids.length-1)*76) + 'px);height:1px;background:var(--border)"></div>';
+      }
+      html += kids.map(function(kid){
+        return '<div style="display:inline-flex;flex-direction:column;align-items:center">' +
+          '<div style="width:1px;height:16px;background:var(--border)"></div>' +
+          _ocNodeHtml(kid, children, depth+1) +
+          '</div>';
+      }).join('');
+      html += '</div>';
+    } else {
+      // Vertical spine — left-aligned spine with horizontal branches right to each card
+      html += '<div style="display:flex;flex-direction:row;margin-top:12px">';
+      // Left spine
+      html += '<div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0">';
+      html += '<div style="width:1px;flex:1;background:var(--border);margin-left:69px"></div>';
+      html += '</div>';
+      // Cards column
+      html += '<div style="display:flex;flex-direction:column;gap:10px;padding-left:0">';
+      html += kids.map(function(kid){
+        return '<div style="display:flex;flex-direction:row;align-items:center">' +
+          '<div style="width:20px;height:1px;background:var(--border);flex-shrink:0"></div>' +
+          _ocNodeHtml(kid, children, depth+1) +
+          '</div>';
+      }).join('');
+      html += '</div>';
+      html += '</div>';
     }
-    html += kids.map(function(kid){
-      return '<div style="display:inline-flex;flex-direction:column;align-items:center">' +
-        '<div style="width:1px;height:16px;background:var(--border)"></div>' +
-        _ocNodeHtml(kid, children, depth+1) +
-        '</div>';
-    }).join('');
-    html += '</div>';
   }
   html += '</div>';
   return html;
