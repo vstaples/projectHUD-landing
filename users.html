@@ -701,7 +701,9 @@
     </div>
     <div class="um-2col">
       <div class="um-field"><label>DEPARTMENT</label>
-        <input id="res-dept" class="um-input" type="text" /></div>
+        <select id="res-dept" class="um-select">
+          <option value="">— Select department —</option>
+        </select></div>
       <div class="um-field"><label>LOCATION / SITE</label>
         <input id="res-location" class="um-input" type="text" /></div>
     </div>
@@ -1082,6 +1084,11 @@ function openResourceDrawer(id) {
   document.getElementById('res-drawer-title').textContent = id ? 'EDIT RESOURCE' : 'ADD RESOURCE';
 
   // Populate role select
+  // Populate department select from categories
+  const deptEl = document.getElementById('res-dept');
+  deptEl.innerHTML = '<option value="">— Select department —</option>' +
+    UM.categories.map(c => `<option value="${c.name}" ${r?.department===c.name?'selected':''}>${c.name}</option>`).join('');
+
   const roleEl = document.getElementById('res-role');
   roleEl.innerHTML = '<option value="">— Select role —</option>';
   UM.categories.forEach(cat => {
@@ -1097,6 +1104,15 @@ function openResourceDrawer(id) {
     });
     roleEl.appendChild(og);
   });
+  // Auto-fill department when role changes
+  roleEl.onchange = function() {
+    var roleId = this.value;
+    if (!roleId) return;
+    var role = UM.roles.find(function(ro){ return ro.id === roleId; });
+    if (!role) return;
+    var cat = UM.categories.find(function(c){ return c.id === role.category_id; });
+    if (cat) document.getElementById('res-dept').value = cat.name;
+  };
 
   // Populate user link select
   const ulEl = document.getElementById('res-user-link');
@@ -1109,7 +1125,7 @@ function openResourceDrawer(id) {
   document.getElementById('res-title').value    = r?.title      || '';
   document.getElementById('res-email').value    = r?.email      || '';
   document.getElementById('res-phone').value    = r?.phone      || '';
-  document.getElementById('res-dept').value     = r?.department || '';
+  // dept select populated above via options
   document.getElementById('res-location').value = r?.location   || '';
   // Populate Reports To — all internal resources except self
   const mgrEl = document.getElementById('res-manager');
