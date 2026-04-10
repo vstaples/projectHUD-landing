@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260410-392000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260410-393000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -834,8 +834,21 @@ window.loadUserRequests = async function() {
   window._myrLoadPending = false;
   window._requestsLoaded = true;
   try {
-    const resId  = _myResource?.id;
     const firmId = _mwFirmId();
+    // Resolve resource UUID — _myResource may not be set; fall back to email lookup
+    let resId = (typeof _myResource !== 'undefined' && _myResource?.id) ? _myResource.id : null;
+    if (!resId && window.CURRENT_USER?.email) {
+      const resRows = await API.get(`resources?firm_id=eq.${firmId}&select=id&limit=1&or=(email.eq.${encodeURIComponent(window.CURRENT_USER.email)},user_id.eq.${encodeURIComponent(window.CURRENT_USER.id||'')})`).catch(()=>[]);
+      resId = resRows?.[0]?.id || null;
+      console.log('[loadUserRequests] resolved resId from email:', resId);
+    }
+    if (!resId && window.CURRENT_USER?.sub) {
+      // Try auth sub (UUID portion)
+      const resRows2 = await API.get(`resources?firm_id=eq.${firmId}&select=id,user_id&limit=50`).catch(()=>[]);
+      const match = resRows2.find(r => r.user_id === window.CURRENT_USER.sub || r.user_id === window.CURRENT_USER.id);
+      resId = match?.id || null;
+      console.log('[loadUserRequests] resolved resId from sub:', resId);
+    }
     const [wfTmpls, formDefs, instances] = await Promise.all([
       API.get(`workflow_templates?compass_visible=eq.true&status=eq.released&firm_id=eq.${firmId}&order=name.asc&select=id,name,description,status,version,trigger_type`).catch(() => []),
       API.get(`workflow_form_definitions?compass_visible=eq.true&state=in.(certified,published)&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id,description`).catch(() => []),
