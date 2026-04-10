@@ -953,7 +953,21 @@ window.myrLaunchRequest = async function(type, templateId) {
         }
       }
     } catch(e) { console.warn('[myrLaunchRequest] form load error:', e); }
-    compassToast('Form submission coming soon — build in progress.', 3000);
+    // Fallback: try source_html from DB
+    try {
+      const firmId2 = _mwFirmId();
+      const rows2 = await API.get(
+        `workflow_form_definitions?id=eq.${templateId}&firm_id=eq.${firmId2}&select=id,source_name,source_html,version&limit=1`
+      ).catch(() => []);
+      const fd2 = rows2?.[0];
+      if (fd2 && fd2.source_html) {
+        const blob = new Blob([fd2.source_html], { type: 'text/html' });
+        const blobUrl = URL.createObjectURL(blob);
+        _myrOpenHtmlFormOverlay(fd2.source_name || 'Form', blobUrl);
+        return;
+      }
+    } catch(e) { console.warn('[myrLaunchRequest] source_html fallback error:', e); }
+    compassToast('No form content available.', 3000);
     return;
   }
   const tmpl = (window._myrTemplates||[]).find(t => t.id === templateId);
