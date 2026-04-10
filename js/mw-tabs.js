@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260410-400000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260410-401000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260410-402000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -784,7 +784,7 @@ window.loadUserConcerns = async function() {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MY REQUESTS — Cadence-backed engine  v20260410-401000
+// MY REQUESTS — Cadence-backed engine  v20260410-402000
 // ── API delete helper (API wrapper lacks delete method) ──────────────────────
 async function _myrDel(path) {
   var SUPA = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : (window.PHUD?.SUPABASE_URL || '');
@@ -991,14 +991,14 @@ function _myrRenderGroupedTable(instances, isHistory) {
       html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px">
         <thead>
           <tr style="background:rgba(255,255,255,.04)">
-            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Date Filed</th>
-            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Business Purpose</th>
-            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
-            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Name</th>
-            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Location</th>
-            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total Expenses</th>
-            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Net Due</th>
-            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
+            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Date Filed</th>
+            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Business Purpose</th>
+            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
+            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Name</th>
+            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Location</th>
+            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total Expenses</th>
+            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Net Due</th>
+            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
             ${!isHistory ? `<th style="padding:6px 10px;border-bottom:0.5px solid rgba(255,255,255,.08);width:32px"></th>` : ''}
           </tr>
         </thead>
@@ -1070,14 +1070,14 @@ function _myrRenderActive() {
     if (isExpenseDraft) {
       html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px">
         <thead><tr style="background:rgba(240,160,48,.06)">
-          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Date Filed</th>
-          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Business Purpose</th>
-          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
-          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Name</th>
-          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Location</th>
-          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total Expenses</th>
-          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Net Due</th>
-          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
+          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Date Filed</th>
+          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Business Purpose</th>
+          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
+          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Name</th>
+          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Location</th>
+          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total Expenses</th>
+          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Net Due</th>
+          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
           <th style="padding:6px 10px;border-bottom:0.5px solid rgba(255,255,255,.08);width:32px"></th>
         </tr></thead>
         <tbody>`;
@@ -1120,7 +1120,7 @@ function _myrRenderActive() {
             <div style="${FA}font-size:10px;color:rgba(255,255,255,.35)">Draft saved ${esc(saved)}</div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <button onclick="myrContinueDraft('${draft.form_def_id}','${draft.id}')" style="${FA}font-size:11px;font-weight:700;padding:4px 12px;border-radius:4px;border:1px solid #f0a030;background:transparent;color:#f0a030;cursor:pointer">Continue &#8594;</button>
+            <button onclick="myrContinueDraft('${draft.form_def_id}','${draft.id}')" style="${FA}font-size:11px;font-weight:700;padding:4px 12px;border-radius:4px;border:1px solid #f0a030;background:transparent;color:#f0a030;cursor:pointer;font-weight:700">Continue &#8594;</button>
             <button onclick="myrDiscardDraft('${draft.id}','${esc(name)}',event)" title="Discard draft" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">&#128465;</button>
           </div>
         </div>`;
@@ -1151,6 +1151,7 @@ window.myrContinueDraft = async function(formDefId, draftId) {
 window.addEventListener('DOMContentLoaded', function() {
   var saved = ${JSON.stringify(savedData)};
   Object.keys(saved).forEach(function(label) {
+    if (label.indexOf('_grid_') === 0) return;
     var el = document.querySelector('[data-label="' + label + '"]');
     if (el && saved[label]) el.value = saved[label];
   });
@@ -1160,6 +1161,25 @@ window.addEventListener('DOMContentLoaded', function() {
     if (s && saved['Trip Start Date']) s.value = saved['Trip Start Date'];
     if (e && saved['Trip End Date']) e.value = saved['Trip End Date'];
     if (typeof onDateChange === 'function') onDateChange();
+    setTimeout(function() {
+      Object.keys(saved).forEach(function(label) {
+        if (label.indexOf('_grid_') !== 0) return;
+        var parts = label.split('_');
+        var cat = parts[2];
+        var dk = parts.slice(3).join('-');
+        var el = document.querySelector('[data-cat="' + cat + '"][data-dk="' + dk + '"]');
+        if (el) { el.value = saved[label]; el.dispatchEvent(new Event('input')); }
+      });
+    }, 300);
+  } else {
+    Object.keys(saved).forEach(function(label) {
+      if (label.indexOf('_grid_') !== 0) return;
+      var parts = label.split('_');
+      var cat = parts[2];
+      var dk = parts.slice(3).join('-');
+      var el = document.querySelector('[data-cat="' + cat + '"][data-dk="' + dk + '"]');
+      if (el) { el.value = saved[label]; el.dispatchEvent(new Event('input')); }
+    });
   }
 });
 <\/script>`;
@@ -1463,7 +1483,7 @@ window.addEventListener('message', function(ev) {
           title:                      title,
           status:                     'in_progress',
           workflow_type:              'form',
-          template_id:                formId,
+          template_id:                (formId ? formId.replace(/^([0-9a-f]{6})10-/, '$100-') : formId),
           submitted_by_resource_id:   res?.id   || null,
           submitted_by_name:          res?.name || null,
           current_step_name:          'Under Review',
