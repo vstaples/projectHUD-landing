@@ -1066,23 +1066,67 @@ function _myrRenderActive() {
       <span style="${FA}font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#f0a030">Drafts</span>
       <span style="${FM}font-size:10px;color:rgba(255,255,255,.3)">${drafts.length} saved</span>
     </div>`;
-    drafts.forEach(function(draft) {
-      const fd = (window._myrFormDefs||[]).find(f => f.id === draft.form_def_id);
-      const name = fd ? fd.source_name : 'Form';
-      const saved = draft.updated_at ? new Date(draft.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-      html += `<div style="padding:10px 12px;border:0.5px solid rgba(240,160,48,.25);border-radius:4px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;background:rgba(240,160,48,.04)">
-        <div>
-          <div style="${FA}font-size:12px;font-weight:600;color:#f0a030;margin-bottom:2px">${esc(name)}</div>
-          <div style="${FA}font-size:10px;color:rgba(255,255,255,.35)">Draft saved ${esc(saved)}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <button onclick="myrContinueDraft('${draft.form_def_id}','${draft.id}')" style="${FA}font-size:11px;font-weight:700;padding:4px 12px;border-radius:4px;border:1px solid #f0a030;background:transparent;color:#f0a030;cursor:pointer">Continue &#8594;</button>
-          <button onclick="myrDiscardDraft('${draft.id}','${esc(name)}',event)" title="Discard draft" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">🗑</button>
-        </div>
-      </div>`;
-    });
+    var isExpenseDraft = drafts.some(function(d){ return /expense\s*report/i.test((window._myrFormDefs||[]).find(function(f){ return f.id===d.form_def_id; })?.source_name||''); });
+    if (isExpenseDraft) {
+      html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px">
+        <thead><tr style="background:rgba(240,160,48,.06)">
+          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Date Filed</th>
+          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Business Purpose</th>
+          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
+          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Name</th>
+          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Location</th>
+          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total Expenses</th>
+          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Net Due</th>
+          <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
+          <th style="padding:6px 10px;border-bottom:0.5px solid rgba(255,255,255,.08);width:32px"></th>
+        </tr></thead>
+        <tbody>`;
+      drafts.forEach(function(draft) {
+        var fdef = (window._myrFormDefs||[]).find(function(f){ return f.id===draft.form_def_id; });
+        var name = fdef ? fdef.source_name : 'Form';
+        if (!/expense\s*report/i.test(name)) return;
+        var dd = draft.form_data || {};
+        var saved = draft.updated_at ? new Date(draft.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+        var purpose = dd['_purpose_label'] || dd['Business Purpose'] || '—';
+        var desc = dd['Purpose Description'] || '—';
+        var clientName = dd['Customer Name'] || '—';
+        var clientLoc = dd['Customer Location'] || '—';
+        var total = dd['_total_expenses'] || '—';
+        var netDue = dd['_net_due_employee'] || '—';
+        html += `<tr style="border-bottom:0.5px solid rgba(255,255,255,.05);background:rgba(240,160,48,.03)">
+          <td style="${FA}font-size:11px;color:rgba(255,255,255,.6);padding:8px 10px;white-space:nowrap">${esc(saved)}</td>
+          <td style="${FA}font-size:11px;color:#f0a030;padding:8px 10px">${esc(purpose)}</td>
+          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(desc)}</td>
+          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientName)}</td>
+          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientLoc)}</td>
+          <td style="${FM}font-size:11px;font-weight:700;color:#3de08a;padding:8px 10px;text-align:right;white-space:nowrap">${esc(total)}</td>
+          <td style="${FM}font-size:11px;font-weight:700;color:#00c9c9;padding:8px 10px;text-align:right;white-space:nowrap">${esc(netDue)}</td>
+          <td style="padding:8px 10px"><span style="${FA}font-size:10px;font-weight:700;color:#f0a030;letter-spacing:.05em">DRAFT</span></td>
+          <td style="padding:4px 8px;white-space:nowrap">
+            <button onclick="myrContinueDraft('${draft.form_def_id}','${draft.id}')" style="${FA}font-size:10px;font-weight:700;padding:3px 8px;border-radius:3px;border:1px solid #f0a030;background:transparent;color:#f0a030;cursor:pointer">Continue →</button>
+            <button onclick="myrDiscardDraft('${draft.id}','${esc(name)}',event)" title="Discard" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px;margin-left:2px" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">&#128465;</button>
+          </td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+    } else {
+      drafts.forEach(function(draft) {
+        var fdef = (window._myrFormDefs||[]).find(function(f){ return f.id===draft.form_def_id; });
+        var name = fdef ? fdef.source_name : 'Form';
+        var saved = draft.updated_at ? new Date(draft.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+        html += `<div style="padding:10px 12px;border:0.5px solid rgba(240,160,48,.25);border-radius:4px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;background:rgba(240,160,48,.04)">
+          <div>
+            <div style="${FA}font-size:12px;font-weight:600;color:#f0a030;margin-bottom:2px">${esc(name)}</div>
+            <div style="${FA}font-size:10px;color:rgba(255,255,255,.35)">Draft saved ${esc(saved)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button onclick="myrContinueDraft('${draft.form_def_id}','${draft.id}')" style="${FA}font-size:11px;font-weight:700;padding:4px 12px;border-radius:4px;border:1px solid #f0a030;background:transparent;color:#f0a030;cursor:pointer">Continue &#8594;</button>
+            <button onclick="myrDiscardDraft('${draft.id}','${esc(name)}',event)" title="Discard draft" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">&#128465;</button>
+          </div>
+        </div>`;
+      });
+    }
   }
-
   // ── Submitted section ────────────────────────────────────────────────────
   if (active.length) {
     html += _myrRenderGroupedTable(active, false);
