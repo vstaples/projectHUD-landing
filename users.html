@@ -642,7 +642,7 @@
     <span style="font-size:11px;color:var(--amber);font-weight:600" id="oc-pending-count"></span>
     <button onclick="_ocCollapseAll()" style="font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Collapse all</button>
     <button onclick="_ocExpandAll()" style="font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Expand all</button>
-    <button onclick="_ocSaveAll()" style="padding:5px 16px;background:var(--cad,#00c9c9);border:none;border-radius:4px;color:#003333;font-size:12px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif">Save Changes</button>
+    <button id="oc-save-btn" onclick="_ocSaveAll()" style="padding:5px 16px;background:rgba(0,201,201,.15);border:1px solid rgba(0,201,201,.25);border-radius:4px;color:rgba(0,201,201,.4);font-size:12px;font-weight:700;cursor:default;font-family:Arial,sans-serif;transition:all .2s" disabled>Save Changes</button>
     <button onclick="_ocClose()" style="padding:5px 14px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:Arial,sans-serif">✕ Close</button>
   </div>
   <!-- Body: left rail + canvas -->
@@ -1060,7 +1060,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM5','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM6','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -2707,6 +2707,22 @@ function _ocBuild() {
   var pendCount = document.getElementById('oc-pending-count');
   var nPending = Object.keys(_ocPending).length;
   if (pendCount) pendCount.textContent = nPending ? nPending + ' unsaved change' + (nPending!==1?'s':'') : '';
+  var saveBtn = document.getElementById('oc-save-btn');
+  if (saveBtn) {
+    if (nPending > 0) {
+      saveBtn.disabled = false;
+      saveBtn.style.background = 'var(--cad,#00c9c9)';
+      saveBtn.style.border = '1px solid var(--cad,#00c9c9)';
+      saveBtn.style.color = '#003333';
+      saveBtn.style.cursor = 'pointer';
+    } else {
+      saveBtn.disabled = true;
+      saveBtn.style.background = 'rgba(0,201,201,.15)';
+      saveBtn.style.border = '1px solid rgba(0,201,201,.25)';
+      saveBtn.style.color = 'rgba(0,201,201,.4)';
+      saveBtn.style.cursor = 'default';
+    }
+  }
 
   // Wire delegated events on tree root
   var treeRoot = document.getElementById('oc-tree-root');
@@ -2949,11 +2965,47 @@ function _ocOpen() {
 }
 
 function _ocClose() {
+  var nPending = Object.keys(_ocPending).length;
+  if (nPending > 0) {
+    _ocShowUnsavedDialog();
+    return;
+  }
+  _ocDoClose();
+}
+
+function _ocDoClose() {
   var ov = document.getElementById('oc-overlay');
   if (ov) ov.style.display = 'none';
-  // Return to resources tab
   _origSwitchUMTab('resources');
   document.querySelectorAll('.um-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === 'resources'); });
+}
+
+function _ocShowUnsavedDialog() {
+  var existing = document.getElementById('oc-unsaved-dialog');
+  if (existing) existing.remove();
+  var nPending = Object.keys(_ocPending).length;
+  var el = document.createElement('div');
+  el.id = 'oc-unsaved-dialog';
+  el.style.cssText = 'position:fixed;inset:0;z-index:700;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)';
+  el.innerHTML = '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:28px 32px;width:380px;font-family:Arial,sans-serif">' +
+    '<div style="font-size:14px;font-weight:700;color:var(--text1);margin-bottom:8px">Unsaved Changes</div>' +
+    '<div style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6">You have <strong style="color:var(--amber)">' + nPending + ' unsaved change' + (nPending!==1?'s':'') + '</strong> in the org chart. Would you like to save before closing?</div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+      '<button data-oc-dlg="cancel" style="padding:8px 16px;border:1px solid var(--border);border-radius:5px;background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:Arial,sans-serif">Cancel</button>' +
+      '<button data-oc-dlg="discard" style="padding:8px 16px;border:1px solid rgba(248,81,73,.4);border-radius:5px;background:transparent;color:#f85149;font-size:12px;cursor:pointer;font-family:Arial,sans-serif">Discard &amp; Close</button>' +
+      '<button data-oc-dlg="save" style="padding:8px 16px;background:var(--cad,#00c9c9);border:none;border-radius:5px;color:#003333;font-size:12px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif">Save &amp; Close</button>' +
+    '</div>' +
+    '</div>';
+  el.addEventListener('click', function(ev) {
+    var btn = ev.target.closest('[data-oc-dlg]');
+    if (!btn) return;
+    var action = btn.dataset.ocDlg;
+    el.remove();
+    if (action === 'cancel') return;
+    if (action === 'discard') { _ocDoClose(); return; }
+    if (action === 'save') { _ocSaveAll().then(function(){ _ocDoClose(); }); }
+  });
+  document.body.appendChild(el);
 }
 </script>
 </body>
