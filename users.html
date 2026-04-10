@@ -631,9 +631,9 @@
 
 <!-- ── OVERLAY ──────────────────────────────────────────────── -->
 <div class="um-panel" id="tab-orgchart">
-  <div style="display:grid;grid-template-columns:220px 1fr;height:600px;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-top:8px">
+  <div style="display:grid;grid-template-columns:220px 1fr;height:600px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
     <!-- Left rail: unassigned -->
-    <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg2)">
+    <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg2);height:600px;overflow:hidden">
       <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)" id="oc-unassigned-hdr">Unassigned (0)</div>
       <div style="padding:8px">
         <input id="oc-search" placeholder="Search name or dept..." oninput="_ocFilter(this.value)"
@@ -1055,7 +1055,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM2','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM3','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -2661,15 +2661,15 @@ function _ocBuild() {
 
   // Unassigned = resources with no manager AND no direct reports
   var unassigned = res.filter(function(r){
-    return !r._oc_manager_id && !children[r.id];
+    return !r._oc_manager_id && r._oc_manager_id !== 'ROOT' && !children[r.id];
   });
 
   // Roots = resources with no manager but HAS reports
   var treeRoots = res.filter(function(r){
-    return !r._oc_manager_id && children[r.id];
+    return r._oc_manager_id === 'ROOT' || (!r._oc_manager_id && children[r.id]);
   });
-  // treeRoots = only resources with children (have direct reports)
-  // Never auto-populate with lone resources — unassigned belong in the left rail
+  // treeRoots = resources explicitly placed as root (sentinel 'ROOT') OR with children
+  // Never auto-populate with lone unassigned resources
 
   // Render unassigned list
   var ul = document.getElementById('oc-unassigned-list');
@@ -2869,8 +2869,8 @@ function _ocCanvasDrop(e) {
   // Dropped on empty canvas — make this person a root (no manager)
   var r = (UM.resources||[]).find(function(x){ return x.id === _ocDragId; });
   if (!r) return;
-  _ocPending[_ocDragId] = null;
-  r._oc_manager_id = null;
+  _ocPending[_ocDragId] = 'ROOT';
+  r._oc_manager_id = 'ROOT';
   cadToast((r.first_name||r.name||'Resource') + ' added to chart as root', 'success');
   _ocBuild();
 }
@@ -2896,7 +2896,8 @@ async function _ocSaveAll() {
   for (var i = 0; i < ids.length; i++) {
     var id = ids[i];
     try {
-      await API.patch('resources?id=eq.' + id + '&firm_id=eq.' + firmId, { manager_id: _ocPending[id] || null });
+      var mgr = _ocPending[id]; if (mgr === 'ROOT') mgr = null;
+      await API.patch('resources?id=eq.' + id + '&firm_id=eq.' + firmId, { manager_id: mgr || null });
       var r = (UM.resources||[]).find(function(x){ return x.id === id; });
       if (r) r.manager_id = _ocPending[id] || null;
     } catch(e) { errors++; }
