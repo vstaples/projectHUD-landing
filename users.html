@@ -653,7 +653,7 @@
         <button onclick="_ocCollapseAll()" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Collapse all</button>
         <button onclick="_ocExpandAll()" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Expand all</button>
       </div>
-      <div id="oc-tree-root"></div>
+      <div id="oc-tree-root" style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;padding:4px"></div>
     </div>
   </div>
   <!-- Detail flyout -->
@@ -1055,7 +1055,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM3','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM4','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -2688,7 +2688,13 @@ function _ocBuild() {
 
   // Render tree
   var root = document.getElementById('oc-tree-root');
-  if (root) root.innerHTML = treeRoots.map(function(r){ return _ocNodeHtml(r, children, 0); }).join('');
+  if (root) {
+    if (treeRoots.length) {
+      root.innerHTML = treeRoots.map(function(r){ return _ocNodeHtml(r, children, 0); }).join('');
+    } else {
+      root.innerHTML = '<div style="width:100%;padding:40px;text-align:center;border:2px dashed var(--border);border-radius:8px;color:var(--muted);font-size:12px;font-family:Arial,sans-serif">Drag managers here to start building the org chart</div>';
+    }
+  }
 
   // Stats
   var stats = document.getElementById('oc-stats');
@@ -2732,7 +2738,7 @@ function _ocNodeHtml(r, children, depth) {
   var borderColor = isSelected ? 'var(--cad,#00c9c9)' : 'var(--border)';
   var borderWidth = isSelected ? '2px' : '1px';
 
-  var html = '<div style="display:flex;flex-direction:column;align-items:center">';
+  var html = '<div style="display:inline-flex;flex-direction:column;align-items:center">';
   html += '<div draggable="true" data-rid="' + r.id + '" data-oc-node="1" ondragstart="_ocDragStart(event)" ' +
     'ondragover="_ocDragOver(event)" data-oc-drop="' + r.id + '" ondragleave="_ocDragLeave(event)" ' +
     'style="border:' + borderWidth + ' solid ' + borderColor + ';border-radius:8px;padding:10px 12px;width:140px;text-align:center;background:var(--bg2);cursor:pointer;position:relative">';
@@ -2746,12 +2752,12 @@ function _ocNodeHtml(r, children, depth) {
 
   if (hasKids && !collapsed) {
     html += '<div style="width:1px;height:16px;background:var(--border)"></div>';
-    html += '<div style="display:flex;gap:12px;position:relative;padding-top:16px">';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:12px;position:relative;padding-top:16px;justify-content:center">';
     if (kids.length > 1) {
       html += '<div style="position:absolute;top:0;left:70px;right:70px;height:1px;background:var(--border)"></div>';
     }
     html += kids.map(function(kid){
-      return '<div style="display:flex;flex-direction:column;align-items:center">' +
+      return '<div style="display:inline-flex;flex-direction:column;align-items:center">' +
         '<div style="width:1px;height:16px;background:var(--border)"></div>' +
         _ocNodeHtml(kid, children, depth+1) +
         '</div>';
