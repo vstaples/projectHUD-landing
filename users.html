@@ -1127,14 +1127,33 @@ function openResourceDrawer(id) {
   document.getElementById('res-phone').value    = r?.phone      || '';
   // dept select populated above via options
   document.getElementById('res-location').value = r?.location   || '';
-  // Populate Reports To — all internal resources except self
+  // Populate Reports To — grouped by department, internal only, excluding self
   const mgrEl = document.getElementById('res-manager');
-  mgrEl.innerHTML = '<option value="">— No manager —</option>' +
-    UM.resources
-      .filter(x => !x.is_external && x.id !== id)
+  const mgrCandidates = UM.resources.filter(x => !x.is_external && x.id !== id);
+  // Group by department
+  const mgrByDept = {};
+  const mgrDeptOrder = [];
+  mgrCandidates.forEach(x => {
+    const dept = x.department || 'Other';
+    if (!mgrByDept[dept]) { mgrByDept[dept] = []; mgrDeptOrder.push(dept); }
+    mgrByDept[dept].push(x);
+  });
+  mgrDeptOrder.sort((a,b) => a.localeCompare(b));
+  mgrEl.innerHTML = '<option value="">— No manager —</option>';
+  mgrDeptOrder.forEach(dept => {
+    const og = document.createElement('optgroup');
+    og.label = dept;
+    mgrByDept[dept]
       .sort((a,b) => (a.name||'').localeCompare(b.name||''))
-      .map(x => `<option value="${x.id}" ${r?.manager_id===x.id?'selected':''}>${x.name}</option>`)
-      .join('');
+      .forEach(x => {
+        const o = document.createElement('option');
+        o.value = x.id;
+        o.textContent = x.name;
+        if (r?.manager_id === x.id) o.selected = true;
+        og.appendChild(o);
+      });
+    mgrEl.appendChild(og);
+  });
   document.getElementById('res-level').value    = r?.level      || '';
   document.getElementById('res-hire').value     = r?.hire_date  || '';
   document.getElementById('res-avail').value    = r?.availability_pct ?? 100;
