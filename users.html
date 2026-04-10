@@ -672,7 +672,7 @@
     </div>
   </div>
   <!-- CoC slide-in panel -->
-  <div id="oc-coc-panel" style="display:none;position:absolute;top:0;right:0;bottom:0;width:320px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:50">
+  <div id="oc-coc-panel" style="display:none;position:absolute;top:48px;right:0;bottom:0;width:320px;background:var(--bg2);border-left:1px solid var(--border);flex-direction:column;z-index:50">
     <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
       <div id="oc-coc-drag" style="width:4px;height:32px;background:var(--border2);border-radius:2px;cursor:col-resize;flex-shrink:0;position:absolute;left:0;top:50%;transform:translateY(-50%)"></div>
       <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:1">Org Chart History</span>
@@ -1080,7 +1080,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM12','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM13','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -2677,7 +2677,7 @@ function _ocToggleCoc() {
   var btn = document.getElementById('oc-coc-btn');
   if (panel) {
     panel.style.display = _ocCocOpen ? 'flex' : 'none';
-    panel.style.flexDirection = 'column';
+    if (_ocCocOpen) panel.style.flexDirection = 'column';
   }
   if (btn) {
     btn.style.color = _ocCocOpen ? 'var(--cad,#00c9c9)' : '';
@@ -2693,6 +2693,7 @@ async function _ocLoadCoc() {
   body.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:20px">Loading…</div>';
   try {
     var rows = await API.get('coc_events?entity_type=eq.org_chart&firm_id=eq.' + UM.firmId + '&order=created_at.desc&limit=100');
+    console.log('[ocCoC] rows:', rows && rows.length, '| firmId:', UM.firmId);
     if (!rows || !rows.length) {
       body.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:20px">No history yet.</div>';
       return;
@@ -2938,22 +2939,21 @@ function _ocNodeHtml(r, children, depth) {
       }).join('');
       html += '</div>';
     } else {
-      // Vertical spine — left-aligned spine with horizontal branches right to each card
-      html += '<div style="display:flex;flex-direction:row;margin-top:12px">';
-      // Left spine
-      html += '<div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0">';
-      html += '<div style="width:1px;flex:1;background:var(--border);margin-left:69px"></div>';
-      html += '</div>';
-      // Cards column
-      html += '<div style="display:flex;flex-direction:column;gap:10px;padding-left:0">';
+      // Vertical spine with horizontal branches to each card
+      // Connector from parent drops down then spine runs vertically with branches right
+      html += '<div style="width:1px;height:12px;background:var(--border)"></div>';
+      html += '<div style="display:flex;flex-direction:row;align-items:stretch;margin-left:70px">';
+      // Vertical spine line
+      html += '<div style="width:1px;background:var(--border);flex-shrink:0"></div>';
+      // Cards with horizontal branch connectors
+      html += '<div style="display:flex;flex-direction:column;gap:10px;padding-top:10px;padding-bottom:10px">';
       html += kids.map(function(kid){
         return '<div style="display:flex;flex-direction:row;align-items:center">' +
-          '<div style="width:20px;height:1px;background:var(--border);flex-shrink:0"></div>' +
+          '<div style="width:24px;height:1px;background:var(--border);flex-shrink:0"></div>' +
           _ocNodeHtml(kid, children, depth+1) +
           '</div>';
       }).join('');
-      html += '</div>';
-      html += '</div>';
+      html += '</div></div>';
     }
   }
   html += '</div>';
