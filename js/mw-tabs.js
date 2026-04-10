@@ -871,7 +871,7 @@ function _myrRenderBrowse() {
         <div class="wf-card-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap">
           <span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3);white-space:nowrap">v${esc(f.version||'0.1.0')}</span>
           ${certBadge}
-          <button class="wf-card-submit" style="margin-left:auto;margin-top:0;white-space:nowrap" onclick="event.stopPropagation();myrLaunchRequest('form','${f.id}')">Submit &#8594;</button>
+          <button onclick="event.stopPropagation();myrLaunchRequest('form','${f.id}')" style="margin-left:auto;display:inline-flex;align-items:center;font-family:var(--font-head);font-size:11px;font-weight:700;padding:4px 12px;border-radius:4px;border:1px solid var(--cad,#00c9c9);background:transparent;color:var(--cad,#00c9c9);cursor:pointer;white-space:nowrap;letter-spacing:.03em">Submit &#8594;</button>
         </div>
       </div>`;
     });
