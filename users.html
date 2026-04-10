@@ -705,6 +705,11 @@
       <div class="um-field"><label>LOCATION / SITE</label>
         <input id="res-location" class="um-input" type="text" /></div>
     </div>
+    <div class="um-field"><label>REPORTS TO</label>
+      <select id="res-manager" class="um-select">
+        <option value="">— No manager —</option>
+      </select>
+    </div>
 
     <div class="um-divider">ROLE CLASSIFICATION</div>
     <div id="res-role-section">
@@ -1106,6 +1111,14 @@ function openResourceDrawer(id) {
   document.getElementById('res-phone').value    = r?.phone      || '';
   document.getElementById('res-dept').value     = r?.department || '';
   document.getElementById('res-location').value = r?.location   || '';
+  // Populate Reports To — all internal resources except self
+  const mgrEl = document.getElementById('res-manager');
+  mgrEl.innerHTML = '<option value="">— No manager —</option>' +
+    UM.resources
+      .filter(x => !x.is_external && x.id !== id)
+      .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+      .map(x => `<option value="${x.id}" ${r?.manager_id===x.id?'selected':''}>${x.name}</option>`)
+      .join('');
   document.getElementById('res-level').value    = r?.level      || '';
   document.getElementById('res-hire').value     = r?.hire_date  || '';
   document.getElementById('res-avail').value    = r?.availability_pct ?? 100;
@@ -1208,6 +1221,7 @@ async function saveResource() {
     is_active:        document.getElementById('res-status').value === 'true',
     user_id:          document.getElementById('res-user-link').value       || null,
     notes:            document.getElementById('res-notes').value.trim()    || null,
+    manager_id:       document.getElementById('res-manager').value              || null,
   };
 
   try {
