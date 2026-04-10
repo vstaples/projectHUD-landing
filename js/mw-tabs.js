@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260410-395000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260410-397000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -849,14 +849,16 @@ window.loadUserRequests = async function() {
       resId = match?.id || null;
       console.log('[loadUserRequests] resolved resId from sub:', resId);
     }
-    const [wfTmpls, formDefs, instances] = await Promise.all([
+    const [wfTmpls, formDefs, instances, drafts] = await Promise.all([
       API.get(`workflow_templates?compass_visible=eq.true&status=eq.released&firm_id=eq.${firmId}&order=name.asc&select=id,name,description,status,version,trigger_type`).catch(() => []),
       API.get(`workflow_form_definitions?compass_visible=eq.true&state=in.(certified,published)&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id,description`).catch(() => []),
-      resId ? API.get(`workflow_instances?submitted_by_resource_id=eq.${resId}&order=created_at.desc&limit=100&select=id,title,status,current_step_name,workflow_type,template_id,created_at,updated_at`).catch(() => []) : [],
+      resId ? API.get(`workflow_instances?submitted_by_resource_id=eq.${resId}&order=created_at.desc&limit=100&select=id,title,status,current_step_name,workflow_type,template_id,created_at,updated_at,form_data`).catch(() => []) : [],
+      resId ? API.get(`form_drafts?user_id=eq.${resId}&firm_id=eq.${firmId}&order=updated_at.desc&select=id,form_def_id,form_data,updated_at`).catch(() => []) : [],
     ]);
     window._myrTemplates = wfTmpls  || [];
     window._myrFormDefs  = formDefs || [];
     window._myrInstances = instances || [];
+    window._myrDrafts    = drafts   || [];
     _myrRenderAll();
   } catch(e) {
     console.error('[loadUserRequests] failed:', e.message);
@@ -922,6 +924,24 @@ function _myrRenderBrowse() {
 
 // ── ACTIVE ────────────────────────────────────────────────────────────────────
 
+// ── Withdraw / delete instance ───────────────────────────────────────────────
+window.myrWithdrawInstance = async function(instanceId, title, evt) {
+  if (evt) { evt.stopPropagation(); evt.preventDefault(); }
+  if (!confirm('Withdraw "' + title + '"?\nThis cannot be undone.')) return;
+  try {
+    var firmId = _mwFirmId();
+    await API.patch(
+      'workflow_instances?id=eq.' + instanceId + '&firm_id=eq.' + firmId,
+      { status: 'cancelled', current_step_name: 'Withdrawn' }
+    );
+    compassToast('Request withdrawn.', 2500);
+    if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 500);
+  } catch(e) {
+    console.error('[myrWithdrawInstance] failed:', e);
+    compassToast('Failed to withdraw — please try again.', 3000);
+  }
+};
+
 // ── Grouped table renderer for Active + History ───────────────────────────────
 function _myrRenderGroupedTable(instances, isHistory) {
   const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -965,6 +985,7 @@ function _myrRenderGroupedTable(instances, isHistory) {
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client</th>
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total</th>
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
+            ${!isHistory ? `<th style="padding:6px 10px;border-bottom:0.5px solid rgba(255,255,255,.08);width:32px"></th>` : ''}
           </tr>
         </thead>
         <tbody>`;
@@ -984,6 +1005,7 @@ function _myrRenderGroupedTable(instances, isHistory) {
           <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(client)}</td>
           <td style="${FM}font-size:11px;font-weight:700;color:#3de08a;padding:8px 10px;text-align:right;white-space:nowrap">${esc(total)}</td>
           <td style="padding:8px 10px"><span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em">${esc(step)}</span></td>
+          ${!isHistory ? `<td style="padding:4px 8px;text-align:center"><button onclick="myrWithdrawInstance('${inst.id}','${esc(inst.title)}',event)" title="Withdraw" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px;transition:color .15s" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">🗑</button></td>` : ''}
         </tr>`;
       });
       html += `</tbody></table>`;
@@ -998,7 +1020,10 @@ function _myrRenderGroupedTable(instances, isHistory) {
             <div style="${FA}font-size:12px;font-weight:600;color:#F0F6FF;margin-bottom:3px">${esc(inst.title)}</div>
             <div style="${FA}font-size:11px;color:rgba(255,255,255,.35)">${esc(date)}</div>
           </div>
-          <span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em;white-space:nowrap">${esc(step)}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em;white-space:nowrap">${esc(step)}</span>
+            ${!isHistory ? `<button onclick="myrWithdrawInstance('${inst.id}','${esc(inst.title)}',event)" title="Withdraw" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">🗑</button>` : ''}
+          </div>
         </div>`;
       });
     }
@@ -1009,13 +1034,96 @@ function _myrRenderGroupedTable(instances, isHistory) {
 function _myrRenderActive() {
   const el = document.getElementById('myr-active-content');
   if (!el) return;
-  const active = (window._myrInstances||[]).filter(i => i.status !== 'complete' && i.status !== 'cancelled');
-  if (!active.length) {
-    el.innerHTML = `<div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.3);padding:32px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
-    return;
+  const active  = (window._myrInstances||[]).filter(i => i.status !== 'complete' && i.status !== 'cancelled');
+  const drafts  = window._myrDrafts || [];
+  const FA = 'font-family:Arial,sans-serif;';
+  const FM = 'font-family:var(--font-mono,monospace);';
+  const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  let html = '';
+
+  // ── Drafts section ───────────────────────────────────────────────────────
+  if (drafts.length) {
+    html += `<div style="margin-bottom:4px;margin-top:8px;padding:6px 10px;background:rgba(240,160,48,.06);border-left:3px solid #f0a030;border-radius:0 4px 4px 0;display:flex;align-items:center;justify-content:space-between">
+      <span style="${FA}font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#f0a030">Drafts</span>
+      <span style="${FM}font-size:10px;color:rgba(255,255,255,.3)">${drafts.length} saved</span>
+    </div>`;
+    drafts.forEach(function(draft) {
+      const fd = (window._myrFormDefs||[]).find(f => f.id === draft.form_def_id);
+      const name = fd ? fd.source_name : 'Form';
+      const saved = draft.updated_at ? new Date(draft.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+      html += `<div style="padding:10px 12px;border:0.5px solid rgba(240,160,48,.25);border-radius:4px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;background:rgba(240,160,48,.04)">
+        <div>
+          <div style="${FA}font-size:12px;font-weight:600;color:#f0a030;margin-bottom:2px">${esc(name)}</div>
+          <div style="${FA}font-size:10px;color:rgba(255,255,255,.35)">Draft saved ${esc(saved)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="myrContinueDraft('${draft.form_def_id}','${draft.id}')" style="${FA}font-size:11px;font-weight:700;padding:4px 12px;border-radius:4px;border:1px solid #f0a030;background:transparent;color:#f0a030;cursor:pointer">Continue &#8594;</button>
+          <button onclick="myrDiscardDraft('${draft.id}','${esc(name)}',event)" title="Discard draft" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">🗑</button>
+        </div>
+      </div>`;
+    });
   }
-  el.innerHTML = _myrRenderGroupedTable(active, false);
+
+  // ── Submitted section ────────────────────────────────────────────────────
+  if (active.length) {
+    html += _myrRenderGroupedTable(active, false);
+  } else if (!drafts.length) {
+    html += `<div style="${FA}font-size:13px;color:rgba(255,255,255,.3);padding:32px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
+  }
+
+  el.innerHTML = html;
 }
+
+window.myrContinueDraft = async function(formDefId, draftId) {
+  try {
+    var firmId = _mwFirmId();
+    var rows = await API.get(`workflow_form_definitions?id=eq.${formDefId}&firm_id=eq.${firmId}&select=id,source_name,source_html,version&limit=1`).catch(()=>[]);
+    var fd = rows?.[0];
+    if (!fd?.source_html) { compassToast('Form not found.', 2500); return; }
+    // Find the draft data
+    var draft = (window._myrDrafts||[]).find(d => d.id === draftId);
+    var savedData = draft?.form_data || {};
+    // Inject saved values into form HTML via script tag
+    var restoreScript = `<script>
+window.addEventListener('DOMContentLoaded', function() {
+  var saved = ${JSON.stringify(savedData)};
+  Object.keys(saved).forEach(function(label) {
+    var el = document.querySelector('[data-label="' + label + '"]');
+    if (el && saved[label]) el.value = saved[label];
+  });
+  if (typeof buildTable === 'function' && (saved['Trip Start Date'] || saved['Trip End Date'])) {
+    var s = document.getElementById('trip-start');
+    var e = document.getElementById('trip-end');
+    if (s && saved['Trip Start Date']) s.value = saved['Trip Start Date'];
+    if (e && saved['Trip End Date']) e.value = saved['Trip End Date'];
+    if (typeof onDateChange === 'function') onDateChange();
+  }
+});
+<\/script>`;
+    var html = fd.source_html.replace('</body>', restoreScript + '</body>');
+    if (!html.includes('</body>')) html = fd.source_html + restoreScript;
+    var blob = new Blob([html], {type:'text/html;charset=utf-8'});
+    _myrOpenHtmlFormOverlay(fd.source_name, URL.createObjectURL(blob));
+  } catch(e) {
+    console.error('[myrContinueDraft] failed:', e);
+    compassToast('Could not open draft — please try again.', 3000);
+  }
+};
+
+window.myrDiscardDraft = async function(draftId, name, evt) {
+  if (evt) { evt.stopPropagation(); evt.preventDefault(); }
+  if (!confirm('Discard draft for "' + name + '"?')) return;
+  try {
+    var firmId = _mwFirmId();
+    await API.delete('form_drafts?id=eq.' + draftId + '&firm_id=eq.' + firmId);
+    compassToast('Draft discarded.', 2000);
+    if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 500);
+  } catch(e) {
+    console.error('[myrDiscardDraft] failed:', e);
+    compassToast('Failed to discard draft.', 3000);
+  }
+};
 
 // ── HISTORY ───────────────────────────────────────────────────────────────────
 function _myrRenderHistory() {
@@ -1256,7 +1364,25 @@ window.addEventListener('message', function(ev) {
   var d = ev.data;
   if (!d || !d.type) return;
   if (d.type === 'compass_form_save_draft') {
-    compassToast('Draft saved.', 2500);
+    (async function() {
+      try {
+        var firmId = _mwFirmId();
+        var res    = window._myResource;
+        if (!res?.id) { compassToast('Draft saved locally — sign in to persist.', 2500); return; }
+        await API.post('form_drafts', {
+          firm_id:          firmId,
+          user_id:          res.id,
+          form_def_id:      d.formId,
+          form_data:        d.formData || {},
+          updated_at:       new Date().toISOString(),
+        }, { upsert: true, onConflict: 'firm_id,user_id,form_def_id' });
+        compassToast('Draft saved. Resume anytime from Active tab.', 3000);
+        if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 500);
+      } catch(e) {
+        console.error('[save_draft] failed:', e);
+        compassToast('Draft save failed — please try again.', 3000);
+      }
+    })();
   } else if (d.type === 'compass_form_submit') {
     var overlay = document.getElementById('myr-html-form-overlay');
     if (overlay) overlay.remove();
@@ -1281,6 +1407,14 @@ window.addEventListener('message', function(ev) {
           form_data:                  d.formData || null,
         };
         await API.post('workflow_instances', payload);
+        // Delete draft on successful submit
+        try {
+          var firmId2 = _mwFirmId();
+          var resId2  = window._myResource?.id;
+          if (resId2 && formId) {
+            await API.delete('form_drafts?firm_id=eq.' + firmId2 + '&user_id=eq.' + resId2 + '&form_def_id=eq.' + formId);
+          }
+        } catch(e) { console.warn('[submit] draft cleanup failed:', e); }
         compassToast('Submitted for approval. You will be notified when reviewed.', 4000);
         if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 1000);
       } catch(e) {
