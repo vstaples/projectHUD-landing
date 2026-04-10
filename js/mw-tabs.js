@@ -1025,7 +1025,7 @@ body,html{margin:0;padding:0;font-family:Arial,sans-serif;font-size:12px;backgro
         const html = fd2.source_html.includes('<style>') 
           ? fd2.source_html 
           : CADENCE_FORM_CSS + fd2.source_html;
-        const blob = new Blob([html], { type: 'text/html' });
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
         _myrOpenHtmlFormOverlay(fd2.source_name || 'Form', blobUrl);
         return;
@@ -1136,7 +1136,7 @@ function _myrOpenHtmlFormOverlay(title, url) {
   var iframe = document.createElement('iframe');
   iframe.src = url;
   iframe.style.cssText = 'flex:1;width:100%;border:none';
-  iframe.allow = 'same-origin';
+  // iframe.allow removed — was triggering unrecognized feature warning
   iframe.sandbox = 'allow-scripts allow-forms allow-popups';
 
   modal.style.position = 'relative';
