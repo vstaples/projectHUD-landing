@@ -961,7 +961,30 @@ window.myrLaunchRequest = async function(type, templateId) {
       ).catch(() => []);
       const fd2 = rows2?.[0];
       if (fd2 && fd2.source_html) {
-        const blob = new Blob([fd2.source_html], { type: 'text/html' });
+        // Prepend CSS variable overrides only — keep the form's own styles intact
+        const cssReset = `<style>
+          :root {
+            --bg1:#ffffff; --bg2:#f9fafb; --bg3:#f3f4f6;
+            --surf2:#f3f4f6; --surf3:#e5e7eb;
+            --border:#d1d5db; --border2:#e5e7eb;
+            --text:#1a1a2e; --text1:#1a1a2e; --text2:#374151; --muted:#6b7280;
+            --cad:#00c9c9; --accent:#00c9c9; --amber:#f59e0b; --red:#E24B4A;
+            --green:#1d9e75;
+          }
+          html, body { background: #ffffff !important; color: #1a1a2e !important; }
+          input, select, textarea {
+            border: 0.5px solid #d1d5db !important;
+            border-radius: 5px !important;
+            background: #f9fafb !important;
+            color: #1a1a2e !important;
+            font-family: Arial, sans-serif;
+          }
+          input[type="date"] { padding: 4px 8px !important; }
+        </style>`;
+        const html = fd2.source_html.includes('<head>')
+          ? fd2.source_html.replace('<head>', '<head>' + cssReset)
+          : cssReset + fd2.source_html;
+        const blob = new Blob([html], { type: 'text/html' });
         const blobUrl = URL.createObjectURL(blob);
         _myrOpenHtmlFormOverlay(fd2.source_name || 'Form', blobUrl);
         return;
@@ -1036,16 +1059,49 @@ function _myrOpenHtmlFormOverlay(title, url) {
   var overlay = document.createElement('div');
   overlay.id = 'myr-html-form-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
-  overlay.innerHTML =
-    '<div style="width:90vw;max-width:1000px;height:90vh;background:var(--color-background-primary);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.6)">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:#00c9c9;flex-shrink:0">' +
-        '<span style="font-family:Arial,sans-serif;font-size:14px;font-weight:500;color:#003333">' + title + '</span>' +
-        '<button onclick="var o=document.getElementById(this.dataset.oid);if(o)o.remove();" data-oid="myr-html-form-overlay" ' +
-          'style="background:none;border:none;color:#003333;font-size:18px;cursor:pointer;line-height:1;padding:0 4px">✕</button>' +
-      '</div>' +
-      '<iframe src="' + url + '" style="flex:1;width:100%;border:none" ' +
-        'allow="same-origin" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>' +
-    '</div>';
+
+  var modal = document.createElement('div');
+  modal.id = 'myr-html-form-modal';
+  modal.style.cssText = 'width:90vw;max-width:1000px;height:90vh;background:#fff;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.6);transition:all .2s ease';
+
+  // Minimal control bar — just maximize + close, no duplicate title
+  var bar = document.createElement('div');
+  bar.style.cssText = 'display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 10px;background:rgba(0,0,0,.08);flex-shrink:0;position:absolute;top:0;right:0;z-index:10';
+
+  var maxBtn = document.createElement('button');
+  maxBtn.title = 'Maximize';
+  maxBtn.innerHTML = '⛶';
+  maxBtn.style.cssText = 'background:none;border:none;color:#003333;font-size:16px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:3px;opacity:.7';
+  maxBtn.onclick = function() {
+    var m = document.getElementById('myr-html-form-modal');
+    if (m.dataset.maximized === '1') {
+      m.style.width = '90vw'; m.style.maxWidth = '1000px'; m.style.height = '90vh';
+      m.dataset.maximized = '0'; maxBtn.innerHTML = '⛶';
+    } else {
+      m.style.width = '100vw'; m.style.maxWidth = '100vw'; m.style.height = '100vh';
+      m.style.borderRadius = '0';
+      m.dataset.maximized = '1'; maxBtn.innerHTML = '⧉';
+    }
+  };
+
+  var closeBtn = document.createElement('button');
+  closeBtn.innerHTML = '✕';
+  closeBtn.style.cssText = 'background:none;border:none;color:#003333;font-size:16px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:3px;opacity:.7';
+  closeBtn.onclick = function() { overlay.remove(); };
+
+  bar.appendChild(maxBtn);
+  bar.appendChild(closeBtn);
+
+  var iframe = document.createElement('iframe');
+  iframe.src = url;
+  iframe.style.cssText = 'flex:1;width:100%;border:none';
+  iframe.allow = 'same-origin';
+  iframe.sandbox = 'allow-scripts allow-same-origin allow-forms';
+
+  modal.style.position = 'relative';
+  modal.appendChild(bar);
+  modal.appendChild(iframe);
+  overlay.appendChild(modal);
   overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
 }
