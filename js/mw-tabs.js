@@ -812,7 +812,7 @@ window.loadUserRequests = async function() {
     const firmId = _mwFirmId();
     const [wfTmpls, formDefs, instances] = await Promise.all([
       API.get(`workflow_templates?compass_visible=eq.true&status=eq.released&firm_id=eq.${firmId}&order=name.asc&select=id,name,description,status,version,trigger_type`).catch(() => []),
-      API.get(`workflow_form_definitions?compass_visible=eq.true&state=in.(certified,published)&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id,description`).catch(() => []),
+      API.get(`workflow_form_definitions?compass_visible=eq.true&state=in.(certified,published)&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id`).catch(() => []),
       resId ? API.get(`workflow_instances?submitted_by_resource_id=eq.${resId}&order=created_at.desc&limit=100&select=id,title,status,current_step_name,workflow_type,template_id,created_at,updated_at`).catch(() => []) : [],
     ]);
     window._myrTemplates = wfTmpls  || [];
@@ -846,7 +846,7 @@ function _myrRenderBrowse() {
   const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
   if (!forms.length) {
-    el.innerHTML = `<div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.3);padding:40px 0;text-align:center">No published workflows yet.<br><span style="font-size:11px;color:rgba(255,255,255,.2)">Release and publish templates in Cadence to populate this library.</span></div>`;
+    el.innerHTML = `<div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.3);padding:40px 0;text-align:center">No published forms yet.<br><span style="font-size:11px;color:rgba(255,255,255,.2)">Publish forms in Cadence to populate this library.</span></div>`;
     return;
   }
 
