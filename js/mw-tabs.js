@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260402-202500
+// VERSION: 20260410-400000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260410-399000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260410-401000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -784,7 +784,7 @@ window.loadUserConcerns = async function() {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MY REQUESTS — Cadence-backed engine  v20260410-400000
+// MY REQUESTS — Cadence-backed engine  v20260410-401000
 // ── API delete helper (API wrapper lacks delete method) ──────────────────────
 async function _myrDel(path) {
   var SUPA = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : (window.PHUD?.SUPABASE_URL || '');
@@ -996,6 +996,7 @@ function _myrRenderGroupedTable(instances, isHistory) {
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client</th>
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total</th>
+            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Net Due</th>
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
             ${!isHistory ? `<th style="padding:6px 10px;border-bottom:0.5px solid rgba(255,255,255,.08);width:32px"></th>` : ''}
           </tr>
@@ -1016,6 +1017,7 @@ function _myrRenderGroupedTable(instances, isHistory) {
           <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(desc)}</td>
           <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(client)}</td>
           <td style="${FM}font-size:11px;font-weight:700;color:#3de08a;padding:8px 10px;text-align:right;white-space:nowrap">${esc(total)}</td>
+          <td style="${FM}font-size:11px;font-weight:700;color:#00c9c9;padding:8px 10px;text-align:right;white-space:nowrap">${esc(fd['_net_due_employee']||'—')}</td>
           <td style="padding:8px 10px"><span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em">${esc(step)}</span></td>
           ${!isHistory ? `<td style="padding:4px 8px;text-align:center"><button onclick="myrWithdrawInstance('${inst.id}','${esc(inst.title)}',event)" title="Withdraw" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px;transition:color .15s" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">🗑</button></td>` : ''}
         </tr>`;
