@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260410-400000
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260410-402000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260410-403000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -784,7 +784,7 @@ window.loadUserConcerns = async function() {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MY REQUESTS — Cadence-backed engine  v20260410-402000
+// MY REQUESTS — Cadence-backed engine  v20260410-403000
 // ── API delete helper (API wrapper lacks delete method) ──────────────────────
 async function _myrDel(path) {
   var SUPA = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : (window.PHUD?.SUPABASE_URL || '');
@@ -871,6 +871,16 @@ window.loadUserRequests = async function() {
     window._myrFormDefs  = formDefs || [];
     window._myrInstances = instances || [];
     window._myrDrafts    = drafts   || [];
+    // Fetch template steps for all instance template_ids and cache
+    var tmplIds = [...new Set((instances||[]).map(function(i){ return i.template_id; }).filter(Boolean))];
+    if (tmplIds.length) {
+      var tmplStepRows = await API.get('workflow_template_steps?template_id=in.(' + tmplIds.join(',') + ')&order=sequence_order.asc&select=id,name,step_type,sequence_order,template_id').catch(function(){ return []; });
+      window._myrTmplSteps = {};
+      (tmplStepRows||[]).forEach(function(s){
+        if (!window._myrTmplSteps[s.template_id]) window._myrTmplSteps[s.template_id] = [];
+        window._myrTmplSteps[s.template_id].push(s);
+      });
+    }
     _myrRenderAll();
   } catch(e) {
     console.error('[loadUserRequests] failed:', e.message);
@@ -1022,8 +1032,11 @@ function _myrRenderGroupedTable(instances, isHistory) {
           <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientLoc)}</td>
           <td style="${FM}font-size:11px;font-weight:700;color:#3de08a;padding:8px 10px;text-align:right;white-space:nowrap">${esc(total)}</td>
           <td style="${FM}font-size:11px;font-weight:700;color:#00c9c9;padding:8px 10px;text-align:right;white-space:nowrap">${esc(netDue)}</td>
-          <td style="padding:8px 10px"><span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em">${esc(step)}</span></td>
-          ${!isHistory ? `<td style="padding:4px 8px;text-align:center"><button onclick="myrWithdrawInstance('${inst.id}','${esc(inst.title)}',event)" title="Withdraw" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px;transition:color .15s" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">🗑</button></td>` : ''}
+          <td style="padding:8px 10px;white-space:nowrap" id="myr-status-${inst.id}">${_myrStatusCell(inst, esc(step), sColor)}</td>
+          ${!isHistory ? `<td style="padding:4px 8px;white-space:nowrap;display:flex;align-items:center;gap:6px">
+            <button onclick="myrRecallToDraft_row('${inst.id}',event)" style="${FA}font-size:10px;font-weight:700;padding:3px 8px;border:1px solid #f0a030;background:transparent;color:#f0a030;border-radius:3px;cursor:pointer">Recall</button>
+            <button onclick="myrWithdrawInstance('${inst.id}','${esc(inst.title)}',event)" title="Withdraw" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px;transition:color .15s" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">&#128465;</button>
+          </td>` : ''}
         </tr>`;
       });
       html += `</tbody></table>`;
@@ -1576,99 +1589,121 @@ async function _myrEnsureCdn() {
   console.log('[myrEnsureCdn] Cadence rendering scripts ready');
 }
 
-window.myrOpenInstance = async function(instanceId) {
-  document.getElementById('myr-instance-overlay')?.remove();
+function _myrStatusCell(inst, step, sColor) {
+  var FA = 'font-family:Arial,sans-serif;font-size:11px;';
+  var steps = (window._myrTmplSteps||{})[inst.template_id] || [];
+  var stepRows = steps.map(function(s) {
+    var isActive = s.name === inst.current_step_name;
+    var isDone = inst.status === 'complete';
+    var dot = isDone ? '#1D9E75' : isActive ? '#00c9c9' : '#EF9F27';
+    var sc = isDone ? '#1D9E75' : isActive ? '#EF9F27' : '#fff';
+    var sl = isDone ? 'Complete' : isActive ? 'In Progress' : 'Waiting';
+    var dt = (s.sequence_order === 1) ? new Date(inst.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    return '<tr style="border-bottom:0.5px solid rgba(255,255,255,.08)">' +
+      '<td style="' + FA + 'color:#e8eef8;padding:6px 10px;white-space:nowrap">' +
+        '<div style="display:flex;align-items:center;gap:7px">' +
+          '<div style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0"></div>' + s.name +
+        '</div></td>' +
+      '<td style="' + FA + 'color:rgba(255,255,255,.6);padding:6px 10px;white-space:nowrap">' + dt + '</td>' +
+      '<td style="' + FA + 'color:rgba(255,255,255,.4);padding:6px 10px">—</td>' +
+      '<td style="padding:6px 10px"><span style="' + FA + 'font-weight:700;color:' + sc + '">' + sl + '</span></td>' +
+    '</tr>';
+  }).join('');
+  var tt = steps.length ? '<div class="myr-sig-tt" style="display:none;position:absolute;bottom:calc(100% + 8px);right:0;background:#111620;border:1px solid rgba(0,201,201,.4);border-radius:6px;z-index:9999;min-width:500px;box-shadow:0 8px 32px rgba(0,0,0,.7);overflow:hidden;font-size:11px">' +
+    '<div style="background:rgba(0,201,201,.12);padding:6px 12px;border-bottom:0.5px solid rgba(0,201,201,.3)">' +
+      '<span style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#00c9c9;letter-spacing:.08em;text-transform:uppercase">Signature Loop Status</span>' +
+    '</div>' +
+    '<table style="border-collapse:collapse;width:100%;font-size:11px">' +
+      '<thead><tr style="border-bottom:0.5px solid rgba(255,255,255,.1)">' +
+        '<th style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#00c9c9;padding:6px 10px;text-align:left">Step</th>' +
+        '<th style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#00c9c9;padding:6px 10px;text-align:left;white-space:nowrap">Date / Time</th>' +
+        '<th style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#00c9c9;padding:6px 10px;text-align:left">Approver</th>' +
+        '<th style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#00c9c9;padding:6px 10px;text-align:left">Status</th>' +
+      '</tr></thead>' +
+      '<tbody>' + stepRows + '</tbody>' +
+    '</table></div>' : '';
+  return '<div style="display:inline-block;position:relative;font-size:11px" onmouseenter="var t=this.querySelector(\'.myr-sig-tt\');if(t)t.style.display=\'block\'" onmouseleave="var t=this.querySelector(\'.myr-sig-tt\');if(t)t.style.display=\'none\'">' +
+    '<span style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:' + sColor + ';letter-spacing:.05em;cursor:default">' + step + '</span>' + tt +
+  '</div>';
+}
 
-  // Build overlay shell immediately so user sees feedback
-  const overlay = document.createElement('div');
-  overlay.id = 'myr-instance-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg0,#0a1628);z-index:700;display:flex;flex-direction:column;overflow:hidden';
-  overlay.innerHTML = `
-    <div id="myr-inst-header" style="display:flex;align-items:center;gap:12px;padding:10px 16px;
-      border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;background:var(--bg1,#0d1b2e)">
-      <button onclick="myrCloseInstance()"
-        style="font-family:var(--font-head);font-size:11px;padding:4px 12px;background:none;
-        border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);cursor:pointer;letter-spacing:.06em">
-        ← Back to Requests
-      </button>
-      <div id="myr-inst-title" style="font-family:var(--font-head);font-size:13px;font-weight:600;color:#F0F6FF">
-        Loading…
-      </div>
-    </div>
-    <div id="myr-inst-body" style="flex:1;overflow:hidden;position:relative">
-      <div style="display:flex;align-items:center;justify-content:center;height:100%;
-        font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,.3)">
-        Loading instance…
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-
+window.myrRecallToDraft_row = async function(instanceId, evt) {
+  if (evt) { evt.stopPropagation(); evt.preventDefault(); }
+  if (!confirm('Recall this submission and return it to Draft?')) return;
   try {
-    // Ensure Cadence rendering scripts are loaded
-    await _myrEnsureCdn();
+    var firmId = _mwFirmId();
+    var resId = _myResource?.id;
+    var inst = (window._myrInstances||[]).find(function(i){ return i.id === instanceId; });
+    if (!inst) { compassToast('Instance not found.', 2500); return; }
+    var formDefId = inst.template_id.replace(/^([0-9a-f]{6})00-/,'$110-');
+    await API.patch('workflow_instances?id=eq.' + instanceId + '&firm_id=eq.' + firmId, {status:'cancelled'});
+    await _myrDel('form_drafts?firm_id=eq.' + firmId + '&user_id=eq.' + resId + '&form_def_id=eq.' + formDefId).catch(function(){});
+    await API.post('form_drafts', {firm_id:firmId, user_id:resId, form_def_id:formDefId, form_data:inst.form_data||{}});
+    compassToast('Recalled to Draft.', 2500);
+    if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 600);
+  } catch(e) {
+    console.error('[myrRecallToDraft_row] failed:', e);
+    compassToast('Recall failed.', 3000);
+  }
+};
 
-    // Fetch instance, template steps, and CoC in parallel
-    const [instRows, stepInstRows] = await Promise.all([
-      API.get(`workflow_instances?id=eq.${instanceId}&select=*&limit=1`).catch(() => []),
-      API.get(`workflow_step_instances?instance_id=eq.${instanceId}&order=created_at.asc,id.asc`).catch(() => []),
-    ]);
-    const inst = instRows?.[0];
-    if (!inst) throw new Error('Instance not found');
-
-    // Fetch template steps
-    const tmplSteps = inst.template_id
-      ? await API.get(`workflow_template_steps?template_id=eq.${inst.template_id}&order=sequence_order.asc&select=*`).catch(() => [])
-      : [];
-
-    // Fetch template record
-    const tmplRows = inst.template_id
-      ? await API.get(`workflow_templates?id=eq.${inst.template_id}&select=*&limit=1`).catch(() => [])
-      : [];
-
-    // Hydrate Cadence globals minimally so renderInstanceDetail works
-    inst._tmplSteps  = tmplSteps  || [];
-    inst._stepInsts  = stepInstRows || [];
-    inst._selectedStep = null;
-
-    // Inject into _instances and _templates if not already present
-    if (!window._instances.find(i => i.id === inst.id)) window._instances.push(inst);
-    else { const idx = window._instances.findIndex(i => i.id === inst.id); window._instances[idx] = inst; }
-
-    if (tmplRows?.[0] && !window._templates.find(t => t.id === tmplRows[0].id)) {
-      tmplRows[0].steps = tmplSteps || [];
-      window._templates.push(tmplRows[0]);
-    }
-
-    window._selectedInstance = inst;
-
-    // Update header title
-    const titleEl = document.getElementById('myr-inst-title');
-    if (titleEl) titleEl.textContent = inst.title || 'Request';
-
-    // Mount Cadence instance detail into overlay body
-    const bodyEl = document.getElementById('myr-inst-body');
-    if (bodyEl && typeof renderInstanceDetail === 'function') {
-      renderInstanceDetail(bodyEl, inst);
-      // Start live event detection for this instance
-      if (typeof _startExternalEventDetection === 'function') {
-        _startExternalEventDetection(inst.id);
-      }
-      if (typeof _startElapsedTimer === 'function') {
-        _startElapsedTimer(inst);
-      }
-    } else if (bodyEl) {
-      bodyEl.innerHTML = `<div style="padding:40px;font-family:var(--font-head);font-size:12px;
-        color:rgba(255,255,255,.4)">Instance renderer not available — ensure cdn-instances.js is loaded.</div>`;
-    }
-
-    // myrCloseInstance() is called by the back button — defined below
-
-
+window.myrOpenInstance = async function(instanceId) {
+  try {
+    var firmId = _mwFirmId();
+    var instRows = await API.get('workflow_instances?id=eq.' + instanceId + '&select=*&limit=1').catch(function(){ return []; });
+    var inst = instRows?.[0];
+    if (!inst) { compassToast('Instance not found.', 2500); return; }
+    var formDefId = inst.template_id ? inst.template_id.replace(/^([0-9a-f]{6})00-/,'$110-') : null;
+    if (!formDefId) { compassToast('No form linked.', 2500); return; }
+    var rows = await API.get('workflow_form_definitions?id=eq.' + formDefId + '&firm_id=eq.' + firmId + '&select=id,source_name,source_html&limit=1').catch(function(){ return []; });
+    var fd = rows?.[0];
+    if (!fd?.source_html) { compassToast('Form not found.', 2500); return; }
+    var savedData = inst.form_data || {};
+    var restoreScript = '<script>\nwindow.addEventListener(\'DOMContentLoaded\', function() {\n' +
+      '  var saved = ' + JSON.stringify(savedData) + ';\n' +
+      '  Object.keys(saved).forEach(function(label) {\n' +
+      '    if (label.indexOf(\'_grid_\') === 0) return;\n' +
+      '    var el = document.querySelector(\'[data-label="\' + label + \'"]\'  );\n' +
+      '    if (el && saved[label]) el.value = saved[label];\n' +
+      '  });\n' +
+      '  if (typeof buildTable === \'function\' && (saved[\'Trip Start Date\'] || saved[\'Trip End Date\'])) {\n' +
+      '    var s = document.querySelector(\'[data-label="Trip Start Date"]\');\n' +
+      '    var e = document.querySelector(\'[data-label="Trip End Date"]\');\n' +
+      '    if (s && saved[\'Trip Start Date\']) s.value = saved[\'Trip Start Date\'];\n' +
+      '    if (e && saved[\'Trip End Date\']) e.value = saved[\'Trip End Date\'];\n' +
+      '    if (typeof onDateChange === \'function\') onDateChange();\n' +
+      '    setTimeout(function() {\n' +
+      '      Object.keys(saved).forEach(function(label) {\n' +
+      '        if (label.indexOf(\'_grid_\') !== 0) return;\n' +
+      '        var parts = label.split(\'_\');\n' +
+      '        var cat = parts[2]; var dk = parts.slice(3).join(\'-\');\n' +
+      '        var el = document.querySelector(\'[data-cat="\' + cat + \'"  ][data-dk="\' + dk + \'"]\'  );\n' +
+      '        if (el) { el.value = saved[label]; el.dispatchEvent(new Event(\'input\')); }\n' +
+      '      });\n' +
+      '      document.querySelectorAll(\'input,textarea,select\').forEach(function(el) { el.disabled=true; el.style.cursor=\'not-allowed\'; });\n' +
+      '      document.querySelectorAll(\'.btn-s,.btn-p,.ftr\').forEach(function(el) { el.style.display=\'none\'; });\n' +
+      '    }, 300);\n' +
+      '  } else {\n' +
+      '    document.querySelectorAll(\'input,textarea,select\').forEach(function(el) { el.disabled=true; el.style.cursor=\'not-allowed\'; });\n' +
+      '    document.querySelectorAll(\'.btn-s,.btn-p,.ftr\').forEach(function(el) { el.style.display=\'none\'; });\n' +
+      '  }\n' +
+      '});\n<\/script>';
+    var html = fd.source_html.replace('<\/body>', restoreScript + '<\/body>');
+    if (!html.includes('<\/body>')) html = fd.source_html + restoreScript;
+    var blob = new Blob([html], {type:'text/html;charset=utf-8'});
+    _myrOpenHtmlFormOverlay(fd.source_name, URL.createObjectURL(blob));
+    setTimeout(function() {
+      var bar = document.querySelector('#myr-html-form-modal > div');
+      if (!bar) return;
+      var recallBtn = document.createElement('button');
+      recallBtn.textContent = 'Recall to Draft';
+      recallBtn.style.cssText = 'font-family:Arial,sans-serif;font-size:11px;font-weight:700;padding:4px 14px;background:none;border:1px solid #f0a030;color:#f0a030;cursor:pointer;border-radius:4px;margin-right:8px';
+      recallBtn.onclick = function() { myrRecallToDraft_row(inst.id, null); };
+      bar.insertBefore(recallBtn, bar.firstChild);
+    }, 50);
   } catch(e) {
     console.error('[myrOpenInstance] failed:', e);
-    const bodyEl = document.getElementById('myr-inst-body');
-    if (bodyEl) bodyEl.innerHTML = `<div style="padding:40px;font-family:var(--font-head);
-      font-size:12px;color:#E24B4A">Failed to load: ${e.message}</div>`;
+    compassToast('Failed to open: ' + e.message, 3000);
   }
 };
 
