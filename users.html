@@ -1104,6 +1104,8 @@ function openResourceDrawer(id) {
     });
     roleEl.appendChild(og);
   });
+  // Force value after optgroup build — o.selected alone is unreliable with optgroups
+  roleEl.value = r?.hud_role_id || '';
   // Auto-fill department when role changes
   roleEl.onchange = function() {
     var roleId = this.value;
