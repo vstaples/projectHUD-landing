@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260410-SE107 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260410-SE109 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -746,7 +746,9 @@ function _renderMatrix() {
       var isSelected = _selectedFieldIds && _selectedFieldIds.has(field.id);
       var rowBg = isSelected ? 'background:var(--cad-dim)' : '';
 
-      out.push('<tr id="vmrow-' + field.id + '" data-fid="' + field.id + '" style="cursor:pointer;' + rowBg + '">');
+      var isCert = field.section === 'certification';
+      var dragAttrs = isCert ? ' draggable="true" ondragstart="_vmCertDragStart(event,\'' + field.id + '\')" ondragover="_vmCertDragOver(event,\'' + field.id + '\')" ondrop="_vmCertDrop(event,\'' + field.id + '\')" ondragend="_vmCertDragEnd()"' : '';
+      out.push('<tr id="vmrow-' + field.id + '" data-fid="' + field.id + '"' + dragAttrs + ' style="cursor:' + (isCert ? 'grab' : 'pointer') + ';' + rowBg + '">');
 
       // Name cell
       out.push('<td style="padding:5px 8px;' + BDR + 'color:var(--text1);max-width:160px">' +
@@ -6717,3 +6719,38 @@ CREATE TABLE IF NOT EXISTS workflow_form_responses (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_form_responses_unique_field ON workflow_form_responses(instance_id,step_id,stage,field_id);
   `);
 }
+
+// ── Certification row D&D ─────────────────────────────────────────────────────
+var _vmCertDragId = null;
+window._vmCertDragStart = function(e, fid) {
+  _vmCertDragId = fid;
+  e.dataTransfer.effectAllowed = 'move';
+  var row = document.getElementById('vmrow-' + fid);
+  if (row) row.style.opacity = '0.4';
+};
+window._vmCertDragOver = function(e, fid) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('#form-matrix-wrap tr').forEach(function(r){ r.style.borderTop = ''; });
+  var row = document.getElementById('vmrow-' + fid);
+  if (row && fid !== _vmCertDragId) row.style.borderTop = '2px solid #00c9c9';
+};
+window._vmCertDragEnd = function() {
+  document.querySelectorAll('#form-matrix-wrap tr').forEach(function(r){
+    r.style.opacity = ''; r.style.borderTop = '';
+  });
+  _vmCertDragId = null;
+};
+window._vmCertDrop = function(e, targetFid) {
+  e.preventDefault();
+  if (!_vmCertDragId || _vmCertDragId === targetFid) return;
+  var dragIdx = _formFields.findIndex(function(f){ return f.id === _vmCertDragId; });
+  var targetIdx = _formFields.findIndex(function(f){ return f.id === targetFid; });
+  if (dragIdx < 0 || targetIdx < 0) return;
+  var dragged = _formFields.splice(dragIdx, 1)[0];
+  var newIdx = _formFields.findIndex(function(f){ return f.id === targetFid; });
+  _formFields.splice(newIdx, 0, dragged);
+  var wrap = document.getElementById('form-matrix-wrap');
+  if (wrap) wrap.innerHTML = _renderMatrix();
+  _vmCertDragEnd();
+};
