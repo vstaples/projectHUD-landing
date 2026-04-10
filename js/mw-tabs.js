@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260410-393000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260410-395000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -798,7 +798,7 @@ function myrSwitchView(view, btnEl) {
   // Update subnav button states
   document.querySelectorAll('.myr-subnav').forEach(function(b) {
     b.classList.remove('active', 'on');
-    if (b.dataset.myr === view) b.classList.add('active');
+    if (b.dataset.myr === view) b.classList.add('on');
   });
   // Show/hide pane containers (myr-pane-*) and content divs
   ['browse', 'active', 'history'].forEach(function(k) {
@@ -921,26 +921,100 @@ function _myrRenderBrowse() {
 }
 
 // ── ACTIVE ────────────────────────────────────────────────────────────────────
+
+// ── Grouped table renderer for Active + History ───────────────────────────────
+function _myrRenderGroupedTable(instances, isHistory) {
+  const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const FA = 'font-family:Arial,sans-serif;';
+  const FM = 'font-family:var(--font-mono,monospace);';
+
+  // Group by template_id → form name
+  var groups = {};
+  instances.forEach(function(inst) {
+    var fd = (window._myrFormDefs||[]).find(function(f){ return f.id === inst.template_id; });
+    var grpKey = inst.template_id || 'other';
+    var grpName = fd ? fd.source_name : (inst.title?.split(' —')[0] || 'Other');
+    if (!groups[grpKey]) groups[grpKey] = { name: grpName, items: [] };
+    groups[grpKey].items.push(inst);
+  });
+
+  var statusColor = { in_progress:'#EF9F27', complete:'#3de08a', cancelled:'rgba(255,255,255,.3)', under_review:'#00D2FF' };
+
+  var html = '';
+  Object.values(groups).forEach(function(grp) {
+    // Sort by created_at desc within group
+    grp.items.sort(function(a,b){ return new Date(b.created_at)-new Date(a.created_at); });
+
+    // Group header
+    html += `<div style="margin-bottom:4px;margin-top:16px;padding:6px 10px;background:rgba(0,201,201,.06);border-left:3px solid #00c9c9;border-radius:0 4px 4px 0;display:flex;align-items:center;justify-content:space-between">
+      <span style="${FA}font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#00c9c9">${esc(grp.name)}</span>
+      <span style="${FM}font-size:10px;color:rgba(255,255,255,.3)">${grp.items.length} request${grp.items.length!==1?'s':''}</span>
+    </div>`;
+
+    // Check if this is an expense report group (has expense form_data)
+    var isExpense = grp.items.some(function(i){ return i.form_data && i.form_data['_total_expenses']; });
+
+    if (isExpense) {
+      // Table layout for expense reports
+      html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px">
+        <thead>
+          <tr style="background:rgba(255,255,255,.04)">
+            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Date Filed</th>
+            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Business Purpose</th>
+            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
+            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client</th>
+            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total</th>
+            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
+          </tr>
+        </thead>
+        <tbody>`;
+      grp.items.forEach(function(inst) {
+        var fd = inst.form_data || {};
+        var date = inst.created_at ? new Date(inst.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+        var purpose = fd['_purpose_label'] || fd['Business Purpose'] || '—';
+        var desc = fd['Purpose Description'] || '—';
+        var client = fd['Customer Name'] ? fd['Customer Name'] + (fd['Customer Location'] ? ', ' + fd['Customer Location'] : '') : '—';
+        var total = fd['_total_expenses'] || '—';
+        var step = inst.current_step_name || inst.status || '—';
+        var sColor = statusColor[inst.status] || '#EF9F27';
+        html += `<tr onclick="myrOpenInstance('${inst.id}')" style="cursor:pointer;border-bottom:0.5px solid rgba(255,255,255,.05);transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
+          <td style="${FA}font-size:11px;color:rgba(255,255,255,.6);padding:8px 10px;white-space:nowrap">${esc(date)}</td>
+          <td style="${FA}font-size:11px;color:rgba(255,255,255,.7);padding:8px 10px">${esc(purpose)}</td>
+          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(desc)}</td>
+          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(client)}</td>
+          <td style="${FM}font-size:11px;font-weight:700;color:#3de08a;padding:8px 10px;text-align:right;white-space:nowrap">${esc(total)}</td>
+          <td style="padding:8px 10px"><span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em">${esc(step)}</span></td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+    } else {
+      // Generic card layout for non-expense forms
+      grp.items.forEach(function(inst) {
+        var date = inst.created_at ? new Date(inst.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+        var step = inst.current_step_name || inst.status || '—';
+        var sColor = statusColor[inst.status] || '#EF9F27';
+        html += `<div onclick="myrOpenInstance('${inst.id}')" style="padding:10px 12px;border:0.5px solid rgba(255,255,255,.07);border-radius:4px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
+          <div>
+            <div style="${FA}font-size:12px;font-weight:600;color:#F0F6FF;margin-bottom:3px">${esc(inst.title)}</div>
+            <div style="${FA}font-size:11px;color:rgba(255,255,255,.35)">${esc(date)}</div>
+          </div>
+          <span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em;white-space:nowrap">${esc(step)}</span>
+        </div>`;
+      });
+    }
+  });
+  return html;
+}
+
 function _myrRenderActive() {
   const el = document.getElementById('myr-active-content');
   if (!el) return;
   const active = (window._myrInstances||[]).filter(i => i.status !== 'complete' && i.status !== 'cancelled');
-  const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   if (!active.length) {
     el.innerHTML = `<div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.3);padding:32px 0;text-align:center">No active requests. Browse the catalog to submit a new request.</div>`;
     return;
   }
-  el.innerHTML = active.map(inst => {
-    const stepColor = inst.current_step_name==='Approve'?'#EF9F27':inst.current_step_name==='Review'?'#00D2FF':inst.current_step_name==='Complete'?'#4ade80':'rgba(255,255,255,.4)';
-    const age = inst.created_at ? Math.floor((Date.now()-new Date(inst.created_at))/86400000) : null;
-    return `<div onclick="myrOpenInstance('${inst.id}')" style="padding:12px 14px;border:1px solid rgba(255,255,255,.07);border-radius:4px;margin-bottom:8px;cursor:pointer;background:rgba(255,255,255,.02);transition:background .12s" onmouseover="this.style.background='rgba(0,210,255,.04)'" onmouseout="this.style.background='rgba(255,255,255,.02)'">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-        <div style="font-family:var(--font-head);font-size:13px;font-weight:600;color:#F0F6FF">${esc(inst.title)}</div>
-        <div style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">${age!==null?age+'d ago':''}</div>
-      </div>
-      <span style="font-family:var(--font-mono);font-size:11px;color:${stepColor};letter-spacing:.06em">${esc(inst.current_step_name||inst.status||'—')}</span>
-    </div>`;
-  }).join('');
+  el.innerHTML = _myrRenderGroupedTable(active, false);
 }
 
 // ── HISTORY ───────────────────────────────────────────────────────────────────
@@ -948,20 +1022,11 @@ function _myrRenderHistory() {
   const el = document.getElementById('myr-history-content');
   if (!el) return;
   const done = (window._myrInstances||[]).filter(i => i.status==='complete'||i.status==='cancelled');
-  const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   if (!done.length) {
     el.innerHTML = `<div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.3);padding:32px 0;text-align:center">No completed requests yet.</div>`;
     return;
   }
-  el.innerHTML = done.map(inst => {
-    const color = inst.status==='complete'?'#4ade80':'rgba(255,255,255,.3)';
-    return `<div onclick="myrOpenInstance('${inst.id}')" style="padding:10px 14px;border:1px solid rgba(255,255,255,.06);border-radius:4px;margin-bottom:6px;cursor:pointer;background:rgba(255,255,255,.01)" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background='rgba(255,255,255,.01)'">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div style="font-family:var(--font-head);font-size:12px;color:rgba(255,255,255,.6)">${esc(inst.title)}</div>
-        <span style="font-family:var(--font-mono);font-size:10px;color:${color};text-transform:uppercase;letter-spacing:.06em">${esc(inst.status)}</span>
-      </div>
-    </div>`;
-  }).join('');
+  el.innerHTML = _myrRenderGroupedTable(done, true);
 }
 
 // ── LAUNCH ────────────────────────────────────────────────────────────────────
@@ -1195,9 +1260,34 @@ window.addEventListener('message', function(ev) {
   } else if (d.type === 'compass_form_submit') {
     var overlay = document.getElementById('myr-html-form-overlay');
     if (overlay) overlay.remove();
-    compassToast('Submitted for approval. You will be notified when reviewed.', 4000);
-    // Reload active requests
-    if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 1000);
+    // Create workflow_instance record in DB
+    (async function() {
+      try {
+        var firmId  = _mwFirmId();
+        var res     = window._myResource;
+        var formId  = d.formId || null;
+        var formDef = (window._myrFormDefs||[]).find(function(f){ return f.id === formId; });
+        var title   = (formDef ? formDef.source_name : 'Form Submission') + ' — ' + (res?.name || 'Unknown');
+        var payload = {
+          firm_id:                    firmId,
+          title:                      title,
+          status:                     'in_progress',
+          workflow_type:              'form',
+          template_id:                formId,
+          submitted_by_resource_id:   res?.id   || null,
+          submitted_by_name:          res?.name || null,
+          current_step_name:          'Under Review',
+          event_notes:                'Submitted via Compass by ' + (res?.name || 'user'),
+          form_data:                  d.formData || null,
+        };
+        await API.post('workflow_instances', payload);
+        compassToast('Submitted for approval. You will be notified when reviewed.', 4000);
+        if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 1000);
+      } catch(e) {
+        console.error('[compass_form_submit] failed to create instance:', e);
+        compassToast('Submission failed — please try again.', 4000);
+      }
+    })();
   } else if (d.type === 'compass_form_error') {
     compassToast('Please complete all required fields: ' + (d.fields||[]).join(', '), 4000);
   }
