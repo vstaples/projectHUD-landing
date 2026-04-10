@@ -584,7 +584,8 @@ function _renderFormEditor() {
           <div style="padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px">
             <span style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:1">Visibility Matrix</span>
             <span id="form-fill-seq" style="font-size:12px;color:var(--text2)"></span>
-            <button onclick="_formAddMatrixRole()" class="btn btn-ghost btn-sm" style="font-size:12px;padding:2px 8px">+ Role</button>
+            <button onclick="_formAddFillRouting()" class="btn btn-ghost btn-sm" style="font-size:12px;padding:2px 8px">+ Fill Routing</button>
+            <button onclick="_formAddSignatory()" class="btn btn-ghost btn-sm" style="font-size:12px;padding:2px 8px">+ Signatory</button>
             <button onclick="_formAutoRename()" class="btn btn-ghost btn-sm" style="font-size:12px;padding:2px 8px" title="Auto-rename">⟳</button>
             <span id="form-sel-count" style="font-size:12px;font-weight:600;color:var(--cad);display:none">0 selected</span>
           </div>
@@ -667,15 +668,74 @@ function _vmEnsureRoles() {
   if (!_formMatrixRoles.length) _formMatrixRoles = ['assignee','reviewer','approver','pm','external'];
 }
 
-function _formAddMatrixRole() {
+function _formAddMatrixRole() { _formAddFillRouting(); }
+
+function _formAddFillRouting() {
   _vmEnsureRoles();
   var all = Object.keys(FORM_ROLES);
   var available = all.filter(function(r){ return _formMatrixRoles.indexOf(r) < 0; });
-  if (!available.length) { cadToast('All roles already added', 'info'); return; }
-  // Simple prompt-free: add first available
-  var next = available[0];
-  _formMatrixRoles.push(next);
+  if (!available.length) { cadToast('All fill routing roles already added', 'info'); return; }
+  var overlay = document.createElement('div');
+  overlay.id = 'fr-picker';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)';
+  var inner = '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:16px;min-width:220px">';
+  inner += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;letter-spacing:.06em;text-transform:uppercase">Add Fill Routing Role</div>';
+  available.forEach(function(r) {
+    var conf = FORM_ROLES[r] || { label: r, color: 'var(--muted)' };
+    inner += '<div data-fr-role="' + r + '" style="padding:7px 10px;border-radius:5px;cursor:pointer;font-size:12px;color:' + conf.color + ';margin-bottom:3px;border:1px solid rgba(255,255,255,.06)">' + escHtml(conf.label) + '</div>';
+  });
+  inner += '<div data-fr-cancel="1" style="margin-top:8px;font-size:11px;color:var(--muted);cursor:pointer;text-align:center">Cancel</div>';
+  inner += '</div>';
+  overlay.innerHTML = inner;
+  overlay.addEventListener('click', function(ev) {
+    var role = ev.target.closest('[data-fr-role]');
+    if (role) { _formAddFillRoutingConfirm(role.dataset.frRole); return; }
+    if (ev.target.closest('[data-fr-cancel]') || ev.target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
+}
+function _formAddFillRoutingConfirm(role) {
+  document.getElementById('fr-picker')?.remove();
+  if (_formMatrixRoles.indexOf(role) < 0) _formMatrixRoles.push(role);
   _reRenderMatrix();
+}
+
+function _formAddSignatory() {
+  var overlay = document.createElement('div');
+  overlay.id = 'sig-picker';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)';
+  var inner = '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:16px;min-width:260px">';
+  inner += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;letter-spacing:.06em;text-transform:uppercase">Add Signatory</div>';
+  inner += '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Role name (e.g. manager, finance, client sponsor)</div>';
+  inner += '<input id="sig-role-input" placeholder="Role name" style="width:100%;font-size:12px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:6px 8px;color:var(--text);font-family:Arial,sans-serif;margin-bottom:6px;box-sizing:border-box">';
+  inner += '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Label (e.g. Manager Signature)</div>';
+  inner += '<input id="sig-label-input" placeholder="Display label" style="width:100%;font-size:12px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:6px 8px;color:var(--text);font-family:Arial,sans-serif;margin-bottom:10px;box-sizing:border-box">';
+  inner += '<div style="display:flex;gap:8px">';
+  inner += '<div data-sig-confirm="1" style="flex:1;padding:7px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--cad);text-align:center;border:1px solid var(--cad-wire);background:var(--cad-dim)">Add Signatory</div>';
+  inner += '<div data-sig-cancel="1" style="padding:7px 12px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--muted);text-align:center;border:1px solid var(--border)">Cancel</div>';
+  inner += '</div></div>';
+  overlay.innerHTML = inner;
+  overlay.addEventListener('click', function(ev) {
+    if (ev.target.closest('[data-sig-confirm]')) { _formAddSignatoryConfirm(); return; }
+    if (ev.target.closest('[data-sig-cancel]') || ev.target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
+  setTimeout(function(){ var el = document.getElementById('sig-role-input'); if (el) el.focus(); }, 50);
+}
+function _formAddSignatoryConfirm() {
+  var roleEl  = document.getElementById('sig-role-input');
+  var labelEl = document.getElementById('sig-label-input');
+  var role  = (roleEl?.value  || '').trim().toLowerCase().replace(/\s+/g,'-');
+  var label = (labelEl?.value || '').trim();
+  if (!role) { cadToast('Role name is required', 'warn'); return; }
+  if (!label) label = role.charAt(0).toUpperCase() + role.slice(1) + ' Signature';
+  document.getElementById('sig-picker')?.remove();
+  var newId = 'f' + Date.now().toString(36);
+  var sigField = { id: newId, label: label, role: role, type: 'signature', section: 'certification', required: true };
+  _formFields = (_formFields || []).concat([sigField]);
+  _formDirty = true;
+  _reRenderMatrix();
+  cadToast('Signatory added — save to persist', 'success');
 }
 
 function _vmUpdateFillSeq() {
@@ -717,14 +777,23 @@ function _renderMatrix() {
       '<span data-rmrole="' + r + '" style="margin-left:3px;opacity:.4;cursor:pointer;font-size:9px" title="Remove role">✕</span>' +
       '</th>');
   });
+  out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;width:28px"></th>');
   out.push('</tr></thead><tbody>');
 
   var sections = _vmGroupSections(fields);
   sections.forEach(function(sec) {
     // Section header row — Field+Type+Req in first td, then one td per role with quick-apply chips
+    var secDisplayName = sec.name === 'certification' ? 'SIGNATORIES' : sec.name;
+    var secTotalCols = 3 + roles.length + 1;
     out.push('<tr>');
-    out.push('<td colspan="3" style="background:var(--bg2);padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:none">' +
-      escHtml(sec.name) + ' <span style="font-weight:400;opacity:.5">(' + sec.fields.length + ')</span></td>');
+    out.push('<td colspan="' + secTotalCols + '" style="background:var(--bg2);padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:none">' +
+      '<div style="display:flex;align-items:center">' +
+      '<span style="flex:1">' + escHtml(secDisplayName) + ' <span style="font-weight:400;opacity:.5">(' + sec.fields.length + ')</span></span>' +
+      '<span data-del-sec="' + sec.id + '" data-sec-name="' + escHtml(secDisplayName) + '" title="Delete section and all its fields" ' +
+        'style="cursor:pointer;color:var(--muted);font-size:12px;opacity:.3;margin-right:4px" ' +
+        'onmouseover="this.style.opacity=1;this.style.color=\'var(--red)\'" ' +
+        'onmouseout="this.style.opacity=.3;this.style.color=\'var(--muted)\'">🗑</span>' +
+      '</div></td>');
     roles.forEach(function(r) {
       var lbl = escHtml((FORM_ROLES[r] || { label: r }).label);
       out.push('<td style="background:var(--bg2);padding:3px 2px;border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:1px solid var(--border);text-align:center">');
@@ -750,34 +819,60 @@ function _renderMatrix() {
       var dragAttrs = isCert ? ' draggable="true" ondragstart="_vmCertDragStart(event,\'' + field.id + '\')" ondragover="_vmCertDragOver(event,\'' + field.id + '\')" ondrop="_vmCertDrop(event,\'' + field.id + '\')" ondragend="_vmCertDragEnd()"' : '';
       out.push('<tr id="vmrow-' + field.id + '" data-fid="' + field.id + '"' + dragAttrs + ' style="cursor:' + (isCert ? 'grab' : 'pointer') + ';' + rowBg + '">');
 
-      // Name cell
-      out.push('<td style="padding:5px 8px;' + BDR + 'color:var(--text1);max-width:160px">' +
-        '<div data-label-target="1" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
-        escHtml(field.label || 'Unlabelled') + '</div></td>');
+      if (isCert) {
+        // SIGNATORY ROW — drag handle + label + role pill + trash, spans all columns
+        var totalCols = 3 + roles.length + 1;
+        out.push('<td colspan="' + totalCols + '" style="padding:4px 8px;' + BDR + '">' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="color:var(--muted);font-size:13px;cursor:grab;flex-shrink:0">⠿</span>' +
+          '<span style="font-size:12px;color:var(--text1);flex:1">' + escHtml(field.label || 'Signature') + '</span>' +
+          '<span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;' +
+            'padding:2px 8px;border-radius:999px;border:1px solid rgba(0,201,201,.3);color:var(--cad);background:rgba(0,201,201,.06)">' +
+            escHtml(field.role || '') + '</span>' +
+          '<span data-del-fid="' + field.id + '" title="Remove signatory" ' +
+            'style="cursor:pointer;color:var(--muted);font-size:12px;flex-shrink:0;opacity:.5" ' +
+            'onmouseover="this.style.opacity=1;this.style.color=\'var(--red)\'" ' +
+            'onmouseout="this.style.opacity=.5;this.style.color=\'var(--muted)\'">🗑</span>' +
+          '</div></td>');
+      } else {
+        // STANDARD FIELD ROW
+        // Name cell
+        out.push('<td style="padding:5px 8px;' + BDR + 'color:var(--text1);max-width:160px">' +
+          '<div data-label-target="1" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+          escHtml(field.label || 'Unlabelled') + '</div></td>');
 
-      // Type select
-      out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
-        '<select data-fid="' + field.id + '" data-action="type" ' +
-        'style="font-size:12px;background:var(--surf2);border:1px solid var(--border);border-radius:3px;color:var(--text2);padding:2px;cursor:pointer;width:100%;font-family:Arial,sans-serif">' +
-        typeOpts + '</select></td>');
+        // Type select
+        out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
+          '<select data-fid="' + field.id + '" data-action="type" ' +
+          'style="font-size:12px;background:var(--surf2);border:1px solid var(--border);border-radius:3px;color:var(--text2);padding:2px;cursor:pointer;width:100%;font-family:Arial,sans-serif">' +
+          typeOpts + '</select></td>');
 
-      // Required toggle
-      var reqOn = field.required;
-      out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
-        '<div data-fid="' + field.id + '" data-action="req" style="cursor:pointer;display:flex;justify-content:center">' +
-        '<div class="toggle-box' + (reqOn ? ' on' : '') + '" style="width:24px;height:13px;transform:scale(.85)"></div>' +
-        '</div></td>');
+        // Required toggle
+        var reqOn = field.required;
+        out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
+          '<div data-fid="' + field.id + '" data-action="req" style="cursor:pointer;display:flex;justify-content:center">' +
+          '<div class="toggle-box' + (reqOn ? ' on' : '') + '" style="width:24px;height:13px;transform:scale(.85)"></div>' +
+          '</div></td>');
 
-      // Role cells
-      roles.forEach(function(r) {
-        var s = _vmGet(field.id, r);
-        out.push('<td id="vmc_' + field.id + '_' + r + '" ' +
-          'data-fid="' + field.id + '" data-role="' + r + '" data-action="cell" ' +
-          'style="padding:3px 4px;' + BDL + 'text-align:center;cursor:pointer;background:' + _VM_CHIP_BG[s] + ';transition:filter .1s" ' +
-          'title="Click to cycle E\u2192R\u2192\u2014">' +
-          '<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;font-size:10px;font-weight:700;color:' + _VM_CHIP_CO[s] + '">' +
-          _VM_LABELS[s] + '</div></td>');
-      });
+        // Role cells
+        roles.forEach(function(r) {
+          var s = _vmGet(field.id, r);
+          out.push('<td id="vmc_' + field.id + '_' + r + '" ' +
+            'data-fid="' + field.id + '" data-role="' + r + '" data-action="cell" ' +
+            'style="padding:3px 4px;' + BDL + 'text-align:center;cursor:pointer;background:' + _VM_CHIP_BG[s] + ';transition:filter .1s" ' +
+            'title="Click to cycle E\u2192R\u2192\u2014">' +
+            '<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;font-size:10px;font-weight:700;color:' + _VM_CHIP_CO[s] + '">' +
+            _VM_LABELS[s] + '</div></td>');
+        });
+
+        // Trash cell
+        out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
+          '<span data-del-fid="' + field.id + '" title="Delete field" ' +
+            'style="cursor:pointer;color:var(--muted);font-size:12px;opacity:.4" ' +
+            'onmouseover="this.style.opacity=1;this.style.color=\'var(--red)\'" ' +
+            'onmouseout="this.style.opacity=.4;this.style.color=\'var(--muted)\'">🗑</span>' +
+          '</td>');
+      }
 
       out.push('</tr>');
     });
@@ -894,6 +989,35 @@ document.addEventListener('click', function(e) {
   // Remove role column
   var rmRole = t.closest('[data-rmrole]');
   if (rmRole) { e.stopPropagation(); _vmRemoveRole(rmRole.dataset.rmrole); return; }
+
+  // Delete field (trashcan)
+  var delFid = t.closest('[data-del-fid]');
+  if (delFid) {
+    e.stopPropagation();
+    var fid = delFid.dataset.delFid;
+    var field = (_formFields||[]).find(function(f){ return f.id === fid; });
+    var isSig = field && field.section === 'certification';
+    if (!isSig || confirm('Remove signatory "' + (field ? field.label : fid) + '"?')) {
+      _formFields = (_formFields||[]).filter(function(f){ return f.id !== fid; });
+      _formDirty = true;
+      _reRenderMatrix();
+    }
+    return;
+  }
+
+  // Delete section (trashcan on header)
+  var delSec = t.closest('[data-del-sec]');
+  if (delSec) {
+    e.stopPropagation();
+    var secId   = delSec.dataset.delSec;
+    var secName = delSec.dataset.secName;
+    var children = (_formFields||[]).filter(function(f){ return (f.section||'Fields').replace(/[^a-zA-Z0-9]/g,'_') === secId; });
+    if (children.length && !confirm('Delete section "' + secName + '" and its ' + children.length + ' field(s)?')) return;
+    _formFields = (_formFields||[]).filter(function(f){ return (f.section||'Fields').replace(/[^a-zA-Z0-9]/g,'_') !== secId; });
+    _formDirty = true;
+    _reRenderMatrix();
+    return;
+  }
 
   // Quick-apply section chips
   if (t.dataset.sec && t.dataset.srole && t.dataset.sstate) {
