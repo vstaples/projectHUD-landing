@@ -983,8 +983,8 @@ function _myrRenderGroupedTable(instances, isHistory) {
       <span style="${FM}font-size:10px;color:rgba(255,255,255,.3)">${grp.items.length} request${grp.items.length!==1?'s':''}</span>
     </div>`;
 
-    // Check if this is an expense report group (has expense form_data)
-    var isExpense = grp.items.some(function(i){ return i.form_data && i.form_data['_total_expenses']; });
+    // Check if this is an expense report group — by name (always) or form_data presence
+    var isExpense = /expense\s*report/i.test(grp.name) || grp.items.some(function(i){ return i.form_data && i.form_data['_total_expenses']; });
 
     if (isExpense) {
       // Table layout for expense reports
@@ -994,8 +994,9 @@ function _myrRenderGroupedTable(instances, isHistory) {
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Date Filed</th>
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Business Purpose</th>
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
-            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client</th>
-            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total</th>
+            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Name</th>
+            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Location</th>
+            <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total Expenses</th>
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Net Due</th>
             <th style="${FA}font-size:10px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
             ${!isHistory ? `<th style="padding:6px 10px;border-bottom:0.5px solid rgba(255,255,255,.08);width:32px"></th>` : ''}
@@ -1007,17 +1008,20 @@ function _myrRenderGroupedTable(instances, isHistory) {
         var date = inst.created_at ? new Date(inst.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
         var purpose = fd['_purpose_label'] || fd['Business Purpose'] || '—';
         var desc = fd['Purpose Description'] || '—';
-        var client = fd['Customer Name'] ? fd['Customer Name'] + (fd['Customer Location'] ? ', ' + fd['Customer Location'] : '') : '—';
+        var clientName = fd['Customer Name'] || '—';
+        var clientLoc = fd['Customer Location'] || '—';
         var total = fd['_total_expenses'] || '—';
+        var netDue = fd['_net_due_employee'] || '—';
         var step = inst.current_step_name || inst.status || '—';
         var sColor = statusColor[inst.status] || '#EF9F27';
         html += `<tr onclick="myrOpenInstance('${inst.id}')" style="cursor:pointer;border-bottom:0.5px solid rgba(255,255,255,.05);transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
           <td style="${FA}font-size:11px;color:rgba(255,255,255,.6);padding:8px 10px;white-space:nowrap">${esc(date)}</td>
           <td style="${FA}font-size:11px;color:rgba(255,255,255,.7);padding:8px 10px">${esc(purpose)}</td>
-          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(desc)}</td>
-          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(client)}</td>
+          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(desc)}</td>
+          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientName)}</td>
+          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientLoc)}</td>
           <td style="${FM}font-size:11px;font-weight:700;color:#3de08a;padding:8px 10px;text-align:right;white-space:nowrap">${esc(total)}</td>
-          <td style="${FM}font-size:11px;font-weight:700;color:#00c9c9;padding:8px 10px;text-align:right;white-space:nowrap">${esc(fd['_net_due_employee']||'—')}</td>
+          <td style="${FM}font-size:11px;font-weight:700;color:#00c9c9;padding:8px 10px;text-align:right;white-space:nowrap">${esc(netDue)}</td>
           <td style="padding:8px 10px"><span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em">${esc(step)}</span></td>
           ${!isHistory ? `<td style="padding:4px 8px;text-align:center"><button onclick="myrWithdrawInstance('${inst.id}','${esc(inst.title)}',event)" title="Withdraw" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px;transition:color .15s" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">🗑</button></td>` : ''}
         </tr>`;
