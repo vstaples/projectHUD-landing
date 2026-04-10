@@ -812,7 +812,7 @@ window.loadUserRequests = async function() {
     const firmId = _mwFirmId();
     const [wfTmpls, formDefs, instances] = await Promise.all([
       API.get(`workflow_templates?compass_visible=eq.true&status=eq.released&firm_id=eq.${firmId}&order=name.asc&select=id,name,description,status,version,trigger_type`).catch(() => []),
-      API.get(`workflow_form_definitions?compass_visible=eq.true&state=in.(certified,published)&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id`).catch(() => []),
+      API.get(`workflow_form_definitions?compass_visible=eq.true&state=in.(certified,published)&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id,description`).catch(() => []),
       resId ? API.get(`workflow_instances?submitted_by_resource_id=eq.${resId}&order=created_at.desc&limit=100&select=id,title,status,current_step_name,workflow_type,template_id,created_at,updated_at`).catch(() => []) : [],
     ]);
     window._myrTemplates = wfTmpls  || [];
@@ -868,10 +868,10 @@ function _myrRenderBrowse() {
           <div class="wf-card-title">${esc(f.source_name||'Form')}</div>
         </div>
         <div class="wf-card-desc">${esc(f.description||'Fill and submit for review and approval.')}</div>
-        <div class="wf-card-meta" style="display:flex;align-items:center;gap:6px;margin-top:auto">
-          <span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">v${esc(f.version||'0.1.0')}</span>
+        <div class="wf-card-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap">
+          <span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3);white-space:nowrap">v${esc(f.version||'0.1.0')}</span>
           ${certBadge}
-          <button class="wf-card-submit" style="margin-left:auto;margin-top:0" onclick="event.stopPropagation();myrLaunchRequest('form','${f.id}')">Open &#8594;</button>
+          <button class="wf-card-submit" style="margin-left:auto;margin-top:0;white-space:nowrap" onclick="event.stopPropagation();myrLaunchRequest('form','${f.id}')">Submit &#8594;</button>
         </div>
       </div>`;
     });
