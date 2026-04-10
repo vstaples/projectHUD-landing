@@ -660,12 +660,10 @@ function _vmApplySection(secLabel, role, state) {
 }
 
 function _vmEnsureRoles() {
-  // Sync _formMatrixRoles from FORM_ROLES keys, preserving any existing order
-  var known = Object.keys(FORM_ROLES);
-  known.forEach(function(r) {
-    if (_formMatrixRoles.indexOf(r) < 0) _formMatrixRoles.push(r);
-  });
-  if (!_formMatrixRoles.length) _formMatrixRoles = ['assignee','reviewer','approver','pm','external'];
+  // Only seed if empty — never re-add roles the user has removed
+  if (!_formMatrixRoles.length) {
+    _formMatrixRoles = Object.keys(FORM_ROLES);
+  }
 }
 
 function _formAddMatrixRole() { _formAddFillRouting(); }
@@ -755,58 +753,49 @@ function _vmUpdateFillSeq() {
 function _renderMatrix() {
   _vmEnsureRoles();
   var fields = _formFields || [];
-  if (!fields.length) {
-    return '<div style="padding:20px 14px;font-size:12px;color:var(--muted);text-align:center;font-family:Arial,sans-serif">Draw fields on the document to populate the matrix.</div>';
-  }
+  if (!fields.length) return '<div style="padding:20px 14px;font-size:12px;color:var(--muted);text-align:center;font-family:Arial,sans-serif">Draw fields on the document to populate the matrix.</div>';
   var roles = _formMatrixRoles;
   var out = [];
   var TH  = 'position:sticky;top:0;z-index:5;background:var(--bg2);border-bottom:1px solid var(--border);';
   var THL = TH + 'border-left:1px solid var(--border);';
   var BDR = 'border-bottom:1px solid var(--border);';
   var BDL = BDR + 'border-left:1px solid var(--border);';
-
   out.push('<table style="width:100%;border-collapse:collapse;font-size:11px;font-family:Arial,sans-serif"><thead><tr>');
   out.push('<th style="' + TH  + 'padding:5px 8px;text-align:left;font-size:12px;font-weight:500;color:var(--muted);min-width:160px">Field</th>');
   out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:12px;font-weight:500;color:var(--muted);width:90px">Type</th>');
   out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:12px;font-weight:500;color:var(--muted);width:36px">Req</th>');
-
   roles.forEach(function(r) {
     var conf = FORM_ROLES[r] || { label: r, color: 'var(--muted)' };
     out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;font-size:10px;font-weight:500;color:' + conf.color + ';min-width:52px;white-space:nowrap">' +
       escHtml(conf.label) +
-      '<span data-rmrole="' + r + '" style="margin-left:3px;opacity:.4;cursor:pointer;font-size:9px" title="Remove role">✕</span>' +
-      '</th>');
+      '<span data-rmrole="' + r + '" style="margin-left:3px;opacity:.4;cursor:pointer;font-size:9px" title="Remove role">✕</span></th>');
   });
   out.push('<th style="' + THL + 'padding:5px 6px;text-align:center;width:28px"></th>');
   out.push('</tr></thead><tbody>');
-
   var sections = _vmGroupSections(fields);
   sections.forEach(function(sec) {
-    // Section header row — Field+Type+Req in first td, then one td per role with quick-apply chips
-    var secDisplayName = sec.name === 'certification' ? 'SIGNATORIES' : sec.name;
-    var secTotalCols = 3 + roles.length + 1;
+    var isCertSec = sec.name === 'certification';
+    var secDisplayName = isCertSec ? 'SIGNATORIES' : sec.name;
     out.push('<tr>');
-    out.push('<td colspan="' + secTotalCols + '" style="background:var(--bg2);padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:none">' +
-      '<div style="display:flex;align-items:center">' +
-      '<span style="flex:1">' + escHtml(secDisplayName) + ' <span style="font-weight:400;opacity:.5">(' + sec.fields.length + ')</span></span>' +
-      '<span data-del-sec="' + sec.id + '" data-sec-name="' + escHtml(secDisplayName) + '" title="Delete section and all its fields" ' +
-        'style="cursor:pointer;color:var(--muted);font-size:12px;opacity:.3;margin-right:4px" ' +
-        'onmouseover="this.style.opacity=1;this.style.color=\'var(--red)\'" ' +
-        'onmouseout="this.style.opacity=.3;this.style.color=\'var(--muted)\'">🗑</span>' +
-      '</div></td>');
-    roles.forEach(function(r) {
-      var lbl = escHtml((FORM_ROLES[r] || { label: r }).label);
-      out.push('<td style="background:var(--bg2);padding:3px 2px;border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:1px solid var(--border);text-align:center">');
-      out.push('<div style="display:flex;justify-content:center;align-items:center;gap:2px">');
-      ['E','R','H'].forEach(function(st) {
-        out.push('<span data-sec="' + sec.id + '" data-srole="' + r + '" data-sstate="' + st + '" ' +
-          'style="cursor:pointer;font-size:9px;padding:1px 5px;border-radius:2px;border:1px solid rgba(255,255,255,.1);color:var(--muted);flex:1;text-align:center" ' +
-          'title="' + (st==='H'?'Hide':st==='R'?'Read-only':'Editable') + ' all ' + lbl + '">' + (st==='H'?'—':st) + '</span>');
+    out.push('<td colspan="3" style="background:var(--bg2);padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:none">' +
+      '<span>' + escHtml(secDisplayName) + ' <span style="font-weight:400;opacity:.5">(' + sec.fields.length + ')</span></span>' +
+      '<span data-del-sec="' + sec.id + '" data-sec-name="' + escHtml(secDisplayName) + '" style="float:right;cursor:pointer;color:var(--muted);font-size:11px;opacity:.5;padding:0 2px" title="Delete section">🗑</span>' +
+      '</td>');
+    if (isCertSec) {
+      out.push('<td colspan="' + (roles.length + 1) + '" style="background:var(--bg2);border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:1px solid var(--border)"></td>');
+    } else {
+      roles.forEach(function(r) {
+        var lbl = escHtml((FORM_ROLES[r] || { label: r }).label);
+        out.push('<td style="background:var(--bg2);padding:3px 2px;border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:1px solid var(--border);text-align:center">');
+        out.push('<div style="display:flex;justify-content:center;align-items:center;gap:2px">');
+        ['E','R','H'].forEach(function(st) {
+          out.push('<span data-sec="' + sec.id + '" data-srole="' + r + '" data-sstate="' + st + '" style="cursor:pointer;font-size:9px;padding:1px 5px;border-radius:2px;border:1px solid rgba(255,255,255,.1);color:var(--muted);flex:1;text-align:center" title="' + (st==='H'?'Hide':st==='R'?'Read-only':'Editable') + ' all ' + lbl + '">' + (st==='H'?'—':st) + '</span>');
+        });
+        out.push('</div></td>');
       });
-      out.push('</div></td>');
-    });
+      out.push('<td style="background:var(--bg2);border-bottom:1px solid var(--border);border-top:1px solid rgba(255,255,255,.1);border-left:1px solid var(--border)"></td>');
+    }
     out.push('</tr>');
-
     sec.fields.forEach(function(field) {
       var typeOpts = (FIELD_TYPES_FULL || ['text','date','number','checkbox','signature','textarea']).map(function(t) {
         var m = (FIELD_TYPE_META && FIELD_TYPE_META[t]) || { label: t };
@@ -814,70 +803,32 @@ function _renderMatrix() {
       }).join('');
       var isSelected = _selectedFieldIds && _selectedFieldIds.has(field.id);
       var rowBg = isSelected ? 'background:var(--cad-dim)' : '';
-
       var isCert = field.section === 'certification';
       var dragAttrs = isCert ? ' draggable="true" ondragstart="_vmCertDragStart(event,\'' + field.id + '\')" ondragover="_vmCertDragOver(event,\'' + field.id + '\')" ondrop="_vmCertDrop(event,\'' + field.id + '\')" ondragend="_vmCertDragEnd()"' : '';
       out.push('<tr id="vmrow-' + field.id + '" data-fid="' + field.id + '"' + dragAttrs + ' style="cursor:' + (isCert ? 'grab' : 'pointer') + ';' + rowBg + '">');
-
       if (isCert) {
-        // SIGNATORY ROW — drag handle + label + role pill + trash, spans all columns
         var totalCols = 3 + roles.length + 1;
         out.push('<td colspan="' + totalCols + '" style="padding:4px 8px;' + BDR + '">' +
           '<div style="display:flex;align-items:center;gap:8px">' +
           '<span style="color:var(--muted);font-size:13px;cursor:grab;flex-shrink:0">⠿</span>' +
           '<span style="font-size:12px;color:var(--text1);flex:1">' + escHtml(field.label || 'Signature') + '</span>' +
-          '<span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;' +
-            'padding:2px 8px;border-radius:999px;border:1px solid rgba(0,201,201,.3);color:var(--cad);background:rgba(0,201,201,.06)">' +
-            escHtml(field.role || '') + '</span>' +
-          '<span data-del-fid="' + field.id + '" title="Remove signatory" ' +
-            'style="cursor:pointer;color:var(--muted);font-size:12px;flex-shrink:0;opacity:.5" ' +
-            'onmouseover="this.style.opacity=1;this.style.color=\'var(--red)\'" ' +
-            'onmouseout="this.style.opacity=.5;this.style.color=\'var(--muted)\'">🗑</span>' +
+          '<span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid rgba(0,201,201,.3);color:var(--cad);background:rgba(0,201,201,.06)">' + escHtml(field.role || '') + '</span>' +
+          '<span data-del-fid="' + field.id + '" style="cursor:pointer;color:var(--muted);font-size:12px;flex-shrink:0;opacity:.5">🗑</span>' +
           '</div></td>');
       } else {
-        // STANDARD FIELD ROW
-        // Name cell
-        out.push('<td style="padding:5px 8px;' + BDR + 'color:var(--text1);max-width:160px">' +
-          '<div data-label-target="1" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
-          escHtml(field.label || 'Unlabelled') + '</div></td>');
-
-        // Type select
-        out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
-          '<select data-fid="' + field.id + '" data-action="type" ' +
-          'style="font-size:12px;background:var(--surf2);border:1px solid var(--border);border-radius:3px;color:var(--text2);padding:2px;cursor:pointer;width:100%;font-family:Arial,sans-serif">' +
-          typeOpts + '</select></td>');
-
-        // Required toggle
+        out.push('<td style="padding:5px 8px;' + BDR + 'color:var(--text1);max-width:160px"><div data-label-target="1" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(field.label || 'Unlabelled') + '</div></td>');
+        out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center"><select data-fid="' + field.id + '" data-action="type" style="font-size:12px;background:var(--surf2);border:1px solid var(--border);border-radius:3px;color:var(--text2);padding:2px;cursor:pointer;width:100%;font-family:Arial,sans-serif">' + typeOpts + '</select></td>');
         var reqOn = field.required;
-        out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
-          '<div data-fid="' + field.id + '" data-action="req" style="cursor:pointer;display:flex;justify-content:center">' +
-          '<div class="toggle-box' + (reqOn ? ' on' : '') + '" style="width:24px;height:13px;transform:scale(.85)"></div>' +
-          '</div></td>');
-
-        // Role cells
+        out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center"><div data-fid="' + field.id + '" data-action="req" style="cursor:pointer;display:flex;justify-content:center"><div class="toggle-box' + (reqOn ? ' on' : '') + '" style="width:24px;height:13px;transform:scale(.85)"></div></div></td>');
         roles.forEach(function(r) {
           var s = _vmGet(field.id, r);
-          out.push('<td id="vmc_' + field.id + '_' + r + '" ' +
-            'data-fid="' + field.id + '" data-role="' + r + '" data-action="cell" ' +
-            'style="padding:3px 4px;' + BDL + 'text-align:center;cursor:pointer;background:' + _VM_CHIP_BG[s] + ';transition:filter .1s" ' +
-            'title="Click to cycle E\u2192R\u2192\u2014">' +
-            '<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;font-size:10px;font-weight:700;color:' + _VM_CHIP_CO[s] + '">' +
-            _VM_LABELS[s] + '</div></td>');
+          out.push('<td id="vmc_' + field.id + '_' + r + '" data-fid="' + field.id + '" data-role="' + r + '" data-action="cell" style="padding:3px 4px;' + BDL + 'text-align:center;cursor:pointer;background:' + _VM_CHIP_BG[s] + ';transition:filter .1s"><div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;font-size:10px;font-weight:700;color:' + _VM_CHIP_CO[s] + '">' + _VM_LABELS[s] + '</div></td>');
         });
-
-        // Trash cell
-        out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center">' +
-          '<span data-del-fid="' + field.id + '" title="Delete field" ' +
-            'style="cursor:pointer;color:var(--muted);font-size:12px;opacity:.4" ' +
-            'onmouseover="this.style.opacity=1;this.style.color=\'var(--red)\'" ' +
-            'onmouseout="this.style.opacity=.4;this.style.color=\'var(--muted)\'">🗑</span>' +
-          '</td>');
+        out.push('<td style="padding:3px 4px;' + BDL + 'text-align:center"><span data-del-fid="' + field.id + '" style="cursor:pointer;color:var(--muted);font-size:12px;opacity:.4">🗑</span></td>');
       }
-
       out.push('</tr>');
     });
   });
-
   out.push('</tbody></table>');
   setTimeout(_vmUpdateFillSeq, 0);
   return out.join('');
