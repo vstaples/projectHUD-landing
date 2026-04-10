@@ -1060,7 +1060,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM6','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM8','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -2024,7 +2024,13 @@ async function _saveResourceExtras(resourceId) {
 function _attachHoverCard(el, resourceId) {
   el.addEventListener('mouseenter', () => {
     UM._hoverId = resourceId;
-    UM._hoverTimer = setTimeout(() => showHoverCard(resourceId, el), 900);
+    UM._hoverTimer = setTimeout(() => {
+      // Suppress if resource drawer or org chart overlay is open
+      var drawerOpen = document.getElementById('res-drawer')?.classList.contains('open') ||
+                       document.getElementById('drawer-overlay')?.classList.contains('open');
+      var ocOpen = document.getElementById('oc-overlay')?.style.display === 'flex';
+      if (!drawerOpen && !ocOpen) showHoverCard(resourceId, el);
+    }, 900);
   });
   el.addEventListener('mouseleave', hideHoverCard);
 }
@@ -2033,6 +2039,11 @@ async function showHoverCard(resourceId, anchorEl) {
   const card = document.getElementById('res-hover-card');
   const r = UM.resources.find(x => x.id === resourceId);
   if (!r || !card) return;
+  // Suppress if resource drawer or org chart overlay is open
+  var drawerOpen = document.getElementById('res-drawer')?.classList.contains('open') ||
+                   document.getElementById('drawer-overlay')?.classList.contains('open');
+  var ocOpen = document.getElementById('oc-overlay')?.style.display === 'flex';
+  if (drawerOpen || ocOpen) return;
 
   const role    = UM.roles.find(x => x.id === r.hud_role_id);
   const cat     = role ? UM.categories.find(c => c.id === role.category_id) : null;
@@ -2647,7 +2658,9 @@ function _ocBuild() {
     if (byId[id]) byId[id]._oc_manager_id = _ocPending[id];
   });
   res.forEach(function(r){
-    if (!r.hasOwnProperty('_oc_manager_id')) r._oc_manager_id = r.manager_id;
+    if (!r.hasOwnProperty('_oc_manager_id')) {
+      r._oc_manager_id = r.manager_id || (r.is_org_root ? 'ROOT' : null);
+    }
   });
 
   var children = {};
@@ -2666,7 +2679,7 @@ function _ocBuild() {
 
   // Unassigned = resources with no manager AND no direct reports
   var unassigned = res.filter(function(r){
-    return !r._oc_manager_id && r._oc_manager_id !== 'ROOT' && !children[r.id];
+    return !r._oc_manager_id && r._oc_manager_id !== 'ROOT' && !r.is_org_root && !children[r.id];
   });
 
   // Roots = resources with no manager but HAS reports
@@ -2871,14 +2884,13 @@ function _ocDetEdit() {
 }
 function _ocDetUnlink() {
   if (!_ocSelectedId) return;
-  _ocPending[_ocSelectedId] = null;
+  _ocPending[_ocSelectedId] = 'UNASSIGNED';
   var id = _ocSelectedId;
   _ocSelectedId = null;
   var det = document.getElementById('oc-detail');
   if (det) det.style.display = 'none';
-  // Apply pending to in-memory resource so tree rebuilds correctly
   var r = (UM.resources||[]).find(function(x){ return x.id === id; });
-  if (r) r._oc_manager_id = null;
+  if (r) { r._oc_manager_id = null; r.is_org_root = false; }
   cadToast('Removed from chart — Save Changes to persist', 'info');
   _ocBuild();
 }
@@ -2903,9 +2915,9 @@ function _ocCanvasDrop(e) {
 }
 
 function _ocUnlinkNode(id) {
-  _ocPending[id] = null;
+  _ocPending[id] = 'UNASSIGNED';
   var r = (UM.resources||[]).find(function(x){ return x.id === id; });
-  if (r) r._oc_manager_id = null;
+  if (r) { r._oc_manager_id = null; r.is_org_root = false; }
   if (_ocSelectedId === id) {
     _ocSelectedId = null;
     var det = document.getElementById('oc-detail');
@@ -2923,10 +2935,14 @@ async function _ocSaveAll() {
   for (var i = 0; i < ids.length; i++) {
     var id = ids[i];
     try {
-      var mgr = _ocPending[id]; if (mgr === 'ROOT') mgr = null;
-      await API.patch('resources?id=eq.' + id + '&firm_id=eq.' + firmId, { manager_id: mgr || null });
+      var pendVal = _ocPending[id];
+      var isUnassigned = pendVal === 'UNASSIGNED';
+      var isRoot = pendVal === 'ROOT';
+      var mgr = (isRoot || isUnassigned) ? null : (pendVal || null);
+      await API.patch('resources?id=eq.' + id + '&firm_id=eq.' + firmId, { manager_id: mgr, is_org_root: isUnassigned ? false : isRoot });
       var r = (UM.resources||[]).find(function(x){ return x.id === id; });
-      if (r) r.manager_id = _ocPending[id] || null;
+      if (r) { r.manager_id = mgr; r.is_org_root = isUnassigned ? false : isRoot; r._oc_manager_id = isUnassigned ? null : pendVal; }
+      console.log('[ocSave]', r ? r.name : id, '| manager_id:', mgr, '| is_org_root:', isRoot);
     } catch(e) { errors++; }
   }
   _ocPending = {};
