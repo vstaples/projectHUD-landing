@@ -1027,7 +1027,7 @@ function renderResources() {
     return;
   }
   grid.innerHTML = list.map(r => {
-    const role  = UM.roles.find(ro => ro.id === r.role_id);
+    const role  = UM.roles.find(ro => ro.id === r.hud_role_id);
     const cat   = role ? UM.categories.find(c => c.id === role.category_id) : null;
     const initials = ((r.first_name||'?')[0] + (r.last_name||'?')[0]).toUpperCase();
     const levelTag    = r.level ? `<span class="res-tag level-${r.level}">${r.level.toUpperCase()}</span>` : '';
@@ -1099,7 +1099,7 @@ function openResourceDrawer(id) {
     catRoles.forEach(ro => {
       const o = document.createElement('option');
       o.value = ro.id; o.textContent = ro.name;
-      if (r && r.role_id === ro.id) o.selected = true;
+      if (r && r.hud_role_id === ro.id) o.selected = true;
       og.appendChild(o);
     });
     roleEl.appendChild(og);
