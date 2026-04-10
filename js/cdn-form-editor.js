@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260410-SE106 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260410-SE107 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -4597,6 +4597,8 @@ function _updateHWWidget() {
   if (!widget || !hEl || !wEl) return;
   const sel = [..._selectedFieldIds].map(id => _formFields.find(f => f.id === id)).filter(Boolean);
   if (!sel.length) { widget.style.display = 'none'; return; }
+  // HTML form fields have no rect — skip widget for non-PDF forms
+  if (sel.some(f => !f.rect)) { widget.style.display = 'none'; return; }
   widget.style.display = 'flex';
   // Show bounding box of selection in inches (PDF pts / 72)
   const minX = Math.min(...sel.map(f => f.rect.x));
