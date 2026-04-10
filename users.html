@@ -446,6 +446,7 @@
       <div class="um-tab" data-tab="users"     onclick="switchUMTab('users')">APP USERS</div>
       <div class="um-tab" data-tab="skills"    onclick="switchUMTab('skills')">SKILLS LIBRARY</div>
       <div class="um-tab" data-tab="calendar"  onclick="switchUMTab('calendar')">CALENDAR</div>
+      <div class="um-tab" data-tab="orgchart"  onclick="switchUMTab('orgchart')">ORG CHART</div>
     </div>
 
     <!-- ── RESOURCES TAB ────────────────────────────────────── -->
@@ -629,6 +630,46 @@
 </div>
 
 <!-- ── OVERLAY ──────────────────────────────────────────────── -->
+<div class="um-panel" id="tab-orgchart">
+  <div style="display:grid;grid-template-columns:220px 1fr;height:calc(100vh - 180px);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-top:8px">
+    <!-- Left rail: unassigned -->
+    <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg2)">
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)" id="oc-unassigned-hdr">Unassigned (0)</div>
+      <div style="padding:8px">
+        <input id="oc-search" placeholder="Search name or dept..." oninput="_ocFilter(this.value)"
+          style="width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg3,var(--bg2));color:var(--text1);font-family:Arial,sans-serif;box-sizing:border-box">
+      </div>
+      <div id="oc-unassigned-list" style="flex:1;overflow-y:auto;padding:4px 8px"></div>
+      <div style="padding:10px 12px;border-top:1px solid var(--border)">
+        <button onclick="_ocSaveAll()" style="width:100%;padding:7px;background:var(--cad,#00c9c9);border:none;border-radius:4px;color:#003333;font-size:12px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif">Save Changes</button>
+      </div>
+    </div>
+    <!-- Right: tree -->
+    <div style="overflow:auto;padding:20px;position:relative;background:var(--bg1,var(--bg))">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+        <span style="font-size:12px;font-weight:700;color:var(--text1);flex:1" id="oc-firm-name">Org Chart</span>
+        <span style="font-size:11px;color:var(--muted)" id="oc-stats"></span>
+        <button onclick="_ocCollapseAll()" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Collapse all</button>
+        <button onclick="_ocExpandAll()" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Expand all</button>
+      </div>
+      <div id="oc-tree-root"></div>
+    </div>
+  </div>
+  <!-- Detail flyout -->
+  <div id="oc-detail" style="display:none;position:fixed;top:120px;right:40px;width:230px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:14px;z-index:200;box-shadow:0 4px 16px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div id="oc-det-avatar" style="width:38px;height:38px;border-radius:50%;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700"></div>
+      <div><div id="oc-det-name" style="font-size:13px;font-weight:700;color:var(--text1)"></div><div id="oc-det-title" style="font-size:11px;color:var(--text2)"></div></div>
+    </div>
+    <div id="oc-det-rows" style="font-size:12px"></div>
+    <div style="margin-top:10px;display:flex;gap:6px">
+      <button onclick="_ocDetEdit()" style="flex:1;padding:6px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Edit resource</button>
+      <button onclick="_ocDetUnlink()" style="padding:6px 10px;font-size:11px;border:1px solid rgba(248,81,73,.4);border-radius:4px;background:transparent;color:#f85149;cursor:pointer;font-family:Arial,sans-serif">Unlink</button>
+    </div>
+    <div onclick="_ocCloseDetail()" style="text-align:center;margin-top:8px;font-size:10px;color:var(--muted);cursor:pointer">close</div>
+  </div>
+</div>
+
 <div class="um-panel-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
 
 <!-- ── RESOURCE DRAWER ──────────────────────────────────────── -->
@@ -2556,6 +2597,277 @@ async function removeAvatar(resourceId) {
 }
   // Init sidebar
   Sidebar.init('users.html');
+
+// ── ORG CHART ─────────────────────────────────────────────────────────────────
+var _ocPending = {};
+var _ocCollapsed = {};
+var _ocSelectedId = null;
+
+function _ocAvatarHtml(r, size) {
+  size = size || 36;
+  var initials = ((r.first_name||'')[0]||'') + ((r.last_name||'')[0]||'');
+  var colors = ['#E1F5EE:#085041','#E6F1FB:#0C447C','#FAEEDA:#633806','#EAF3DE:#27500A','#EEEDFE:#3C3489','#FBEAF0:#72243E'];
+  var ci = (r.name||'').charCodeAt(0) % colors.length;
+  var pair = colors[ci].split(':');
+  var bg = pair[0], fg = pair[1];
+  if (r.avatar_url) {
+    return '<img src="' + r.avatar_url + '" style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;object-fit:cover;display:block">';
+  }
+  return '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + bg + ';color:' + fg + ';display:flex;align-items:center;justify-content:center;font-size:' + Math.floor(size*0.35) + 'px;font-weight:700;flex-shrink:0">' + initials + '</div>';
+}
+
+function _ocBuild() {
+  var res = UM.resources || [];
+  var byId = {};
+  res.forEach(function(r){ byId[r.id] = r; });
+
+  // Apply pending manager changes
+  Object.keys(_ocPending).forEach(function(id){
+    if (byId[id]) byId[id]._oc_manager_id = _ocPending[id];
+  });
+  res.forEach(function(r){
+    if (!r.hasOwnProperty('_oc_manager_id')) r._oc_manager_id = r.manager_id;
+  });
+
+  var children = {};
+  var roots = [];
+  var assigned = {};
+  res.forEach(function(r){
+    var mid = r._oc_manager_id;
+    if (mid && byId[mid]) {
+      if (!children[mid]) children[mid] = [];
+      children[mid].push(r);
+      assigned[r.id] = true;
+    } else {
+      roots.push(r);
+    }
+  });
+
+  // Unassigned = resources with no manager AND no direct reports
+  var unassigned = res.filter(function(r){
+    return !r._oc_manager_id && !children[r.id];
+  });
+
+  // Roots = resources with no manager but HAS reports
+  var treeRoots = res.filter(function(r){
+    return !r._oc_manager_id && children[r.id];
+  });
+  // Also include lone roots with no manager and no reports but were manually placed
+  // Keep it simple: treeRoots = anyone with children
+  if (!treeRoots.length && roots.length) treeRoots = roots.slice(0,1);
+
+  // Render unassigned list
+  var ul = document.getElementById('oc-unassigned-list');
+  var hdr = document.getElementById('oc-unassigned-hdr');
+  if (ul) {
+    ul.innerHTML = unassigned.length ? unassigned.map(function(r){
+      return '<div draggable="true" data-rid="' + r.id + '" ondragstart="_ocDragStart(event)" ' +
+        'style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg1,var(--bg));margin-bottom:4px;cursor:grab;font-size:12px;color:var(--text1)">' +
+        _ocAvatarHtml(r, 26) +
+        '<div><div style="font-size:12px;font-weight:600">' + (r.name||'') + '</div>' +
+        '<div style="font-size:10px;color:var(--muted)">' + (r.title||r.department||'') + '</div></div>' +
+        '</div>';
+    }).join('') : '<div style="font-size:11px;color:var(--muted);padding:8px 2px">All resources assigned</div>';
+    if (hdr) hdr.textContent = 'Unassigned (' + unassigned.length + ')';
+  }
+
+  // Render tree
+  var root = document.getElementById('oc-tree-root');
+  if (root) root.innerHTML = treeRoots.map(function(r){ return _ocNodeHtml(r, children, 0); }).join('');
+
+  // Stats
+  var stats = document.getElementById('oc-stats');
+  if (stats) stats.textContent = res.length + ' resources · ' + (res.length - unassigned.length) + ' assigned';
+
+  // Wire delegated events on tree root
+  var treeRoot = document.getElementById('oc-tree-root');
+  if (treeRoot && !treeRoot._ocWired) {
+    treeRoot._ocWired = true;
+    treeRoot.addEventListener('click', function(e) {
+      var toggle = e.target.closest('[data-oc-toggle]');
+      if (toggle) { e.stopPropagation(); _ocToggle(toggle.dataset.ocToggle); return; }
+      var node = e.target.closest('[data-oc-node]');
+      if (node) { _ocSelect(node.dataset.rid); }
+    });
+    treeRoot.addEventListener('dragover', function(e) {
+      var node = e.target.closest('[data-oc-drop]');
+      if (node) _ocDragOver(e);
+    });
+    treeRoot.addEventListener('dragleave', function(e) {
+      var node = e.target.closest('[data-oc-drop]');
+      if (node) _ocDragLeave(e);
+    });
+    treeRoot.addEventListener('drop', function(e) {
+      var node = e.target.closest('[data-oc-drop]');
+      if (node) _ocDrop(e, node.dataset.ocDrop);
+    });
+  }
+}
+
+function _ocNodeHtml(r, children, depth) {
+  var kids = (children[r.id] || []).sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  var hasKids = kids.length > 0;
+  var collapsed = _ocCollapsed[r.id];
+  var isSelected = _ocSelectedId === r.id;
+  var borderColor = isSelected ? 'var(--cad,#00c9c9)' : 'var(--border)';
+  var borderWidth = isSelected ? '2px' : '1px';
+
+  var html = '<div style="display:flex;flex-direction:column;align-items:center">';
+  html += '<div draggable="true" data-rid="' + r.id + '" data-oc-node="1" ondragstart="_ocDragStart(event)" ' +
+    'ondragover="_ocDragOver(event)" data-oc-drop="' + r.id + '" ondragleave="_ocDragLeave(event)" ' +
+    'style="border:' + borderWidth + ' solid ' + borderColor + ';border-radius:8px;padding:10px 12px;width:140px;text-align:center;background:var(--bg2);cursor:pointer;position:relative">';
+  html += '<div style="width:36px;height:36px;margin:0 auto 6px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center">' + _ocAvatarHtml(r, 36) + '</div>';
+  html += '<div style="font-size:12px;font-weight:700;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.first_name||'') + ' ' + ((r.last_name||'')[0]||'') + '.</div>';
+  html += '<div style="font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">' + (r.title||'') + '</div>';
+  if (r.department) html += '<div style="font-size:9px;margin-top:4px;padding:1px 6px;border-radius:999px;background:var(--bg3,rgba(255,255,255,.06));color:var(--muted);display:inline-block">' + r.department + '</div>';
+  if (hasKids) html += '<div data-oc-toggle="' + r.id + '" style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:16px;height:16px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;color:var(--text2);border:1px solid var(--border)">' + (collapsed ? '+' : '\u2212') + '</div>';
+  html += '</div>';
+
+  if (hasKids && !collapsed) {
+    html += '<div style="width:1px;height:16px;background:var(--border)"></div>';
+    html += '<div style="display:flex;gap:12px;position:relative;padding-top:16px">';
+    if (kids.length > 1) {
+      html += '<div style="position:absolute;top:0;left:70px;right:70px;height:1px;background:var(--border)"></div>';
+    }
+    html += kids.map(function(kid){
+      return '<div style="display:flex;flex-direction:column;align-items:center">' +
+        '<div style="width:1px;height:16px;background:var(--border)"></div>' +
+        _ocNodeHtml(kid, children, depth+1) +
+        '</div>';
+    }).join('');
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function _ocSelect(id) {
+  _ocSelectedId = id;
+  var r = (UM.resources||[]).find(function(x){ return x.id === id; });
+  if (!r) return;
+  var det = document.getElementById('oc-detail');
+  var detAvatar = document.getElementById('oc-det-avatar');
+  var detName = document.getElementById('oc-det-name');
+  var detTitle = document.getElementById('oc-det-title');
+  var detRows = document.getElementById('oc-det-rows');
+  if (!det) return;
+  det.style.display = 'block';
+  if (detAvatar) detAvatar.innerHTML = _ocAvatarHtml(r, 38);
+  if (detName) detName.textContent = r.name || '';
+  if (detTitle) detTitle.textContent = r.title || '';
+  var mid = (_ocPending[id] !== undefined ? _ocPending[id] : r.manager_id);
+  var mgr = mid ? (UM.resources||[]).find(function(x){ return x.id === mid; }) : null;
+  var kids = (UM.resources||[]).filter(function(x){ return (x._oc_manager_id||x.manager_id) === id; });
+  var rows = [
+    ['Dept', r.department||'—'],
+    ['Reports to', mgr ? mgr.name : '— none —'],
+    ['Direct reports', kids.length],
+    ['Routing rule', mid ? 'session.submitter.manager' : '—'],
+  ];
+  if (detRows) detRows.innerHTML = rows.map(function(row){
+    return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">' +
+      '<span style="color:var(--text2)">' + row[0] + '</span>' +
+      '<span style="color:var(--text1);font-weight:600">' + row[1] + '</span></div>';
+  }).join('');
+  _ocBuild();
+}
+
+function _ocCloseDetail() {
+  _ocSelectedId = null;
+  var det = document.getElementById('oc-detail');
+  if (det) det.style.display = 'none';
+  _ocBuild();
+}
+
+function _ocToggle(id) { _ocCollapsed[id] = !_ocCollapsed[id]; _ocBuild(); }
+function _ocCollapseAll() { (UM.resources||[]).forEach(function(r){ _ocCollapsed[r.id]=true; }); _ocBuild(); }
+function _ocExpandAll() { _ocCollapsed={}; _ocBuild(); }
+
+var _ocDragId = null;
+function _ocDragStart(e) {
+  _ocDragId = e.currentTarget.dataset.rid;
+  e.dataTransfer.effectAllowed = 'move';
+}
+function _ocDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = 'var(--cad,#00c9c9)';
+  e.currentTarget.style.borderStyle = 'dashed';
+}
+function _ocDragLeave(e) {
+  e.currentTarget.style.borderColor = '';
+  e.currentTarget.style.borderStyle = '';
+}
+function _ocDrop(e, targetId) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = '';
+  e.currentTarget.style.borderStyle = '';
+  if (!_ocDragId || _ocDragId === targetId) return;
+  // Prevent circular: don't drop a parent onto its own descendant
+  if (_ocIsDescendant(_ocDragId, targetId)) { cadToast('Cannot assign a manager who reports to this person', 'warn'); return; }
+  _ocPending[_ocDragId] = targetId;
+  cadToast('Manager assigned — click Save Changes to persist', 'info');
+  _ocBuild();
+}
+function _ocIsDescendant(ancestorId, nodeId) {
+  var r = (UM.resources||[]).find(function(x){ return x.id === nodeId; });
+  if (!r) return false;
+  var mid = _ocPending[nodeId] !== undefined ? _ocPending[nodeId] : r.manager_id;
+  if (!mid) return false;
+  if (mid === ancestorId) return true;
+  return _ocIsDescendant(ancestorId, mid);
+}
+
+function _ocDetEdit() {
+  _ocCloseDetail();
+  if (_ocSelectedId) openResourceDrawer(_ocSelectedId);
+}
+function _ocDetUnlink() {
+  if (!_ocSelectedId) return;
+  _ocPending[_ocSelectedId] = null;
+  cadToast('Manager unlinked — click Save Changes to persist', 'info');
+  _ocCloseDetail();
+}
+
+async function _ocSaveAll() {
+  var ids = Object.keys(_ocPending);
+  if (!ids.length) { cadToast('No changes to save', 'info'); return; }
+  var firmId = UM.firmId;
+  var errors = 0;
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i];
+    try {
+      await API.patch('resources?id=eq.' + id + '&firm_id=eq.' + firmId, { manager_id: _ocPending[id] || null });
+      var r = (UM.resources||[]).find(function(x){ return x.id === id; });
+      if (r) r.manager_id = _ocPending[id] || null;
+    } catch(e) { errors++; }
+  }
+  _ocPending = {};
+  if (errors) cadToast(errors + ' error(s) saving — check console', 'error');
+  else cadToast('Org chart saved', 'success');
+  _ocBuild();
+}
+
+function _ocFilter(q) {
+  var ul = document.getElementById('oc-unassigned-list');
+  if (!ul) return;
+  Array.from(ul.children).forEach(function(el){
+    var rid = el.dataset.rid;
+    var r = (UM.resources||[]).find(function(x){ return x.id === rid; });
+    if (!r) return;
+    var match = !q || (r.name||'').toLowerCase().includes(q.toLowerCase()) || (r.department||'').toLowerCase().includes(q.toLowerCase());
+    el.style.display = match ? '' : 'none';
+  });
+}
+
+// Hook into switchUMTab to render on first visit
+var _origSwitchUMTab = switchUMTab;
+switchUMTab = function(tab) {
+  _origSwitchUMTab(tab);
+  if (tab === 'orgchart') {
+    (UM.resources||[]).forEach(function(r){ r._oc_manager_id = _ocPending[r.id] !== undefined ? _ocPending[r.id] : r.manager_id; });
+    _ocBuild();
+  }
+};
 </script>
 </body>
 </html>
