@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260410-398000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260410-399000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -785,6 +785,18 @@ window.loadUserConcerns = async function() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MY REQUESTS — Cadence-backed engine  v20260403-400000
+// ── API delete helper (API wrapper lacks delete method) ──────────────────────
+async function API.del(path) {
+  var SUPA = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : (window.PHUD?.SUPABASE_URL || '');
+  var KEY  = typeof SUPABASE_KEY !== 'undefined' ? SUPABASE_KEY : (window.PHUD?.SUPABASE_KEY || '');
+  var resp = await fetch(SUPA + '/rest/v1/' + path, {
+    method: 'DELETE',
+    headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json' }
+  });
+  if (!resp.ok) throw new Error('DELETE ' + path + ' → ' + resp.status);
+  return true;
+}
+
 // ── Stubs for cdn-instances.js dependencies ──────────────────────────────────
 if (typeof _startElapsedTimer === 'undefined') {
   window._startElapsedTimer = function() {};
@@ -1116,7 +1128,7 @@ window.myrDiscardDraft = async function(draftId, name, evt) {
   if (!confirm('Discard draft for "' + name + '"?')) return;
   try {
     var firmId = _mwFirmId();
-    await API.delete('form_drafts?id=eq.' + draftId + '&firm_id=eq.' + firmId);
+    await API.del('form_drafts?id=eq.' + draftId + '&firm_id=eq.' + firmId);
     compassToast('Draft discarded.', 2000);
     if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 500);
   } catch(e) {
@@ -1370,7 +1382,7 @@ window.addEventListener('message', function(ev) {
         var res    = window._myResource;
         if (!res?.id) { compassToast('Draft saved locally — sign in to persist.', 2500); return; }
         // Upsert: delete existing draft for this form+user, then insert fresh
-        await API.delete('form_drafts?firm_id=eq.' + firmId + '&user_id=eq.' + res.id + '&form_def_id=eq.' + d.formId).catch(()=>{});
+        await API.del('form_drafts?firm_id=eq.' + firmId + '&user_id=eq.' + res.id + '&form_def_id=eq.' + d.formId).catch(()=>{});
         await API.post('form_drafts', {
           firm_id:          firmId,
           user_id:          res.id,
@@ -1413,7 +1425,7 @@ window.addEventListener('message', function(ev) {
           var firmId2 = _mwFirmId();
           var resId2  = window._myResource?.id;
           if (resId2 && formId) {
-            await API.delete('form_drafts?firm_id=eq.' + firmId2 + '&user_id=eq.' + resId2 + '&form_def_id=eq.' + formId);
+            await API.del('form_drafts?firm_id=eq.' + firmId2 + '&user_id=eq.' + resId2 + '&form_def_id=eq.' + formId);
           }
         } catch(e) { console.warn('[submit] draft cleanup failed:', e); }
         compassToast('Submitted for approval. You will be notified when reviewed.', 4000);
