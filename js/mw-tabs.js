@@ -961,29 +961,7 @@ window.myrLaunchRequest = async function(type, templateId) {
       ).catch(() => []);
       const fd2 = rows2?.[0];
       if (fd2 && fd2.source_html) {
-        // Prepend CSS variable overrides only — keep the form's own styles intact
-        const cssReset = `<style>
-          :root {
-            --bg1:#ffffff; --bg2:#f9fafb; --bg3:#f3f4f6;
-            --surf2:#f3f4f6; --surf3:#e5e7eb;
-            --border:#d1d5db; --border2:#e5e7eb;
-            --text:#1a1a2e; --text1:#1a1a2e; --text2:#374151; --muted:#6b7280;
-            --cad:#00c9c9; --accent:#00c9c9; --amber:#f59e0b; --red:#E24B4A;
-            --green:#1d9e75;
-          }
-          html, body { background: #ffffff !important; color: #1a1a2e !important; }
-          input, select, textarea {
-            border: 0.5px solid #d1d5db !important;
-            border-radius: 5px !important;
-            background: #f9fafb !important;
-            color: #1a1a2e !important;
-            font-family: Arial, sans-serif;
-          }
-          input[type="date"] { padding: 4px 8px !important; }
-        </style>`;
-        const html = fd2.source_html.includes('<head>')
-          ? fd2.source_html.replace('<head>', '<head>' + cssReset)
-          : cssReset + fd2.source_html;
+        const html = fd2.source_html;
         const blob = new Blob([html], { type: 'text/html' });
         const blobUrl = URL.createObjectURL(blob);
         _myrOpenHtmlFormOverlay(fd2.source_name || 'Form', blobUrl);
