@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260407-SE105 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260410-SE106 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -1339,14 +1339,16 @@ function _formSyncFieldToHtml(fieldId, key, value, field) {
     if (el.parentNode) el.parentNode.replaceChild(newW, el);
   }
 
-  // Serialize back to string (body innerHTML only — no html/head wrapper)
-  _selectedForm.source_html = doc.body.innerHTML;
+  // Serialize back — preserve <meta>+<style> prefix from stored source_html
+  var _prefixEnd = _selectedForm.source_html.indexOf('<div class="shell">');
+  var _prefix = _prefixEnd > -1 ? _selectedForm.source_html.substring(0, _prefixEnd) : '';
+  _selectedForm.source_html = _prefix + doc.body.innerHTML;
 
   // Refresh iframe
   var iframe = document.getElementById('form-html-preview');
   if (iframe) {
     var cssVars = _formGetCssVars();
-    var blob = new Blob([cssVars + _selectedForm.source_html], { type: 'text/html' });
+    var blob = new Blob([cssVars + _selectedForm.source_html], { type: 'text/html;charset=utf-8' });
     iframe.src = URL.createObjectURL(blob);
   }
 }
@@ -2953,7 +2955,7 @@ async function _formSelect(formId) {
       '--font-mono:monospace' +
     '}</style>';
     var htmlWithVars = form.source_html.replace('<style>', cssVars + '<style>');
-    var blob = new Blob([htmlWithVars], { type: 'text/html' });
+    var blob = new Blob([htmlWithVars], { type: 'text/html;charset=utf-8' });
     iframe.src = URL.createObjectURL(blob);
     if (canvasWrap) canvasWrap.appendChild(iframe);
     else if (canvas && canvas.parentElement) canvas.parentElement.appendChild(iframe);
