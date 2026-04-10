@@ -785,6 +785,21 @@ window.loadUserConcerns = async function() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MY REQUESTS — Cadence-backed engine  v20260403-400000
+// ── My Requests subnav switcher ─────────────────────────────────────────────
+function myrSwitchView(view, btnEl) {
+  // Update subnav button states
+  document.querySelectorAll('.myr-subnav').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.myr === view);
+  });
+  // Show/hide content panels
+  var panels = { browse: 'myr-catalog-content', active: 'myr-active-content', history: 'myr-history-content' };
+  Object.keys(panels).forEach(function(k) {
+    var el = document.getElementById(panels[k]);
+    if (el) el.style.display = k === view ? '' : 'none';
+  });
+}
+window.myrSwitchView = myrSwitchView;
+
 // Browse  = live query: workflow_templates + workflow_form_definitions (compass_visible=true)
 // Active  = live query: workflow_instances submitted by this user
 // History = completed instances
