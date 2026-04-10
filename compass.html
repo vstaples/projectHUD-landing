@@ -1092,6 +1092,7 @@ let _tasks      = [];
 let _resources  = [];
 let _users      = [];
 let _myResource = null;
+window._myResource = null; // exposed for mw-tabs.js
 let _currentView = null;
 let _viewLoaded  = {};
 let _identityDebug = {};
@@ -1129,6 +1130,7 @@ async function loadBaseData() {
           _myResource = { ...r,
             name: `${r.first_name||''} ${r.last_name||''}`.trim() || appUser.name || appUser.email || '—',
           };
+          window._myResource = _myResource;
         }
       }
 
@@ -1142,6 +1144,7 @@ async function loadBaseData() {
           _myResource = { ...r,
             name: `${r.first_name||''} ${r.last_name||''}`.trim() || authEmail || '—',
           };
+          window._myResource = _myResource;
         }
       }
 
