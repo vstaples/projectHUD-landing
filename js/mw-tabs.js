@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260410-390000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260410-392000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -785,17 +785,28 @@ window.loadUserConcerns = async function() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MY REQUESTS — Cadence-backed engine  v20260403-400000
+// ── Stubs for cdn-instances.js dependencies ──────────────────────────────────
+if (typeof _startElapsedTimer === 'undefined') {
+  window._startElapsedTimer = function() {};
+}
+if (typeof _stopElapsedTimer === 'undefined') {
+  window._stopElapsedTimer = function() {};
+}
+
 // ── My Requests subnav switcher ─────────────────────────────────────────────
 function myrSwitchView(view, btnEl) {
   // Update subnav button states
   document.querySelectorAll('.myr-subnav').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.myr === view);
+    b.classList.remove('active', 'on');
+    if (b.dataset.myr === view) b.classList.add('active');
   });
-  // Show/hide content panels
-  var panels = { browse: 'myr-catalog-content', active: 'myr-active-content', history: 'myr-history-content' };
-  Object.keys(panels).forEach(function(k) {
-    var el = document.getElementById(panels[k]);
-    if (el) el.style.display = k === view ? '' : 'none';
+  // Show/hide pane containers (myr-pane-*) and content divs
+  ['browse', 'active', 'history'].forEach(function(k) {
+    var pane    = document.getElementById('myr-pane-' + k);
+    var content = document.getElementById('myr-' + (k === 'browse' ? 'catalog' : k) + '-content');
+    var show    = k === view;
+    if (pane)    pane.style.display    = show ? '' : 'none';
+    if (content) content.style.display = show ? '' : 'none';
   });
 }
 window.myrSwitchView = myrSwitchView;
