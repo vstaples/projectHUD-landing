@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260402-202500
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260410-397000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260410-398000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1369,13 +1369,15 @@ window.addEventListener('message', function(ev) {
         var firmId = _mwFirmId();
         var res    = window._myResource;
         if (!res?.id) { compassToast('Draft saved locally — sign in to persist.', 2500); return; }
+        // Upsert: delete existing draft for this form+user, then insert fresh
+        await API.delete('form_drafts?firm_id=eq.' + firmId + '&user_id=eq.' + res.id + '&form_def_id=eq.' + d.formId).catch(()=>{});
         await API.post('form_drafts', {
           firm_id:          firmId,
           user_id:          res.id,
           form_def_id:      d.formId,
           form_data:        d.formData || {},
           updated_at:       new Date().toISOString(),
-        }, { upsert: true, onConflict: 'firm_id,user_id,form_def_id' });
+        });
         compassToast('Draft saved. Resume anytime from Active tab.', 3000);
         if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 500);
       } catch(e) {
@@ -1403,7 +1405,6 @@ window.addEventListener('message', function(ev) {
           submitted_by_resource_id:   res?.id   || null,
           submitted_by_name:          res?.name || null,
           current_step_name:          'Under Review',
-          event_notes:                'Submitted via Compass by ' + (res?.name || 'user'),
           form_data:                  d.formData || null,
         };
         await API.post('workflow_instances', payload);
@@ -1598,11 +1599,13 @@ window.myrCloseInstance = function() {
 // ── Badge update ──────────────────────────────────────────────────────────────
 function _myrUpdateRequestBadges() {
   const insts       = window._myrInstances || [];
+  const drafts      = window._myrDrafts    || [];
   const activeCount = insts.filter(i => i.status!=='complete' && i.status!=='cancelled').length;
+  const total       = activeCount + drafts.length;
   const activeBadge = document.getElementById('myr-active-badge');
   if (activeBadge) {
-    activeBadge.textContent = activeCount > 0 ? activeCount : '';
-    activeBadge.style.display = activeCount > 0 ? 'inline' : 'none';
+    activeBadge.textContent = total > 0 ? total : '';
+    activeBadge.style.display = total > 0 ? 'inline' : 'none';
   }
 }
 
