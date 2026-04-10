@@ -784,9 +784,9 @@ window.loadUserConcerns = async function() {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MY REQUESTS — Cadence-backed engine  v20260403-400000
+// MY REQUESTS — Cadence-backed engine  v20260410-400000
 // ── API delete helper (API wrapper lacks delete method) ──────────────────────
-async function API.del(path) {
+async function _myrDel(path) {
   var SUPA = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : (window.PHUD?.SUPABASE_URL || '');
   var KEY  = typeof SUPABASE_KEY !== 'undefined' ? SUPABASE_KEY : (window.PHUD?.SUPABASE_KEY || '');
   var resp = await fetch(SUPA + '/rest/v1/' + path, {
@@ -1128,7 +1128,7 @@ window.myrDiscardDraft = async function(draftId, name, evt) {
   if (!confirm('Discard draft for "' + name + '"?')) return;
   try {
     var firmId = _mwFirmId();
-    await API.del('form_drafts?id=eq.' + draftId + '&firm_id=eq.' + firmId);
+    await _myrDel('form_drafts?id=eq.' + draftId + '&firm_id=eq.' + firmId);
     compassToast('Draft discarded.', 2000);
     if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 500);
   } catch(e) {
@@ -1382,7 +1382,7 @@ window.addEventListener('message', function(ev) {
         var res    = window._myResource;
         if (!res?.id) { compassToast('Draft saved locally — sign in to persist.', 2500); return; }
         // Upsert: delete existing draft for this form+user, then insert fresh
-        await API.del('form_drafts?firm_id=eq.' + firmId + '&user_id=eq.' + res.id + '&form_def_id=eq.' + d.formId).catch(()=>{});
+        await _myrDel('form_drafts?firm_id=eq.' + firmId + '&user_id=eq.' + res.id + '&form_def_id=eq.' + d.formId).catch(()=>{});
         await API.post('form_drafts', {
           firm_id:          firmId,
           user_id:          res.id,
@@ -1425,7 +1425,7 @@ window.addEventListener('message', function(ev) {
           var firmId2 = _mwFirmId();
           var resId2  = window._myResource?.id;
           if (resId2 && formId) {
-            await API.del('form_drafts?firm_id=eq.' + firmId2 + '&user_id=eq.' + resId2 + '&form_def_id=eq.' + formId);
+            await _myrDel('form_drafts?firm_id=eq.' + firmId2 + '&user_id=eq.' + resId2 + '&form_def_id=eq.' + formId);
           }
         } catch(e) { console.warn('[submit] draft cleanup failed:', e); }
         compassToast('Submitted for approval. You will be notified when reviewed.', 4000);
