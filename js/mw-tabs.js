@@ -812,7 +812,7 @@ window.loadUserRequests = async function() {
     const firmId = _mwFirmId();
     const [wfTmpls, formDefs, instances] = await Promise.all([
       API.get(`workflow_templates?compass_visible=eq.true&status=eq.released&firm_id=eq.${firmId}&order=name.asc&select=id,name,description,status,version,trigger_type`).catch(() => []),
-      API.get(`workflow_form_definitions?compass_visible=eq.true&state=in.(certified,published)&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id`).catch(() => []),
+      API.get(`workflow_form_definitions?compass_visible=eq.true&state=in.(certified,published)&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id,description`).catch(() => []),
       resId ? API.get(`workflow_instances?submitted_by_resource_id=eq.${resId}&order=created_at.desc&limit=100&select=id,title,status,current_step_name,workflow_type,template_id,created_at,updated_at`).catch(() => []) : [],
     ]);
     window._myrTemplates = wfTmpls  || [];
@@ -845,51 +845,16 @@ function _myrRenderBrowse() {
   const forms = window._myrFormDefs  || [];
   const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-  if (!tmpls.length && !forms.length) {
+  if (!forms.length) {
     el.innerHTML = `<div style="font-family:var(--font-head);font-size:13px;color:rgba(255,255,255,.3);padding:40px 0;text-align:center">No published workflows yet.<br><span style="font-size:11px;color:rgba(255,255,255,.2)">Release and publish templates in Cadence to populate this library.</span></div>`;
     return;
   }
 
   let html = '';
 
-  // Build a name→state map from form defs for badge lookup on workflow cards
-  const formStateByName = {};
-  forms.forEach(f => { formStateByName[(f.source_name||'').trim().toLowerCase()] = f.state; });
-
-  if (tmpls.length) {
-    html += `<div class="myr-cat-label"><div class="myr-cat-line"></div>WORKFLOWS<div class="myr-cat-line"></div></div><div class="wf-catalog-grid">`;
-    tmpls.forEach(t => {
-      const fState = formStateByName[(t.name||'').trim().toLowerCase()];
-      const certBadge = fState === 'published'
-        ? `<span style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:rgba(61,224,138,.15);color:#3de08a;border:1px solid rgba(61,224,138,.35)">Certified ✓</span>`
-        : fState === 'certified'
-        ? `<span style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:rgba(61,224,138,.08);color:rgba(61,224,138,.5);border:1px solid rgba(61,224,138,.2)">Certified</span>`
-        : '';
-      html += `<div class="wf-card" onclick="myrLaunchRequest('workflow','${t.id}')">
-        <div class="wf-card-top">
-          <div class="wf-icon" style="background:rgba(0,210,255,.1);color:#00D2FF">
-            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7l3.5 3.5L12 4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-          </div>
-          <div class="wf-card-title">${esc(t.name)}</div>
-        </div>
-        <div class="wf-card-desc">${esc(t.description||'')}</div>
-        <div class="wf-card-meta" style="display:flex;align-items:center;gap:6px">
-          <span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">v${esc(t.version||'1.0.0')}</span>
-          ${certBadge}
-        </div>
-        <button class="wf-card-submit" onclick="event.stopPropagation();myrLaunchRequest('workflow','${t.id}')">Submit &#8594;</button>
-      </div>`;
-    });
-    html += `</div>`;
-  }
-
-  // Only show form defs that don't already have a workflow template with the same name
-  const tmplNames = new Set(tmpls.map(t => (t.name||'').trim().toLowerCase()));
-  const uniqueForms = forms.filter(f => !tmplNames.has((f.source_name||'').trim().toLowerCase()));
-
-  if (uniqueForms.length) {
-    html += `<div class="myr-cat-label"><div class="myr-cat-line"></div>FORMS<div class="myr-cat-line"></div></div><div class="wf-catalog-grid">`;
-    uniqueForms.forEach(f => {
+  if (forms.length) {
+    html += `<div class="wf-catalog-grid">`;
+    forms.forEach(f => {
       const certBadge = f.state === 'published'
         ? `<span style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:rgba(61,224,138,.15);color:#3de08a;border:1px solid rgba(61,224,138,.35)">Certified ✓</span>`
         : f.state === 'certified'
@@ -902,12 +867,12 @@ function _myrRenderBrowse() {
           </div>
           <div class="wf-card-title">${esc(f.source_name||'Form')}</div>
         </div>
-        <div class="wf-card-desc">Fill and submit for review and approval.</div>
-        <div class="wf-card-meta" style="display:flex;align-items:center;gap:6px">
+        <div class="wf-card-desc">${esc(f.description||'Fill and submit for review and approval.')}</div>
+        <div class="wf-card-meta" style="display:flex;align-items:center;gap:6px;margin-top:auto">
           <span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3)">v${esc(f.version||'0.1.0')}</span>
           ${certBadge}
+          <button class="wf-card-submit" style="margin-left:auto;margin-top:0" onclick="event.stopPropagation();myrLaunchRequest('form','${f.id}')">Open &#8594;</button>
         </div>
-        <button class="wf-card-submit" onclick="event.stopPropagation();myrLaunchRequest('form','${f.id}')">Open &#8594;</button>
       </div>`;
     });
     html += `</div>`;
