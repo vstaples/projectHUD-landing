@@ -1100,7 +1100,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM34','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM35','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -3064,7 +3064,6 @@ function _ocBuild() {
   // Stats
   var stats = document.getElementById('oc-stats');
   if (stats) stats.textContent = res.length + ' resources · ' + (res.length - unassigned.length) + ' assigned';
-  setTimeout(_ocFixCrossbars, 50);
   var pendCount = document.getElementById('oc-pending-count');
   var nPending = Object.keys(_ocPending).length;
   if (pendCount) pendCount.textContent = nPending ? nPending + ' unsaved change' + (nPending!==1?'s':'') : '';
@@ -3137,11 +3136,12 @@ function _ocNodeHtml(r, children, depth) {
   if (hasKids && !collapsed) {
     if (isDirector || kids.length <= 3) {
       // Director role or few kids — always horizontal fan
-      html += '<div style="width:2px;height:16px;background:rgba(0,201,201,.5)"></div>';
-      html += '<div style="display:flex;flex-wrap:nowrap;gap:10px;position:relative;padding-top:16px;justify-content:center">';
-      if (kids.length > 1) html += '<div class="oc-crossbar" style="position:absolute;top:0;left:calc(' + Math.round(50/kids.length) + '% + 0px);right:calc(' + Math.round(50/kids.length) + '% + 0px);height:2px;background:rgba(0,201,201,.5)"></div>';
+      // Connector zone: 20px parent drop + crossbar + 20px child drop = 40px total
+      html += '<div style="width:2px;height:20px;background:rgba(0,201,201,.5)"></div>';
+      html += '<div style="display:flex;flex-wrap:nowrap;gap:10px;position:relative;height:20px;justify-content:center;align-items:flex-start">';
+      if (kids.length > 1) html += '<div class="oc-crossbar" style="position:absolute;top:50%;transform:translateY(-50%);left:0;right:0;height:2px;background:rgba(0,201,201,.5)"></div>';
       html += kids.map(function(kid){
-        return '<div style="display:inline-flex;flex-direction:column;align-items:center"><div style="width:2px;height:16px;background:rgba(0,201,201,.5)"></div>' + _ocNodeHtml(kid, children, depth+1) + '</div>';
+        return '<div style="display:inline-flex;flex-direction:column;align-items:center"><div style="width:2px;height:20px;background:rgba(0,201,201,.5)"></div>' + _ocNodeHtml(kid, children, depth+1) + '</div>';
       }).join('');
       html += '</div>';
     } else {
