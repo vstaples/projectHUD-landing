@@ -2013,9 +2013,9 @@ function renderProfileLists() {
     if (!el) return;
     el.innerHTML = (UM._pendingProfile[key] || []).map((v, i) => `
       <div style="display:flex;align-items:center;gap:8px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);margin-bottom:4px;">
-        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text1);flex:1;">${v}</span>
-        <button onclick="removeListItem('${key}',${i})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;">✕</button>
-      </div>`).join('') || '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:4px 0;">None added</div>';
+        <span style="font-family:Arial,sans-serif;font-size:13px;color:var(--text1);flex:1;">${v}</span>
+        <button onclick="removeListItem('${key}',${i})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;">✕</button>
+      </div>`).join('') || '<div style="font-family:Arial,sans-serif;font-size:13px;color:var(--text3);padding:4px 0;">None added</div>';
   });
 }
 
@@ -2660,6 +2660,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     await Auth.getFreshToken();   // waits for token to be available
   } catch(e) { /* not authenticated — requireAuth will redirect */ return; }
   initUM();
+
+  // Suppress hover card whenever any drawer is open
+  var _hoverCard = document.getElementById('res-hover-card');
+  if (_hoverCard) {
+    new MutationObserver(function() {
+      if (_hoverCard.classList.contains('visible')) {
+        var drawerOpen = document.querySelector('.um-drawer.open');
+        var overlayOpen = document.getElementById('drawer-overlay') && document.getElementById('drawer-overlay').classList.contains('open');
+        if (drawerOpen || overlayOpen) _hoverCard.classList.remove('visible');
+      }
+    }).observe(_hoverCard, { attributes: true, attributeFilter: ['class'] });
+  }
 });
 
 // ── AVATAR UPLOAD ──────────────────────────────────────────────
