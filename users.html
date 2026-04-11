@@ -3085,7 +3085,7 @@ function _ocBuild() {
 
   // Unassigned = resources with no manager AND no direct reports
   var unassigned = res.filter(function(r){
-    return !r._oc_manager_id && r._oc_manager_id !== 'ROOT' && !r.is_org_root && !children[r.id];
+    return (r._oc_manager_id === 'UNASSIGNED' || !r._oc_manager_id) && r._oc_manager_id !== 'ROOT' && !r.is_org_root && !children[r.id];
   });
 
   // Roots = resources with no manager but HAS reports
@@ -3349,7 +3349,7 @@ function _ocCanvasDrop(e) {
 function _ocUnlinkNode(id) {
   _ocPending[id] = 'UNASSIGNED';
   var r = (UM.resources||[]).find(function(x){ return x.id === id; });
-  if (r) { r._oc_manager_id = null; r.is_org_root = false; }
+  if (r) { r._oc_manager_id = 'UNASSIGNED'; r.is_org_root = false; }
   if (_ocSelectedId === id) {
     _ocSelectedId = null;
     var det = document.getElementById('oc-detail');
