@@ -2825,7 +2825,18 @@ function _ocFixConnectors() {
     var dropRect    = parentDrop.getBoundingClientRect();
     var dropCenterX = dropRect.left + dropRect.width/2;
 
-    // Spine bar height: use lastStub midY so bar bottom touches last stub exactly
+    // Fix stubs first so their positions are correct before measuring spine height
+    rows.forEach(function(row, i){
+      if (!cardRects[i]) return;
+      var stub = row.children[0];
+      if (!stub) return;
+      var rowRect  = row.getBoundingClientRect();
+      var cardMidY = cardRects[i].top + cardRects[i].height/2;
+      stub.style.width     = '20px';
+      stub.style.marginTop = Math.round(cardMidY - rowRect.top - 1) + 'px';
+    });
+
+    // Spine bar height: use lastStub midY AFTER stubs are positioned
     var lastRow      = rows[rows.length-1];
     var lastStub     = lastRow ? lastRow.children[0] : null;
     var lastStubRect = lastStub ? lastStub.getBoundingClientRect() : null;
@@ -2850,17 +2861,6 @@ function _ocFixConnectors() {
       wrap.appendChild(bridge);
     }
     bridge.style.cssText = 'position:absolute;top:0;left:0;height:2px;background:rgba(0,201,201,0.5);width:' + Math.round(dropCenterX - wrapRect.left) + 'px';
-
-    // Stubs: fixed width 20px, marginTop centers on card
-    rows.forEach(function(row, i){
-      if (!cardRects[i]) return;
-      var stub = row.children[0];
-      if (!stub) return;
-      var rowRect  = row.getBoundingClientRect();
-      var cardMidY = cardRects[i].top + cardRects[i].height/2;
-      stub.style.width     = '20px';
-      stub.style.marginTop = Math.round(cardMidY - rowRect.top - 1) + 'px';
-    });
   });
 }
 
