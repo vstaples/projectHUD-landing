@@ -2822,10 +2822,17 @@ function _ocFixConnectors() {
     if (!cardRects.length) return;
     var wrapRect    = wrap.getBoundingClientRect();
     var dropRect    = parentDrop.getBoundingClientRect();
-    var lastMidY    = cardRects[cardRects.length-1].top + cardRects[cardRects.length-1].height/2;
     var dropCenterX = dropRect.left + dropRect.width/2;
 
-    // Spine bar: left=0, top=0, height from wrapTop to lastCard midY
+    // Spine bar height: use lastStub midY so bar bottom touches last stub exactly
+    var lastRow      = rows[rows.length-1];
+    var lastStub     = lastRow ? lastRow.children[0] : null;
+    var lastStubRect = lastStub ? lastStub.getBoundingClientRect() : null;
+    var lastMidY     = lastStubRect
+      ? lastStubRect.top + lastStubRect.height/2
+      : cardRects[cardRects.length-1].top + cardRects[cardRects.length-1].height/2;
+
+    // Spine bar: left=0, top=0, height from wrapTop to lastStub midY
     wrap.style.position       = 'relative';
     spineBar.style.position   = 'absolute';
     spineBar.style.left       = '0px';
