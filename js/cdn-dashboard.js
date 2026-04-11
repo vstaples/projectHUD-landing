@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260411-CD54 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260411-CD55 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1278,7 +1278,7 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     var nameClr = statusCls==='wf-fail'?'#e84040':statusCls==='wf-cert'?'#3de08a':statusCls==='wf-stale'?'#3de08a':'#ffffff';
     var covClrR1 = (function(){var pt=tmplPaths.total,pc=tmplPaths.scripted||tmplPaths.covered;return pt===0?'rgba(255,255,255,.3)':pc===pt?'var(--cd-grn)':pc>0?'var(--cd-amb)':'rgba(255,255,255,.3)';}());
     var covLblR1 = (function(){var pt=tmplPaths.total,pc=tmplPaths.scripted||tmplPaths.covered;return pt>0?(pc+'/'+pt+' Coverage Path'+(pt===1?'':'s')+' Defined'):'No Coverage Paths Defined';}());
-    var GRID = 'display:grid;grid-template-columns:130px 8px 150px 8px 200px 660px 1fr;align-items:center;';
+    var GRID = 'display:grid;grid-template-columns:minmax(0,130px) 8px minmax(0,150px) 8px minmax(0,200px) minmax(0,660px) minmax(160px,1fr);align-items:center;';
     return '<div class="cd-wf '+statusCls+'" id="cd-wf-'+t.id+'" data-tid="'+t.id+'" onclick="_cdPortToggle(this.dataset.tid)">'+
       '<div style="'+GRID+'margin-bottom:2px;align-items:end">'+
         '<div style="grid-column:1/6;font-size:13px;font-weight:500;font-family:Arial,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:'+nameClr+'">'+_cdEsc(t.name)+'</div>'+
