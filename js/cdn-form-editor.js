@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260411-SE115 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260411-SE116 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -699,6 +699,13 @@ function _formAddFillRouting() {
 function _formAddFillRoutingConfirm(role) {
   document.getElementById('fr-picker')?.remove();
   if (_formMatrixRoles.indexOf(role) < 0) _formMatrixRoles.push(role);
+  // Persist to _formRouting and DB immediately
+  _formRouting.matrix_roles = _formMatrixRoles.slice();
+  if (_selectedForm) {
+    API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id, {
+      routing: _formRouting
+    }).catch(function(e){ console.warn('[addFillRouting] save failed:', e.message); });
+  }
   _reRenderMatrix();
 }
 
@@ -870,11 +877,11 @@ function _vmApplySec(secId, role, state) {
 
 function _vmRemoveRole(role) {
   _formMatrixRoles = _formMatrixRoles.filter(function(r){ return r !== role; });
-  // Persist to DB before rerender (rerender calls _vmEnsureRoles)
-  if (_selectedForm && _selectedForm.routing) {
-    _selectedForm.routing.matrix_roles = _formMatrixRoles.slice();
+  // Persist to _formRouting and DB immediately
+  _formRouting.matrix_roles = _formMatrixRoles.slice();
+  if (_selectedForm) {
     API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id, {
-      routing: _selectedForm.routing
+      routing: _formRouting
     }).catch(function(e){ console.warn('[vmRemoveRole] save failed:', e.message); });
   }
   _reRenderMatrix();
@@ -4253,6 +4260,8 @@ async function _formToggleCompassVisible(checked) {
 
 async function _formSave() {
   if (!_selectedForm) return;
+  // Always persist current matrix roles into routing before saving
+  _formRouting.matrix_roles = _formMatrixRoles.slice();
   _selectedForm.fields  = JSON.parse(JSON.stringify(_formFields));
   _selectedForm.routing = JSON.parse(JSON.stringify(_formRouting));
   if (_selectedForm._unsaved || (!_selectedForm.source_path && _selectedForm._file)) {
