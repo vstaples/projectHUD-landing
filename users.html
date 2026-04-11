@@ -1919,6 +1919,13 @@ function switchResTab(tab) {
   document.querySelectorAll('.res-drawer-panel').forEach(p => p.classList.toggle('active', p.id === 'rdp-' + tab));
   if (tab === 'skills') renderSkillPicker();
   if (tab === 'domain') renderDomainPicker();
+  if (tab === 'profile') {
+    renderProfileLists();
+    var spec = document.getElementById('res-specialty');
+    var li   = document.getElementById('res-linkedin');
+    if (spec) spec.value = UM._pendingProfile.specialty_summary || '';
+    if (li)   li.value   = UM._pendingProfile.linkedin_url      || '';
+  }
 }
 
 function renderSkillPicker() {
@@ -2168,7 +2175,9 @@ function _attachHoverCard(el, resourceId) {
       // Suppress if any drawer is open or org chart overlay is open
       var drawerOpen = !!document.querySelector('.um-drawer.open');
       var ocOpen = document.getElementById('oc-overlay')?.style.display === 'flex';
-      if (!drawerOpen && !ocOpen) showHoverCard(resourceId, el);
+      // Suppress if the hovered element is inside an open drawer
+      var insideDrawer = !!el.closest('.um-drawer');
+      if (!drawerOpen && !ocOpen && !insideDrawer) showHoverCard(resourceId, el);
     }, 900);
   });
   el.addEventListener('mouseleave', hideHoverCard);
@@ -2182,7 +2191,8 @@ async function showHoverCard(resourceId, anchorEl) {
   var drawerOpen = document.getElementById('res-drawer')?.classList.contains('open') ||
                    document.getElementById('drawer-overlay')?.classList.contains('open');
   var ocOpen = document.getElementById('oc-overlay')?.style.display === 'flex';
-  if (drawerOpen || ocOpen) return;
+  var insideDrawer = !!(anchorEl && anchorEl.closest('.um-drawer'));
+  if (drawerOpen || ocOpen || insideDrawer) return;
 
   const role    = UM.roles.find(x => x.id === r.hud_role_id);
   const cat     = role ? UM.categories.find(c => c.id === role.category_id) : null;
