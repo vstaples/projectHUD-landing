@@ -1,0 +1,3450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProjectHUD — User Management</title>
+<link rel="stylesheet" href="/css/hud.css">
+<style>
+
+/* ── HOVER CARD ──────────────────────────────────────────────── */
+#res-hover-card {
+  position:fixed; z-index:500; width:340px;
+  background:var(--bg1); border:1px solid var(--border2);
+  box-shadow:0 8px 40px rgba(0,0,0,.6), 0 0 0 1px rgba(0,210,255,.08);
+  pointer-events:none; opacity:0; transition:opacity .15s;
+}
+#res-hover-card.visible { opacity:1; }
+.hc-top { padding:14px 16px 10px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; gap:12px; }
+.hc-avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-hud); font-size:15px; font-weight:700; color:var(--cyan);
+  background:rgba(0,210,255,.1); border:1px solid rgba(0,210,255,.3); flex-shrink:0; }
+.hc-name { font-family:var(--font-ui); font-size:15px; font-weight:700; color:var(--text0); }
+.hc-title { font-family:var(--font-mono); font-size:10px; color:var(--text3); margin-top:2px; }
+.hc-tags { display:flex; gap:5px; margin-top:6px; flex-wrap:wrap; }
+.hc-section { padding:10px 16px; border-bottom:1px solid var(--border); }
+.hc-section:last-child { border-bottom:none; }
+.hc-section-title { font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:.14em; margin-bottom:7px; }
+.hc-field { display:flex; justify-content:space-between; align-items:center; padding:2px 0; }
+.hc-field label { font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:.08em; }
+.hc-field span { font-family:var(--font-mono); font-size:10px; color:var(--text2); }
+.hc-alloc-bar { height:5px; background:rgba(255,255,255,.05); margin-top:3px; margin-bottom:8px; }
+.hc-alloc-fill { height:100%; transition:width .3s; }
+.hc-alloc-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:2px; }
+.hc-alloc-proj { font-family:var(--font-ui); font-size:10px; color:var(--text2); }
+.hc-alloc-pct { font-family:var(--font-mono); font-size:10px; }
+.hc-task-row { padding:3px 0; border-bottom:1px solid rgba(255,255,255,.03); }
+.hc-task-name { font-family:var(--font-ui); font-size:10px; color:var(--text1); }
+.hc-task-dates { font-family:var(--font-mono); font-size:10px; color:var(--text3); }
+
+/* ── RESOURCE CARD SKILL CHIPS ───────────────────────────────── */
+.skill-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+.skill-chip { font-family:var(--font-mono); font-size:11px; padding:3px 9px; border:1px solid var(--border);
+  color:var(--text3); background:var(--bg3); cursor:default; }
+.skill-chip.aware       { border-color:rgba(100,140,180,.3); color:var(--text2); }
+.skill-chip.practitioner{ border-color:rgba(0,210,255,.25); color:var(--cyan); background:rgba(0,210,255,.04); }
+.skill-chip.expert      { border-color:rgba(255,170,0,.3); color:var(--amber); background:rgba(255,170,0,.04); }
+.skill-chip.authority   { border-color:rgba(168,85,247,.35); color:var(--purple); background:rgba(168,85,247,.04); }
+
+/* ── SKILLS TAB ──────────────────────────────────────────────── */
+.skills-layout { display:grid; grid-template-columns:220px 1fr; gap:0; height:calc(100vh - 200px); overflow:hidden; }
+.skills-sidebar { border-right:1px solid var(--border); overflow-y:auto; }
+.skills-cat-item { padding:9px 14px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.03);
+  font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:.1em;
+  display:flex; align-items:center; gap:8px; transition:all .15s; }
+.skills-cat-item:hover { color:var(--text1); background:rgba(255,255,255,.02); }
+.skills-cat-item.active { color:var(--cyan); background:rgba(0,210,255,.04); border-left:2px solid var(--cyan); }
+.skills-cat-icon { font-size:14px; }
+.skills-content { overflow-y:auto; padding:20px; }
+.skills-cat-header { font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:.16em;
+  margin-bottom:14px; padding-bottom:8px; border-bottom:1px solid rgba(0,210,255,.15); }
+.skill-row { display:flex; align-items:center; gap:12px; padding:8px 10px;
+  border-bottom:1px solid rgba(255,255,255,.03); transition:background .1s; }
+.skill-row:hover { background:rgba(0,210,255,.02); }
+.skill-name { font-family:var(--font-ui); font-size:13px; color:var(--text1); flex:1; }
+.skill-aliases { font-family:var(--font-mono); font-size:10px; color:var(--text3); flex:2; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+.skill-count { font-family:var(--font-mono); font-size:10px; color:var(--text3); width:60px; text-align:right; }
+
+/* ── CALENDAR TAB ────────────────────────────────────────────── */
+.cal-layout { display:grid; grid-template-columns:1fr 320px; gap:20px; }
+.cal-month { background:var(--bg2); border:1px solid var(--border); }
+.cal-month-hdr { padding:10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.cal-month-title { font-family:var(--font-hud); font-size:16px; font-weight:700; color:var(--text0); flex:1; }
+.cal-nav { background:none; border:1px solid var(--border); color:var(--text3); font-size:14px;
+  padding:3px 10px; cursor:pointer; font-family:var(--font-mono); }
+.cal-nav:hover { border-color:var(--cyan); color:var(--cyan); }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); }
+.cal-dow { font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:.1em;
+  padding:8px; text-align:center; border-bottom:1px solid var(--border); }
+.cal-day { padding:6px; min-height:52px; border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border); position:relative; cursor:pointer; transition:background .1s; }
+.cal-day:hover { background:rgba(0,210,255,.03); }
+.cal-day.other-month .cal-day-num { color:var(--text3); opacity:.4; }
+.cal-day.today .cal-day-num { color:var(--cyan); font-weight:700; }
+.cal-day-num { font-family:var(--font-mono); font-size:10px; color:var(--text2); }
+.cal-event { font-family:var(--font-mono); font-size:10px; padding:1px 4px; margin-top:2px; border-radius:1px; }
+.cal-event.holiday { background:rgba(255,71,87,.15); color:var(--red); border:1px solid rgba(255,71,87,.3); }
+.cal-event.pto     { background:rgba(0,210,255,.12); color:var(--cyan); border:1px solid rgba(0,210,255,.25); }
+.cal-event.training{ background:rgba(255,170,0,.12); color:var(--amber); border:1px solid rgba(255,170,0,.25); }
+.cal-event.travel  { background:rgba(168,85,247,.12); color:var(--purple); border:1px solid rgba(168,85,247,.25); }
+.cal-sidebar { display:flex; flex-direction:column; gap:14px; }
+.cal-event-panel { background:var(--bg2); border:1px solid var(--border); }
+.cal-event-hdr { padding:9px 14px; border-bottom:1px solid var(--border);
+  font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:.14em; }
+.cal-event-list { padding:8px; max-height:200px; overflow-y:auto; }
+.cal-event-item { display:flex; align-items:center; gap:8px; padding:5px 6px;
+  border-bottom:1px solid rgba(255,255,255,.03); }
+.cal-event-item:last-child { border-bottom:none; }
+.cal-event-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.cal-event-info { flex:1; }
+.cal-event-name { font-family:var(--font-ui); font-size:11px; color:var(--text1); }
+.cal-event-who { font-family:var(--font-mono); font-size:10px; color:var(--text3); }
+.cal-event-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:12px; padding:0 2px; }
+.cal-event-del:hover { color:var(--red); }
+
+/* ── ADD EVENT FORM ──────────────────────────────────────────── */
+.cal-add-form { background:var(--bg2); border:1px solid var(--border); padding:14px; }
+.cal-add-title { font-family:var(--font-mono); font-size:10px; color:var(--amber); letter-spacing:.14em; margin-bottom:12px; }
+
+/* ── RESOURCE DRAWER TABS ────────────────────────────────────── */
+.res-drawer-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:16px; }
+.res-drawer-tab { font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; color:var(--text3);
+  padding:7px 14px; cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; }
+.res-drawer-tab:hover { color:var(--text1); }
+.res-drawer-tab.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+.res-drawer-panel { display:none; }
+.res-drawer-panel.active { display:block; }
+
+/* ── PROFICIENCY SELECTOR ────────────────────────────────────── */
+.prof-select { display:flex; gap:4px; }
+.prof-btn { font-family:var(--font-mono); font-size:10px; padding:3px 8px; cursor:pointer;
+  border:1px solid var(--border); background:none; color:var(--text3); transition:all .15s; }
+.prof-btn:hover { color:var(--text1); }
+.prof-btn.active-aware       { border-color:rgba(100,140,180,.5); color:var(--text1); background:rgba(100,140,180,.1); }
+.prof-btn.active-practitioner{ border-color:rgba(0,210,255,.4); color:var(--cyan); background:rgba(0,210,255,.08); }
+.prof-btn.active-expert      { border-color:rgba(255,170,0,.4); color:var(--amber); background:rgba(255,170,0,.08); }
+.prof-btn.active-authority   { border-color:rgba(168,85,247,.45); color:var(--purple); background:rgba(168,85,247,.08); }
+
+/* ── PAGE LAYOUT ─────────────────────────────────────────────── */
+.um-wrap { display:flex; height:100vh; overflow:hidden; }
+.um-main { flex:1; overflow-y:auto; padding:28px 32px; }
+.um-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; }
+.um-title { font-family:var(--font-hud); font-size:22px; font-weight:700; color:var(--text0); letter-spacing:0.04em; }
+.um-subtitle { font-family:var(--font-mono); font-size:11px; color:var(--text3); letter-spacing:0.12em; margin-top:3px; }
+
+/* ── TABS ────────────────────────────────────────────────────── */
+.um-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:24px; }
+.um-tab { font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; color:var(--text3);
+  padding:8px 18px; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; }
+.um-tab:hover { color:var(--text1); }
+.um-tab.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+
+/* ── PANELS ──────────────────────────────────────────────────── */
+.um-panel { display:none; }
+.um-panel.active { display:block; }
+
+/* ── SECTION HEADER ──────────────────────────────────────────── */
+.um-section-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.um-section-title { font-family:var(--font-mono); font-size:11px; letter-spacing:0.14em; color:var(--cyan); }
+.um-add-btn { font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em;
+  padding:5px 14px; background:rgba(0,210,255,0.08); border:1px solid rgba(0,210,255,0.35);
+  color:var(--cyan); cursor:pointer; transition:all 0.15s; }
+.um-add-btn:hover { background:rgba(0,210,255,0.15); }
+
+/* ── CARDS GRID ──────────────────────────────────────────────── */
+.um-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; margin-bottom:28px; }
+.um-card { background:var(--bg2); border:1px solid var(--border); padding:16px 18px; position:relative;
+  transition:border-color 0.15s; }
+.um-card:hover { border-color:rgba(0,210,255,0.25); }
+.um-card-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+.um-card-name { font-family:var(--font-ui); font-size:14px; font-weight:600; color:var(--text0); }
+.um-card-sub { font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:0.08em; margin-top:2px; }
+.um-card-badge { font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em;
+  padding:2px 8px; border:1px solid rgba(0,210,255,0.3); color:var(--cyan); background:rgba(0,210,255,0.06); }
+.um-card-actions { display:flex; gap:6px; }
+.um-card-action { background:none; border:none; cursor:pointer; font-size:13px; padding:2px 4px; opacity:0.6; }
+.um-card-action:hover { opacity:1; }
+.um-card-action.edit { color:var(--amber); }
+.um-card-action.del  { color:var(--red); }
+.um-card-field { display:flex; justify-content:space-between; align-items:center;
+  padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.04); font-size:11px; }
+.um-card-field:last-child { border-bottom:none; }
+.um-card-field label { font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em; color:var(--text3); }
+.um-card-field span { font-family:var(--font-mono); font-size:12px; color:var(--text2); }
+
+/* ── RESOURCE CARD ───────────────────────────────────────────── */
+.res-avatar {
+  width:52px; height:52px; border-radius:50%;
+  background:rgba(0,210,255,0.12);
+  border:2px solid rgba(0,210,255,0.3);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-hud); font-size:16px; font-weight:700;
+  color:var(--cyan); flex-shrink:0;
+  overflow:hidden; position:relative; cursor:pointer;
+  transition: border-color .2s, box-shadow .2s;
+}
+.res-avatar:hover { border-color:rgba(0,210,255,.7); box-shadow:0 0 12px rgba(0,210,255,.25); }
+.res-avatar img {
+  width:100%; height:100%;
+  object-fit:cover;       /* fills circle, crops — never stretches */
+  object-position:center; /* keeps face centered */
+  display:block;
+}
+.res-avatar-overlay {
+  position:absolute; inset:0; border-radius:50%;
+  background:rgba(0,0,0,.55);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; transition:opacity .2s;
+  font-size:18px; color:#fff;
+  pointer-events:none;
+}
+.res-avatar:hover .res-avatar-overlay { opacity:1; }
+.res-avatar-upload { display:none; }
+.res-info { flex:1; margin-left:12px; }
+.res-name { font-family:var(--font-ui); font-size:15px; font-weight:700; color:var(--text0); }
+.res-title { font-family:var(--font-mono); font-size:11px; color:var(--text3); margin-top:1px; }
+.res-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.res-tag { font-family:var(--font-mono); font-size:10px; letter-spacing:0.08em;
+  padding:2px 7px; border-radius:1px; }
+.res-tag.level-junior    { background:rgba(100,200,100,0.08); border:1px solid rgba(100,200,100,0.3); color:#6cc; }
+.res-tag.level-staff     { background:rgba(0,210,255,0.08); border:1px solid rgba(0,210,255,0.3); color:var(--cyan); }
+.res-tag.level-senior    { background:rgba(255,170,0,0.08); border:1px solid rgba(255,170,0,0.3); color:var(--amber); }
+.res-tag.level-principal { background:rgba(200,100,255,0.08); border:1px solid rgba(200,100,255,0.3); color:#c8a0ff; }
+.res-tag.active   { background:rgba(0,229,160,0.08); border:1px solid rgba(0,229,160,0.3); color:var(--green); }
+.res-tag.inactive { background:rgba(255,71,87,0.08); border:1px solid rgba(255,71,87,0.3); color:var(--red); }
+
+/* ── ROLES TABLE ─────────────────────────────────────────────── */
+.um-tbl { width:100%; border-collapse:collapse; }
+.um-tbl th { font-family:var(--font-mono); font-size:12px; color:var(--text3); letter-spacing:0.12em;
+  padding:8px 12px; border-bottom:1px solid var(--border); text-align:left; background:var(--bg2);
+  white-space:nowrap; }
+.um-tbl td { font-family:var(--font-ui); font-size:14px; color:var(--text1);
+  padding:9px 12px; border-bottom:1px solid rgba(100,160,220,0.06); vertical-align:middle; }
+.um-tbl tr:hover td { background:rgba(0,210,255,0.02); }
+.um-tbl .mono { font-family:var(--font-mono); font-size:12px; }
+.um-tbl .abbr { font-family:var(--font-mono); font-size:11px; color:var(--cyan); letter-spacing:0.1em; }
+.um-cat-header td { font-family:var(--font-mono); font-size:11px; letter-spacing:0.14em;
+  color:var(--cyan); background:rgba(0,210,255,0.04); padding:6px 12px;
+  border-top:1px solid rgba(0,210,255,0.12); }
+
+/* Level rate cells */
+.rate-cell { font-family:var(--font-mono); font-size:11px; }
+.rate-input { background:var(--bg1); border:1px solid var(--border); color:var(--text1);
+  font-family:var(--font-mono); font-size:13px; padding:4px 8px; width:86px; outline:none; }
+.rate-input:focus { border-color:rgba(0,210,255,0.4); }
+
+/* ── SLIDE PANEL ─────────────────────────────────────────────── */
+.um-panel-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:100; display:none; }
+.um-panel-overlay.open { display:block; }
+.um-drawer { position:fixed; top:0; right:-520px; width:500px; height:100vh;
+  background:var(--bg1); border-left:1px solid var(--border); z-index:101;
+  transition:right 0.25s cubic-bezier(0.4,0,0.2,1); overflow-y:auto; }
+.um-drawer.open { right:0; }
+.um-drawer-hdr { display:flex; align-items:flex-start; justify-content:space-between;
+  padding:20px 22px 16px; border-bottom:1px solid var(--border); }
+.um-drawer-title { font-family:var(--font-hud); font-size:16px; font-weight:700; color:var(--text0); }
+.um-drawer-close { background:none; border:none; color:var(--text3); font-size:18px; cursor:pointer; padding:0 4px; }
+.um-drawer-body { padding:22px; }
+.um-field { margin-bottom:16px; }
+.um-field label { display:block; font-family:var(--font-mono); font-size:10px; letter-spacing:0.12em;
+  color:var(--cyan); margin-bottom:5px; }
+.um-field label .req { color:var(--red); margin-left:3px; }
+.um-input, .um-select { width:100%; box-sizing:border-box; background:var(--bg2); border:1px solid var(--border);
+  color:var(--text1); font-family:var(--font-ui); font-size:13px; padding:8px 10px; outline:none; }
+.um-input:focus, .um-select:focus { border-color:rgba(0,210,255,0.4); }
+.um-select { background:var(--bg2); }
+.um-2col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.um-3col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+.um-drawer-footer { display:flex; gap:10px; padding:16px 22px; border-top:1px solid var(--border); }
+.um-save-btn { flex:1; background:rgba(0,210,255,0.1); border:1px solid rgba(0,210,255,0.4);
+  color:var(--cyan); font-family:var(--font-mono); font-size:11px; letter-spacing:0.1em;
+  padding:10px; cursor:pointer; transition:all 0.15s; }
+.um-save-btn:hover { background:rgba(0,210,255,0.18); }
+.um-cancel-btn { background:none; border:1px solid var(--border); color:var(--text3);
+  font-family:var(--font-mono); font-size:11px; padding:10px 18px; cursor:pointer; }
+.um-err { font-family:var(--font-mono); font-size:11px; color:var(--red);
+  background:rgba(255,71,87,0.08); border:1px solid rgba(255,71,87,0.25);
+  padding:7px 10px; margin-bottom:12px; display:none; }
+
+/* ── SECTION DIVIDER ─────────────────────────────────────────── */
+.um-divider { font-family:var(--font-mono); font-size:10px; letter-spacing:0.16em;
+  color:var(--cyan); margin:10px 0 6px; padding-bottom:5px; border-bottom:1px solid rgba(0,210,255,0.12); }
+
+/* ── EMPTY STATE ─────────────────────────────────────────────── */
+.um-empty { text-align:center; padding:40px 20px; font-family:var(--font-mono);
+  font-size:11px; color:var(--text3); letter-spacing:0.1em; }
+
+/* ── HOVER CARD ──────────────────────────────────────────────── */
+#res-hover-card {
+  position:fixed; z-index:500; width:340px;
+  background:var(--bg2); border:1px solid var(--border2);
+  box-shadow:0 8px 40px rgba(0,0,0,0.6),0 0 0 1px rgba(0,210,255,0.08);
+  pointer-events:none; opacity:0; transition:opacity 0.15s;
+}
+#res-hover-card.visible { opacity:1; }
+.hc-top { padding:14px 16px 10px; border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:flex-start; }
+.hc-avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-hud); font-size:15px; font-weight:700; flex-shrink:0; border:1px solid rgba(0,210,255,0.3); }
+.hc-name { font-family:var(--font-ui); font-size:15px; font-weight:700; color:var(--text0); }
+.hc-title { font-family:var(--font-mono); font-size:10px; color:var(--text3); margin-top:2px; }
+.hc-section { padding:10px 16px; border-bottom:1px solid var(--border); }
+.hc-section:last-child { border-bottom:none; }
+.hc-section-lbl { font-family:var(--font-mono); font-size:10px; color:var(--cyan); letter-spacing:0.14em; margin-bottom:8px; }
+.hc-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:11px; }
+.hc-row-lbl { font-family:var(--font-mono); font-size:10px; color:var(--text3); letter-spacing:0.08em; }
+.hc-row-val { font-family:var(--font-mono); font-size:11px; color:var(--text2); }
+.hc-alloc-bar { height:5px; background:rgba(255,255,255,0.06); margin-top:2px; margin-bottom:6px; }
+.hc-alloc-fill { height:100%; transition:width 0.3s; }
+.hc-task-row { display:flex; justify-content:space-between; align-items:center;
+  padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.03); font-size:10px; }
+.hc-task-row:last-child { border-bottom:none; }
+.hc-task-name { font-family:var(--font-ui); font-size:11px; color:var(--text1); max-width:180px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hc-task-meta { font-family:var(--font-mono); font-size:10px; color:var(--text3); white-space:nowrap; }
+.hc-skill-chip { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:10px;
+  padding:2px 7px; border:1px solid var(--border); color:var(--text2); margin:2px; }
+.hc-skill-chip .prof { color:var(--cyan); }
+.hc-empty { font-family:var(--font-mono); font-size:10px; color:var(--text3); text-align:center; padding:8px; }
+
+
+/* ── SKILL MANAGEMENT ────────────────────────────────────────── */
+.skill-cat-hdr { display:flex; align-items:center; justify-content:space-between;
+  font-family:var(--font-mono); font-size:11px; color:var(--cyan); letter-spacing:0.14em;
+  padding:8px 12px; background:rgba(0,210,255,0.04); border:1px solid rgba(0,210,255,0.12);
+  margin-bottom:8px; }
+.skill-cat-hdr .cat-actions { display:flex; gap:6px; opacity:0; transition:opacity .15s; }
+.skill-cat-block:hover .cat-actions { opacity:1; }
+.skill-mgmt-btn { background:none; border:1px solid var(--border); color:var(--text3);
+  font-family:var(--font-mono); font-size:10px; padding:2px 7px; cursor:pointer;
+  letter-spacing:0.08em; transition:all .15s; }
+.skill-mgmt-btn:hover { color:var(--text1); border-color:rgba(0,210,255,0.3); }
+.skill-mgmt-btn.add   { color:var(--cyan); border-color:rgba(0,210,255,0.3); }
+.skill-mgmt-btn.edit  { color:var(--amber); border-color:rgba(255,170,0,0.3); }
+.skill-mgmt-btn.del   { color:var(--red); border-color:rgba(255,71,87,0.3); }
+.skill-chip-wrap { position:relative; display:inline-block; }
+.skill-chip-del { position:absolute; top:-5px; right:-5px; width:14px; height:14px;
+  border-radius:50%; background:var(--red); color:#fff; font-size:10px; border:none;
+  cursor:pointer; display:none; align-items:center; justify-content:center;
+  line-height:1; padding:0; }
+.skill-chip-wrap:hover .skill-chip-del { display:flex; }
+
+/* ── SKILL HOVER TOOLTIP ─────────────────────────────────────── */
+#skill-hover-tt {
+  position:fixed; z-index:600; width:300px; pointer-events:none;
+  background:var(--bg1); border:1px solid var(--border2);
+  box-shadow:0 8px 32px rgba(0,0,0,.6); opacity:0; transition:opacity .15s;
+}
+#skill-hover-tt.visible { opacity:1; }
+.stt-hdr { padding:10px 14px 8px; border-bottom:1px solid var(--border);
+  font-family:var(--font-hud); font-size:14px; font-weight:700; color:var(--text0); }
+.stt-sub { font-family:var(--font-mono); font-size:10px; color:var(--text3);
+  letter-spacing:0.1em; margin-top:2px; }
+.stt-section { padding:8px 14px; }
+.stt-section-lbl { font-family:var(--font-mono); font-size:10px; color:var(--cyan);
+  letter-spacing:0.14em; margin-bottom:6px; }
+.stt-person-row { display:flex; align-items:center; gap:8px; padding:3px 0;
+  border-bottom:1px solid rgba(255,255,255,.03); }
+.stt-person-row:last-child { border-bottom:none; }
+.stt-person-name { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
+.stt-prof { font-family:var(--font-mono); font-size:10px; padding:1px 6px;
+  border-radius:1px; }
+.stt-prof.aware       { background:rgba(100,140,180,.1); color:var(--text2);
+  border:1px solid rgba(100,140,180,.3); }
+.stt-prof.practitioner{ background:rgba(0,210,255,.08); color:var(--cyan);
+  border:1px solid rgba(0,210,255,.25); }
+.stt-prof.expert      { background:rgba(255,170,0,.08); color:var(--amber);
+  border:1px solid rgba(255,170,0,.3); }
+.stt-prof.authority   { background:rgba(168,85,247,.1); color:var(--purple);
+  border:1px solid rgba(168,85,247,.35); }
+.stt-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.stt-empty { font-family:var(--font-mono); font-size:10px; color:var(--text3);
+  padding:4px 0; }
+/* ── SKILLS LIBRARY TAB ──────────────────────────────────────── */
+.skill-cat-block { margin-bottom:24px; }
+.skill-cat-hdr { font-family:var(--font-mono); font-size:11px; color:var(--cyan); letter-spacing:0.14em;
+  padding:6px 12px; background:rgba(0,210,255,0.04); border:1px solid var(--border); margin-bottom:8px;
+  display:flex; justify-content:space-between; align-items:center; }
+.skill-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.skill-chip { font-family:var(--font-ui); font-size:13px; padding:6px 12px;
+  border:1px solid var(--border); color:var(--text2); background:var(--bg2);
+  cursor:pointer; transition:all 0.15s; }
+.skill-chip:hover { border-color:rgba(0,210,255,0.4); color:var(--cyan); }
+.skill-chip .sk-alias { font-size:11px; color:var(--text3); display:block; margin-top:2px; }
+
+/* ── CALENDAR TAB ────────────────────────────────────────────── */
+.cal-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.cal-panel { background:var(--bg2); border:1px solid var(--border); }
+.cal-hdr { padding:10px 14px; background:var(--bg3); border-bottom:1px solid var(--border);
+  font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; display:flex; align-items:center; justify-content:space-between; }
+.cal-entry { display:flex; align-items:center; gap:10px; padding:7px 14px; border-bottom:1px solid rgba(255,255,255,0.03); }
+.cal-entry:last-child { border-bottom:none; }
+.cal-date { font-family:var(--font-mono); font-size:11px; color:var(--cyan); width:80px; flex-shrink:0; }
+.cal-note { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
+.cal-type { font-family:var(--font-mono); font-size:10px; padding:1px 6px; border:1px solid; }
+.cal-hours { font-family:var(--font-mono); font-size:10px; color:var(--text3); width:30px; text-align:right; }
+.cal-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:12px; opacity:0.6; }
+.cal-del:hover { color:var(--red); opacity:1; }
+.cal-add-form { padding:12px 14px; border-top:1px solid var(--border); background:var(--bg3); }
+
+/* ── SKILL PICKER (in resource drawer) ──────────────────────── */
+.sp-row { display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid rgba(255,255,255,0.03);
+  cursor:pointer; transition:background 0.1s; }
+.sp-row:hover { background:rgba(0,210,255,0.04); }
+.sp-name { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
+.sp-cat { font-family:var(--font-mono); font-size:10px; color:var(--text3); }
+.sp-add { font-family:var(--font-mono); font-size:10px; color:var(--cyan); padding:2px 7px;
+  border:1px solid rgba(0,210,255,0.3); background:none; cursor:pointer; flex-shrink:0; }
+.as-row { display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid rgba(255,255,255,0.03); }
+.as-name { font-family:var(--font-ui); font-size:12px; color:var(--text1); flex:1; }
+.as-prof { font-family:var(--font-mono); font-size:10px; }
+.as-prof-sel { background:var(--bg3); border:1px solid var(--border); color:var(--text1);
+  font-family:var(--font-mono); font-size:10px; padding:2px 6px; outline:none; }
+.as-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:12px; }
+.as-del:hover { color:var(--red); }
+.de-row { background:var(--bg3); border:1px solid var(--border); padding:8px 10px; margin-bottom:6px; position:relative; }
+.de-domain { font-family:var(--font-hud); font-size:13px; font-weight:700; color:var(--text0); }
+.de-sub { font-family:var(--font-mono); font-size:10px; color:var(--text3); margin-top:2px; }
+.de-ctx { font-family:var(--font-mono); font-size:10px; color:var(--cyan); margin-top:3px; }
+.de-del { position:absolute; top:8px; right:8px; background:none; border:none; color:var(--text3); cursor:pointer; }
+
+/* ── LOADING ─────────────────────────────────────────────────── */
+.um-loading { text-align:center; padding:32px; font-family:var(--font-mono);
+  font-size:11px; color:var(--text3); letter-spacing:0.1em; animation:pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+/* ── APP ROLE BADGE ──────────────────────────────────────────── */
+.app-role { font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; padding:3px 9px; }
+.app-role.admin    { background:rgba(255,71,87,0.1); border:1px solid rgba(255,71,87,0.3); color:var(--red); }
+.app-role.pm       { background:rgba(255,170,0,0.1); border:1px solid rgba(255,170,0,0.3); color:var(--amber); }
+.app-role.resource { background:rgba(0,210,255,0.1); border:1px solid rgba(0,210,255,0.3); color:var(--cyan); }
+.app-role.viewer   { background:rgba(100,140,180,0.1); border:1px solid rgba(100,140,180,0.2); color:var(--text3); }
+</style>
+</head>
+<body>
+<div class="um-wrap">
+  <!-- Sidebar injected by sidebar.js -->
+  <nav id="sidebar"></nav>
+
+  <div class="um-main">
+    <div class="um-header">
+      <div>
+        <div class="um-title">USER MANAGEMENT</div>
+        <div class="um-subtitle">RESOURCES · ROLES · RATES · ACCESS</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div id="um-firm-label" style="font-family:var(--font-mono);font-size:10px;color:var(--text3);text-align:right;"></div>
+        <div id="um-date" style="font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:0.1em;white-space:nowrap;"></div>
+        <button onclick="goBack()" style="background:none;border:1px solid rgba(0,210,255,0.25);color:var(--cyan);font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;padding:5px 14px;cursor:pointer;white-space:nowrap;">&#9668; BACK</button>
+      </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="um-tabs">
+      <div class="um-tab active" data-tab="resources" onclick="switchUMTab('resources')">RESOURCES</div>
+      <div class="um-tab" data-tab="roles"     onclick="switchUMTab('roles')">ROLES &amp; RATES</div>
+      <div class="um-tab" data-tab="users"     onclick="switchUMTab('users')">APP USERS</div>
+      <div class="um-tab" data-tab="skills"    onclick="switchUMTab('skills')">SKILLS LIBRARY</div>
+      <div class="um-tab" data-tab="calendar"  onclick="switchUMTab('calendar')">CALENDAR</div>
+      <div class="um-tab" data-tab="orgchart"  onclick="switchUMTab('orgchart')">ORG CHART</div>
+    </div>
+
+    <!-- ── RESOURCES TAB ────────────────────────────────────── -->
+    <div class="um-panel active" id="tab-resources">
+      <div class="um-section-hdr">
+        <div class="um-section-title">COMPANY DIRECTORY</div>
+        <button class="um-add-btn" onclick="openResourceDrawer()">+ ADD RESOURCE</button>
+      </div>
+      <div id="resources-grid" class="um-grid">
+        <div class="um-loading">LOADING RESOURCES...</div>
+      </div>
+    </div>
+
+    <!-- ── ROLES & RATES TAB ─────────────────────────────────── -->
+    <div class="um-panel" id="tab-roles">
+      <div class="um-section-hdr">
+        <div class="um-section-title">ROLE CATALOGUE</div>
+        <div style="display:flex;gap:8px;">
+          <button class="um-add-btn" onclick="openCategoryDrawer()" style="border-color:rgba(255,170,0,0.35);color:var(--amber);">+ CATEGORY</button>
+          <button class="um-add-btn" onclick="openRoleDrawer()">+ ROLE</button>
+        </div>
+      </div>
+      <div id="roles-table-wrap">
+        <div class="um-loading">LOADING ROLES...</div>
+      </div>
+    </div>
+
+    <!-- ── APP USERS TAB ─────────────────────────────────────── -->
+    <div class="um-panel" id="tab-users">
+      <div class="um-section-hdr">
+        <div class="um-section-title">APP ACCESS &amp; ROLES</div>
+      </div>
+      <div id="users-table-wrap">
+        <div class="um-loading">LOADING USERS...</div>
+      </div>
+    </div>
+    <!-- ── SKILLS LIBRARY TAB ────────────────────────────────── -->
+    <div class="um-panel" id="tab-skills">
+      <div class="um-section-hdr">
+        <div class="um-section-title">SKILL CATALOGUE</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);" id="skill-count-lbl"></div>
+          <button class="um-add-btn" onclick="openSkillCatDrawer()">+ ADD CATEGORY</button>
+        </div>
+      </div>
+      <div id="skills-library-wrap">
+        <div class="um-loading">LOADING SKILLS...</div>
+      </div>
+    </div>
+
+    <!-- ── CALENDAR TAB ──────────────────────────────────────── -->
+    <div class="um-panel" id="tab-calendar">
+      <div class="um-section-hdr">
+        <div class="um-section-title">FIRM CALENDAR &amp; PTO</div>
+      </div>
+      <div class="cal-grid">
+        <!-- Firm-wide holidays -->
+        <div>
+          <div class="cal-panel">
+            <div class="cal-hdr">
+              <span style="color:var(--amber)">🏢 FIRM-WIDE HOLIDAYS</span>
+              <span id="holiday-count" style="color:var(--text3)"></span>
+            </div>
+            <div id="holiday-list"><div class="um-loading">...</div></div>
+            <div class="cal-add-form">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">DATE</label>
+                  <input id="hol-date" class="um-input" type="date" style="width:100%;box-sizing:border-box;"/></div>
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">HRS AVAILABLE</label>
+                  <input id="hol-hrs" class="um-input" type="number" min="0" max="8" value="0" style="width:100%;box-sizing:border-box;"/></div>
+              </div>
+              <input id="hol-note" class="um-input" type="text" placeholder="Holiday name..." style="width:100%;box-sizing:border-box;margin-bottom:8px;"/>
+              <button class="um-add-btn" onclick="addHoliday()" style="width:100%;">+ ADD HOLIDAY</button>
+            </div>
+          </div>
+        </div>
+        <!-- Per-resource PTO -->
+        <div>
+          <div class="cal-panel">
+            <div class="cal-hdr">
+              <span style="color:var(--cyan)">👤 RESOURCE PTO / EXCEPTIONS</span>
+            </div>
+            <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
+              <label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">SELECT RESOURCE</label>
+              <select id="pto-resource-sel" class="um-select" onchange="loadResourceCalendar()" style="width:100%;">
+                <option value="">— Select resource —</option>
+              </select>
+            </div>
+            <div id="pto-list"><div class="hc-empty">Select a resource to view their calendar</div></div>
+            <div class="cal-add-form" id="pto-add-form" style="display:none;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">DATE</label>
+                  <input id="pto-date" class="um-input" type="date" style="width:100%;box-sizing:border-box;"/></div>
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">TYPE</label>
+                  <select id="pto-type" class="um-select" style="width:100%;box-sizing:border-box;">
+                    <option value="pto">PTO</option>
+                    <option value="training">Training</option>
+                    <option value="travel">Travel</option>
+                    <option value="other">Other</option>
+                  </select></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">HRS AVAILABLE</label>
+                  <input id="pto-hrs" class="um-input" type="number" min="0" max="8" value="0" style="width:100%;box-sizing:border-box;"/></div>
+                <div><label style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;display:block;margin-bottom:4px;">NOTE</label>
+                  <input id="pto-note" class="um-input" type="text" placeholder="Optional note" style="width:100%;box-sizing:border-box;"/></div>
+              </div>
+              <button class="um-add-btn" onclick="addPTO()" style="width:100%;">+ ADD EXCEPTION</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── HOVER CARD ─────────────────────────────────────────────── -->
+<div id="res-hover-card">
+  <div class="hc-top">
+    <div class="hc-avatar" id="hc-avatar"></div>
+    <div>
+      <div class="hc-name" id="hc-name"></div>
+      <div class="hc-title" id="hc-title"></div>
+    </div>
+  </div>
+  <div id="hc-body"></div>
+</div>
+
+<!-- ── SKILL CATEGORY DRAWER ──────────────────────────────── -->
+<div class="um-drawer" id="skill-cat-drawer" style="width:380px;">
+  <div class="um-drawer-hdr">
+    <div class="um-drawer-title" id="skill-cat-drawer-title">ADD CATEGORY</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="um-drawer-body">
+    <div class="um-field"><label>CATEGORY NAME <span class="req">*</span></label>
+      <input id="scat-name" class="um-input" type="text" placeholder="e.g. Biomedical Engineering" /></div>
+    <div class="um-field"><label>ICON (emoji)</label>
+      <input id="scat-icon" class="um-input" type="text" placeholder="🧬" maxlength="4" style="font-size:20px;width:60px;" /></div>
+    <div id="scat-err" class="um-err"></div>
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="scat-save-btn" onclick="saveSkillCategory()">SAVE CATEGORY</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- ── ADD SKILL DRAWER ────────────────────────────────────── -->
+<div class="um-drawer" id="skill-drawer" style="width:420px;">
+  <div class="um-drawer-hdr">
+    <div class="um-drawer-title" id="skill-drawer-title">ADD SKILL</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="um-drawer-body">
+    <div class="um-field"><label>SKILL NAME <span class="req">*</span></label>
+      <input id="sk-name" class="um-input" type="text" placeholder="e.g. Optical Fiber Design" /></div>
+    <div class="um-field"><label>CATEGORY</label>
+      <select id="sk-cat" class="um-select"></select></div>
+    <div class="um-field"><label>DESCRIPTION</label>
+      <textarea id="sk-desc" class="um-input" rows="2" style="resize:vertical;"></textarea></div>
+    <div class="um-field"><label>ALIASES / KEYWORDS (comma separated)</label>
+      <input id="sk-aliases" class="um-input" type="text" placeholder="e.g. fiber optics, optical waveguide" /></div>
+    <div id="sk-err" class="um-err"></div>
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="sk-save-btn" onclick="saveSkill()">SAVE SKILL</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- ── SKILL HOVER TOOLTIP ───────────────────────────────────── -->
+<div id="skill-hover-tt">
+  <div class="stt-hdr">
+    <div id="stt-name"></div>
+    <div class="stt-sub" id="stt-cat"></div>
+  </div>
+  <div class="stt-section">
+    <div class="stt-section-lbl">TEAM MEMBERS WITH THIS SKILL</div>
+    <div id="stt-people"></div>
+  </div>
+</div>
+
+<!-- ── OVERLAY ──────────────────────────────────────────────── -->
+<div class="um-panel" id="tab-orgchart"></div>
+
+<!-- ── ORG CHART FULL-SCREEN OVERLAY ─────────────────────────── -->
+<div id="oc-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:var(--bg,#0d1117);flex-direction:column">
+  <!-- Top bar -->
+  <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
+    <span style="font-size:13px;font-weight:700;color:var(--text1);letter-spacing:.04em">ORG CHART</span>
+    <span style="font-size:11px;color:var(--muted)" id="oc-stats"></span>
+    <div style="flex:1"></div>
+    <span style="font-size:11px;color:var(--amber);font-weight:600" id="oc-pending-count"></span>
+    <button onclick="_ocCollapseAll()" style="font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Collapse all</button>
+    <button onclick="_ocExpandAll()" style="font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Expand all</button>
+    <span style="font-size:11px;color:var(--text2)" id="oc-updated-badge"></span>
+    <div style="display:flex;align-items:center;gap:4px"><button onclick="_ocZoomIn()" style="width:26px;height:26px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--text1);font-size:14px;cursor:pointer;font-family:Arial,sans-serif">+</button><button onclick="_ocZoomOut()" style="width:26px;height:26px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--text1);font-size:14px;cursor:pointer;font-family:Arial,sans-serif">−</button><span id="oc-zoom-pct" style="font-size:11px;color:var(--text2);min-width:32px;text-align:center">100%</span></div>
+    <button onclick="_ocToggleCoc()" id="oc-coc-btn" style="padding:5px 14px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:Arial,sans-serif">CoC</button>
+    <button id="oc-save-btn" onclick="_ocSaveAll()" style="padding:5px 16px;background:rgba(0,201,201,.15);border:1px solid rgba(0,201,201,.25);border-radius:4px;color:rgba(0,201,201,.4);font-size:12px;font-weight:700;cursor:default;font-family:Arial,sans-serif;transition:all .2s" disabled>Save Changes</button>
+    <button onclick="_ocClose()" style="padding:5px 14px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:Arial,sans-serif">✕ Close</button>
+  </div>
+  <!-- Body: left rail + canvas -->
+  <div id="oc-body-grid" style="display:grid;grid-template-columns:220px 1fr;flex:1;overflow:hidden">
+    <!-- Left rail -->
+    <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg2);overflow:hidden">
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)" id="oc-unassigned-hdr">Unassigned (0)</div>
+      <div style="padding:8px;flex-shrink:0">
+        <input id="oc-search" placeholder="Search name or dept..." oninput="_ocFilter(this.value)"
+          style="width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg3,var(--bg2));color:var(--text1);font-family:Arial,sans-serif;box-sizing:border-box">
+      </div>
+      <div id="oc-unassigned-list" style="flex:1;overflow-y:auto;padding:4px 8px;min-height:0"></div>
+    </div>
+    <!-- Canvas -->
+    <div style="overflow:auto;padding:0;background:var(--bg1,var(--bg))" id="oc-canvas" ondragover="_ocCanvasDragOver(event)" ondrop="_ocCanvasDrop(event)">
+      <div id="oc-tree-root" style="display:flex;flex-wrap:nowrap;gap:12px;align-items:flex-start;padding:20px;min-width:max-content"></div>
+  <!-- CoC slide-in panel -->
+  <div id="oc-coc-panel" style="display:none;flex-direction:column;border-left:1px solid var(--border);background:var(--bg2);overflow:hidden;min-height:0;z-index:10">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div id="oc-coc-drag" style="width:4px;height:32px;background:var(--border2);border-radius:2px;cursor:col-resize;flex-shrink:0;position:absolute;left:0;top:50%;transform:translateY(-50%)"></div>
+      <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:1">Org Chart History</span>
+      <span onclick="_ocToggleCoc()" style="cursor:pointer;color:var(--text3);font-size:14px;padding:2px 4px">✕</span>
+    </div>
+    <div id="oc-coc-body" style="flex:1;overflow-y:auto;padding:10px 12px"></div>
+  </div>
+
+  <!-- Detail flyout -->
+  <div id="oc-detail" style="display:none;position:fixed;top:60px;right:20px;width:230px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:14px;z-index:600">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div id="oc-det-avatar" style="width:38px;height:38px;border-radius:50%;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700"></div>
+      <div><div id="oc-det-name" style="font-size:13px;font-weight:700;color:var(--text1)"></div><div id="oc-det-title" style="font-size:11px;color:var(--text2)"></div></div>
+    </div>
+    <div id="oc-det-rows" style="font-size:12px"></div>
+    <div style="margin-top:10px;display:flex;gap:6px">
+      <button onclick="_ocDetEdit()" style="flex:1;padding:6px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Edit resource</button>
+      <button onclick="_ocDetUnlink()" style="padding:6px 10px;font-size:11px;border:1px solid rgba(248,81,73,.4);border-radius:4px;background:transparent;color:#f85149;cursor:pointer;font-family:Arial,sans-serif">Unlink</button>
+    </div>
+    <div onclick="_ocCloseDetail()" style="text-align:center;margin-top:8px;font-size:10px;color:var(--muted);cursor:pointer">close</div>
+  </div>
+</div>
+
+<div class="um-panel-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+<!-- ── RESOURCE DRAWER ──────────────────────────────────────── -->
+<div class="um-drawer" id="resource-drawer">
+  <div class="um-drawer-hdr" style="flex-direction:column;align-items:stretch;gap:12px;padding-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="um-drawer-title" id="res-drawer-title">ADD RESOURCE</div>
+      <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div class="res-avatar" id="drawer-avatar" style="width:64px;height:64px;font-size:20px;cursor:pointer;"
+           onclick="document.getElementById('drawer-av-input').click()" title="Upload photo">
+        <img id="drawer-avatar-img" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;object-position:center;"/>
+        <span id="drawer-avatar-initials"></span>
+        <div class="res-avatar-overlay">📷</div>
+        <input type="file" id="drawer-av-input" class="res-avatar-upload"
+          accept="image/jpeg,image/png,image/webp"
+          onchange="uploadAvatarFromDrawer(this)" />
+      </div>
+      <div>
+        <div id="drawer-name-preview" style="font-family:var(--font-hud);font-size:17px;font-weight:700;color:var(--text0);"></div>
+        <div id="drawer-title-preview" style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:2px;"></div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-top:6px;">CLICK PHOTO TO UPLOAD · JPG, PNG, WEBP · MAX 5MB</div>
+      </div>
+    </div>
+  </div>
+  <div class="um-drawer-body">
+    <div class="res-drawer-tabs">
+      <div class="res-drawer-tab active" data-rtab="info"    onclick="switchResTab('info')">INFO</div>
+      <div class="res-drawer-tab"        data-rtab="team"    onclick="switchResTab('team')">TEAM</div>
+      <div class="res-drawer-tab"        data-rtab="skills"  onclick="switchResTab('skills')">SKILLS</div>
+      <div class="res-drawer-tab"        data-rtab="profile" onclick="switchResTab('profile')">PROFILE</div>
+      <div class="res-drawer-tab"        data-rtab="domain"  onclick="switchResTab('domain')">DOMAINS</div>
+    </div>
+
+    <!-- INFO TAB -->
+    <div class="res-drawer-panel active" id="rdp-info">
+    <div class="um-field" style="margin-bottom:14px">
+      <label>RESOURCE TYPE</label>
+      <div style="display:flex;gap:0;border:1px solid var(--border)">
+        <button id="rtype-internal" onclick="setResourceType('internal')"
+          style="flex:1;padding:7px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+          cursor:pointer;border:none;border-right:1px solid var(--border);
+          background:rgba(0,210,255,.1);color:var(--cyan);transition:all .15s">
+          INTERNAL
+        </button>
+        <button id="rtype-external" onclick="setResourceType('external')"
+          style="flex:1;padding:7px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+          cursor:pointer;border:none;background:transparent;color:var(--text3);transition:all .15s">
+          EXTERNAL
+        </button>
+      </div>
+      <div id="rtype-hint" style="font-family:var(--font-mono);font-size:9px;color:var(--text3);margin-top:4px">
+        Internal: employee or contractor on staff. External: client contact, decision maker, or outside reviewer.
+      </div>
+    </div>
+    <div class="um-divider">PERSONAL INFO</div>
+    <div class="um-2col">
+      <div class="um-field"><label>FIRST NAME <span class="req">*</span></label>
+        <input id="res-first" class="um-input" type="text" /></div>
+      <div class="um-field"><label>LAST NAME <span class="req">*</span></label>
+        <input id="res-last" class="um-input" type="text" /></div>
+    </div>
+    <div class="um-field"><label>TITLE / POSITION</label>
+      <input id="res-title" class="um-input" type="text" placeholder="e.g. Senior Mechanical Engineer" /></div>
+    <div class="um-2col">
+      <div class="um-field"><label>EMAIL</label>
+        <input id="res-email" class="um-input" type="email" /></div>
+      <div class="um-field"><label>PHONE</label>
+        <input id="res-phone" class="um-input" type="text" /></div>
+    </div>
+    <!-- dept/location/manager moved to TEAM tab — fields kept in DOM for save compatibility -->
+    <div style="display:none">
+      <select id="res-dept"><option value="">— Select department —</option></select>
+      <input id="res-location" type="text" />
+      <select id="res-manager"><option value="">— No manager —</option></select>
+    </div>
+
+    <div class="um-divider">ROLE CLASSIFICATION</div>
+    <div id="res-role-section">
+    <div class="um-2col">
+      <div class="um-field"><label>ROLE</label>
+        <select id="res-role" class="um-select">
+          <option value="">— Select role —</option>
+        </select>
+      </div>
+      <div class="um-field"><label>LEVEL</label>
+        <select id="res-level" class="um-select">
+          <option value="">— Select level —</option>
+          <option value="junior">Junior (0–3 yrs)</option>
+          <option value="staff">Staff (3–7 yrs)</option>
+          <option value="senior">Senior (7–15 yrs)</option>
+          <option value="principal">Principal (15+ yrs)</option>
+        </select>
+      </div>
+    </div>
+    <div id="res-hire-section" class="um-2col">
+      <div class="um-field"><label>HIRE DATE</label>
+        <input id="res-hire" class="um-input" type="date" /></div>
+      <div class="um-field"><label>AVAILABILITY %</label>
+        <input id="res-avail" class="um-input" type="number" min="0" max="100" value="100" /></div>
+    </div>
+    </div><!-- end res-role-section -->
+    <!-- Availability for external (always shown, hire date hidden) -->
+    <div id="res-avail-external" class="um-field" style="display:none"><label>AVAILABILITY %</label>
+      <input id="res-avail-ext" class="um-input" type="number" min="0" max="100" value="100" /></div>
+    <div class="um-field"><label>STATUS</label>
+      <select id="res-status" class="um-select">
+        <option value="true">Active</option>
+        <option value="false">Inactive</option>
+      </select>
+    </div>
+    <div class="um-field"><label>LINK TO APP USER (optional)</label>
+      <select id="res-user-link" class="um-select">
+        <option value="">— Not linked —</option>
+      </select>
+    </div>
+    <div class="um-field"><label>NOTES</label>
+      <textarea id="res-notes" class="um-input" rows="2" style="resize:vertical;"></textarea></div>
+
+    <div id="res-err" class="um-err"></div>
+    </div><!-- end rdp-info -->
+
+    <!-- TEAM TAB -->
+    <div class="res-drawer-panel" id="rdp-team">
+      <div class="um-divider">PLACEMENT</div>
+      <div class="um-2col">
+        <div class="um-field"><label>DEPARTMENT</label>
+          <select id="res-dept-team" class="um-select" onchange="document.getElementById('res-dept').value=this.value">
+            <option value="">— Select department —</option>
+          </select></div>
+        <div class="um-field"><label>LOCATION / SITE</label>
+          <input id="res-location-team" class="um-input" type="text" oninput="document.getElementById('res-location').value=this.value" /></div>
+      </div>
+      <div class="um-field"><label>REPORTS TO</label>
+        <select id="res-manager-team" class="um-select" onchange="document.getElementById('res-manager').value=this.value">
+          <option value="">— No manager —</option>
+        </select>
+      </div>
+      <div class="um-divider">CONTACTS</div>
+      <div class="um-field"><label>ADVISOR</label>
+        <select id="res-advisor" class="um-select"><option value="">— None —</option></select></div>
+      <div class="um-field"><label>HR CONTACT</label>
+        <select id="res-hr-contact" class="um-select"><option value="">— None —</option></select></div>
+      <div class="um-field"><label>IT CONTACT</label>
+        <select id="res-it-contact" class="um-select"><option value="">— None —</option></select></div>
+      <div class="um-field"><label>FINANCE CONTACT</label>
+        <select id="res-finance-contact" class="um-select"><option value="">— None —</option></select></div>
+      <div class="um-field"><label>LEGAL CONTACT</label>
+        <select id="res-legal-contact" class="um-select"><option value="">— None —</option></select></div>
+      <div class="um-field"><label>SAFETY OFFICER</label>
+        <select id="res-safety-contact" class="um-select"><option value="">— None —</option></select></div>
+    </div><!-- end rdp-team -->
+
+    <!-- SKILLS TAB -->
+    <div class="res-drawer-panel" id="rdp-skills">
+      <div class="um-divider">SKILL PROFICIENCIES</div>
+      <p style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-bottom:12px;">
+        Click a skill to add it. Select proficiency level. Only shows skills not yet assigned.</p>
+      <div class="um-field">
+        <label>FILTER SKILLS</label>
+        <select id="res-skill-cat-filter" class="um-select" onchange="renderSkillPicker()">
+          <option value="">All Categories</option>
+        </select>
+      </div>
+      <div id="res-skill-picker" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);margin-bottom:12px;"></div>
+      <div class="um-divider">ASSIGNED SKILLS</div>
+      <div id="res-assigned-skills" style="max-height:200px;overflow-y:auto;"></div>
+    </div>
+
+    <!-- PROFILE TAB -->
+    <div class="res-drawer-panel" id="rdp-profile">
+      <div class="um-divider">EDUCATION</div>
+      <div id="edu-list" style="margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;">
+        <input id="edu-input" class="um-input" type="text" placeholder="e.g. BSME, Georgia Tech, 2012" style="flex:1;"/>
+        <button class="um-add-btn" onclick="addListItem('edu')" style="white-space:nowrap;">+ ADD</button>
+      </div>
+      <div class="um-divider">CERTIFICATIONS</div>
+      <div id="cert-list" style="margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;">
+        <input id="cert-input" class="um-input" type="text" placeholder="e.g. PMP, ASQ CQE, RAC"/>
+        <button class="um-add-btn" onclick="addListItem('cert')" style="white-space:nowrap;">+ ADD</button>
+      </div>
+      <div class="um-divider">PRIOR COMPANIES</div>
+      <div id="co-list" style="margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;">
+        <input id="co-input" class="um-input" type="text" placeholder="e.g. Intuitive Surgical 4yr"/>
+        <button class="um-add-btn" onclick="addListItem('co')" style="white-space:nowrap;">+ ADD</button>
+      </div>
+      <div class="um-divider">NOTABLE PROJECTS</div>
+      <div id="proj-list" style="margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;">
+        <input id="proj-input" class="um-input" type="text" placeholder="e.g. da Vinci Si instrument redesign"/>
+        <button class="um-add-btn" onclick="addListItem('proj')" style="white-space:nowrap;">+ ADD</button>
+      </div>
+      <div class="um-divider">SPECIALTY SUMMARY</div>
+      <textarea id="res-specialty" class="um-input" rows="3" placeholder="2-3 sentence summary of this resource's expertise..." style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:10px;"></textarea>
+      <div class="um-field"><label>LINKEDIN URL</label>
+        <input id="res-linkedin" class="um-input" type="url" placeholder="https://linkedin.com/in/..."/></div>
+    </div>
+
+    <!-- DOMAIN TAB -->
+    <div class="res-drawer-panel" id="rdp-domain">
+      <div class="um-divider">DOMAIN EXPERIENCE</div>
+      <p style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-bottom:12px;">
+        Document industry domains and subsystems this resource has hands-on experience with.</p>
+      <div id="domain-exp-list" style="margin-bottom:12px;"></div>
+      <div style="background:var(--bg3);border:1px solid var(--border);padding:12px;margin-bottom:8px;">
+        <div class="um-divider" style="margin-top:0;">ADD DOMAIN EXPERIENCE</div>
+        <div class="um-field"><label>DOMAIN</label>
+          <select id="domain-sel" class="um-select">
+            <option value="">— Select domain —</option>
+          </select>
+        </div>
+        <div class="um-field"><label>SUBSYSTEM (optional)</label>
+          <input id="domain-subsystem" class="um-input" type="text" placeholder="e.g. Cable Drive Mechanism, Sterile Barrier"/></div>
+        <div class="um-2col">
+          <div class="um-field"><label>YEARS EXP</label>
+            <input id="domain-years" class="um-input" type="number" min="0" step="0.5" placeholder="0"/></div>
+          <div class="um-field"><label>REG. CLASS</label>
+            <select id="domain-regclass" class="um-select">
+              <option value="N/A">N/A</option>
+              <option value="Class I">Class I</option>
+              <option value="Class II">Class II</option>
+              <option value="Class III">Class III</option>
+              <option value="510(k)">510(k)</option>
+              <option value="PMA">PMA</option>
+              <option value="De Novo">De Novo</option>
+            </select>
+          </div>
+        </div>
+        <div class="um-field"><label>CONTEXT / COMPANY</label>
+          <input id="domain-context" class="um-input" type="text" placeholder="e.g. Led fixture design at Intuitive Surgical 2018-2022"/></div>
+        <button class="um-add-btn" onclick="addDomainExp()" style="width:100%;margin-top:4px;">+ ADD EXPERIENCE</button>
+      </div>
+    </div>
+
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="res-save-btn" onclick="saveResource()">SAVE RESOURCE</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- ── ROLE DRAWER ───────────────────────────────────────────── -->
+<div class="um-drawer" id="role-drawer" style="width:460px;right:-480px;">
+  <div class="um-drawer-hdr">
+    <div class="um-drawer-title" id="role-drawer-title">ADD ROLE</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="um-drawer-body">
+    <div class="um-field"><label>ROLE NAME <span class="req">*</span></label>
+      <input id="role-name" class="um-input" type="text" placeholder="e.g. Electrical Engineer" /></div>
+    <div class="um-2col">
+      <div class="um-field"><label>ABBREVIATION</label>
+        <input id="role-abbr" class="um-input" type="text" placeholder="EE" maxlength="6" /></div>
+      <div class="um-field"><label>CATEGORY</label>
+        <select id="role-cat" class="um-select">
+          <option value="">— Select category —</option>
+        </select>
+      </div>
+    </div>
+    <div class="um-field"><label>DESCRIPTION</label>
+      <textarea id="role-desc" class="um-input" rows="2" style="resize:vertical;"></textarea></div>
+
+    <div class="um-divider">OVERHEAD RATES (ADMIN ONLY)</div>
+    <p style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin:0 0 12px;">
+      Set the blended overhead rate per hour for each seniority level. Used to calculate project budget.</p>
+    <div class="um-2col">
+      <div class="um-field"><label>JUNIOR $/hr</label>
+        <input id="rate-junior" class="um-input" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+      <div class="um-field"><label>STAFF $/hr</label>
+        <input id="rate-staff" class="um-input" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+    </div>
+    <div class="um-2col">
+      <div class="um-field"><label>SENIOR $/hr</label>
+        <input id="rate-senior" class="um-input" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+      <div class="um-field"><label>PRINCIPAL $/hr</label>
+        <input id="rate-principal" class="um-input" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+    </div>
+    <div id="role-err" class="um-err"></div>
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="role-save-btn" onclick="saveRole()">SAVE ROLE</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- ── CATEGORY DRAWER ──────────────────────────────────────── -->
+<div class="um-drawer" id="cat-drawer" style="width:380px;right:-400px;">
+  <div class="um-drawer-hdr">
+    <div class="um-drawer-title" id="cat-drawer-title">ADD CATEGORY</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="um-drawer-body">
+    <div class="um-field"><label>CATEGORY NAME <span class="req">*</span></label>
+      <input id="cat-name" class="um-input" type="text" placeholder="e.g. Engineering" /></div>
+    <div id="cat-err" class="um-err"></div>
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="cat-save-btn" onclick="saveCategory()">SAVE CATEGORY</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- ── USER ROLE DRAWER ──────────────────────────────────────── -->
+<div class="um-drawer" id="user-drawer" style="width:400px;right:-420px;">
+  <div class="um-drawer-hdr">
+    <div class="um-drawer-title">EDIT APP ACCESS</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="um-drawer-body">
+    <div id="user-drawer-name" style="font-family:var(--font-ui);font-size:15px;font-weight:600;color:var(--text0);margin-bottom:16px;"></div>
+    <div class="um-field"><label>APP ROLE</label>
+      <select id="user-app-role" class="um-select">
+        <option value="admin">Admin — full access + user management</option>
+        <option value="pm">Project Manager — manage assigned projects</option>
+        <option value="resource">Resource — view assigned tasks + enter actuals</option>
+        <option value="viewer">Viewer — read-only access</option>
+      </select>
+    </div>
+    <div class="um-field"><label>LINKED RESOURCE RECORD</label>
+      <select id="user-resource-link" class="um-select">
+        <option value="">— Not linked —</option>
+      </select>
+    </div>
+    <p style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:8px;">
+      Linking a user to a resource record enables actuals entry and task assignment visibility.</p>
+    <div id="user-err" class="um-err"></div>
+  </div>
+  <div class="um-drawer-footer">
+    <button class="um-save-btn" id="user-save-btn" onclick="saveUserRole()">SAVE ACCESS</button>
+    <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
+  </div>
+</div>
+
+<!-- External scripts -->
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/ticker.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+// ── STATE ─────────────────────────────────────────────────────
+let UM = {
+  firms: [], categories: [], roles: [], roleLevels: [],
+  resources: [], users: [], firmId: null,
+  skillCats: [], skills: [], domains: [],
+  resourceSkills: {}, resourceProfiles: {}, resourceDomains: {},
+  calendarEntries: [], ptoEntries: [],
+  editingResourceId: null, editingRoleId: null, editingSkillId: null,
+  editingCatId: null, editingUserId: null,
+  // hover card
+  _hoverTimer: null, _hoverId: null,
+  // skill picker state
+  _pendingSkills: [],   // [{skill_id, proficiency, skill_name}] for current drawer
+  _pendingDomains: [],  // [{domain_id, domain_name, subsystem, years, reg_class, context}]
+  _pendingProfile: {education:[], certifications:[], prior_companies:[], notable_projects:[], specialty_summary:'', linkedin_url:''},
+};
+
+// ── INIT ──────────────────────────────────────────────────────
+async function initUM() {
+  try {
+    const [firms, users, categories, roles, roleLevels, resources,
+           skillCats, skills, domains, calEntries] = await Promise.all([
+      API.get('firms?select=*&limit=10'),
+      API.get('users?select=*&order=name.asc'),
+      API.get('hud_role_categories?select=*').catch(() => []),
+      API.get('hud_roles?select=*').catch(() => []),
+      API.get('hud_role_levels?select=*').catch(() => []),
+      API.get('resources?select=*').catch(() => []),
+      API.get('hud_skill_categories?select=*').catch(() => []),
+      API.get('hud_skills?select=*').catch(() => []),
+      API.get('hud_skill_domains?select=*').catch(() => []),
+      API.get('resource_calendars?select=*&is_firm_wide=eq.true').catch(() => []),
+    ]);
+    UM.firms      = firms || [];
+    UM.users      = users || [];
+    UM.categories = (categories || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0) || (a.name||'').localeCompare(b.name||''));
+    UM.roles      = (roles || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0) || (a.name||'').localeCompare(b.name||''));
+    UM.roleLevels = roleLevels || [];
+    UM.resources  = (resources || []).sort((a,b) => (a.last_name||a.name||'').localeCompare(b.last_name||b.name||''));
+    UM.skillCats  = (skillCats || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+    UM.skills     = (skills || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0) || (a.name||'').localeCompare(b.name||''));
+    UM.domains    = (domains || []).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+    UM.calendarEntries = calEntries || [];
+    UM.firmId     = firms?.[0]?.id || null;
+
+    const lbl = document.getElementById('um-firm-label');
+    if (lbl && firms?.[0]) lbl.textContent = firms[0].name?.toUpperCase();
+    const dateEl = document.getElementById('um-date');
+    if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' }).toUpperCase();
+
+    renderResources();
+    renderRolesTable();
+    renderUsersTable();
+    renderSkillsLibrary();
+    renderHolidayList();
+    populatePTOResourceSelect();
+    // Move all drawers to body so position:fixed works from hidden panels
+    document.querySelectorAll('.um-drawer').forEach(function(d){ document.body.appendChild(d); });
+    var dov = document.getElementById('drawer-overlay');
+    if (dov) document.body.appendChild(dov);
+  } catch(e) {
+    console.error('UM init failed:', e);
+    document.getElementById('resources-grid').innerHTML =
+      `<div class="um-empty" style="color:var(--red);">Load failed: ${e.message}</div>`;
+  }
+}
+
+// ── TAB SWITCHING ─────────────────────────────────────────────
+console.log('%c[users.html] v20260411-UM35','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+
+function cadToast(msg, type) {
+  var existing = document.getElementById('oc-toast');
+  if (existing) existing.remove();
+  var colors = { success:'#39d353', error:'#f85149', warn:'#f0a732', info:'#5aa7f0' };
+  var color = colors[type] || colors.info;
+  var el = document.createElement('div');
+  el.id = 'oc-toast';
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg2,#161b22);border:1px solid ' + color + ';color:' + color + ';padding:8px 18px;border-radius:6px;font-size:12px;font-family:Arial,sans-serif;z-index:9999;pointer-events:none;transition:opacity .3s';
+  document.body.appendChild(el);
+  setTimeout(function(){ el.style.opacity='0'; setTimeout(function(){ el.remove(); },300); }, 2500);
+}
+
+function switchUMTab(tab) {
+  document.querySelectorAll('.um-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.um-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+}
+
+// ── RESOURCES ─────────────────────────────────────────────────
+function renderResources() {
+  const grid = document.getElementById('resources-grid');
+  const list = UM.resources;
+  if (!list.length) {
+    grid.innerHTML = '<div class="um-empty">NO RESOURCES YET — ADD YOUR FIRST TEAM MEMBER</div>';
+    return;
+  }
+  grid.innerHTML = list.map(r => {
+    const role  = UM.roles.find(ro => ro.id === r.hud_role_id);
+    const cat   = role ? UM.categories.find(c => c.id === role.category_id) : null;
+    const initials = ((r.first_name||'?')[0] + (r.last_name||'?')[0]).toUpperCase();
+    const levelTag    = r.level ? `<span class="res-tag level-${r.level}">${r.level.toUpperCase()}</span>` : '';
+    const statusTag   = `<span class="res-tag ${r.is_active !== false ? 'active' : 'inactive'}">${r.is_active !== false ? 'ACTIVE' : 'INACTIVE'}</span>`;
+    const externalTag = r.is_external ? `<span class="res-tag" style="background:rgba(255,170,0,.08);border:1px solid rgba(255,170,0,.3);color:var(--amber)">EXTERNAL</span>` : '';
+    return `<div class="um-card">
+      <div class="um-card-top">
+        <div class="res-row">
+          <div class="res-avatar" onclick="triggerAvatarUpload('${r.id}')" title="${r.avatar_url ? 'Change photo' : 'Upload photo'}">
+            ${r.avatar_url
+              ? `<img src="${r.avatar_url}?v=${Date.now()}" alt="${initials}" />`
+              : initials}
+            <div class="res-avatar-overlay">📷</div>
+            <input type="file" class="res-avatar-upload" id="av-input-${r.id}"
+              accept="image/jpeg,image/png,image/webp"
+              onchange="uploadAvatar(this, '${r.id}')" />
+          </div>
+          <div class="res-info">
+            <div class="res-name">${r.first_name} ${r.last_name}</div>
+            <div class="res-title">${r.title || (role ? role.name : '—')}</div>
+          </div>
+        </div>
+        <div class="um-card-actions">
+          <button class="um-card-action edit" onclick="openResourceDrawer('${r.id}')" title="Edit">✎</button>
+          <button class="um-card-action del"  onclick="deleteResource('${r.id}','${r.first_name} ${r.last_name}')" title="Delete">🗑</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+        ${externalTag}${levelTag}${statusTag}
+        ${!r.is_external && cat ? `<span class="res-tag" style="border:1px solid var(--border);color:var(--text3);">${cat.name.toUpperCase()}</span>` : ''}
+      </div>
+      ${r.email ? `<div class="um-card-field"><label>EMAIL</label><span>${r.email}</span></div>` : ''}
+      ${r.phone ? `<div class="um-card-field"><label>PHONE</label><span>${r.phone}</span></div>` : ''}
+      ${r.department ? `<div class="um-card-field"><label>DEPT</label><span>${r.department}</span></div>` : ''}
+      ${r.availability_pct != null ? `<div class="um-card-field"><label>AVAILABILITY</label><span>${r.availability_pct}%</span></div>` : ''}
+    </div>`;
+  }).join('');
+  // Attach hover card listeners after DOM is painted
+  setTimeout(() => {
+    document.querySelectorAll('.um-card').forEach(card => {
+      const editBtn = card.querySelector('.um-card-action.edit');
+      if (!editBtn) return;
+      const onclick = editBtn.getAttribute('onclick') || '';
+      const match = onclick.match(/openResourceDrawer\('([^']+)'\)/);
+      if (!match) return;
+      _attachHoverCard(card, match[1]);
+    });
+  }, 50);
+}
+
+function openResourceDrawer(id) {
+  UM.editingResourceId = id || null;
+  const r = id ? UM.resources.find(x => x.id === id) : null;
+  document.getElementById('res-drawer-title').textContent = id ? 'EDIT RESOURCE' : 'ADD RESOURCE';
+
+  // Populate role select
+  // Populate department select from categories
+  const deptEl = document.getElementById('res-dept');
+  deptEl.innerHTML = '<option value="">— Select department —</option>' +
+    [...UM.categories].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c => `<option value="${c.name}" ${r?.department===c.name?'selected':''}>${c.name}</option>`).join('');
+
+  const roleEl = document.getElementById('res-role');
+  roleEl.innerHTML = '<option value="">— Select role —</option>';
+  UM.categories.forEach(cat => {
+    const catRoles = UM.roles.filter(ro => ro.category_id === cat.id);
+    if (!catRoles.length) return;
+    const og = document.createElement('optgroup');
+    og.label = cat.name;
+    catRoles.forEach(ro => {
+      const o = document.createElement('option');
+      o.value = ro.id; o.textContent = ro.name;
+      if (r && r.hud_role_id === ro.id) o.selected = true;
+      og.appendChild(o);
+    });
+    roleEl.appendChild(og);
+  });
+  // Force value after optgroup build — o.selected alone is unreliable with optgroups
+  roleEl.value = r?.hud_role_id || '';
+  // Auto-fill department when role changes
+  roleEl.onchange = function() {
+    var roleId = this.value;
+    if (!roleId) return;
+    var role = UM.roles.find(function(ro){ return ro.id === roleId; });
+    if (!role) return;
+    var cat = UM.categories.find(function(c){ return c.id === role.category_id; });
+    if (cat) document.getElementById('res-dept').value = cat.name;
+  };
+
+  // ── Populate TEAM tab fields ─────────────────────────────────────────────
+  // Dept (team tab mirror)
+  const deptTeamEl = document.getElementById('res-dept-team');
+  if (deptTeamEl) {
+    deptTeamEl.innerHTML = '<option value="">— Select department —</option>' +
+      [...UM.categories].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c => `<option value="${c.name}" ${r?.department===c.name?'selected':''}>${c.name}</option>`).join('');
+  }
+  // Location (team tab mirror)
+  const locTeamEl = document.getElementById('res-location-team');
+  if (locTeamEl) locTeamEl.value = r?.location || '';
+
+  // Reports To (team tab mirror) — same candidates as main
+  const mgrTeamEl = document.getElementById('res-manager-team');
+
+  // Contact dropdowns — detect by department keyword or role name
+  var contactFields = [
+    { id: 'res-advisor',        match: function(x){ return (x.title||'').toLowerCase().includes('advisor') || (x.title||'').toLowerCase().includes('consultant'); } },
+    { id: 'res-hr-contact',     match: function(x){ var d=(x.department||'').toLowerCase(); return d.includes('hr') || d.includes('human resource'); } },
+    { id: 'res-it-contact',     match: function(x){ var d=(x.department||'').toLowerCase(); return d.includes('it ') || d==='it' || d.includes('information tech'); } },
+    { id: 'res-finance-contact',match: function(x){ var d=(x.department||'').toLowerCase(); return d.includes('finance') || d.includes('accounting'); } },
+    { id: 'res-legal-contact',  match: function(x){ var d=(x.department||'').toLowerCase(); var t=(x.title||'').toLowerCase(); return d.includes('legal') || t.includes('counsel') || t.includes('legal'); } },
+    { id: 'res-safety-contact', match: function(x){ var t=(x.title||'').toLowerCase(); return t.includes('safety') || t.includes('ehs') || t.includes('environmental'); } },
+  ];
+  var allRes = (UM.resources||[]).filter(function(x){ return x.id !== id && x.is_active !== false; });
+  contactFields.forEach(function(cf) {
+    var el = document.getElementById(cf.id);
+    if (!el) return;
+    var matches = allRes.filter(cf.match);
+    el.innerHTML = '<option value="">— None —</option>' +
+      allRes.map(function(x){
+        var hint = matches.length === 1 && matches[0].id === x.id ? ' ★' : '';
+        return '<option value="' + x.id + '"' + (r && r[cf.id.replace('res-','').replace(/-/g,'_')] === x.id ? ' selected' : '') + (hint ? ' style="color:var(--cad)"' : '') + '>' + (x.name||'') + hint + '</option>';
+      }).join('');
+    // Load saved value first
+    var savedKey = cf.id.replace('res-', '').replace(/-/g, '_') + '_id';
+    // advisor -> advisor_id, hr_contact -> hr_contact_id etc.
+    if (r && r[savedKey]) {
+      el.value = r[savedKey];
+    } else if (matches.length === 1) {
+      // Auto-select if exactly 1 match and no saved value
+      el.value = matches[0].id;
+    }
+  });
+
+  // Populate user link select
+  const ulEl = document.getElementById('res-user-link');
+  ulEl.innerHTML = '<option value="">— Not linked —</option>' +
+    UM.users.map(u => `<option value="${u.id}" ${r?.user_id===u.id?'selected':''}>${u.name} (${u.email||'no email'})</option>`).join('');
+
+  // Fill fields
+  document.getElementById('res-first').value    = r?.first_name || '';
+  document.getElementById('res-last').value     = r?.last_name  || '';
+  document.getElementById('res-title').value    = r?.title      || '';
+  document.getElementById('res-email').value    = r?.email      || '';
+  document.getElementById('res-phone').value    = r?.phone      || '';
+  // dept select populated above via options
+  document.getElementById('res-location').value = r?.location   || '';
+  // Populate Reports To — grouped by department, internal only, excluding self
+  const mgrEl = document.getElementById('res-manager');
+  const mgrCandidates = UM.resources.filter(x => !x.is_external && x.id !== id);
+  // Group by department
+  const mgrByDept = {};
+  const mgrDeptOrder = [];
+  mgrCandidates.forEach(x => {
+    const dept = x.department || 'Other';
+    if (!mgrByDept[dept]) { mgrByDept[dept] = []; mgrDeptOrder.push(dept); }
+    mgrByDept[dept].push(x);
+  });
+  mgrDeptOrder.sort((a,b) => a.localeCompare(b));
+  mgrEl.innerHTML = '<option value="">— No manager —</option>';
+  if (mgrTeamEl) mgrTeamEl.innerHTML = '<option value="">— No manager —</option>';
+  mgrDeptOrder.forEach(dept => {
+    const og = document.createElement('optgroup');
+    og.label = dept;
+    mgrByDept[dept]
+      .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+      .forEach(x => {
+        const o = document.createElement('option');
+        o.value = x.id;
+        o.textContent = x.name;
+        if (r?.manager_id === x.id) o.selected = true;
+        og.appendChild(o);
+      });
+    mgrEl.appendChild(og);
+  });
+  // Mirror manager options to TEAM tab
+  if (mgrTeamEl) {
+    mgrTeamEl.innerHTML = mgrEl.innerHTML;
+    mgrTeamEl.value = r?.manager_id || '';
+    mgrTeamEl.onchange = function(){ mgrEl.value = this.value; };
+  }
+  document.getElementById('res-level').value    = r?.level      || '';
+  document.getElementById('res-hire').value     = r?.hire_date  || '';
+  document.getElementById('res-avail').value    = r?.availability_pct ?? 100;
+  document.getElementById('res-status').value   = String(r?.is_active !== false);
+  document.getElementById('res-notes').value    = r?.notes      || '';
+  document.getElementById('res-err').style.display = 'none';
+
+  // Update drawer avatar preview
+  const dAvImg      = document.getElementById('drawer-avatar-img');
+  const dAvInitials = document.getElementById('drawer-avatar-initials');
+  const dAvEl       = document.getElementById('drawer-avatar');
+  const dNamePrev   = document.getElementById('drawer-name-preview');
+  const dTitlePrev  = document.getElementById('drawer-title-preview');
+  const firstName   = r?.first_name || '';
+  const lastName    = r?.last_name  || '';
+  const titleStr    = r?.title      || '';
+  const initStr     = ((firstName[0]||'') + (lastName[0]||'')).toUpperCase() || '?';
+  if (dAvInitials) dAvInitials.textContent = initStr;
+  if (dNamePrev)   dNamePrev.textContent   = firstName + ' ' + lastName;
+  if (dTitlePrev)  dTitlePrev.textContent  = titleStr;
+  if (r?.avatar_url && dAvImg) {
+    dAvImg.src = r.avatar_url + '?v=' + Date.now(); dAvImg.style.display = 'block';
+    if (dAvInitials) dAvInitials.style.display = 'none';
+  } else if (dAvImg) {
+    dAvImg.src = ''; dAvImg.style.display = 'none';
+    if (dAvInitials) dAvInitials.style.display = '';
+  }
+  // Live-update drawer preview as name fields change
+  ['res-first','res-last','res-title'].forEach(fid => {
+    const el = document.getElementById(fid);
+    if (el) el.oninput = () => {
+      const fn = document.getElementById('res-first').value;
+      const ln = document.getElementById('res-last').value;
+      const ti = document.getElementById('res-title').value;
+      if (dNamePrev)   dNamePrev.textContent  = fn + ' ' + ln;
+      if (dTitlePrev)  dTitlePrev.textContent = ti;
+      if (dAvInitials) dAvInitials.textContent = ((fn[0]||'')+(ln[0]||'')).toUpperCase()||'?';
+    };
+  });
+
+  openDrawer('resource-drawer');
+  // Set resource type toggle from existing record or default to internal
+  setResourceType(r?.is_external ? 'external' : 'internal');
+  // Build styled contact pickers for TEAM tab
+  setTimeout(function(){ _buildAllContactPickers(r); }, 50);
+}
+
+function setResourceType(type) {
+  const intBtn  = document.getElementById('rtype-internal');
+  const extBtn  = document.getElementById('rtype-external');
+  const roleSection  = document.getElementById('res-role-section');
+  const availExt     = document.getElementById('res-avail-external');
+  const hint         = document.getElementById('rtype-hint');
+  const isExternal   = type === 'external';
+
+  // Toggle button styles
+  const activeStyle   = 'flex:1;padding:7px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;cursor:pointer;border:none;border-right:1px solid var(--border);transition:all .15s;background:rgba(0,210,255,.1);color:var(--cyan)';
+  const inactiveStyle = 'flex:1;padding:7px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;cursor:pointer;border:none;transition:all .15s;background:transparent;color:var(--text3)';
+  const extActiveStyle = 'flex:1;padding:7px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;cursor:pointer;border:none;transition:all .15s;background:rgba(255,170,0,.1);color:var(--amber)';
+
+  if (intBtn) { intBtn.style.cssText = isExternal ? inactiveStyle + ';border-right:1px solid var(--border)' : activeStyle; intBtn.classList.toggle('rtype-active', !isExternal); }
+  if (extBtn) { extBtn.style.cssText = isExternal ? extActiveStyle : inactiveStyle; extBtn.classList.toggle('rtype-active', isExternal); }
+
+  // Show/hide role classification section
+  if (roleSection)  roleSection.style.display   = isExternal ? 'none' : '';
+  if (availExt)     availExt.style.display       = isExternal ? '' : 'none';
+
+  // Update hint text
+  if (hint) hint.textContent = isExternal
+    ? 'External: client contact, decision maker, or outside reviewer — no internal role required.'
+    : 'Internal: employee or contractor on staff — role classification applies.';
+}
+
+async function saveResource() {
+  const first = document.getElementById('res-first').value.trim();
+  const last  = document.getElementById('res-last').value.trim();
+  const errEl = document.getElementById('res-err');
+  if (!first || !last) { errEl.textContent='First and last name are required'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('res-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+
+  const isExternal = document.getElementById('rtype-external')?.classList.contains('rtype-active');
+
+  const payload = {
+    firm_id:          UM.firmId,
+    first_name:       first,
+    last_name:        last,
+    name:             first + ' ' + last,
+    is_external:      isExternal,
+    title:            document.getElementById('res-title').value.trim()    || null,
+    email:            document.getElementById('res-email').value.trim()    || null,
+    phone:            document.getElementById('res-phone').value.trim()    || null,
+    department:       document.getElementById('res-dept').value.trim()     || null,
+    location:         document.getElementById('res-location').value.trim() || null,
+    hud_role_id:      isExternal ? null : (document.getElementById('res-role').value || null),
+    level:            isExternal ? null : (document.getElementById('res-level').value || null),
+    hire_date:        isExternal ? null : (document.getElementById('res-hire').value  || null),
+    availability_pct: isExternal
+      ? (parseFloat(document.getElementById('res-avail-ext')?.value) || 100)
+      : (parseFloat(document.getElementById('res-avail').value) || 100),
+    is_active:        document.getElementById('res-status').value === 'true',
+    user_id:          document.getElementById('res-user-link').value       || null,
+    notes:            document.getElementById('res-notes').value.trim()    || null,
+    manager_id:       document.getElementById('res-manager').value              || null,
+    advisor_id:       document.getElementById('res-advisor')?.value             || null,
+    hr_contact_id:    document.getElementById('res-hr-contact')?.value          || null,
+    it_contact_id:    document.getElementById('res-it-contact')?.value          || null,
+    finance_contact_id: document.getElementById('res-finance-contact')?.value   || null,
+    legal_contact_id: document.getElementById('res-legal-contact')?.value       || null,
+    safety_contact_id: document.getElementById('res-safety-contact')?.value     || null,
+  };
+
+  try {
+    if (UM.editingResourceId) {
+      await API.patch(`resources?id=eq.${UM.editingResourceId}`, payload);
+      const idx = UM.resources.findIndex(r => r.id === UM.editingResourceId);
+      if (idx >= 0) UM.resources[idx] = { ...UM.resources[idx], ...payload };
+    } else {
+      const [created] = await API.post('resources', payload);
+      if (created) UM.resources.push(created);
+    }
+    closeDrawer();
+    renderResources();
+    // Refresh org chart card if overlay is open
+    if (document.getElementById('oc-overlay')?.style.display === 'flex') {
+      var ocId = UM.editingResourceId;
+      var ocIdx = UM.resources.findIndex(function(r){ return r.id === ocId; });
+      if (ocIdx > -1) {
+        var ocMgr = UM.resources[ocIdx]._oc_manager_id;
+        UM.resources[ocIdx] = Object.assign({}, UM.resources[ocIdx], payload);
+        UM.resources[ocIdx]._oc_manager_id = ocMgr;
+      }
+      _ocBuild();
+    }
+  } catch(e) {
+    errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'SAVE RESOURCE'; btn.disabled = false;
+  }
+}
+
+async function deleteResource(id, name) {
+  if (!confirm(`Delete resource "${name}"? This cannot be undone.`)) return;
+  try {
+    await API.del(`resources?id=eq.${id}`);
+    UM.resources = UM.resources.filter(r => r.id !== id);
+    renderResources();
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// ── ROLES TABLE ───────────────────────────────────────────────
+function renderRolesTable() {
+  const wrap = document.getElementById('roles-table-wrap');
+  if (!UM.roles.length) {
+    wrap.innerHTML = '<div class="um-empty">NO ROLES DEFINED YET</div>';
+    return;
+  }
+
+  const levelCols = ['junior','staff','senior','principal'];
+  let html = `<table class="um-tbl">
+    <thead><tr>
+      <th>ROLE</th><th>ABBR</th><th>CATEGORY</th>
+      ${levelCols.map(l=>`<th style="color:${levelColor(l)};">${l.toUpperCase()} $/hr</th>`).join('')}
+      <th></th>
+    </tr></thead><tbody>`;
+
+  UM.categories.forEach(cat => {
+    const catRoles = UM.roles.filter(r => r.category_id === cat.id);
+    html += `<tr class="um-cat-header">
+      <td colspan="6">▸ ${cat.name.toUpperCase()}</td>
+      <td colspan="2" style="text-align:right;padding-right:8px;white-space:nowrap">
+        <button onclick="openCategoryDrawer('${cat.id}')" title="Rename category"
+          style="background:transparent;border:none;cursor:pointer;color:#f0b429;font-size:14px;padding:2px 5px;font-family:var(--font-mono)">✎</button>
+        <button onclick="deleteCategory('${cat.id}','${cat.name.replace(/'/g,"\'")}')" title="Delete category"
+          style="background:transparent;border:none;cursor:pointer;color:#f85149;font-size:14px;padding:2px 5px;font-family:var(--font-mono)">🗑</button>
+      </td>
+    </tr>`;
+    if (!catRoles.length) {
+      html += `<tr><td colspan="8" style="font-size:11px;color:var(--muted);padding:8px 12px;font-style:italic">No roles yet — click + ROLE to add one</td></tr>`;
+    }
+    catRoles.forEach(r => {
+      const rates = {};
+      UM.roleLevels.filter(rl => rl.role_id === r.id).forEach(rl => { rates[rl.level] = rl; });
+      html += `<tr>
+        <td>${r.name}</td>
+        <td class="abbr">${r.abbreviation || '—'}</td>
+        <td class="mono" style="color:var(--text3);font-size:12px;">${cat.name}</td>
+        ${levelCols.map(l => {
+          const rl = rates[l];
+          return `<td><input class="rate-input" type="number" min="0" step="0.01"
+            value="${rl ? rl.overhead_rate_per_hour : ''}"
+            placeholder="—"
+            onchange="saveRate('${r.id}','${l}',this.value,'${rl?.id||''}')"
+            style="color:${levelColor(l)};" /></td>`;
+        }).join('')}
+        <td style="white-space:nowrap;">
+          <button class="um-card-action edit" onclick="openRoleDrawer('${r.id}')" title="Edit">✎</button>
+          <button class="um-card-action del"  onclick="deleteRole('${r.id}','${r.name}')" title="Delete">🗑</button>
+        </td>
+      </tr>`;
+    });
+  });
+
+  // Uncategorised roles
+  const uncatRoles = UM.roles.filter(r => !r.category_id);
+  if (uncatRoles.length) {
+    html += `<tr class="um-cat-header"><td colspan="8">▸ UNCATEGORISED</td></tr>`;
+    uncatRoles.forEach(r => {
+      html += `<tr><td>${r.name}</td><td class="abbr">${r.abbreviation||'—'}</td><td>—</td>
+        ${['junior','staff','senior','principal'].map(()=>'<td>—</td>').join('')}
+        <td><button class="um-card-action edit" onclick="openRoleDrawer('${r.id}')">✎</button>
+            <button class="um-card-action del" onclick="deleteRole('${r.id}','${r.name}')">🗑</button></td>
+      </tr>`;
+    });
+  }
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function levelColor(l) {
+  return l==='junior'?'#6cc':l==='staff'?'var(--cyan)':l==='senior'?'var(--amber)':'#c8a0ff';
+}
+
+async function saveRate(roleId, level, value, existingId) {
+  const rate = parseFloat(value);
+  if (isNaN(rate)) return;
+  try {
+    if (existingId) {
+      await API.patch(`hud_role_levels?id=eq.${existingId}`, { overhead_rate_per_hour: rate });
+      const rl = UM.roleLevels.find(r => r.id === existingId);
+      if (rl) rl.overhead_rate_per_hour = rate;
+    } else {
+      const [created] = await API.post('hud_role_levels', { role_id: roleId, level, overhead_rate_per_hour: rate });
+      if (created) {
+        UM.roleLevels.push(created);
+        // Re-render so the new ID is in the input's onchange
+        renderRolesTable();
+      }
+    }
+  } catch(e) { alert('Rate save failed: ' + e.message); }
+}
+
+function openRoleDrawer(id) {
+  UM.editingRoleId = id || null;
+  const r = id ? UM.roles.find(x => x.id === id) : null;
+  document.getElementById('role-drawer-title').textContent = id ? 'EDIT ROLE' : 'ADD ROLE';
+
+  const catEl = document.getElementById('role-cat');
+  catEl.innerHTML = '<option value="">— Select category —</option>' +
+    UM.categories.map(c => `<option value="${c.id}" ${r?.category_id===c.id?'selected':''}>${c.name}</option>`).join('');
+
+  document.getElementById('role-name').value = r?.name         || '';
+  document.getElementById('role-abbr').value = r?.abbreviation || '';
+  document.getElementById('role-desc').value = r?.description  || '';
+
+  // Pre-fill rates
+  ['junior','staff','senior','principal'].forEach(l => {
+    const rl = id ? UM.roleLevels.find(x => x.role_id===id && x.level===l) : null;
+    document.getElementById('rate-'+l).value = rl?.overhead_rate_per_hour ?? '';
+  });
+  document.getElementById('role-err').style.display = 'none';
+  openDrawer('role-drawer');
+}
+
+async function saveRole() {
+  const name = document.getElementById('role-name').value.trim();
+  const errEl = document.getElementById('role-err');
+  if (!name) { errEl.textContent='Role name is required'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('role-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+
+  const payload = {
+    firm_id:      UM.firmId,
+    name,
+    abbreviation: document.getElementById('role-abbr').value.trim() || null,
+    category_id:  document.getElementById('role-cat').value         || null,
+    description:  document.getElementById('role-desc').value.trim() || null,
+  };
+
+  try {
+    let roleId = UM.editingRoleId;
+    if (roleId) {
+      await API.patch(`hud_roles?id=eq.${roleId}`, payload);
+      const idx = UM.roles.findIndex(r => r.id === roleId);
+      if (idx >= 0) UM.roles[idx] = { ...UM.roles[idx], ...payload };
+    } else {
+      const [created] = await API.post('hud_roles', payload);
+      if (created) { UM.roles.push(created); roleId = created.id; }
+    }
+    // Save rates
+    for (const level of ['junior','staff','senior','principal']) {
+      const val = parseFloat(document.getElementById('rate-'+level).value);
+      if (isNaN(val)) continue;
+      const existing = UM.roleLevels.find(rl => rl.role_id===roleId && rl.level===level);
+      if (existing) {
+        await API.patch(`hud_role_levels?id=eq.${existing.id}`, { overhead_rate_per_hour: val });
+        existing.overhead_rate_per_hour = val;
+      } else {
+        const [created] = await API.post('hud_role_levels', { role_id: roleId, level, overhead_rate_per_hour: val });
+        if (created) UM.roleLevels.push(created);
+      }
+    }
+    closeDrawer();
+    renderRolesTable();
+    renderResources();
+  } catch(e) {
+    errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'SAVE ROLE'; btn.disabled = false;
+  }
+}
+
+async function deleteCategory(id, name) {
+  var hasRoles = UM.roles.some(function(r){ return r.category_id === id; });
+  if (hasRoles) {
+    alert('Cannot delete "' + name + '" — it still has roles assigned to it. Delete or move all roles first.');
+    return;
+  }
+  if (!confirm('Delete category "' + name + '"? This cannot be undone.')) return;
+  try {
+    await API.del('hud_role_categories?id=eq.' + id);
+    UM.categories = UM.categories.filter(function(c){ return c.id !== id; });
+    renderRolesTable();
+    cadToast('Category deleted', 'success');
+  } catch(e) { alert('Delete failed: ' + (e.message||e)); }
+}
+
+async function deleteRole(id, name) {
+  if (!confirm(`Delete role "${name}"? This will remove all associated rates.`)) return;
+  try {
+    await API.del(`hud_role_levels?role_id=eq.${id}`);
+    await API.del(`hud_roles?id=eq.${id}`);
+    UM.roles = UM.roles.filter(r => r.id !== id);
+    UM.roleLevels = UM.roleLevels.filter(rl => rl.role_id !== id);
+    renderRolesTable();
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// ── CATEGORIES ────────────────────────────────────────────────
+function openCategoryDrawer(id) {
+  UM.editingCatId = id || null;
+  const c = id ? UM.categories.find(x => x.id === id) : null;
+  document.getElementById('cat-drawer-title').textContent = id ? 'EDIT CATEGORY' : 'ADD CATEGORY';
+  document.getElementById('cat-name').value = c?.name || '';
+  document.getElementById('cat-err').style.display = 'none';
+  openDrawer('cat-drawer');
+}
+
+async function saveCategory() {
+  const name = document.getElementById('cat-name').value.trim();
+  const errEl = document.getElementById('cat-err');
+  if (!name) { errEl.textContent='Category name is required'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('cat-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+  try {
+    if (UM.editingCatId) {
+      await API.patch(`hud_role_categories?id=eq.${UM.editingCatId}`, { name });
+      const c = UM.categories.find(x => x.id === UM.editingCatId);
+      if (c) c.name = name;
+    } else {
+      const [created] = await API.post('hud_role_categories', { firm_id: UM.firmId, name, sort_order: UM.categories.length * 10 });
+      if (created) UM.categories.push(created);
+    }
+    closeDrawer();
+    renderRolesTable();
+  } catch(e) {
+    errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'SAVE CATEGORY'; btn.disabled = false;
+  }
+}
+
+// ── APP USERS TABLE ───────────────────────────────────────────
+function renderUsersTable() {
+  const wrap = document.getElementById('users-table-wrap');
+  if (!UM.users.length) {
+    wrap.innerHTML = '<div class="um-empty">NO USERS FOUND</div>';
+    return;
+  }
+  let html = `<table class="um-tbl"><thead><tr>
+    <th>NAME</th><th>EMAIL</th><th>APP ROLE</th><th>LINKED RESOURCE</th><th></th>
+  </tr></thead><tbody>`;
+  UM.users.forEach(u => {
+    const res = UM.resources.find(r => r.id === u.resource_id);
+    const roleBadge = `<span class="app-role ${u.app_role||'viewer'}">${(u.app_role||'viewer').toUpperCase()}</span>`;
+    html += `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px;">${UI.avatar(u.name, 22)}<span style="font-size:15px;font-weight:600;color:var(--text0);">${u.name||'—'}</span></div></td>
+      <td class="mono" style="color:var(--text3);font-size:13px;">${u.email||'—'}</td>
+      <td>${roleBadge}</td>
+      <td style="font-size:11px;color:var(--text2);">${res ? res.first_name+' '+res.last_name : '<span style="color:var(--text3);">—</span>'}</td>
+      <td><button class="um-card-action edit" onclick="openUserDrawer('${u.id}')" title="Edit access">✎</button></td>
+    </tr>`;  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function openUserDrawer(id) {
+  UM.editingUserId = id;
+  const u = UM.users.find(x => x.id === id);
+  document.getElementById('user-drawer-name').textContent = u?.name || '';
+  document.getElementById('user-app-role').value = u?.app_role || 'viewer';
+
+  const ulEl = document.getElementById('user-resource-link');
+  ulEl.innerHTML = '<option value="">— Not linked —</option>' +
+    UM.resources.map(r => `<option value="${r.id}" ${u?.resource_id===r.id?'selected':''}>${r.first_name} ${r.last_name}</option>`).join('');
+
+  document.getElementById('user-err').style.display = 'none';
+  openDrawer('user-drawer');
+}
+
+async function saveUserRole() {
+  const errEl = document.getElementById('user-err');
+  const btn   = document.getElementById('user-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+  try {
+    const payload = {
+      app_role:    document.getElementById('user-app-role').value,
+      resource_id: document.getElementById('user-resource-link').value || null,
+    };
+    await API.patch(`users?id=eq.${UM.editingUserId}`, payload);
+    const u = UM.users.find(x => x.id === UM.editingUserId);
+    if (u) Object.assign(u, payload);
+    closeDrawer();
+    renderUsersTable();
+  } catch(e) {
+    errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'SAVE ACCESS'; btn.disabled = false;
+  }
+}
+
+
+// ── EXTENDED STATE ────────────────────────────────────────────
+// ── SKILLS LIBRARY ────────────────────────────────────────────
+function renderSkillsLibrary() {
+  const wrap = document.getElementById('skills-library-wrap');
+  const lbl  = document.getElementById('skill-count-lbl');
+  const total = UM.skills.filter(s => s.is_active !== false).length;
+  if (lbl) lbl.textContent = total + ' SKILLS · ' + UM.skillCats.length + ' CATEGORIES';
+  if (!UM.skillCats.length) {
+    wrap.innerHTML = '<div class="um-empty">NO CATEGORIES YET — ADD YOUR FIRST CATEGORY</div>';
+    return;
+  }
+  let html = '';
+  UM.skillCats.forEach(cat => {
+    const catSkills = UM.skills.filter(s => s.category_id === cat.id && s.is_active !== false);
+    html += `<div class="skill-cat-block" data-cat-id="${cat.id}">
+      <div class="skill-cat-hdr">
+        <span>${cat.icon || '◈'} ${cat.name.toUpperCase()}
+          <span style="color:var(--text3);font-size:10px;margin-left:8px;">${catSkills.length} SKILLS</span>
+        </span>
+        <div class="cat-actions">
+          <button class="skill-mgmt-btn add"  onclick="openSkillDrawer('${cat.id}','${cat.name.replace(/'/g,"\'")}')">+ SKILL</button>
+          <button class="skill-mgmt-btn edit" onclick="openSkillCatDrawer('${cat.id}')">✎ RENAME</button>
+          <button class="skill-mgmt-btn del"  onclick="deleteSkillCategory('${cat.id}','${cat.name.replace(/'/g,"\'")}')">🗑 DELETE</button>
+        </div>
+      </div>
+      <div class="skill-chips">
+        ${catSkills.length ? catSkills.map(s => {
+          const aliases = Array.isArray(s.aliases) ? s.aliases : [];
+          return `<div class="skill-chip-wrap">
+            <div class="skill-chip" data-skill-id="${s.id}"
+              onmouseenter="_showSkillTT(event,'${s.id}')"
+              onmouseleave="_hideSkillTT()"
+              onmousemove="_moveSkillTT(event)">
+              ${s.name}
+              ${aliases.length ? `<span class="sk-alias">${aliases.slice(0,2).join(', ')}</span>` : ''}
+            </div>
+            <button class="skill-chip-del" onclick="deleteSkill('${s.id}','${s.name.replace(/'/g,"\'")}','${cat.id}')" title="Delete skill">✕</button>
+          </div>`;
+        }).join('') : `<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:8px;">
+          No skills yet — click + SKILL to add one</div>`}
+      </div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+}
+
+// ── CALENDAR — HOLIDAYS ────────────────────────────────────────
+function renderHolidayList() {
+  const el = document.getElementById('holiday-list');
+  const cnt = document.getElementById('holiday-count');
+  const entries = UM.calendarEntries.filter(e => e.is_firm_wide);
+  if (cnt) cnt.textContent = entries.length + ' ENTRIES';
+  if (!entries.length) { el.innerHTML = '<div class="hc-empty">No holidays added yet</div>'; return; }
+  const sorted = [...entries].sort((a,b) => a.date.localeCompare(b.date));
+  el.innerHTML = sorted.map(e => {
+    const typeColor = e.calendar_type === 'holiday' ? 'var(--amber)' : 'var(--cyan)';
+    return `<div class="cal-entry">
+      <div class="cal-date">${_fmtCalDate(e.date)}</div>
+      <div class="cal-note">${e.note || '—'}</div>
+      <div class="cal-type" style="color:${typeColor};border-color:${typeColor}33;">${(e.calendar_type||'').toUpperCase()}</div>
+      <div class="cal-hours">${e.available_hours}h</div>
+      <button class="cal-del" onclick="deleteCalEntry('${e.id}', true)">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function _fmtCalDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d + 'T12:00:00');
+  return dt.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+
+async function addHoliday() {
+  const date = document.getElementById('hol-date').value;
+  const note = document.getElementById('hol-note').value.trim();
+  const hrs  = parseFloat(document.getElementById('hol-hrs').value) || 0;
+  if (!date) return;
+  try {
+    const [created] = await API.post('resource_calendars', {
+      firm_id: UM.firmId, resource_id: null, date, available_hours: hrs,
+      note: note || null, calendar_type: 'holiday', is_firm_wide: true,
+    });
+    if (created) UM.calendarEntries.push(created);
+    renderHolidayList();
+    document.getElementById('hol-date').value = '';
+    document.getElementById('hol-note').value = '';
+    document.getElementById('hol-hrs').value  = '0';
+  } catch(e) { alert('Failed: ' + e.message); }
+}
+
+// ── CALENDAR — PTO ─────────────────────────────────────────────
+function populatePTOResourceSelect() {
+  const sel = document.getElementById('pto-resource-sel');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Select resource —</option>' +
+    UM.resources.map(r => `<option value="${r.id}">${r.first_name} ${r.last_name}</option>`).join('');
+}
+
+async function loadResourceCalendar() {
+  const resId = document.getElementById('pto-resource-sel').value;
+  const list  = document.getElementById('pto-list');
+  const form  = document.getElementById('pto-add-form');
+  if (!resId) { list.innerHTML = '<div class="hc-empty">Select a resource</div>'; form.style.display='none'; return; }
+  form.style.display = 'block';
+  list.innerHTML = '<div class="um-loading">...</div>';
+  try {
+    const entries = await API.get(`resource_calendars?resource_id=eq.${resId}&order=date.asc`);
+    UM.ptoEntries = entries || [];
+    renderPTOList(resId);
+  } catch(e) { list.innerHTML = '<div class="hc-empty" style="color:var(--red)">Load failed</div>'; }
+}
+
+function renderPTOList(resId) {
+  const el = document.getElementById('pto-list');
+  const entries = UM.ptoEntries;
+  if (!entries.length) { el.innerHTML = '<div class="hc-empty">No exceptions recorded</div>'; return; }
+  el.innerHTML = entries.map(e => {
+    const typeColors = {pto:'var(--cyan)',training:'var(--green)',travel:'var(--amber)',other:'var(--text2)'};
+    const tc = typeColors[e.calendar_type] || 'var(--text2)';
+    return `<div class="cal-entry">
+      <div class="cal-date">${_fmtCalDate(e.date)}</div>
+      <div class="cal-note">${e.note || e.calendar_type}</div>
+      <div class="cal-type" style="color:${tc};border-color:${tc}33;">${(e.calendar_type||'').toUpperCase()}</div>
+      <div class="cal-hours">${e.available_hours}h</div>
+      <button class="cal-del" onclick="deleteCalEntry('${e.id}', false, '${resId}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+async function addPTO() {
+  const resId = document.getElementById('pto-resource-sel').value;
+  if (!resId) return;
+  const date  = document.getElementById('pto-date').value;
+  const type  = document.getElementById('pto-type').value;
+  const hrs   = parseFloat(document.getElementById('pto-hrs').value) || 0;
+  const note  = document.getElementById('pto-note').value.trim();
+  if (!date) return;
+  try {
+    const [created] = await API.post('resource_calendars', {
+      firm_id: UM.firmId, resource_id: resId, date, available_hours: hrs,
+      note: note || null, calendar_type: type, is_firm_wide: false,
+    });
+    if (created) UM.ptoEntries.push(created);
+    renderPTOList(resId);
+    document.getElementById('pto-date').value = '';
+    document.getElementById('pto-note').value = '';
+    document.getElementById('pto-hrs').value  = '0';
+  } catch(e) { alert('Failed: ' + e.message); }
+}
+
+async function deleteCalEntry(id, isFirmWide, resId) {
+  if (!confirm('Remove this calendar entry?')) return;
+  try {
+    await API.del(`resource_calendars?id=eq.${id}`);
+    if (isFirmWide) {
+      UM.calendarEntries = UM.calendarEntries.filter(e => e.id !== id);
+      renderHolidayList();
+    } else {
+      UM.ptoEntries = UM.ptoEntries.filter(e => e.id !== id);
+      renderPTOList(resId);
+    }
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// ── RESOURCE DRAWER — SKILL PICKER ────────────────────────────
+function switchResTab(tab) {
+  document.querySelectorAll('.res-drawer-tab').forEach(t => t.classList.toggle('active', t.dataset.rtab === tab));
+  document.querySelectorAll('.res-drawer-panel').forEach(p => p.classList.toggle('active', p.id === 'rdp-' + tab));
+  if (tab === 'skills') renderSkillPicker();
+  if (tab === 'domain') renderDomainPicker();
+}
+
+function renderSkillPicker() {
+  const catFilter = document.getElementById('res-skill-cat-filter');
+  // Populate category filter
+  if (catFilter && catFilter.options.length <= 1) {
+    catFilter.innerHTML = '<option value="">All Categories</option>' +
+      UM.skillCats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  }
+  const selectedCat = catFilter?.value || '';
+  const assignedIds = new Set(UM._pendingSkills.map(s => s.skill_id));
+  const filtered = UM.skills.filter(s =>
+    (!selectedCat || s.category_id === selectedCat) && !assignedIds.has(s.id)
+  );
+  const picker = document.getElementById('res-skill-picker');
+  if (!filtered.length) {
+    picker.innerHTML = '<div class="hc-empty">All skills in this category assigned</div>';
+  } else {
+    const cat = {};
+    UM.skillCats.forEach(c => { cat[c.id] = c.name; });
+    picker.innerHTML = filtered.map(s => `
+      <div class="sp-row">
+        <div>
+          <div class="sp-name">${s.name}</div>
+          <div class="sp-cat">${cat[s.category_id] || ''}</div>
+        </div>
+        <button class="sp-add" onclick="addSkillToPending('${s.id}','${s.name.replace(/'/g,"\'")}')">+ ADD</button>
+      </div>`).join('');
+  }
+  renderAssignedSkills();
+}
+
+function addSkillToPending(skillId, skillName) {
+  if (UM._pendingSkills.find(s => s.skill_id === skillId)) return;
+  UM._pendingSkills.push({ skill_id: skillId, skill_name: skillName, proficiency: 'practitioner' });
+  renderSkillPicker();
+}
+
+function renderAssignedSkills() {
+  const el = document.getElementById('res-assigned-skills');
+  if (!UM._pendingSkills.length) {
+    el.innerHTML = '<div class="hc-empty">No skills assigned yet</div>';
+    return;
+  }
+  el.innerHTML = UM._pendingSkills.map((s, i) => `
+    <div class="as-row">
+      <div class="as-name">${s.skill_name}</div>
+      <select class="as-prof-sel" onchange="UM._pendingSkills[${i}].proficiency=this.value">
+        ${['aware','practitioner','expert','authority'].map(p =>
+          `<option value="${p}" ${s.proficiency===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`
+        ).join('')}
+      </select>
+      <button class="as-del" onclick="removeSkillPending(${i})">✕</button>
+    </div>`).join('');
+}
+
+function removeSkillPending(i) {
+  UM._pendingSkills.splice(i, 1);
+  renderSkillPicker();
+}
+
+// ── RESOURCE DRAWER — PROFILE TAB ─────────────────────────────
+function addListItem(type) {
+  const inputs = {edu:'edu-input', cert:'cert-input', co:'co-input', proj:'proj-input'};
+  const lists  = {edu:'education', cert:'certifications', co:'prior_companies', proj:'notable_projects'};
+  const el = document.getElementById(inputs[type]);
+  const val = el?.value.trim();
+  if (!val) return;
+  UM._pendingProfile[lists[type]].push(val);
+  el.value = '';
+  renderProfileLists();
+}
+
+function renderProfileLists() {
+  const cfg = [
+    {key:'education',        id:'edu-list'},
+    {key:'certifications',   id:'cert-list'},
+    {key:'prior_companies',  id:'co-list'},
+    {key:'notable_projects', id:'proj-list'},
+  ];
+  cfg.forEach(({key, id}) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = (UM._pendingProfile[key] || []).map((v, i) => `
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);margin-bottom:4px;">
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text1);flex:1;">${v}</span>
+        <button onclick="removeListItem('${key}',${i})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;">✕</button>
+      </div>`).join('') || '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:4px 0;">None added</div>';
+  });
+}
+
+function removeListItem(key, i) {
+  UM._pendingProfile[key].splice(i, 1);
+  renderProfileLists();
+}
+
+// ── RESOURCE DRAWER — DOMAIN TAB ──────────────────────────────
+function renderDomainPicker() {
+  const sel = document.getElementById('domain-sel');
+  if (sel && sel.options.length <= 1) {
+    sel.innerHTML = '<option value="">— Select domain —</option>' +
+      UM.domains.map(d => `<option value="${d.id}">${d.name} (${d.industry||''})</option>`).join('');
+  }
+  renderDomainList();
+}
+
+function renderDomainList() {
+  const el = document.getElementById('domain-exp-list');
+  if (!el) return;
+  if (!UM._pendingDomains.length) {
+    el.innerHTML = '<div class="hc-empty">No domain experience added</div>';
+    return;
+  }
+  el.innerHTML = UM._pendingDomains.map((d, i) => `
+    <div class="de-row">
+      <div class="de-domain">${d.domain_name}</div>
+      ${d.subsystem ? `<div class="de-sub">Subsystem: ${d.subsystem}</div>` : ''}
+      ${d.context   ? `<div class="de-ctx">${d.context}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3);">${d.years||0}yrs</span>
+        ${d.reg_class && d.reg_class !== 'N/A' ? `<span style="font-family:var(--font-mono);font-size:10px;color:var(--amber);">${d.reg_class}</span>` : ''}
+      </div>
+      <button class="de-del" onclick="removeDomainPending(${i})">✕</button>
+    </div>`).join('');
+}
+
+function addDomainExp() {
+  const sel = document.getElementById('domain-sel');
+  const domId = sel?.value;
+  const dom = UM.domains.find(d => d.id === domId);
+  const domName = dom?.name || document.getElementById('domain-subsystem')?.value || '';
+  if (!domId && !domName) return;
+  UM._pendingDomains.push({
+    domain_id:   domId || null,
+    domain_name: domName,
+    subsystem:   document.getElementById('domain-subsystem').value.trim() || null,
+    years:       parseFloat(document.getElementById('domain-years').value) || 0,
+    reg_class:   document.getElementById('domain-regclass').value || 'N/A',
+    context:     document.getElementById('domain-context').value.trim() || null,
+  });
+  if (sel) sel.value = '';
+  document.getElementById('domain-subsystem').value = '';
+  document.getElementById('domain-years').value = '';
+  document.getElementById('domain-context').value = '';
+  renderDomainList();
+}
+
+function removeDomainPending(i) {
+  UM._pendingDomains.splice(i, 1);
+  renderDomainList();
+}
+
+// ── OPEN RESOURCE DRAWER — extended to load skills/profile/domains ──
+async function _loadResourceExtras(resourceId) {
+  if (!resourceId) {
+    UM._pendingSkills   = [];
+    UM._pendingDomains  = [];
+    UM._pendingProfile  = {education:[],certifications:[],prior_companies:[],notable_projects:[],specialty_summary:'',linkedin_url:''};
+    return;
+  }
+  try {
+    const [skills, profile, domains] = await Promise.all([
+      API.get(`resource_skills?resource_id=eq.${resourceId}`).catch(() => []),
+      API.get(`resource_profiles?resource_id=eq.${resourceId}&limit=1`).catch(() => []),
+      API.get(`resource_domain_experience?resource_id=eq.${resourceId}`).catch(() => []),
+    ]);
+    UM._pendingSkills = (skills || []).map(s => {
+      const sk = UM.skills.find(x => x.id === s.skill_id);
+      return { skill_id: s.skill_id, skill_name: sk?.name || '?', proficiency: s.proficiency, _dbId: s.id };
+    });
+    const prof = profile?.[0] || {};
+    UM._pendingProfile = {
+      education:        prof.education || [],
+      certifications:   prof.certifications || [],
+      prior_companies:  prof.prior_companies || [],
+      notable_projects: prof.notable_projects || [],
+      specialty_summary: prof.specialty_summary || '',
+      linkedin_url:     prof.linkedin_url || '',
+      _dbId:            prof.id || null,
+    };
+    UM._pendingDomains = (domains || []).map(d => {
+      const dom = UM.domains.find(x => x.id === d.domain_id);
+      return {
+        _dbId: d.id, domain_id: d.domain_id,
+        domain_name: dom?.name || d.domain_name || '?',
+        subsystem: d.subsystem, years: d.years_experience,
+        reg_class: d.regulatory_class, context: d.context,
+      };
+    });
+    UM.resourceSkills[resourceId] = skills;
+    UM.resourceProfiles[resourceId] = prof;
+  } catch(e) { console.error('Load extras failed:', e); }
+}
+
+// ── SAVE RESOURCE — extended to save skills/profile/domains ───
+async function _saveResourceExtras(resourceId) {
+  // Skills — delete all then re-insert (simpler than diffing)
+  try {
+    await API.del(`resource_skills?resource_id=eq.${resourceId}`);
+    if (UM._pendingSkills.length) {
+      for (const s of UM._pendingSkills) {
+        await API.post('resource_skills', {
+          resource_id: resourceId, skill_id: s.skill_id, proficiency: s.proficiency,
+        });
+      }
+    }
+  } catch(e) { console.warn('Skills save err:', e); }
+
+  // Profile — upsert
+  try {
+    const profPayload = {
+      resource_id: resourceId,
+      education:        UM._pendingProfile.education,
+      certifications:   UM._pendingProfile.certifications,
+      prior_companies:  UM._pendingProfile.prior_companies,
+      notable_projects: UM._pendingProfile.notable_projects,
+      specialty_summary: document.getElementById('res-specialty')?.value.trim() || null,
+      linkedin_url:     document.getElementById('res-linkedin')?.value.trim() || null,
+    };
+    if (UM._pendingProfile._dbId) {
+      await API.patch(`resource_profiles?resource_id=eq.${resourceId}`, profPayload);
+    } else {
+      await API.post('resource_profiles', profPayload);
+    }
+  } catch(e) { console.warn('Profile save err:', e); }
+
+  // Domain experience — delete all then re-insert
+  try {
+    await API.del(`resource_domain_experience?resource_id=eq.${resourceId}`);
+    for (const d of UM._pendingDomains) {
+      await API.post('resource_domain_experience', {
+        resource_id: resourceId, domain_id: d.domain_id || null,
+        domain_name: d.domain_name, subsystem: d.subsystem || null,
+        years_experience: d.years || 0, regulatory_class: d.reg_class || 'N/A',
+        context: d.context || null,
+      });
+    }
+  } catch(e) { console.warn('Domain exp save err:', e); }
+}
+
+// ── HOVER CARD ─────────────────────────────────────────────────
+function _attachHoverCard(el, resourceId) {
+  el.addEventListener('mouseenter', () => {
+    UM._hoverId = resourceId;
+    UM._hoverTimer = setTimeout(() => {
+      // Suppress if any drawer is open or org chart overlay is open
+      var drawerOpen = !!document.querySelector('.um-drawer.open');
+      var ocOpen = document.getElementById('oc-overlay')?.style.display === 'flex';
+      if (!drawerOpen && !ocOpen) showHoverCard(resourceId, el);
+    }, 900);
+  });
+  el.addEventListener('mouseleave', hideHoverCard);
+}
+
+async function showHoverCard(resourceId, anchorEl) {
+  const card = document.getElementById('res-hover-card');
+  const r = UM.resources.find(x => x.id === resourceId);
+  if (!r || !card) return;
+  // Suppress if resource drawer or org chart overlay is open
+  var drawerOpen = document.getElementById('res-drawer')?.classList.contains('open') ||
+                   document.getElementById('drawer-overlay')?.classList.contains('open');
+  var ocOpen = document.getElementById('oc-overlay')?.style.display === 'flex';
+  if (drawerOpen || ocOpen) return;
+
+  const role    = UM.roles.find(x => x.id === r.hud_role_id);
+  const cat     = role ? UM.categories.find(c => c.id === role.category_id) : null;
+  const initials= ((r.first_name||'?')[0]+(r.last_name||'?')[0]).toUpperCase();
+  const colors  = ['#00d2ff','#00e5a0','#ffaa00','#a855f7','#ff4757'];
+  const color   = colors[initials.charCodeAt(0) % colors.length];
+
+  document.getElementById('hc-avatar').textContent = initials;
+  document.getElementById('hc-avatar').style.cssText = `background:${color}18;color:${color};border-color:${color}44;`;
+  document.getElementById('hc-name').textContent  = `${r.first_name} ${r.last_name}`;
+  document.getElementById('hc-title').textContent = r.title || role?.name || '—';
+
+  // Load all extended data in parallel
+  const [skills, profile, domains, assignments] = await Promise.all([
+    UM.resourceSkills[resourceId]
+      ? Promise.resolve(UM.resourceSkills[resourceId])
+      : API.get(`resource_skills?resource_id=eq.${resourceId}`).catch(()=>[]),
+    UM.resourceProfiles[resourceId]
+      ? Promise.resolve([UM.resourceProfiles[resourceId]])
+      : API.get(`resource_profiles?resource_id=eq.${resourceId}&limit=1`).catch(()=>[]),
+    UM.resourceDomains[resourceId]
+      ? Promise.resolve(UM.resourceDomains[resourceId])
+      : API.get(`resource_domain_experience?resource_id=eq.${resourceId}`).catch(()=>[]),
+    API.get(`task_resource_assignments?resource_id=eq.${resourceId}&select=*,tasks(name,start_date,due_date,project_id,status)`).catch(()=>[]),
+  ]);
+
+  // Cache
+  UM.resourceSkills[resourceId]   = skills  || [];
+  UM.resourceProfiles[resourceId] = profile?.[0] || null;
+  UM.resourceDomains[resourceId]  = domains || [];
+
+  const prof = profile?.[0];
+
+  // Build allocation map
+  const byProject = {};
+  (assignments||[]).forEach(a => {
+    const pid = a.tasks?.project_id || 'unknown';
+    if (!byProject[pid]) byProject[pid] = { tasks:[], totalPct:0 };
+    byProject[pid].tasks.push(a);
+    byProject[pid].totalPct += (a.allocation_pct || 0);
+  });
+  const totalPct = Object.values(byProject).reduce((s,p) => s+(p.totalPct||0), 0);
+  const availPct = r.availability_pct ?? 100;
+  const utilColor = totalPct > availPct ? 'var(--red)' : totalPct > availPct*0.8 ? 'var(--amber)' : 'var(--green)';
+
+  const profColors = { aware:'var(--text2)', practitioner:'var(--cyan)', expert:'var(--amber)', authority:'var(--purple)' };
+
+  let html = '';
+
+  // ── SECTION 1: CONTACT & INFO ─────────────────────────────
+  html += '<div class="hc-section">';
+  html += '<div class="hc-section-lbl">CONTACT &amp; INFO</div>';
+  if (r.email)      html += `<div class="hc-row"><span class="hc-row-lbl">EMAIL</span><span class="hc-row-val">${r.email}</span></div>`;
+  if (r.phone)      html += `<div class="hc-row"><span class="hc-row-lbl">PHONE</span><span class="hc-row-val">${r.phone}</span></div>`;
+  if (r.department) html += `<div class="hc-row"><span class="hc-row-lbl">DEPT</span><span class="hc-row-val">${r.department}</span></div>`;
+  if (r.location)   html += `<div class="hc-row"><span class="hc-row-lbl">LOCATION</span><span class="hc-row-val">${r.location}</span></div>`;
+  if (r.hire_date)  html += `<div class="hc-row"><span class="hc-row-lbl">HIRED</span><span class="hc-row-val">${_fmtCalDate(r.hire_date)}</span></div>`;
+  if (cat)          html += `<div class="hc-row"><span class="hc-row-lbl">CATEGORY</span><span class="hc-row-val">${cat.name}</span></div>`;
+  if (r.availability_pct != null) html += `<div class="hc-row"><span class="hc-row-lbl">AVAILABILITY</span><span class="hc-row-val" style="color:${availPct<100?'var(--amber)':'var(--text1)'};">${availPct}%</span></div>`;
+  html += '</div>';
+
+  // ── SECTION 2: PROFESSIONAL PROFILE ──────────────────────
+  if (prof) {
+    const hasProfile = (prof.specialty_summary || prof.education?.length ||
+      prof.certifications?.length || prof.prior_companies?.length || prof.notable_projects?.length);
+    if (hasProfile) {
+      html += '<div class="hc-section">';
+      html += '<div class="hc-section-lbl">PROFESSIONAL PROFILE</div>';
+      if (prof.specialty_summary) {
+        html += `<div style="font-family:var(--font-body);font-size:11px;color:var(--text2);
+          line-height:1.55;margin-bottom:8px;font-style:italic;">${prof.specialty_summary}</div>`;
+      }
+      if (prof.certifications?.length) {
+        html += `<div class="hc-row"><span class="hc-row-lbl">CERTS</span>
+          <span class="hc-row-val">${prof.certifications.join(' · ')}</span></div>`;
+      }
+      if (prof.education?.length) {
+        html += `<div class="hc-row"><span class="hc-row-lbl">EDUCATION</span>
+          <span class="hc-row-val">${prof.education[0]}${prof.education.length>1?' +'+( prof.education.length-1):''}</span></div>`;
+      }
+      if (prof.prior_companies?.length) {
+        html += `<div class="hc-row"><span class="hc-row-lbl">PRIOR</span>
+          <span class="hc-row-val">${prof.prior_companies.slice(0,2).join(' · ')}</span></div>`;
+      }
+      if (prof.notable_projects?.length) {
+        html += `<div class="hc-row"><span class="hc-row-lbl">NOTABLE</span>
+          <span class="hc-row-val">${prof.notable_projects[0]}${prof.notable_projects.length>1?' +'+( prof.notable_projects.length-1):''}</span></div>`;
+      }
+      if (prof.linkedin_url) {
+        html += `<div class="hc-row"><span class="hc-row-lbl">LINKEDIN</span>
+          <span class="hc-row-val"><a href="${prof.linkedin_url}" target="_blank"
+            style="color:var(--cyan);">View Profile ↗</a></span></div>`;
+      }
+      html += '</div>';
+    }
+  }
+
+  // ── SECTION 3: SKILLS ────────────────────────────────────
+  if (skills?.length) {
+    const sorted = [...skills].sort((a,b) => {
+      const order = {authority:0,expert:1,practitioner:2,aware:3};
+      return (order[a.proficiency]||9)-(order[b.proficiency]||9);
+    });
+    html += '<div class="hc-section">';
+    html += '<div class="hc-section-lbl">SKILLS &amp; PROFICIENCY</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+    sorted.slice(0,10).forEach(s => {
+      const sk = UM.skills.find(x => x.id === s.skill_id);
+      const pc = profColors[s.proficiency] || 'var(--text3)';
+      html += `<span style="font-family:var(--font-mono);font-size:10px;padding:2px 7px;
+        border:1px solid ${pc}44;color:${pc};background:${pc}0d;white-space:nowrap;">
+        ${sk?.name||'?'}</span>`;
+    });
+    if (sorted.length > 10) html += `<span style="font-family:var(--font-mono);font-size:10px;
+      color:var(--text3);padding:2px 4px;">+${sorted.length-10} more</span>`;
+    html += '</div></div>';
+  }
+
+  // ── SECTION 4: DOMAIN EXPERIENCE ─────────────────────────
+  if (domains?.length) {
+    html += '<div class="hc-section">';
+    html += '<div class="hc-section-lbl">DOMAIN EXPERIENCE</div>';
+    domains.slice(0,4).forEach(d => {
+      const dom = UM.domains?.find(x => x.id === d.domain_id);
+      html += `<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);">
+        <div style="font-family:var(--font-hud);font-size:12px;font-weight:700;color:var(--text0);">
+          ${dom?.name || d.domain_name || '—'}</div>`;
+      if (d.subsystem) html += `<div style="font-family:var(--font-mono);font-size:10px;
+        color:var(--cyan);margin-top:1px;">${d.subsystem}</div>`;
+      const meta = [
+        d.years_experience ? d.years_experience+'yr exp' : null,
+        d.regulatory_class && d.regulatory_class!=='N/A' ? d.regulatory_class : null,
+      ].filter(Boolean);
+      if (meta.length) html += `<div style="font-family:var(--font-mono);font-size:10px;
+        color:var(--text3);margin-top:2px;">${meta.join(' · ')}</div>`;
+      if (d.context) html += `<div style="font-family:var(--font-body);font-size:10px;
+        color:var(--text2);margin-top:2px;font-style:italic;">${d.context}</div>`;
+      html += '</div>';
+    });
+    if (domains.length > 4) html += `<div style="font-family:var(--font-mono);font-size:10px;
+      color:var(--text3);padding:4px 0;">+${domains.length-4} more domains</div>`;
+    html += '</div>';
+  }
+
+  // ── SECTION 5: ALLOCATION & TASKS ────────────────────────
+  html += `<div class="hc-section">
+    <div class="hc-section-lbl">ALLOCATION — FIRM-WIDE</div>
+    <div class="hc-row">
+      <span class="hc-row-lbl">CAPACITY</span><span class="hc-row-val">${availPct}%</span>
+    </div>
+    <div class="hc-row">
+      <span class="hc-row-lbl">COMMITTED</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:${utilColor};font-weight:700;">
+        ${totalPct.toFixed(0)}%${totalPct>availPct?' ⚠ OVERLOADED':''}</span>
+    </div>
+    <div class="hc-alloc-bar" style="margin:5px 0;">
+      <div class="hc-alloc-fill" style="width:${Math.min(totalPct/availPct*100,100)}%;background:${utilColor};"></div>
+    </div>`;
+  if (assignments?.length) {
+    html += '<div class="hc-section-lbl" style="margin-top:6px;">ACTIVE TASKS</div>';
+    assignments.slice(0,4).forEach(a => {
+      const t  = a.tasks || {};
+      const st = t.start_date ? new Date(t.start_date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+      const en = t.due_date   ? new Date(t.due_date  +'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+      html += `<div class="hc-task-row">
+        <span class="hc-task-name">${t.name||'—'}</span>
+        <span class="hc-task-meta">[${a.allocation_pct||100}%] ${st}${en?' – '+en:''}</span>
+      </div>`;
+    });
+    if (assignments.length > 4) html += `<div class="hc-task-meta" style="padding:3px 0;">
+      +${assignments.length-4} more tasks</div>`;
+  } else {
+    html += '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:4px 0;">No active task assignments</div>';
+  }
+  html += '</div>';
+
+  // ── Notes ─────────────────────────────────────────────────
+  if (r.notes) {
+    html += `<div class="hc-section" style="border-bottom:none;">
+      <div class="hc-section-lbl">NOTES</div>
+      <div style="font-family:var(--font-body);font-size:11px;color:var(--text2);
+        line-height:1.5;font-style:italic;">${r.notes}</div>
+    </div>`;
+  }
+
+  document.getElementById('hc-body').innerHTML = html;
+
+  // ── Position card ─────────────────────────────────────────
+  const rect   = anchorEl.getBoundingClientRect();
+  const cardW  = 360;
+  const cardH  = Math.min(card.scrollHeight + 20, window.innerHeight - 20);
+  card.style.maxHeight = (window.innerHeight - 20) + 'px';
+  card.style.overflowY = 'auto';
+  let left = rect.right + 12;
+  let top  = rect.top;
+  if (left + cardW > window.innerWidth  - 10) left = rect.left - cardW - 12;
+  if (top  + cardH > window.innerHeight - 10) top  = window.innerHeight - cardH - 10;
+  card.style.left  = Math.max(10, left) + 'px';
+  card.style.top   = Math.max(10, top)  + 'px';
+  card.style.width = cardW + 'px';
+  card.classList.add('visible');
+}
+
+function hideHoverCard() {
+  clearTimeout(UM._hoverTimer);
+  const card = document.getElementById('res-hover-card');
+  if (card) card.classList.remove('visible');
+  UM._hoverId = null;
+}
+
+// ── DRAWER HELPERS ────────────────────────────────────────────
+function openDrawer(id) {
+  document.querySelectorAll('.um-drawer').forEach(d => d.classList.remove('open'));
+  const el = document.getElementById(id);
+  if (el) {
+    el.style.right = '0';
+    el.classList.add('open');
+  }
+  const overlay = document.getElementById('drawer-overlay');
+  if (overlay) overlay.classList.add('open');
+}
+
+function closeDrawer() {
+  document.querySelectorAll('.um-drawer').forEach(d => {
+    d.classList.remove('open');
+    d.style.right = '';
+  });
+  const overlay = document.getElementById('drawer-overlay');
+  if (overlay) overlay.classList.remove('open');
+  UM.editingResourceId = UM.editingRoleId = UM.editingCatId = UM.editingUserId = null;
+}
+
+
+// ── SKILL CATEGORY MANAGEMENT ─────────────────────────────────
+function openSkillCatDrawer(catId) {
+  UM.editingCatId = catId || null;
+  const cat = catId ? UM.skillCats.find(c => c.id === catId) : null;
+  document.getElementById('skill-cat-drawer-title').textContent = catId ? 'EDIT CATEGORY' : 'ADD CATEGORY';
+  document.getElementById('scat-name').value = cat?.name || '';
+  document.getElementById('scat-icon').value = cat?.icon || '';
+  document.getElementById('scat-err').style.display = 'none';
+  openDrawer('skill-cat-drawer');
+}
+
+async function saveSkillCategory() {
+  const name = document.getElementById('scat-name').value.trim();
+  const icon = document.getElementById('scat-icon').value.trim() || null;
+  const errEl = document.getElementById('scat-err');
+  if (!name) { errEl.textContent = 'Category name is required'; errEl.style.display = 'block'; return; }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('scat-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+  try {
+    if (UM.editingCatId) {
+      await API.patch(`hud_skill_categories?id=eq.${UM.editingCatId}`, { name, icon });
+      const c = UM.skillCats.find(x => x.id === UM.editingCatId);
+      if (c) { c.name = name; c.icon = icon; }
+    } else {
+      const payload = { firm_id: UM.firmId, name, icon, sort_order: UM.skillCats.length * 10 };
+      const [created] = await API.post('hud_skill_categories', payload);
+      if (created) UM.skillCats.push(created);
+    }
+    closeDrawer();
+    renderSkillsLibrary();
+  } catch(e) { errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block'; }
+  finally { btn.textContent = 'SAVE CATEGORY'; btn.disabled = false; }
+}
+
+async function deleteSkillCategory(catId, catName) {
+  const skillCount = UM.skills.filter(s => s.category_id === catId).length;
+  const msg = skillCount
+    ? `Delete category "${catName}" and its ${skillCount} skill(s)? This cannot be undone.`
+    : `Delete category "${catName}"?`;
+  if (!confirm(msg)) return;
+  try {
+    // Delete skills first
+    if (skillCount) await API.del(`hud_skills?category_id=eq.${catId}`).catch(()=>{});
+    await API.del(`hud_skill_categories?id=eq.${catId}`);
+    UM.skillCats = UM.skillCats.filter(c => c.id !== catId);
+    UM.skills    = UM.skills.filter(s => s.category_id !== catId);
+    renderSkillsLibrary();
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// ── SKILL MANAGEMENT ──────────────────────────────────────────
+function openSkillDrawer(catId, catName) {
+  UM.editingSkillId = null;
+  UM._defaultSkillCat = catId;
+  document.getElementById('skill-drawer-title').textContent = 'ADD SKILL' + (catName ? ' — ' + catName : '');
+  document.getElementById('sk-name').value    = '';
+  document.getElementById('sk-desc').value    = '';
+  document.getElementById('sk-aliases').value = '';
+  // Populate category select
+  const catSel = document.getElementById('sk-cat');
+  catSel.innerHTML = UM.skillCats.map(c =>
+    `<option value="${c.id}" ${c.id === catId ? 'selected' : ''}>${c.name}</option>`
+  ).join('');
+  document.getElementById('sk-err').style.display = 'none';
+  openDrawer('skill-drawer');
+}
+
+function openEditSkillDrawer(skillId) {
+  const s = UM.skills.find(x => x.id === skillId);
+  if (!s) return;
+  UM.editingSkillId = skillId;
+  document.getElementById('skill-drawer-title').textContent = 'EDIT SKILL';
+  document.getElementById('sk-name').value    = s.name || '';
+  document.getElementById('sk-desc').value    = s.description || '';
+  const aliases = Array.isArray(s.aliases) ? s.aliases : [];
+  document.getElementById('sk-aliases').value = aliases.join(', ');
+  const catSel = document.getElementById('sk-cat');
+  catSel.innerHTML = UM.skillCats.map(c =>
+    `<option value="${c.id}" ${c.id === s.category_id ? 'selected' : ''}>${c.name}</option>`
+  ).join('');
+  document.getElementById('sk-err').style.display = 'none';
+  openDrawer('skill-drawer');
+}
+
+async function saveSkill() {
+  const name    = document.getElementById('sk-name').value.trim();
+  const catId   = document.getElementById('sk-cat').value;
+  const desc    = document.getElementById('sk-desc').value.trim() || null;
+  const aliasRaw= document.getElementById('sk-aliases').value;
+  const aliases = aliasRaw.split(',').map(a => a.trim()).filter(Boolean);
+  const errEl   = document.getElementById('sk-err');
+  if (!name) { errEl.textContent = 'Skill name is required'; errEl.style.display = 'block'; return; }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('sk-save-btn');
+  btn.textContent = 'SAVING...'; btn.disabled = true;
+  const payload = { firm_id: UM.firmId, category_id: catId||null, name, description: desc,
+    aliases: aliases.length ? aliases : null, is_active: true,
+    sort_order: UM.skills.filter(s=>s.category_id===catId).length * 10 };
+  try {
+    if (UM.editingSkillId) {
+      await API.patch(`hud_skills?id=eq.${UM.editingSkillId}`, payload);
+      const idx = UM.skills.findIndex(s => s.id === UM.editingSkillId);
+      if (idx >= 0) UM.skills[idx] = { ...UM.skills[idx], ...payload };
+    } else {
+      const [created] = await API.post('hud_skills', payload);
+      if (created) UM.skills.push(created);
+    }
+    closeDrawer();
+    renderSkillsLibrary();
+  } catch(e) { errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block'; }
+  finally { btn.textContent = 'SAVE SKILL'; btn.disabled = false; }
+}
+
+async function deleteSkill(skillId, skillName, catId) {
+  if (!confirm(`Delete skill "${skillName}"? This will also remove it from all resource profiles.`)) return;
+  try {
+    await API.del(`resource_skills?skill_id=eq.${skillId}`).catch(()=>{});
+    await API.del(`hud_skills?id=eq.${skillId}`);
+    UM.skills = UM.skills.filter(s => s.id !== skillId);
+    renderSkillsLibrary();
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// ── SKILL HOVER TOOLTIP ───────────────────────────────────────
+let _skillTTTimer = null;
+let _skillTTCache = {};
+
+function _showSkillTT(e, skillId) {
+  clearTimeout(_skillTTTimer);
+  _skillTTTimer = setTimeout(async () => {
+    const skill = UM.skills.find(s => s.id === skillId);
+    if (!skill) return;
+    const tt = document.getElementById('skill-hover-tt');
+    document.getElementById('stt-name').textContent = skill.name;
+    const cat = UM.skillCats.find(c => c.id === skill.category_id);
+    document.getElementById('stt-cat').textContent = cat ? cat.name.toUpperCase() : '';
+    const peopleEl = document.getElementById('stt-people');
+    peopleEl.innerHTML = '<div class="stt-empty">Loading...</div>';
+    tt.classList.add('visible');
+    _positionSkillTT(e.clientX, e.clientY);
+    // Fetch resource_skills for this skill (cached)
+    if (!_skillTTCache[skillId]) {
+      try {
+        _skillTTCache[skillId] = await API.get(
+          `resource_skills?select=*&skill_id=eq.${skillId}`
+        ).catch(() => []);
+      } catch(err) { _skillTTCache[skillId] = []; }
+    }
+    const entries = _skillTTCache[skillId] || [];
+    if (!entries.length) {
+      peopleEl.innerHTML = '<div class="stt-empty">No team members have this skill yet</div>';
+      return;
+    }
+    const profOrder = { authority:0, expert:1, practitioner:2, aware:3 };
+    const sorted = [...entries].sort((a,b) =>
+      (profOrder[a.proficiency]||9) - (profOrder[b.proficiency]||9));
+    const profColors = {
+      authority:'var(--purple)', expert:'var(--amber)',
+      practitioner:'var(--cyan)', aware:'var(--text3)'
+    };
+    peopleEl.innerHTML = sorted.slice(0, 8).map(rs => {
+      const res = UM.resources.find(r => r.id === rs.resource_id);
+      if (!res) return '';
+      const dotColor = profColors[rs.proficiency] || 'var(--text3)';
+      return `<div class="stt-person-row">
+        <div class="stt-dot" style="background:${dotColor};"></div>
+        <div class="stt-person-name">${res.first_name} ${res.last_name}</div>
+        <span class="stt-prof ${rs.proficiency}">${rs.proficiency?.charAt(0).toUpperCase()+rs.proficiency?.slice(1)}</span>
+      </div>`;
+    }).join('') + (sorted.length > 8 ?
+      `<div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:4px 0;">
+        +${sorted.length-8} more</div>` : '');
+  }, 600);
+}
+
+function _hideSkillTT() {
+  clearTimeout(_skillTTTimer);
+  const tt = document.getElementById('skill-hover-tt');
+  if (tt) tt.classList.remove('visible');
+}
+
+function _moveSkillTT(e) {
+  const tt = document.getElementById('skill-hover-tt');
+  if (tt?.classList.contains('visible')) _positionSkillTT(e.clientX, e.clientY);
+}
+
+function _positionSkillTT(x, y) {
+  const tt = document.getElementById('skill-hover-tt');
+  if (!tt) return;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let left = x + 14, top = y - 10;
+  if (left + 310 > vw - 8) left = x - 314;
+  if (top + tt.offsetHeight > vh - 8) top = vh - tt.offsetHeight - 8;
+  tt.style.left = Math.max(8, left) + 'px';
+  tt.style.top  = Math.max(8, top) + 'px';
+}
+
+// Invalidate cache when skills are updated
+const _origSaveSkill = typeof saveSkill !== 'undefined' ? saveSkill : null;
+
+// ── NAVIGATION ───────────────────────────────────────────────
+function goBack() {
+  // Try to return to the last project page, or fall back to projects list
+  const lastProject = sessionStorage.getItem('lastProjectId') || localStorage.getItem('lastProjectId');
+  if (lastProject) {
+    window.location.href = '/project-detail.html?id=' + lastProject;
+  } else {
+    window.history.length > 1 ? window.history.back() : window.location.href = '/projects.html';
+  }
+}
+
+// ── BOOT ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  // Ensure auth session is active before making API calls
+  try {
+    Auth.requireAuth();           // redirects to login if not authenticated
+    await Auth.getFreshToken();   // waits for token to be available
+  } catch(e) { /* not authenticated — requireAuth will redirect */ return; }
+  initUM();
+});
+
+// ── AVATAR UPLOAD ──────────────────────────────────────────────
+const SUPABASE_STORAGE = PHUD.SUPABASE_URL + '/storage/v1';
+const AVATARS_BUCKET   = 'avatars';
+
+// Called from card click
+function triggerAvatarUpload(resourceId) {
+  const inp = document.getElementById('av-input-' + resourceId);
+  if (inp) inp.click();
+}
+
+// Upload from the resource card
+async function uploadAvatar(input, resourceId) {
+  const file = input.files[0];
+  if (!file) return;
+  await _doAvatarUpload(file, resourceId);
+  input.value = ''; // reset so same file can be re-selected
+}
+
+// Upload from the drawer
+async function uploadAvatarFromDrawer(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const resourceId = UM.editingResourceId;
+  if (!resourceId) { alert('Save the resource first before uploading a photo.'); return; }
+  const url = await _doAvatarUpload(file, resourceId);
+  if (url) {
+    // Update drawer preview immediately
+    const img = document.getElementById('drawer-avatar-img');
+    const ini = document.getElementById('drawer-avatar-initials');
+    if (img) { img.src = url; img.style.display = 'block'; }
+    if (ini) ini.style.display = 'none';
+  }
+  input.value = '';
+}
+
+async function _doAvatarUpload(file, resourceId) {
+  // Validate size (5 MB max)
+  if (file.size > 5 * 1024 * 1024) {
+    alert('Photo must be under 5 MB. Please choose a smaller file.');
+    return null;
+  }
+
+  // Always store as .jpg to avoid extension-mismatch duplicates
+  // (uploading foo.png when foo.jpg exists causes 409)
+  const path    = resourceId + '.jpg';
+  const token   = await Auth.getFreshToken().catch(() => Auth.getToken());
+  const headers = { 'Authorization': 'Bearer ' + token, 'apikey': PHUD.SUPABASE_KEY };
+
+  // Show uploading state on the avatar
+  const cardAv = document.querySelector('[id="av-input-' + resourceId + '"]')?.closest('.res-avatar');
+  if (cardAv) { cardAv.style.opacity = '0.5'; }
+
+  try {
+    // Convert file to JPEG blob via canvas (normalises format + extension)
+    const jpegBlob = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        // Limit to 400x400 max — avatar display doesn't need more
+        const MAX = 400;
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else        { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob(resolve, 'image/jpeg', 0.88);
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+
+    // Use x-upsert: true — single PUT replaces existing file, no 409 possible
+    const uploadRes = await fetch(SUPABASE_STORAGE + '/object/' + AVATARS_BUCKET + '/' + path, {
+      method:  'POST',
+      headers: { ...headers, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+      body:    jpegBlob,
+    });
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.text();
+      throw new Error('Upload failed: ' + err);
+    }
+
+    // Build permanent public URL — no token, no expiry, no cache-bust needed
+    // Strip any previous ?t= param so the stored URL stays clean
+    const publicUrl = PHUD.SUPABASE_URL + '/storage/v1/object/public/' + AVATARS_BUCKET + '/' + path;
+
+    // Save URL to resources table
+    const patchRes = await API.patch('resources?id=eq.' + resourceId, { avatar_url: publicUrl });
+    console.log('[Avatar] patch result:', patchRes);
+
+    // Update local state immediately
+    const res = UM.resources.find(r => r.id === resourceId);
+    if (res) res.avatar_url = publicUrl;
+
+    // Re-render cards — add cache-bust on img src only (not stored URL)
+    renderResources();
+    return publicUrl;
+
+  } catch(e) {
+    console.error('Avatar upload error:', e);
+    alert('Photo upload failed: ' + e.message);
+    return null;
+  } finally {
+    if (cardAv) cardAv.style.opacity = '';
+  }
+}
+
+// Remove avatar (revert to initials)
+async function removeAvatar(resourceId) {
+  if (!confirm('Remove this photo and revert to initials?')) return;
+  const res = UM.resources.find(r => r.id === resourceId);
+  if (!res) return;
+  const token   = await Auth.getFreshToken().catch(() => Auth.getToken());
+  const headers = { 'Authorization': 'Bearer ' + token, 'apikey': PHUD.SUPABASE_KEY };
+  // Extract path from URL
+  const urlPath = res.avatar_url?.split('/' + AVATARS_BUCKET + '/')[1]?.split('?')[0];
+  if (urlPath) {
+    await fetch(SUPABASE_STORAGE + '/object/' + AVATARS_BUCKET + '/' + urlPath, {
+      method: 'DELETE', headers
+    }).catch(()=>{});
+  }
+  await API.patch('resources?id=eq.' + resourceId, { avatar_url: null });
+  if (res) res.avatar_url = null;
+  renderResources();
+}
+  // Init sidebar
+  Sidebar.init('users.html');
+
+// ── ORG CHART ─────────────────────────────────────────────────────────────────
+var _ocPending = {};
+var _ocCollapsed = {};
+var _ocSelectedId = null;
+
+function _ocAvatarHtml(r, size) {
+  size = size || 36;
+  var initials = ((r.first_name||'')[0]||'') + ((r.last_name||'')[0]||'');
+  var colors = ['#E1F5EE:#085041','#E6F1FB:#0C447C','#FAEEDA:#633806','#EAF3DE:#27500A','#EEEDFE:#3C3489','#FBEAF0:#72243E'];
+  var ci = (r.name||'').charCodeAt(0) % colors.length;
+  var pair = colors[ci].split(':');
+  var bg = pair[0], fg = pair[1];
+  if (r.avatar_url) {
+    return '<img src="' + r.avatar_url + '" style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;object-fit:cover;display:block">';
+  }
+  return '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + bg + ';color:' + fg + ';display:flex;align-items:center;justify-content:center;font-size:' + Math.floor(size*0.35) + 'px;font-weight:700;flex-shrink:0">' + initials + '</div>';
+}
+
+var _ocCocOpen = false;
+
+function _ocFixCrossbars() {
+  document.querySelectorAll('#oc-tree-root [style*="position:absolute"][style*="top:0"]').forEach(function(bar) {
+    var parent = bar.parentElement;
+    if (!parent) return;
+    var cards = Array.from(parent.children).filter(function(c){ return c !== bar && c.querySelector('[data-oc-node]'); });
+    if (cards.length < 2) return;
+    var parentRect = parent.getBoundingClientRect();
+    var firstCard = cards[0].querySelector('[data-oc-node]');
+    var lastCard = cards[cards.length-1].querySelector('[data-oc-node]');
+    if (!firstCard || !lastCard) return;
+    var firstRect = firstCard.getBoundingClientRect();
+    var lastRect = lastCard.getBoundingClientRect();
+    var left = firstRect.left + firstRect.width/2 - parentRect.left;
+    var right = parentRect.right - (lastRect.left + lastRect.width/2);
+    bar.style.left = left + 'px';
+    bar.style.right = right + 'px';
+    bar.style.width = '';
+  });
+}
+
+
+// ── Styled resource contact picker ────────────────────────────────────────────
+function _cpAvatar(r) {
+  if (r.avatar_url) return '<img src="' + r.avatar_url + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0">';
+  var initials = ((r.first_name||'')[0]||'') + ((r.last_name||'')[0]||'');
+  var colors = ['#e8a87c','#85c1e9','#82e0aa','#f1948a','#bb8fce','#76d7c4','#f8c471','#aab7b8'];
+  var ci = (r.name||'x').charCodeAt(0) % colors.length;
+  return '<div style="width:28px;height:28px;border-radius:50%;background:' + colors[ci] + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#1a1a2e;flex-shrink:0">' + initials + '</div>';
+}
+
+function _cpUpdateBtn(btn, r) {
+  btn.innerHTML = r ? _cpAvatar(r) + '<div style="min-width:0"><div style="font-size:12px;font-weight:600;color:var(--text1)">' + (r.name||'') + '</div><div style="font-size:10px;color:var(--text2)">' + (r.title||'') + '</div></div>' : '<span style="font-size:12px;color:var(--text3)">— None —</span>';
+}
+
+function _buildContactPicker(elId, resources, selectedId) {
+  var orig = document.getElementById(elId);
+  if (!orig) return;
+  var wrapperId = elId + '-picker';
+  var existing = document.getElementById(wrapperId);
+  if (existing) existing.remove();
+  var wrapper = document.createElement('div');
+  wrapper.id = wrapperId;
+  wrapper.style.cssText = 'position:relative';
+  orig.parentElement.insertBefore(wrapper, orig);
+  orig.style.display = 'none';
+  var byDept = {};
+  var deptOrder = [];
+  resources.forEach(function(r) {
+    var d = r.department || 'Other';
+    if (!byDept[d]) { byDept[d] = []; deptOrder.push(d); }
+    byDept[d].push(r);
+  });
+  deptOrder.sort();
+  var selectedRes = selectedId ? resources.find(function(r){ return r.id === selectedId; }) : null;
+  var btn = document.createElement('div');
+  btn.style.cssText = 'border:1px solid var(--border);border-radius:4px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;background:var(--bg2);min-height:34px';
+  _cpUpdateBtn(btn, selectedRes);
+  wrapper.appendChild(btn);
+  var drop = document.createElement('div');
+  drop.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:4px;z-index:999;max-height:280px;overflow-y:auto;margin-top:2px;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+  var noneRow = document.createElement('div');
+  noneRow.style.cssText = 'padding:8px 10px;cursor:pointer;font-size:11px;color:var(--text3)';
+  noneRow.textContent = '— None —';
+  noneRow.onmouseenter = function(){ this.style.background='rgba(255,255,255,.05)'; };
+  noneRow.onmouseleave = function(){ this.style.background=''; };
+  noneRow.onclick = function(){ orig.value=''; _cpUpdateBtn(btn, null); drop.style.display='none'; };
+  drop.appendChild(noneRow);
+  deptOrder.forEach(function(dept) {
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'padding:5px 10px;font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--cad,#00c9c9);text-transform:uppercase;border-top:1px solid var(--border);background:var(--bg1,var(--bg))';
+    hdr.textContent = dept;
+    drop.appendChild(hdr);
+    byDept[dept].sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); }).forEach(function(r) {
+      var row = document.createElement('div');
+      row.style.cssText = 'padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:8px' + (r.id === selectedId ? ';background:rgba(0,201,201,.08)' : '');
+      row.innerHTML = _cpAvatar(r) + '<div style="min-width:0"><div style="font-size:12px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.name||'') + '</div><div style="font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.title||'') + '</div></div>';
+      row.onmouseenter = function(){ this.style.background='rgba(0,201,201,.06)'; };
+      row.onmouseleave = function(){ this.style.background = r.id===orig.value ? 'rgba(0,201,201,.08)' : ''; };
+      row.onclick = function(){ orig.value = r.id; _cpUpdateBtn(btn, r); drop.style.display='none'; };
+      drop.appendChild(row);
+    });
+  });
+  wrapper.appendChild(drop);
+  btn.onclick = function(e) {
+    e.stopPropagation();
+    var isOpen = drop.style.display !== 'none';
+    document.querySelectorAll('[id$="-picker"] > div:last-child').forEach(function(d){ d.style.display='none'; });
+    drop.style.display = isOpen ? 'none' : 'block';
+  };
+}
+
+function _buildAllContactPickers(r) {
+  var allRes = (UM.resources||[]).filter(function(x){ return x.is_active !== false; });
+  var contactIds = ['res-advisor','res-hr-contact','res-it-contact','res-finance-contact','res-legal-contact','res-safety-contact','res-manager-team'];
+  var keyMap = {
+    'res-advisor': 'advisor_id', 'res-hr-contact': 'hr_contact_id',
+    'res-it-contact': 'it_contact_id', 'res-finance-contact': 'finance_contact_id',
+    'res-legal-contact': 'legal_contact_id', 'res-safety-contact': 'safety_contact_id',
+    'res-manager-team': 'manager_id'
+  };
+  contactIds.forEach(function(id) {
+    var key = keyMap[id];
+    var val = r ? (r[key] || '') : '';
+    var el = document.getElementById(id);
+    if (el) el.value = val;
+    _buildContactPicker(id, allRes, val);
+  });
+}
+
+
+var _ocDirectorRoleId = null;
+
+function _ocGetDirectorRoleId() {
+  if (_ocDirectorRoleId) return _ocDirectorRoleId;
+  var role = (UM.roles||[]).find(function(ro){ return ro.name === 'Director'; });
+  _ocDirectorRoleId = role ? role.id : null;
+  return _ocDirectorRoleId;
+}
+
+var _ocZoomLevel = 1;
+
+function _ocZoomIn() {
+  _ocZoomLevel = Math.min(2, parseFloat((_ocZoomLevel + 0.1).toFixed(1)));
+  var tr = document.getElementById('oc-tree-root');
+  if (tr) { tr.style.transform = 'scale(' + _ocZoomLevel + ')'; tr.style.transformOrigin = 'top left'; }
+  var lbl = document.getElementById('oc-zoom-pct');
+  if (lbl) lbl.textContent = Math.round(_ocZoomLevel*100) + '%';
+}
+
+function _ocZoomOut() {
+  _ocZoomLevel = Math.max(0.3, parseFloat((_ocZoomLevel - 0.1).toFixed(1)));
+  var tr = document.getElementById('oc-tree-root');
+  if (tr) { tr.style.transform = 'scale(' + _ocZoomLevel + ')'; tr.style.transformOrigin = 'top left'; }
+  var lbl = document.getElementById('oc-zoom-pct');
+  if (lbl) lbl.textContent = Math.round(_ocZoomLevel*100) + '%';
+}
+
+
+
+function _ocToggleCoc() {
+  _ocCocOpen = !_ocCocOpen;
+  var panel = document.getElementById('oc-coc-panel');
+  var btn = document.getElementById('oc-coc-btn');
+  var grid = document.getElementById('oc-body-grid');
+  if (panel) {
+    panel.style.display = _ocCocOpen ? 'flex' : 'none';
+    panel.style.flexDirection = 'column';
+    panel.style.zIndex = '10';
+  }
+  if (grid) grid.style.gridTemplateColumns = _ocCocOpen ? '220px 1fr 300px' : '220px 1fr';
+  if (btn) {
+    btn.style.color = _ocCocOpen ? 'var(--cad,#00c9c9)' : '';
+    btn.style.borderColor = _ocCocOpen ? 'var(--cad,#00c9c9)' : '';
+    btn.style.background = _ocCocOpen ? 'rgba(0,201,201,.08)' : '';
+  }
+  if (_ocCocOpen) _ocLoadCoc();
+}
+
+async function _ocLoadCoc() {
+  var body = document.getElementById('oc-coc-body');
+  if (!body) return;
+  body.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:20px">Loading…</div>';
+  try {
+    var rows = await API.get('coc_events?entity_type=eq.org_chart&firm_id=eq.' + UM.firmId + '&order=created_at.desc&limit=100');
+    console.log('[ocCoC] rows:', rows && rows.length, '| firmId:', UM.firmId);
+    if (!rows || !rows.length) {
+      body.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:20px">No history yet.</div>';
+      return;
+    }
+    body.innerHTML = rows.map(function(e) {
+      var meta = e.metadata || {};
+      var color = e.event_type === 'org.assigned' ? 'var(--cad,#00c9c9)' :
+                  e.event_type === 'org.unlinked'  ? '#f85149' : 'var(--muted)';
+      var label = e.event_type === 'org.assigned' ? 'Assigned' :
+                  e.event_type === 'org.unlinked'  ? 'Unlinked' : e.event_type;
+      var note = meta.resource_name ? meta.resource_name + (meta.manager_name ? ' → ' + meta.manager_name : ' (root)') : '';
+      return '<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+        '<div style="width:6px;height:6px;border-radius:50%;background:' + color + ';flex-shrink:0;margin-top:4px"></div>' +
+        '<div style="flex:1">' +
+          '<div style="font-size:10px;font-weight:700;color:' + color + ';letter-spacing:.06em;text-transform:uppercase">' + label + '</div>' +
+          '<div style="font-size:12px;color:var(--text1);margin-top:1px">' + _ocEsc(note) + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-top:2px">' + _ocEsc(e.actor_name||'') + ' · ' + _ocFmtTs(e.created_at) + '</div>' +
+        '</div></div>';
+    }).join('');
+  } catch(err) {
+    body.innerHTML = '<div style="font-size:11px;color:#f85149;padding:12px">Failed to load history.</div>';
+  }
+}
+
+function _ocEsc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function _ocFmtTs(ts) {
+  if (!ts) return '';
+  var d = new Date(ts);
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' · ' +
+         d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+function _ocUpdateBadge() {
+  var badge = document.getElementById('oc-updated-badge');
+  if (!badge) return;
+  var now = new Date();
+  badge.textContent = 'Updated: ' + now.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' ' +
+    now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+
+
+function _ocBuild() {
+  var res = UM.resources || [];
+  var byId = {};
+  res.forEach(function(r){ byId[r.id] = r; });
+
+  // Apply pending manager changes
+  Object.keys(_ocPending).forEach(function(id){
+    if (byId[id]) byId[id]._oc_manager_id = _ocPending[id];
+  });
+  res.forEach(function(r){
+    // Only set if not already overridden by _ocOpen or pending changes this session
+    if (!r.hasOwnProperty('_oc_manager_id') || r._oc_manager_id === undefined) {
+      r._oc_manager_id = r.manager_id || (r.is_org_root ? 'ROOT' : null);
+    }
+  });
+
+  var children = {};
+  var roots = [];
+  var assigned = {};
+  res.forEach(function(r){
+    var mid = r._oc_manager_id;
+    if (mid && byId[mid]) {
+      if (!children[mid]) children[mid] = [];
+      children[mid].push(r);
+      assigned[r.id] = true;
+    } else {
+      roots.push(r);
+    }
+  });
+
+  // Unassigned = resources with no manager AND no direct reports
+  var unassigned = res.filter(function(r){
+    return !r._oc_manager_id && r._oc_manager_id !== 'ROOT' && !r.is_org_root && !children[r.id];
+  });
+
+  // Roots = resources with no manager but HAS reports
+  var treeRoots = res.filter(function(r){
+    return r._oc_manager_id === 'ROOT' || (!r._oc_manager_id && children[r.id]);
+  });
+  // treeRoots = resources explicitly placed as root (sentinel 'ROOT') OR with children
+  // Never auto-populate with lone unassigned resources
+
+  // Render unassigned list
+  var ul = document.getElementById('oc-unassigned-list');
+  var hdr = document.getElementById('oc-unassigned-hdr');
+  if (ul) {
+    ul.innerHTML = unassigned.length ? unassigned.map(function(r){
+      return '<div draggable="true" data-rid="' + r.id + '" ondragstart="_ocDragStart(event)" ' +
+        'style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg1,var(--bg));margin-bottom:4px;cursor:grab;font-size:12px;color:var(--text1)">' +
+        _ocAvatarHtml(r, 26) +
+        '<div><div style="font-size:12px;font-weight:600">' + (r.name||'') + '</div>' +
+        '<div style="font-size:10px;color:var(--muted)">' + (r.title||r.department||'') + '</div></div>' +
+        '</div>';
+    }).join('') : '<div style="font-size:11px;color:var(--muted);padding:8px 2px">All resources assigned</div>';
+    if (hdr) hdr.textContent = 'Unassigned (' + unassigned.length + ')';
+  }
+
+  // Render tree
+  var root = document.getElementById('oc-tree-root');
+  if (root) {
+    if (treeRoots.length) {
+      root.innerHTML = treeRoots.map(function(r){ return _ocNodeHtml(r, children, 0); }).join('');
+    } else {
+      root.innerHTML = '<div style="width:100%;padding:40px;text-align:center;border:2px dashed var(--border);border-radius:8px;color:var(--muted);font-size:12px;font-family:Arial,sans-serif">Drag managers here to start building the org chart</div>';
+    }
+  }
+
+  // Stats
+  var stats = document.getElementById('oc-stats');
+  if (stats) stats.textContent = res.length + ' resources · ' + (res.length - unassigned.length) + ' assigned';
+  var pendCount = document.getElementById('oc-pending-count');
+  var nPending = Object.keys(_ocPending).length;
+  if (pendCount) pendCount.textContent = nPending ? nPending + ' unsaved change' + (nPending!==1?'s':'') : '';
+  var saveBtn = document.getElementById('oc-save-btn');
+  if (saveBtn) {
+    if (nPending > 0) {
+      saveBtn.disabled = false;
+      saveBtn.style.background = 'var(--cad,#00c9c9)';
+      saveBtn.style.border = '1px solid var(--cad,#00c9c9)';
+      saveBtn.style.color = '#003333';
+      saveBtn.style.cursor = 'pointer';
+    } else {
+      saveBtn.disabled = true;
+      saveBtn.style.background = 'rgba(0,201,201,.15)';
+      saveBtn.style.border = '1px solid rgba(0,201,201,.25)';
+      saveBtn.style.color = 'rgba(0,201,201,.4)';
+      saveBtn.style.cursor = 'default';
+    }
+  }
+
+  // Wire delegated events on tree root
+  var treeRoot = document.getElementById('oc-tree-root');
+  if (treeRoot && !treeRoot._ocWired) {
+    treeRoot._ocWired = true;
+    treeRoot.addEventListener('click', function(e) {
+      var unlink = e.target.closest('[data-oc-unlink]');
+      if (unlink) { e.stopPropagation(); _ocUnlinkNode(unlink.dataset.ocUnlink); return; }
+      var toggle = e.target.closest('[data-oc-toggle]');
+      if (toggle) { e.stopPropagation(); _ocToggle(toggle.dataset.ocToggle); return; }
+      var node = e.target.closest('[data-oc-node]');
+      if (node) { _ocSelect(node.dataset.rid); }
+    });
+    treeRoot.addEventListener('dragover', function(e) {
+      var node = e.target.closest('[data-oc-drop]');
+      if (node) _ocDragOver(e);
+    });
+    treeRoot.addEventListener('dragleave', function(e) {
+      var node = e.target.closest('[data-oc-drop]');
+      if (node && !node.contains(e.relatedTarget)) _ocDragLeave({currentTarget: node, relatedTarget: e.relatedTarget});
+    });
+    treeRoot.addEventListener('drop', function(e) {
+      var node = e.target.closest('[data-oc-drop]');
+      if (node) _ocDrop(e, node.dataset.ocDrop);
+    });
+  }
+}
+
+function _ocNodeHtml(r, children, depth) {
+  var kids = (children[r.id] || []).sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  var hasKids = kids.length > 0;
+  var collapsed = _ocCollapsed[r.id];
+  var isSelected = _ocSelectedId === r.id;
+  var borderColor = isSelected ? 'var(--cad,#00c9c9)' : 'var(--border)';
+  var borderWidth = isSelected ? '2px' : '1px';
+  var lastInitial = (r.last_name||'').charAt(0);
+  var isDirector = r.hud_role_id === _ocGetDirectorRoleId();
+
+  var html = '<div style="display:inline-flex;flex-direction:column;align-items:center;min-width:150px">';
+  html += '<div draggable="true" data-rid="' + r.id + '" data-oc-node="1" ondragstart="_ocDragStart(event)" ondragover="_ocDragOver(event)" data-oc-drop="' + r.id + '" ondragleave="_ocDragLeave(event)" style="border:' + borderWidth + ' solid ' + borderColor + ';border-radius:8px;padding:7px 10px;width:150px;min-width:150px;background:var(--bg2);cursor:pointer;position:relative">';
+  html += '<div data-oc-unlink="' + r.id + '" style="position:absolute;top:3px;right:3px;width:13px;height:13px;border-radius:50%;background:rgba(248,81,73,.15);color:#f85149;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid rgba(248,81,73,.3)">x</div>';
+  html += '<div style="display:flex;align-items:center;gap:7px">';
+  html += '<div style="width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">' + _ocAvatarHtml(r, 28) + '</div>';
+  html += '<div style="min-width:0"><div style="font-size:11px;font-weight:700;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.first_name||'') + ' ' + lastInitial + '.</div>';
+  if (r.department) html += '<div style="font-size:9px;color:var(--cad,#00c9c9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">' + r.department + '</div>';
+  html += '</div></div>';
+  if (r.title) html += '<div style="font-size:9px;color:var(--muted,#8b949e);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-align:center">' + r.title + '</div>';
+  if (hasKids) html += '<div data-oc-toggle="' + r.id + '" style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;color:var(--text2);border:1px solid var(--border)">' + (collapsed ? '+' : '−') + '</div>';
+  html += '</div>';
+
+  if (hasKids && !collapsed) {
+    if (isDirector || kids.length <= 3) {
+      // Director role or few kids — always horizontal fan
+      // Connector zone: 20px parent drop + crossbar + 20px child drop = 40px total
+      html += '<div style="width:2px;height:20px;background:rgba(0,201,201,.5)"></div>';
+      html += '<div style="display:flex;flex-wrap:nowrap;gap:10px;position:relative;height:20px;justify-content:center;align-items:flex-start">';
+      if (kids.length > 1) html += '<div class="oc-crossbar" style="position:absolute;top:50%;transform:translateY(-50%);left:0;right:0;height:2px;background:rgba(0,201,201,.5)"></div>';
+      html += kids.map(function(kid){
+        return '<div style="display:inline-flex;flex-direction:column;align-items:center"><div style="width:2px;height:20px;background:rgba(0,201,201,.5)"></div>' + _ocNodeHtml(kid, children, depth+1) + '</div>';
+      }).join('');
+      html += '</div>';
+    } else {
+      html += '<div style="width:2px;height:12px;background:rgba(0,201,201,.5)"></div>';
+      html += '<div style="display:flex;flex-direction:row;align-items:stretch;margin-left:57px">';
+      html += '<div style="width:2px;background:rgba(0,201,201,.5);flex-shrink:0"></div>';
+      html += '<div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;padding-bottom:8px">';
+      html += kids.map(function(kid){
+        return '<div style="display:flex;align-items:center"><div style="width:20px;height:2px;background:rgba(0,201,201,.5);flex-shrink:0"></div>' + _ocNodeHtml(kid, children, depth+1) + '</div>';
+      }).join('');
+      html += '</div></div>';
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+function _ocSelect(id) {
+  _ocSelectedId = id;
+  var r = (UM.resources||[]).find(function(x){ return x.id === id; });
+  if (!r) return;
+  var det = document.getElementById('oc-detail');
+  var detAvatar = document.getElementById('oc-det-avatar');
+  var detName = document.getElementById('oc-det-name');
+  var detTitle = document.getElementById('oc-det-title');
+  var detRows = document.getElementById('oc-det-rows');
+  if (!det) return;
+  det.style.display = 'block';
+  if (detAvatar) detAvatar.innerHTML = _ocAvatarHtml(r, 38);
+  if (detName) detName.textContent = r.name || '';
+  if (detTitle) detTitle.textContent = r.title || '';
+  var mid = (_ocPending[id] !== undefined ? _ocPending[id] : r.manager_id);
+  var mgr = mid ? (UM.resources||[]).find(function(x){ return x.id === mid; }) : null;
+  var kids = (UM.resources||[]).filter(function(x){ return (x._oc_manager_id||x.manager_id) === id; });
+  var rows = [
+    ['Dept', r.department||'—'],
+    ['Reports to', mgr ? mgr.name : '— none —'],
+    ['Direct reports', kids.length],
+    ['Routing rule', mid ? 'session.submitter.manager' : '—'],
+  ];
+  if (detRows) detRows.innerHTML = rows.map(function(row){
+    return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">' +
+      '<span style="color:var(--text2)">' + row[0] + '</span>' +
+      '<span style="color:var(--text1);font-weight:600">' + row[1] + '</span></div>';
+  }).join('');
+  _ocBuild();
+}
+
+function _ocCloseDetail() {
+  _ocSelectedId = null;
+  var det = document.getElementById('oc-detail');
+  if (det) det.style.display = 'none';
+  _ocBuild();
+}
+
+function _ocToggle(id) { _ocCollapsed[id] = !_ocCollapsed[id]; _ocBuild(); }
+function _ocCollapseAll() { (UM.resources||[]).forEach(function(r){ _ocCollapsed[r.id]=true; }); _ocBuild(); }
+function _ocExpandAll() { _ocCollapsed={}; _ocBuild(); }
+
+var _ocDragId = null;
+function _ocDragStart(e) {
+  _ocDragId = e.currentTarget.dataset.rid;
+  e.dataTransfer.effectAllowed = 'move';
+}
+function _ocDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = 'var(--cad,#00c9c9)';
+  e.currentTarget.style.borderStyle = 'dashed';
+}
+function _ocDragLeave(e) {
+  // Only clear if cursor truly left the node — not just moved to a child element
+  if (e.currentTarget.contains(e.relatedTarget)) return;
+  e.currentTarget.style.borderColor = '';
+  e.currentTarget.style.borderStyle = '';
+}
+function _ocDrop(e, targetId) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = '';
+  e.currentTarget.style.borderStyle = '';
+  if (!_ocDragId || _ocDragId === targetId) return;
+  // Prevent circular: don't drop a parent onto its own descendant
+  if (_ocIsDescendant(_ocDragId, targetId)) { cadToast('Cannot assign a manager who reports to this person', 'warn'); return; }
+  _ocPending[_ocDragId] = targetId;
+  // Inherit department from manager
+  var draggedRes = (UM.resources||[]).find(function(x){ return x.id === _ocDragId; });
+  var managerRes = (UM.resources||[]).find(function(x){ return x.id === targetId; });
+  if (draggedRes && managerRes && managerRes.department) {
+    draggedRes._oc_manager_id = targetId;
+    draggedRes.department = managerRes.department;
+    // Queue dept update to save alongside manager_id
+    if (!_ocPendingDept) window._ocPendingDept = {};
+    _ocPendingDept[_ocDragId] = managerRes.department;
+  }
+  cadToast('Manager assigned — click Save Changes to persist', 'info');
+  _ocBuild();
+}
+function _ocIsDescendant(ancestorId, nodeId) {
+  var r = (UM.resources||[]).find(function(x){ return x.id === nodeId; });
+  if (!r) return false;
+  var mid = _ocPending[nodeId] !== undefined ? _ocPending[nodeId] : r.manager_id;
+  if (!mid) return false;
+  if (mid === ancestorId) return true;
+  return _ocIsDescendant(ancestorId, mid);
+}
+
+function _ocDetEdit() {
+  var id = _ocSelectedId;
+  _ocCloseDetail();
+  if (id) setTimeout(function() { openResourceDrawer(id); }, 50);
+}
+function _ocDetUnlink() {
+  if (!_ocSelectedId) return;
+  _ocPending[_ocSelectedId] = 'UNASSIGNED';
+  var id = _ocSelectedId;
+  _ocSelectedId = null;
+  var det = document.getElementById('oc-detail');
+  if (det) det.style.display = 'none';
+  var r = (UM.resources||[]).find(function(x){ return x.id === id; });
+  if (r) { r._oc_manager_id = null; r.is_org_root = false; }
+  cadToast('Removed from chart — Save Changes to persist', 'info');
+  _ocBuild();
+}
+
+function _ocCanvasDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function _ocCanvasDrop(e) {
+  e.preventDefault();
+  if (!_ocDragId) return;
+  var node = e.target.closest('[data-oc-drop]');
+  if (node) return; // handled by node drop
+  // Dropped on empty canvas — make this person a root (no manager)
+  var r = (UM.resources||[]).find(function(x){ return x.id === _ocDragId; });
+  if (!r) return;
+  _ocPending[_ocDragId] = 'ROOT';
+  r._oc_manager_id = 'ROOT';
+  cadToast((r.first_name||r.name||'Resource') + ' added to chart as root', 'success');
+  _ocBuild();
+}
+
+function _ocUnlinkNode(id) {
+  _ocPending[id] = 'UNASSIGNED';
+  var r = (UM.resources||[]).find(function(x){ return x.id === id; });
+  if (r) { r._oc_manager_id = null; r.is_org_root = false; }
+  if (_ocSelectedId === id) {
+    _ocSelectedId = null;
+    var det = document.getElementById('oc-detail');
+    if (det) det.style.display = 'none';
+  }
+  cadToast('Removed from chart — Save Changes to persist', 'info');
+  _ocBuild();
+}
+
+async function _ocSaveAll() {
+  var ids = Object.keys(_ocPending);
+  if (!ids.length) { cadToast('No changes to save', 'info'); return; }
+  var firmId = UM.firmId;
+  var errors = 0;
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i];
+    try {
+      var pendVal = _ocPending[id];
+      var isUnassigned = pendVal === 'UNASSIGNED';
+      var isRoot = pendVal === 'ROOT';
+      var mgr = (isRoot || isUnassigned) ? null : (pendVal || null);
+      var patchPayload = { manager_id: mgr, is_org_root: isUnassigned ? false : isRoot };
+      if (window._ocPendingDept && _ocPendingDept[id]) patchPayload.department = _ocPendingDept[id];
+      await API.patch('resources?id=eq.' + id + '&firm_id=eq.' + firmId, patchPayload);
+      var r = (UM.resources||[]).find(function(x){ return x.id === id; });
+      if (r) { r.manager_id = mgr; r.is_org_root = isUnassigned ? false : isRoot; r._oc_manager_id = isUnassigned ? null : pendVal; }
+      console.log('[ocSave]', r ? r.name : id, '| manager_id:', mgr, '| is_org_root:', isRoot);
+      // Write CoC event
+      var mgrRes = mgr ? (UM.resources||[]).find(function(x){ return x.id === mgr; }) : null;
+      API.post('coc_events', {
+        firm_id: firmId,
+        entity_type: 'org_chart',
+        entity_id: id,
+        event_type: (isUnassigned ? 'org.unlinked' : 'org.assigned'),
+        actor_name: (UM.currentUser && UM.currentUser.name) || 'Admin',
+        actor_resource_id: (UM.currentUser && UM.currentUser.resource_id) || null,
+        metadata: {
+          resource_name: r ? r.name : id,
+          manager_name: mgrRes ? mgrRes.name : (isRoot ? null : null),
+          is_root: isRoot
+        }
+      }).catch(function(){});
+    } catch(e) { errors++; }
+  }
+  _ocPending = {};
+  window._ocPendingDept = {};
+  if (errors) cadToast(errors + ' error(s) saving — check console', 'error');
+  else cadToast('Org chart saved', 'success');
+  _ocUpdateBadge();
+  if (_ocCocOpen) setTimeout(_ocLoadCoc, 500);
+  _ocBuild();
+}
+
+function _ocFilter(q) {
+  var ul = document.getElementById('oc-unassigned-list');
+  if (!ul) return;
+  Array.from(ul.children).forEach(function(el){
+    var rid = el.dataset.rid;
+    var r = (UM.resources||[]).find(function(x){ return x.id === rid; });
+    if (!r) return;
+    var match = !q || (r.name||'').toLowerCase().includes(q.toLowerCase()) || (r.department||'').toLowerCase().includes(q.toLowerCase());
+    el.style.display = match ? '' : 'none';
+  });
+}
+
+// Hook into switchUMTab to render on first visit
+var _origSwitchUMTab = switchUMTab;
+switchUMTab = function(tab) {
+  if (tab === 'orgchart') {
+    _ocOpen();
+    return;
+  }
+  _origSwitchUMTab(tab);
+};
+
+function _ocOpen() {
+  var ov = document.getElementById('oc-overlay');
+  if (ov) { ov.style.display = 'flex'; }
+  if (!window._ocDrawerPatched) {
+    window._ocDrawerPatched = true;
+    var _origOpenDrawer = openResourceDrawer;
+    openResourceDrawer = function(id) {
+      _origOpenDrawer(id);
+      setTimeout(function() {
+        document.querySelectorAll('[class*="drawer"]').forEach(function(el) {
+          if (getComputedStyle(el).display !== 'none') el.style.zIndex = '600';
+        });
+      }, 100);
+    };
+  }
+  if (!window._ocDrawerPatched) {
+    window._ocDrawerPatched = true;
+    var _origOpenDrawer = openResourceDrawer;
+    openResourceDrawer = function(id) {
+      _origOpenDrawer(id);
+      setTimeout(function() {
+        document.querySelectorAll('[class*="drawer"]').forEach(function(el) {
+          if (getComputedStyle(el).display !== 'none') el.style.zIndex = '600';
+        });
+      }, 100);
+    };
+  }
+  _ocDirectorRoleId = null; // reset cache so role lookup is fresh
+  (UM.resources||[]).forEach(function(r){
+    if (_ocPending[r.id] !== undefined) {
+      r._oc_manager_id = _ocPending[r.id];
+    } else {
+      r._oc_manager_id = r.manager_id || (r.is_org_root ? 'ROOT' : null);
+    }
+  });
+  _ocBuild();
+  _ocUpdateBadge();
+}
+
+function _ocClose() {
+  var nPending = Object.keys(_ocPending).length;
+  if (nPending > 0) {
+    _ocShowUnsavedDialog();
+    return;
+  }
+  _ocDoClose();
+}
+
+function _ocDoClose() {
+  var ov = document.getElementById('oc-overlay');
+  if (ov) ov.style.display = 'none';
+  _origSwitchUMTab('resources');
+  document.querySelectorAll('.um-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === 'resources'); });
+}
+
+function _ocShowUnsavedDialog() {
+  var existing = document.getElementById('oc-unsaved-dialog');
+  if (existing) existing.remove();
+  var nPending = Object.keys(_ocPending).length;
+  var el = document.createElement('div');
+  el.id = 'oc-unsaved-dialog';
+  el.style.cssText = 'position:fixed;inset:0;z-index:700;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)';
+  el.innerHTML = '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:28px 32px;width:380px;font-family:Arial,sans-serif">' +
+    '<div style="font-size:14px;font-weight:700;color:var(--text1);margin-bottom:8px">Unsaved Changes</div>' +
+    '<div style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6">You have <strong style="color:var(--amber)">' + nPending + ' unsaved change' + (nPending!==1?'s':'') + '</strong> in the org chart. Would you like to save before closing?</div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+      '<button data-oc-dlg="cancel" style="padding:8px 16px;border:1px solid var(--border);border-radius:5px;background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:Arial,sans-serif">Cancel</button>' +
+      '<button data-oc-dlg="discard" style="padding:8px 16px;border:1px solid rgba(248,81,73,.4);border-radius:5px;background:transparent;color:#f85149;font-size:12px;cursor:pointer;font-family:Arial,sans-serif">Discard &amp; Close</button>' +
+      '<button data-oc-dlg="save" style="padding:8px 16px;background:var(--cad,#00c9c9);border:none;border-radius:5px;color:#003333;font-size:12px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif">Save &amp; Close</button>' +
+    '</div>' +
+    '</div>';
+  el.addEventListener('click', function(ev) {
+    var btn = ev.target.closest('[data-oc-dlg]');
+    if (!btn) return;
+    var action = btn.dataset.ocDlg;
+    el.remove();
+    if (action === 'cancel') return;
+    if (action === 'discard') { _ocDoClose(); return; }
+    if (action === 'save') { _ocSaveAll().then(function(){ _ocDoClose(); }); }
+  });
+  document.body.appendChild(el);
+}
+</script>
+</body>
+</html>
