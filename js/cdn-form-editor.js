@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260411-SE114 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260411-SE115 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -660,9 +660,13 @@ function _vmApplySection(secLabel, role, state) {
 }
 
 function _vmEnsureRoles() {
-  // Only seed if empty — never re-add roles the user has removed
+  // Only seed if empty — load from saved routing.matrix_roles first, then default
   if (!_formMatrixRoles.length) {
-    _formMatrixRoles = Object.keys(FORM_ROLES);
+    if (_selectedForm && _selectedForm.routing && _selectedForm.routing.matrix_roles) {
+      _formMatrixRoles = _selectedForm.routing.matrix_roles.slice();
+    } else {
+      _formMatrixRoles = Object.keys(FORM_ROLES);
+    }
   }
 }
 
@@ -866,6 +870,13 @@ function _vmApplySec(secId, role, state) {
 
 function _vmRemoveRole(role) {
   _formMatrixRoles = _formMatrixRoles.filter(function(r){ return r !== role; });
+  // Persist to DB before rerender (rerender calls _vmEnsureRoles)
+  if (_selectedForm && _selectedForm.routing) {
+    _selectedForm.routing.matrix_roles = _formMatrixRoles.slice();
+    API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id, {
+      routing: _selectedForm.routing
+    }).catch(function(e){ console.warn('[vmRemoveRole] save failed:', e.message); });
+  }
   _reRenderMatrix();
 }
 
@@ -2969,6 +2980,10 @@ async function _formSelect(formId) {
   _selectedForm = form;
   _formFields   = JSON.parse(JSON.stringify(form.fields || []));
   _formRouting  = JSON.parse(JSON.stringify(form.routing || { stages:[] }));
+  // Restore saved matrix roles or default to all roles
+  _formMatrixRoles = (_formRouting.matrix_roles && _formRouting.matrix_roles.length)
+    ? _formRouting.matrix_roles.slice()
+    : Object.keys(FORM_ROLES);
   _pdfPage = 1; _pdfDoc = null;
   const el = document.getElementById('cad-content');
   if (el) renderFormsTab(el);
