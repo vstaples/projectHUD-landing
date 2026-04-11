@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260407-CD52 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260411-CD53 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -348,7 +348,7 @@ async function _cdLoadAll(){
   var results=await Promise.all([
     _cdQ('bist_runs',{filters:[['firm_id','eq',firmId]],order:'run_at.desc',limit:500,select:'id,status,run_at,duration_ms,steps_passed,steps_failed,script_id,template_version'}),
     _cdQ('bist_certificates',{filters:[['firm_id','eq',firmId]],order:'issued_at.desc',select:'id,status,issued_at,expires_at,template_id,template_version'}),
-    _cdQ('workflow_templates',{filters:[['firm_id','eq',firmId]],select:'id,name,version,status,created_at'}),
+    _cdQ('workflow_templates',{filters:[['firm_id','eq',firmId],['status','neq','archived']],select:'id,name,version,status,created_at'}),
     _cdQ('bist_test_scripts',{filters:[['firm_id','eq',firmId]],select:'id,name,template_id'}),
   ]).catch(function(){return [[],[],[],[]];});
   _cdRuns=results[0]||[];_cdCerts=results[1]||[];
