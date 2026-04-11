@@ -3361,6 +3361,10 @@ async function _formCommit() {
   var firmId = window.FIRM_ID || FIRM_ID_CAD;
   var formName = (_selectedForm.source_name || 'Untitled Form').trim();
   var roles = _formRoutingRolesOrdered(_formRouting.roles || []);
+  // Fall back to stages if roles not defined (newer forms use stages)
+  if (!roles.length && _formRouting.stages && _formRouting.stages.length) {
+    roles = _formRouting.stages.map(function(s, i) { return { role: s.actor, order: i + 1 }; });
+  }
 
   if (!roles.length) { cadToast('Add at least one role in Routing Order before committing', 'error'); return; }
 
@@ -6714,7 +6718,7 @@ function _formRefreshRolePanel() {
       ${stages.length > 1 ? `
       <div style="display:flex;gap:4px;margin-bottom:8px">
         ${stages.map(s => {
-          const LABELS = { assignee:'Assignee', reviewer:'Reviewer', approver:'Approver', pm:'PM', external:'External' };
+          const LABELS = { assignee:'Submitter', reviewer:'Reviewer', approver:'Approver', pm:'PM', external:'External' };
           const COLORS = { reviewer:'var(--cad)', approver:'var(--green)', assignee:'var(--accent)' };
           const isActive = s.stage === _previewStage;
           const col = COLORS[s.role] || 'var(--muted)';
