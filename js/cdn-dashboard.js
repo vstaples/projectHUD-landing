@@ -269,7 +269,7 @@ function _cdRenderShell(panel){
       '</div>'+
       '<div id="cd-cov-tip-panel" style="display:none;position:fixed;z-index:9999;background:#131820;border:1px solid #252d3f;border-radius:6px;padding:14px 16px;width:520px;box-shadow:0 8px 28px rgba(0,0,0,.7);pointer-events:none;font-family:Arial,sans-serif"></div>'+
       '<div id="cd-portfolio-panel" style="overflow-y:auto;padding:14px 16px">'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div id="cd-port-count" style="font-size:10px;color:var(--cd-teal);font-weight:700;letter-spacing:.09em;text-transform:uppercase"></div><div id="cd-last-updated" style="font-size:10px;color:rgba(255,255,255,.3);font-family:Arial,sans-serif"></div></div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div id="cd-port-count" style="font-size:11px;color:var(--cd-teal);font-weight:700;letter-spacing:.09em;text-transform:uppercase"></div><div id="cd-last-updated" style="font-size:11px;color:rgba(255,255,255,.3);font-family:Arial,sans-serif"></div></div>'+
         '<div id="cd-port-grid" style="display:flex;flex-direction:column;gap:8px">'+
           '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:24px;text-align:center">Loading portfolio...</div>'+
         '</div>'+
