@@ -1100,7 +1100,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM27','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM29','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -1352,6 +1352,8 @@ function openResourceDrawer(id) {
   openDrawer('resource-drawer');
   // Set resource type toggle from existing record or default to internal
   setResourceType(r?.is_external ? 'external' : 'internal');
+  // Build styled contact pickers for TEAM tab
+  setTimeout(function(){ _buildAllContactPickers(r); }, 50);
 }
 
 function setResourceType(type) {
@@ -1476,7 +1478,15 @@ function renderRolesTable() {
 
   UM.categories.forEach(cat => {
     const catRoles = UM.roles.filter(r => r.category_id === cat.id);
-    html += `<tr class="um-cat-header"><td colspan="8">▸ ${cat.name.toUpperCase()}</td></tr>`;
+    html += `<tr class="um-cat-header">
+      <td colspan="6">▸ ${cat.name.toUpperCase()}</td>
+      <td colspan="2" style="text-align:right;padding-right:8px;white-space:nowrap">
+        <button onclick="openCategoryDrawer('${cat.id}')" title="Rename category"
+          style="background:transparent;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px 5px;font-family:var(--font-mono)">✎</button>
+        <button onclick="deleteCategory('${cat.id}','${cat.name.replace(/'/g,"\'")}')" title="Delete category"
+          style="background:transparent;border:none;cursor:pointer;color:rgba(248,81,73,.6);font-size:13px;padding:2px 5px;font-family:var(--font-mono)">🗑</button>
+      </td>
+    </tr>`;
     if (!catRoles.length) {
       html += `<tr><td colspan="8" style="font-size:11px;color:var(--muted);padding:8px 12px;font-style:italic">No roles yet — click + ROLE to add one</td></tr>`;
     }
@@ -1612,6 +1622,21 @@ async function saveRole() {
   } finally {
     btn.textContent = 'SAVE ROLE'; btn.disabled = false;
   }
+}
+
+async function deleteCategory(id, name) {
+  var hasRoles = UM.roles.some(function(r){ return r.category_id === id; });
+  if (hasRoles) {
+    alert('Cannot delete "' + name + '" — it still has roles assigned to it. Delete or move all roles first.');
+    return;
+  }
+  if (!confirm('Delete category "' + name + '"? This cannot be undone.')) return;
+  try {
+    await API.del('hud_role_categories?id=eq.' + id);
+    UM.categories = UM.categories.filter(function(c){ return c.id !== id; });
+    renderRolesTable();
+    cadToast('Category deleted', 'success');
+  } catch(e) { alert('Delete failed: ' + (e.message||e)); }
 }
 
 async function deleteRole(id, name) {
@@ -2135,9 +2160,8 @@ function _attachHoverCard(el, resourceId) {
   el.addEventListener('mouseenter', () => {
     UM._hoverId = resourceId;
     UM._hoverTimer = setTimeout(() => {
-      // Suppress if resource drawer or org chart overlay is open
-      var drawerOpen = document.getElementById('res-drawer')?.classList.contains('open') ||
-                       document.getElementById('drawer-overlay')?.classList.contains('open');
+      // Suppress if any drawer is open or org chart overlay is open
+      var drawerOpen = !!document.querySelector('.um-drawer.open');
       var ocOpen = document.getElementById('oc-overlay')?.style.display === 'flex';
       if (!drawerOpen && !ocOpen) showHoverCard(resourceId, el);
     }, 900);
@@ -2759,6 +2783,96 @@ function _ocAvatarHtml(r, size) {
 }
 
 var _ocCocOpen = false;
+
+// ── Styled resource contact picker ────────────────────────────────────────────
+function _cpAvatar(r) {
+  if (r.avatar_url) return '<img src="' + r.avatar_url + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0">';
+  var initials = ((r.first_name||'')[0]||'') + ((r.last_name||'')[0]||'');
+  var colors = ['#e8a87c','#85c1e9','#82e0aa','#f1948a','#bb8fce','#76d7c4','#f8c471','#aab7b8'];
+  var ci = (r.name||'x').charCodeAt(0) % colors.length;
+  return '<div style="width:28px;height:28px;border-radius:50%;background:' + colors[ci] + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#1a1a2e;flex-shrink:0">' + initials + '</div>';
+}
+
+function _cpUpdateBtn(btn, r) {
+  btn.innerHTML = r ? _cpAvatar(r) + '<div style="min-width:0"><div style="font-size:12px;font-weight:600;color:var(--text1)">' + (r.name||'') + '</div><div style="font-size:10px;color:var(--text2)">' + (r.title||'') + '</div></div>' : '<span style="font-size:12px;color:var(--text3)">— None —</span>';
+}
+
+function _buildContactPicker(elId, resources, selectedId) {
+  var orig = document.getElementById(elId);
+  if (!orig) return;
+  var wrapperId = elId + '-picker';
+  var existing = document.getElementById(wrapperId);
+  if (existing) existing.remove();
+  var wrapper = document.createElement('div');
+  wrapper.id = wrapperId;
+  wrapper.style.cssText = 'position:relative';
+  orig.parentElement.insertBefore(wrapper, orig);
+  orig.style.display = 'none';
+  var byDept = {};
+  var deptOrder = [];
+  resources.forEach(function(r) {
+    var d = r.department || 'Other';
+    if (!byDept[d]) { byDept[d] = []; deptOrder.push(d); }
+    byDept[d].push(r);
+  });
+  deptOrder.sort();
+  var selectedRes = selectedId ? resources.find(function(r){ return r.id === selectedId; }) : null;
+  var btn = document.createElement('div');
+  btn.style.cssText = 'border:1px solid var(--border);border-radius:4px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;background:var(--bg2);min-height:34px';
+  _cpUpdateBtn(btn, selectedRes);
+  wrapper.appendChild(btn);
+  var drop = document.createElement('div');
+  drop.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:4px;z-index:999;max-height:280px;overflow-y:auto;margin-top:2px;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+  var noneRow = document.createElement('div');
+  noneRow.style.cssText = 'padding:8px 10px;cursor:pointer;font-size:11px;color:var(--text3)';
+  noneRow.textContent = '— None —';
+  noneRow.onmouseenter = function(){ this.style.background='rgba(255,255,255,.05)'; };
+  noneRow.onmouseleave = function(){ this.style.background=''; };
+  noneRow.onclick = function(){ orig.value=''; _cpUpdateBtn(btn, null); drop.style.display='none'; };
+  drop.appendChild(noneRow);
+  deptOrder.forEach(function(dept) {
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'padding:5px 10px;font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--cad,#00c9c9);text-transform:uppercase;border-top:1px solid var(--border);background:var(--bg1,var(--bg))';
+    hdr.textContent = dept;
+    drop.appendChild(hdr);
+    byDept[dept].sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); }).forEach(function(r) {
+      var row = document.createElement('div');
+      row.style.cssText = 'padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:8px' + (r.id === selectedId ? ';background:rgba(0,201,201,.08)' : '');
+      row.innerHTML = _cpAvatar(r) + '<div style="min-width:0"><div style="font-size:12px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.name||'') + '</div><div style="font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.title||'') + '</div></div>';
+      row.onmouseenter = function(){ this.style.background='rgba(0,201,201,.06)'; };
+      row.onmouseleave = function(){ this.style.background = r.id===orig.value ? 'rgba(0,201,201,.08)' : ''; };
+      row.onclick = function(){ orig.value = r.id; _cpUpdateBtn(btn, r); drop.style.display='none'; };
+      drop.appendChild(row);
+    });
+  });
+  wrapper.appendChild(drop);
+  btn.onclick = function(e) {
+    e.stopPropagation();
+    var isOpen = drop.style.display !== 'none';
+    document.querySelectorAll('[id$="-picker"] > div:last-child').forEach(function(d){ d.style.display='none'; });
+    drop.style.display = isOpen ? 'none' : 'block';
+  };
+}
+
+function _buildAllContactPickers(r) {
+  var allRes = (UM.resources||[]).filter(function(x){ return x.is_active !== false; });
+  var contactIds = ['res-advisor','res-hr-contact','res-it-contact','res-finance-contact','res-legal-contact','res-safety-contact','res-manager-team'];
+  var keyMap = {
+    'res-advisor': 'advisor_id', 'res-hr-contact': 'hr_contact_id',
+    'res-it-contact': 'it_contact_id', 'res-finance-contact': 'finance_contact_id',
+    'res-legal-contact': 'legal_contact_id', 'res-safety-contact': 'safety_contact_id',
+    'res-manager-team': 'manager_id'
+  };
+  contactIds.forEach(function(id) {
+    var key = keyMap[id];
+    var val = r ? (r[key] || '') : '';
+    var el = document.getElementById(id);
+    if (el) el.value = val;
+    _buildContactPicker(id, allRes, val);
+  });
+}
+
+
 var _ocDirectorRoleId = null;
 
 function _ocGetDirectorRoleId() {
