@@ -2582,7 +2582,7 @@ async function _s9PopulateTemplateSelector() {
   if (!sel) return;
   var firmId = await _s9WaitForFirmId();
   var templates = await API.get(
-    'workflow_templates?firm_id=eq.' + firmId + '&order=name.asc&select=id,name,version,status,form_driven'
+    'workflow_templates?firm_id=eq.' + firmId + '&status=neq.archived&order=name.asc&select=id,name,version,status,form_driven'
   ).catch(function(){ return []; });
   if (!Array.isArray(templates) || !templates.length) return;
 
