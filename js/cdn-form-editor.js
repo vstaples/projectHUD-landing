@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260411-SE117 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260411-SE118 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -350,8 +350,8 @@ function _renderFormList() {
     const sel = _selectedForm?.id === f.id;
     const st  = f.state || 'draft';
     const ver = f.version || '0.1.0';
-    const locked = st === 'certified' || st === 'published';
-    const stLabel = {released:'RELEASED',draft:'DRAFT',in_review:'IN REVIEW',approved:'APPROVED',archived:'ARCHIVED'}[st] || st.toUpperCase();
+    const locked = st === 'committed' || st === 'certified' || st === 'published' || st === 'superseded';
+    const stLabel = {released:'RELEASED',draft:'DRAFT',committed:'COMMITTED',certified:'CERTIFIED',published:'PUBLISHED',superseded:'SUPERSEDED',in_review:'IN REVIEW',approved:'APPROVED',archived:'ARCHIVED'}[st] || st.toUpperCase();
     return `
       <div class="tmpl-item status-${st}${sel?' active':''}" onclick="_formSelect('${f.id}')">
         <div class="tmpl-item-name status-${st}" style="display:flex;align-items:center;gap:5px">
@@ -3256,6 +3256,24 @@ async function _formSetCategory(catId) {
   if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(_selectedForm);
 }
 
+// ── FORM LIFECYCLE STATE MODEL ──────────────────────────────────────────────
+// States:   draft -> committed -> certified -> published -> superseded
+//           Any active state -> archived (terminal)
+// Rules:
+//   draft      -- editable, Save + Commit buttons active
+//   committed  -- locked, companion workflow built, cert testing begins
+//   certified  -- all coverage paths passing, bist_certificate valid, Publish unlocked
+//   published  -- compass_visible:true, live in Compass Browse
+//   superseded -- compass_visible:false, superseded_by FK populated, read only
+//   archived   -- read only, end of life
+// Return paths:
+//   committed -> draft  : unlock only, no cert to invalidate
+//   certified -> draft  : invalidates bist_certificate (status='invalidated')
+//   published -> draft  : new version row forked; published row stays live until superseded
+// Certification:
+//   Tests run only against committed state -- never against draft
+//   Passing all coverage paths in Cadence Dashboard patches state -> certified
+// ─────────────────────────────────────────────────────────────────────────────
 function _formLifecycleButtons(f) {
   const state = f.state || 'draft';
   const btns  = [];
@@ -3274,6 +3292,16 @@ function _formLifecycleButtons(f) {
       style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
              border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
       Commit</button>`);
+  }
+
+  // Committed — locked, awaiting certification tests
+  if (state === 'committed') {
+    btns.push(`<span style="font-size:12px;color:var(--muted);font-family:Arial,sans-serif;
+      padding:3px 8px;background:rgba(255,255,255,.04);border-radius:4px">Awaiting certification</span>`);
+    btns.push(`<button onclick="_formReturnToDraft()"
+      style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
+             border:1px solid rgba(248,81,73,.4);background:transparent;color:#f85149;cursor:pointer">
+      Return to Draft</button>`);
   }
 
   // Publish — only when certified
@@ -3319,15 +3347,43 @@ async function _formPublish() {
 
 async function _formReturnToDraft() {
   if (!_selectedForm) return;
-  if (!confirm('Return this form to Draft? It will no longer be certified.')) return;
+  var wasCertified = _selectedForm.state === 'certified';
+  var msg = wasCertified
+    ? 'Return this form to Draft? The current certificate will be invalidated.'
+    : 'Return this form to Draft?';
+  if (!confirm(msg)) return;
   await API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id, {
     state: 'draft', updated_at: new Date().toISOString()
   });
   _selectedForm.state = 'draft';
+  // Invalidate bist_certificate if returning from certified state
+  if (wasCertified) {
+    try {
+      var firmId = window.FIRM_ID || FIRM_ID_CAD;
+      var certs = await API.get(
+        'bist_certificates?firm_id=eq.' + firmId +
+        '&template_id=in.(select id from workflow_templates where form_driven=eq.true)' +
+        '&status=eq.valid&order=issued_at.desc&limit=1'
+      ).catch(function(){ return []; }) || [];
+      // Simpler: find cert by matching template linked to this form
+      var tmplRows = await API.get(
+        'workflow_templates?firm_id=eq.' + firmId +
+        '&name=eq.' + encodeURIComponent(_selectedForm.source_name || '') +
+        '&form_driven=eq.true&select=id'
+      ).catch(function(){ return []; }) || [];
+      if (tmplRows.length) {
+        var tmplId = tmplRows[0].id;
+        await API.patch(
+          'bist_certificates?template_id=eq.' + tmplId + '&status=eq.valid',
+          { status: 'invalidated', updated_at: new Date().toISOString() }
+        ).catch(function(){});
+      }
+    } catch(e) { console.warn('[formReturnToDraft] cert invalidation failed:', e); }
+  }
   var lcDiv = document.getElementById('form-lifecycle-btns');
   if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(_selectedForm);
   _formRefreshToolbar();
-  cadToast('Returned to Draft', 'info');
+  cadToast(wasCertified ? 'Returned to Draft — certificate invalidated' : 'Returned to Draft', 'info');
 }
 
 async function _formUnpublish() {
@@ -3558,6 +3614,10 @@ async function _formCommit() {
         _selectedForm.version = targetVer;
       }
 
+      // Transition form to committed state — cert testing begins from here
+      await API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id,
+        { state: 'committed', updated_at: new Date().toISOString() });
+      _selectedForm.state = 'committed';
       _formCoCWrite('form.committed', _selectedForm.id, { version: targetVer, workflow_id: tmplId, roles: roleNames, note: note });
       // Also patch companion workflow version to match
       await API.patch('workflow_templates?id=eq.'+tmplId, { version: targetVer, updated_at: new Date().toISOString() }).catch(function(){});
@@ -3566,7 +3626,7 @@ async function _formCommit() {
       const listEl = document.getElementById('form-list');
       if (listEl) listEl.innerHTML = _renderFormList();
       _formRefreshToolbar();
-      cadToast('Form committed at ' + targetVer, 'success');
+      cadToast('Form committed at ' + targetVer + ' — ready for certification', 'success');
     } catch(e) {
       console.error('[formCommit] failed:', e);
       cadToast('Commit failed: ' + e.message, 'error');
