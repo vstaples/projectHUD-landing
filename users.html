@@ -1424,25 +1424,29 @@ async function saveResource() {
 
   try {
     if (UM.editingResourceId) {
+      const resourceId = UM.editingResourceId; // capture before closeDrawer clears it
       await API.patch(`resources?id=eq.${UM.editingResourceId}`, payload);
       const idx = UM.resources.findIndex(r => r.id === UM.editingResourceId);
       if (idx >= 0) UM.resources[idx] = { ...UM.resources[idx], ...payload };
+      closeDrawer();
+      renderResources();
+      // Refresh org chart card if overlay is open
+      if (document.getElementById('oc-overlay')?.style.display === 'flex') {
+        var ocId = resourceId;
+        var ocIdx = UM.resources.findIndex(function(r){ return r.id === ocId; });
+        if (ocIdx > -1) {
+          var ocMgr = UM.resources[ocIdx]._oc_manager_id;
+          UM.resources[ocIdx] = Object.assign({}, UM.resources[ocIdx], payload);
+          UM.resources[ocIdx]._oc_manager_id = ocMgr;
+        }
+        _ocBuild();
+      }
+      await _saveResourceExtras(resourceId);
     } else {
       const [created] = await API.post('resources', payload);
       if (created) UM.resources.push(created);
-    }
-    closeDrawer();
-    renderResources();
-    // Refresh org chart card if overlay is open
-    if (document.getElementById('oc-overlay')?.style.display === 'flex') {
-      var ocId = UM.editingResourceId;
-      var ocIdx = UM.resources.findIndex(function(r){ return r.id === ocId; });
-      if (ocIdx > -1) {
-        var ocMgr = UM.resources[ocIdx]._oc_manager_id;
-        UM.resources[ocIdx] = Object.assign({}, UM.resources[ocIdx], payload);
-        UM.resources[ocIdx]._oc_manager_id = ocMgr;
-      }
-      _ocBuild();
+      closeDrawer();
+      renderResources();
     }
   } catch(e) {
     errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block';
@@ -2123,7 +2127,7 @@ async function _saveResourceExtras(resourceId) {
     }
   } catch(e) { console.warn('Skills save err:', e); }
 
-  // Profile — upsert
+  // Profile — true upsert: check existence then patch or post
   try {
     const profPayload = {
       resource_id: resourceId,
@@ -2134,7 +2138,8 @@ async function _saveResourceExtras(resourceId) {
       specialty_summary: document.getElementById('res-specialty')?.value.trim() || null,
       linkedin_url:     document.getElementById('res-linkedin')?.value.trim() || null,
     };
-    if (UM._pendingProfile._dbId) {
+    const existingProf = await API.get(`resource_profiles?resource_id=eq.${resourceId}&limit=1`).catch(() => []);
+    if (existingProf && existingProf.length) {
       await API.patch(`resource_profiles?resource_id=eq.${resourceId}`, profPayload);
     } else {
       await API.post('resource_profiles', profPayload);
