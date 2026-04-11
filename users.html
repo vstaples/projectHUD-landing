@@ -1920,11 +1920,13 @@ function switchResTab(tab) {
   if (tab === 'skills') renderSkillPicker();
   if (tab === 'domain') renderDomainPicker();
   if (tab === 'profile') {
-    renderProfileLists();
-    var spec = document.getElementById('res-specialty');
-    var li   = document.getElementById('res-linkedin');
-    if (spec) spec.value = UM._pendingProfile.specialty_summary || '';
-    if (li)   li.value   = UM._pendingProfile.linkedin_url      || '';
+    _loadResourceExtras(UM.editingResourceId).then(function() {
+      renderProfileLists();
+      var spec = document.getElementById('res-specialty');
+      var li   = document.getElementById('res-linkedin');
+      if (spec) spec.value = UM._pendingProfile.specialty_summary || '';
+      if (li)   li.value   = UM._pendingProfile.linkedin_url      || '';
+    });
   }
 }
 
@@ -2117,6 +2119,18 @@ async function _loadResourceExtras(resourceId) {
     });
     UM.resourceSkills[resourceId] = skills;
     UM.resourceProfiles[resourceId] = prof;
+    // Re-render active tab — data arrives async after tab may already be shown
+    var activeResTab = document.querySelector('.res-drawer-tab.active');
+    var curTab = activeResTab ? activeResTab.dataset.rtab : null;
+    if (curTab === 'profile') {
+      renderProfileLists();
+      var specEl = document.getElementById('res-specialty');
+      var liEl   = document.getElementById('res-linkedin');
+      if (specEl) specEl.value = UM._pendingProfile.specialty_summary || '';
+      if (liEl)   liEl.value   = UM._pendingProfile.linkedin_url      || '';
+    }
+    if (curTab === 'skills') renderSkillPicker();
+    if (curTab === 'domain') renderDomainList();
   } catch(e) { console.error('Load extras failed:', e); }
 }
 
