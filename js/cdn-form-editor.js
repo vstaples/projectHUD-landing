@@ -3181,19 +3181,23 @@ function _formUpdateSaveBtn() {
 }
 
 // Professional confirmation modal — replaces browser confirm()
-function _cadConfirm(title, msgHtml, onConfirm) {
+// confirmLabel: optional button label (default 'Confirm'), confirmColor: optional color (default red)
+function _cadConfirm(title, msgHtml, onConfirm, confirmLabel, confirmColor) {
   var existing = document.getElementById('cad-confirm-modal');
   if (existing) existing.remove();
+  var btnLabel = confirmLabel || 'Confirm';
+  var btnColor = confirmColor || 'rgba(248,81,73,.4)';
+  var btnTxt   = confirmColor ? 'var(--text)' : '#f85149';
   var el = document.createElement('div');
   el.id = 'cad-confirm-modal';
   el.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)';
   el.innerHTML =
-    '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:24px 28px;width:380px;font-family:Arial,sans-serif;box-shadow:0 16px 48px rgba(0,0,0,.7)">' +
+    '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:24px 28px;width:420px;font-family:Arial,sans-serif;box-shadow:0 16px 48px rgba(0,0,0,.7)">' +
       '<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px">' + escHtml(title) + '</div>' +
       '<div style="font-size:13px;color:var(--text2);margin-bottom:22px;line-height:1.6">' + msgHtml + '</div>' +
       '<div style="display:flex;gap:10px;justify-content:flex-end">' +
         '<button id="cad-confirm-cancel" style="padding:8px 18px;border:1px solid var(--border);border-radius:5px;background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:Arial,sans-serif">Cancel</button>' +
-        '<button id="cad-confirm-ok" style="padding:8px 18px;border:1px solid rgba(248,81,73,.4);border-radius:5px;background:transparent;color:#f85149;font-size:12px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif">Delete</button>' +
+        '<button id="cad-confirm-ok" style="padding:8px 18px;border:1px solid '+btnColor+';border-radius:5px;background:transparent;color:'+btnTxt+';font-size:12px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif">'+btnLabel+'</button>' +
       '</div>' +
     '</div>';
   el.addEventListener('click', function(ev) {
@@ -3347,43 +3351,54 @@ async function _formPublish() {
 
 async function _formReturnToDraft() {
   if (!_selectedForm) return;
-  var wasCertified = _selectedForm.state === 'certified';
-  var msg = wasCertified
-    ? 'Return this form to Draft? The current certificate will be invalidated.'
-    : 'Return this form to Draft?';
-  if (!confirm(msg)) return;
-  await API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id, {
-    state: 'draft', updated_at: new Date().toISOString()
-  });
-  _selectedForm.state = 'draft';
-  // Invalidate bist_certificate if returning from certified state
-  if (wasCertified) {
-    try {
-      var firmId = window.FIRM_ID || FIRM_ID_CAD;
-      var certs = await API.get(
-        'bist_certificates?firm_id=eq.' + firmId +
-        '&template_id=in.(select id from workflow_templates where form_driven=eq.true)' +
-        '&status=eq.valid&order=issued_at.desc&limit=1'
-      ).catch(function(){ return []; }) || [];
-      // Simpler: find cert by matching template linked to this form
-      var tmplRows = await API.get(
-        'workflow_templates?firm_id=eq.' + firmId +
-        '&name=eq.' + encodeURIComponent(_selectedForm.source_name || '') +
-        '&form_driven=eq.true&select=id'
-      ).catch(function(){ return []; }) || [];
-      if (tmplRows.length) {
-        var tmplId = tmplRows[0].id;
-        await API.patch(
-          'bist_certificates?template_id=eq.' + tmplId + '&status=eq.valid',
-          { status: 'invalidated', updated_at: new Date().toISOString() }
-        ).catch(function(){});
-      }
-    } catch(e) { console.warn('[formReturnToDraft] cert invalidation failed:', e); }
-  }
-  var lcDiv = document.getElementById('form-lifecycle-btns');
-  if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(_selectedForm);
-  _formRefreshToolbar();
-  cadToast(wasCertified ? 'Returned to Draft — certificate invalidated' : 'Returned to Draft', 'info');
+  var wasCertified  = _selectedForm.state === 'certified';
+  var wasCommitted  = _selectedForm.state === 'committed';
+  var title = 'Return to Draft';
+  var msgHtml = wasCertified
+    ? '<div style="font-size:13px;color:var(--text2);line-height:1.6;font-family:Arial,sans-serif">' +
+      'This form is currently <strong>Certified</strong>. Returning to Draft will:' +
+      '<ul style="margin:8px 0 0 16px;padding:0;font-size:12px;color:var(--muted)">' +
+      '<li>Unlock the form for editing</li>' +
+      '<li>Invalidate the current certificate</li>' +
+      '<li>Require a new Commit and certification run to re-certify</li>' +
+      '</ul></div>'
+    : wasCommitted
+    ? '<div style="font-size:13px;color:var(--text2);line-height:1.6;font-family:Arial,sans-serif">' +
+      'This form is currently <strong>Committed</strong>. Returning to Draft will:' +
+      '<ul style="margin:8px 0 0 16px;padding:0;font-size:12px;color:var(--muted)">' +
+      '<li>Unlock the form for editing</li>' +
+      '<li>Discard the committed companion workflow steps</li>' +
+      '<li>Require a new Commit before certification testing</li>' +
+      '</ul></div>'
+    : '<div style="font-size:13px;color:var(--text2);font-family:Arial,sans-serif">Return this form to Draft state?</div>';
+  _cadConfirm(title, msgHtml, async function() {
+    await API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id, {
+      state: 'draft', updated_at: new Date().toISOString()
+    });
+    _selectedForm.state = 'draft';
+    // Invalidate bist_certificate if returning from certified state
+    if (wasCertified) {
+      try {
+        var firmId = window.FIRM_ID || FIRM_ID_CAD;
+        var tmplRows = await API.get(
+          'workflow_templates?firm_id=eq.' + firmId +
+          '&name=eq.' + encodeURIComponent(_selectedForm.source_name || '') +
+          '&form_driven=eq.true&select=id'
+        ).catch(function(){ return []; }) || [];
+        if (tmplRows.length) {
+          var tmplId = tmplRows[0].id;
+          await API.patch(
+            'bist_certificates?template_id=eq.' + tmplId + '&status=eq.valid',
+            { status: 'invalidated', updated_at: new Date().toISOString() }
+          ).catch(function(){});
+        }
+      } catch(e) { console.warn('[formReturnToDraft] cert invalidation failed:', e); }
+    }
+    var lcDiv = document.getElementById('form-lifecycle-btns');
+    if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(_selectedForm);
+    _formRefreshToolbar();
+    cadToast(wasCertified ? 'Returned to Draft — certificate invalidated' : 'Returned to Draft', 'info');
+  }, 'Return to Draft');
 }
 
 async function _formUnpublish() {
@@ -3619,8 +3634,8 @@ async function _formCommit() {
         { state: 'committed', updated_at: new Date().toISOString() });
       _selectedForm.state = 'committed';
       _formCoCWrite('form.committed', _selectedForm.id, { version: targetVer, workflow_id: tmplId, roles: roleNames, note: note });
-      // Also patch companion workflow version to match
-      await API.patch('workflow_templates?id=eq.'+tmplId, { version: targetVer, updated_at: new Date().toISOString() }).catch(function(){});
+      // Also patch companion workflow version + status to match
+      await API.patch('workflow_templates?id=eq.'+tmplId, { version: targetVer, status: 'committed', updated_at: new Date().toISOString() }).catch(function(){});
       // Reload form defs so Library reflects new version
       if (typeof _formLoadDefs === 'function') await _formLoadDefs().catch(function(){});
       const listEl = document.getElementById('form-list');

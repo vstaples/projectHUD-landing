@@ -269,7 +269,7 @@ function _cdRenderShell(panel){
       '</div>'+
       '<div id="cd-cov-tip-panel" style="display:none;position:fixed;z-index:9999;background:#131820;border:1px solid #252d3f;border-radius:6px;padding:14px 16px;width:520px;box-shadow:0 8px 28px rgba(0,0,0,.7);pointer-events:none;font-family:Arial,sans-serif"></div>'+
       '<div id="cd-portfolio-panel" style="overflow-y:auto;padding:14px 16px">'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div id="cd-port-count" style="font-size:11px;color:var(--cd-teal);font-weight:700;letter-spacing:.09em;text-transform:uppercase"></div><div id="cd-last-updated" style="font-size:11px;color:rgba(255,255,255,.3);font-family:Arial,sans-serif"></div></div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div id="cd-port-count" style="font-size:11px;color:var(--cd-teal);font-weight:700;letter-spacing:.09em;text-transform:uppercase"></div><div id="cd-last-updated" style="font-size:11px;color:#00c9c9;font-family:Arial,sans-serif"></div></div>'+
         '<div id="cd-port-grid" style="display:flex;flex-direction:column;gap:8px">'+
           '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:24px;text-align:center">Loading portfolio...</div>'+
         '</div>'+
@@ -1228,8 +1228,11 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
       statusCls='wf-uncov'; statusPillCls='cd-pill-cert-dim';
     } else if (cert.status==='invalidated') {
       statusCls='wf-fail'; statusPillCls='cd-pill-cert-red';
+    } else if (cert.template_version && t.version && cert.template_version !== t.version) {
+      // Gate 3: cert exists but is for a different version — stale
+      statusCls='wf-stale'; statusPillCls='cd-pill-cert-amb';
     } else if (tmplPaths.covered < tmplPaths.total) {
-      // Gate 3: cert exists but coverage is incomplete — treat as stale/partial
+      // Gate 4: cert exists but coverage is incomplete — treat as stale/partial
       statusCls='wf-stale'; statusPillCls='cd-pill-cert-amb';
     } else {
       var age=_cdDaysAgo(cert.issued_at)||0;
