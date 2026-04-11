@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260411-CD55 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260411-CD56 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -210,6 +210,15 @@ function _cdQ(table,opts){var o=opts||{};var qs=[];(o.filters||[]).forEach(funct
 var _cdCerts=[],_cdRuns=[],_cdOverrideCtx=null;
 var _cdHmState={},_cdHmTimers=[],_cdHmTipTarget=null,_cdHmTemplates=[],_cdHmScripts={};
 var _cdLastLoad=0,_cdLoadTtl=120000,_cdRange='30d';
+function _cdUpdateLastUpdated() {
+  var el = document.getElementById('cd-last-updated');
+  if (!el) return;
+  var now = new Date();
+  var h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  el.textContent = 'Updated ' + h + ':' + (m<10?'0':'')+m + ':' + (s<10?'0':'')+s + ' ' + ampm;
+}
 var _cdActiveView='portfolio';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -225,6 +234,15 @@ function _s9RouteDashboard(){
   if(!document.getElementById('cd-brief')){_cdRenderShell(panel);}
   else if(now-_cdLastLoad>_cdLoadTtl){_cdLastLoad=now;_cdLoadAll();}
 }
+// True background refresh — fires every 2 min regardless of tab interaction
+(function _cdStartPolling() {
+  setInterval(function() {
+    if (document.getElementById('cd-brief')) {
+      _cdLastLoad = Date.now();
+      _cdLoadAll();
+    }
+  }, 120000);
+}());
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 function _cdRenderShell(panel){
@@ -251,7 +269,7 @@ function _cdRenderShell(panel){
       '</div>'+
       '<div id="cd-cov-tip-panel" style="display:none;position:fixed;z-index:9999;background:#131820;border:1px solid #252d3f;border-radius:6px;padding:14px 16px;width:520px;box-shadow:0 8px 28px rgba(0,0,0,.7);pointer-events:none;font-family:Arial,sans-serif"></div>'+
       '<div id="cd-portfolio-panel" style="overflow-y:auto;padding:14px 16px">'+
-        '<div id="cd-port-count" style="font-size:10px;color:var(--cd-teal);font-weight:700;margin-bottom:8px;letter-spacing:.09em;text-transform:uppercase"></div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div id="cd-port-count" style="font-size:10px;color:var(--cd-teal);font-weight:700;letter-spacing:.09em;text-transform:uppercase"></div><div id="cd-last-updated" style="font-size:10px;color:rgba(255,255,255,.3);font-family:Arial,sans-serif"></div></div>'+
         '<div id="cd-port-grid" style="display:flex;flex-direction:column;gap:8px">'+
           '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:24px;text-align:center">Loading portfolio...</div>'+
         '</div>'+
@@ -367,6 +385,7 @@ async function _cdLoadAll(){
   _cdRenderLog();
   _cdRenderHealthMonitor();
   _cdLoadPortfolio(firmId);
+  _cdUpdateLastUpdated();
 }
 
 
