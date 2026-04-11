@@ -1063,6 +1063,10 @@ async function initUM() {
     renderSkillsLibrary();
     renderHolidayList();
     populatePTOResourceSelect();
+    // Move all drawers to body so position:fixed works from hidden panels
+    document.querySelectorAll('.um-drawer').forEach(function(d){ document.body.appendChild(d); });
+    var dov = document.getElementById('drawer-overlay');
+    if (dov) document.body.appendChild(dov);
   } catch(e) {
     console.error('UM init failed:', e);
     document.getElementById('resources-grid').innerHTML =
@@ -1071,7 +1075,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM21','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM25','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -1390,8 +1394,10 @@ function renderRolesTable() {
 
   UM.categories.forEach(cat => {
     const catRoles = UM.roles.filter(r => r.category_id === cat.id);
-    if (!catRoles.length) return;
     html += `<tr class="um-cat-header"><td colspan="8">▸ ${cat.name.toUpperCase()}</td></tr>`;
+    if (!catRoles.length) {
+      html += `<tr><td colspan="8" style="font-size:11px;color:var(--muted);padding:8px 12px;font-style:italic">No roles yet — click + ROLE to add one</td></tr>`;
+    }
     catRoles.forEach(r => {
       const rates = {};
       UM.roleLevels.filter(rl => rl.role_id === r.id).forEach(rl => { rates[rl.level] = rl; });
@@ -2671,6 +2677,15 @@ function _ocAvatarHtml(r, size) {
 }
 
 var _ocCocOpen = false;
+var _ocDirectorRoleId = null;
+
+function _ocGetDirectorRoleId() {
+  if (_ocDirectorRoleId) return _ocDirectorRoleId;
+  var role = (UM.roles||[]).find(function(ro){ return ro.name === 'Director'; });
+  _ocDirectorRoleId = role ? role.id : null;
+  return _ocDirectorRoleId;
+}
+
 var _ocZoomLevel = 1;
 
 function _ocZoomIn() {
@@ -2887,6 +2902,7 @@ function _ocNodeHtml(r, children, depth) {
   var borderColor = isSelected ? 'var(--cad,#00c9c9)' : 'var(--border)';
   var borderWidth = isSelected ? '2px' : '1px';
   var lastInitial = (r.last_name||'').charAt(0);
+  var isDirector = r.hud_role_id === _ocGetDirectorRoleId();
 
   var html = '<div style="display:inline-flex;flex-direction:column;align-items:center;min-width:150px">';
   html += '<div draggable="true" data-rid="' + r.id + '" data-oc-node="1" ondragstart="_ocDragStart(event)" ondragover="_ocDragOver(event)" data-oc-drop="' + r.id + '" ondragleave="_ocDragLeave(event)" style="border:' + borderWidth + ' solid ' + borderColor + ';border-radius:8px;padding:7px 10px;width:150px;min-width:150px;background:var(--bg2);cursor:pointer;position:relative">';
@@ -2901,10 +2917,11 @@ function _ocNodeHtml(r, children, depth) {
   html += '</div>';
 
   if (hasKids && !collapsed) {
-    if (kids.length <= 3) {
+    if (isDirector || kids.length <= 3) {
+      // Director role or few kids — always horizontal fan
       html += '<div style="width:1px;height:16px;background:var(--border)"></div>';
       html += '<div style="display:flex;flex-wrap:nowrap;gap:10px;position:relative;padding-top:16px;justify-content:center">';
-      if (kids.length > 1) html += '<div style="position:absolute;top:0;left:20%;right:20%;height:1px;background:var(--border)"></div>';
+      if (kids.length > 1) html += '<div style="position:absolute;top:0;left:' + Math.floor(100/kids.length/2) + '%;right:' + Math.floor(100/kids.length/2) + '%;height:1px;background:var(--border)"></div>';
       html += kids.map(function(kid){
         return '<div style="display:inline-flex;flex-direction:column;align-items:center"><div style="width:1px;height:16px;background:var(--border)"></div>' + _ocNodeHtml(kid, children, depth+1) + '</div>';
       }).join('');
@@ -3142,6 +3159,7 @@ function _ocOpen() {
       }, 100);
     };
   }
+  _ocDirectorRoleId = null; // reset cache so role lookup is fresh
   (UM.resources||[]).forEach(function(r){
     if (_ocPending[r.id] !== undefined) {
       r._oc_manager_id = _ocPending[r.id];
