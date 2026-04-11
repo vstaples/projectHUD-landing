@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260411-CD53 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260411-CD54 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1096,7 +1096,7 @@ function _cdRenderHotQueue(items) {
 async function _cdLoadPortfolio(firmId) {
   try {
     var results = await Promise.all([
-      _cdQ('workflow_templates', { filters:[['firm_id','eq',firmId]], select:'id,name,version,status,updated_at,created_at' }),
+      _cdQ('workflow_templates', { filters:[['firm_id','eq',firmId],['status','neq','archived']], select:'id,name,version,status,updated_at,created_at' }),
       _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]], order:'issued_at.desc', select:'id,status,template_id,template_version,issued_at,expires_at' }),
       _cdQ('bist_test_scripts', { filters:[['firm_id','eq',firmId]], select:'id,template_id,name' }),
       _cdQ('bist_coverage_paths', { filters:[['firm_id','eq',firmId]], select:'id,template_id,coverage_status,covering_script_id' })
