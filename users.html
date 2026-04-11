@@ -1100,7 +1100,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM35','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM37','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -2784,6 +2784,39 @@ function _ocAvatarHtml(r, size) {
 
 var _ocCocOpen = false;
 
+function _ocFixSpines() {
+  document.querySelectorAll('.oc-spine-cards').forEach(function(cardCol) {
+    var container = cardCol.parentElement; // relative positioned container
+    var containerRect = container.getBoundingClientRect();
+    var spineV = container.querySelector('.oc-spine-v');
+    var spineH = container.querySelector('.oc-spine-h');
+    var rows = Array.from(cardCol.children);
+    if (!rows.length || !spineV) return;
+
+    var firstCard = rows[0].querySelector('[data-oc-node]');
+    var lastCard = rows[rows.length-1].querySelector('[data-oc-node]');
+    if (!firstCard || !lastCard) return;
+
+    var firstRect = firstCard.getBoundingClientRect();
+    var lastRect = lastCard.getBoundingClientRect();
+    var firstCenterY = firstRect.top + firstRect.height/2 - containerRect.top;
+    var lastCenterY = lastRect.top + lastRect.height/2 - containerRect.top;
+
+    // Spine runs from first card center to last card center
+    spineV.style.top = firstCenterY + 'px';
+    spineV.style.height = (lastCenterY - firstCenterY) + 'px';
+
+    // Horizontal connector sits at first card center Y
+    if (spineH) spineH.style.top = firstCenterY + 'px';
+
+    // Parent drop: from container top (0) to firstCenterY
+    var parentDrop = container.previousElementSibling;
+    if (parentDrop && (parentDrop.style.width === '2px' || parentDrop.style.background?.includes('201'))) {
+      parentDrop.style.height = firstCenterY + 'px';
+    }
+  });
+}
+
 function _ocFixCrossbars() {
   document.querySelectorAll('#oc-tree-root [style*="position:absolute"][style*="top:0"]').forEach(function(bar) {
     var parent = bar.parentElement;
@@ -3064,6 +3097,7 @@ function _ocBuild() {
   // Stats
   var stats = document.getElementById('oc-stats');
   if (stats) stats.textContent = res.length + ' resources · ' + (res.length - unassigned.length) + ' assigned';
+  setTimeout(function(){ _ocFixCrossbars(); _ocFixSpines(); }, 80);
   var pendCount = document.getElementById('oc-pending-count');
   var nPending = Object.keys(_ocPending).length;
   if (pendCount) pendCount.textContent = nPending ? nPending + ' unsaved change' + (nPending!==1?'s':'') : '';
@@ -3145,14 +3179,29 @@ function _ocNodeHtml(r, children, depth) {
       }).join('');
       html += '</div>';
     } else {
-      html += '<div style="width:2px;height:12px;background:rgba(0,201,201,.5)"></div>';
-      html += '<div style="display:flex;flex-direction:row;align-items:stretch;margin-left:57px">';
-      html += '<div style="width:2px;background:rgba(0,201,201,.5);flex-shrink:0"></div>';
-      html += '<div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;padding-bottom:8px">';
+      // Vertical spine layout:
+      // - short drop from parent
+      // - L-shaped connector: horizontal to spine position + vertical spine
+      // - horizontal branches to each card
+      var SPINE_X = 75; // px from parent center to spine
+      var CARD_GAP = 12; // gap between cards
+      // Render as a relative-positioned container holding all children
+      html += '<div style="position:relative;padding-top:16px;padding-bottom:8px;padding-left:' + SPINE_X + 'px">';
+      // Vertical drop from parent to first card level - drawn via absolute positioned spine
+      // Spine line (vertical)
+      html += '<div class="oc-spine-v" style="position:absolute;left:0;top:0;width:2px;background:rgba(0,201,201,.5)" data-spine="1"></div>';
+      // Horizontal connector from spine to parent center
+      html += '<div class="oc-spine-h" style="position:absolute;left:' + (-SPINE_X) + 'px;top:0;width:' + SPINE_X + 'px;height:2px;background:rgba(0,201,201,.5)" data-hconn="1"></div>';
+      // Cards with horizontal branches
+      html += '<div class="oc-spine-cards" style="display:flex;flex-direction:column;gap:' + CARD_GAP + 'px">';
       html += kids.map(function(kid){
-        return '<div style="display:flex;align-items:center"><div style="width:20px;height:2px;background:rgba(0,201,201,.5);flex-shrink:0"></div>' + _ocNodeHtml(kid, children, depth+1) + '</div>';
+        return '<div style="display:flex;align-items:center;gap:0">' +
+          '<div style="width:20px;height:2px;background:rgba(0,201,201,.5);flex-shrink:0"></div>' +
+          _ocNodeHtml(kid, children, depth+1) +
+          '</div>';
       }).join('');
-      html += '</div></div>';
+      html += '</div>';
+      html += '</div>';
     }
   }
   html += '</div>';
