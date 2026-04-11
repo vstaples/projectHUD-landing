@@ -716,6 +716,7 @@
   <div class="um-drawer-body">
     <div class="res-drawer-tabs">
       <div class="res-drawer-tab active" data-rtab="info"    onclick="switchResTab('info')">INFO</div>
+      <div class="res-drawer-tab"        data-rtab="team"    onclick="switchResTab('team')">TEAM</div>
       <div class="res-drawer-tab"        data-rtab="skills"  onclick="switchResTab('skills')">SKILLS</div>
       <div class="res-drawer-tab"        data-rtab="profile" onclick="switchResTab('profile')">PROFILE</div>
       <div class="res-drawer-tab"        data-rtab="domain"  onclick="switchResTab('domain')">DOMAINS</div>
@@ -757,18 +758,11 @@
       <div class="um-field"><label>PHONE</label>
         <input id="res-phone" class="um-input" type="text" /></div>
     </div>
-    <div class="um-2col">
-      <div class="um-field"><label>DEPARTMENT</label>
-        <select id="res-dept" class="um-select">
-          <option value="">— Select department —</option>
-        </select></div>
-      <div class="um-field"><label>LOCATION / SITE</label>
-        <input id="res-location" class="um-input" type="text" /></div>
-    </div>
-    <div class="um-field"><label>REPORTS TO</label>
-      <select id="res-manager" class="um-select">
-        <option value="">— No manager —</option>
-      </select>
+    <!-- dept/location/manager moved to TEAM tab — fields kept in DOM for save compatibility -->
+    <div style="display:none">
+      <select id="res-dept"><option value="">— Select department —</option></select>
+      <input id="res-location" type="text" />
+      <select id="res-manager"><option value="">— No manager —</option></select>
     </div>
 
     <div class="um-divider">ROLE CLASSIFICATION</div>
@@ -815,6 +809,37 @@
 
     <div id="res-err" class="um-err"></div>
     </div><!-- end rdp-info -->
+
+    <!-- TEAM TAB -->
+    <div class="res-drawer-panel" id="rdp-team">
+      <div class="um-divider">PLACEMENT</div>
+      <div class="um-2col">
+        <div class="um-field"><label>DEPARTMENT</label>
+          <select id="res-dept-team" class="um-select" onchange="document.getElementById('res-dept').value=this.value">
+            <option value="">— Select department —</option>
+          </select></div>
+        <div class="um-field"><label>LOCATION / SITE</label>
+          <input id="res-location-team" class="um-input" type="text" oninput="document.getElementById('res-location').value=this.value" /></div>
+      </div>
+      <div class="um-field"><label>REPORTS TO</label>
+        <select id="res-manager-team" class="um-select" onchange="document.getElementById('res-manager').value=this.value">
+          <option value="">— No manager —</option>
+        </select>
+      </div>
+      <div class="um-divider">CONTACTS</div>
+      <div class="um-field"><label>ADVISOR</label>
+        <select id="res-advisor" class="um-select"><option value="">— None —</option></select></div>
+      <div class="um-field"><label>HR CONTACT</label>
+        <select id="res-hr-contact" class="um-select"><option value="">— None —</option></select></div>
+      <div class="um-field"><label>IT CONTACT</label>
+        <select id="res-it-contact" class="um-select"><option value="">— None —</option></select></div>
+      <div class="um-field"><label>FINANCE CONTACT</label>
+        <select id="res-finance-contact" class="um-select"><option value="">— None —</option></select></div>
+      <div class="um-field"><label>LEGAL CONTACT</label>
+        <select id="res-legal-contact" class="um-select"><option value="">— None —</option></select></div>
+      <div class="um-field"><label>SAFETY OFFICER</label>
+        <select id="res-safety-contact" class="um-select"><option value="">— None —</option></select></div>
+    </div><!-- end rdp-team -->
 
     <!-- SKILLS TAB -->
     <div class="res-drawer-panel" id="rdp-skills">
@@ -1075,7 +1100,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM25','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM26','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -1193,6 +1218,43 @@ function openResourceDrawer(id) {
     if (cat) document.getElementById('res-dept').value = cat.name;
   };
 
+  // ── Populate TEAM tab fields ─────────────────────────────────────────────
+  // Dept (team tab mirror)
+  const deptTeamEl = document.getElementById('res-dept-team');
+  if (deptTeamEl) {
+    deptTeamEl.innerHTML = '<option value="">— Select department —</option>' +
+      UM.categories.map(c => `<option value="${c.name}" ${r?.department===c.name?'selected':''}>${c.name}</option>`).join('');
+  }
+  // Location (team tab mirror)
+  const locTeamEl = document.getElementById('res-location-team');
+  if (locTeamEl) locTeamEl.value = r?.location || '';
+
+  // Reports To (team tab mirror) — same candidates as main
+  const mgrTeamEl = document.getElementById('res-manager-team');
+
+  // Contact dropdowns — detect by department keyword or role name
+  var contactFields = [
+    { id: 'res-advisor',        match: function(x){ return (x.title||'').toLowerCase().includes('advisor') || (x.title||'').toLowerCase().includes('consultant'); } },
+    { id: 'res-hr-contact',     match: function(x){ var d=(x.department||'').toLowerCase(); return d.includes('hr') || d.includes('human resource'); } },
+    { id: 'res-it-contact',     match: function(x){ var d=(x.department||'').toLowerCase(); return d.includes('it ') || d==='it' || d.includes('information tech'); } },
+    { id: 'res-finance-contact',match: function(x){ var d=(x.department||'').toLowerCase(); return d.includes('finance') || d.includes('accounting'); } },
+    { id: 'res-legal-contact',  match: function(x){ var d=(x.department||'').toLowerCase(); var t=(x.title||'').toLowerCase(); return d.includes('legal') || t.includes('counsel') || t.includes('legal'); } },
+    { id: 'res-safety-contact', match: function(x){ var t=(x.title||'').toLowerCase(); return t.includes('safety') || t.includes('ehs') || t.includes('environmental'); } },
+  ];
+  var allRes = (UM.resources||[]).filter(function(x){ return x.id !== id && x.is_active !== false; });
+  contactFields.forEach(function(cf) {
+    var el = document.getElementById(cf.id);
+    if (!el) return;
+    var matches = allRes.filter(cf.match);
+    el.innerHTML = '<option value="">— None —</option>' +
+      allRes.map(function(x){
+        var hint = matches.length === 1 && matches[0].id === x.id ? ' ★' : '';
+        return '<option value="' + x.id + '"' + (r && r[cf.id.replace('res-','').replace(/-/g,'_')] === x.id ? ' selected' : '') + (hint ? ' style="color:var(--cad)"' : '') + '>' + (x.name||'') + hint + '</option>';
+      }).join('');
+    // Auto-select if exactly 1 match and no existing value
+    if (matches.length === 1 && el.value === '') el.value = matches[0].id;
+  });
+
   // Populate user link select
   const ulEl = document.getElementById('res-user-link');
   ulEl.innerHTML = '<option value="">— Not linked —</option>' +
@@ -1219,6 +1281,7 @@ function openResourceDrawer(id) {
   });
   mgrDeptOrder.sort((a,b) => a.localeCompare(b));
   mgrEl.innerHTML = '<option value="">— No manager —</option>';
+  if (mgrTeamEl) mgrTeamEl.innerHTML = '<option value="">— No manager —</option>';
   mgrDeptOrder.forEach(dept => {
     const og = document.createElement('optgroup');
     og.label = dept;
@@ -1233,6 +1296,12 @@ function openResourceDrawer(id) {
       });
     mgrEl.appendChild(og);
   });
+  // Mirror manager options to TEAM tab
+  if (mgrTeamEl) {
+    mgrTeamEl.innerHTML = mgrEl.innerHTML;
+    mgrTeamEl.value = r?.manager_id || '';
+    mgrTeamEl.onchange = function(){ mgrEl.value = this.value; };
+  }
   document.getElementById('res-level').value    = r?.level      || '';
   document.getElementById('res-hire').value     = r?.hire_date  || '';
   document.getElementById('res-avail').value    = r?.availability_pct ?? 100;
