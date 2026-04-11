@@ -2802,12 +2802,14 @@ function _ocFixConnectors() {
     bar.style.top       = '0px';
     bar.style.transform = 'none';
     bar.style.width     = '';
-    bar.style.left      = (first.left + first.width/2 - parentRect.left) + 'px';
-    bar.style.right     = (parentRect.right - (last.left + last.width/2)) + 'px';
+    bar.style.left      = Math.round(first.left + first.width/2 - parentRect.left) + 'px';
+    bar.style.right     = Math.round(parentRect.right - (last.left + last.width/2)) + 'px';
   });
 
   // ── Spine bars (vertical list) ─────────────────────────────
-  document.querySelectorAll('#oc-tree-root [style*="margin-left: 57px"]').forEach(function(wrap) {
+  var all = Array.from(document.querySelectorAll('#oc-tree-root div[style]'));
+  var wraps = all.filter(function(el){ return el.style.marginLeft === '57px'; });
+  wraps.forEach(function(wrap) {
     var spineBar   = wrap.children[0];
     var childCol   = wrap.children[1];
     var parentDrop = wrap.previousElementSibling;
@@ -2822,12 +2824,26 @@ function _ocFixConnectors() {
     var dropRect    = parentDrop.getBoundingClientRect();
     var lastMidY    = cardRects[cardRects.length-1].top + cardRects[cardRects.length-1].height/2;
     var dropCenterX = dropRect.left + dropRect.width/2;
+
+    // Spine bar: left=0, top=0, height from wrapTop to lastCard midY
+    wrap.style.position       = 'relative';
     spineBar.style.position   = 'absolute';
-    spineBar.style.left       = (dropCenterX - wrapRect.left) + 'px';
-    spineBar.style.top        = (dropRect.bottom - wrapRect.top) + 'px';
-    spineBar.style.height     = (lastMidY - dropRect.bottom) + 'px';
+    spineBar.style.left       = '0px';
+    spineBar.style.top        = '0px';
+    spineBar.style.height     = Math.round(lastMidY - wrapRect.top) + 'px';
     spineBar.style.background = 'rgba(0,201,201,0.5)';
-    // Fix stubs: marginTop centers each stub on its card
+
+    // Horizontal bridge: from spine bar (left:0) rightward to parent drop centerX
+    var bridgeId = 'oc-bridge-' + (wrap.dataset.for || wraps.indexOf(wrap));
+    var bridge = document.getElementById(bridgeId);
+    if (!bridge) {
+      bridge = document.createElement('div');
+      bridge.id = bridgeId;
+      wrap.appendChild(bridge);
+    }
+    bridge.style.cssText = 'position:absolute;top:0;left:0;height:2px;background:rgba(0,201,201,0.5);width:' + Math.round(dropCenterX - wrapRect.left) + 'px';
+
+    // Stubs: fixed width 20px, marginTop centers on card
     rows.forEach(function(row, i){
       if (!cardRects[i]) return;
       var stub = row.children[0];
@@ -2835,7 +2851,7 @@ function _ocFixConnectors() {
       var rowRect  = row.getBoundingClientRect();
       var cardMidY = cardRects[i].top + cardRects[i].height/2;
       stub.style.width     = '20px';
-      stub.style.marginTop = (cardMidY - rowRect.top - 1) + 'px';
+      stub.style.marginTop = Math.round(cardMidY - rowRect.top - 1) + 'px';
     });
   });
 }
