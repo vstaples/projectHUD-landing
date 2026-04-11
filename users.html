@@ -2784,23 +2784,59 @@ function _ocAvatarHtml(r, size) {
 
 var _ocCocOpen = false;
 
-function _ocFixCrossbars() {
-  document.querySelectorAll('#oc-tree-root [style*="position:absolute"][style*="top:0"]').forEach(function(bar) {
+function _ocFixConnectors() {
+  // ── Crossbars (horizontal fan) ─────────────────────────────
+  document.querySelectorAll('#oc-tree-root .oc-crossbar').forEach(function(bar) {
     var parent = bar.parentElement;
     if (!parent) return;
-    var cards = Array.from(parent.children).filter(function(c){ return c !== bar && c.querySelector('[data-oc-node]'); });
-    if (cards.length < 2) return;
+    var siblings = Array.from(parent.children).filter(function(c){ return c !== bar; });
+    var drops = siblings.map(function(s){
+      return s.querySelector(':scope > [data-oc-node]') || s.querySelector(':scope > div > [data-oc-node]');
+    }).filter(Boolean);
+    if (drops.length < 2) return;
     var parentRect = parent.getBoundingClientRect();
-    var firstCard = cards[0].querySelector('[data-oc-node]');
-    var lastCard = cards[cards.length-1].querySelector('[data-oc-node]');
-    if (!firstCard || !lastCard) return;
-    var firstRect = firstCard.getBoundingClientRect();
-    var lastRect = lastCard.getBoundingClientRect();
-    var left = firstRect.left + firstRect.width/2 - parentRect.left;
-    var right = parentRect.right - (lastRect.left + lastRect.width/2);
-    bar.style.left = left + 'px';
-    bar.style.right = right + 'px';
-    bar.style.width = '';
+    var first = drops[0].getBoundingClientRect();
+    var last  = drops[drops.length-1].getBoundingClientRect();
+    parent.style.overflow = 'visible';
+    bar.style.position  = 'absolute';
+    bar.style.top       = '0px';
+    bar.style.transform = 'none';
+    bar.style.width     = '';
+    bar.style.left      = (first.left + first.width/2 - parentRect.left) + 'px';
+    bar.style.right     = (parentRect.right - (last.left + last.width/2)) + 'px';
+  });
+
+  // ── Spine bars (vertical list) ─────────────────────────────
+  document.querySelectorAll('#oc-tree-root [style*="margin-left: 57px"]').forEach(function(wrap) {
+    var spineBar   = wrap.children[0];
+    var childCol   = wrap.children[1];
+    var parentDrop = wrap.previousElementSibling;
+    if (!spineBar || !childCol || !parentDrop) return;
+    var rows = Array.from(childCol.children);
+    var cardRects = rows.map(function(row){
+      var card = row.querySelector('[data-oc-node]');
+      return card ? card.getBoundingClientRect() : null;
+    }).filter(Boolean);
+    if (!cardRects.length) return;
+    var wrapRect    = wrap.getBoundingClientRect();
+    var dropRect    = parentDrop.getBoundingClientRect();
+    var lastMidY    = cardRects[cardRects.length-1].top + cardRects[cardRects.length-1].height/2;
+    var dropCenterX = dropRect.left + dropRect.width/2;
+    spineBar.style.position   = 'absolute';
+    spineBar.style.left       = (dropCenterX - wrapRect.left) + 'px';
+    spineBar.style.top        = (dropRect.bottom - wrapRect.top) + 'px';
+    spineBar.style.height     = (lastMidY - dropRect.bottom) + 'px';
+    spineBar.style.background = 'rgba(0,201,201,0.5)';
+    // Fix stubs: marginTop centers each stub on its card
+    rows.forEach(function(row, i){
+      if (!cardRects[i]) return;
+      var stub = row.children[0];
+      if (!stub) return;
+      var rowRect  = row.getBoundingClientRect();
+      var cardMidY = cardRects[i].top + cardRects[i].height/2;
+      stub.style.width     = '20px';
+      stub.style.marginTop = (cardMidY - rowRect.top - 1) + 'px';
+    });
   });
 }
 
@@ -3083,6 +3119,9 @@ function _ocBuild() {
       saveBtn.style.cursor = 'default';
     }
   }
+
+  // Fix connectors after DOM settles
+  setTimeout(function(){ _ocFixConnectors(); }, 80);
 
   // Wire delegated events on tree root
   var treeRoot = document.getElementById('oc-tree-root');
