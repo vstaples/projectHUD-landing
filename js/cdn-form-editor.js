@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260411-SE116 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260411-SE117 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -644,6 +644,7 @@ function _vmCycleCell(fieldId, role) {
     cellEl.innerHTML = '<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;font-size:10px;font-weight:700;color:'+_VM_CHIP_CO[next]+'">'+_VM_LABELS[next]+'</div>';
   }
   _vmUpdateFillSeq();
+  _formDirty = true; _formUpdateSaveBtn();
 }
 
 function _vmApplySection(secLabel, role, state) {
@@ -710,26 +711,61 @@ function _formAddFillRoutingConfirm(role) {
 }
 
 function _formAddSignatory() {
-  var overlay = document.createElement('div');
-  overlay.id = 'sig-picker';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)';
-  var inner = '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:16px;min-width:260px">';
-  inner += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;letter-spacing:.06em;text-transform:uppercase">Add Signatory</div>';
-  inner += '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Role name (e.g. manager, finance, client sponsor)</div>';
-  inner += '<input id="sig-role-input" placeholder="Role name" style="width:100%;font-size:12px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:6px 8px;color:var(--text);font-family:Arial,sans-serif;margin-bottom:6px;box-sizing:border-box">';
-  inner += '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Label (e.g. Manager Signature)</div>';
-  inner += '<input id="sig-label-input" placeholder="Display label" style="width:100%;font-size:12px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:6px 8px;color:var(--text);font-family:Arial,sans-serif;margin-bottom:10px;box-sizing:border-box">';
-  inner += '<div style="display:flex;gap:8px">';
-  inner += '<div data-sig-confirm="1" style="flex:1;padding:7px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--cad);text-align:center;border:1px solid var(--cad-wire);background:var(--cad-dim)">Add Signatory</div>';
-  inner += '<div data-sig-cancel="1" style="padding:7px 12px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--muted);text-align:center;border:1px solid var(--border)">Cancel</div>';
-  inner += '</div></div>';
-  overlay.innerHTML = inner;
-  overlay.addEventListener('click', function(ev) {
-    if (ev.target.closest('[data-sig-confirm]')) { _formAddSignatoryConfirm(); return; }
-    if (ev.target.closest('[data-sig-cancel]') || ev.target === overlay) overlay.remove();
-  });
-  document.body.appendChild(overlay);
-  setTimeout(function(){ var el = document.getElementById('sig-role-input'); if (el) el.focus(); }, 50);
+  // Fetch departments from resources then show dialog
+  API.get('resources?select=department,is_external&firm_id=eq.' + (window.FIRM_ID || FIRM_ID_CAD))
+    .then(function(rows) {
+      var depts = [];
+      var seen = {};
+      (rows || []).forEach(function(r) {
+        if (r.department && !seen[r.department]) { seen[r.department] = 1; depts.push(r.department); }
+      });
+      depts.sort();
+      var hasExternal = (rows || []).some(function(r){ return r.is_external; });
+
+      var overlay = document.createElement('div');
+      overlay.id = 'sig-picker';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)';
+      var deptOptions = depts.map(function(d) {
+        return '<option value="' + escHtml(d.toLowerCase().replace(/\s+/g,'-')) + '" data-label="' + escHtml(d) + '">' + escHtml(d) + '</option>';
+      }).join('');
+      if (hasExternal) deptOptions += '<option value="external" data-label="External">External</option>';
+
+      var inner = '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:20px;min-width:300px;font-family:Arial,sans-serif">';
+      inner += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:14px;letter-spacing:.04em">Add Signatory</div>';
+      inner += '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Department / Role</div>';
+      inner += '<select id="sig-role-input" style="width:100%;font-size:13px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:7px 8px;color:var(--text);font-family:Arial,sans-serif;margin-bottom:10px;box-sizing:border-box">';
+      inner += '<option value="">— Select department —</option>';
+      inner += deptOptions;
+      inner += '</select>';
+      inner += '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Signature Label <span style="opacity:.5">(auto-filled, editable)</span></div>';
+      inner += '<input id="sig-label-input" placeholder="e.g. Finance Signature" style="width:100%;font-size:13px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:7px 8px;color:var(--text);font-family:Arial,sans-serif;margin-bottom:14px;box-sizing:border-box">';
+      inner += '<div style="display:flex;gap:8px">';
+      inner += '<div data-sig-confirm="1" style="flex:1;padding:8px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600;color:var(--cad);text-align:center;border:1px solid var(--cad-wire);background:var(--cad-dim)">Add Signatory</div>';
+      inner += '<div data-sig-cancel="1" style="padding:8px 14px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--muted);text-align:center;border:1px solid var(--border)">Cancel</div>';
+      inner += '</div></div>';
+      overlay.innerHTML = inner;
+
+      // Auto-fill label when department selected
+      overlay.addEventListener('change', function(ev) {
+        if (ev.target.id === 'sig-role-input') {
+          var sel = ev.target;
+          var opt = sel.options[sel.selectedIndex];
+          var deptLabel = opt ? opt.textContent.trim() : '';
+          var labelEl = document.getElementById('sig-label-input');
+          if (labelEl && deptLabel && deptLabel !== '— Select department —') {
+            labelEl.value = deptLabel + ' Signature';
+          }
+        }
+      });
+      overlay.addEventListener('click', function(ev) {
+        if (ev.target.closest('[data-sig-confirm]')) { _formAddSignatoryConfirm(); return; }
+        if (ev.target.closest('[data-sig-cancel]') || ev.target === overlay) overlay.remove();
+      });
+      document.body.appendChild(overlay);
+      setTimeout(function(){ var el = document.getElementById('sig-role-input'); if (el) el.focus(); }, 50);
+    }).catch(function() {
+      cadToast('Could not load departments', 'error');
+    });
 }
 function _formAddSignatoryConfirm() {
   var roleEl  = document.getElementById('sig-role-input');
@@ -966,11 +1002,17 @@ document.addEventListener('click', function(e) {
     var fid = delFid.dataset.delFid;
     var field = (_formFields||[]).find(function(f){ return f.id === fid; });
     var isSig = field && field.section === 'certification';
-    if (!isSig || confirm('Remove signatory "' + (field ? field.label : fid) + '"?')) {
+    var label = field ? field.label : fid;
+    var title = isSig ? 'Remove Signatory' : 'Delete Field';
+    var msg = isSig
+      ? 'Remove <strong>' + escHtml(label) + '</strong> from the signatories?'
+      : 'Delete field <strong>' + escHtml(label) + '</strong>? This cannot be undone.';
+    _cadConfirm(title, msg, function() {
       _formFields = (_formFields||[]).filter(function(f){ return f.id !== fid; });
       _formDirty = true;
+      _formMarkDirty();
       _reRenderMatrix();
-    }
+    });
     return;
   }
 
@@ -981,10 +1023,15 @@ document.addEventListener('click', function(e) {
     var secId   = delSec.dataset.delSec;
     var secName = delSec.dataset.secName;
     var children = (_formFields||[]).filter(function(f){ return (f.section||'Fields').replace(/[^a-zA-Z0-9]/g,'_') === secId; });
-    if (children.length && !confirm('Delete section "' + secName + '" and its ' + children.length + ' field(s)?')) return;
-    _formFields = (_formFields||[]).filter(function(f){ return (f.section||'Fields').replace(/[^a-zA-Z0-9]/g,'_') !== secId; });
-    _formDirty = true;
-    _reRenderMatrix();
+    var msg2 = children.length
+      ? 'Delete section <strong>' + escHtml(secName) + '</strong> and its <strong>' + children.length + ' field(s)</strong>? This cannot be undone.'
+      : 'Delete empty section <strong>' + escHtml(secName) + '</strong>?';
+    _cadConfirm('Delete Section', msg2, function() {
+      _formFields = (_formFields||[]).filter(function(f){ return (f.section||'Fields').replace(/[^a-zA-Z0-9]/g,'_') !== secId; });
+      _formDirty = true;
+      _formMarkDirty();
+      _reRenderMatrix();
+    });
     return;
   }
 
@@ -3118,8 +3165,43 @@ function _formMarkDirty() {
 function _formUpdateSaveBtn() {
   const btn = document.getElementById('form-save-btn');
   if (!btn) return;
-  btn.className = _formDirty ? 'btn btn-solid btn-sm' : 'btn btn-ghost btn-sm';
-  btn.style.fontSize = '12px';
+  if (_formDirty) {
+    btn.className = 'btn btn-solid btn-sm';
+    btn.style.fontSize = '12px';
+    btn.style.background = 'var(--green)';
+    btn.style.color = '#003333';
+    btn.style.borderColor = 'var(--green)';
+  } else {
+    btn.className = 'btn btn-ghost btn-sm';
+    btn.style.fontSize = '12px';
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }
+}
+
+// Professional confirmation modal — replaces browser confirm()
+function _cadConfirm(title, msgHtml, onConfirm) {
+  var existing = document.getElementById('cad-confirm-modal');
+  if (existing) existing.remove();
+  var el = document.createElement('div');
+  el.id = 'cad-confirm-modal';
+  el.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)';
+  el.innerHTML =
+    '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:24px 28px;width:380px;font-family:Arial,sans-serif;box-shadow:0 16px 48px rgba(0,0,0,.7)">' +
+      '<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px">' + escHtml(title) + '</div>' +
+      '<div style="font-size:13px;color:var(--text2);margin-bottom:22px;line-height:1.6">' + msgHtml + '</div>' +
+      '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+        '<button id="cad-confirm-cancel" style="padding:8px 18px;border:1px solid var(--border);border-radius:5px;background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:Arial,sans-serif">Cancel</button>' +
+        '<button id="cad-confirm-ok" style="padding:8px 18px;border:1px solid rgba(248,81,73,.4);border-radius:5px;background:transparent;color:#f85149;font-size:12px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif">Delete</button>' +
+      '</div>' +
+    '</div>';
+  el.addEventListener('click', function(ev) {
+    if (ev.target.id === 'cad-confirm-ok')     { el.remove(); onConfirm(); }
+    if (ev.target.id === 'cad-confirm-cancel' || ev.target === el) el.remove();
+  });
+  document.body.appendChild(el);
+  setTimeout(function(){ var b = document.getElementById('cad-confirm-ok'); if (b) b.focus(); }, 50);
 }
 
 // Renders the category pill (clickable if assigned) or + Category button
