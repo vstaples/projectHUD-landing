@@ -1100,7 +1100,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM26','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM27','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -1251,8 +1251,15 @@ function openResourceDrawer(id) {
         var hint = matches.length === 1 && matches[0].id === x.id ? ' ★' : '';
         return '<option value="' + x.id + '"' + (r && r[cf.id.replace('res-','').replace(/-/g,'_')] === x.id ? ' selected' : '') + (hint ? ' style="color:var(--cad)"' : '') + '>' + (x.name||'') + hint + '</option>';
       }).join('');
-    // Auto-select if exactly 1 match and no existing value
-    if (matches.length === 1 && el.value === '') el.value = matches[0].id;
+    // Load saved value first
+    var savedKey = cf.id.replace('res-', '').replace(/-/g, '_') + '_id';
+    // advisor -> advisor_id, hr_contact -> hr_contact_id etc.
+    if (r && r[savedKey]) {
+      el.value = r[savedKey];
+    } else if (matches.length === 1) {
+      // Auto-select if exactly 1 match and no saved value
+      el.value = matches[0].id;
+    }
   });
 
   // Populate user link select
@@ -1405,6 +1412,12 @@ async function saveResource() {
     user_id:          document.getElementById('res-user-link').value       || null,
     notes:            document.getElementById('res-notes').value.trim()    || null,
     manager_id:       document.getElementById('res-manager').value              || null,
+    advisor_id:       document.getElementById('res-advisor')?.value             || null,
+    hr_contact_id:    document.getElementById('res-hr-contact')?.value          || null,
+    it_contact_id:    document.getElementById('res-it-contact')?.value          || null,
+    finance_contact_id: document.getElementById('res-finance-contact')?.value   || null,
+    legal_contact_id: document.getElementById('res-legal-contact')?.value       || null,
+    safety_contact_id: document.getElementById('res-safety-contact')?.value     || null,
   };
 
   try {
