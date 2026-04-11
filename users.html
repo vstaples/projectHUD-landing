@@ -1100,7 +1100,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM29','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM32','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -1189,7 +1189,7 @@ function openResourceDrawer(id) {
   // Populate department select from categories
   const deptEl = document.getElementById('res-dept');
   deptEl.innerHTML = '<option value="">— Select department —</option>' +
-    UM.categories.map(c => `<option value="${c.name}" ${r?.department===c.name?'selected':''}>${c.name}</option>`).join('');
+    [...UM.categories].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c => `<option value="${c.name}" ${r?.department===c.name?'selected':''}>${c.name}</option>`).join('');
 
   const roleEl = document.getElementById('res-role');
   roleEl.innerHTML = '<option value="">— Select role —</option>';
@@ -1223,7 +1223,7 @@ function openResourceDrawer(id) {
   const deptTeamEl = document.getElementById('res-dept-team');
   if (deptTeamEl) {
     deptTeamEl.innerHTML = '<option value="">— Select department —</option>' +
-      UM.categories.map(c => `<option value="${c.name}" ${r?.department===c.name?'selected':''}>${c.name}</option>`).join('');
+      [...UM.categories].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c => `<option value="${c.name}" ${r?.department===c.name?'selected':''}>${c.name}</option>`).join('');
   }
   // Location (team tab mirror)
   const locTeamEl = document.getElementById('res-location-team');
@@ -1482,9 +1482,9 @@ function renderRolesTable() {
       <td colspan="6">▸ ${cat.name.toUpperCase()}</td>
       <td colspan="2" style="text-align:right;padding-right:8px;white-space:nowrap">
         <button onclick="openCategoryDrawer('${cat.id}')" title="Rename category"
-          style="background:transparent;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px 5px;font-family:var(--font-mono)">✎</button>
+          style="background:transparent;border:none;cursor:pointer;color:#f0b429;font-size:14px;padding:2px 5px;font-family:var(--font-mono)">✎</button>
         <button onclick="deleteCategory('${cat.id}','${cat.name.replace(/'/g,"\'")}')" title="Delete category"
-          style="background:transparent;border:none;cursor:pointer;color:rgba(248,81,73,.6);font-size:13px;padding:2px 5px;font-family:var(--font-mono)">🗑</button>
+          style="background:transparent;border:none;cursor:pointer;color:#f85149;font-size:14px;padding:2px 5px;font-family:var(--font-mono)">🗑</button>
       </td>
     </tr>`;
     if (!catRoles.length) {
@@ -3203,6 +3203,16 @@ function _ocDrop(e, targetId) {
   // Prevent circular: don't drop a parent onto its own descendant
   if (_ocIsDescendant(_ocDragId, targetId)) { cadToast('Cannot assign a manager who reports to this person', 'warn'); return; }
   _ocPending[_ocDragId] = targetId;
+  // Inherit department from manager
+  var draggedRes = (UM.resources||[]).find(function(x){ return x.id === _ocDragId; });
+  var managerRes = (UM.resources||[]).find(function(x){ return x.id === targetId; });
+  if (draggedRes && managerRes && managerRes.department) {
+    draggedRes._oc_manager_id = targetId;
+    draggedRes.department = managerRes.department;
+    // Queue dept update to save alongside manager_id
+    if (!_ocPendingDept) window._ocPendingDept = {};
+    _ocPendingDept[_ocDragId] = managerRes.department;
+  }
   cadToast('Manager assigned — click Save Changes to persist', 'info');
   _ocBuild();
 }
@@ -3277,7 +3287,9 @@ async function _ocSaveAll() {
       var isUnassigned = pendVal === 'UNASSIGNED';
       var isRoot = pendVal === 'ROOT';
       var mgr = (isRoot || isUnassigned) ? null : (pendVal || null);
-      await API.patch('resources?id=eq.' + id + '&firm_id=eq.' + firmId, { manager_id: mgr, is_org_root: isUnassigned ? false : isRoot });
+      var patchPayload = { manager_id: mgr, is_org_root: isUnassigned ? false : isRoot };
+      if (window._ocPendingDept && _ocPendingDept[id]) patchPayload.department = _ocPendingDept[id];
+      await API.patch('resources?id=eq.' + id + '&firm_id=eq.' + firmId, patchPayload);
       var r = (UM.resources||[]).find(function(x){ return x.id === id; });
       if (r) { r.manager_id = mgr; r.is_org_root = isUnassigned ? false : isRoot; r._oc_manager_id = isUnassigned ? null : pendVal; }
       console.log('[ocSave]', r ? r.name : id, '| manager_id:', mgr, '| is_org_root:', isRoot);
@@ -3299,6 +3311,7 @@ async function _ocSaveAll() {
     } catch(e) { errors++; }
   }
   _ocPending = {};
+  window._ocPendingDept = {};
   if (errors) cadToast(errors + ' error(s) saving — check console', 'error');
   else cadToast('Org chart saved', 'success');
   _ocUpdateBadge();
