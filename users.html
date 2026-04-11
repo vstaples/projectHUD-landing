@@ -1100,7 +1100,7 @@ async function initUM() {
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
-console.log('%c[users.html] v20260411-UM32','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[users.html] v20260411-UM34','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
 
 function cadToast(msg, type) {
   var existing = document.getElementById('oc-toast');
@@ -2784,6 +2784,27 @@ function _ocAvatarHtml(r, size) {
 
 var _ocCocOpen = false;
 
+function _ocFixCrossbars() {
+  document.querySelectorAll('#oc-tree-root [style*="position:absolute"][style*="top:0"]').forEach(function(bar) {
+    var parent = bar.parentElement;
+    if (!parent) return;
+    var cards = Array.from(parent.children).filter(function(c){ return c !== bar && c.querySelector('[data-oc-node]'); });
+    if (cards.length < 2) return;
+    var parentRect = parent.getBoundingClientRect();
+    var firstCard = cards[0].querySelector('[data-oc-node]');
+    var lastCard = cards[cards.length-1].querySelector('[data-oc-node]');
+    if (!firstCard || !lastCard) return;
+    var firstRect = firstCard.getBoundingClientRect();
+    var lastRect = lastCard.getBoundingClientRect();
+    var left = firstRect.left + firstRect.width/2 - parentRect.left;
+    var right = parentRect.right - (lastRect.left + lastRect.width/2);
+    bar.style.left = left + 'px';
+    bar.style.right = right + 'px';
+    bar.style.width = '';
+  });
+}
+
+
 // ── Styled resource contact picker ────────────────────────────────────────────
 function _cpAvatar(r) {
   if (r.avatar_url) return '<img src="' + r.avatar_url + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0">';
@@ -3043,6 +3064,7 @@ function _ocBuild() {
   // Stats
   var stats = document.getElementById('oc-stats');
   if (stats) stats.textContent = res.length + ' resources · ' + (res.length - unassigned.length) + ' assigned';
+  setTimeout(_ocFixCrossbars, 50);
   var pendCount = document.getElementById('oc-pending-count');
   var nPending = Object.keys(_ocPending).length;
   if (pendCount) pendCount.textContent = nPending ? nPending + ' unsaved change' + (nPending!==1?'s':'') : '';
@@ -3115,20 +3137,20 @@ function _ocNodeHtml(r, children, depth) {
   if (hasKids && !collapsed) {
     if (isDirector || kids.length <= 3) {
       // Director role or few kids — always horizontal fan
-      html += '<div style="width:1px;height:16px;background:var(--border)"></div>';
+      html += '<div style="width:2px;height:16px;background:rgba(0,201,201,.5)"></div>';
       html += '<div style="display:flex;flex-wrap:nowrap;gap:10px;position:relative;padding-top:16px;justify-content:center">';
-      if (kids.length > 1) html += '<div style="position:absolute;top:0;left:' + Math.floor(100/kids.length/2) + '%;right:' + Math.floor(100/kids.length/2) + '%;height:1px;background:var(--border)"></div>';
+      if (kids.length > 1) html += '<div class="oc-crossbar" style="position:absolute;top:0;left:calc(' + Math.round(50/kids.length) + '% + 0px);right:calc(' + Math.round(50/kids.length) + '% + 0px);height:2px;background:rgba(0,201,201,.5)"></div>';
       html += kids.map(function(kid){
-        return '<div style="display:inline-flex;flex-direction:column;align-items:center"><div style="width:1px;height:16px;background:var(--border)"></div>' + _ocNodeHtml(kid, children, depth+1) + '</div>';
+        return '<div style="display:inline-flex;flex-direction:column;align-items:center"><div style="width:2px;height:16px;background:rgba(0,201,201,.5)"></div>' + _ocNodeHtml(kid, children, depth+1) + '</div>';
       }).join('');
       html += '</div>';
     } else {
-      html += '<div style="width:1px;height:12px;background:var(--border)"></div>';
+      html += '<div style="width:2px;height:12px;background:rgba(0,201,201,.5)"></div>';
       html += '<div style="display:flex;flex-direction:row;align-items:stretch;margin-left:57px">';
-      html += '<div style="width:1px;background:var(--border);flex-shrink:0"></div>';
+      html += '<div style="width:2px;background:rgba(0,201,201,.5);flex-shrink:0"></div>';
       html += '<div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;padding-bottom:8px">';
       html += kids.map(function(kid){
-        return '<div style="display:flex;align-items:center"><div style="width:20px;height:1px;background:var(--border);flex-shrink:0"></div>' + _ocNodeHtml(kid, children, depth+1) + '</div>';
+        return '<div style="display:flex;align-items:center"><div style="width:20px;height:2px;background:rgba(0,201,201,.5);flex-shrink:0"></div>' + _ocNodeHtml(kid, children, depth+1) + '</div>';
       }).join('');
       html += '</div></div>';
     }
