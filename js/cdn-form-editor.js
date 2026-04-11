@@ -3622,7 +3622,7 @@ async function _formCommit() {
       // Also patch companion workflow version to match
       await API.patch('workflow_templates?id=eq.'+tmplId, { version: targetVer, updated_at: new Date().toISOString() }).catch(function(){});
       // Reload form defs so Library reflects new version
-      await _formLoadDefs().catch(function(){});
+      if (typeof _formLoadDefs === 'function') await _formLoadDefs().catch(function(){});
       const listEl = document.getElementById('form-list');
       if (listEl) listEl.innerHTML = _renderFormList();
       _formRefreshToolbar();
