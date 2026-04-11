@@ -3178,6 +3178,10 @@ function _formLifecycleButtons(f) {
       style="font-family:Arial,sans-serif;font-size:12px;padding:4px 14px;border-radius:999px;
              background:var(--green);color:#003333;border:none;cursor:pointer;font-weight:700">
       Publish</button>`);
+    btns.push(`<button onclick="_formReturnToDraft()"
+      style="font-family:Arial,sans-serif;font-size:12px;padding:4px 12px;border-radius:999px;
+             border:1px solid rgba(248,81,73,.4);background:transparent;color:#f85149;cursor:pointer">
+      Return to Draft</button>`);
   }
 
   // Published state actions
@@ -3207,6 +3211,19 @@ async function _formPublish() {
   _selectedForm.compass_visible = true;
   _formRefreshToolbar();
   cadToast('Form published — now visible in Compass Browse', 'success');
+}
+
+async function _formReturnToDraft() {
+  if (!_selectedForm) return;
+  if (!confirm('Return this form to Draft? It will no longer be certified.')) return;
+  await API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id, {
+    state: 'draft', updated_at: new Date().toISOString()
+  });
+  _selectedForm.state = 'draft';
+  var lcDiv = document.getElementById('form-lifecycle-btns');
+  if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(_selectedForm);
+  _formRefreshToolbar();
+  cadToast('Returned to Draft', 'info');
 }
 
 async function _formUnpublish() {
