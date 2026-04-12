@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260411-SE118 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260411-SE119 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3561,26 +3561,38 @@ async function _formCommit() {
       cadToast('Committing form…', 'info');
       await _formSave();
 
-      var existingTmpls = await API.get(
-        'workflow_templates?firm_id=eq.' + firmId + '&name=eq.' + encodeURIComponent(formName) + '&form_driven=eq.true'
+      // Version lane model — each commit creates a NEW workflow_templates row.
+      // Prior active version (committed/certified) is frozen to 'superseded'.
+      var priorTmpls = await API.get(
+        'workflow_templates?firm_id=eq.' + firmId +
+        '&name=eq.' + encodeURIComponent(formName) +
+        '&form_driven=eq.true&status=neq.archived&status=neq.superseded&select=id,status,version'
       ).catch(function(){ return []; }) || [];
 
-      var tmplId;
-      if (existingTmpls.length) {
-        tmplId = existingTmpls[0].id;
-      } else {
-        var newTmpl = await API.post('workflow_templates', {
-          firm_id: firmId, name: formName,
-          description: 'Auto-generated from form: ' + formName,
-          status: 'draft', version: targetVer,
-          trigger_type: 'manual', form_driven: true,
-          created_at: new Date().toISOString(), updated_at: new Date().toISOString()
-        });
-        tmplId = newTmpl?.[0]?.id;
-        if (!tmplId) throw new Error('Failed to create companion workflow');
+      // Freeze all prior active versions
+      for (var pi = 0; pi < priorTmpls.length; pi++) {
+        var prior = priorTmpls[pi];
+        var freezeStatus = prior.status === 'published' ? 'superseded' : 'archived';
+        await API.patch('workflow_templates?id=eq.' + prior.id, {
+          status: freezeStatus, updated_at: new Date().toISOString()
+        }).catch(function(){});
       }
 
-      await API.del('workflow_template_steps?template_id=eq.' + tmplId).catch(function(){});
+      // Create new version row
+      var newTmpl = await API.post('workflow_templates', {
+        firm_id: firmId, name: formName,
+        description: 'Auto-generated from form: ' + formName,
+        status: 'committed', version: targetVer,
+        trigger_type: 'manual', form_driven: true,
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+      });
+      var tmplId = newTmpl?.[0]?.id;
+      if (!tmplId) throw new Error('Failed to create companion workflow version');
+
+      // Wipe any stale coverage paths and scripts from prior versions on this new row
+      // (new row has no data yet — this is a safety guard only)
+      await API.del('bist_coverage_paths?template_id=eq.' + tmplId).catch(function(){});
+      await API.del('bist_test_scripts?template_id=eq.' + tmplId).catch(function(){});
       var steps = [];
       steps.push(API.post('workflow_template_steps', {
         template_id: tmplId,
@@ -3633,9 +3645,8 @@ async function _formCommit() {
       await API.patch('workflow_form_definitions?id=eq.' + _selectedForm.id,
         { state: 'committed', updated_at: new Date().toISOString() });
       _selectedForm.state = 'committed';
-      _formCoCWrite('form.committed', _selectedForm.id, { version: targetVer, workflow_id: tmplId, roles: roleNames, note: note });
-      // Also patch companion workflow version + status to match
-      await API.patch('workflow_templates?id=eq.'+tmplId, { version: targetVer, status: 'committed', updated_at: new Date().toISOString() }).catch(function(){});
+      // CoC is version-scoped — write to the new template row's id
+      _formCoCWrite('form.committed', tmplId, { version: targetVer, workflow_id: tmplId, roles: roleNames, note: note });
       // Reload form defs so Library reflects new version
       if (typeof _formLoadDefs === 'function') await _formLoadDefs().catch(function(){});
       const listEl = document.getElementById('form-list');

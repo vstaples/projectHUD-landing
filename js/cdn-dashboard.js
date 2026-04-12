@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260411-CD56 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260411-CD57 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1115,7 +1115,7 @@ function _cdRenderHotQueue(items) {
 async function _cdLoadPortfolio(firmId) {
   try {
     var results = await Promise.all([
-      _cdQ('workflow_templates', { filters:[['firm_id','eq',firmId],['status','neq','archived']], select:'id,name,version,status,updated_at,created_at' }),
+      _cdQ('workflow_templates', { filters:[['firm_id','eq',firmId],['status','neq','archived'],['status','neq','superseded']], select:'id,name,version,status,updated_at,created_at' }),
       _cdQ('bist_certificates', { filters:[['firm_id','eq',firmId]], order:'issued_at.desc', select:'id,status,template_id,template_version,issued_at,expires_at' }),
       _cdQ('bist_test_scripts', { filters:[['firm_id','eq',firmId]], select:'id,template_id,name' }),
       _cdQ('bist_coverage_paths', { filters:[['firm_id','eq',firmId]], select:'id,template_id,coverage_status,covering_script_id' })
@@ -1157,9 +1157,16 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     scriptObjsByTmpl[s.template_id].push(s);
     tmplByScriptId[s.id] = s.template_id;
   });
+  // Build tmpl version lookup for version-scoped run filtering
+  var tmplVersionById = {};
+  tmpls.forEach(function(t){ tmplVersionById[t.id] = t.version; });
+
   var runsByTmpl = {};
   runs.forEach(function(r){
     var tid = r.template_id || tmplByScriptId[r.script_id]; if (!tid) return;
+    // Version lane — only count runs that match the current template version
+    var tmplVer = tmplVersionById[tid];
+    if (tmplVer && r.template_version && r.template_version !== tmplVer) return;
     if (!runsByTmpl[tid]) runsByTmpl[tid] = [];
     runsByTmpl[tid].push(r);
   });
@@ -1182,7 +1189,9 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
   }
   if (countEl) countEl.textContent = tmpls.length+' template'+(tmpls.length>1?'s':'');
 
-  // Sort: cert-invalid first, then not-covered/uncertified, then stale, then certified
+  // Version lane — group by name, show all active versions per template
+  // Sort within each group: committed first (pending cert), then certified, then published
+  var statusOrder = { committed:0, certified:1, published:2, draft:3 };
   var sortPriority = function(t) {
     var c = certByTmpl[t.id];
     if (!c || c.status==='revoked') return scriptsByTmpl[t.id] ? 2 : 1;
@@ -1190,7 +1199,17 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
     var age = _cdDaysAgo(c.issued_at)||0;
     return age>30 ? 3 : 4;
   };
-  tmpls = tmpls.slice().sort(function(a,b){ return sortPriority(a)-sortPriority(b); });
+  tmpls = tmpls.slice().sort(function(a,b){
+    // Primary sort: by name alphabetically
+    if (a.name < b.name) return -1;
+    if (a.name > b.name) return 1;
+    // Secondary sort within same name: by status priority
+    var sa = statusOrder[a.status] !== undefined ? statusOrder[a.status] : 9;
+    var sb = statusOrder[b.status] !== undefined ? statusOrder[b.status] : 9;
+    if (sa !== sb) return sa - sb;
+    // Tertiary: by cert priority
+    return sortPriority(a) - sortPriority(b);
+  });
 
   gridEl.innerHTML = tmpls.map(function(t){
     var cert      = certByTmpl[t.id] || null;
