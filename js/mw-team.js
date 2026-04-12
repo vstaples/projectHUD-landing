@@ -1,5 +1,5 @@
 // mw-team.js — My Team view for Compass
-// v20260412-MT4
+// v20260412-MT5
 // Globals: _myResource, API
 // Tab key: 'team' → panel: #utc-team
 
@@ -515,7 +515,7 @@ function _e(s) {
       btn.textContent = 'My Team';
       btn.onclick = function() { uSwitchTab('team', btn); };
       tabBar.appendChild(btn);
-      console.log('[mw-team] MT4 — My Team tab injected via mw:viewready');
+      console.log('[mw-team] MT5 — My Team tab injected via mw:viewready');
     }
     // 2. Inject MY TEAM panel if not already present
     var sibling = document.getElementById('utc-work');
@@ -541,14 +541,11 @@ function _e(s) {
     doInstall(e.detail && e.detail.tabBar);
   }, { once: true });
 
-  // Fallback: if mw:viewready never fires (older mw-core.js),
-  // try once after a short delay
+  // Fallback: if mw:viewready never fires (e.g. older mw-core.js without MC1),
+  // silently install after a longer delay. Guard prevents double-inject.
   setTimeout(function() {
-    if (!document.querySelector('[data-tab="team"]')) {
-      console.warn('[mw-team] mw:viewready not received — falling back to timeout install');
-      doInstall(null);
-    }
-  }, 2000);
+    doInstall(null); // doInstall no-ops if tab already present
+  }, 4000);
 })();
 
 })();
