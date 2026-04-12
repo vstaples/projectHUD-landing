@@ -1679,6 +1679,13 @@ window.addEventListener('message', function(ev) {
         console.log('%c[compass_form_submit] instance created: ' + instanceId + ' · template: ' + tmpl.id,
           'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
 
+        // Resolve role → resource and create workflow_request for step 1
+        if (firstStep && res && res.id) {
+          await window._mwResolveAndRoute(
+            instanceId, steps, firstStep.sequence_order, res.id, formName
+          ).catch(function(e) { console.warn('[compass_form_submit] routing failed:', e); });
+        }
+
         compassToast('Submitted for approval — routing to ' + (firstStep ? firstStep.name : 'reviewers') + '.', 4000);
         if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 800);
 
@@ -1692,6 +1699,104 @@ window.addEventListener('message', function(ev) {
     compassToast('Please complete all required fields: ' + (d.fields||[]).join(', '), 4000);
   }
 });
+
+// ── _mwResolveAndRoute — Resolution Engine ───────────────────────────────────
+// Maps workflow template step roles to actual resource IDs and creates
+// workflow_requests rows so the right people see the request in their queue.
+//
+// Role resolution map:
+//   submitter → the resource who submitted (passed in as submitterResId)
+//   manager   → submitter's resources.manager_id
+//   finance   → submitter's resources.finance_contact_id
+//   (extensible: add more roles here as needed)
+//
+// Called immediately after step_activated is written on submit.
+// Also called when a step completes and the next step is activated.
+// ─────────────────────────────────────────────────────────────────────────────
+window._mwResolveAndRoute = async function(instanceId, templateSteps, currentStepSeq, submitterResId, formName) {
+  try {
+    var firmId = _mwFirmId();
+    var now    = new Date().toISOString();
+
+    // Find the step to route
+    var step = (templateSteps || []).find(function(s) { return s.sequence_order === currentStepSeq; });
+    if (!step) {
+      console.warn('[_mwResolveAndRoute] no step found at seq:', currentStepSeq);
+      return;
+    }
+
+    // Load submitter's resource row for role resolution
+    var resRows = await API.get(
+      'resources?id=eq.' + submitterResId +
+      '&select=id,name,manager_id,finance_contact_id,legal_contact_id,hr_contact_id'
+    ).catch(function() { return []; });
+    var submitterRes = resRows && resRows[0];
+    if (!submitterRes) {
+      console.warn('[_mwResolveAndRoute] submitter resource not found:', submitterResId);
+      return;
+    }
+
+    // Resolve role → resource ID
+    var roleMap = {
+      submitter: submitterResId,
+      manager:   submitterRes.manager_id,
+      finance:   submitterRes.finance_contact_id,
+      legal:     submitterRes.legal_contact_id,
+      hr:        submitterRes.hr_contact_id,
+    };
+
+    var assigneeResId = roleMap[step.assignee_role] || null;
+    if (!assigneeResId) {
+      console.warn('[_mwResolveAndRoute] role "' + step.assignee_role + '" not resolved — no contact assigned for this user');
+      return;
+    }
+
+    // Load assignee name
+    var assigneeRows = await API.get(
+      'resources?id=eq.' + assigneeResId + '&select=id,name'
+    ).catch(function() { return []; });
+    var assigneeName = (assigneeRows && assigneeRows[0] && assigneeRows[0].name) || 'Unknown';
+    var submitterName = submitterRes.name || 'Unknown';
+
+    // Check if a workflow_request already exists for this instance + step
+    var existing = await API.get(
+      'workflow_requests?instance_id=eq.' + instanceId +
+      '&role=eq.' + step.assignee_role +
+      '&status=eq.open&select=id&limit=1'
+    ).catch(function() { return []; });
+    if (existing && existing.length) {
+      console.log('[_mwResolveAndRoute] request already exists for role:', step.assignee_role);
+      return;
+    }
+
+    // Create the workflow_request
+    await API.post('workflow_requests', {
+      firm_id:          firmId,
+      instance_id:      instanceId,
+      role:             step.assignee_role,
+      title:            formName + ' — ' + step.name,
+      body:             'Please review and action: ' + formName + ' submitted by ' + submitterName,
+      status:           'open',
+      owner_resource_id: assigneeResId,
+      owner_name:       assigneeName,
+      created_by_name:  submitterName,
+      due_date:         null,
+      created_at:       now,
+    });
+
+    console.log('%c[_mwResolveAndRoute] routed step ' + currentStepSeq + ' (' + step.assignee_role + ') → ' + assigneeName,
+      'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
+
+    // Update instance current_step_id
+    await API.patch(
+      'workflow_instances?id=eq.' + instanceId,
+      { current_step_id: step.id, updated_at: now }
+    ).catch(function(e) { console.warn('[_mwResolveAndRoute] current_step_id patch failed:', e); });
+
+  } catch(e) {
+    console.error('[_mwResolveAndRoute] failed:', e);
+  }
+};
 
 function _myrLaunchModal(tmpl) {
   return new Promise(resolve => {
