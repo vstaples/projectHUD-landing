@@ -1560,6 +1560,34 @@ function _cdPortSimulate(tmplId) {
 }
 
 function _cdPortRunAll(tmplId) {
+  // Check if scripts exist before navigating — show professional modal if not
+  var d = window._cdPortData || {};
+  var scriptObjs = (d.scriptObjsByTmpl || {})[tmplId] || [];
+  if (!scriptObjs.length) {
+    var existing = document.getElementById('cd-noscript-modal');
+    if (existing) existing.remove();
+    var el = document.createElement('div');
+    el.id = 'cd-noscript-modal';
+    el.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)';
+    el.innerHTML =
+      '<div style="background:#0d1017;border:1px solid #1e2535;border-radius:8px;padding:28px 32px;width:400px;font-family:Arial,sans-serif;box-shadow:0 16px 48px rgba(0,0,0,.8)">' +
+        '<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:10px">No Test Scripts</div>' +
+        '<div style="font-size:13px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:20px">' +
+          'This template has no test scripts yet. Before running tests, define coverage paths and write scripts in the Simulator.' +
+        '</div>' +
+        '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+          '<button id="cd-noscript-close" style="padding:8px 18px;border:1px solid #1e2535;border-radius:5px;background:transparent;color:rgba(255,255,255,.6);font-size:12px;cursor:pointer;font-family:Arial,sans-serif">Close</button>' +
+          '<button id="cd-noscript-goto" style="padding:8px 18px;border:1px solid rgba(0,201,201,.4);border-radius:5px;background:rgba(0,201,201,.1);color:#00c9c9;font-size:12px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif">Open Simulator →</button>' +
+        '</div>' +
+      '</div>';
+    el.addEventListener('click', function(ev) {
+      if (ev.target.id === 'cd-noscript-close' || ev.target === el) el.remove();
+      if (ev.target.id === 'cd-noscript-goto') { el.remove(); _s9DashOpenSimulator(tmplId); }
+    });
+    document.body.appendChild(el);
+    setTimeout(function(){ var b = document.getElementById('cd-noscript-goto'); if (b) b.focus(); }, 50);
+    return;
+  }
   _s9DashOpenSimulator(tmplId);
   setTimeout(function() {
     var runAllBtn = document.getElementById('s9-run-all-btn');
