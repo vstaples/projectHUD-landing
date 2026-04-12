@@ -1736,8 +1736,8 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
       return;
     }
 
-    // Resolve role → resource ID
-    var roleMap = {
+    // Resolve Cadence role → resource ID
+    var resourceMap = {
       submitter: submitterResId,
       manager:   submitterRes.manager_id,
       finance:   submitterRes.finance_contact_id,
@@ -1745,7 +1745,19 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
       hr:        submitterRes.hr_contact_id,
     };
 
-    var assigneeResId = roleMap[step.assignee_role] || null;
+    // Map Cadence role → workflow_requests.role constraint value
+    // workflow_requests only accepts: 'approver', 'reviewer'
+    var dbRoleMap = {
+      submitter: 'reviewer',  // submitter reviews their own form before it routes
+      manager:   'approver',
+      finance:   'approver',
+      legal:     'approver',
+      hr:        'approver',
+    };
+
+    var assigneeResId = resourceMap[step.assignee_role] || null;
+    var dbRole        = dbRoleMap[step.assignee_role]   || 'approver';
+
     if (!assigneeResId) {
       console.warn('[_mwResolveAndRoute] role "' + step.assignee_role + '" not resolved — no contact assigned for this user');
       return;
@@ -1761,7 +1773,7 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
     // Check if a workflow_request already exists for this instance + step
     var existing = await API.get(
       'workflow_requests?instance_id=eq.' + instanceId +
-      '&role=eq.' + step.assignee_role +
+      '&owner_resource_id=eq.' + assigneeResId +
       '&status=eq.open&select=id&limit=1'
     ).catch(function() { return []; });
     if (existing && existing.length) {
@@ -1773,7 +1785,7 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
     await API.post('workflow_requests', {
       firm_id:          firmId,
       instance_id:      instanceId,
-      role:             step.assignee_role,
+      role:             dbRole,
       title:            formName + ' — ' + step.name,
       body:             'Please review and action: ' + formName + ' submitted by ' + submitterName,
       status:           'open',
