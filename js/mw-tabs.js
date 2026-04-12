@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260410-400000
+// VERSION: 20260412-MT1
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260410-403000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260412-MT1 — bulletproof form submit: DB lookup · form_def_id · proper routing','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1481,41 +1481,124 @@ window.addEventListener('message', function(ev) {
       }
     })();
   } else if (d.type === 'compass_form_submit') {
-    var overlay = document.getElementById('myr-html-form-overlay');
-    if (overlay) overlay.remove();
-    // Create workflow_instance record in DB
+    // ── MT1: Bulletproof form submit ──────────────────────────────────────
+    // Prior code used a UUID regex heuristic to map form_def_id → template_id.
+    // That heuristic is fragile and wrong. The correct approach:
+    //   1. Look up the companion workflow_templates row by name + form_driven=true
+    //      from the DB at submit time — authoritative, never guesses.
+    //   2. Write both template_id (companion) AND form_def_id on the instance
+    //      so the round-trip is explicit and permanent.
+    //   3. Activate routing steps correctly via workflow_step_instances,
+    //      mirroring exactly what cdn-instances.js does in Cadence.
+    //   4. Close the overlay AFTER the instance is created, not before,
+    //      so a failed submit doesn't silently discard the user's work.
+    // ─────────────────────────────────────────────────────────────────────
     (async function() {
+      var overlay = document.getElementById('myr-html-form-overlay');
       try {
-        var firmId  = _mwFirmId();
-        var res     = window._myResource;
-        var formId  = d.formId || null;
-        var formDef = (window._myrFormDefs||[]).find(function(f){ return f.id === formId; });
-        var title   = (formDef ? formDef.source_name : 'Form Submission') + ' — ' + (res?.name || 'Unknown');
-        var payload = {
-          firm_id:                    firmId,
-          title:                      title,
-          status:                     'in_progress',
-          workflow_type:              'form',
-          template_id:                (formId ? formId.replace(/^([0-9a-f]{6})10-/, '$100-') : formId),
-          submitted_by_resource_id:   res?.id   || null,
-          submitted_by_name:          res?.name || null,
-          current_step_name:          'Under Review',
-          form_data:                  d.formData || null,
-        };
-        await API.post('workflow_instances', payload);
-        // Delete draft on successful submit
-        try {
-          var firmId2 = _mwFirmId();
-          var resId2  = window._myResource?.id;
-          if (resId2 && formId) {
-            await _myrDel('form_drafts?firm_id=eq.' + firmId2 + '&user_id=eq.' + resId2 + '&form_def_id=eq.' + formId);
-          }
-        } catch(e) { console.warn('[submit] draft cleanup failed:', e); }
-        compassToast('Submitted for approval. You will be notified when reviewed.', 4000);
-        if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 1000);
+        var firmId = _mwFirmId();
+        var res    = window._myResource;
+        var formId = d.formId || null;
+        if (!formId) throw new Error('No formId in submit message');
+
+        // 1. Get the form definition — name + version for the instance title
+        var formDef = (window._myrFormDefs || []).find(function(f) { return f.id === formId; });
+        var formName = formDef ? (formDef.source_name || 'Form') : 'Form';
+
+        // 2. Look up the companion workflow_templates row by name + form_driven.
+        //    Filter to published/certified only — never submit against a draft template.
+        var tmplRows = await API.get(
+          'workflow_templates?firm_id=eq.' + firmId +
+          '&name=eq.' + encodeURIComponent(formName) +
+          '&form_driven=eq.true' +
+          '&status=in.(published,certified)' +
+          '&order=created_at.desc&limit=1&select=id,name,version,status'
+        ).catch(function() { return []; });
+        var tmpl = tmplRows && tmplRows[0];
+        if (!tmpl) throw new Error(
+          'No published/certified companion template found for "' + formName + '". ' +
+          'The form must be published in Cadence before it can be submitted.'
+        );
+
+        // 3. Load template steps so we can activate the first real step
+        var steps = await API.get(
+          'workflow_template_steps?template_id=eq.' + tmpl.id +
+          '&order=sequence_order.asc&select=id,name,step_type,sequence_order'
+        ).catch(function() { return []; });
+        var firstStep = (steps || []).find(function(s) { return s.step_type !== 'trigger'; });
+
+        // 4. Create the workflow_instance — template_id = companion UUID (not form_def_id)
+        var now   = new Date().toISOString();
+        var title = formName + ' — ' + (res ? res.name || 'Unknown' : 'Unknown');
+        var instRows = await API.post('workflow_instances', {
+          firm_id:                  firmId,
+          template_id:              tmpl.id,
+          form_def_id:              formId,
+          title:                    title,
+          status:                   'in_progress',
+          workflow_type:            'form',
+          launched_by:              res ? (res.user_id || res.id || null) : null,
+          launched_at:              now,
+          submitted_by_resource_id: res ? res.id   : null,
+          submitted_by_name:        res ? res.name : null,
+          current_step_name:        firstStep ? firstStep.name : null,
+          form_data:                d.formData || null,
+          created_at:               now,
+        });
+        var inst = instRows && instRows[0];
+        if (!inst || !inst.id) throw new Error('Instance creation returned no row');
+        var instanceId = inst.id;
+
+        // 5. Write trigger event (instance_launched)
+        await API.post('workflow_step_instances', {
+          instance_id:       instanceId,
+          firm_id:           firmId,
+          step_type:         'trigger',
+          step_name:         'Instance launched',
+          status:            'complete',
+          event_type:        'instance_launched',
+          event_notes:       'Submitted via Compass by ' + (res ? res.name || 'Unknown' : 'Unknown'),
+          actor_resource_id: res ? res.id : null,
+          actor_name:        res ? res.name : null,
+          created_at:        now,
+        });
+
+        // 6. Activate first real step (Employee Submission / step 1)
+        if (firstStep) {
+          await API.post('workflow_step_instances', {
+            instance_id:      instanceId,
+            firm_id:          firmId,
+            event_type:       'step_activated',
+            template_step_id: firstStep.id,
+            step_type:        firstStep.step_type || 'form',
+            step_name:        firstStep.name || null,
+            actor_name:       'System',
+            created_at:       new Date(Date.now() + 1).toISOString(),
+          }).catch(function(e) { console.warn('[compass_form_submit] step_activated write failed:', e); });
+        }
+
+        // 7. Delete draft now that submit succeeded
+        if (res && res.id && formId) {
+          await _myrDel(
+            'form_drafts?firm_id=eq.' + firmId +
+            '&user_id=eq.' + res.id +
+            '&form_def_id=eq.' + formId
+          ).catch(function(e) { console.warn('[compass_form_submit] draft cleanup failed:', e); });
+        }
+
+        // 8. Close overlay — only on success so user keeps their form on failure
+        if (overlay) overlay.remove();
+
+        console.log('%c[compass_form_submit] instance created: ' + instanceId + ' · template: ' + tmpl.id,
+          'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
+
+        compassToast('Submitted for approval — routing to ' + (firstStep ? firstStep.name : 'reviewers') + '.', 4000);
+        if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 800);
+
       } catch(e) {
-        console.error('[compass_form_submit] failed to create instance:', e);
-        compassToast('Submission failed — please try again.', 4000);
+        console.error('[compass_form_submit] failed:', e);
+        // Do NOT close the overlay on failure — user's filled form stays visible
+        compassToast('Submission failed: ' + (e.message || 'check console') + '. Your form data is preserved.', 6000);
       }
     })();
   } else if (d.type === 'compass_form_error') {
@@ -1632,18 +1715,50 @@ window.myrRecallToDraft_row = async function(instanceId, evt) {
   if (!confirm('Recall this submission and return it to Draft?')) return;
   try {
     var firmId = _mwFirmId();
-    var resId = _myResource?.id;
-    var inst = (window._myrInstances||[]).find(function(i){ return i.id === instanceId; });
+    var resId  = _myResource ? _myResource.id : null;
+    if (!resId) { compassToast('Cannot recall — user identity not resolved.', 3000); return; }
+    // MT1: fetch fresh from DB so form_def_id is available even if _myrInstances cache is stale
+    var instRows = await API.get(
+      'workflow_instances?id=eq.' + instanceId + '&select=id,template_id,form_def_id,form_data&limit=1'
+    ).catch(function(){ return []; });
+    var inst = instRows && instRows[0];
     if (!inst) { compassToast('Instance not found.', 2500); return; }
-    var formDefId = inst.template_id.replace(/^([0-9a-f]{6})00-/,'$110-');
-    await API.patch('workflow_instances?id=eq.' + instanceId + '&firm_id=eq.' + firmId, {status:'cancelled'});
-    await _myrDel('form_drafts?firm_id=eq.' + firmId + '&user_id=eq.' + resId + '&form_def_id=eq.' + formDefId).catch(function(){});
-    await API.post('form_drafts', {firm_id:firmId, user_id:resId, form_def_id:formDefId, form_data:inst.form_data||{}});
+    // Use form_def_id directly — written at submit time (MT1). No regex.
+    var formDefId = inst.form_def_id || null;
+    if (!formDefId) {
+      // Legacy fallback for pre-MT1 instances
+      if (inst.template_id) {
+        var tmplRows = await API.get(
+          'workflow_templates?id=eq.' + inst.template_id + '&select=id,name,form_driven&limit=1'
+        ).catch(function(){ return []; });
+        var lt = tmplRows && tmplRows[0];
+        if (lt && lt.form_driven && lt.name) {
+          var fdRows = await API.get(
+            'workflow_form_definitions?firm_id=eq.' + firmId +
+            '&source_name=eq.' + encodeURIComponent(lt.name) +
+            '&select=id&order=updated_at.desc&limit=1'
+          ).catch(function(){ return []; });
+          formDefId = fdRows && fdRows[0] ? fdRows[0].id : null;
+        }
+      }
+      if (!formDefId) { compassToast('Cannot recall — form definition not linked.', 3000); return; }
+    }
+    await API.patch('workflow_instances?id=eq.' + instanceId + '&firm_id=eq.' + firmId, { status: 'cancelled' });
+    await _myrDel(
+      'form_drafts?firm_id=eq.' + firmId + '&user_id=eq.' + resId + '&form_def_id=eq.' + formDefId
+    ).catch(function(){});
+    await API.post('form_drafts', {
+      firm_id:     firmId,
+      user_id:     resId,
+      form_def_id: formDefId,
+      form_data:   inst.form_data || {},
+      updated_at:  new Date().toISOString(),
+    });
     compassToast('Recalled to Draft.', 2500);
     if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 600);
   } catch(e) {
     console.error('[myrRecallToDraft_row] failed:', e);
-    compassToast('Recall failed.', 3000);
+    compassToast('Recall failed: ' + (e.message || 'check console'), 3000);
   }
 };
 
@@ -1653,8 +1768,27 @@ window.myrOpenInstance = async function(instanceId) {
     var instRows = await API.get('workflow_instances?id=eq.' + instanceId + '&select=*&limit=1').catch(function(){ return []; });
     var inst = instRows?.[0];
     if (!inst) { compassToast('Instance not found.', 2500); return; }
-    var formDefId = inst.template_id ? inst.template_id.replace(/^([0-9a-f]{6})00-/,'$110-') : null;
-    if (!formDefId) { compassToast('No form linked.', 2500); return; }
+    // MT1: Use form_def_id directly — no regex heuristic.
+    // form_def_id is written at submit time by the bulletproof compass_form_submit handler.
+    // For legacy instances that pre-date MT1 (no form_def_id), fall back gracefully.
+    var formDefId = inst.form_def_id || null;
+    if (!formDefId && inst.template_id) {
+      // Legacy fallback: look up form_def by companion template name
+      var tmplRows = await API.get(
+        'workflow_templates?id=eq.' + inst.template_id + '&select=id,name,form_driven&limit=1'
+      ).catch(function(){ return []; });
+      var legacyTmpl = tmplRows && tmplRows[0];
+      if (legacyTmpl && legacyTmpl.form_driven && legacyTmpl.name) {
+        var fdRows = await API.get(
+          'workflow_form_definitions?firm_id=eq.' + firmId +
+          '&source_name=eq.' + encodeURIComponent(legacyTmpl.name) +
+          '&select=id&order=updated_at.desc&limit=1'
+        ).catch(function(){ return []; });
+        formDefId = fdRows && fdRows[0] ? fdRows[0].id : null;
+        console.warn('[myrOpenInstance] legacy fallback resolved form_def_id:', formDefId, 'for template:', legacyTmpl.name);
+      }
+    }
+    if (!formDefId) { compassToast('No form linked to this instance.', 2500); return; }
     var rows = await API.get('workflow_form_definitions?id=eq.' + formDefId + '&firm_id=eq.' + firmId + '&select=id,source_name,source_html&limit=1').catch(function(){ return []; });
     var fd = rows?.[0];
     if (!fd?.source_html) { compassToast('Form not found.', 2500); return; }
