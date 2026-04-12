@@ -947,9 +947,57 @@ function _myrRenderBrowse() {
 // ── ACTIVE ────────────────────────────────────────────────────────────────────
 
 // ── Withdraw / delete instance ───────────────────────────────────────────────
+// ── _myrConfirm — professional confirm modal (replaces browser confirm()) ────
+// Usage: await _myrConfirm({ title, body, confirmLabel, danger })
+// Returns: true (confirmed) or false (cancelled)
+function _myrConfirm(opts) {
+  return new Promise(function(resolve) {
+    var existing = document.getElementById('myr-confirm-overlay');
+    if (existing) existing.remove();
+    var title        = opts.title        || 'Confirm';
+    var body         = opts.body         || 'Are you sure?';
+    var confirmLabel = opts.confirmLabel || 'Confirm';
+    var danger       = opts.danger !== false; // default true
+    var FA = 'font-family:Arial,sans-serif;';
+    var overlay = document.createElement('div');
+    overlay.id = 'myr-confirm-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+    overlay.innerHTML =
+      '<div style="'+FA+'background:#0d1117;border:1px solid rgba(255,255,255,.12);border-radius:10px;width:400px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.7);overflow:hidden">' +
+        '<div style="padding:18px 22px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:12px">' +
+          (danger ? '<div style="width:32px;height:32px;border-radius:8px;background:rgba(232,64,64,.12);border:1px solid rgba(232,64,64,.3);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">⚠</div>' : '') +
+          '<div style="font-size:15px;font-weight:700;color:#ffffff;letter-spacing:.01em">' + title + '</div>' +
+        '</div>' +
+        '<div style="padding:16px 22px;font-size:13px;color:rgba(255,255,255,.6);line-height:1.6">' + body + '</div>' +
+        '<div style="padding:12px 22px 18px;display:flex;justify-content:flex-end;gap:8px">' +
+          '<button id="myr-confirm-cancel" style="'+FA+'font-size:12px;font-weight:600;padding:6px 16px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.6);cursor:pointer">Cancel</button>' +
+          '<button id="myr-confirm-ok" style="'+FA+'font-size:12px;font-weight:700;padding:6px 16px;border-radius:6px;border:none;background:'+(danger?'#c0392b':'#1D9E75')+';color:#fff;cursor:pointer;letter-spacing:.02em">' + confirmLabel + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    function close(result) {
+      overlay.remove();
+      resolve(result);
+    }
+    document.getElementById('myr-confirm-ok').onclick     = function() { close(true);  };
+    document.getElementById('myr-confirm-cancel').onclick = function() { close(false); };
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) close(false); });
+    document.addEventListener('keydown', function onKey(e) {
+      if (e.key === 'Escape')  { close(false); document.removeEventListener('keydown', onKey); }
+      if (e.key === 'Enter')   { close(true);  document.removeEventListener('keydown', onKey); }
+    });
+  });
+}
+
 window.myrWithdrawInstance = async function(instanceId, title, evt) {
   if (evt) { evt.stopPropagation(); evt.preventDefault(); }
-  if (!confirm('Withdraw "' + title + '"?\nThis cannot be undone.')) return;
+  var confirmed = await _myrConfirm({
+    title: 'Withdraw Request',
+    body: '<strong style="color:#fff">' + title + '</strong><br><br>This will cancel the submission and remove it from active routing. This cannot be undone.',
+    confirmLabel: 'Withdraw',
+    danger: true
+  });
+  if (!confirmed) return;
   try {
     var firmId = _mwFirmId();
     await API.patch(
@@ -1001,14 +1049,14 @@ function _myrRenderGroupedTable(instances, isHistory) {
       html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px">
         <thead>
           <tr style="background:rgba(255,255,255,.04)">
-            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Date Filed</th>
-            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Business Purpose</th>
-            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
-            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Name</th>
-            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Location</th>
-            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total Expenses</th>
-            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Net Due</th>
-            <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
+            <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Date Filed</th>
+            <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Business Purpose</th>
+            <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
+            <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Name</th>
+            <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Location</th>
+            <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total Expenses</th>
+            <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Net Due</th>
+            <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
             ${!isHistory ? `<th style="padding:6px 10px;border-bottom:0.5px solid rgba(255,255,255,.08);width:32px"></th>` : ''}
           </tr>
         </thead>
@@ -1025,13 +1073,13 @@ function _myrRenderGroupedTable(instances, isHistory) {
         var step = inst.current_step_name || inst.status || '—';
         var sColor = statusColor[inst.status] || '#EF9F27';
         html += `<tr onclick="myrOpenInstance('${inst.id}')" style="cursor:pointer;border-bottom:0.5px solid rgba(255,255,255,.05);transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
-          <td style="${FA}font-size:11px;color:rgba(255,255,255,.6);padding:8px 10px;white-space:nowrap">${esc(date)}</td>
-          <td style="${FA}font-size:11px;color:rgba(255,255,255,.7);padding:8px 10px">${esc(purpose)}</td>
-          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(desc)}</td>
-          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientName)}</td>
-          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientLoc)}</td>
-          <td style="${FM}font-size:11px;font-weight:700;color:#3de08a;padding:8px 10px;text-align:right;white-space:nowrap">${esc(total)}</td>
-          <td style="${FM}font-size:11px;font-weight:700;color:#00c9c9;padding:8px 10px;text-align:right;white-space:nowrap">${esc(netDue)}</td>
+          <td style="${FA}font-size:13px;color:rgba(255,255,255,.6);padding:8px 10px;white-space:nowrap">${esc(date)}</td>
+          <td style="${FA}font-size:13px;color:rgba(255,255,255,.7);padding:8px 10px">${esc(purpose)}</td>
+          <td style="${FA}font-size:13px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(desc)}</td>
+          <td style="${FA}font-size:13px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientName)}</td>
+          <td style="${FA}font-size:13px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientLoc)}</td>
+          <td style="${FM}font-size:13px;font-weight:700;color:#3de08a;padding:8px 10px;text-align:right;white-space:nowrap">${esc(total)}</td>
+          <td style="${FM}font-size:13px;font-weight:700;color:#00c9c9;padding:8px 10px;text-align:right;white-space:nowrap">${esc(netDue)}</td>
           <td style="padding:8px 10px;white-space:nowrap" id="myr-status-${inst.id}">${_myrStatusCell(inst, esc(step), sColor)}</td>
           ${!isHistory ? `<td style="padding:4px 8px;white-space:nowrap;display:flex;align-items:center;gap:6px">
             <button onclick="myrRecallToDraft_row('${inst.id}',event)" style="${FA}font-size:10px;font-weight:700;padding:3px 8px;border:1px solid #f0a030;background:transparent;color:#f0a030;border-radius:3px;cursor:pointer">Recall</button>
@@ -1084,13 +1132,13 @@ function _myrRenderActive() {
       html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px">
         <thead><tr style="background:rgba(240,160,48,.06)">
           <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Date Filed</th>
-          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Business Purpose</th>
-          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
-          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Name</th>
-          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Location</th>
-          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total Expenses</th>
-          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Net Due</th>
-          <th style="${FA}font-size:11px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
+          <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Business Purpose</th>
+          <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Description</th>
+          <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Name</th>
+          <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Client Location</th>
+          <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Total Expenses</th>
+          <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:right;border-bottom:0.5px solid rgba(255,255,255,.08)">Net Due</th>
+          <th style="${FA}font-size:12px;font-weight:500;color:rgba(255,255,255,.4);padding:6px 10px;text-align:left;border-bottom:0.5px solid rgba(255,255,255,.08)">Status</th>
           <th style="padding:6px 10px;border-bottom:0.5px solid rgba(255,255,255,.08);width:32px"></th>
         </tr></thead>
         <tbody>`;
@@ -1107,16 +1155,16 @@ function _myrRenderActive() {
         var total = dd['_total_expenses'] || '—';
         var netDue = dd['_net_due_employee'] || '—';
         html += `<tr style="border-bottom:0.5px solid rgba(255,255,255,.05);background:rgba(240,160,48,.03)">
-          <td style="${FA}font-size:11px;color:rgba(255,255,255,.6);padding:8px 10px;white-space:nowrap">${esc(saved)}</td>
-          <td style="${FA}font-size:11px;color:#f0a030;padding:8px 10px">${esc(purpose)}</td>
-          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(desc)}</td>
-          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientName)}</td>
-          <td style="${FA}font-size:11px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientLoc)}</td>
-          <td style="${FM}font-size:11px;font-weight:700;color:#3de08a;padding:8px 10px;text-align:right;white-space:nowrap">${esc(total)}</td>
-          <td style="${FM}font-size:11px;font-weight:700;color:#00c9c9;padding:8px 10px;text-align:right;white-space:nowrap">${esc(netDue)}</td>
-          <td style="padding:8px 10px"><span style="${FA}font-size:10px;font-weight:700;color:#f0a030;letter-spacing:.05em">DRAFT</span></td>
+          <td style="${FA}font-size:13px;color:rgba(255,255,255,.6);padding:8px 10px;white-space:nowrap">${esc(saved)}</td>
+          <td style="${FA}font-size:13px;color:#f0a030;padding:8px 10px">${esc(purpose)}</td>
+          <td style="${FA}font-size:13px;color:rgba(255,255,255,.5);padding:8px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(desc)}</td>
+          <td style="${FA}font-size:13px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientName)}</td>
+          <td style="${FA}font-size:13px;color:rgba(255,255,255,.5);padding:8px 10px;white-space:nowrap">${esc(clientLoc)}</td>
+          <td style="${FM}font-size:13px;font-weight:700;color:#3de08a;padding:8px 10px;text-align:right;white-space:nowrap">${esc(total)}</td>
+          <td style="${FM}font-size:13px;font-weight:700;color:#00c9c9;padding:8px 10px;text-align:right;white-space:nowrap">${esc(netDue)}</td>
+          <td style="padding:8px 10px"><span style="${FA}font-size:12px;font-weight:700;color:#f0a030;letter-spacing:.05em">DRAFT</span></td>
           <td style="padding:4px 8px;white-space:nowrap">
-            <button onclick="myrContinueDraft('${draft.form_def_id}','${draft.id}')" style="${FA}font-size:10px;font-weight:700;padding:3px 8px;border-radius:3px;border:1px solid #f0a030;background:transparent;color:#f0a030;cursor:pointer">Continue →</button>
+            <button onclick="myrContinueDraft('${draft.form_def_id}','${draft.id}')" style="${FA}font-size:12px;font-weight:700;padding:3px 8px;border-radius:3px;border:1px solid #f0a030;background:transparent;color:#f0a030;cursor:pointer">Continue →</button>
             <button onclick="myrDiscardDraft('${draft.id}','${esc(name)}',event)" title="Discard" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px;margin-left:2px" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">&#128465;</button>
           </td>
         </tr>`;
@@ -1224,7 +1272,13 @@ window.addEventListener('DOMContentLoaded', function() {
 
 window.myrDiscardDraft = async function(draftId, name, evt) {
   if (evt) { evt.stopPropagation(); evt.preventDefault(); }
-  if (!confirm('Discard draft for "' + name + '"?')) return;
+  var confirmed = await _myrConfirm({
+    title: 'Discard Draft',
+    body: 'Discard the draft for <strong style="color:#fff">' + name + '</strong>?<br><br>All entered data will be permanently deleted.',
+    confirmLabel: 'Discard',
+    danger: true
+  });
+  if (!confirmed) return;
   try {
     var firmId = _mwFirmId();
     await _myrDel('form_drafts?id=eq.' + draftId + '&firm_id=eq.' + firmId);
@@ -1499,7 +1553,15 @@ window.addEventListener('message', function(ev) {
           updated_at:       new Date().toISOString(),
         });
         compassToast('Draft saved. Resume anytime from Active tab.', 3000);
-        if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 500);
+        if (typeof loadUserRequests === 'function') {
+          setTimeout(function() {
+            loadUserRequests().then(function() {
+              // Force re-render the Active pane so totals update immediately
+              // even if the user is still on the overlay or Active tab
+              if (typeof _myrRenderActive === 'function') _myrRenderActive();
+            }).catch(function(){});
+          }, 300);
+        }
       } catch(e) {
         console.error('[save_draft] failed:', e);
         compassToast('Draft save failed — please try again.', 3000);
@@ -1737,7 +1799,13 @@ function _myrStatusCell(inst, step, sColor) {
 
 window.myrRecallToDraft_row = async function(instanceId, evt) {
   if (evt) { evt.stopPropagation(); evt.preventDefault(); }
-  if (!confirm('Recall this submission and return it to Draft?')) return;
+  var confirmed = await _myrConfirm({
+    title: 'Recall to Draft',
+    body: 'Return this submission to Draft status?<br><br>The form will be removed from active routing and restored as an editable draft.',
+    confirmLabel: 'Recall',
+    danger: false
+  });
+  if (!confirmed) return;
   try {
     var firmId = _mwFirmId();
     var resId  = _myResource ? _myResource.id : null;
