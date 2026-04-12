@@ -916,7 +916,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 
       <!-- Spacer + Library sub-filter pills (visible only on Library tab) -->
       <div class="s9-subnav-spacer"></div>
-      <div class="s9-lib-filters" id="s9-lib-filters">
+      <div class="s9-lib-filters" id="s9-lib-filters" style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:rgba(255,255,255,.35);font-family:Arial,sans-serif;white-space:nowrap">Filter:</span>
         <button class="s9-filter-pill s9-fp-all active" id="s9-fp-all"
                 onclick="_s9LibFilter('all')">All</button>
         <button class="s9-filter-pill s9-fp-wf" id="s9-fp-wf"
