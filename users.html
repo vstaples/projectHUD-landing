@@ -1803,10 +1803,22 @@ function openAddUserDrawer() {
   document.getElementById('add-user-name').value  = '';
   document.getElementById('add-user-role').value  = 'viewer';
   const resEl = document.getElementById('add-user-resource');
+  // Sort: internal resources first (by department then name), external last
+  const sorted = [...UM.resources].sort((a, b) => {
+    const aExt = a.is_external ? 1 : 0;
+    const bExt = b.is_external ? 1 : 0;
+    if (aExt !== bExt) return aExt - bExt;
+    const deptCmp = (a.department||'').localeCompare(b.department||'');
+    if (deptCmp !== 0) return deptCmp;
+    return (a.first_name||'').localeCompare(b.first_name||'');
+  });
   resEl.innerHTML = '<option value="">— Not linked —</option>' +
-    UM.resources.map(r =>
-      `<option value="${r.id}">${r.first_name} ${r.last_name}</option>`
-    ).join('');
+    sorted.map(r => {
+      const name  = `${r.first_name||''} ${r.last_name||''}`.trim();
+      const title = r.title || r.department || '';
+      const ext   = r.is_external ? ' [External]' : '';
+      return `<option value="${r.id}">${name}${title ? ' — ' + title : ''}${ext}</option>`;
+    }).join('');
   const errEl = document.getElementById('add-user-err');
   const okEl  = document.getElementById('add-user-ok');
   errEl.style.display = 'none';
@@ -1843,15 +1855,16 @@ async function saveNewUser() {
 
   try {
     // Call edge function — uses service role key server-side
-    const SUPA_URL  = (typeof PHUD !== 'undefined' && PHUD.SUPABASE_URL)  || 'https://dvbetgdzksatcgdfftbs.supabase.co';
-    const SUPA_KEY  = (typeof PHUD !== 'undefined' && PHUD.SUPABASE_KEY)  || PHUD?.SUPABASE_KEY;
-    const token     = Auth.getToken ? Auth.getToken() : SUPA_KEY;
+    const SUPA_URL = PHUD.SUPABASE_URL;
+    const SUPA_KEY = PHUD.SUPABASE_KEY;
+    // Use fresh JWT for edge function auth — anon key alone returns 401
+    const token    = await Auth.getFreshToken().catch(() => Auth.getToken());
 
     const res = await fetch(`${SUPA_URL}/functions/v1/create-user`, {
       method:  'POST',
       headers: {
         'Content-Type':  'application/json',
-        'apikey':        token,
+        'apikey':        SUPA_KEY,
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
