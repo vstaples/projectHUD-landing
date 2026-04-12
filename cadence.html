@@ -4233,11 +4233,12 @@ async function _s9CovCreateScript(pathName, pathIdx) {
         // Remove + Create Script CTA, add Run script CTA
         var cta = dagRow ? dagRow.querySelector('[onclick*="_s9CovCreateScript"]') : null;
         if (cta && cta.parentElement) {
+          var runScriptId = (row && row[0]) ? row[0].id : '';
           cta.parentElement.innerHTML =
             '<div style="margin-left:16px;font-size:11px;color:#3b82f6;cursor:pointer;text-decoration:underline"' +
-            ' onclick="_cvRunPathScript('' + (row && row[0] ? row[0].id : '') + '',' + pathIdx + ')"' +
+            ' onclick="_cvRunPathScript(' + JSON.stringify(runScriptId) + ',' + pathIdx + ')"' +
             ' id="cv-run-cta-' + pathIdx + '"' +
-            '>▶ Run coverage script to verify this path</div>';
+            '>&#9654; Run coverage script to verify this path</div>';
         }
         // Update node status dots to scripted
         pathSec.querySelectorAll('.cv-dag-box.uncovered').forEach(function(box) {
