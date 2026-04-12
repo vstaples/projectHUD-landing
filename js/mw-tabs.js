@@ -1159,12 +1159,13 @@ window.myrContinueDraft = async function(formDefId, draftId) {
     // Find the draft data
     var draft = (window._myrDrafts||[]).find(d => d.id === draftId);
     var savedData = draft?.form_data || {};
-    // Inject saved values into form HTML via script tag
+    // MT1: Full restore including grid, misc, and ent rows (editable mode)
     var restoreScript = `<script>
 window.addEventListener('DOMContentLoaded', function() {
   var saved = ${JSON.stringify(savedData)};
   Object.keys(saved).forEach(function(label) {
-    if (label.indexOf('_grid_') === 0) return;
+    if (label.indexOf('_grid_') === 0 || label.indexOf('_misc_') === 0 ||
+        label.indexOf('_ent_')  === 0 || label.charAt(0) === '_') return;
     var el = document.querySelector('[data-label="' + label + '"]');
     if (el && saved[label]) el.value = saved[label];
   });
@@ -1172,28 +1173,43 @@ window.addEventListener('DOMContentLoaded', function() {
     var s = document.getElementById('trip-start');
     var e = document.getElementById('trip-end');
     if (s && saved['Trip Start Date']) s.value = saved['Trip Start Date'];
-    if (e && saved['Trip End Date']) e.value = saved['Trip End Date'];
+    if (e && saved['Trip End Date'])   e.value = saved['Trip End Date'];
     if (typeof onDateChange === 'function') onDateChange();
-    setTimeout(function() {
-      Object.keys(saved).forEach(function(label) {
-        if (label.indexOf('_grid_') !== 0) return;
-        var parts = label.split('_');
-        var cat = parts[2];
-        var dk = parts.slice(3).join('-');
-        var el = document.querySelector('[data-cat="' + cat + '"][data-dk="' + dk + '"]');
-        if (el) { el.value = saved[label]; el.dispatchEvent(new Event('input')); }
-      });
-    }, 300);
-  } else {
+  }
+  setTimeout(function() {
     Object.keys(saved).forEach(function(label) {
       if (label.indexOf('_grid_') !== 0) return;
       var parts = label.split('_');
-      var cat = parts[2];
-      var dk = parts.slice(3).join('-');
+      var cat = parts[2]; var dk = parts.slice(3).join('-');
       var el = document.querySelector('[data-cat="' + cat + '"][data-dk="' + dk + '"]');
       if (el) { el.value = saved[label]; el.dispatchEvent(new Event('input')); }
     });
-  }
+    var miscIdxs = {};
+    Object.keys(saved).forEach(function(k) { if (k.indexOf('_misc_') === 0) { miscIdxs[k.split('_')[2]] = true; } });
+    Object.keys(miscIdxs).sort().forEach(function(idx) {
+      if (typeof addMiscRow === 'function') addMiscRow();
+      var rows = document.querySelectorAll('#misc-tbody tr'); var row = rows[parseInt(idx)]; if (!row) return;
+      var desc = row.querySelector('input[placeholder="Item description"]');
+      var date = row.querySelector('input[type="date"]'); var type = row.querySelector('select'); var amt = row.querySelector('input[type="number"]');
+      if (desc && saved['_misc_'+idx+'_desc']) desc.value = saved['_misc_'+idx+'_desc'];
+      if (date && saved['_misc_'+idx+'_date']) date.value = saved['_misc_'+idx+'_date'];
+      if (type && saved['_misc_'+idx+'_type']) type.value = saved['_misc_'+idx+'_type'];
+      if (amt  && saved['_misc_'+idx+'_amt'])  { amt.value = saved['_misc_'+idx+'_amt']; amt.dispatchEvent(new Event('input')); }
+    });
+    var entIdxs = {};
+    Object.keys(saved).forEach(function(k) { if (k.indexOf('_ent_') === 0) { entIdxs[k.split('_')[2]] = true; } });
+    Object.keys(entIdxs).sort().forEach(function(idx) {
+      if (typeof addEntRow === 'function') addEntRow();
+      var rows = document.querySelectorAll('#ent-tbody tr'); var row = rows[parseInt(idx)]; if (!row) return;
+      var date = row.querySelector('input[type="date"]'); var type = row.querySelector('.ent-type');
+      var guests = row.querySelector('.ent-guests'); var purpose = row.querySelector('.ent-purpose'); var amt = row.querySelector('.ent-amt');
+      if (date    && saved['_ent_'+idx+'_date'])    date.value    = saved['_ent_'+idx+'_date'];
+      if (type    && saved['_ent_'+idx+'_type'])    type.value    = saved['_ent_'+idx+'_type'];
+      if (guests  && saved['_ent_'+idx+'_guests'])  guests.value  = saved['_ent_'+idx+'_guests'];
+      if (purpose && saved['_ent_'+idx+'_purpose']) purpose.value = saved['_ent_'+idx+'_purpose'];
+      if (amt     && saved['_ent_'+idx+'_amt'])     { amt.value = saved['_ent_'+idx+'_amt']; amt.dispatchEvent(new Event('input')); }
+    });
+  }, 400);
 });
 <\/script>`;
     var html = fd.source_html.replace('</body>', restoreScript + '</body>');
@@ -1458,6 +1474,15 @@ function _myrOpenHtmlFormOverlay(title, url) {
 window.addEventListener('message', function(ev) {
   var d = ev.data;
   if (!d || !d.type) return;
+  // MT1 security: only process Cadence form messages.
+  // Blob URL iframes have origin 'null' — that's the only expected source.
+  // Reject anything else that isn't the same origin (e.g. injected cross-origin frames).
+  var knownTypes = ['compass_form_save_draft', 'compass_form_submit', 'compass_form_error'];
+  if (knownTypes.indexOf(d.type) === -1) return; // not a Cadence form message — ignore
+  if (ev.origin !== 'null' && ev.origin !== window.location.origin) {
+    console.warn('[mw-tabs] postMessage from unexpected origin rejected:', ev.origin);
+    return;
+  }
   if (d.type === 'compass_form_save_draft') {
     (async function() {
       try {
@@ -1793,35 +1818,91 @@ window.myrOpenInstance = async function(instanceId) {
     var fd = rows?.[0];
     if (!fd?.source_html) { compassToast('Form not found.', 2500); return; }
     var savedData = inst.form_data || {};
-    var restoreScript = '<script>\nwindow.addEventListener(\'DOMContentLoaded\', function() {\n' +
-      '  var saved = ' + JSON.stringify(savedData) + ';\n' +
-      '  Object.keys(saved).forEach(function(label) {\n' +
-      '    if (label.indexOf(\'_grid_\') === 0) return;\n' +
-      '    var el = document.querySelector(\'[data-label="\' + label + \'"]\'  );\n' +
-      '    if (el && saved[label]) el.value = saved[label];\n' +
-      '  });\n' +
-      '  if (typeof buildTable === \'function\' && (saved[\'Trip Start Date\'] || saved[\'Trip End Date\'])) {\n' +
-      '    var s = document.querySelector(\'[data-label="Trip Start Date"]\');\n' +
-      '    var e = document.querySelector(\'[data-label="Trip End Date"]\');\n' +
-      '    if (s && saved[\'Trip Start Date\']) s.value = saved[\'Trip Start Date\'];\n' +
-      '    if (e && saved[\'Trip End Date\']) e.value = saved[\'Trip End Date\'];\n' +
-      '    if (typeof onDateChange === \'function\') onDateChange();\n' +
-      '    setTimeout(function() {\n' +
-      '      Object.keys(saved).forEach(function(label) {\n' +
-      '        if (label.indexOf(\'_grid_\') !== 0) return;\n' +
-      '        var parts = label.split(\'_\');\n' +
-      '        var cat = parts[2]; var dk = parts.slice(3).join(\'-\');\n' +
-      '        var el = document.querySelector(\'[data-cat="\' + cat + \'"  ][data-dk="\' + dk + \'"]\'  );\n' +
-      '        if (el) { el.value = saved[label]; el.dispatchEvent(new Event(\'input\')); }\n' +
-      '      });\n' +
-      '      document.querySelectorAll(\'input,textarea,select\').forEach(function(el) { el.disabled=true; el.style.cursor=\'not-allowed\'; });\n' +
-      '      document.querySelectorAll(\'.btn-s,.btn-p,.ftr\').forEach(function(el) { el.style.display=\'none\'; });\n' +
-      '    }, 300);\n' +
-      '  } else {\n' +
-      '    document.querySelectorAll(\'input,textarea,select\').forEach(function(el) { el.disabled=true; el.style.cursor=\'not-allowed\'; });\n' +
-      '    document.querySelectorAll(\'.btn-s,.btn-p,.ftr\').forEach(function(el) { el.style.display=\'none\'; });\n' +
-      '  }\n' +
-      '});\n<\/script>';
+    var restoreScript = `<script>
+window.addEventListener('DOMContentLoaded', function() {
+  var saved = ${JSON.stringify(savedData)};
+
+  // 1. Restore named fields (data-label)
+  Object.keys(saved).forEach(function(label) {
+    if (label.indexOf('_grid_') === 0 || label.indexOf('_misc_') === 0 ||
+        label.indexOf('_ent_')  === 0 || label.charAt(0) === '_') return;
+    var el = document.querySelector('[data-label="' + label + '"]');
+    if (el && saved[label]) el.value = saved[label];
+  });
+
+  // 2. Rebuild date grid if trip dates are saved, then restore grid values
+  if (typeof buildTable === 'function' && (saved['Trip Start Date'] || saved['Trip End Date'])) {
+    var s = document.getElementById('trip-start');
+    var e = document.getElementById('trip-end');
+    if (s && saved['Trip Start Date']) s.value = saved['Trip Start Date'];
+    if (e && saved['Trip End Date'])   e.value = saved['Trip End Date'];
+    if (typeof onDateChange === 'function') onDateChange();
+  }
+
+  setTimeout(function() {
+    // 3. Grid cells — _grid_{cat}_{dk}
+    Object.keys(saved).forEach(function(label) {
+      if (label.indexOf('_grid_') !== 0) return;
+      var parts = label.split('_');
+      // parts: ['', 'grid', cat, ...dk parts]
+      var cat = parts[2];
+      var dk  = parts.slice(3).join('-');
+      var el = document.querySelector('[data-cat="' + cat + '"][data-dk="' + dk + '"]');
+      if (el) { el.value = saved[label]; el.dispatchEvent(new Event('input')); }
+    });
+
+    // 4. Misc expense rows — _misc_{idx}_{field}
+    var miscIdxs = {};
+    Object.keys(saved).forEach(function(k) {
+      if (k.indexOf('_misc_') === 0) { miscIdxs[k.split('_')[2]] = true; }
+    });
+    Object.keys(miscIdxs).sort().forEach(function(idx) {
+      if (typeof addMiscRow === 'function') addMiscRow();
+      var rows = document.querySelectorAll('#misc-tbody tr');
+      var row  = rows[parseInt(idx)];
+      if (!row) return;
+      var desc = row.querySelector('input[placeholder="Item description"]');
+      var date = row.querySelector('input[type="date"]');
+      var type = row.querySelector('select');
+      var amt  = row.querySelector('input[type="number"]');
+      if (desc && saved['_misc_'+idx+'_desc']) desc.value = saved['_misc_'+idx+'_desc'];
+      if (date && saved['_misc_'+idx+'_date']) date.value = saved['_misc_'+idx+'_date'];
+      if (type && saved['_misc_'+idx+'_type']) type.value = saved['_misc_'+idx+'_type'];
+      if (amt  && saved['_misc_'+idx+'_amt'])  { amt.value = saved['_misc_'+idx+'_amt']; amt.dispatchEvent(new Event('input')); }
+    });
+
+    // 5. Entertainment detail rows — _ent_{idx}_{field}
+    var entIdxs = {};
+    Object.keys(saved).forEach(function(k) {
+      if (k.indexOf('_ent_') === 0) { entIdxs[k.split('_')[2]] = true; }
+    });
+    Object.keys(entIdxs).sort().forEach(function(idx) {
+      if (typeof addEntRow === 'function') addEntRow();
+      var rows = document.querySelectorAll('#ent-tbody tr');
+      var row  = rows[parseInt(idx)];
+      if (!row) return;
+      var date    = row.querySelector('input[type="date"]');
+      var type    = row.querySelector('.ent-type');
+      var guests  = row.querySelector('.ent-guests');
+      var purpose = row.querySelector('.ent-purpose');
+      var amt     = row.querySelector('.ent-amt');
+      if (date    && saved['_ent_'+idx+'_date'])    date.value    = saved['_ent_'+idx+'_date'];
+      if (type    && saved['_ent_'+idx+'_type'])    type.value    = saved['_ent_'+idx+'_type'];
+      if (guests  && saved['_ent_'+idx+'_guests'])  guests.value  = saved['_ent_'+idx+'_guests'];
+      if (purpose && saved['_ent_'+idx+'_purpose']) purpose.value = saved['_ent_'+idx+'_purpose'];
+      if (amt     && saved['_ent_'+idx+'_amt'])     { amt.value = saved['_ent_'+idx+'_amt']; amt.dispatchEvent(new Event('input')); }
+    });
+
+    // 6. Lock form — read-only view mode
+    document.querySelectorAll('input,textarea,select').forEach(function(el) {
+      el.disabled = true; el.style.cursor = 'not-allowed';
+    });
+    document.querySelectorAll('.btn-s,.btn-p,.ftr').forEach(function(el) {
+      el.style.display = 'none';
+    });
+  }, 400);
+});
+<\/script>`;
     var html = fd.source_html.replace('<\/body>', restoreScript + '<\/body>');
     if (!html.includes('<\/body>')) html = fd.source_html + restoreScript;
     var blob = new Blob([html], {type:'text/html;charset=utf-8'});
@@ -1878,7 +1959,7 @@ window.renderDeltaStrip = function(deltas) {
     cyan:  'border:1px solid rgba(0,210,255,.3);color:#00D2FF',
   };
   chips.innerHTML = deltas.map((d, i) =>
-    `<span class="delta-chip" style="${colorMap[d.color]||colorMap.cyan}" data-delta-idx="${i}">${_esc(d.label)}</span>`
+    '<span class="delta-chip" style="' + (colorMap[d.color]||colorMap.cyan) + '" data-delta-idx="' + i + '">' + _esc(d.label) + '</span>'
   ).join('');
   // Store navigate fns
   window._deltaNavigateFns = deltas.map(d => d.navigate || null);
