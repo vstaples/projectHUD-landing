@@ -3058,9 +3058,9 @@ window._s9OnSimComplete = async function(allResults) {
     if (certRow && certRow.id) window._s9LastCertDbId = certRow.id;
     window._s9CertIssuingLock = false;
     console.log('%c[S9] Certificate persisted -- ' + certNum + (certRow?' · DB:'+certRow.id.slice(0,8):''), 'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
-    // Auto-certify linked form def if this is a form-driven workflow
+    // Auto-certify linked form def + template if this is a form-driven workflow
     if (tmpl && tmpl.form_driven) {
-      // Match by source_name + committed state — the correct version lane approach
+      console.log('[S9] Auto-certify: looking up committed form def for', tmpl.name, '(tmpl:', tmpl.id.slice(0,8), 'form_driven:', tmpl.form_driven, ')');
       API.get(
         'workflow_form_definitions?firm_id=eq.'+firmId+
         '&source_name=eq.'+encodeURIComponent(tmpl.name)+
@@ -3068,9 +3068,11 @@ window._s9OnSimComplete = async function(allResults) {
       ).then(function(forms) {
         var linked = forms && forms[0];
         if (!linked) {
-          console.warn('[S9] Auto-certify: no committed form def found for', tmpl.name);
+          console.warn('[S9] Auto-certify: no committed form def found for "'+tmpl.name+'" — form may already be certified or name mismatch');
           return;
         }
+        console.log('[S9] Auto-certify: found form def', linked.id.slice(0,8), '— patching to certified');
+        // Patch form def to certified
         API.patch('workflow_form_definitions?id=eq.'+linked.id, {
           state: 'certified',
           updated_at: new Date().toISOString()
@@ -3085,7 +3087,16 @@ window._s9OnSimComplete = async function(allResults) {
             if (listEl) listEl.innerHTML = _renderFormList();
           }
         }).catch(function(e){ console.warn('[S9] Form def auto-certify patch failed:', e); });
+        // Also patch companion template to certified
+        API.patch('workflow_templates?id=eq.'+tmpl.id, {
+          status: 'certified',
+          updated_at: new Date().toISOString()
+        }).then(function() {
+          console.log('[S9] Template auto-certified:', tmpl.id.slice(0,8));
+        }).catch(function(e){ console.warn('[S9] Template auto-certify patch failed:', e); });
       }).catch(function(e){ console.warn('[S9] Auto-certify form lookup failed:', e); });
+    } else {
+      console.log('[S9] Auto-certify skipped — tmpl.form_driven:', tmpl && tmpl.form_driven, 'tmpl:', tmpl && tmpl.id.slice(0,8));
     }
   }).catch(function(e){ console.warn('[S9] bist_certificates write failed:', e); });
 };
@@ -5562,7 +5573,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-dashboard.js?v=20260410-CD57"></script>
 <script src="/js/cdn-documents.js?v=20260403-S9"></script>
 <script src="/js/cdn-events.js?v=20260403-S9"></script>
-<script src="/js/cdn-form-editor.js?v=20260410-SE119"></script>
+<script src="/js/cdn-form-editor.js?v=20260410-SE120"></script>
 <script src="/js/cdn-form-runtime.js?v=20260407-FRT3"></script>
 <script src="/js/cdn-form-settings.js?v=20260403-S9"></script>
 <script src="/js/cdn-instance-dag.js?v=20260403-S9"></script>
