@@ -1679,6 +1679,33 @@ window.addEventListener('message', function(ev) {
         console.log('%c[compass_form_submit] instance created: ' + instanceId + ' · template: ' + tmpl.id,
           'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
 
+        // Write request.submitted CoC event — powers the Document Review Request panel.
+        // The docs[] array makes the form appear as a clickable link in the review panel.
+        // path: 'form:{formDefId}' is handled by myrOpenAttachment to render source_html.
+        await API.post('coc_events', {
+          firm_id:           firmId,
+          entity_id:         instanceId,
+          entity_type:       'workflow_instance',
+          event_type:        'request.submitted',
+          event_class:       'lifecycle',
+          severity:          'info',
+          event_notes:       JSON.stringify({
+            doc_name:     formName,
+            instructions: 'Please review and sign the ' + formName + ' submitted by ' + (res ? res.name : 'Unknown') + '.',
+            docs: [{
+              name:   formName + ' v' + (formDef ? formDef.version || '—' : '—'),
+              source: 'form',
+              path:   'form:' + formId,
+              mime:   'text/html',
+            }],
+            submitter_resource_id: res ? res.id : null,
+          }),
+          actor_name:        res ? res.name : 'System',
+          actor_resource_id: res ? res.id   : null,
+          occurred_at:       now,
+          created_at:        now,
+        }).catch(function(e) { console.warn('[compass_form_submit] CoC write failed:', e); });
+
         // Resolve role → resource and create workflow_request for step 1
         if (firstStep && res && res.id) {
           await window._mwResolveAndRoute(
@@ -1699,6 +1726,69 @@ window.addEventListener('message', function(ev) {
     compassToast('Please complete all required fields: ' + (d.fields||[]).join(', '), 4000);
   }
 });
+
+// ── myrOpenAttachment ─────────────────────────────────────────────────────────
+// Opens an attachment from the Document Review Request panel.
+// Handles two cases:
+//   source='form'  → fetches source_html from DB and renders in overlay (read-only)
+//   otherwise      → treats path as a storage path and opens via signed URL
+// ─────────────────────────────────────────────────────────────────────────────
+window.myrOpenAttachment = async function(path) {
+  if (!path) return;
+  var firmId = _mwFirmId();
+
+  // Form attachment — path is the form_def_id prefixed with 'form:'
+  if (path.indexOf('form:') === 0) {
+    var formDefId = path.slice(5);
+    var rows = await API.get(
+      'workflow_form_definitions?id=eq.' + formDefId +
+      '&firm_id=eq.' + firmId +
+      '&select=id,source_name,source_html&limit=1'
+    ).catch(function() { return []; });
+    var fd = rows && rows[0];
+    if (!fd || !fd.source_html) {
+      compassToast('Form not available.', 2500);
+      return;
+    }
+    // Render read-only form in overlay
+    var blob = new Blob([fd.source_html], { type: 'text/html;charset=utf-8' });
+    var blobUrl = URL.createObjectURL(blob);
+    _myrOpenHtmlFormOverlay(fd.source_name || 'Form', blobUrl);
+    // Lock it immediately since this is a review view, not an edit
+    setTimeout(function() {
+      var iframe = document.querySelector('#myr-html-form-modal iframe');
+      if (!iframe) return;
+      iframe.addEventListener('load', function() {
+        try {
+          var doc = iframe.contentDocument || iframe.contentWindow.document;
+          doc.querySelectorAll('input,textarea,select').forEach(function(el) {
+            el.disabled = true; el.style.cursor = 'not-allowed';
+          });
+          doc.querySelectorAll('.btn-s,.btn-p,.ftr').forEach(function(el) {
+            el.style.display = 'none';
+          });
+        } catch(e) { /* cross-origin guard */ }
+      });
+    }, 100);
+    return;
+  }
+
+  // File attachment — open via signed URL
+  try {
+    var url;
+    if (typeof _getSignedUrl === 'function') {
+      url = await _getSignedUrl(path);
+    } else {
+      var SUPA = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : _mwSupaURL();
+      var BKT  = typeof STORAGE_BUCKET !== 'undefined' ? STORAGE_BUCKET : 'workflow-documents';
+      url = SUPA + '/storage/v1/object/public/' + BKT + '/' + path;
+    }
+    window.open(url, '_blank');
+  } catch(e) {
+    compassToast('Could not open attachment.', 2500);
+    console.error('[myrOpenAttachment] failed:', e);
+  }
+};
 
 // ── _mwResolveAndRoute — Resolution Engine ───────────────────────────────────
 // Maps workflow template step roles to actual resource IDs and creates
