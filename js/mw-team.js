@@ -1,5 +1,5 @@
 // mw-team.js — My Team view for Compass
-// v20260411-MT3
+// v20260412-MT4
 // Globals: _myResource, API
 // Tab key: 'team' → panel: #utc-team
 
@@ -531,6 +531,8 @@ function _e(s) {
   tryInstall();
   setTimeout(tryInstall, 500);
   setTimeout(tryInstall, 1500);
+  setTimeout(tryInstall, 3000);
+  setTimeout(tryInstall, 5000);
 })();
 
 })();
