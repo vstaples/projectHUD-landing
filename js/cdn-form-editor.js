@@ -3031,6 +3031,20 @@ async function _proceedWithImport(startPage = 1, endPage = null) {
 async function _formSelect(formId) {
   const form = _formDefs.find(f => f.id === formId);
   if (!form) return;
+  // SE122 — re-fetch authoritative state/version from DB before rendering.
+  // Prevents toolbar showing stale state from in-memory cache when auto-certify
+  // or another tab has advanced the form since _formDefs was last loaded.
+  try {
+    var fresh = await API.get(
+      'workflow_form_definitions?id=eq.'+formId+'&select=id,state,version,compass_visible,updated_at'
+    ).catch(function(){ return null; });
+    if (fresh && fresh[0]) {
+      form.state           = fresh[0].state;
+      form.version         = fresh[0].version;
+      form.compass_visible = fresh[0].compass_visible;
+      form.updated_at      = fresh[0].updated_at;
+    }
+  } catch(e) { /* non-fatal — render from cache if fetch fails */ }
   _selectedForm = form;
   _formFields   = JSON.parse(JSON.stringify(form.fields || []));
   _formRouting  = JSON.parse(JSON.stringify(form.routing || { stages:[] }));
