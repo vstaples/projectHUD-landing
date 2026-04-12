@@ -3060,32 +3060,32 @@ window._s9OnSimComplete = async function(allResults) {
     console.log('%c[S9] Certificate persisted -- ' + certNum + (certRow?' · DB:'+certRow.id.slice(0,8):''), 'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
     // Auto-certify linked form def if this is a form-driven workflow
     if (tmpl && tmpl.form_driven) {
-      API.get('workflow_form_definitions?firm_id=eq.'+firmId+'&select=id,state&order=updated_at.desc&limit=10').then(function(forms) {
-        // Find form def linked to this companion workflow
-        API.get('workflow_template_steps?template_id=eq.'+tmpl.id+'&step_type=eq.form&select=id&limit=1').then(function(steps) {
-          if (!steps || !steps[0]) return;
-          var stepId = steps[0].id;
-          API.get('workflow_form_definitions?firm_id=eq.'+firmId+'&select=id,state').then(function(allForms) {
-            // Find form def whose step is linked — match by companion template name
-            var linked = allForms.find(function(f){ return f.state === 'draft'; });
-            if (!linked) return;
-            // Patch to certified
-            API.patch('workflow_form_definitions?id=eq.'+linked.id, {
-              state: 'certified',
-              updated_at: new Date().toISOString()
-            }).then(function() {
-              console.log('[S9] Form def auto-certified:', linked.id.slice(0,8));
-              // Refresh form editor if open
-              if (window._selectedForm && window._selectedForm.id === linked.id) {
-                window._selectedForm.state = 'certified';
-                if (typeof _formRefreshToolbar === 'function') _formRefreshToolbar();
-              }
-              // Refresh form list
-              if (typeof _formRefreshUI === 'function') _formRefreshUI();
-            }).catch(function(){});
-          }).catch(function(){});
-        }).catch(function(){});
-      }).catch(function(){});
+      // Match by source_name + committed state — the correct version lane approach
+      API.get(
+        'workflow_form_definitions?firm_id=eq.'+firmId+
+        '&source_name=eq.'+encodeURIComponent(tmpl.name)+
+        '&state=eq.committed&select=id,state,source_name&order=updated_at.desc&limit=1'
+      ).then(function(forms) {
+        var linked = forms && forms[0];
+        if (!linked) {
+          console.warn('[S9] Auto-certify: no committed form def found for', tmpl.name);
+          return;
+        }
+        API.patch('workflow_form_definitions?id=eq.'+linked.id, {
+          state: 'certified',
+          updated_at: new Date().toISOString()
+        }).then(function() {
+          console.log('[S9] Form def auto-certified:', linked.id.slice(0,8));
+          if (window._selectedForm && window._selectedForm.id === linked.id) {
+            window._selectedForm.state = 'certified';
+            if (typeof _formRefreshToolbar === 'function') _formRefreshToolbar();
+          }
+          if (typeof _renderFormList === 'function') {
+            var listEl = document.getElementById('form-list');
+            if (listEl) listEl.innerHTML = _renderFormList();
+          }
+        }).catch(function(e){ console.warn('[S9] Form def auto-certify patch failed:', e); });
+      }).catch(function(e){ console.warn('[S9] Auto-certify form lookup failed:', e); });
     }
   }).catch(function(e){ console.warn('[S9] bist_certificates write failed:', e); });
 };
@@ -3288,23 +3288,71 @@ async function _s9LoadSimScripts(templateId, version) {
         var gateEl = document.getElementById('s9-sim-gate');
         if (gateEl) gateEl.style.display = 'flex';
         gateLeftEl.style.color = '#f0a030'; gateLeftEl.style.cursor = 'default'; gateLeftEl.onclick = null;
-        // No runs — cert button stays hidden
-        var certBtn = document.getElementById('s9-cert-btn');
-        if (certBtn) certBtn.style.display = 'none';
+        // No runs this session — check DB for valid cert before hiding button
+        (async function() {
+          try {
+            var _fId = await _s9WaitForFirmId();
+            var _tmplId = (typeof _selectedTmpl !== 'undefined' && _selectedTmpl) ? _selectedTmpl.id : templateId;
+            var _certs = await API.get(
+              'bist_certificates?firm_id=eq.' + _fId +
+              '&template_id=eq.' + _tmplId + '&status=eq.valid&select=id,issued_at,certificate_number&limit=1'
+            ).catch(function(){ return []; });
+            var _hasDbCert = _certs && _certs.length > 0;
+            if (_hasDbCert && !window._s9LastCertTs) {
+              window._s9LastCertTs = _certs[0].issued_at;
+              window._s9LastCertId = _certs[0].certificate_number;
+              window._s9LastCertDbId = _certs[0].id;
+            }
+            var _btn = document.getElementById('s9-cert-btn');
+            if (_btn) {
+              _btn.style.display     = _hasDbCert ? '' : 'none';
+              _btn.style.borderColor = 'rgba(40,212,192,.3)';
+              _btn.style.background  = 'rgba(40,212,192,.08)';
+              _btn.style.color       = '#28d4c0';
+              _btn.style.cursor      = 'pointer';
+              _btn.textContent       = '✓ Certificate';
+            }
+          } catch(e) {
+            var _btn = document.getElementById('s9-cert-btn');
+            if (_btn) _btn.style.display = 'none';
+          }
+        }());
       } else if (allPass) {
         gateEl.textContent = '✓ All tests passing — cleared for release';
         gateEl.style.color = '#3de08a'; gateEl.style.background = 'rgba(61,224,138,.1)'; gateEl.style.borderColor = 'rgba(61,224,138,.25)';
         gateEl.style.cursor = 'default'; gateEl.onclick = null;
         gateLeftEl.textContent = '✓ All tests passing — cleared for release';
         gateLeftEl.style.color = '#3de08a'; gateLeftEl.style.cursor = 'default'; gateLeftEl.onclick = null;
-        // All pass — show cert button always when all tests pass (DB cert checked on click)
+        // All pass — check DB for valid cert to set button state correctly after hard reset
         var certBtn = document.getElementById('s9-cert-btn');
         if (certBtn) {
-          certBtn.style.display     = '';
-          certBtn.style.borderColor = 'rgba(40,212,192,.3)';
-          certBtn.style.background  = 'rgba(40,212,192,.08)';
-          certBtn.style.color       = '#28d4c0';
-          certBtn.style.cursor      = 'pointer';
+          certBtn.style.display = '';
+          // Check DB for valid cert to style button correctly
+          (async function() {
+            try {
+              var _fId = await _s9WaitForFirmId();
+              var _tmplId = (typeof _selectedTmpl !== 'undefined' && _selectedTmpl) ? _selectedTmpl.id : templateId;
+              var _certs = await API.get(
+                'bist_certificates?firm_id=eq.' + _fId +
+                '&template_id=eq.' + _tmplId + '&status=eq.valid&select=id,issued_at,certificate_number&limit=1'
+              ).catch(function(){ return []; });
+              var _hasDbCert = _certs && _certs.length > 0;
+              // Restore session state from DB if not already set
+              if (_hasDbCert && !window._s9LastCertTs) {
+                window._s9LastCertTs = _certs[0].issued_at;
+                window._s9LastCertId = _certs[0].certificate_number;
+                window._s9LastCertDbId = _certs[0].id;
+              }
+              var _btn = document.getElementById('s9-cert-btn');
+              if (_btn) {
+                _btn.style.borderColor = _hasDbCert ? 'rgba(40,212,192,.3)' : 'rgba(255,255,255,.15)';
+                _btn.style.background  = _hasDbCert ? 'rgba(40,212,192,.08)' : 'rgba(255,255,255,.04)';
+                _btn.style.color       = _hasDbCert ? '#28d4c0' : 'rgba(255,255,255,.55)';
+                _btn.style.cursor      = 'pointer';
+                _btn.textContent       = _hasDbCert ? '✓ Certificate' : '○ Certificate';
+              }
+            } catch(e) {}
+          }());
         }
       } else {
         // Failing — make gate clickable to open failing script
@@ -3496,25 +3544,6 @@ async function _s9LoadCoverageData(templateId, version) {
     console.log('[S9 Coverage] scripts:', scripts.length, 'runs:', (runs||[]).length, 'steps:', steps.length);
     _s9RenderCoverageTab(body, scripts || [], runs || [], steps, version);
 
-    // Check DB for valid cert and show cert button if found — handles post-reset state
-    (async function() {
-      try {
-        var tmplId2 = templateId;
-        var firmId2 = await _s9WaitForFirmId();
-        var certs2 = await API.get(
-          'bist_certificates?firm_id=eq.' + firmId2 +
-          '&template_id=eq.' + tmplId2 + '&status=eq.valid&select=id&limit=1'
-        ).catch(function(){ return []; });
-        var certBtn2 = document.getElementById('s9-cert-btn');
-        if (certBtn2 && certs2 && certs2.length) {
-          certBtn2.style.display     = '';
-          certBtn2.style.borderColor = 'rgba(40,212,192,.3)';
-          certBtn2.style.background  = 'rgba(40,212,192,.08)';
-          certBtn2.style.color       = '#28d4c0';
-          certBtn2.style.cursor      = 'pointer';
-        }
-      } catch(e) {}
-    }());
 
   } catch(e) {
     console.error('[S9 Coverage] Load failed:', e);
