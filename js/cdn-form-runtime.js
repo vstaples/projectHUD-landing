@@ -1,5 +1,5 @@
 // cdn-form-runtime.js
-console.log('[cdn-form-runtime] v20260407-FRT2');
+console.log('[cdn-form-runtime] v20260407-FRT3');
 // Renders the fillable form inside the instance step panel.
 // Handles response persistence, gate check, and evidence PDF generation.
 //
@@ -82,9 +82,18 @@ function _renderHtmlFormFillPanel(el, formDef, step, inst, existing) {
 
   // Pre-fill existing responses into HTML
   var html = formDef.source_html;
+  // Always parse html to inject runtime-controlled values
+  var parser = new DOMParser();
+  var doc = parser.parseFromString(html, 'text/html');
+  // Inject template version into data-runtime="template_version" elements
+  var verEls = doc.querySelectorAll('[data-runtime="template_version"]');
+  if (verEls.length && formDef.version) {
+    verEls.forEach(function(el2) {
+      el2.textContent = 'v' + formDef.version + ' · Cadence / Compass';
+    });
+  }
+  // Restore existing field values
   if (existing && Object.keys(existing).length) {
-    var parser = new DOMParser();
-    var doc = parser.parseFromString(html, 'text/html');
     Object.keys(existing).forEach(function(fieldId) {
       var el2 = doc.querySelector('[data-field-id="'+fieldId+'"]');
       if (el2 && existing[fieldId].value) {
@@ -97,8 +106,8 @@ function _renderHtmlFormFillPanel(el, formDef, step, inst, existing) {
         }
       }
     });
-    html = doc.body.innerHTML;
   }
+  html = doc.body.innerHTML;
 
   var blob = new Blob([cssVars + html], { type: 'text/html' });
   var iframeId = 'frt-iframe-' + step.id;
