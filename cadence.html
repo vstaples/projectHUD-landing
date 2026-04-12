@@ -4216,21 +4216,26 @@ async function _s9CovCreateScript(pathName, pathIdx) {
 
   // Targeted path update — update only the affected path row DOM, no full re-render
   setTimeout(function() {
-    // Update path section label from UNCOVERED to SCRIPTED without full re-render
     if (pathIdx != null) {
       var pathSec = document.getElementById('cv-path-sec-' + pathIdx);
       var dagRow  = document.getElementById('cv-dag-row-' + pathIdx);
       if (pathSec) {
-        // Update path label color to scripted (blue)
+        // Update path label — it is the first child .cv-path-label inside pathSec
         var lbl = pathSec.querySelector('.cv-path-label');
-        if (lbl) lbl.style.color = '#3b82f6';
-        // Update section heading text from UNCOVERED to SCRIPTED
-        var heading = pathSec.previousElementSibling;
-        if (heading && heading.textContent && heading.textContent.includes('UNCOVERED')) {
-          heading.textContent = heading.textContent.replace('UNCOVERED', 'SCRIPTED');
-          heading.style.color = '#3b82f6';
+        if (lbl) {
+          // Update color
+          lbl.style.color = '#3b82f6';
+          // Update heading text: find the text node or span with UNCOVERED
+          var hcEl = lbl.querySelector('.cv-pl-hc');
+          if (hcEl && hcEl.textContent.includes('UNCOVERED')) {
+            hcEl.textContent = hcEl.textContent.replace('UNCOVERED', 'SCRIPTED');
+            hcEl.style.color = '#3b82f6';
+          }
+          // Replace + Create script link in label with nothing (script now in dagRow CTA)
+          var lblLink = lbl.querySelector('[onclick*="_s9CovCreateScript"]');
+          if (lblLink) lblLink.remove();
         }
-        // Remove + Create Script CTA, add Run script CTA
+        // Remove + Create Script CTA from dagRow, add Run script CTA
         var cta = dagRow ? dagRow.querySelector('[onclick*="_s9CovCreateScript"]') : null;
         if (cta && cta.parentElement) {
           var runScriptId = (row && row[0]) ? row[0].id : '';
@@ -4240,14 +4245,22 @@ async function _s9CovCreateScript(pathName, pathIdx) {
             ' id="cv-run-cta-' + pathIdx + '"' +
             '>&#9654; Run coverage script to verify this path</div>';
         }
-        // Update node status dots to scripted
+        // Update node status dots from uncovered to scripted
         pathSec.querySelectorAll('.cv-dag-box.uncovered').forEach(function(box) {
           box.classList.remove('uncovered');
           box.classList.add('scripted');
         });
       }
+      // Update bottom routing path table row status
+      var tblRows = document.querySelectorAll('.cv-path-tbl-row, [data-path-idx]');
+      tblRows.forEach(function(r) {
+        if (r.dataset.pathIdx == pathIdx) {
+          var statusEl = r.querySelector('.cv-path-status, [data-status]');
+          if (statusEl) { statusEl.textContent = 'SCRIPTED'; statusEl.style.color = '#3b82f6'; }
+        }
+      });
     }
-    // Also refresh left sidebar script list without full re-render
+    // Refresh left sidebar script list
     if (typeof _s9LoadSimScripts === 'function') {
       _s9LoadSimScripts(tmpl.id, tmpl.version || '0.0.0');
     }
