@@ -1,5 +1,5 @@
 // cdn-template-editor.js — Cadence: template editor, spine, step CRUD
-console.log('%c[cdn-template-editor] v20260406-D2','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-template-editor] v20260406-D3','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 // Depends on: cdn-dag-viewer, cdn-assignee, cdn-outcomes, cdn-documents
 // LOAD ORDER: 7th
 
@@ -120,7 +120,16 @@ async function selectTemplate(id) {
     _dirtySteps = false;
   }
   _selectedTmpl = _templates.find(t => t.id === id) || null;
-  if (!_selectedTmpl) return;
+  if (!_selectedTmpl) {
+    // DB fallback — template may have been created this session after _templates was loaded
+    const rows = await API.get(
+      'workflow_templates?id=eq.' + id + '&select=id,name,version,status,form_driven,trigger_type'
+    ).catch(() => []);
+    if (!rows || !rows[0]) return;
+    _selectedTmpl = rows[0];
+    _templates.push(_selectedTmpl); // add to cache so future finds work
+    console.log('[selectTemplate] DB fallback for:', _selectedTmpl.name, _selectedTmpl.version);
+  }
 
   // Load steps
   const steps = await API.get(
