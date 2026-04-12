@@ -2582,7 +2582,7 @@ async function _s9PopulateTemplateSelector() {
   if (!sel) return;
   var firmId = await _s9WaitForFirmId();
   var templates = await API.get(
-    'workflow_templates?firm_id=eq.' + firmId + '&order=name.asc&select=id,name,version,status,form_driven'
+    'workflow_templates?firm_id=eq.' + firmId + '&status=neq.archived&status=neq.superseded&order=name.asc&select=id,name,version,status,form_driven'
   ).catch(function(){ return []; });
   if (!Array.isArray(templates) || !templates.length) return;
 
@@ -2921,7 +2921,7 @@ function _s9RenderCertBody() {
 
 // ── Wire cert button visibility after sim completes ───────────────────────
 // Called by _bistLaunchCockpit completion path in cdn-bist.js (if available)
-window._s9OnSimComplete = function(allResults) {
+window._s9OnSimComplete = async function(allResults) {
   window._s9CertResults = allResults || [];
   var btn = document.getElementById('s9-cert-btn');
   if (btn) {
@@ -2972,8 +2972,9 @@ window._s9OnSimComplete = function(allResults) {
   var expires  = new Date(now.getTime() + 30*86400*1000).toISOString();
 
   // Invalidate any existing valid certs for this template+version before issuing new one
+  // await ensures invalidation completes before new cert is posted — prevents double-run race
   if (tmpl && firmId) {
-    API.patch(
+    await API.patch(
       'bist_certificates?firm_id=eq.'+firmId+'&template_id=eq.'+tmpl.id+'&status=eq.valid',
       { status: 'invalidated', revoke_reason: 'Superseded by new certification run' }
     ).catch(function(){});
@@ -5449,7 +5450,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-comments.js?v=20260403-S9"></script>
 <script src="/js/cdn-conformance.js?v=20260406-CF2"></script>
 <script src="/js/cdn-core-state.js?v=20260403-S9"></script>
-<script src="/js/cdn-coverage.js?v=20260407-CV26"></script>
+<script src="/js/cdn-coverage.js?v=20260407-CV31"></script>
 <script src="/js/cdn-dag-viewer.js?v=20260403-S9"></script>
 <script src="/js/cdn-dashboard.js?v=20260410-CD57"></script>
 <script src="/js/cdn-documents.js?v=20260403-S9"></script>

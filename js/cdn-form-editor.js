@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260411-SE119 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260411-SE120 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3376,24 +3376,31 @@ async function _formReturnToDraft() {
       state: 'draft', updated_at: new Date().toISOString()
     });
     _selectedForm.state = 'draft';
-    // Invalidate bist_certificate if returning from certified state
-    if (wasCertified) {
-      try {
-        var firmId = window.FIRM_ID || FIRM_ID_CAD;
-        var tmplRows = await API.get(
-          'workflow_templates?firm_id=eq.' + firmId +
-          '&name=eq.' + encodeURIComponent(_selectedForm.source_name || '') +
-          '&form_driven=eq.true&select=id'
-        ).catch(function(){ return []; }) || [];
-        if (tmplRows.length) {
-          var tmplId = tmplRows[0].id;
+    // Cascade: archive all committed/certified companion template versions
+    // and invalidate any valid bist_certificates
+    try {
+      var firmId = window.FIRM_ID || FIRM_ID_CAD;
+      var tmplRows = await API.get(
+        'workflow_templates?firm_id=eq.' + firmId +
+        '&name=eq.' + encodeURIComponent(_selectedForm.source_name || '') +
+        '&form_driven=eq.true&select=id,status'
+      ).catch(function(){ return []; }) || [];
+      for (var ti = 0; ti < tmplRows.length; ti++) {
+        var tr = tmplRows[ti];
+        // Invalidate any valid certs
+        await API.patch(
+          'bist_certificates?template_id=eq.' + tr.id + '&status=eq.valid',
+          { status: 'invalidated' }
+        ).catch(function(){});
+        // Archive the template row (unless already archived/superseded)
+        if (tr.status !== 'archived' && tr.status !== 'superseded') {
           await API.patch(
-            'bist_certificates?template_id=eq.' + tmplId + '&status=eq.valid',
-            { status: 'invalidated', updated_at: new Date().toISOString() }
+            'workflow_templates?id=eq.' + tr.id,
+            { status: 'archived', updated_at: new Date().toISOString() }
           ).catch(function(){});
         }
-      } catch(e) { console.warn('[formReturnToDraft] cert invalidation failed:', e); }
-    }
+      }
+    } catch(e) { console.warn('[formReturnToDraft] cascade failed:', e); }
     var lcDiv = document.getElementById('form-lifecycle-btns');
     if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(_selectedForm);
     _formRefreshToolbar();
@@ -3496,37 +3503,76 @@ async function _formDeleteWithConfirm(formId) {
   const form = _formDefs.find(f => f.id === formId);
   const name = form?.source_name || 'this form';
   const inDB = form && !form._unsaved;
-  const msg = inDB
-    ? 'Remove "' + name + '" from the Form Library? This will permanently delete the form definition from the database.'
-    : 'Remove "' + name + '" from the Form Library?';
-  if (!confirm(msg)) return;
-  if (inDB) {
-    await API.del('workflow_form_definitions?id=eq.' + formId).catch(function(){});
-    _formCoCWrite('form.archived', formId, { action:'deleted', name });
-  }
-  _formDefs = _formDefs.filter(function(f){ return f.id !== formId; });
-  if (_selectedForm?.id === formId) {
-    _selectedForm = null;
-    _formFields = [];
-    _formRouting = { mode: 'serial', roles: [], stages: [] };
-    // Clear canvas
-    var iframe = document.getElementById('form-html-preview');
-    if (iframe) iframe.remove();
-    var canvasWrap = document.getElementById('form-canvas-wrap');
-    if (canvasWrap) {
-      Array.from(canvasWrap.children).forEach(function(c){ c.style.display = ''; });
+  var msgHtml = inDB
+    ? '<div style="font-size:13px;color:var(--text2);line-height:1.6;font-family:Arial,sans-serif">' +
+      'Permanently delete <strong>' + escHtml(name) + '</strong> from the Form Library?' +
+      '<ul style="margin:8px 0 0 16px;padding:0;font-size:12px;color:var(--muted)">' +
+      '<li>Form definition and all fields</li>' +
+      '<li>All companion workflow versions and steps</li>' +
+      '<li>All certification records, test scripts and coverage paths</li>' +
+      '<li>All chain of custody history</li>' +
+      '</ul>' +
+      '<div style="margin-top:10px;font-size:12px;color:#f85149">This cannot be undone.</div>' +
+      '</div>'
+    : '<div style="font-size:13px;color:var(--text2);font-family:Arial,sans-serif">Remove <strong>' + escHtml(name) + '</strong> from the Form Library?</div>';
+  _cadConfirm('Delete Form', msgHtml, async function() {
+    if (inDB) {
+      var firmId = window.FIRM_ID || FIRM_ID_CAD;
+      cadToast('Deleting form and all associated data…', 'info');
+      try {
+        // Find all companion workflow_templates rows for this form
+        var tmpls = await API.get(
+          'workflow_templates?firm_id=eq.' + firmId +
+          '&name=eq.' + encodeURIComponent(name) +
+          '&form_driven=eq.true&select=id'
+        ).catch(function(){ return []; }) || [];
+
+        // Cascade delete each template and its dependent data
+        for (var ti = 0; ti < tmpls.length; ti++) {
+          var tid = tmpls[ti].id;
+          // Delete bist data (order matters — coverage_paths refs test_scripts)
+          var scripts = await API.get('bist_test_scripts?template_id=eq.'+tid+'&select=id').catch(function(){ return []; }) || [];
+          if (scripts.length) {
+            var sids = scripts.map(function(s){ return s.id; }).join(',');
+            await API.del('bist_runs?script_id=in.('+sids+')').catch(function(){});
+          }
+          await API.del('bist_coverage_paths?template_id=eq.'+tid).catch(function(){});
+          await API.del('bist_test_scripts?template_id=eq.'+tid).catch(function(){});
+          await API.del('bist_certificates?template_id=eq.'+tid).catch(function(){});
+          await API.del('workflow_template_steps?template_id=eq.'+tid).catch(function(){});
+          await API.del('coc_events?entity_id=eq.'+tid).catch(function(){});
+          await API.del('workflow_templates?id=eq.'+tid).catch(function(){});
+        }
+
+        // Delete form CoC and form definition
+        await API.del('coc_events?entity_id=eq.'+formId).catch(function(){});
+        await API.del('workflow_form_definitions?id=eq.' + formId).catch(function(){});
+        console.log('[formDelete] Cascade complete — deleted', tmpls.length, 'template rows');
+      } catch(e) {
+        console.error('[formDelete] cascade failed:', e);
+        cadToast('Delete partially failed — check console', 'warn');
+      }
     }
-    // Clear right panels
-    var fieldsCol = document.getElementById('form-col-matrix');
-    var routingCol = null;
-    var toolbar = document.getElementById('form-top-toolbar');
-    if (fieldsCol) fieldsCol.style.display = 'none';
-    if (routingCol) routingCol.style.display = 'none';
-    if (toolbar) toolbar.style.display = 'none';
-  }
-  const listEl = document.getElementById('form-list');
-  if (listEl) listEl.innerHTML = _renderFormList();
-  cadToast('Form removed', 'success');
+    _formDefs = _formDefs.filter(function(f){ return f.id !== formId; });
+    if (_selectedForm?.id === formId) {
+      _selectedForm = null;
+      _formFields = [];
+      _formRouting = { mode: 'serial', roles: [], stages: [] };
+      var iframe = document.getElementById('form-html-preview');
+      if (iframe) iframe.remove();
+      var canvasWrap = document.getElementById('form-canvas-wrap');
+      if (canvasWrap) {
+        Array.from(canvasWrap.children).forEach(function(c){ c.style.display = ''; });
+      }
+      var fieldsCol = document.getElementById('form-col-matrix');
+      var toolbar = document.getElementById('form-top-toolbar');
+      if (fieldsCol) fieldsCol.style.display = 'none';
+      if (toolbar) toolbar.style.display = 'none';
+    }
+    const listEl = document.getElementById('form-list');
+    if (listEl) listEl.innerHTML = _renderFormList();
+    cadToast('Form and all associated data deleted', 'success');
+  }, 'Delete', 'rgba(248,81,73,.4)');
 }
 
 async function _formCommit() {
@@ -3612,7 +3658,7 @@ async function _formCommit() {
       roles.forEach(function(r, idx) {
         steps.push(API.post('workflow_template_steps', {
           template_id: tmplId,
-          name: (FORM_ROLES[r.role]||{label:r.role}).label + ' Approval',
+          name: (function(s){ return s.charAt(0).toUpperCase()+s.slice(1); })((FORM_ROLES[r.role]||{label:r.role}).label) + ' Approval',
           step_type: 'approval',
           assignee_type: 'role',
           assignee_role: r.role,
