@@ -3078,6 +3078,11 @@ window._s9OnSimComplete = async function(allResults) {
           updated_at: new Date().toISOString()
         }).then(function() {
           console.log('[S9] Form def auto-certified:', linked.id.slice(0,8));
+          // Update in-memory caches so UI reflects certified state immediately
+          if (window._formDefs && Array.isArray(window._formDefs)) {
+            var _cachedForm = window._formDefs.find(function(f){ return f.id === linked.id; });
+            if (_cachedForm) _cachedForm.state = 'certified';
+          }
           if (window._selectedForm && window._selectedForm.id === linked.id) {
             window._selectedForm.state = 'certified';
             if (typeof _formRefreshToolbar === 'function') _formRefreshToolbar();
