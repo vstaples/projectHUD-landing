@@ -450,6 +450,22 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
     } catch(e) { console.warn('[ReviewPanel] fetch failed:', e); }
   }
 
+  // Resolve the Cadence assignee_role for the current step
+  // Used to activate the correct signature field in the review form
+  let cadenceRole = null;
+  if (instance && instance.current_step_id) {
+    try {
+      const stepRows = await API.get(
+        `workflow_template_steps?id=eq.${instance.current_step_id}&select=assignee_role&limit=1`
+      ).catch(() => []);
+      cadenceRole = stepRows?.[0]?.assignee_role || null;
+    } catch(_) {}
+  }
+  // Fallback: derive from _wrRole if step lookup fails
+  if (!cadenceRole) {
+    cadenceRole = item._wrRole === 'reviewer' ? 'submitter' : null;
+  }
+
   // Parse submission details from CoC event notes
   let submittedDetails = {};
   // Use MOST RECENT request.submitted event — captures resubmitted documents
@@ -511,7 +527,12 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
             const icon = (d.mime||'').includes('pdf')||(d.name||'').endsWith('.pdf') ? '📄' :
                          (d.mime||'').includes('word')||(d.name||'').endsWith('.docx') ? '📝' :
                          (d.source==='form') ? '◈' : '📎';
-            const safePathAttr = (d.path||'').replace(/'/g,"\\'");
+            // Append cadenceRole to form paths so myrOpenAttachment
+            // knows which signature field to activate for this reviewer
+            const rawPath = d.source === 'form' && cadenceRole
+              ? (d.path||'') + ':' + cadenceRole
+              : (d.path||'');
+            const safePathAttr = rawPath.replace(/'/g,"\\'");
             return `<button onclick="myrOpenAttachment('${safePathAttr}')"
               style="display:flex;align-items:center;gap:7px;padding:5px 10px;
                      background:rgba(0,210,255,.04);border:1px solid rgba(0,210,255,.15);

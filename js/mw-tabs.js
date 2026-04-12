@@ -1695,7 +1695,7 @@ window.addEventListener('message', function(ev) {
             docs: [{
               name:   formName + ' v' + (formDef ? formDef.version || '—' : '—'),
               source: 'form',
-              path:   'form:' + formId,
+              path:   'form:' + formId + ':' + instanceId,
               mime:   'text/html',
             }],
             submitter_resource_id: res ? res.id : null,
@@ -1737,37 +1737,122 @@ window.myrOpenAttachment = async function(path) {
   if (!path) return;
   var firmId = _mwFirmId();
 
-  // Form attachment — path is the form_def_id prefixed with 'form:'
+  // Form attachment — path format: 'form:{formDefId}:{instanceId}'
   if (path.indexOf('form:') === 0) {
-    var formDefId = path.slice(5);
-    var rows = await API.get(
-      'workflow_form_definitions?id=eq.' + formDefId +
-      '&firm_id=eq.' + firmId +
-      '&select=id,source_name,source_html&limit=1'
-    ).catch(function() { return []; });
-    var fd = rows && rows[0];
+    var parts      = path.slice(5).split(':');
+    var formDefId  = parts[0];
+    var instanceId = parts[1] || null;
+
+    // Fetch form definition and instance data in parallel
+    var fetches = [
+      API.get(
+        'workflow_form_definitions?id=eq.' + formDefId +
+        '&firm_id=eq.' + firmId +
+        '&select=id,source_name,source_html&limit=1'
+      ).catch(function() { return []; })
+    ];
+    if (instanceId) {
+      fetches.push(
+        API.get(
+          'workflow_instances?id=eq.' + instanceId +
+          '&select=id,form_data&limit=1'
+        ).catch(function() { return []; })
+      );
+    }
+    var results   = await Promise.all(fetches);
+    var fd        = results[0] && results[0][0];
+    var instRow   = results[1] && results[1][0];
+    var savedData = (instRow && instRow.form_data) || {};
+
     if (!fd || !fd.source_html) {
       compassToast('Form not available.', 2500);
       return;
     }
-    // Render read-only form in overlay
-    var blob = new Blob([fd.source_html], { type: 'text/html;charset=utf-8' });
+
+    // Build restore + lock script to inject into the form HTML
+    var restoreScript = `<script>
+window.addEventListener('DOMContentLoaded', function() {
+  var saved = ${JSON.stringify(savedData)};
+  Object.keys(saved).forEach(function(label) {
+    if (label.indexOf('_grid_') === 0 || label.indexOf('_misc_') === 0 ||
+        label.indexOf('_ent_')  === 0 || label.charAt(0) === '_') return;
+    var el = document.querySelector('[data-label="' + label + '"]');
+    if (el && saved[label]) el.value = saved[label];
+  });
+  if (typeof buildTable === 'function' && (saved['Trip Start Date'] || saved['Trip End Date'])) {
+    var s = document.getElementById('trip-start');
+    var e = document.getElementById('trip-end');
+    if (s && saved['Trip Start Date']) s.value = saved['Trip Start Date'];
+    if (e && saved['Trip End Date'])   e.value = saved['Trip End Date'];
+    if (typeof onDateChange === 'function') onDateChange();
+  }
+  setTimeout(function() {
+    Object.keys(saved).forEach(function(label) {
+      if (label.indexOf('_grid_') !== 0) return;
+      var parts = label.split('_');
+      var cat = parts[2]; var dk = parts.slice(3).join('-');
+      var el = document.querySelector('[data-cat="' + cat + '"][data-dk="' + dk + '"]');
+      if (el) { el.value = saved[label]; el.dispatchEvent(new Event('input')); }
+    });
+    var miscIdxs = {};
+    Object.keys(saved).forEach(function(k) { if (k.indexOf('_misc_') === 0) { miscIdxs[k.split('_')[2]] = true; } });
+    Object.keys(miscIdxs).sort().forEach(function(idx) {
+      var rows = document.querySelectorAll('#misc-tbody tr'); var row = rows[parseInt(idx)]; if (!row) return;
+      var desc = row.querySelector('input[placeholder="Item description"]');
+      var date = row.querySelector('input[type="date"]'); var type = row.querySelector('select'); var amt = row.querySelector('input[type="number"]');
+      if (desc && saved['_misc_'+idx+'_desc']) desc.value = saved['_misc_'+idx+'_desc'];
+      if (date && saved['_misc_'+idx+'_date']) date.value = saved['_misc_'+idx+'_date'];
+      if (type && saved['_misc_'+idx+'_type']) type.value = saved['_misc_'+idx+'_type'];
+      if (amt  && saved['_misc_'+idx+'_amt'])  { amt.value = saved['_misc_'+idx+'_amt']; amt.dispatchEvent(new Event('input')); }
+    });
+    var entIdxs = {};
+    Object.keys(saved).forEach(function(k) { if (k.indexOf('_ent_') === 0) { entIdxs[k.split('_')[2]] = true; } });
+    Object.keys(entIdxs).sort().forEach(function(idx) {
+      var rows = document.querySelectorAll('#ent-body tr'); var row = rows[parseInt(idx)]; if (!row) return;
+      var date = row.querySelector('input[type="date"]'); var type = row.querySelector('.ent-type');
+      var guests = row.querySelector('.ent-guests'); var purpose = row.querySelector('.ent-purpose'); var amt = row.querySelector('.ent-amt');
+      if (date    && saved['_ent_'+idx+'_date'])    date.value    = saved['_ent_'+idx+'_date'];
+      if (type    && saved['_ent_'+idx+'_type'])    type.value    = saved['_ent_'+idx+'_type'];
+      if (guests  && saved['_ent_'+idx+'_guests'])  guests.value  = saved['_ent_'+idx+'_guests'];
+      if (purpose && saved['_ent_'+idx+'_purpose']) purpose.value = saved['_ent_'+idx+'_purpose'];
+      if (amt     && saved['_ent_'+idx+'_amt'])     { amt.value = saved['_ent_'+idx+'_amt']; amt.dispatchEvent(new Event('input')); }
+    });
+    // Lock all fields — review mode
+    document.querySelectorAll('input,textarea,select').forEach(function(el) {
+      el.disabled = true; el.style.cursor = 'not-allowed';
+    });
+    document.querySelectorAll('.btn-s,.btn-p,.ftr').forEach(function(el) {
+      el.style.display = 'none';
+    });
+  }, 400);
+});
+<\/script>`;
+
+    var html = fd.source_html.replace('</body>', restoreScript + '</body>');
+    if (!html.includes('</body>')) html = fd.source_html + restoreScript;
+    var blob    = new Blob([html], { type: 'text/html;charset=utf-8' });
     var blobUrl = URL.createObjectURL(blob);
     _myrOpenHtmlFormOverlay(fd.source_name || 'Form', blobUrl);
-    // Lock it immediately since this is a review view, not an edit
+
+    // Send activation message to the iframe after it loads
+    // role comes from the path: 'form:{formDefId}:{instanceId}:{role}'
+    var sigRole    = parts[2] || null;
+    var signerName = (window._myResource && window._myResource.name) || '';
     setTimeout(function() {
       var iframe = document.querySelector('#myr-html-form-modal iframe');
       if (!iframe) return;
-      iframe.addEventListener('load', function() {
-        try {
-          var doc = iframe.contentDocument || iframe.contentWindow.document;
-          doc.querySelectorAll('input,textarea,select').forEach(function(el) {
-            el.disabled = true; el.style.cursor = 'not-allowed';
-          });
-          doc.querySelectorAll('.btn-s,.btn-p,.ftr').forEach(function(el) {
-            el.style.display = 'none';
-          });
-        } catch(e) { /* cross-origin guard */ }
+      iframe.addEventListener('load', function onLoad() {
+        iframe.removeEventListener('load', onLoad);
+        setTimeout(function() {
+          if (iframe.contentWindow) {
+            iframe.contentWindow.postMessage({
+              type:       'cad:activate_signature',
+              role:       sigRole,
+              signerName: sigRole ? signerName : '',
+              readOnly:   !sigRole,
+            }, '*');
+          }
+        }, 500); // wait for DOMContentLoaded + CadenceSignature.activate to run first
       });
     }, 100);
     return;
