@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
-// VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260411-SE121 8px;border-radius:3px');
+// VERSION: 20260412-SE122
+console.log('%c[cdn-form-editor] v20260412-SE122 — _formSyncCompanion: single sync utility for all state transitions','background:#1a4a6a;color:#7dd3fc;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3337,29 +3337,84 @@ function _formLifecycleButtons(f) {
   return btns.join('\n');
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// _formSyncCompanion  ·  SE122
+//
+// Single source of truth for syncing workflow_templates.status to match
+// workflow_form_definitions.state after any state transition.
+//
+// PROBLEM THIS SOLVES:
+//   The Library reads workflow_form_definitions.state.
+//   The Dashboard reads workflow_templates.status.
+//   Every transition must write to both tables or the UI splits.
+//   SE121 fixed _formPublish. SE122 centralises this for all transitions.
+//
+// targetStatus — the workflow_templates.status value to write.
+//   Mapping: form state  → template status
+//     committed          → committed   (new row created by _formCommit; not called here)
+//     certified          → certified
+//     published          → published
+//     draft (unpublish)  → certified   (unpublish returns template to certified, not draft)
+//     draft (to-draft)   → archived    (handled by _formReturnToDraft's own cascade)
+//
+// statusFilter — optional PostgREST status filter clause appended to the GET,
+//   e.g. 'status=eq.certified'. Defaults to excluding terminal states so we
+//   never accidentally re-activate an archived or superseded row.
+//
+// Returns: number of companion rows patched (0 = lookup found nothing, safe to warn).
+// ─────────────────────────────────────────────────────────────────────────────
+async function _formSyncCompanion(targetStatus, statusFilter) {
+  if (!_selectedForm) return 0;
+  var firmId   = window.FIRM_ID || FIRM_ID_CAD;
+  var formName = (_selectedForm.source_name || '').trim();
+  if (!formName) { console.warn('[formSyncCompanion] source_name empty — cannot look up companion'); return 0; }
+
+  // Default filter: any status that is not a terminal frozen state
+  var filter = statusFilter || 'status=neq.archived&status=neq.superseded';
+
+  var url = 'workflow_templates?firm_id=eq.'+firmId+
+            '&name=eq.'+encodeURIComponent(formName)+
+            '&form_driven=eq.true&'+filter+'&select=id,status';
+
+  var rows = await API.get(url).catch(function(e){
+    console.warn('[formSyncCompanion] lookup failed:', e);
+    return [];
+  }) || [];
+
+  if (!rows.length) {
+    console.warn('[formSyncCompanion] no companion rows found for "'+formName+'" with filter: '+filter);
+    return 0;
+  }
+
+  var patched = 0;
+  for (var i = 0; i < rows.length; i++) {
+    await API.patch('workflow_templates?id=eq.'+rows[i].id, {
+      status: targetStatus, updated_at: new Date().toISOString()
+    }).then(function() {
+      patched++;
+      console.log('[formSyncCompanion] '+rows[i].id.slice(0,8)+' → '+targetStatus);
+    }).catch(function(e){
+      console.warn('[formSyncCompanion] patch failed for '+rows[i].id.slice(0,8)+':', e);
+    });
+  }
+
+  console.log('%c[formSyncCompanion] '+patched+'/'+rows.length+' companion row(s) → '+targetStatus,
+    'background:#1a4a6a;color:#7dd3fc;padding:2px 8px;border-radius:3px');
+  return patched;
+}
+
 async function _formPublish() {
   if (!_selectedForm) return;
   if (_selectedForm.state !== 'certified') { cadToast('Form must be certified before publishing', 'warn'); return; }
-  var firmId = window.FIRM_ID || FIRM_ID_CAD;
-  var formName = (_selectedForm.source_name || '').trim();
-  // Patch form def to published
+  // 1. Patch form def
   await API.patch('workflow_form_definitions?id=eq.'+_selectedForm.id, {
     state: 'published', compass_visible: true, updated_at: new Date().toISOString()
   });
   _selectedForm.state = 'published';
   _selectedForm.compass_visible = true;
-  // Patch companion template to published
-  var tmpls = await API.get(
-    'workflow_templates?firm_id=eq.'+firmId+
-    '&name=eq.'+encodeURIComponent(formName)+
-    '&form_driven=eq.true&status=eq.certified&select=id'
-  ).catch(function(){ return []; }) || [];
-  for (var ti = 0; ti < tmpls.length; ti++) {
-    await API.patch('workflow_templates?id=eq.'+tmpls[ti].id, {
-      status: 'published', updated_at: new Date().toISOString()
-    }).catch(function(){});
-  }
-  // Update _formDefs cache
+  // 2. Sync companion template — filter to certified rows only so we target the right version
+  await _formSyncCompanion('published', 'status=eq.certified');
+  // 3. Update _formDefs cache
   if (window._formDefs) {
     var cached = window._formDefs.find(function(f){ return f.id === _selectedForm.id; });
     if (cached) { cached.state = 'published'; cached.compass_visible = true; }
@@ -3422,21 +3477,38 @@ async function _formReturnToDraft() {
         }
       }
     } catch(e) { console.warn('[formReturnToDraft] cascade failed:', e); }
+    // Update _formDefs cache so Library rail reflects draft state immediately
+    if (window._formDefs) {
+      var cached = window._formDefs.find(function(f){ return f.id === _selectedForm.id; });
+      if (cached) { cached.state = 'draft'; cached.compass_visible = false; }
+    }
     var lcDiv = document.getElementById('form-lifecycle-btns');
     if (lcDiv) lcDiv.innerHTML = _formLifecycleButtons(_selectedForm);
     _formRefreshToolbar();
+    var listEl = document.getElementById('form-list');
+    if (listEl && typeof _renderFormList === 'function') listEl.innerHTML = _renderFormList();
     cadToast(wasCertified ? 'Returned to Draft — certificate invalidated' : 'Returned to Draft', 'info');
   }, 'Return to Draft');
 }
 
 async function _formUnpublish() {
   if (!_selectedForm) return;
+  // 1. Patch form def back to certified
   await API.patch('workflow_form_definitions?id=eq.'+_selectedForm.id, {
     state: 'certified', compass_visible: false, updated_at: new Date().toISOString()
   });
   _selectedForm.state = 'certified';
   _selectedForm.compass_visible = false;
+  // 2. Sync companion template — was published, bring back to certified
+  await _formSyncCompanion('certified', 'status=eq.published');
+  // 3. Update _formDefs cache
+  if (window._formDefs) {
+    var cached = window._formDefs.find(function(f){ return f.id === _selectedForm.id; });
+    if (cached) { cached.state = 'certified'; cached.compass_visible = false; }
+  }
   _formRefreshToolbar();
+  var listEl = document.getElementById('form-list');
+  if (listEl && typeof _renderFormList === 'function') listEl.innerHTML = _renderFormList();
   cadToast('Form unpublished — removed from Compass Browse', 'info');
 }
 
