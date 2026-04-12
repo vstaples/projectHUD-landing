@@ -501,17 +501,23 @@ function _e(s) {
 }
 
 // ── Self-install ──────────────────────────────────────────────────────────────
+// MC1: Uses mw:viewready event fired by mw-core.js instead of setTimeout polling.
+// Guaranteed to run at exactly the right moment — after the tab strip is in the DOM.
+// Falls back to DOMContentLoaded + a single 500ms retry for resilience.
 (function _install() {
-  function tryInstall() {
-    var tabBar = document.getElementById('user-suite-tabs');
+  function doInstall(tabBar) {
+    // 1. Inject MY TEAM tab button if not already present
+    tabBar = tabBar || document.getElementById('user-suite-tabs');
     if (tabBar && !document.querySelector('[data-tab="team"]')) {
       var btn = document.createElement('button');
       btn.className   = 'ust';
       btn.dataset.tab = 'team';
       btn.textContent = 'My Team';
-      btn.onclick = function(){ uSwitchTab('team', btn); };
+      btn.onclick = function() { uSwitchTab('team', btn); };
       tabBar.appendChild(btn);
+      console.log('[mw-team] MT4 — My Team tab injected via mw:viewready');
     }
+    // 2. Inject MY TEAM panel if not already present
     var sibling = document.getElementById('utc-work');
     if (sibling && !document.getElementById('utc-team')) {
       var panel = document.createElement('div');
@@ -519,6 +525,7 @@ function _e(s) {
       panel.className = 'utc';
       sibling.parentElement.appendChild(panel);
     }
+    // 3. Patch uSwitchTab to load team data on tab click
     if (typeof uSwitchTab === 'function' && !uSwitchTab._mtPatched) {
       var _orig = uSwitchTab;
       uSwitchTab = function(tab, btn) {
@@ -528,11 +535,20 @@ function _e(s) {
       uSwitchTab._mtPatched = true;
     }
   }
-  tryInstall();
-  setTimeout(tryInstall, 500);
-  setTimeout(tryInstall, 1500);
-  setTimeout(tryInstall, 3000);
-  setTimeout(tryInstall, 5000);
+
+  // Primary: listen for mw:viewready (fired by mw-core.js MC1+)
+  window.addEventListener('mw:viewready', function(e) {
+    doInstall(e.detail && e.detail.tabBar);
+  }, { once: true });
+
+  // Fallback: if mw:viewready never fires (older mw-core.js),
+  // try once after a short delay
+  setTimeout(function() {
+    if (!document.querySelector('[data-tab="team"]')) {
+      console.warn('[mw-team] mw:viewready not received — falling back to timeout install');
+      doInstall(null);
+    }
+  }, 2000);
 })();
 
 })();

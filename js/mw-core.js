@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-310000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260412-MC1 — mw:viewready event for deterministic tab injection','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1286,6 +1286,14 @@ window._mwLoadUserView = async function() {
 
     if (loading) loading.style.display = 'none';
     content.style.display = 'block';
+
+    // ── MC1: Fire mw:viewready — tab strip is in DOM, all core tabs rendered.
+    // Extension modules (mw-team.js etc.) listen for this event instead of
+    // polling with setTimeout — deterministic, no timing dependency.
+    window.dispatchEvent(new CustomEvent('mw:viewready', {
+      detail: { tabBar: document.getElementById('user-suite-tabs') }
+    }));
+    console.log('[mw-core] mw:viewready fired');
 
     // ── Delta strip — since last login ───────────────────
     setTimeout(() => { if (window.populateDeltaStrip) populateDeltaStrip(); }, 200);
