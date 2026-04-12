@@ -3524,30 +3524,88 @@ async function _formDeleteWithConfirm(formId) {
         var tmpls = await API.get(
           'workflow_templates?firm_id=eq.' + firmId +
           '&name=eq.' + encodeURIComponent(name) +
-          '&form_driven=eq.true&select=id'
+          '&form_driven=eq.true&select=id,version,status'
         ).catch(function(){ return []; }) || [];
+
+        // GC counters
+        var gc = {
+          templates: 0, steps: 0, runs: 0,
+          scripts: 0, paths: 0, certs: 0,
+          tmplCoc: 0, formCoc: 0, errors: []
+        };
 
         // Cascade delete each template and its dependent data
         for (var ti = 0; ti < tmpls.length; ti++) {
           var tid = tmpls[ti].id;
-          // Delete bist data (order matters — coverage_paths refs test_scripts)
+
+          // bist_runs (via script IDs)
           var scripts = await API.get('bist_test_scripts?template_id=eq.'+tid+'&select=id').catch(function(){ return []; }) || [];
           if (scripts.length) {
             var sids = scripts.map(function(s){ return s.id; }).join(',');
-            await API.del('bist_runs?script_id=in.('+sids+')').catch(function(){});
+            var runsBefore = await API.get('bist_runs?script_id=in.('+sids+')&select=id').catch(function(){ return []; }) || [];
+            await API.del('bist_runs?script_id=in.('+sids+')').catch(function(e){ gc.errors.push('bist_runs: '+e.message); });
+            gc.runs += runsBefore.length;
           }
-          await API.del('bist_coverage_paths?template_id=eq.'+tid).catch(function(){});
-          await API.del('bist_test_scripts?template_id=eq.'+tid).catch(function(){});
-          await API.del('bist_certificates?template_id=eq.'+tid).catch(function(){});
-          await API.del('workflow_template_steps?template_id=eq.'+tid).catch(function(){});
-          await API.del('coc_events?entity_id=eq.'+tid).catch(function(){});
-          await API.del('workflow_templates?id=eq.'+tid).catch(function(){});
+
+          // bist_coverage_paths
+          var pathsBefore = await API.get('bist_coverage_paths?template_id=eq.'+tid+'&select=id').catch(function(){ return []; }) || [];
+          await API.del('bist_coverage_paths?template_id=eq.'+tid).catch(function(e){ gc.errors.push('bist_coverage_paths: '+e.message); });
+          gc.paths += pathsBefore.length;
+
+          // bist_test_scripts
+          await API.del('bist_test_scripts?template_id=eq.'+tid).catch(function(e){ gc.errors.push('bist_test_scripts: '+e.message); });
+          gc.scripts += scripts.length;
+
+          // bist_certificates
+          var certsBefore = await API.get('bist_certificates?template_id=eq.'+tid+'&select=id').catch(function(){ return []; }) || [];
+          await API.del('bist_certificates?template_id=eq.'+tid).catch(function(e){ gc.errors.push('bist_certificates: '+e.message); });
+          gc.certs += certsBefore.length;
+
+          // workflow_template_steps
+          var stepsBefore = await API.get('workflow_template_steps?template_id=eq.'+tid+'&select=id').catch(function(){ return []; }) || [];
+          await API.del('workflow_template_steps?template_id=eq.'+tid).catch(function(e){ gc.errors.push('workflow_template_steps: '+e.message); });
+          gc.steps += stepsBefore.length;
+
+          // coc_events for template
+          var tmplCocBefore = await API.get('coc_events?entity_id=eq.'+tid+'&select=id').catch(function(){ return []; }) || [];
+          await API.del('coc_events?entity_id=eq.'+tid).catch(function(e){ gc.errors.push('coc_events(tmpl): '+e.message); });
+          gc.tmplCoc += tmplCocBefore.length;
+
+          // workflow_templates row
+          await API.del('workflow_templates?id=eq.'+tid).catch(function(e){ gc.errors.push('workflow_templates: '+e.message); });
+          gc.templates++;
         }
 
-        // Delete form CoC and form definition
-        await API.del('coc_events?entity_id=eq.'+formId).catch(function(){});
-        await API.del('workflow_form_definitions?id=eq.' + formId).catch(function(){});
-        console.log('[formDelete] Cascade complete — deleted', tmpls.length, 'template rows');
+        // form CoC and form definition
+        var formCocBefore = await API.get('coc_events?entity_id=eq.'+formId+'&select=id').catch(function(){ return []; }) || [];
+        await API.del('coc_events?entity_id=eq.'+formId).catch(function(e){ gc.errors.push('coc_events(form): '+e.message); });
+        gc.formCoc += formCocBefore.length;
+        await API.del('workflow_form_definitions?id=eq.' + formId).catch(function(e){ gc.errors.push('workflow_form_definitions: '+e.message); });
+
+        // Verify — confirm nothing remains
+        var verifyTmpls   = await API.get('workflow_templates?firm_id=eq.'+firmId+'&name=eq.'+encodeURIComponent(name)+'&form_driven=eq.true&select=id').catch(function(){ return null; });
+        var verifyForm    = await API.get('workflow_form_definitions?id=eq.'+formId+'&select=id').catch(function(){ return null; });
+        var gcOk = verifyTmpls !== null && verifyForm !== null && verifyTmpls.length === 0 && verifyForm.length === 0;
+
+        // GC Report
+        var pass = gc.errors.length === 0 && gcOk;
+        var stamp = 'background:'+(pass?'#1a4a2a':'#4a1a1a')+';color:'+(pass?'#3de08a':'#e84040')+';font-weight:700;padding:2px 8px;border-radius:3px';
+        console.group('%c[formDelete] GC Report — ' + name + (pass?' ✓ COMPLETE':' ✗ INCOMPLETE'), stamp);
+        console.log('  Template versions deleted : ' + gc.templates + (verifyTmpls ? ' (verified: '+verifyTmpls.length+' remaining)' : ''));
+        console.log('  Template steps deleted    : ' + gc.steps);
+        console.log('  Coverage paths deleted    : ' + gc.paths);
+        console.log('  Test scripts deleted      : ' + gc.scripts);
+        console.log('  BIST runs deleted         : ' + gc.runs);
+        console.log('  Certificates deleted      : ' + gc.certs);
+        console.log('  CoC events (templates)    : ' + gc.tmplCoc);
+        console.log('  CoC events (form)         : ' + gc.formCoc);
+        console.log('  Form definition           : ' + (verifyForm && verifyForm.length === 0 ? 'deleted ✓' : 'NOT DELETED ✗'));
+        if (gc.errors.length) {
+          console.warn('  ERRORS (' + gc.errors.length + '):', gc.errors);
+        } else {
+          console.log('  Errors                    : none');
+        }
+        console.groupEnd();
       } catch(e) {
         console.error('[formDelete] cascade failed:', e);
         cadToast('Delete partially failed — check console', 'warn');
