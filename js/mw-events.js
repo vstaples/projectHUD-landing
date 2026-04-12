@@ -1103,6 +1103,73 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       // Other reviewers will see the amber step color in the submitter's My Requests view.
     }
 
+    // ── Advance to next template step via resolution engine ──────────────────
+    // After a successful approval, look up the current step sequence and route
+    // the next step. This is what moves the instance from step 1 → 2 → 3 → 4.
+    if (approved && instanceId && typeof window._mwResolveAndRoute === 'function') {
+      try {
+        const instFull = await API.get(
+          `workflow_instances?id=eq.${instanceId}` +
+          `&select=id,template_id,form_def_id,current_step_id,submitted_by_resource_id,title&limit=1`
+        ).catch(() => []);
+        const instRow = instFull?.[0];
+        if (instRow && instRow.template_id) {
+          // Load all template steps
+          const allSteps = await API.get(
+            `workflow_template_steps?template_id=eq.${instRow.template_id}` +
+            `&order=sequence_order.asc&select=id,name,step_type,sequence_order,assignee_type,assignee_role`
+          ).catch(() => []);
+
+          // Find the current step and the next one
+          const currStep = (allSteps||[]).find(s => s.id === instRow.current_step_id);
+          const currSeq  = currStep ? currStep.sequence_order : 0;
+          const nextStep = (allSteps||[]).find(s =>
+            s.sequence_order > currSeq && s.step_type !== 'trigger'
+          );
+
+          if (nextStep) {
+            const submitterResId = instRow.submitted_by_resource_id;
+            const formName = instRow.title || 'Expense Report';
+
+            // Write step_activated event for the next step
+            await API.post('workflow_step_instances', {
+              firm_id:     _mwFirmId(),
+              instance_id: instanceId,
+              event_type:  'step_activated',
+              step_name:   nextStep.name,
+              step_type:   nextStep.step_type,
+              created_at:  now,
+            }).catch(() => {});
+
+            // Update instance current_step_id + current_step_name
+            await API.patch(`workflow_instances?id=eq.${instanceId}`, {
+              current_step_id:   nextStep.id,
+              current_step_name: nextStep.name,
+              updated_at:        now,
+            }).catch(() => {});
+
+            // Route the next step → creates workflow_requests for the right person
+            await window._mwResolveAndRoute(
+              instanceId, allSteps, nextStep.sequence_order, submitterResId, formName
+            ).catch(e => console.warn('[rrpSubmit] next-step routing failed:', e));
+
+            console.log('%c[rrpSubmit] advanced to step ' + nextStep.sequence_order +
+              ' (' + nextStep.assignee_role + ') — ' + nextStep.name,
+              'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
+          } else {
+            // No next step — workflow complete
+            await API.patch(`workflow_instances?id=eq.${instanceId}`, {
+              status:     'completed',
+              updated_at: now,
+            }).catch(() => {});
+            console.log('[rrpSubmit] workflow complete — no further steps');
+          }
+        }
+      } catch(e) {
+        console.error('[rrpSubmit] step advance failed:', e);
+      }
+    }
+
     document.getElementById('req-review-panel')?.remove();
     compassToast(approved
       ? `✓ Request approved${comments?' — comments recorded':''}. Submitter notified.`
