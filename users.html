@@ -1749,7 +1749,7 @@ function renderUsersTable() {
   </tr></thead><tbody>`;
   UM.users.forEach(u => {
     const res = UM.resources.find(r => r.id === u.resource_id);
-    const roleBadge = `<span class="app-role ${u.app_role||'viewer'}">${(u.app_role||'viewer').toUpperCase()}</span>`;
+    const roleBadge = `<span class="app-role ${u.role||'viewer'}">${(u.role||'viewer').toUpperCase()}</span>`;
     html += `<tr>
       <td><div style="display:flex;align-items:center;gap:8px;">${UI.avatar(u.name, 22)}<span style="font-size:15px;font-weight:600;color:var(--text0);">${u.name||'—'}</span></div></td>
       <td class="mono" style="color:var(--text3);font-size:13px;">${u.email||'—'}</td>
@@ -1765,7 +1765,7 @@ function openUserDrawer(id) {
   UM.editingUserId = id;
   const u = UM.users.find(x => x.id === id);
   document.getElementById('user-drawer-name').textContent = u?.name || '';
-  document.getElementById('user-app-role').value = u?.app_role || 'viewer';
+  document.getElementById('user-app-role').value = u?.role || 'viewer';
 
   const ulEl = document.getElementById('user-resource-link');
   ulEl.innerHTML = '<option value="">— Not linked —</option>' +
@@ -1781,7 +1781,8 @@ async function saveUserRole() {
   btn.textContent = 'SAVING...'; btn.disabled = true;
   try {
     const payload = {
-      app_role:    document.getElementById('user-app-role').value,
+      role:        document.getElementById('user-app-role').value,
+      is_admin:    document.getElementById('user-app-role').value === 'admin',
       resource_id: document.getElementById('user-resource-link').value || null,
     };
     await API.patch(`users?id=eq.${UM.editingUserId}`, payload);
