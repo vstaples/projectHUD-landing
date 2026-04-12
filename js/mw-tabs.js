@@ -1610,7 +1610,7 @@ window.addEventListener('message', function(ev) {
         // 3. Load template steps so we can activate the first real step
         var steps = await API.get(
           'workflow_template_steps?template_id=eq.' + tmpl.id +
-          '&order=sequence_order.asc&select=id,name,step_type,sequence_order'
+          '&order=sequence_order.asc&select=id,name,step_type,sequence_order,assignee_type,assignee_role'
         ).catch(function() { return []; });
         var firstStep = (steps || []).find(function(s) { return s.step_type !== 'trigger'; });
 
