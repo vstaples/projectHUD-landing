@@ -6,7 +6,7 @@
 
 /* global API, _s9Switch, _s9WaitForFirmId, _s9DashOpenSimulator */
 
-console.log('%c[cdn-dashboard] v20260411-CD57 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[cdn-dashboard] v20260411-CD58 — composite dashboard','background:#1e6a7a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Inject CSS ─────────────────────────────────────────────────────────────────
 (function() {
@@ -1316,6 +1316,11 @@ function _cdRenderPortfolio(tmpls, certs, scripts, runs, paths) {
         '<button class="cd-wf-btn primary" data-tid="'+t.id+'" onclick="event.stopPropagation();_s9DashOpenSimulator(this.dataset.tid)">Simulate</button>';
     }
 
+    // Published templates — upgrade label and color if cert is green
+    if (t.status === 'published' && statusCls === 'wf-cert') {
+      statusLabel    = 'Published';
+      statusPillCls  = 'cd-pill-cert-grn';
+    }
     var nameClr = statusCls==='wf-fail'?'#e84040':statusCls==='wf-cert'?'#3de08a':statusCls==='wf-stale'?'#3de08a':'#ffffff';
     var covClrR1 = (function(){var pt=tmplPaths.total,pc=tmplPaths.scripted||tmplPaths.covered;return pt===0?'rgba(255,255,255,.3)':pc===pt?'var(--cd-grn)':pc>0?'var(--cd-amb)':'rgba(255,255,255,.3)';}());
     var covLblR1 = (function(){var pt=tmplPaths.total,pc=tmplPaths.scripted||tmplPaths.covered;return pt>0?(pc+'/'+pt+' Coverage Path'+(pt===1?'':'s')+' Defined'):'No Coverage Paths Defined';}());
