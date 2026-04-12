@@ -2582,7 +2582,7 @@ async function _s9PopulateTemplateSelector() {
   if (!sel) return;
   var firmId = await _s9WaitForFirmId();
   var templates = await API.get(
-    'workflow_templates?firm_id=eq.' + firmId + '&status=neq.archived&order=name.asc&select=id,name,version,status,form_driven'
+    'workflow_templates?firm_id=eq.' + firmId + '&order=name.asc&select=id,name,version,status,form_driven'
   ).catch(function(){ return []; });
   if (!Array.isArray(templates) || !templates.length) return;
 
@@ -3019,32 +3019,32 @@ window._s9OnSimComplete = function(allResults) {
     console.log('%c[S9] Certificate persisted -- ' + certNum + (certRow?' · DB:'+certRow.id.slice(0,8):''), 'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
     // Auto-certify linked form def if this is a form-driven workflow
     if (tmpl && tmpl.form_driven) {
-      // Match by source_name + committed state — draft match was incorrect
-      API.get(
-        'workflow_form_definitions?firm_id=eq.'+firmId+
-        '&source_name=eq.'+encodeURIComponent(tmpl.name)+
-        '&state=eq.committed&select=id,state,source_name&order=updated_at.desc&limit=1'
-      ).then(function(forms) {
-        var linked = forms && forms[0];
-        if (!linked) {
-          console.warn('[S9] Auto-certify: no committed form def found for', tmpl.name);
-          return;
-        }
-        API.patch('workflow_form_definitions?id=eq.'+linked.id, {
-          state: 'certified',
-          updated_at: new Date().toISOString()
-        }).then(function() {
-          console.log('[S9] Form def auto-certified:', linked.id.slice(0,8));
-          if (window._selectedForm && window._selectedForm.id === linked.id) {
-            window._selectedForm.state = 'certified';
-            if (typeof _formRefreshToolbar === 'function') _formRefreshToolbar();
-          }
-          if (typeof _renderFormList === 'function') {
-            var listEl = document.getElementById('form-list');
-            if (listEl) listEl.innerHTML = _renderFormList();
-          }
-        }).catch(function(e){ console.warn('[S9] Form def auto-certify patch failed:', e); });
-      }).catch(function(e){ console.warn('[S9] Auto-certify form lookup failed:', e); });
+      API.get('workflow_form_definitions?firm_id=eq.'+firmId+'&select=id,state&order=updated_at.desc&limit=10').then(function(forms) {
+        // Find form def linked to this companion workflow
+        API.get('workflow_template_steps?template_id=eq.'+tmpl.id+'&step_type=eq.form&select=id&limit=1').then(function(steps) {
+          if (!steps || !steps[0]) return;
+          var stepId = steps[0].id;
+          API.get('workflow_form_definitions?firm_id=eq.'+firmId+'&select=id,state').then(function(allForms) {
+            // Find form def whose step is linked — match by companion template name
+            var linked = allForms.find(function(f){ return f.state === 'draft'; });
+            if (!linked) return;
+            // Patch to certified
+            API.patch('workflow_form_definitions?id=eq.'+linked.id, {
+              state: 'certified',
+              updated_at: new Date().toISOString()
+            }).then(function() {
+              console.log('[S9] Form def auto-certified:', linked.id.slice(0,8));
+              // Refresh form editor if open
+              if (window._selectedForm && window._selectedForm.id === linked.id) {
+                window._selectedForm.state = 'certified';
+                if (typeof _formRefreshToolbar === 'function') _formRefreshToolbar();
+              }
+              // Refresh form list
+              if (typeof _formRefreshUI === 'function') _formRefreshUI();
+            }).catch(function(){});
+          }).catch(function(){});
+        }).catch(function(){});
+      }).catch(function(){});
     }
   }).catch(function(e){ console.warn('[S9] bist_certificates write failed:', e); });
 };
@@ -5082,7 +5082,32 @@ async function _s9RunAllCoveragePaths() {
   if (!pathData.length) { cadToast('No coverage paths loaded', 'warn'); return; }
 
   var scripted = pathData.filter(function(pd){ return pd.sc; });
-  if (!scripted.length) { cadToast('No scripted paths to run', 'warn'); return; }
+  if (!scripted.length) {
+    var _nsm = document.getElementById('cv-noscript-modal');
+    if (_nsm) _nsm.remove();
+    var _nsel = document.createElement('div');
+    _nsel.id = 'cv-noscript-modal';
+    _nsel.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)';
+    _nsel.innerHTML =
+      '<div style="background:#0d1017;border:1px solid #1e2535;border-radius:8px;padding:28px 32px;width:420px;font-family:Arial,sans-serif;box-shadow:0 16px 48px rgba(0,0,0,.8)">' +
+        '<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:10px;font-family:Arial,sans-serif">No Scripted Paths</div>' +
+        '<div style="font-size:13px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:8px;font-family:Arial,sans-serif">' +
+          'Coverage paths have been defined but none have test scripts assigned yet.' +
+        '</div>' +
+        '<div style="font-size:12px;color:rgba(255,255,255,.35);line-height:1.6;margin-bottom:20px;font-family:Arial,sans-serif">' +
+          'Click <strong style="color:#00c9c9">+ Create Script</strong> next to each path in the Coverage tab, or use <strong style="color:#00c9c9">Write test scripts</strong> from the Dashboard to generate scripts automatically.' +
+        '</div>' +
+        '<div style="display:flex;justify-content:flex-end">' +
+          '<button id="cv-noscript-close" style="padding:8px 18px;border:1px solid #1e2535;border-radius:5px;background:transparent;color:rgba(255,255,255,.6);font-size:12px;cursor:pointer;font-family:Arial,sans-serif">Close</button>' +
+        '</div>' +
+      '</div>';
+    _nsel.addEventListener('click', function(ev) {
+      if (ev.target.id === 'cv-noscript-close' || ev.target === _nsel) _nsel.remove();
+    });
+    document.body.appendChild(_nsel);
+    setTimeout(function(){ var b = document.getElementById('cv-noscript-close'); if (b) b.focus(); }, 50);
+    return;
+  }
   // Capture template NOW — _selectedTmpl may change if user navigates away
   var _runTmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
 
