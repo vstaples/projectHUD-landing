@@ -3506,6 +3506,12 @@ async function _s9LoadCoverageData(templateId, version) {
 
 // ── Coverage tab renderer ──────────────────────────────────────────────────────
 function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
+  // Fade out on refresh to eliminate blink — fade back in after innerHTML swap
+  var isRefresh = container.dataset.loaded === '1';
+  if (isRefresh) {
+    container.style.transition = 'opacity 0.1s';
+    container.style.opacity = '0';
+  }
   var FA  = 'font-family:Arial,sans-serif;';
   var F10 = FA + 'font-size:10px;';
   var F11 = FA + 'font-size:11px;';
@@ -4003,6 +4009,13 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
 
     '</div>';  // end outer flex row
   container.dataset.loaded = '1'; // suppresses loading spinner on subsequent refreshes
+  // Fade back in
+  if (isRefresh) {
+    requestAnimationFrame(function() {
+      container.style.opacity = '1';
+      setTimeout(function(){ container.style.transition = ''; }, 150);
+    });
+  }
 
   // Tooltip system
   window._s9CovTipEl = null;
@@ -4201,10 +4214,41 @@ async function _s9CovCreateScript(pathName, pathIdx) {
     }
   }, 300);
 
-  // Refresh coverage tab immediately with fresh data
+  // Targeted path update — update only the affected path row DOM, no full re-render
   setTimeout(function() {
-    if (typeof _s9LoadCoverageData === 'function') {
-      _s9LoadCoverageData(tmpl.id, tmpl.version || '0.0.0');
+    // Update path section label from UNCOVERED to SCRIPTED without full re-render
+    if (pathIdx != null) {
+      var pathSec = document.getElementById('cv-path-sec-' + pathIdx);
+      var dagRow  = document.getElementById('cv-dag-row-' + pathIdx);
+      if (pathSec) {
+        // Update path label color to scripted (blue)
+        var lbl = pathSec.querySelector('.cv-path-label');
+        if (lbl) lbl.style.color = '#3b82f6';
+        // Update section heading text from UNCOVERED to SCRIPTED
+        var heading = pathSec.previousElementSibling;
+        if (heading && heading.textContent && heading.textContent.includes('UNCOVERED')) {
+          heading.textContent = heading.textContent.replace('UNCOVERED', 'SCRIPTED');
+          heading.style.color = '#3b82f6';
+        }
+        // Remove + Create Script CTA, add Run script CTA
+        var cta = dagRow ? dagRow.querySelector('[onclick*="_s9CovCreateScript"]') : null;
+        if (cta && cta.parentElement) {
+          cta.parentElement.innerHTML =
+            '<div style="margin-left:16px;font-size:11px;color:#3b82f6;cursor:pointer;text-decoration:underline"' +
+            ' onclick="_cvRunPathScript('' + (row && row[0] ? row[0].id : '') + '',' + pathIdx + ')"' +
+            ' id="cv-run-cta-' + pathIdx + '"' +
+            '>▶ Run coverage script to verify this path</div>';
+        }
+        // Update node status dots to scripted
+        pathSec.querySelectorAll('.cv-dag-box.uncovered').forEach(function(box) {
+          box.classList.remove('uncovered');
+          box.classList.add('scripted');
+        });
+      }
+    }
+    // Also refresh left sidebar script list without full re-render
+    if (typeof _s9LoadSimScripts === 'function') {
+      _s9LoadSimScripts(tmpl.id, tmpl.version || '0.0.0');
     }
   }, 400);
 
