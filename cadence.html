@@ -1284,7 +1284,7 @@ function _s9RenderSimPanel(el) {
 
       // Right side buttons
       '<div style="margin-left:auto;display:flex;align-items:center;gap:7px">' +
-        '<button id="s9-cert-btn" onclick="if(window._s9LastCertTs){_s9ShowCert();}else{cadToast(\'Run All Tests to generate a certificate — individual script runs do not qualify.\',\'warn\');}" style="' + FA + 'font-size:12px;font-weight:700;' +
+        '<button id="s9-cert-btn" onclick="_s9ShowCertOrPrompt()" style="' + FA + 'font-size:12px;font-weight:700;' +
           'padding:4px 12px;border-radius:3px;border:1px solid rgba(255,255,255,.15);' +
           'background:rgba(255,255,255,.04);color:rgba(255,255,255,.3);cursor:default;letter-spacing:.04em">○ Certificate</button>' +
         (tmpl
@@ -1447,8 +1447,8 @@ function _s9RenderSimPanel(el) {
         'background:#faf8f2;border-radius:6px;box-shadow:0 40px 120px rgba(0,0,0,.8);' +
         'position:relative">' +
         '<button onclick="_s9HideCert()" style="position:absolute;top:12px;right:14px;' +
-          'background:none;border:none;color:rgba(200,180,120,.4);cursor:pointer;' +
-          'font-size:18px;z-index:10;line-height:1;' + FA + '">✕</button>' +
+          'background:none;border:none;color:rgba(200,180,120,.6);cursor:pointer;' +
+          'font-size:22px;font-weight:700;z-index:9999;line-height:1;' + FA + '">✕</button>' +
         '<div style="position:absolute;inset:10px;border:1.5px solid rgba(160,120,40,.28);' +
           'border-radius:3px;pointer-events:none;z-index:0"></div>' +
         '<div id="s9-cert-body" style="position:relative;z-index:1">' +
@@ -2696,6 +2696,45 @@ function _s9ShowCert() {
   overlay.style.display = 'flex';
   _s9RenderCertBody();
 }
+async function _s9ShowCertOrPrompt() {
+  // If cert was generated this session, show it directly
+  if (window._s9LastCertTs) { _s9ShowCert(); return; }
+  // Otherwise check DB for a valid cert for the current template
+  var tmpl = (typeof _selectedTmpl !== 'undefined') ? _selectedTmpl : null;
+  if (!tmpl) { cadToast('No template selected', 'warn'); return; }
+  try {
+    var firmId = await _s9WaitForFirmId();
+    var certs = await API.get(
+      'bist_certificates?firm_id=eq.' + firmId +
+      '&template_id=eq.' + tmpl.id +
+      '&status=eq.valid&order=issued_at.desc&limit=1'
+    ).catch(function(){ return []; });
+    if (certs && certs[0]) {
+      // Restore session state from DB cert so _s9ShowCert renders correctly
+      window._s9LastCertDbId = certs[0].id;
+      window._s9LastCertTs   = certs[0].issued_at;
+      window._s9LastCertId   = certs[0].certificate_number;
+      // Build results from coverage paths
+      var covPaths = await API.get(
+        'bist_coverage_paths?firm_id=eq.' + firmId +
+        '&template_id=eq.' + tmpl.id +
+        '&select=path_name,coverage_status&order=created_at.asc'
+      ).catch(function(){ return []; });
+      window._s9CertResults = (covPaths || []).map(function(cp) {
+        return { name: cp.path_name, status: cp.coverage_status === 'covered' ? 'passed' : 'failed' };
+      });
+      window._s9CertRoutes = (covPaths || []).map(function(cp) {
+        return { from: cp.path_name, arrow: '→', desc: 'Coverage path verified via BIST', verified: cp.coverage_status === 'covered' };
+      });
+      _s9ShowCert();
+    } else {
+      cadToast('No certificate on file — run all tests to certify this template', 'warn');
+    }
+  } catch(e) {
+    cadToast('Could not retrieve certificate', 'warn');
+  }
+}
+
 function _s9HideCert() {
   var overlay = document.getElementById('s9-cert-overlay');
   if (overlay) overlay.style.display = 'none';
@@ -3407,15 +3446,19 @@ async function _s9LoadCoverageData(templateId, version) {
   }
   // No template selected — show empty state, not spinner
   if (!templateId) {
-    body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;width:100%;padding:60px;text-align:center;gap:16px">' +
+    if (body) body.dataset.loaded = ''; // reset so spinner shows on next fresh load
+  body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;width:100%;padding:60px;text-align:center;gap:16px">' +
       '<div style="font-size:48px;opacity:.15">◎</div>' +
       '<div style="font-family:Arial,sans-serif;font-size:22px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.02em">Select a workflow to view coverage.</div>' +
       '<div style="font-family:Arial,sans-serif;font-size:13px;color:rgba(255,255,255,.3);max-width:360px;line-height:1.7">Choose a workflow from the dropdown above to see routing paths, coverage status, and test scripts.</div>' +
       '</div>';
     return;
   }
-  body.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;' +
-    'color:rgba(255,255,255,.3);padding:40px;text-align:center;width:100%">Loading coverage data…</div>';
+  // Silent refresh on subsequent loads — suppresses blink when re-rendering after script create
+  if (!body.dataset.loaded) {
+    body.innerHTML = '<div style="font-family:Arial,sans-serif;font-size:12px;' +
+      'color:rgba(255,255,255,.3);padding:40px;text-align:center;width:100%">Loading coverage data…</div>';
+  }
 
   try {
     // Always fetch fresh — cache invalidated after script creation/deletion
@@ -3959,6 +4002,7 @@ function _s9RenderCoverageTab(container, scripts, runs, steps, version) {
       '</div>' +
 
     '</div>';  // end outer flex row
+  container.dataset.loaded = '1'; // suppresses loading spinner on subsequent refreshes
 
   // Tooltip system
   window._s9CovTipEl = null;
@@ -5455,7 +5499,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/js/cdn-dashboard.js?v=20260410-CD57"></script>
 <script src="/js/cdn-documents.js?v=20260403-S9"></script>
 <script src="/js/cdn-events.js?v=20260403-S9"></script>
-<script src="/js/cdn-form-editor.js?v=20260410-SE120"></script>
+<script src="/js/cdn-form-editor.js?v=20260410-SE119"></script>
 <script src="/js/cdn-form-runtime.js?v=20260407-FRT3"></script>
 <script src="/js/cdn-form-settings.js?v=20260403-S9"></script>
 <script src="/js/cdn-instance-dag.js?v=20260403-S9"></script>
