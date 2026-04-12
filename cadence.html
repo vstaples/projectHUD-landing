@@ -3297,15 +3297,14 @@ async function _s9LoadSimScripts(templateId, version) {
         gateEl.style.cursor = 'default'; gateEl.onclick = null;
         gateLeftEl.textContent = '✓ All tests passing — cleared for release';
         gateLeftEl.style.color = '#3de08a'; gateLeftEl.style.cursor = 'default'; gateLeftEl.onclick = null;
-        // All pass — only show cert button if a suite-level cert was issued this session
+        // All pass — show cert button always when all tests pass (DB cert checked on click)
         var certBtn = document.getElementById('s9-cert-btn');
         if (certBtn) {
-          var hasSuiteCert = !!(window._s9LastCertTs);
-          certBtn.style.display = hasSuiteCert ? '' : 'none';
-          certBtn.style.borderColor = hasSuiteCert ? 'rgba(40,212,192,.3)' : 'rgba(255,255,255,.15)';
-          certBtn.style.background  = hasSuiteCert ? 'rgba(40,212,192,.08)' : 'rgba(255,255,255,.04)';
-          certBtn.style.color       = hasSuiteCert ? '#28d4c0' : 'rgba(255,255,255,.3)';
-          certBtn.style.cursor      = hasSuiteCert ? 'pointer' : 'default';
+          certBtn.style.display     = '';
+          certBtn.style.borderColor = 'rgba(40,212,192,.3)';
+          certBtn.style.background  = 'rgba(40,212,192,.08)';
+          certBtn.style.color       = '#28d4c0';
+          certBtn.style.cursor      = 'pointer';
         }
       } else {
         // Failing — make gate clickable to open failing script
@@ -3496,6 +3495,26 @@ async function _s9LoadCoverageData(templateId, version) {
 
     console.log('[S9 Coverage] scripts:', scripts.length, 'runs:', (runs||[]).length, 'steps:', steps.length);
     _s9RenderCoverageTab(body, scripts || [], runs || [], steps, version);
+
+    // Check DB for valid cert and show cert button if found — handles post-reset state
+    (async function() {
+      try {
+        var tmplId2 = templateId;
+        var firmId2 = await _s9WaitForFirmId();
+        var certs2 = await API.get(
+          'bist_certificates?firm_id=eq.' + firmId2 +
+          '&template_id=eq.' + tmplId2 + '&status=eq.valid&select=id&limit=1'
+        ).catch(function(){ return []; });
+        var certBtn2 = document.getElementById('s9-cert-btn');
+        if (certBtn2 && certs2 && certs2.length) {
+          certBtn2.style.display     = '';
+          certBtn2.style.borderColor = 'rgba(40,212,192,.3)';
+          certBtn2.style.background  = 'rgba(40,212,192,.08)';
+          certBtn2.style.color       = '#28d4c0';
+          certBtn2.style.cursor      = 'pointer';
+        }
+      } catch(e) {}
+    }());
 
   } catch(e) {
     console.error('[S9 Coverage] Load failed:', e);
