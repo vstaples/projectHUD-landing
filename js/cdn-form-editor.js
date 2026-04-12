@@ -1,6 +1,6 @@
 // cdn-form-editor.js — Cadence: Form Library tab
 // VERSION: 20260401-230000
-console.log('%c[cdn-form-editor] v20260411-SE120 8px;border-radius:3px');
+console.log('%c[cdn-form-editor] v20260411-SE121 8px;border-radius:3px');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL FONT RULE — injected once, applies to all form editor UI
@@ -3340,12 +3340,33 @@ function _formLifecycleButtons(f) {
 async function _formPublish() {
   if (!_selectedForm) return;
   if (_selectedForm.state !== 'certified') { cadToast('Form must be certified before publishing', 'warn'); return; }
+  var firmId = window.FIRM_ID || FIRM_ID_CAD;
+  var formName = (_selectedForm.source_name || '').trim();
+  // Patch form def to published
   await API.patch('workflow_form_definitions?id=eq.'+_selectedForm.id, {
     state: 'published', compass_visible: true, updated_at: new Date().toISOString()
   });
   _selectedForm.state = 'published';
   _selectedForm.compass_visible = true;
+  // Patch companion template to published
+  var tmpls = await API.get(
+    'workflow_templates?firm_id=eq.'+firmId+
+    '&name=eq.'+encodeURIComponent(formName)+
+    '&form_driven=eq.true&status=eq.certified&select=id'
+  ).catch(function(){ return []; }) || [];
+  for (var ti = 0; ti < tmpls.length; ti++) {
+    await API.patch('workflow_templates?id=eq.'+tmpls[ti].id, {
+      status: 'published', updated_at: new Date().toISOString()
+    }).catch(function(){});
+  }
+  // Update _formDefs cache
+  if (window._formDefs) {
+    var cached = window._formDefs.find(function(f){ return f.id === _selectedForm.id; });
+    if (cached) { cached.state = 'published'; cached.compass_visible = true; }
+  }
   _formRefreshToolbar();
+  var listEl = document.getElementById('form-list');
+  if (listEl && typeof _renderFormList === 'function') listEl.innerHTML = _renderFormList();
   cadToast('Form published — now visible in Compass Browse', 'success');
 }
 
