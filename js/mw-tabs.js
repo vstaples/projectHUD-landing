@@ -1029,6 +1029,18 @@ window.myrWithdrawInstance = async function(instanceId, title, evt) {
 };
 
 // ── Grouped table renderer for Active + History ───────────────────────────────
+// Returns true if the instance has any step with a null/missing assignee
+function _myrHasMissingApprover(inst) {
+  try {
+    var notes = inst.notes ? JSON.parse(inst.notes) : null;
+    var chain = notes && notes.step_chain;
+    if (!chain) return false;
+    return Object.values(chain).some(function(s) {
+      return !s.assignee_name || s.assignee_name === '—';
+    });
+  } catch(_) { return false; }
+}
+
 function _myrRenderGroupedTable(instances, isHistory) {
   const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const FA = 'font-family:Arial,sans-serif;';
@@ -1088,7 +1100,9 @@ function _myrRenderGroupedTable(instances, isHistory) {
         var netDue = fd['_net_due_employee'] || '—';
         var step = inst.current_step_name || inst.status || '—';
         var sColor = statusColor[inst.status] || '#EF9F27';
-        if (inst.status === 'blocked') step = '⚠ ' + step;
+        var hasMissing = _myrHasMissingApprover(inst);
+        if (inst.status === 'blocked') { step = '⚠ ' + step; }
+        else if (hasMissing) { sColor = '#EF9F27'; } // keep amber but flag in popup
         html += `<tr onclick="myrOpenInstance('${inst.id}')" style="cursor:pointer;border-bottom:0.5px solid rgba(255,255,255,.05);transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
           <td style="${FA}font-size:13px;color:rgba(255,255,255,.6);padding:8px 10px;white-space:nowrap">${esc(date)}</td>
           <td style="${FA}font-size:13px;color:rgba(255,255,255,.7);padding:8px 10px">${esc(purpose)}</td>
@@ -1117,13 +1131,15 @@ function _myrRenderGroupedTable(instances, isHistory) {
         var date = inst.created_at ? new Date(inst.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
         var step = inst.current_step_name || inst.status || '—';
         var sColor = statusColor[inst.status] || '#EF9F27';
+        if (inst.status === 'blocked') step = '⚠ ' + step;
+        var cardMissing = _myrHasMissingApprover(inst) && inst.status !== 'blocked';
         html += `<div onclick="myrOpenInstance('${inst.id}')" style="padding:10px 12px;border:0.5px solid rgba(255,255,255,.07);border-radius:4px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
           <div>
             <div style="${FA}font-size:12px;font-weight:600;color:#F0F6FF;margin-bottom:3px">${esc(inst.title)}</div>
             <div style="${FA}font-size:11px;color:rgba(255,255,255,.35)">${esc(date)}</div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em;white-space:nowrap">${esc(step)}</span>
+            <span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em;white-space:nowrap">${esc(step)}${cardMissing?' ⚠':''}</span>
             ${!isHistory ? `<button onclick="myrWithdrawInstance('${inst.id}','${esc(inst.title)}',event)" title="Withdraw" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">🗑</button>` : ''}
           </div>
         </div>`;
@@ -2383,8 +2399,12 @@ function _myrStatusCell(inst, step, sColor) {
       '</tr></thead>' +
       '<tbody>' + stepRows + '</tbody>' +
     '</table></div>' : '';
+  var hasMissingApprover = _myrHasMissingApprover(inst);
+  var warningBadge = (hasMissingApprover && inst.status !== 'blocked')
+    ? '<span title="One or more approvers not assigned" style="margin-left:5px;font-size:12px;cursor:help">⚠</span>'
+    : '';
   return '<div style="display:inline-block;position:relative;font-size:11px" onmouseenter="var t=this.querySelector(\'.myr-sig-tt\');if(t)t.style.display=\'block\'" onmouseleave="var t=this.querySelector(\'.myr-sig-tt\');if(t)t.style.display=\'none\'">' +
-    '<span style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:' + sColor + ';letter-spacing:.05em;cursor:default">' + step + '</span>' + tt +
+    '<span style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:' + sColor + ';letter-spacing:.05em;cursor:default">' + step + '</span>' + warningBadge + tt +
   '</div>';
 }
 
