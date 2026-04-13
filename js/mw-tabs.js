@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260412-MT1
+// VERSION: 20260412-MT2
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260412-MT1 — bulletproof form submit: DB lookup · form_def_id · proper routing','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260412-MT2 — graceful blocked-role handling in _mwResolveAndRoute','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1934,7 +1934,54 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
     var dbRole        = dbRoleMap[step.assignee_role]   || 'approver';
 
     if (!assigneeResId) {
-      console.warn('[_mwResolveAndRoute] role "' + step.assignee_role + '" not resolved — no contact assigned for this user');
+      // ── Unresolved role — contact not yet assigned ───────────────────────────
+      // Don't silently stall. Write a CoC event flagging the blockage,
+      // patch the instance to 'blocked', and surface a toast to the current user.
+      var roleLabel = {
+        finance: 'Finance contact',
+        legal:   'Legal contact',
+        hr:      'HR contact',
+        manager: 'Manager',
+      }[step.assignee_role] || ('"' + step.assignee_role + '" contact');
+
+      var blockedMsg = roleLabel + ' is not assigned for this user. '
+        + 'Please assign one in My Team settings, then resubmit.';
+
+      console.warn('[_mwResolveAndRoute] ' + blockedMsg);
+
+      // Write CoC event so admins can see the blockage in audit trail
+      await API.post('coc_events', {
+        firm_id:     firmId,
+        entity_id:   instanceId,
+        entity_type: 'workflow_instance',
+        event_type:  'request.blocked',
+        event_class: 'lifecycle',
+        severity:    'warning',
+        event_notes: JSON.stringify({
+          reason:        'unresolved_role',
+          role:          step.assignee_role,
+          step_name:     step.name,
+          message:       blockedMsg,
+        }),
+        actor_name:  'System',
+        occurred_at: new Date().toISOString(),
+        created_at:  new Date().toISOString(),
+      }).catch(function() {});
+
+      // Mark instance as blocked
+      await API.patch('workflow_instances?id=eq.' + instanceId, {
+        status:            'blocked',
+        current_step_name: step.name + ' — BLOCKED: ' + roleLabel + ' not assigned',
+        updated_at:        new Date().toISOString(),
+      }).catch(function() {});
+
+      // Surface toast to whoever triggered this
+      if (typeof compassToast === 'function') {
+        compassToast(
+          '⚠ Routing blocked — ' + blockedMsg,
+          6000
+        );
+      }
       return;
     }
 
