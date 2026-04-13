@@ -874,11 +874,27 @@ window.loadUserRequests = async function() {
     // Fetch template steps for all instance template_ids and cache
     var tmplIds = [...new Set((instances||[]).map(function(i){ return i.template_id; }).filter(Boolean))];
     if (tmplIds.length) {
-      var tmplStepRows = await API.get('workflow_template_steps?template_id=in.(' + tmplIds.join(',') + ')&order=sequence_order.asc&select=id,name,step_type,sequence_order,template_id').catch(function(){ return []; });
+      var tmplStepRows = await API.get('workflow_template_steps?template_id=in.(' + tmplIds.join(',') + ')&order=sequence_order.asc&select=id,name,step_type,sequence_order,template_id,assignee_role').catch(function(){ return []; });
       window._myrTmplSteps = {};
       (tmplStepRows||[]).forEach(function(s){
         if (!window._myrTmplSteps[s.template_id]) window._myrTmplSteps[s.template_id] = [];
         window._myrTmplSteps[s.template_id].push(s);
+      });
+    }
+    // Fetch CoC events + workflow_requests for all active instances to power Signature Loop Status
+    var instIds = (instances||[]).filter(function(i){ return i.status === 'in_progress' || i.status === 'blocked'; }).map(function(i){ return i.id; });
+    window._myrInstCoc = {};
+    window._myrInstReqs = {};
+    if (instIds.length) {
+      var cocRows  = await API.get('coc_events?entity_id=in.(' + instIds.join(',') + ')&order=occurred_at.asc&select=entity_id,event_type,actor_name,occurred_at,event_notes').catch(function(){ return []; });
+      var reqRows  = await API.get('workflow_requests?instance_id=in.(' + instIds.join(',') + ')&order=created_at.asc&select=instance_id,role,status,owner_name,created_at').catch(function(){ return []; });
+      (cocRows||[]).forEach(function(e){
+        if (!window._myrInstCoc[e.entity_id]) window._myrInstCoc[e.entity_id] = [];
+        window._myrInstCoc[e.entity_id].push(e);
+      });
+      (reqRows||[]).forEach(function(r){
+        if (!window._myrInstReqs[r.instance_id]) window._myrInstReqs[r.instance_id] = [];
+        window._myrInstReqs[r.instance_id].push(r);
       });
     }
     _myrRenderAll();
@@ -2101,20 +2117,73 @@ async function _myrEnsureCdn() {
 function _myrStatusCell(inst, step, sColor) {
   var FA = 'font-family:Arial,sans-serif;font-size:11px;';
   var steps = (window._myrTmplSteps||{})[inst.template_id] || [];
-  var stepRows = steps.map(function(s) {
-    var isActive = s.name === inst.current_step_name;
-    var isDone = inst.status === 'complete';
-    var dot = isDone ? '#1D9E75' : isActive ? '#00c9c9' : '#EF9F27';
-    var sc = isDone ? '#1D9E75' : isActive ? '#EF9F27' : '#fff';
-    var sl = isDone ? 'Complete' : isActive ? 'In Progress' : 'Waiting';
-    var dt = (s.sequence_order === 1) ? new Date(inst.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+  var cocEvts  = (window._myrInstCoc  || {})[inst.id] || [];
+  var instReqs = (window._myrInstReqs || {})[inst.id] || [];
+  var fmtDt = function(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  };
+
+  // Build a map of step completion from CoC events + requests
+  // request.approved events carry actor_name = the approver
+  var approvedEvents = cocEvts.filter(function(e){ return e.event_type === 'request.approved'; });
+  var submittedEvent = cocEvts.find(function(e){ return e.event_type === 'request.submitted'; });
+  var blockedEvent   = cocEvts.find(function(e){ return e.event_type === 'request.blocked'; });
+
+  // Find current step sequence_order to know which steps are before/after
+  var currentStep = steps.find(function(s){ return s.name === inst.current_step_name; });
+  var currentSeq  = currentStep ? currentStep.sequence_order : 0;
+
+  var stepRows = steps.filter(function(s){ return s.step_type !== 'trigger'; }).map(function(s, idx) {
+    var isPast    = s.sequence_order < currentSeq;
+    var isActive  = s.name === inst.current_step_name;
+    var isFuture  = s.sequence_order > currentSeq;
+    var isBlocked = isActive && inst.status === 'blocked';
+    var isAllDone = inst.status === 'completed';
+
+    // Determine approver and date from CoC events
+    var approvalEvent = approvedEvents[idx - 1]; // offset by 1 since trigger is step 0
+    // Step 1 (submit) uses submitted event
+    if (s.sequence_order === 1 && submittedEvent) {
+      approvalEvent = null; // show submitted date not approval
+    }
+
+    var approverName = '—';
+    var stepDate     = '—';
+
+    if (s.sequence_order === 1) {
+      stepDate     = submittedEvent ? fmtDt(submittedEvent.occurred_at) : fmtDt(inst.created_at);
+      approverName = inst.submitted_by_name || '—';
+    } else if (isPast || isAllDone) {
+      var ev = approvedEvents[idx - 1];
+      if (ev) {
+        stepDate     = fmtDt(ev.occurred_at);
+        approverName = ev.actor_name || '—';
+      }
+    } else if (isActive) {
+      // Find the open/resolved request for this step
+      var req = instReqs.find(function(r){ return r.status === 'open' || r.status === 'resolved'; });
+      if (req) approverName = req.owner_name || '—';
+    }
+
+    var dot, sc, sl;
+    if (isAllDone || isPast) {
+      dot = '#1D9E75'; sc = '#1D9E75'; sl = 'Approved';
+    } else if (isBlocked) {
+      dot = '#E24B4A'; sc = '#E24B4A'; sl = 'Blocked';
+    } else if (isActive) {
+      dot = '#00c9c9'; sc = '#EF9F27'; sl = 'In Progress';
+    } else {
+      dot = '#555e6e'; sc = 'rgba(255,255,255,.3)'; sl = 'Waiting';
+    }
+
     return '<tr style="border-bottom:0.5px solid rgba(255,255,255,.08)">' +
       '<td style="' + FA + 'color:#e8eef8;padding:6px 10px;white-space:nowrap">' +
         '<div style="display:flex;align-items:center;gap:7px">' +
           '<div style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0"></div>' + s.name +
         '</div></td>' +
-      '<td style="' + FA + 'color:rgba(255,255,255,.6);padding:6px 10px;white-space:nowrap">' + dt + '</td>' +
-      '<td style="' + FA + 'color:rgba(255,255,255,.4);padding:6px 10px">—</td>' +
+      '<td style="' + FA + 'color:rgba(255,255,255,.6);padding:6px 10px;white-space:nowrap">' + stepDate + '</td>' +
+      '<td style="' + FA + 'color:rgba(255,255,255,.5);padding:6px 10px;white-space:nowrap">' + approverName + '</td>' +
       '<td style="padding:6px 10px"><span style="' + FA + 'font-weight:700;color:' + sc + '">' + sl + '</span></td>' +
     '</tr>';
   }).join('');
