@@ -2151,19 +2151,24 @@ function _myrStatusCell(inst, step, sColor) {
     var approverName = '—';
     var stepDate     = '—';
 
+    // Use workflow_requests rows sorted by created_at — each maps to a step in sequence
+    // Filter out trigger steps to align indices correctly
+    var nonTriggerSteps = steps.filter(function(s){ return s.step_type !== 'trigger'; });
+    var stepIdx = nonTriggerSteps.findIndex(function(ns){ return ns.id === s.id; });
+    var stepReq = instReqs[stepIdx] || null;
+
     if (s.sequence_order === 1) {
+      // Step 1 = submission itself
       stepDate     = submittedEvent ? fmtDt(submittedEvent.occurred_at) : fmtDt(inst.created_at);
-      approverName = inst.submitted_by_name || '—';
+      approverName = stepReq ? stepReq.owner_name : (inst.submitted_by_name || '—');
     } else if (isPast || isAllDone) {
-      var ev = approvedEvents[idx - 1];
-      if (ev) {
-        stepDate     = fmtDt(ev.occurred_at);
-        approverName = ev.actor_name || '—';
-      }
+      // Completed step — use the approval CoC event for date, request for name
+      var approvalIdx = stepIdx - 1; // submitted event is idx 0 in approvedEvents context
+      var ev = approvedEvents[approvalIdx];
+      stepDate     = ev ? fmtDt(ev.occurred_at) : (stepReq ? fmtDt(stepReq.created_at) : '—');
+      approverName = stepReq ? stepReq.owner_name : (ev ? ev.actor_name : '—');
     } else if (isActive) {
-      // Find the open/resolved request for this step
-      var req = instReqs.find(function(r){ return r.status === 'open' || r.status === 'resolved'; });
-      if (req) approverName = req.owner_name || '—';
+      approverName = stepReq ? stepReq.owner_name : '—';
     }
 
     var dot, sc, sl;
