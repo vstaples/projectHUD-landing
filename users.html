@@ -8,6 +8,51 @@
 <style>
 
 /* ── HOVER CARD ──────────────────────────────────────────────── */
+/* ── Org chart canvas — MS-style scrollbars ──────────────────── */
+#oc-canvas::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+#oc-canvas::-webkit-scrollbar-track {
+  background: #d4d0c8;
+  border: 1px solid #a0a0a0;
+  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #808080;
+}
+#oc-canvas::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border: 1px solid #808080;
+  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #404040;
+  min-width: 20px;
+  min-height: 20px;
+}
+#oc-canvas::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+#oc-canvas::-webkit-scrollbar-thumb:active {
+  background: #808080;
+  box-shadow: inset 1px 1px 0 #404040, inset -1px -1px 0 #fff;
+}
+#oc-canvas::-webkit-scrollbar-button {
+  background: #c0c0c0;
+  border: 1px solid #808080;
+  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #404040;
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+#oc-canvas::-webkit-scrollbar-button:hover {
+  background: #a8a8a8;
+}
+#oc-canvas::-webkit-scrollbar-corner {
+  background: #d4d0c8;
+  border: 1px solid #a0a0a0;
+}
+/* Firefox */
+#oc-canvas {
+  scrollbar-width: auto;
+  scrollbar-color: #c0c0c0 #d4d0c8;
+}
+
 #res-hover-card {
   position:fixed; z-index:500; width:340px;
   background:var(--bg1); border:1px solid var(--border2);
@@ -644,7 +689,24 @@
     <button onclick="_ocCollapseAll()" style="font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Collapse all</button>
     <button onclick="_ocExpandAll()" style="font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text2);cursor:pointer;font-family:Arial,sans-serif">Expand all</button>
     <span style="font-size:11px;color:var(--text2)" id="oc-updated-badge"></span>
-    <div style="display:flex;align-items:center;gap:4px"><button onclick="_ocZoomIn()" style="width:26px;height:26px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--text1);font-size:14px;cursor:pointer;font-family:Arial,sans-serif">+</button><button onclick="_ocZoomOut()" style="width:26px;height:26px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--text1);font-size:14px;cursor:pointer;font-family:Arial,sans-serif">−</button><span id="oc-zoom-pct" style="font-size:11px;color:var(--text2);min-width:32px;text-align:center">100%</span></div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button onclick="_ocZoomOut()" title="Zoom out"
+        style="width:22px;height:22px;border:1px solid var(--border);border-radius:3px;
+               background:var(--bg2);color:var(--text1);font-size:14px;cursor:pointer;
+               font-family:Arial,sans-serif;line-height:1;flex-shrink:0">−</button>
+      <input type="range" id="oc-zoom-slider"
+        min="30" max="200" step="5" value="100"
+        oninput="_ocZoomSlider(this.value)"
+        style="width:120px;height:4px;cursor:pointer;accent-color:var(--cyan,#00c9c9);
+               -webkit-appearance:slider-horizontal">
+      <button onclick="_ocZoomIn()" title="Zoom in"
+        style="width:22px;height:22px;border:1px solid var(--border);border-radius:3px;
+               background:var(--bg2);color:var(--text1);font-size:14px;cursor:pointer;
+               font-family:Arial,sans-serif;line-height:1;flex-shrink:0">+</button>
+      <span id="oc-zoom-pct"
+        style="font-family:var(--font-mono);font-size:11px;color:var(--text2);
+               min-width:36px;text-align:right">100%</span>
+    </div>
     <button onclick="_ocToggleCoc()" id="oc-coc-btn" style="padding:5px 14px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:Arial,sans-serif">CoC</button>
     <button id="oc-save-btn" onclick="_ocSaveAll()" style="padding:5px 16px;background:rgba(0,201,201,.15);border:1px solid rgba(0,201,201,.25);border-radius:4px;color:rgba(0,201,201,.4);font-size:12px;font-weight:700;cursor:default;font-family:Arial,sans-serif;transition:all .2s" disabled>Save Changes</button>
     <button onclick="_ocClose()" style="padding:5px 14px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:Arial,sans-serif">✕ Close</button>
@@ -1200,6 +1262,12 @@ function cadToast(msg, type) {
 function switchUMTab(tab) {
   document.querySelectorAll('.um-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.um-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+  // Dismiss any open hover card and contact pickers on tab switch
+  clearTimeout(UM._hoverTimer);
+  UM._hoverId = null;
+  var card = document.getElementById('res-hover-card');
+  if (card) card.classList.remove('visible');
+  document.querySelectorAll('[id$="-picker"] > div:last-child').forEach(function(d) { d.style.display = 'none'; });
 }
 
 // ── RESOURCES ─────────────────────────────────────────────────
@@ -3234,8 +3302,35 @@ function _cpAvatar(r) {
   return '<div style="width:28px;height:28px;border-radius:50%;background:' + colors[ci] + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#1a1a2e;flex-shrink:0">' + initials + '</div>';
 }
 
-function _cpUpdateBtn(btn, r) {
-  btn.innerHTML = r ? _cpAvatar(r) + '<div style="min-width:0"><div style="font-size:12px;font-weight:600;color:var(--text1)">' + (r.name||'') + '</div><div style="font-size:10px;color:var(--text2)">' + (r.title||'') + '</div></div>' : '<span style="font-size:12px;color:var(--text3)">— None —</span>';
+function _cpUpdateBtn(btn, r, orig) {
+  // Store orig reference for clear button
+  if (orig) btn._cpOrig = orig;
+  var clearOrig = btn._cpOrig;
+  if (r) {
+    btn.innerHTML = _cpAvatar(r) +
+      '<div style="min-width:0;flex:1">' +
+        '<div style="font-size:12px;font-weight:600;color:var(--text1)">' + (r.name||'') + '</div>' +
+        '<div style="font-size:10px;color:var(--text2)">' + (r.title||'') + '</div>' +
+      '</div>' +
+      '<button class="cp-clear-btn" title="Remove" ' +
+        'style="background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;' +
+               'padding:0 2px;flex-shrink:0;line-height:1;border-radius:3px" ' +
+        'onmouseenter="this.style.color='var(--red,#E24B4A)'" ' +
+        'onmouseleave="this.style.color='var(--text3)'">' +
+        '&#x2715;' +
+      '</button>';
+    // Wire clear button — stop propagation so it doesn't open the dropdown
+    var clearBtn = btn.querySelector('.cp-clear-btn');
+    if (clearBtn) {
+      clearBtn.onclick = function(e) {
+        e.stopPropagation();
+        if (clearOrig) clearOrig.value = '';
+        _cpUpdateBtn(btn, null, clearOrig);
+      };
+    }
+  } else {
+    btn.innerHTML = '<span style="font-size:12px;color:var(--text3)">— None —</span>';
+  }
 }
 
 function _buildContactPicker(elId, resources, selectedId) {
@@ -3260,7 +3355,7 @@ function _buildContactPicker(elId, resources, selectedId) {
   var selectedRes = selectedId ? resources.find(function(r){ return r.id === selectedId; }) : null;
   var btn = document.createElement('div');
   btn.style.cssText = 'border:1px solid var(--border);border-radius:4px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;background:var(--bg2);min-height:34px';
-  _cpUpdateBtn(btn, selectedRes);
+  _cpUpdateBtn(btn, selectedRes, orig);
   wrapper.appendChild(btn);
   var drop = document.createElement('div');
   drop.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:4px;z-index:999;max-height:280px;overflow-y:auto;margin-top:2px;box-shadow:0 4px 16px rgba(0,0,0,.3)';
@@ -3269,7 +3364,7 @@ function _buildContactPicker(elId, resources, selectedId) {
   noneRow.textContent = '— None —';
   noneRow.onmouseenter = function(){ this.style.background='rgba(255,255,255,.05)'; };
   noneRow.onmouseleave = function(){ this.style.background=''; };
-  noneRow.onclick = function(){ orig.value=''; _cpUpdateBtn(btn, null); drop.style.display='none'; };
+  noneRow.onclick = function(){ orig.value=''; _cpUpdateBtn(btn, null, orig); drop.style.display='none'; };
   drop.appendChild(noneRow);
   deptOrder.forEach(function(dept) {
     var hdr = document.createElement('div');
@@ -3282,7 +3377,7 @@ function _buildContactPicker(elId, resources, selectedId) {
       row.innerHTML = _cpAvatar(r) + '<div style="min-width:0"><div style="font-size:12px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.name||'') + '</div><div style="font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.title||'') + '</div></div>';
       row.onmouseenter = function(){ this.style.background='rgba(0,201,201,.06)'; };
       row.onmouseleave = function(){ this.style.background = r.id===orig.value ? 'rgba(0,201,201,.08)' : ''; };
-      row.onclick = function(){ orig.value = r.id; _cpUpdateBtn(btn, r); drop.style.display='none'; };
+      row.onclick = function(){ orig.value = r.id; _cpUpdateBtn(btn, r, orig); drop.style.display='none'; };
       drop.appendChild(row);
     });
   });
@@ -3346,8 +3441,18 @@ function _ocGetDirectorRoleId() {
 
 var _ocZoomLevel = 1;
 
+function _ocZoomSlider(val) {
+  _ocZoomLevel = parseFloat(val) / 100;
+  var tr = document.getElementById('oc-tree-root');
+  if (tr) { tr.style.transform = 'scale(' + _ocZoomLevel + ')'; tr.style.transformOrigin = 'top left'; }
+  var lbl = document.getElementById('oc-zoom-pct');
+  if (lbl) lbl.textContent = Math.round(_ocZoomLevel * 100) + '%';
+}
+
 function _ocZoomIn() {
   _ocZoomLevel = Math.min(2, parseFloat((_ocZoomLevel + 0.1).toFixed(1)));
+  var sl = document.getElementById('oc-zoom-slider');
+  if (sl) sl.value = Math.round(_ocZoomLevel * 100);
   var tr = document.getElementById('oc-tree-root');
   if (tr) { tr.style.transform = 'scale(' + _ocZoomLevel + ')'; tr.style.transformOrigin = 'top left'; }
   var lbl = document.getElementById('oc-zoom-pct');
@@ -3356,6 +3461,8 @@ function _ocZoomIn() {
 
 function _ocZoomOut() {
   _ocZoomLevel = Math.max(0.3, parseFloat((_ocZoomLevel - 0.1).toFixed(1)));
+  var sl = document.getElementById('oc-zoom-slider');
+  if (sl) sl.value = Math.round(_ocZoomLevel * 100);
   var tr = document.getElementById('oc-tree-root');
   if (tr) { tr.style.transform = 'scale(' + _ocZoomLevel + ')'; tr.style.transformOrigin = 'top left'; }
   var lbl = document.getElementById('oc-zoom-pct');
