@@ -3290,8 +3290,29 @@ function _buildContactPicker(elId, resources, selectedId) {
   btn.onclick = function(e) {
     e.stopPropagation();
     var isOpen = drop.style.display !== 'none';
-    document.querySelectorAll('[id$="-picker"] > div:last-child').forEach(function(d){ d.style.display='none'; });
-    drop.style.display = isOpen ? 'none' : 'block';
+    document.querySelectorAll('[id$="-picker"] > div:last-child').forEach(function(d){
+      d.style.display='none';
+      d.style.top=''; d.style.bottom='';
+    });
+    if (!isOpen) {
+      // Flip upward if not enough space below
+      var rect     = btn.getBoundingClientRect();
+      var spaceBelow = window.innerHeight - rect.bottom;
+      var dropH    = Math.min(280, 400); // max-height from CSS
+      if (spaceBelow < dropH + 8) {
+        // Not enough space below — open upward
+        drop.style.top    = '';
+        drop.style.bottom = '100%';
+        drop.style.marginTop   = '';
+        drop.style.marginBottom = '2px';
+      } else {
+        drop.style.top    = '100%';
+        drop.style.bottom = '';
+        drop.style.marginTop   = '2px';
+        drop.style.marginBottom = '';
+      }
+      drop.style.display = 'block';
+    }
   };
 }
 
