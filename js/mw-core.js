@@ -1,5 +1,5 @@
-// VERSION: 20260402-173000
-console.log('%c[mw-core] v20260403-310000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260412-MC2
+console.log('%c[mw-core] v20260412-MC2 — filter cancelled instances from workflow_requests queue','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
