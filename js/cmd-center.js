@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD2
+// cmd-center.js  ·  v20260412-CMD4
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,7 +27,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD2',
+    'cmd-center':  'v20260412-CMD4',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -133,13 +133,23 @@ function _connect() {
     _renderSessionList();
   });
 
+  // Track pending leave timers so we can cancel them if user re-joins
+  var _leaveTimers = {};
+
   _channel.on('presence', { event: 'join' }, function(data) {
     var p = data.newPresences && data.newPresences[0];
     if (!p) return;
-    var isNew = !_sessions[p.userId]; // truly new session, not a heartbeat re-track
-    _sessions[p.userId] = { name: p.name, initials: p.initials, location: p.location, online: true, ts: p.ts };
+    // Cancel any pending leave timer for this user
+    if (_leaveTimers[p.userId]) {
+      clearTimeout(_leaveTimers[p.userId]);
+      delete _leaveTimers[p.userId];
+    }
+    var isNew = !_sessions[p.userId];
+    _sessions[p.userId] = {
+      name: p.name, initials: p.initials, location: p.location,
+      online: true, ts: Date.now(), lastSeen: Date.now()
+    };
     _renderSessionList();
-    // Only log if it's a genuinely new session (not our own heartbeat)
     if (isNew && _mySession && p.userId !== _mySession.userId) {
       _appendLine('SYS', 'event', p.name + ' joined');
     }
@@ -148,20 +158,20 @@ function _connect() {
   _channel.on('presence', { event: 'leave' }, function(data) {
     var p = data.leftPresences && data.leftPresences[0];
     if (!p) return;
-    // Ignore leave events for sessions that immediately re-join (heartbeat)
-    // Only mark offline after a short debounce
     var uid = p.userId;
-    setTimeout(function() {
-      // If they re-joined within 2s, their ts will be newer — don't mark offline
+    // Debounce 8s — Supabase fires leave on every track() update.
+    // If they re-join within 8s it was just a presence update, not a true disconnect.
+    if (_leaveTimers[uid]) clearTimeout(_leaveTimers[uid]);
+    _leaveTimers[uid] = setTimeout(function() {
+      delete _leaveTimers[uid];
       var sess = _sessions[uid];
-      if (sess && (Date.now() - (sess.ts || 0)) > 2000) {
-        sess.online = false;
-        _renderSessionList();
-        if (_mySession && uid !== _mySession.userId) {
-          _appendLine('SYS', 'event', sess.name + ' left');
-        }
+      if (!sess) return;
+      sess.online = false;
+      _renderSessionList();
+      if (_mySession && uid !== _mySession.userId) {
+        _appendLine('SYS', 'event', sess.name + ' left');
       }
-    }, 2000);
+    }, 8000);
   });
 
   // Commands: receive commands addressed to this session
@@ -178,6 +188,18 @@ function _connect() {
         });
       }
     });
+  });
+
+  // Location updates — keep session location current without track() churn
+  _channel.on('broadcast', { event: 'location_update' }, function(payload) {
+    var d = payload.payload;
+    if (!d || !d.userId) return;
+    if (_sessions[d.userId]) {
+      _sessions[d.userId].location = d.location;
+      _sessions[d.userId].online   = true;
+      _sessions[d.userId].lastSeen = Date.now();
+      _renderSessionList();
+    }
   });
 
   // Results: receive results from other sessions
@@ -208,16 +230,20 @@ function _connect() {
         ts:       Date.now(),
       });
       _appendLine('SYS', 'sys', 'Connected · session: ' + _mySession.name);
-      // Heartbeat — update location every 15s
+      // Location-only update — use a separate broadcast instead of track()
+      // to avoid triggering leave/join cycles on every heartbeat
       setInterval(function() {
-        _channel.track({
-          userId:   _mySession.userId,
-          name:     _mySession.name,
-          initials: _mySession.initials,
-          location: _currentLocation(),
-          ts:       Date.now(),
+        if (!_channel) return;
+        _channel.send({
+          type: 'broadcast', event: 'location_update',
+          payload: {
+            userId:   _mySession.userId,
+            name:     _mySession.name,
+            initials: _mySession.initials,
+            location: _currentLocation(),
+          }
         });
-      }, 15000);
+      }, 10000);
     }
   });
 }
@@ -627,21 +653,17 @@ function _buildPanel() {
 
 function _panelHTML() {
   return `
-<div id="phr-titlebar" style="background:#040710;border-bottom:1px solid #0d1f2e;padding:7px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;cursor:move">
-  <div style="display:flex;align-items:center;gap:10px">
-    <div style="display:flex;gap:5px">
-      <div id="phr-close-dot" style="width:10px;height:10px;border-radius:50%;background:#E24B4A;cursor:pointer" title="Close"></div>
-      <div id="phr-min-dot"   style="width:10px;height:10px;border-radius:50%;background:#EF9F27;cursor:pointer" title="Minimize"></div>
-      <div id="phr-pop-dot"   style="width:10px;height:10px;border-radius:50%;background:#1D9E75;cursor:pointer" title="Pop out to new window"></div>
-    </div>
-    <span style="font-size:11px;font-weight:700;color:#00c9c9;letter-spacing:.1em">PHUD RUNNER</span>
-    <span id="phr-status" style="font-size:10px;color:rgba(255,255,255,.3)">connecting…</span>
-  </div>
-  <div style="display:flex;gap:5px">
-    <button class="phr-tab-btn phr-tab-active" data-tab="transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,.3);border-radius:3px;background:rgba(0,201,201,.1);color:#00c9c9;cursor:pointer;font-family:monospace;letter-spacing:.05em">Transcript</button>
-    <button class="phr-tab-btn" data-tab="editor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;letter-spacing:.05em">Editor</button>
-    <button class="phr-tab-btn" data-tab="library" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;letter-spacing:.05em">Library</button>
-  </div>
+<div id="phr-titlebar" style="background:#040710;border-bottom:1px solid #0d1f2e;padding:6px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0;cursor:move">
+  <span style="font-size:11px;font-weight:700;color:#00c9c9;letter-spacing:.1em;flex-shrink:0">COMMAND CENTER</span>
+  <span id="phr-status" style="font-size:10px;color:rgba(255,255,255,.3);flex-shrink:0">connecting…</span>
+  <div style="flex:1"></div>
+  <button class="phr-tab-btn phr-tab-active" data-tab="transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,.3);border-radius:3px;background:rgba(0,201,201,.1);color:#00c9c9;cursor:pointer;font-family:monospace;letter-spacing:.05em">Transcript</button>
+  <button class="phr-tab-btn" data-tab="editor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;letter-spacing:.05em">Editor</button>
+  <button class="phr-tab-btn" data-tab="library" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;letter-spacing:.05em">Library</button>
+  <div style="width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 2px;flex-shrink:0"></div>
+  <button id="phr-pop-dot" title="Pop out to new window" style="font-size:11px;padding:2px 7px;border:1px solid rgba(29,158,117,.4);border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;flex-shrink:0">⤢ Pop Out</button>
+  <button id="phr-min-dot" title="Minimize" style="font-size:11px;padding:2px 7px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;flex-shrink:0">—</button>
+  <button id="phr-close-dot" title="Close" style="font-size:11px;padding:2px 7px;border:1px solid rgba(226,75,74,.4);border-radius:3px;background:rgba(226,75,74,.1);color:#E24B4A;cursor:pointer;font-family:monospace;flex-shrink:0">✕</button>
 </div>
 
 <div style="display:flex;flex:1;min-height:0">
@@ -1188,6 +1210,33 @@ function _tryHook() {
     };
     window.myrSwitchView._cmdHooked = true;
   } else if (!window.myrSwitchView) {
+    allHooked = false;
+  }
+
+  // Hook myrOpenInstance — opening a task/instance
+  if (window.myrOpenInstance && !window.myrOpenInstance._cmdHooked) {
+    var origOpen = window.myrOpenInstance;
+    window.myrOpenInstance = function(instanceId) {
+      origOpen.call(this, instanceId);
+      var inst = (window._myrInstances||[]).find(function(i){ return i.id === instanceId; });
+      if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'sys',
+        'Open instance "' + (inst ? inst.title : instanceId.slice(0,8)) + '"');
+    };
+    window.myrOpenInstance._cmdHooked = true;
+  } else if (!window.myrOpenInstance) {
+    allHooked = false;
+  }
+
+  // Hook myrLaunchRequest — opening a form from Browse
+  if (window.myrLaunchRequest && !window.myrLaunchRequest._cmdHooked) {
+    var origLaunch = window.myrLaunchRequest;
+    window.myrLaunchRequest = function(type, templateId) {
+      origLaunch.apply(this, arguments);
+      if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'sys',
+        'Form Open "' + (type||'') + '" id=' + (templateId||'').slice(0,8));
+    };
+    window.myrLaunchRequest._cmdHooked = true;
+  } else if (!window.myrLaunchRequest) {
     allHooked = false;
   }
 
