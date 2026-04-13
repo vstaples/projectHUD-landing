@@ -1,5 +1,5 @@
 // VERSION: 20260402-173000
-console.log('%c[mw-core] v20260412-MC1 — mw:viewready event for deterministic tab injection','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-core] v20260403-310000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -46,7 +46,7 @@ window._mwRefreshWorkItems = async function() {
     const today = new Date().toLocaleDateString('en-CA');
     const [freshActions, freshReviews] = await Promise.all([
       API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
-      API.get(`workflow_requests?select=id,title,body,status,role,due_date,owner_resource_id,owner_name,created_by_name,instance_id&owner_resource_id=eq.${resId}&status=eq.open&limit=50`).catch(() => []),
+      API.get(`workflow_requests?select=id,title,body,status,role,due_date,owner_resource_id,owner_name,created_by_name,instance_id,workflow_instances!inner(status)&owner_resource_id=eq.${resId}&status=eq.open&workflow_instances.status=not.in.(cancelled,completed,withdrawn)&limit=50`).catch(() => []),
     ]);
     // Rebuild work items for action items and pending reviews only
     const wrInstanceIds = new Set();
@@ -211,7 +211,7 @@ window._mwLoadUserView = async function() {
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),
       API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.resolved&limit=100`).catch(() => []),
       // 4th parallel fetch: dedicated workflow_requests table (review/approve rows)
-      API.get(`workflow_requests?owner_resource_id=eq.${resId}&status=eq.open&select=id,role,title,body,instance_id,owner_name,created_by_name,due_date,created_at&limit=100`).catch(() => []),
+      API.get(`workflow_requests?owner_resource_id=eq.${resId}&status=eq.open&select=id,role,title,body,instance_id,owner_name,created_by_name,due_date,created_at,workflow_instances!inner(status)&workflow_instances.status=not.in.(cancelled,completed,withdrawn)&limit=100`).catch(() => []),
     ]);
 
     // _myCocEvents set after workItems built (below)
@@ -1287,14 +1287,6 @@ window._mwLoadUserView = async function() {
     if (loading) loading.style.display = 'none';
     content.style.display = 'block';
 
-    // ── MC1: Fire mw:viewready — tab strip is in DOM, all core tabs rendered.
-    // Extension modules (mw-team.js etc.) listen for this event instead of
-    // polling with setTimeout — deterministic, no timing dependency.
-    window.dispatchEvent(new CustomEvent('mw:viewready', {
-      detail: { tabBar: document.getElementById('user-suite-tabs') }
-    }));
-    console.log('[mw-core] mw:viewready fired');
-
     // ── Delta strip — since last login ───────────────────
     setTimeout(() => { if (window.populateDeltaStrip) populateDeltaStrip(); }, 200);
 
@@ -1315,7 +1307,7 @@ window._mwLoadUserView = async function() {
               `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,title&limit=50`
             ).catch(e => { console.warn('[Poll] action_items fetch error:', e.message); return null; }),
             API.get(
-              `workflow_requests?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,role&limit=50`
+              `workflow_requests?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,role,workflow_instances!inner(status)&workflow_instances.status=not.in.(cancelled,completed,withdrawn)&limit=50`
             ).catch(e => { console.warn('[Poll] workflow_requests fetch error:', e.message); return null; }),
             API.get(
               `workflow_instances?submitted_by_resource_id=eq.${_myResource.id}&status=in.(in_progress,complete)&select=id,current_step_name,updated_at&limit=50`

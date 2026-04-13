@@ -1,5 +1,5 @@
-// VERSION: 20260403-260000
-console.log('%c[mw-events] v20260403-280000','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260412-ME1
+console.log('%c[mw-events] v20260412-ME1 — next-step routing + cadenceRole resolution','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
