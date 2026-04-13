@@ -1042,32 +1042,66 @@
   </div>
 </div>
 
-<div class="um-drawer" id="user-drawer" style="width:400px;right:-420px;">
+<div class="um-drawer" id="user-drawer" style="width:440px;right:-460px;">
   <div class="um-drawer-hdr">
-    <div class="um-drawer-title">EDIT APP ACCESS</div>
-    <button class="um-drawer-close" onclick="closeDrawer()">✕</button>
+    <div class="um-drawer-title" id="user-drawer-title">EDIT USER</div>
+    <button class="um-drawer-close" onclick="closeDrawer()">&#x2715;</button>
   </div>
   <div class="um-drawer-body">
-    <div id="user-drawer-name" style="font-family:var(--font-ui);font-size:15px;font-weight:600;color:var(--text0);margin-bottom:16px;"></div>
-    <div class="um-field"><label>APP ROLE</label>
+    <div class="um-field">
+      <label>FULL NAME</label>
+      <input id="user-edit-name" class="um-input" type="text" placeholder="First Last">
+    </div>
+    <div class="um-field">
+      <label>EMAIL ADDRESS</label>
+      <input id="user-edit-email" class="um-input" type="email" placeholder="name@company.com">
+      <p style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:4px;">
+        Changing email updates both the login account and the user record.</p>
+    </div>
+    <div class="um-field">
+      <label>NEW PASSWORD <span style="color:var(--text3);font-weight:400">(leave blank to keep current)</span></label>
+      <div style="position:relative">
+        <input id="user-edit-password" class="um-input" type="password" placeholder="Min. 8 characters to change" style="padding-right:36px">
+        <button type="button" onclick="toggleEditUserPwd()"
+          style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0"
+          title="Show/hide">&#x1F441;</button>
+      </div>
+    </div>
+    <div class="um-field">
+      <label>APP ROLE</label>
       <select id="user-app-role" class="um-select">
-        <option value="admin">Admin — full access + user management</option>
-        <option value="pm">Project Manager — manage assigned projects</option>
-        <option value="resource">Resource — view assigned tasks + enter actuals</option>
         <option value="viewer">Viewer — read-only access</option>
+        <option value="resource">Resource — view assigned tasks + enter actuals</option>
+        <option value="pm">Project Manager — manage assigned projects</option>
+        <option value="admin">Admin — full access + user management</option>
       </select>
     </div>
-    <div class="um-field"><label>LINKED RESOURCE RECORD</label>
+    <div class="um-field">
+      <label>LINKED RESOURCE RECORD <span style="color:var(--text3);font-weight:400">(optional)</span></label>
       <select id="user-resource-link" class="um-select">
         <option value="">— Not linked —</option>
       </select>
+      <p style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:4px;">
+        Linking enables actuals entry, task assignment, and work queue visibility.</p>
     </div>
-    <p style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:8px;">
-      Linking a user to a resource record enables actuals entry and task assignment visibility.</p>
-    <div id="user-err" class="um-err"></div>
+    <div id="user-err" class="um-err" style="display:none"></div>
+    <div id="user-ok" style="display:none;font-family:var(--font-mono);font-size:12px;color:var(--green);margin-top:8px;padding:8px;background:rgba(29,158,117,.08);border:1px solid rgba(29,158,117,.25);border-radius:4px;"></div>
+
+    <!-- Delete zone -->
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(226,75,74,.15)">
+      <div style="font-family:var(--font-mono);font-size:11px;color:rgba(226,75,74,.6);letter-spacing:.1em;margin-bottom:8px">DANGER ZONE</div>
+      <button id="user-delete-btn" onclick="confirmDeleteUser()"
+        style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;
+               padding:6px 14px;border:1px solid rgba(226,75,74,.4);background:rgba(226,75,74,.08);
+               color:#E24B4A;cursor:pointer;border-radius:3px;width:100%">
+        &#x1F5D1; DELETE USER ACCOUNT
+      </button>
+      <p style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:6px;line-height:1.5">
+        Permanently removes login access and the user record. This cannot be undone.</p>
+    </div>
   </div>
   <div class="um-drawer-footer">
-    <button class="um-save-btn" id="user-save-btn" onclick="saveUserRole()">SAVE ACCESS</button>
+    <button class="um-save-btn" id="user-save-btn" onclick="saveUserRole()">SAVE CHANGES</button>
     <button class="um-cancel-btn" onclick="closeDrawer()">CANCEL</button>
   </div>
 </div>
@@ -1761,39 +1795,165 @@ function renderUsersTable() {
   wrap.innerHTML = html;
 }
 
+function toggleEditUserPwd() {
+  const inp = document.getElementById('user-edit-password');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
 function openUserDrawer(id) {
   UM.editingUserId = id;
   const u = UM.users.find(x => x.id === id);
-  document.getElementById('user-drawer-name').textContent = u?.name || '';
-  document.getElementById('user-app-role').value = u?.role || 'viewer';
 
+  document.getElementById('user-edit-name').value    = u?.name  || '';
+  document.getElementById('user-edit-email').value   = u?.email || '';
+  document.getElementById('user-edit-password').value = '';
+  document.getElementById('user-app-role').value     = u?.role  || 'viewer';
+
+  // Resource dropdown — sorted by dept then name, with title
+  const sorted = [...UM.resources].sort((a, b) => {
+    const aExt = a.is_external ? 1 : 0, bExt = b.is_external ? 1 : 0;
+    if (aExt !== bExt) return aExt - bExt;
+    const d = (a.department||'').localeCompare(b.department||'');
+    return d !== 0 ? d : (a.first_name||'').localeCompare(b.first_name||'');
+  });
   const ulEl = document.getElementById('user-resource-link');
   ulEl.innerHTML = '<option value="">— Not linked —</option>' +
-    UM.resources.map(r => `<option value="${r.id}" ${u?.resource_id===r.id?'selected':''}>${r.first_name} ${r.last_name}</option>`).join('');
+    sorted.map(r => {
+      const name  = `${r.first_name||''} ${r.last_name||''}`.trim();
+      const title = r.title || r.department || '';
+      const ext   = r.is_external ? ' [External]' : '';
+      const sel   = u?.resource_id === r.id ? 'selected' : '';
+      return `<option value="${r.id}" ${sel}>${name}${title?' — '+title:''}${ext}</option>`;
+    }).join('');
 
   document.getElementById('user-err').style.display = 'none';
+  document.getElementById('user-ok').style.display  = 'none';
   openDrawer('user-drawer');
 }
 
 async function saveUserRole() {
-  const errEl = document.getElementById('user-err');
-  const btn   = document.getElementById('user-save-btn');
+  const errEl  = document.getElementById('user-err');
+  const okEl   = document.getElementById('user-ok');
+  const btn    = document.getElementById('user-save-btn');
+  errEl.style.display = 'none';
+  okEl.style.display  = 'none';
   btn.textContent = 'SAVING...'; btn.disabled = true;
+
   try {
+    const name       = document.getElementById('user-edit-name').value.trim();
+    const email      = document.getElementById('user-edit-email').value.trim();
+    const password   = document.getElementById('user-edit-password').value;
+    const appRole    = document.getElementById('user-app-role').value;
+    const resourceId = document.getElementById('user-resource-link').value || null;
+
+    if (!name)  { errEl.textContent = 'Name is required.';  errEl.style.display='block'; return; }
+    if (!email) { errEl.textContent = 'Email is required.'; errEl.style.display='block'; return; }
+    if (password && password.length < 8) {
+      errEl.textContent = 'Password must be at least 8 characters.';
+      errEl.style.display = 'block'; return;
+    }
+
+    // 1. Patch users table
     const payload = {
-      role:        document.getElementById('user-app-role').value,
-      is_admin:    document.getElementById('user-app-role').value === 'admin',
-      resource_id: document.getElementById('user-resource-link').value || null,
+      name,
+      email,
+      role:        appRole,
+      is_admin:    appRole === 'admin',
+      resource_id: resourceId,
+      updated_at:  new Date().toISOString(),
     };
     await API.patch(`users?id=eq.${UM.editingUserId}`, payload);
+
+    // 2. If resource linked — patch resources.user_id so _myResource resolves on login
+    if (resourceId) {
+      await API.patch(`resources?id=eq.${resourceId}`,
+        { user_id: UM.editingUserId, updated_at: new Date().toISOString() }
+      ).catch(() => {});
+    }
+
+    // 3. If email or password changed — update via edge function
     const u = UM.users.find(x => x.id === UM.editingUserId);
+    const emailChanged    = u?.email !== email;
+    const passwordChanged = !!password;
+    if (emailChanged || passwordChanged) {
+      const SUPA_URL = PHUD.SUPABASE_URL;
+      const token    = await Auth.getFreshToken().catch(() => Auth.getToken());
+      const body     = { user_id: UM.editingUserId };
+      if (emailChanged)    body.email    = email;
+      if (passwordChanged) body.password = password;
+      const res = await fetch(`${SUPA_URL}/functions/v1/update-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': PHUD.SUPABASE_KEY,
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const result = await res.json();
+      if (!result.ok) throw new Error(result.error || 'Auth update failed');
+    }
+
+    // Update local cache
     if (u) Object.assign(u, payload);
+    renderUsersTable();
+
+    okEl.textContent = `${name} updated successfully.`;
+    okEl.style.display = 'block';
+    setTimeout(closeDrawer, 2000);
+
+  } catch(e) {
+    errEl.textContent = e.message || 'Save failed — please try again.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'SAVE CHANGES'; btn.disabled = false;
+  }
+}
+
+async function confirmDeleteUser() {
+  const u = UM.users.find(x => x.id === UM.editingUserId);
+  if (!u) return;
+  // Use _myrConfirm if available (Compass context), else native confirm
+  const confirmed = typeof _myrConfirm === 'function'
+    ? await _myrConfirm({
+        title: 'Delete User Account',
+        body: 'Permanently delete <strong style="color:#fff">' + (u.name||u.email) + '</strong>?<br><br>This removes their login access and user record. It cannot be undone.',
+        confirmLabel: 'Delete',
+        danger: true
+      })
+    : confirm('Delete user ' + (u.name||u.email) + '? This cannot be undone.');
+  if (!confirmed) return;
+
+  const btn = document.getElementById('user-delete-btn');
+  btn.textContent = 'DELETING...'; btn.disabled = true;
+
+  try {
+    const SUPA_URL = PHUD.SUPABASE_URL;
+    const token    = await Auth.getFreshToken().catch(() => Auth.getToken());
+
+    // Call delete-user edge function
+    const res = await fetch(`${SUPA_URL}/functions/v1/delete-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': PHUD.SUPABASE_KEY,
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ user_id: UM.editingUserId }),
+    });
+    const result = await res.json();
+    if (!result.ok) throw new Error(result.error || 'Delete failed');
+
+    // Remove from local cache and re-render
+    UM.users = UM.users.filter(x => x.id !== UM.editingUserId);
     closeDrawer();
     renderUsersTable();
+    compassToast && compassToast((u.name||u.email) + ' deleted.', 2500);
+
   } catch(e) {
-    errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block';
-  } finally {
-    btn.textContent = 'SAVE ACCESS'; btn.disabled = false;
+    document.getElementById('user-err').textContent = e.message || 'Delete failed.';
+    document.getElementById('user-err').style.display = 'block';
+    btn.textContent = 'DELETE USER ACCOUNT'; btn.disabled = false;
   }
 }
 
