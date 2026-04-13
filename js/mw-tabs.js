@@ -1088,6 +1088,7 @@ function _myrRenderGroupedTable(instances, isHistory) {
         var netDue = fd['_net_due_employee'] || '—';
         var step = inst.current_step_name || inst.status || '—';
         var sColor = statusColor[inst.status] || '#EF9F27';
+        if (inst.status === 'blocked') step = '⚠ ' + step;
         html += `<tr onclick="myrOpenInstance('${inst.id}')" style="cursor:pointer;border-bottom:0.5px solid rgba(255,255,255,.05);transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
           <td style="${FA}font-size:13px;color:rgba(255,255,255,.6);padding:8px 10px;white-space:nowrap">${esc(date)}</td>
           <td style="${FA}font-size:13px;color:rgba(255,255,255,.7);padding:8px 10px">${esc(purpose)}</td>
@@ -2351,13 +2352,18 @@ function _myrStatusCell(inst, step, sColor) {
       dot = '#555e6e'; sc = 'rgba(255,255,255,.3)'; sl = 'Waiting';
     }
 
-    return '<tr style="border-bottom:0.5px solid rgba(255,255,255,.08)">' +
+    // Flag missing approver in red
+    var isMissingApprover = (approverName === '—' || !approverName) && !isAllDone && !isPast;
+    var approverDisplay = isMissingApprover
+      ? '<span style="color:#E24B4A;font-weight:700">⚠ Not assigned</span>'
+      : approverName;
+    return '<tr style="border-bottom:0.5px solid rgba(255,255,255,.08)' + (isMissingApprover?';background:rgba(226,75,74,.05)':'') + '">' +
       '<td style="' + FA + 'color:#e8eef8;padding:6px 10px;white-space:nowrap">' +
         '<div style="display:flex;align-items:center;gap:7px">' +
           '<div style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0"></div>' + s.name +
         '</div></td>' +
       '<td style="' + FA + 'color:rgba(255,255,255,.6);padding:6px 10px;white-space:nowrap">' + stepDate + '</td>' +
-      '<td style="' + FA + 'color:rgba(255,255,255,.5);padding:6px 10px;white-space:nowrap">' + approverName + '</td>' +
+      '<td style="' + FA + 'padding:6px 10px;white-space:nowrap">' + approverDisplay + '</td>' +
       '<td style="padding:6px 10px"><span style="' + FA + 'font-weight:700;color:' + sc + '">' + sl + '</span></td>' +
     '</tr>';
   }).join('');
