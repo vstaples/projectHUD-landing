@@ -1971,7 +1971,7 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
       // Mark instance as blocked
       await API.patch('workflow_instances?id=eq.' + instanceId, {
         status:            'blocked',
-        current_step_name: step.name + ' — BLOCKED: ' + roleLabel + ' not assigned',
+        current_step_name: 'BLOCKED: ' + roleLabel + ' not assigned',
         updated_at:        new Date().toISOString(),
       }).catch(function() {});
 
