@@ -1592,11 +1592,14 @@ async function saveResource() {
         _ocBuild();
       }
       await _saveResourceExtras(resourceId);
+      // Invalidate MY TEAM cache so contact changes show immediately
+      if (typeof window._mwTeamInvalidate === 'function') window._mwTeamInvalidate();
     } else {
       const [created] = await API.post('resources', payload);
       if (created) UM.resources.push(created);
       closeDrawer();
       renderResources();
+      if (typeof window._mwTeamInvalidate === 'function') window._mwTeamInvalidate();
     }
   } catch(e) {
     errEl.textContent = e.message || 'Save failed'; errEl.style.display = 'block';

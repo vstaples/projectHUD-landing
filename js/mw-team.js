@@ -1,5 +1,5 @@
 // mw-team.js — My Team view for Compass
-// v20260412-MT5
+// v20260412-MT6
 // Globals: _myResource, API
 // Tab key: 'team' → panel: #utc-team
 
@@ -119,18 +119,27 @@ if (!document.getElementById('mw-team-styles')) {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-var _loaded = false;
-var _data   = null;
+var _loaded    = false;
+var _data      = null;
+var _lastFetch = 0;
 
 // ── Entry point ───────────────────────────────────────────────────────────────
+// Invalidate cache — call after saving resource/contact changes
+window._mwTeamInvalidate = function() {
+  _loaded = false; _data = null; _lastFetch = 0;
+};
+
 window._mwTeamLoad = async function() {
   var panel = document.getElementById('utc-team');
   if (!panel) return;
-  if (_loaded && _data) { _mtRender(panel); return; }
+  // Re-fetch if data is stale (>30s) or not yet loaded
+  var now = Date.now();
+  if (_loaded && _data && (now - (_lastFetch||0)) < 30000) { _mtRender(panel); return; }
   panel.innerHTML = '<div class="mt-loading">LOADING MY TEAM\u2026</div>';
   try {
     await _mtFetch();
-    _loaded = true;
+    _loaded    = true;
+    _lastFetch = Date.now();
     _mtRender(panel);
   } catch(ex) {
     panel.innerHTML = '<div class="mt-loading" style="color:var(--red)">Failed: ' + ex.message + '</div>';
@@ -515,7 +524,7 @@ function _e(s) {
       btn.textContent = 'My Team';
       btn.onclick = function() { uSwitchTab('team', btn); };
       tabBar.appendChild(btn);
-      console.log('[mw-team] MT5 — My Team tab injected via mw:viewready');
+      console.log('[mw-team] MT6 — 30s cache + _mwTeamInvalidate');
     }
     // 2. Inject MY TEAM panel if not already present
     var sibling = document.getElementById('utc-work');
