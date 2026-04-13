@@ -24,8 +24,24 @@
 if (window._cmdCenterLoaded) return;
 window._cmdCenterLoaded = true;
 
-console.log('%c[CMD Center] v20260412-CMD1 — multi-client orchestrator',
-  'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+// Version banner — fires on every page load/refresh so you can confirm what's running
+(function() {
+  var versions = {
+    'cmd-center':  'v20260412-CMD1',
+    'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
+    'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
+    'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
+    'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
+  };
+  console.group('%c CMD Center v20260412-CMD1 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
+  Object.entries(versions).forEach(function([mod, ver]) {
+    console.log('%c' + mod.padEnd(16) + '%c' + ver,
+      'color:rgba(255,255,255,.4);font-family:monospace',
+      'color:#EF9F27;font-family:monospace;font-weight:700');
+  });
+  console.groupEnd();
+})();
 
 // ── Config ────────────────────────────────────────────────────────────────────
 var SUPA_URL = (typeof PHUD !== 'undefined' && PHUD.SUPABASE_URL) ||
@@ -1028,7 +1044,9 @@ function _togglePanel() {
 
 // ── Keyboard shortcut: Ctrl+Shift+R ──────────────────────────────────────────
 document.addEventListener('keydown', function(e) {
-  if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+  // Ctrl+Shift+` (backtick/tilde) — toggle CMD Center panel
+  // Avoids Ctrl+Shift+R which is Chrome hard-refresh
+  if (e.ctrlKey && e.shiftKey && (e.key === '`' || e.key === '~')) {
     e.preventDefault();
     _togglePanel();
   }
@@ -1104,7 +1122,7 @@ async function _init() {
     }
   }, 2000);
 
-  console.log('[CMD Center] initialized — Ctrl+Shift+R to toggle panel');
+  console.log('[CMD Center] initialized — Ctrl+Shift+` to toggle panel');
 }
 
 // Seed a sample script if none exist
