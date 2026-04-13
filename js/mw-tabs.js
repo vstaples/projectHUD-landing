@@ -864,7 +864,7 @@ window.loadUserRequests = async function() {
     const [wfTmpls, formDefs, instances, drafts] = await Promise.all([
       API.get(`workflow_templates?compass_visible=eq.true&status=eq.released&firm_id=eq.${firmId}&order=name.asc&select=id,name,description,status,version,trigger_type`).catch(() => []),
       API.get(`workflow_form_definitions?compass_visible=eq.true&state=in.(certified,published)&firm_id=eq.${firmId}&order=source_name.asc&select=id,source_name,state,version,category_id,description`).catch(() => []),
-      resId ? API.get(`workflow_instances?submitted_by_resource_id=eq.${resId}&order=created_at.desc&limit=100&select=id,title,status,current_step_name,workflow_type,template_id,created_at,updated_at,form_data`).catch(() => []) : [],
+      resId ? API.get(`workflow_instances?submitted_by_resource_id=eq.${resId}&order=created_at.desc&limit=100&select=id,title,status,current_step_name,workflow_type,template_id,created_at,updated_at,form_data,notes`).catch(() => []) : [],
       resId ? API.get(`form_drafts?user_id=eq.${resId}&firm_id=eq.${firmId}&order=updated_at.desc&select=id,form_def_id,form_data,updated_at`).catch(() => []) : [],
     ]);
     window._myrTemplates = wfTmpls  || [];
@@ -1728,6 +1728,54 @@ window.addEventListener('message', function(ev) {
           created_at:        now,
         }).catch(function(e) { console.warn('[compass_form_submit] CoC write failed:', e); });
 
+        // Pre-resolve all step assignees and store in notes for Signature Loop Status
+        // This lets the popup show WHO is responsible for each step before they act
+        try {
+          var submitterResId = res ? res.id : null;
+          if (submitterResId) {
+            var submitterResRows = await API.get(
+              'resources?id=eq.' + submitterResId +
+              '&select=id,name,manager_id,finance_contact_id,legal_contact_id,hr_contact_id'
+            ).catch(function(){ return []; });
+            var submitterResRow = submitterResRows && submitterResRows[0];
+            if (submitterResRow) {
+              var roleToResId = {
+                submitter: submitterResId,
+                manager:   submitterResRow.manager_id,
+                finance:   submitterResRow.finance_contact_id,
+                legal:     submitterResRow.legal_contact_id,
+                hr:        submitterResRow.hr_contact_id,
+              };
+              // Gather all assignee resource IDs
+              var assigneeIds = Object.values(roleToResId).filter(Boolean);
+              var assigneeMap = {};
+              if (assigneeIds.length) {
+                var assigneeRows = await API.get(
+                  'resources?id=in.(' + [...new Set(assigneeIds)].join(',') + ')&select=id,name'
+                ).catch(function(){ return []; });
+                (assigneeRows||[]).forEach(function(r){ assigneeMap[r.id] = r.name; });
+              }
+              // Build step chain: sequence_order → { role, assignee_name }
+              var stepChain = {};
+              (steps||[]).filter(function(s){ return s.step_type !== 'trigger'; }).forEach(function(s) {
+                var resId = roleToResId[s.assignee_role] || null;
+                stepChain[s.sequence_order] = {
+                  role:          s.assignee_role,
+                  assignee_name: resId ? (assigneeMap[resId] || '—') : null,
+                  assignee_id:   resId || null,
+                };
+              });
+              // Patch notes on the instance
+              await API.patch('workflow_instances?id=eq.' + instanceId, {
+                notes:      JSON.stringify({ step_chain: stepChain }),
+                updated_at: now,
+              }).catch(function(e){ console.warn('[compass_form_submit] notes patch failed:', e); });
+            }
+          }
+        } catch(e) {
+          console.warn('[compass_form_submit] step chain pre-resolve failed:', e);
+        }
+
         // Resolve role → resource and create workflow_request for step 1
         if (firstStep && res && res.id) {
           await window._mwResolveAndRoute(
@@ -2261,23 +2309,35 @@ function _myrStatusCell(inst, step, sColor) {
     var stepDate     = '—';
 
     // Use workflow_requests rows sorted by created_at — each maps to a step in sequence
-    // Filter out trigger steps to align indices correctly
     var nonTriggerSteps = steps.filter(function(s){ return s.step_type !== 'trigger'; });
     var stepIdx = nonTriggerSteps.findIndex(function(ns){ return ns.id === s.id; });
     var stepReq = instReqs[stepIdx] || null;
 
+    // Pre-resolved step chain stored in notes at submit time
+    var stepChain = null;
+    try {
+      var notesObj = inst.notes ? JSON.parse(inst.notes) : null;
+      stepChain = notesObj ? notesObj.step_chain : null;
+    } catch(_) {}
+    var chainEntry = stepChain ? stepChain[s.sequence_order] : null;
+    // Assignee from chain — the person responsible for this step
+    var chainAssignee = chainEntry ? (chainEntry.assignee_name || '—') : '—';
+
     if (s.sequence_order === 1) {
-      // Step 1 = submission itself
       stepDate     = submittedEvent ? fmtDt(submittedEvent.occurred_at) : fmtDt(inst.created_at);
-      approverName = stepReq ? stepReq.owner_name : (inst.submitted_by_name || '—');
+      // For completed step 1, show who actually signed; otherwise show assignee
+      approverName = (isPast || isAllDone)
+        ? (stepReq ? stepReq.owner_name : chainAssignee)
+        : chainAssignee;
     } else if (isPast || isAllDone) {
-      // Completed step — use the approval CoC event for date, request for name
-      var approvalIdx = stepIdx - 1; // submitted event is idx 0 in approvedEvents context
+      var approvalIdx = stepIdx - 1;
       var ev = approvedEvents[approvalIdx];
       stepDate     = ev ? fmtDt(ev.occurred_at) : (stepReq ? fmtDt(stepReq.created_at) : '—');
-      approverName = stepReq ? stepReq.owner_name : (ev ? ev.actor_name : '—');
-    } else if (isActive) {
-      approverName = stepReq ? stepReq.owner_name : '—';
+      // Show actual signer for completed steps
+      approverName = ev ? ev.actor_name : (stepReq ? stepReq.owner_name : chainAssignee);
+    } else {
+      // Waiting or active — show who is responsible from the pre-resolved chain
+      approverName = chainAssignee;
     }
 
     var dot, sc, sl;
