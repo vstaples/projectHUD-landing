@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD1
+// cmd-center.js  ·  v20260412-CMD2
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,7 +27,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD1',
+    'cmd-center':  'v20260412-CMD2',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -136,17 +136,32 @@ function _connect() {
   _channel.on('presence', { event: 'join' }, function(data) {
     var p = data.newPresences && data.newPresences[0];
     if (!p) return;
+    var isNew = !_sessions[p.userId]; // truly new session, not a heartbeat re-track
     _sessions[p.userId] = { name: p.name, initials: p.initials, location: p.location, online: true, ts: p.ts };
     _renderSessionList();
-    _appendLine('SYS', 'event', p.name + ' joined');
+    // Only log if it's a genuinely new session (not our own heartbeat)
+    if (isNew && _mySession && p.userId !== _mySession.userId) {
+      _appendLine('SYS', 'event', p.name + ' joined');
+    }
   });
 
   _channel.on('presence', { event: 'leave' }, function(data) {
     var p = data.leftPresences && data.leftPresences[0];
     if (!p) return;
-    if (_sessions[p.userId]) _sessions[p.userId].online = false;
-    _renderSessionList();
-    _appendLine('SYS', 'event', p.name + ' left');
+    // Ignore leave events for sessions that immediately re-join (heartbeat)
+    // Only mark offline after a short debounce
+    var uid = p.userId;
+    setTimeout(function() {
+      // If they re-joined within 2s, their ts will be newer — don't mark offline
+      var sess = _sessions[uid];
+      if (sess && (Date.now() - (sess.ts || 0)) > 2000) {
+        sess.online = false;
+        _renderSessionList();
+        if (_mySession && uid !== _mySession.userId) {
+          _appendLine('SYS', 'event', sess.name + ' left');
+        }
+      }
+    }, 2000);
   });
 
   // Commands: receive commands addressed to this session
@@ -617,7 +632,7 @@ function _panelHTML() {
     <div style="display:flex;gap:5px">
       <div id="phr-close-dot" style="width:10px;height:10px;border-radius:50%;background:#E24B4A;cursor:pointer" title="Close"></div>
       <div id="phr-min-dot"   style="width:10px;height:10px;border-radius:50%;background:#EF9F27;cursor:pointer" title="Minimize"></div>
-      <div id="phr-pop-dot"   style="width:10px;height:10px;border-radius:50%;background:#1D9E75;cursor:pointer" title="Expand"></div>
+      <div id="phr-pop-dot"   style="width:10px;height:10px;border-radius:50%;background:#1D9E75;cursor:pointer" title="Pop out to new window"></div>
     </div>
     <span style="font-size:11px;font-weight:700;color:#00c9c9;letter-spacing:.1em">PHUD RUNNER</span>
     <span id="phr-status" style="font-size:10px;color:rgba(255,255,255,.3)">connecting…</span>
@@ -709,9 +724,8 @@ function _wirePanel() {
   // Close/minimize dots
   p.querySelector('#phr-close-dot').onclick = function() { _togglePanel(); };
   p.querySelector('#phr-min-dot').onclick   = function() { p.style.height = p.style.height === '36px' ? '520px' : '36px'; };
-  p.querySelector('#phr-pop-dot').onclick   = function() {
-    p.style.width  = p.style.width  === '95vw' ? '680px' : '95vw';
-    p.style.height = p.style.height === '85vh' ? '520px' : '85vh';
+  p.querySelector('#phr-pop-dot').onclick = function() {
+    _popOut();
   };
 
   // Tab switching
@@ -1007,10 +1021,10 @@ function _appendLine(who, type, text) {
   if (who === 'SYS') whoColor = 'rgba(255,255,255,.25)';
 
   var div = document.createElement('div');
-  div.style.cssText = 'display:flex;gap:7px;align-items:baseline;font-size:11px;line-height:1.6';
-  div.innerHTML = `<span style="color:rgba(255,255,255,.2);font-size:10px;flex-shrink:0;width:56px">${ts}</span>`
-    + `<span style="font-size:10px;font-weight:700;color:${whoColor};flex-shrink:0;min-width:24px">${who}</span>`
-    + `<span style="color:${color};flex:1;word-break:break-all">${_escHtml(text)}</span>`;
+  div.style.cssText = 'display:table;width:100%;table-layout:fixed;font-size:11px;line-height:1.7;margin-bottom:1px';
+  div.innerHTML = '<span style="display:table-cell;color:rgba(255,255,255,.2);font-size:10px;white-space:nowrap;width:58px;vertical-align:top;padding-right:4px">' + ts + '</span>'
+    + '<span style="display:table-cell;font-size:10px;font-weight:700;color:' + whoColor + ';white-space:nowrap;width:28px;vertical-align:top;padding-right:6px">' + who + '</span>'
+    + '<span style="display:table-cell;color:' + color + ';overflow-wrap:anywhere;vertical-align:top">' + _escHtml(text) + '</span>';
 
   pane.appendChild(div);
   pane.scrollTop = pane.scrollHeight;
@@ -1032,6 +1046,96 @@ function _escHtml(s) {
 }
 
 // ── Toggle panel ──────────────────────────────────────────────────────────────
+// ── Pop out into a detached window ───────────────────────────────────────────
+// Opens CMD Center in a new browser window — can be moved to a second monitor.
+// The pop-out window shares the same Realtime channel so transcript stays live.
+function _popOut() {
+  var w = 720, h = 580;
+  var left = window.screen.width  - w - 40;
+  var top  = window.screen.height - h - 60;
+  var win  = window.open('', 'phud-cmd-center',
+    'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top +
+    ',resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no'
+  );
+  if (!win) {
+    // Popup blocked — fall back to expand
+    if (_panelEl) {
+      _panelEl.style.width  = '95vw';
+      _panelEl.style.height = '85vh';
+    }
+    console.warn('[CMD Center] Pop-out blocked by browser. Allow popups for this site.');
+    if (_panelEl) _appendLine('SYS', 'warn', 'Pop-out blocked — allow popups for this site, then try again.');
+    return;
+  }
+
+  // Write a minimal host page into the new window
+  var SUPA_URL_VAL = typeof SUPA_URL !== 'undefined' ? SUPA_URL : '';
+  var SUPA_KEY_VAL = typeof SUPA_KEY !== 'undefined' ? SUPA_KEY : '';
+  var FIRM_ID_VAL  = typeof FIRM_ID  !== 'undefined' ? FIRM_ID  : '';
+
+  win.document.write([
+    '<!DOCTYPE html><html><head>',
+    '<meta charset="utf-8">',
+    '<title>CMD Center — ProjectHUD</title>',
+    '<style>',
+    'html,body{margin:0;padding:0;background:#060a10;height:100%;overflow:hidden}',
+    '</style>',
+    '</head><body>',
+    // Pass credentials into the pop-out window context
+    '<script>',
+    'window.PHUD = {',
+    '  SUPABASE_URL: "' + SUPA_URL_VAL + '",',
+    '  SUPABASE_KEY: "' + SUPA_KEY_VAL + '",',
+    '  FIRM_ID:      "' + FIRM_ID_VAL  + '"',
+    '};',
+    // Pass identity from parent
+    'window._myResourceOverride = ' + JSON.stringify(_mySession || null) + ';',
+    // Pass existing scripts
+    'window._scriptsOverride = ' + JSON.stringify(_scripts) + ';',
+    // Pass existing transcript
+    'window._transcriptOverride = ' + JSON.stringify(_transcript.slice(-100)) + ';',
+    '<\/script>',
+    '<script src="' + (window.location.origin) + '/js/cmd-center.js"><\/script>',
+    // Auto-fullscreen the panel in the pop-out
+    '<script>',
+    'window.addEventListener("load", function() {',
+    '  if (window.CMDCenter) {',
+    '    window.CMDCenter.toggle();',
+    '    setTimeout(function() {',
+    '      var p = document.getElementById("phud-runner-panel");',
+    '      if (p) {',
+    '        p.style.position = "fixed";',
+    '        p.style.inset = "0";',
+    '        p.style.width = "100vw";',
+    '        p.style.height = "100vh";',
+    '        p.style.borderRadius = "0";',
+    '        p.style.resize = "none";',
+    '      }',
+    '    }, 500);',
+    '  }',
+    '});',
+    '<\/script>',
+    '</body></html>',
+  ].join('\n'));
+  win.document.close();
+
+  // Hide the inline panel now that it's popped out
+  if (_panelEl) {
+    _panelEl.style.display = 'none';
+    _panelOpen = false;
+  }
+  _appendLine('SYS', 'sys', 'Popped out to new window');
+
+  // Reopen inline panel if pop-out is closed
+  var checkInterval = setInterval(function() {
+    if (win.closed) {
+      clearInterval(checkInterval);
+      _appendLine('SYS', 'sys', 'Pop-out closed — panel restored');
+      if (_panelEl) { _panelEl.style.display = 'flex'; _panelOpen = true; }
+    }
+  }, 1000);
+}
+
 function _togglePanel() {
   if (!_panelEl) {
     _buildPanel();
@@ -1055,29 +1159,42 @@ document.addEventListener('keydown', function(e) {
 // ── Intercept app events for transcript ──────────────────────────────────────
 // Hook into existing app functions to emit events
 function _hookAppEvents() {
-  // Tab switches
-  var origSwitch = window.uSwitchTab;
-  if (origSwitch && !origSwitch._cmdHooked) {
+  _tryHook();
+}
+
+// Retry hooking until the target functions are defined (they load after cmd-center.js)
+function _tryHook() {
+  var allHooked = true;
+
+  // Hook uSwitchTab
+  if (window.uSwitchTab && !window.uSwitchTab._cmdHooked) {
+    var origSwitch = window.uSwitchTab;
     window.uSwitchTab = function(tab, btn) {
       origSwitch.call(this, tab, btn);
       if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'sys', 'Set Tab "' + (tab||'').toUpperCase() + '"');
-      window._cmdEmit('tab_switch', { tab });
+      window._cmdEmit('tab_switch', { tab: tab });
     };
     window.uSwitchTab._cmdHooked = true;
+  } else if (!window.uSwitchTab) {
+    allHooked = false;
   }
 
-  // MY REQUESTS subtab
-  var origMyr = window.myrSwitchView;
-  if (origMyr && !origMyr._cmdHooked) {
+  // Hook myrSwitchView
+  if (window.myrSwitchView && !window.myrSwitchView._cmdHooked) {
+    var origMyr = window.myrSwitchView;
     window.myrSwitchView = function(view, btn) {
       origMyr.call(this, view, btn);
       if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'sys', 'Set SubTab "' + (view||'').toUpperCase() + '"');
     };
     window.myrSwitchView._cmdHooked = true;
+  } else if (!window.myrSwitchView) {
+    allHooked = false;
   }
 
-  // Form submit — capture instance creation
-  // Hooked via _cmdEmit from mw-tabs.js
+  // Retry until all hooks land
+  if (!allHooked) {
+    setTimeout(_tryHook, 500);
+  }
 }
 
 // ── Expose public API ─────────────────────────────────────────────────────────
@@ -1095,7 +1212,18 @@ window.CMDCenter = {
 async function _init() {
   _loadScripts();
   await _loadSupabase();
-  _resolveSession();
+  // Accept overrides from parent window (pop-out mode)
+  if (window._myResourceOverride) {
+    _mySession = window._myResourceOverride;
+  } else {
+    _resolveSession();
+  }
+  if (window._scriptsOverride) {
+    _scripts = window._scriptsOverride;
+  }
+  if (window._transcriptOverride) {
+    _transcript = window._transcriptOverride;
+  }
 
   // Retry identity resolution if resource not loaded yet
   if (!_mySession || _mySession.userId.startsWith('anon-')) {
