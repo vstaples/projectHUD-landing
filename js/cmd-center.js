@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD4
+// cmd-center.js  ·  v20260412-CMD5
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,7 +27,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD4',
+    'cmd-center':  'v20260412-CMD5',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -151,7 +151,7 @@ function _connect() {
     };
     _renderSessionList();
     if (isNew && _mySession && p.userId !== _mySession.userId) {
-      _appendLine('SYS', 'event', p.name + ' joined');
+      _appendMonitor(p.name + ' joined');
     }
   });
 
@@ -169,7 +169,7 @@ function _connect() {
       sess.online = false;
       _renderSessionList();
       if (_mySession && uid !== _mySession.userId) {
-        _appendLine('SYS', 'event', sess.name + ' left');
+        _appendMonitor(sess.name + ' left');
       }
     }, 8000);
   });
@@ -195,10 +195,14 @@ function _connect() {
     var d = payload.payload;
     if (!d || !d.userId) return;
     if (_sessions[d.userId]) {
+      var prevLoc = _sessions[d.userId].location;
       _sessions[d.userId].location = d.location;
       _sessions[d.userId].online   = true;
       _sessions[d.userId].lastSeen = Date.now();
       _renderSessionList();
+      if (prevLoc !== d.location) {
+        _appendMonitor(d.name + ' → ' + d.location);
+      }
     }
   });
 
@@ -230,6 +234,15 @@ function _connect() {
         ts:       Date.now(),
       });
       _appendLine('SYS', 'sys', 'Connected · session: ' + _mySession.name);
+      // Update status dot and header immediately on confirmed connection
+      if (_panelEl) {
+        var statusEl = _panelEl.querySelector('#phr-status');
+        if (statusEl) {
+          statusEl.textContent = '● ' + _mySession.name;
+          statusEl.style.color = '#1D9E75';
+        }
+      }
+      _renderSessionList();
       // Location-only update — use a separate broadcast instead of track()
       // to avoid triggering leave/join cycles on every heartbeat
       setInterval(function() {
@@ -658,6 +671,7 @@ function _panelHTML() {
   <span id="phr-status" style="font-size:10px;color:rgba(255,255,255,.3);flex-shrink:0">connecting…</span>
   <div style="flex:1"></div>
   <button class="phr-tab-btn phr-tab-active" data-tab="transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,.3);border-radius:3px;background:rgba(0,201,201,.1);color:#00c9c9;cursor:pointer;font-family:monospace;letter-spacing:.05em">Transcript</button>
+  <button class="phr-tab-btn" data-tab="monitor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;letter-spacing:.05em">Monitor</button>
   <button class="phr-tab-btn" data-tab="editor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;letter-spacing:.05em">Editor</button>
   <button class="phr-tab-btn" data-tab="library" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;letter-spacing:.05em">Library</button>
   <div style="width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 2px;flex-shrink:0"></div>
@@ -689,6 +703,9 @@ function _panelHTML() {
 
     <!-- Transcript tab -->
     <div id="phr-pane-transcript" style="flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:1px" class="phr-pane"></div>
+    <div id="phr-pane-monitor" style="display:none;flex:1;overflow-y:auto;padding:8px 12px;flex-direction:column;gap:1px" class="phr-pane">
+      <div style="font-size:10px;color:rgba(255,255,255,.25);padding:4px 0 8px;font-family:monospace">Session presence events — join / leave / location updates</div>
+    </div>
 
     <!-- Editor tab -->
     <div id="phr-pane-editor" style="display:none;flex:1;flex-direction:column" class="phr-pane">
@@ -760,8 +777,11 @@ function _wirePanel() {
         b.style.borderColor = b === btn ? 'rgba(0,201,201,.3)' : 'rgba(255,255,255,.12)';
       });
       p.querySelectorAll('.phr-pane').forEach(function(pane) {
-        pane.style.display = pane.id === 'phr-pane-' + _activeTab ? 'flex' : 'none';
-        if (pane.id === 'phr-pane-' + _activeTab) pane.style.flexDirection = pane.id === 'phr-pane-editor' ? 'column' : '';
+        var isActive = pane.id === 'phr-pane-' + _activeTab;
+        pane.style.display = isActive ? 'flex' : 'none';
+        if (isActive) {
+          pane.style.flexDirection = (pane.id === 'phr-pane-editor' || pane.id === 'phr-pane-monitor') ? 'column' : '';
+        }
       });
       if (_activeTab === 'library') _renderLibrary();
     };
@@ -1023,6 +1043,21 @@ function _renderLibrary() {
   });
 }
 
+function _appendMonitor(text) {
+  // Append to Monitor pane only — keeps Transcript clean
+  var ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  var p  = _panelEl;
+  if (!p) return;
+  var pane = p.querySelector('#phr-pane-monitor');
+  if (!pane) return;
+  var div = document.createElement('div');
+  div.style.cssText = 'display:table;width:100%;font-size:11px;line-height:1.7;margin-bottom:1px';
+  div.innerHTML = '<span style="display:table-cell;color:rgba(255,255,255,.2);font-size:10px;white-space:nowrap;width:58px;vertical-align:top">' + ts + '</span>'
+    + '<span style="display:table-cell;color:rgba(125,211,252,.7);vertical-align:top">' + _escHtml(text) + '</span>';
+  pane.appendChild(div);
+  pane.scrollTop = pane.scrollHeight;
+}
+
 function _appendLine(who, type, text) {
   var ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
   _transcript.push({ ts, who, type, text });
@@ -1090,56 +1125,15 @@ function _popOut() {
     return;
   }
 
-  // Write a minimal host page into the new window
-  var SUPA_URL_VAL = typeof SUPA_URL !== 'undefined' ? SUPA_URL : '';
-  var SUPA_KEY_VAL = typeof SUPA_KEY !== 'undefined' ? SUPA_KEY : '';
-  var FIRM_ID_VAL  = typeof FIRM_ID  !== 'undefined' ? FIRM_ID  : '';
-
-  win.document.write([
-    '<!DOCTYPE html><html><head>',
-    '<meta charset="utf-8">',
-    '<title>CMD Center — ProjectHUD</title>',
-    '<style>',
-    'html,body{margin:0;padding:0;background:#060a10;height:100%;overflow:hidden}',
-    '</style>',
-    '</head><body>',
-    // Pass credentials into the pop-out window context
-    '<script>',
-    'window.PHUD = {',
-    '  SUPABASE_URL: "' + SUPA_URL_VAL + '",',
-    '  SUPABASE_KEY: "' + SUPA_KEY_VAL + '",',
-    '  FIRM_ID:      "' + FIRM_ID_VAL  + '"',
-    '};',
-    // Pass identity from parent
-    'window._myResourceOverride = ' + JSON.stringify(_mySession || null) + ';',
-    // Pass existing scripts
-    'window._scriptsOverride = ' + JSON.stringify(_scripts) + ';',
-    // Pass existing transcript
-    'window._transcriptOverride = ' + JSON.stringify(_transcript.slice(-100)) + ';',
-    '<\/script>',
-    '<script src="' + (window.location.origin) + '/js/cmd-center.js"><\/script>',
-    // Auto-fullscreen the panel in the pop-out
-    '<script>',
-    'window.addEventListener("load", function() {',
-    '  if (window.CMDCenter) {',
-    '    window.CMDCenter.toggle();',
-    '    setTimeout(function() {',
-    '      var p = document.getElementById("phud-runner-panel");',
-    '      if (p) {',
-    '        p.style.position = "fixed";',
-    '        p.style.inset = "0";',
-    '        p.style.width = "100vw";',
-    '        p.style.height = "100vh";',
-    '        p.style.borderRadius = "0";',
-    '        p.style.resize = "none";',
-    '      }',
-    '    }, 500);',
-    '  }',
-    '});',
-    '<\/script>',
-    '</body></html>',
-  ].join('\n'));
-  win.document.close();
+  // Store state in window name so pop-out can read it (avoids CSP issues with document.write)
+  win.name = JSON.stringify({
+    session:    _mySession,
+    scripts:    _scripts,
+    transcript: _transcript.slice(-100),
+    origin:     window.location.origin,
+  });
+  // Navigate to the standalone cmd-center page
+  win.location.href = window.location.origin + '/cmd-center.html';
 
   // Hide the inline panel now that it's popped out
   if (_panelEl) {
