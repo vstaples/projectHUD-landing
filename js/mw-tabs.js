@@ -1044,7 +1044,7 @@ function _myrRenderGroupedTable(instances, isHistory) {
     groups[grpKey].items.push(inst);
   });
 
-  var statusColor = { in_progress:'#EF9F27', complete:'#3de08a', cancelled:'rgba(255,255,255,.3)', under_review:'#00D2FF' };
+  var statusColor = { in_progress:'#EF9F27', complete:'#3de08a', cancelled:'rgba(255,255,255,.3)', under_review:'#00D2FF', blocked:'#E24B4A' };
 
   var html = '';
   Object.values(groups).forEach(function(grp) {
@@ -1098,7 +1098,13 @@ function _myrRenderGroupedTable(instances, isHistory) {
           <td style="${FM}font-size:13px;font-weight:700;color:#00c9c9;padding:8px 10px;text-align:right;white-space:nowrap">${esc(netDue)}</td>
           <td style="padding:8px 10px;white-space:nowrap" id="myr-status-${inst.id}">${_myrStatusCell(inst, esc(step), sColor)}</td>
           ${!isHistory ? `<td style="padding:4px 8px;white-space:nowrap;display:flex;align-items:center;gap:6px">
-            <button onclick="myrRecallToDraft_row('${inst.id}',event)" style="${FA}font-size:10px;font-weight:700;padding:3px 8px;border:1px solid #f0a030;background:transparent;color:#f0a030;border-radius:3px;cursor:pointer">Recall</button>
+            ${inst.status === 'blocked'
+              ? `<button onclick="myrResumeInstance('${inst.id}','${esc(inst.title)}',event)"
+                  style="${FA}font-size:10px;font-weight:700;padding:3px 8px;border:1px solid #E24B4A;
+                  background:rgba(226,75,74,.1);color:#E24B4A;border-radius:3px;cursor:pointer">
+                  ▶ Resume</button>`
+              : `<button onclick="myrRecallToDraft_row('${inst.id}',event)" style="${FA}font-size:10px;font-weight:700;padding:3px 8px;border:1px solid #f0a030;background:transparent;color:#f0a030;border-radius:3px;cursor:pointer">Recall</button>`
+            }
             <button onclick="myrWithdrawInstance('${inst.id}','${esc(inst.title)}',event)" title="Withdraw" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px;transition:color .15s" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">&#128465;</button>
           </td>` : ''}
         </tr>`;
@@ -1991,6 +1997,45 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
         updated_at:        new Date().toISOString(),
       }).catch(function() {});
 
+      // Layer 2: Notify ALL admins via workflow_action_items
+      // Tagged with instance_id so they can be batch-resolved when the issue is fixed
+      try {
+        var adminUsers = await API.get(
+          'resources?firm_id=eq.' + firmId +
+          '&select=id,name,user_id&is_active=eq.true'
+        ).catch(function() { return []; });
+        // Find admin users by cross-referencing users table
+        var userRows = await API.get(
+          'users?firm_id=eq.' + firmId + '&is_admin=eq.true&select=id,name,resource_id'
+        ).catch(function() { return []; });
+        var adminResIds = (userRows||[]).map(function(u){ return u.resource_id; }).filter(Boolean);
+        // Also include the submitter's manager as a fallback
+        if (submitterRes && submitterRes.manager_id) adminResIds.push(submitterRes.manager_id);
+        var uniqueAdminResIds = adminResIds.filter(function(id, i, a){ return a.indexOf(id) === i; });
+
+        if (uniqueAdminResIds.length) {
+          var adminActionTitle = '⚠ Routing blocked: ' + roleLabel + ' not assigned';
+          var adminActionBody  = 'The workflow "' + formName + '" is blocked because ' + blockedMsg +
+            ' Click "Resume" on the request in MY REQUESTS to continue routing once the contact is assigned.';
+          await Promise.all(uniqueAdminResIds.map(function(adminResId) {
+            return API.post('workflow_action_items', {
+              firm_id:           firmId,
+              instance_id:       instanceId,
+              title:             adminActionTitle,
+              body:              adminActionBody,
+              status:            'open',
+              owner_resource_id: adminResId,
+              owner_name:        (adminUsers||[]).find(function(r){ return r.id===adminResId; })?.name || 'Admin',
+              created_by_name:   'Cadence Workflow Engine',
+              created_at:        new Date().toISOString(),
+            }).catch(function() {});
+          }));
+          console.log('[_mwResolveAndRoute] notified ' + uniqueAdminResIds.length + ' admin(s) of routing block');
+        }
+      } catch(e) {
+        console.warn('[_mwResolveAndRoute] admin notification failed:', e);
+      }
+
       // Surface toast to whoever triggered this
       if (typeof compassToast === 'function') {
         compassToast(
@@ -2045,6 +2090,70 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
 
   } catch(e) {
     console.error('[_mwResolveAndRoute] failed:', e);
+  }
+};
+
+// ── myrResumeInstance ─────────────────────────────────────────────────────────
+// Layer 3: Resume a blocked instance after the missing contact has been assigned.
+// Re-runs _mwResolveAndRoute for the current step. If it resolves, clears all
+// admin action items for this instance and continues routing.
+window.myrResumeInstance = async function(instanceId, title, evt) {
+  if (evt) { evt.stopPropagation(); evt.preventDefault(); }
+  try {
+    var firmId = _mwFirmId();
+    var res    = window._myResource;
+    if (!res) { compassToast('Cannot resume — user identity not resolved.', 3000); return; }
+
+    // Re-fetch the instance to get current step
+    var instRows = await API.get(
+      'workflow_instances?id=eq.' + instanceId + '&select=id,title,current_step_id,template_id,submitted_by_resource_id,form_data&limit=1'
+    ).catch(function() { return []; });
+    var inst = instRows && instRows[0];
+    if (!inst) { compassToast('Instance not found.', 3000); return; }
+
+    // Load template steps
+    var steps = await API.get(
+      'workflow_template_steps?template_id=eq.' + inst.template_id +
+      '&order=sequence_order.asc&select=id,name,step_type,sequence_order,assignee_type,assignee_role'
+    ).catch(function() { return []; });
+
+    var currentStep = (steps||[]).find(function(s) { return s.id === inst.current_step_id; });
+    if (!currentStep) { compassToast('Could not determine current step.', 3000); return; }
+
+    // Temporarily patch status back to in_progress so routing can proceed
+    await API.patch('workflow_instances?id=eq.' + instanceId, {
+      status:     'in_progress',
+      updated_at: new Date().toISOString(),
+    });
+
+    // Re-run resolution for the current step
+    var submitterResId = inst.submitted_by_resource_id || res.id;
+    var formName = title || inst.title || 'Form';
+    await window._mwResolveAndRoute(instanceId, steps, currentStep.sequence_order, submitterResId, formName);
+
+    // Check if still blocked after resolution attempt
+    var checkRows = await API.get(
+      'workflow_instances?id=eq.' + instanceId + '&select=status&limit=1'
+    ).catch(function() { return []; });
+    var newStatus = checkRows && checkRows[0] && checkRows[0].status;
+
+    if (newStatus === 'blocked') {
+      compassToast('Still blocked — contact is still missing. Please assign the contact first.', 5000);
+      return;
+    }
+
+    // Success — resolve all admin action items for this instance
+    await API.patch(
+      'workflow_action_items?instance_id=eq.' + instanceId + '&status=eq.open',
+      { status: 'resolved', updated_at: new Date().toISOString() }
+    ).catch(function() {});
+
+    compassToast('✓ Routing resumed successfully.', 3000);
+    if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 500);
+
+  } catch(e) {
+    console.error('[myrResumeInstance] failed:', e);
+    compassToast('Resume failed: ' + (e.message || 'check console'), 4000);
   }
 };
 
@@ -2193,8 +2302,11 @@ function _myrStatusCell(inst, step, sColor) {
     '</tr>';
   }).join('');
   var tt = steps.length ? '<div class="myr-sig-tt" style="display:none;position:absolute;bottom:calc(100% + 8px);right:0;background:#111620;border:1px solid rgba(0,201,201,.4);border-radius:6px;z-index:9999;min-width:500px;box-shadow:0 8px 32px rgba(0,0,0,.7);overflow:hidden;font-size:11px">' +
-    '<div style="background:rgba(0,201,201,.12);padding:6px 12px;border-bottom:0.5px solid rgba(0,201,201,.3)">' +
-      '<span style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#00c9c9;letter-spacing:.08em;text-transform:uppercase">Signature Loop Status</span>' +
+    '<div style="background:' + (inst.status==='blocked'?'rgba(226,75,74,.12)':'rgba(0,201,201,.12)') + ';padding:6px 12px;border-bottom:0.5px solid ' + (inst.status==='blocked'?'rgba(226,75,74,.3)':'rgba(0,201,201,.3)') + ';display:flex;align-items:center;gap:8px">' +
+      (inst.status==='blocked'?'<span style="font-size:13px">⚠</span>':'') +
+      '<span style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:' + (inst.status==='blocked'?'#E24B4A':'#00c9c9') + ';letter-spacing:.08em;text-transform:uppercase">' +
+      (inst.status==='blocked'?'ACTION REQUIRED — ROUTING BLOCKED':'Signature Loop Status') +
+      '</span>' +
     '</div>' +
     '<table style="border-collapse:collapse;width:100%;font-size:11px">' +
       '<thead><tr style="border-bottom:0.5px solid rgba(255,255,255,.1)">' +
