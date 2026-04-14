@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD11
+// cmd-center.js  ·  v20260412-CMD12
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD11',
+    'cmd-center':  'v20260412-CMD12',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD11 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD12 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1206,88 +1206,61 @@ document.addEventListener('keydown', function(e) {
 // ── Intercept app events for transcript ──────────────────────────────────────
 // Hook into existing app functions to emit events
 function _hookAppEvents() {
-  // my-work.html is injected dynamically AFTER window load, so we can't rely on
-  // load event. Instead run _tryHook on an interval until all hooks land,
-  // then use a MutationObserver to re-hook if the DOM is replaced.
-  _tryHook();
+  // Use defineProperty to intercept assignments to window.uSwitchTab
+  // This fires whenever ANY script does window.uSwitchTab = function(...) { ... }
+  // So it doesn't matter when mw-tabs.js loads — we always get the final version
+  _interceptProperty(window, 'uSwitchTab', function(tab, btn) {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Set Tab "' + (tab||'').toUpperCase() + '"');
+    window._cmdEmit('tab_switch', { tab: tab });
+  });
+  _interceptProperty(window, 'myrSwitchView', function(view) {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Set SubTab "' + (view||'').toUpperCase() + '"');
+  });
+  _interceptProperty(window, 'myrOpenInstance', function(instanceId) {
+    var inst = (window._myrInstances||[]).find(function(i){ return i.id === instanceId; });
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Open "' + (inst ? inst.title : instanceId.slice(0,8)) + '"');
+  });
+  _interceptProperty(window, 'myrLaunchRequest', function(type) {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Form Open "' + (type||'') + '"');
+  });
+}
 
-  // Watch for dynamic script injections (my-work.html loaded into #view-user)
-  var observer = new MutationObserver(function(mutations) {
-    var hasNewScripts = mutations.some(function(m) {
-      return Array.from(m.addedNodes).some(function(n) {
-        return n.nodeName === 'SCRIPT' ||
-          (n.querySelectorAll && n.querySelectorAll('script').length > 0);
-      });
-    });
-    if (hasNewScripts) {
-      // New scripts injected — re-run hooks after they execute
-      setTimeout(_tryHook, 800);
+// Intercept property assignment on an object.
+// Wraps the function with our observer each time it is set.
+function _interceptProperty(obj, prop, observer) {
+  var _realFn = obj[prop] || null;
+  Object.defineProperty(obj, prop, {
+    configurable: true,
+    get: function() { return _realFn; },
+    set: function(newFn) {
+      // Wrap the new function with our observer
+      _realFn = function() {
+        var args = Array.prototype.slice.call(arguments);
+        newFn.apply(this, args);
+        try { observer.apply(this, args); } catch(e) {}
+      };
+      // Preserve any properties set on the original (like _cmdHooked)
+      _realFn._cmdHooked = true;
     }
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  // If already defined, wrap it now
+  if (_realFn) {
+    var existingFn = _realFn;
+    _realFn = function() {
+      var args = Array.prototype.slice.call(arguments);
+      existingFn.apply(this, args);
+      try { observer.apply(this, args); } catch(e) {}
+    };
+    _realFn._cmdHooked = true;
+  }
 }
 
 // Retry hooking until the target functions are defined (they load after cmd-center.js)
-function _tryHook() {
-  var allHooked = true;
 
-  // Hook uSwitchTab
-  if (window.uSwitchTab && !window.uSwitchTab._cmdHooked) {
-    var origSwitch = window.uSwitchTab;
-    window.uSwitchTab = function(tab, btn) {
-      origSwitch.call(this, tab, btn);
-      if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'sys', 'Set Tab "' + (tab||'').toUpperCase() + '"');
-      window._cmdEmit('tab_switch', { tab: tab });
-    };
-    window.uSwitchTab._cmdHooked = true;
-  } else if (!window.uSwitchTab) {
-    allHooked = false;
-  }
-
-  // Hook myrSwitchView
-  if (window.myrSwitchView && !window.myrSwitchView._cmdHooked) {
-    var origMyr = window.myrSwitchView;
-    window.myrSwitchView = function(view, btn) {
-      origMyr.call(this, view, btn);
-      if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'sys', 'Set SubTab "' + (view||'').toUpperCase() + '"');
-    };
-    window.myrSwitchView._cmdHooked = true;
-  } else if (!window.myrSwitchView) {
-    allHooked = false;
-  }
-
-  // Hook myrOpenInstance — opening a task/instance
-  if (window.myrOpenInstance && !window.myrOpenInstance._cmdHooked) {
-    var origOpen = window.myrOpenInstance;
-    window.myrOpenInstance = function(instanceId) {
-      origOpen.call(this, instanceId);
-      var inst = (window._myrInstances||[]).find(function(i){ return i.id === instanceId; });
-      if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'sys',
-        'Open instance "' + (inst ? inst.title : instanceId.slice(0,8)) + '"');
-    };
-    window.myrOpenInstance._cmdHooked = true;
-  } else if (!window.myrOpenInstance) {
-    allHooked = false;
-  }
-
-  // Hook myrLaunchRequest — opening a form from Browse
-  if (window.myrLaunchRequest && !window.myrLaunchRequest._cmdHooked) {
-    var origLaunch = window.myrLaunchRequest;
-    window.myrLaunchRequest = function(type, templateId) {
-      origLaunch.apply(this, arguments);
-      if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'sys',
-        'Form Open "' + (type||'') + '" id=' + (templateId||'').slice(0,8));
-    };
-    window.myrLaunchRequest._cmdHooked = true;
-  } else if (!window.myrLaunchRequest) {
-    allHooked = false;
-  }
-
-  // Retry until all hooks land
-  if (!allHooked) {
-    setTimeout(_tryHook, 500);
-  }
-}
 
 // ── Expose public API ─────────────────────────────────────────────────────────
 window.CMDCenter = {
