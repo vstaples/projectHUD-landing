@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD25
+// cmd-center.js  ·  v20260412-CMD26
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD25',
+    'cmd-center':  'v20260412-CMD26',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD25 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD26 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -394,6 +394,16 @@ var COMMANDS = {
                   document.getElementById('myr-html-form-overlay');
     if (overlay) { overlay.remove(); return 'form closed'; }
     return 'no form overlay found';
+  },
+
+  'Form Scroll': async function(args) {
+    var target = args[0];
+    var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
+    if (!iframe) return 'No form overlay open';
+    iframe.contentWindow.postMessage({
+      source: 'cmd-center', cmd: 'Form Scroll', target: target
+    }, '*');
+    return 'scrolled to ' + target;
   },
 
   // ── Work queue actions ───────────────────────────────────────────────────────
@@ -1528,6 +1538,158 @@ VS: Form Insert airfare 212.00`
 VS: Get instance_id
 DB Get workflow_requests instance_id=eq.$instance_id
 DB Get coc_events entity_id=eq.$instance_id`
+    );
+
+    _saveScript('demo_expense_report',
+`# ── Expense Report Demo ─────────────────────────────────────────
+# Submits a complete expense report for Vaughn Staples
+# Trip: NovaBio client visit, Mar 31 – Apr 3, 2026
+# ────────────────────────────────────────────────────────────────
+
+# Navigate to MY REQUESTS > BROWSE
+VS: Set Tab "MY REQUESTS"
+Wait 1500
+VS: Set SubTab "BROWSE"
+Wait 1500
+
+# Open the Expense Report form
+VS: Form Open "Expense Report"
+Wait 2000
+
+# ── Employee Information ─────────────────────────────────────────
+VS: Form Insert "Employee Name" "Vaughn Staples"
+Wait 600
+VS: Form Insert "Trip Start Date" "2026-03-31"
+Wait 600
+VS: Form Insert "Trip End Date" "2026-04-03"
+Wait 600
+VS: Form Insert "Business Purpose" "Client Visit"
+Wait 600
+VS: Form Insert "Purpose Description" "NovaBio Quality System Implementation kick-off"
+Wait 600
+VS: Form Insert "Customer Name" "NovaBio Corp"
+Wait 600
+VS: Form Insert "Customer Location" "Boston, MA"
+Wait 1500
+
+# Scroll down to Daily Expenses grid
+VS: Form Scroll daily
+Wait 1000
+
+# ── Meals — 4 days (Mon–Thu) ─────────────────────────────────────
+VS: Form Insert breakfast[0] 18.50
+Wait 400
+VS: Form Insert lunch[0] 24.00
+Wait 400
+VS: Form Insert dinner[0] 68.00
+Wait 400
+VS: Form Insert breakfast[1] 16.75
+Wait 400
+VS: Form Insert lunch[1] 22.50
+Wait 400
+VS: Form Insert dinner[1] 94.00
+Wait 400
+VS: Form Insert breakfast[2] 19.00
+Wait 400
+VS: Form Insert lunch[2] 28.00
+Wait 400
+VS: Form Insert dinner[2] 112.00
+Wait 400
+VS: Form Insert lunch[3] 21.00
+Wait 1200
+
+# ── Transportation & Lodging ─────────────────────────────────────
+VS: Form Insert airfare[0] 387.00
+Wait 600
+VS: Form Insert lodging[0] 219.00
+Wait 400
+VS: Form Insert lodging[1] 219.00
+Wait 400
+VS: Form Insert lodging[2] 219.00
+Wait 400
+VS: Form Insert taxi[0] 42.00
+Wait 400
+VS: Form Insert taxi[3] 38.00
+Wait 1200
+
+# Scroll to Miscellaneous section
+VS: Form Scroll misc
+Wait 1000
+
+# ── Miscellaneous Expenses ───────────────────────────────────────
+VS: Form Insert "misc[0].description" "Conference materials & printing"
+Wait 400
+VS: Form Insert "misc[0].date" "2026-03-31"
+Wait 400
+VS: Form Insert "misc[0].type" "Billable"
+Wait 400
+VS: Form Insert "misc[0].amount" 47.50
+Wait 800
+
+VS: Form AddRow misc
+Wait 500
+VS: Form Insert "misc[1].description" "Client gift — NovaBio branded items"
+Wait 400
+VS: Form Insert "misc[1].date" "2026-04-01"
+Wait 400
+VS: Form Insert "misc[1].type" "Billable"
+Wait 400
+VS: Form Insert "misc[1].amount" 125.00
+Wait 1200
+
+# Scroll to Entertainment section
+VS: Form Scroll entertainment
+Wait 1000
+
+# ── Entertainment Detail ─────────────────────────────────────────
+VS: Form Insert "ent[0].date" "2026-04-01"
+Wait 400
+VS: Form Insert "ent[0].type" "Dinner"
+Wait 400
+VS: Form Insert "ent[0].guests" "Dr. Sarah Chen · CMO · NovaBio Corp"
+Wait 400
+VS: Form Insert "ent[0].purpose" "Q2 implementation roadmap alignment"
+Wait 400
+VS: Form Insert "ent[0].amount" 248.00
+Wait 800
+
+VS: Form AddRow ent
+Wait 500
+VS: Form Insert "ent[1].date" "2026-04-02"
+Wait 400
+VS: Form Insert "ent[1].type" "Lunch"
+Wait 400
+VS: Form Insert "ent[1].guests" "Marcus Webb · VP Ops · NovaBio Corp; Lisa Park · QA Lead · NovaBio Corp"
+Wait 400
+VS: Form Insert "ent[1].purpose" "Quality system gap analysis working session"
+Wait 400
+VS: Form Insert "ent[1].amount" 143.00
+Wait 1500
+
+# Scroll to top to review before saving
+VS: Form Scroll top
+Wait 2000
+
+# Save as draft
+VS: Form Save
+Wait 2000
+
+# Close form
+VS: Form Close
+Wait 1500
+
+# Reopen from ACTIVE tab — continue draft
+VS: Set SubTab "ACTIVE"
+Wait 1500
+
+# Submit for approval
+VS: Continue Draft id=last
+Wait 2000
+VS: Form Scroll top
+Wait 1000
+VS: Form Submit
+Wait 1000
+Log Demo complete — expense report submitted for approval`
     );
 
     _renderScriptList && _renderScriptList();
