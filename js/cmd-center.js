@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD35
+// cmd-center.js  ·  v20260414-CMD36
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD35',
+    'cmd-center':  'v20260414-CMD36',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD35 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -55,7 +55,9 @@ var FIRM_ID  = (typeof PHUD !== 'undefined' && PHUD.FIRM_ID) ||
 var _supabase    = null;   // Supabase JS client
 var _channel     = null;   // shared presence + command channel
 var _mySession   = null;   // this browser's session identity
-var _sessions    = {};     // { userId: { name, initials, location, online, ts } }
+var _myAlias     = null;   // short alias set by operator, e.g. "VS" or "AK" — persisted in localStorage
+var _sessions    = {};     // { userId: { name, initials, alias, location, online, ts } }
+var _aliasMap    = {};     // { alias: userId } — built from presence, enables "VS:" routing by alias
 var _transcript  = [];     // { ts, who, type, text }
 var _scripts     = {};     // { name: scriptText }
 var _panelEl     = null;   // the floating panel DOM element
@@ -66,7 +68,6 @@ var _eventListeners = {};  // { eventName: [resolvers] }
 var _storeVars   = {};     // script variable storage { name: value }
 var _scriptRunning = false; // suppress hook double-logging during script execution
 var _scriptAborted = false; // set when panel closes mid-script
-var _scriptAborted = false;  // set by Stop button or form closure
 
 // ── Load Supabase JS client ───────────────────────────────────────────────────
 function _loadSupabase() {
@@ -98,6 +99,10 @@ function _resolveSession() {
     initials: initials.toUpperCase(),
     firmId:   FIRM_ID,
   };
+  // Load persisted alias for this userId, or fall back to initials
+  if (!_myAlias) {
+    _myAlias = localStorage.getItem('phud:cmd:alias:' + _mySession.userId) || _mySession.initials;
+  }
 }
 
 // ── Location tracking ─────────────────────────────────────────────────────────
@@ -164,16 +169,20 @@ function _connect() {
   _channel.on('presence', { event: 'sync' }, function() {
     var state = _channel.presenceState();
     _sessions = {};
+    _aliasMap = {};
     Object.entries(state).forEach(function([key, presences]) {
       var p = presences[0];
       if (p) {
         _sessions[p.userId] = {
           name:     p.name,
           initials: p.initials,
+          alias:    p.alias || p.initials,
           location: p.location,
           online:   true,
           ts:       p.ts,
         };
+        // Alias takes priority; fall back to initials
+        _aliasMap[p.alias || p.initials] = p.userId;
       }
     });
     _renderSessionList();
@@ -192,9 +201,11 @@ function _connect() {
     }
     var isNew = !_sessions[p.userId];
     _sessions[p.userId] = {
-      name: p.name, initials: p.initials, location: p.location,
+      name: p.name, initials: p.initials, alias: p.alias || p.initials, location: p.location,
       online: true, ts: Date.now(), lastSeen: Date.now()
     };
+    // Rebuild aliasMap entry
+    _aliasMap[p.alias || p.initials] = p.userId;
     _renderSessionList();
     if (isNew && _mySession && p.userId !== _mySession.userId) {
       _appendMonitor(p.name + ' joined');
@@ -278,6 +289,7 @@ function _connect() {
           userId:   _mySession.userId,
           name:     _mySession.name,
           initials: _mySession.initials,
+          alias:    _myAlias || _mySession.initials,
           location: _currentLocation(),
           ts:       Date.now(),
         });
@@ -332,6 +344,52 @@ function _resolveEventListeners(eventName, data) {
   if (!listeners.length) return;
   _eventListeners[eventName] = [];
   listeners.forEach(function(r) { r(data); });
+}
+
+// ── Filtered event wait ───────────────────────────────────────────────────────
+// Like _waitForEvent but only resolves when the event data matches a filter.
+// filterKey: field to check (e.g. 'assignee', 'userId', 'resource_id')
+// filterVal: expected value — compared against common data fields
+// Non-matching events re-queue the listener so it keeps waiting.
+function _waitForEventFiltered(eventName, filterKey, filterVal, timeoutMs) {
+  return new Promise(function(resolve, reject) {
+    var deadline = Date.now() + (timeoutMs || 60000);
+
+    function attempt() {
+      if (!_eventListeners[eventName]) _eventListeners[eventName] = [];
+
+      var timer = setTimeout(function() {
+        _eventListeners[eventName] = (_eventListeners[eventName]||[]).filter(function(r){ return r !== resolver; });
+        reject(new Error('Timeout waiting for event: ' + eventName
+          + (filterKey ? ' [' + filterKey + '=' + filterVal + ']' : '')));
+      }, Math.max(0, deadline - Date.now()));
+
+      var resolver = function(data) {
+        clearTimeout(timer);
+        // No filter — resolve immediately
+        if (!filterKey || !filterVal) { resolve(data); return; }
+        // Check common field names that might carry the assignee identity
+        var fields = [
+          data[filterKey],                     // exact key match
+          data.userId, data.user_id,           // user identity fields
+          data.resource_id, data.assigneeId,   // resource fields
+          data.from,                           // sender field
+        ];
+        var matches = fields.some(function(f) {
+          return f && String(f) === String(filterVal);
+        });
+        if (matches) {
+          resolve(data);
+        } else {
+          // Event didn't match filter — re-queue and keep waiting
+          _eventListeners[eventName] = _eventListeners[eventName] || [];
+          _eventListeners[eventName].push(resolver);
+        }
+      };
+      _eventListeners[eventName].push(resolver);
+    }
+    attempt();
+  });
 }
 
 // ── Broadcast app events from this session ────────────────────────────────────
@@ -526,9 +584,45 @@ var COMMANDS = {
       return 'waited ' + val + 'ms';
     }
     if (val === 'ForEvent') {
+      // Syntax variants:
+      //   Wait ForEvent "workflow_request.created"
+      //   Wait ForEvent "workflow_request.created" → $instance_id
+      //   Wait ForEvent "workflow_request.resolved" where assignee=AK
       var eventName = args[1];
-      var data = await _waitForEvent(eventName, 30000);
-      return 'event received: ' + eventName + (data && data.instanceId ? ' · instance ' + data.instanceId : '');
+      var filterKey = null, filterVal = null, storeAs = null;
+
+      // Parse remaining tokens for "where key=val" and "→ $varname"
+      for (var wi = 2; wi < args.length; wi++) {
+        var tok = args[wi];
+        if (tok === 'where' && args[wi+1]) {
+          var wm = args[wi+1].match(/^(\w+)=(.+)$/);
+          if (wm) { filterKey = wm[1]; filterVal = wm[2]; wi++; }
+        } else if ((tok === '→' || tok === '->') && args[wi+1]) {
+          storeAs = args[wi+1].replace(/^\$/, ''); wi++;
+        }
+      }
+
+      // If filtering by assignee alias, resolve to userId so we can match
+      var filterUserId = null;
+      if (filterKey === 'assignee' && filterVal) {
+        filterUserId = _resolveTargetAlias(filterVal.toUpperCase()) || filterVal;
+      }
+
+      // Wait for a matching event, retrying non-matching ones
+      var data = await _waitForEventFiltered(eventName, filterKey, filterUserId || filterVal, 60000);
+
+      // Store captured value if requested (e.g. → $instance_id)
+      if (storeAs && data) {
+        var captured = data.instanceId || data.instance_id || data.id || '';
+        if (captured) {
+          _storeVars[storeAs] = captured;
+          _appendLine('SYS', 'result', '→ stored $' + storeAs + ' = ' + captured);
+        }
+      }
+
+      return 'event received: ' + eventName
+        + (filterKey ? ' [' + filterKey + '=' + filterVal + ']' : '')
+        + (data && data.instanceId ? ' · instance ' + data.instanceId : '');
     }
     return 'unknown Wait argument: ' + val;
   },
@@ -572,7 +666,19 @@ var COMMANDS = {
   'Assert': async function(args) {
     var key   = args[0];
     var value = args[1];
-    // Support DB assertions — "Assert instance_status in_progress"
+
+    // Assert session VS is connected
+    if (key === 'session') {
+      var alias     = args[1];
+      // args[2] should be "is", args[3] should be "connected"
+      var uid = _resolveTargetAlias(alias);
+      var sess = uid ? _sessions[uid] : null;
+      var live = sess && sess.online;
+      if (live) return '✓ PASS: session ' + alias + ' connected (' + sess.name + ')';
+      throw new Error('✗ FAIL: session ' + alias + ' not connected — open a Compass window logged in as ' + alias + ' and try again');
+    }
+
+    // Assert instance_status "in_progress"
     if (key === 'instance_status') {
       var inst = (window._myrInstances||[]).find(function(i){
         return i.id === _storeVars['instance_id'];
@@ -581,6 +687,7 @@ var COMMANDS = {
       if (actual === value) return '✓ PASS: instance status = ' + value;
       throw new Error('✗ FAIL: expected status = ' + value + ' but got ' + actual);
     }
+
     var actual = await COMMANDS['Get']([key]);
     if (actual === value) return '✓ PASS: ' + key + ' = ' + value;
     throw new Error('✗ FAIL: expected ' + key + ' = ' + value + ' but got ' + actual);
@@ -623,12 +730,14 @@ var COMMANDS = {
 // Handles: VS: Set Tab "MY REQUESTS"
 //          AK: Click "Approve"
 //          Wait ForEvent "workflow_request.created"
+// Target prefix is matched against _aliasMap (alias → userId) first,
+// then falls back to initials match for backward compatibility.
 function _parseLine(line) {
   line = line.trim();
   if (!line || line.startsWith('#') || line.startsWith('//')) return null;
 
   var target = null;
-  var initials = line.match(/^([A-Z]{1,3}):\s*/);
+  var initials = line.match(/^([A-Z]{1,4}):\s*/);
   if (initials) {
     target = initials[1];
     line   = line.slice(initials[0].length);
@@ -660,6 +769,20 @@ function _parseLine(line) {
   return { target, verb, args, raw: line };
 }
 
+// ── Resolve a target alias/initials string to a userId ───────────────────────
+// Checks _aliasMap first (operator-set aliases like "VS", "AK"),
+// then falls back to scanning _sessions by initials for backward compat.
+function _resolveTargetAlias(targetStr) {
+  if (!targetStr) return null;
+  // Direct alias map hit
+  if (_aliasMap[targetStr]) return _aliasMap[targetStr];
+  // Fallback: match by initials (handles sessions that haven't set an alias)
+  var match = Object.entries(_sessions).find(function([uid, s]) {
+    return s.initials === targetStr || s.alias === targetStr;
+  });
+  return match ? match[0] : null;
+}
+
 // ── Execute a single command ──────────────────────────────────────────────────
 async function _executeCommand(cmdLine, fromWho) {
   var parsed = _parseLine(cmdLine);
@@ -688,9 +811,42 @@ async function _executeCommand(cmdLine, fromWho) {
   }
 }
 
+// ── Parse script header for Requires: directive ───────────────────────────────
+// Scans comment lines at top of script for:  # Requires: VS, AK, DN
+// Returns array of alias strings, or [] if not found.
+function _parseScriptRequires(scriptText) {
+  var lines = scriptText.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    if (!line.startsWith('#') && !line.startsWith('//')) break; // past header
+    var m = line.match(/requires:\s*(.+)/i);
+    if (m) {
+      return m[1].split(/[\s,]+/).map(function(s){ return s.trim().toUpperCase(); }).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 // ── Run a multi-line script ───────────────────────────────────────────────────
 async function _runScript(scriptText, scriptName) {
   var lines = scriptText.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+
+  // Preflight: check required sessions from script header
+  var required = _parseScriptRequires(scriptText);
+  if (required.length) {
+    var missing = required.filter(function(alias) {
+      var uid = _resolveTargetAlias(alias);
+      if (!uid) return true;                           // not in presence at all
+      var sess = _sessions[uid];
+      return !sess || !sess.online;                    // offline
+    });
+    if (missing.length) {
+      var ok = _showPreflightPanel(scriptName || 'script', required, missing, scriptText);
+      if (!ok) return; // user cancelled
+    }
+  }
+
   _scriptRunning = true;
   _scriptAborted = false;
   _appendLine('SYS', 'sys', 'Script: ' + (scriptName||'inline') + ' · ' + lines.filter(function(l){ return !l.startsWith('#'); }).length + ' commands');
@@ -726,13 +882,10 @@ async function _runScript(scriptText, scriptName) {
         }
       }
 
-      // Determine target session
+      // Determine target session via alias map
       var targetUserId = null;
       if (parsed.target) {
-        var match = Object.entries(_sessions).find(function([uid, s]) {
-          return s.initials === parsed.target;
-        });
-        targetUserId = match ? match[0] : null;
+        targetUserId = _resolveTargetAlias(parsed.target);
       }
 
       if (targetUserId && targetUserId !== _mySession.userId) {
@@ -743,7 +896,7 @@ async function _runScript(scriptText, scriptName) {
             type: 'broadcast', event: 'cmd',
             payload: {
               target: targetUserId,
-              from:   _mySession.initials,
+              from:   _myAlias || _mySession.initials,
               cmd:    line.replace(/^[A-Z]+:\s*/, ''),
               cmdId:  Date.now() + '-' + i,
             }
@@ -756,9 +909,9 @@ async function _runScript(scriptText, scriptName) {
         }
       } else {
         // Execute locally
-        _appendLine(_mySession.initials, 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
+        _appendLine(_myAlias || _mySession.initials, 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
         try {
-          await _executeCommand(line.replace(/^[A-Z]+:\s*/, ''), _mySession.initials);
+          await _executeCommand(line.replace(/^[A-Z]+:\s*/, ''), _myAlias || _mySession.initials);
         } catch(e) {
           _appendLine('SYS', 'err', 'Script halted: ' + e.message);
           break;
@@ -775,6 +928,82 @@ async function _runScript(scriptText, scriptName) {
   }
 
   _appendLine('SYS', 'result', _scriptAborted ? '■ Script stopped' : '✓ Script complete · ' + (scriptName||'inline'));
+}
+
+// ── Script preflight panel ────────────────────────────────────────────────────
+// Shown when a script requires sessions that aren't live.
+// Returns true if the operator clicks Run Anyway, false if they cancel.
+// Non-blocking modal injected into the CMD Center panel.
+function _showPreflightPanel(scriptName, required, missing, scriptText) {
+  return new Promise(function(resolve) {
+    var existing = document.getElementById('phr-preflight');
+    if (existing) existing.remove();
+
+    var liveAliases   = required.filter(function(a){ return !missing.includes(a); });
+    var missingAliases = missing;
+
+    var rows = required.map(function(alias) {
+      var isLive = !missing.includes(alias);
+      var uid = _resolveTargetAlias(alias);
+      var sess = uid ? _sessions[uid] : null;
+      var nameStr = sess ? sess.name : '—';
+      var dot = isLive
+        ? '<span style="color:#1D9E75">●</span>'
+        : '<span style="color:#E24B4A">○</span>';
+      var loc = isLive && sess ? ('<span style="color:rgba(255,255,255,.3);font-size:9px"> · ' + (sess.location||'') + '</span>') : '';
+      var tag = isLive
+        ? '<span style="font-size:9px;color:#1D9E75;border:1px solid rgba(29,158,117,.3);border-radius:2px;padding:0 4px">LIVE</span>'
+        : '<span style="font-size:9px;color:#E24B4A;border:1px solid rgba(226,75,74,.3);border-radius:2px;padding:0 4px">MISSING</span>';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        + '<span style="font-size:10px;font-family:monospace;color:#EF9F27;min-width:32px">' + alias + '</span>'
+        + dot + ' '
+        + '<span style="font-size:10px;color:rgba(255,255,255,.7);flex:1">' + nameStr + loc + '</span>'
+        + tag
+        + '</div>';
+    }).join('');
+
+    var overlay = document.createElement('div');
+    overlay.id = 'phr-preflight';
+    overlay.style.cssText = [
+      'position:absolute;inset:0;background:rgba(4,7,16,.88)',
+      'display:flex;align-items:center;justify-content:center',
+      'z-index:10;border-radius:8px',
+    ].join(';');
+    overlay.innerHTML = [
+      '<div style="background:#0a1220;border:1px solid rgba(0,201,201,.25);border-radius:6px;padding:16px 18px;width:320px;max-width:90%">',
+      '  <div style="font-size:10px;letter-spacing:.1em;color:rgba(255,255,255,.3);margin-bottom:8px">SESSION PREFLIGHT</div>',
+      '  <div style="font-size:12px;color:#EF9F27;font-weight:700;margin-bottom:10px;font-family:monospace">' + scriptName + '</div>',
+      '  <div style="margin-bottom:12px">' + rows + '</div>',
+      '  <div style="font-size:10px;color:#E24B4A;margin-bottom:12px">',
+      '    ' + missingAliases.length + ' required session' + (missingAliases.length !== 1 ? 's' : '') + ' not connected: ' + missingAliases.join(', '),
+      '  </div>',
+      '  <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:14px">',
+      '    Open a Compass window for each missing session and log in. Script will block when it reaches those steps.',
+      '  </div>',
+      '  <div style="display:flex;gap:8px;justify-content:flex-end">',
+      '    <button id="phr-pre-cancel" style="font-size:10px;padding:4px 12px;border:1px solid rgba(255,255,255,.15);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">Cancel</button>',
+      '    <button id="phr-pre-run" style="font-size:10px;padding:4px 12px;border:1px solid rgba(239,159,39,.4);border-radius:3px;background:rgba(239,159,39,.1);color:#EF9F27;cursor:pointer;font-family:monospace;font-weight:700">Run anyway ▶</button>',
+      '  </div>',
+      '</div>',
+    ].join('');
+
+    var panel = document.getElementById('cmd-center-panel');
+    if (panel) {
+      panel.style.position = 'relative'; // ensure overlay positions within panel
+      panel.appendChild(overlay);
+    } else {
+      document.body.appendChild(overlay);
+    }
+
+    overlay.querySelector('#phr-pre-cancel').onclick = function() {
+      overlay.remove();
+      resolve(false);
+    };
+    overlay.querySelector('#phr-pre-run').onclick = function() {
+      overlay.remove();
+      resolve(true);
+    };
+  });
 }
 
 // ── Script storage ────────────────────────────────────────────────────────────
@@ -955,7 +1184,15 @@ function _panelHTML() {
   <div style="width:180px;border-right:1px solid #0d1f2e;display:flex;flex-direction:column;flex-shrink:0">
 
     <div style="border-bottom:1px solid #0d1f2e">
-      <div style="font-size:9px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.25);padding:7px 10px 3px;text-transform:uppercase">Sessions</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px 3px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.25);text-transform:uppercase">Sessions</div>
+        <div style="display:flex;align-items:center;gap:4px" title="Your alias — used in scripts as VS:, AK:, etc.">
+          <span style="font-size:9px;color:rgba(255,255,255,.2)">alias</span>
+          <input id="phr-alias-input" maxlength="4"
+            style="width:34px;font-family:monospace;font-size:10px;font-weight:700;background:rgba(239,159,39,.08);border:1px solid rgba(239,159,39,.25);border-radius:2px;color:#EF9F27;text-align:center;outline:none;padding:1px 3px;text-transform:uppercase"
+            placeholder="VS">
+        </div>
+      </div>
       <div id="phr-sessions" style="padding-bottom:4px"></div>
     </div>
 
@@ -1051,6 +1288,40 @@ function _wirePanel() {
   p.querySelector('#phr-pop-dot').onclick = function() {
     _popOut();
   };
+
+  // Alias input — lets operator set their session alias (VS, AK, etc.)
+  var aliasInput = p.querySelector('#phr-alias-input');
+  if (aliasInput) {
+    aliasInput.value = _myAlias || (_mySession ? _mySession.initials : '');
+    aliasInput.addEventListener('keydown', function(e) {
+      // Force uppercase as typed
+      setTimeout(function() { aliasInput.value = aliasInput.value.toUpperCase(); }, 0);
+      if (e.key === 'Enter') { aliasInput.blur(); }
+    });
+    aliasInput.addEventListener('blur', function() {
+      var newAlias = aliasInput.value.trim().toUpperCase();
+      if (!newAlias) { aliasInput.value = _myAlias || _mySession.initials; return; }
+      if (newAlias === _myAlias) return;
+      _myAlias = newAlias;
+      // Persist for this userId
+      if (_mySession) localStorage.setItem('phud:cmd:alias:' + _mySession.userId, _myAlias);
+      // Re-track presence with new alias so other sessions pick it up
+      if (_channel && _mySession && !window._cmdCenterFullscreen) {
+        _channel.track({
+          userId:   _mySession.userId,
+          name:     _mySession.name,
+          initials: _mySession.initials,
+          alias:    _myAlias,
+          location: _currentLocation(),
+          ts:       Date.now(),
+        });
+      }
+      // Update aliasMap locally so scripts can target immediately
+      _aliasMap[_myAlias] = _mySession ? _mySession.userId : null;
+      _appendLine('SYS', 'sys', 'Alias set: ' + _myAlias + ' · other sessions will see this within ~5s');
+      _renderSessionList();
+    });
+  }
 
   // Tab switching
   p.querySelectorAll('.phr-tab-btn').forEach(function(btn) {
@@ -1234,27 +1505,27 @@ function _runCmd() {
 
   // Prefix with target if not already addressed
   var fullCmd = cmd;
-  if (_cmdTarget !== 'ALL' && !cmd.match(/^[A-Z]{1,3}:\s*/)) {
+  if (_cmdTarget !== 'ALL' && !cmd.match(/^[A-Z]{1,4}:\s*/)) {
     var sess = _sessions[_cmdTarget];
-    if (sess) fullCmd = sess.initials + ': ' + cmd;
+    if (sess) fullCmd = (sess.alias || sess.initials) + ': ' + cmd;
   }
 
-  _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd', cmd);
+  _appendLine(_myAlias || (_mySession ? _mySession.initials : 'ME'), 'cmd', cmd);
 
   // Determine if dispatching to remote session
   var parsed = _parseLine(fullCmd);
-  if (parsed && parsed.target && _mySession && parsed.target !== _mySession.initials) {
-    var match = Object.entries(_sessions).find(function([uid, s]) { return s.initials === parsed.target; });
-    if (match && _channel) {
+  if (parsed && parsed.target) {
+    var targetUserId = _resolveTargetAlias(parsed.target);
+    if (targetUserId && _mySession && targetUserId !== _mySession.userId && _channel) {
       _channelSend({
         type: 'broadcast', event: 'cmd',
-        payload: { target: match[0], from: _mySession.initials, cmd: cmd, cmdId: Date.now() }
+        payload: { target: targetUserId, from: _myAlias || _mySession.initials, cmd: cmd, cmdId: Date.now() }
       });
       return;
     }
   }
 
-  _executeCommand(fullCmd, _mySession ? _mySession.initials : 'ME');
+  _executeCommand(fullCmd, _myAlias || (_mySession ? _mySession.initials : 'ME'));
 }
 
 // ── Render helpers ────────────────────────────────────────────────────────────
@@ -1282,14 +1553,23 @@ function _renderSessionList() {
     var isTarget = uid === _cmdTarget;
     var bg = isTarget ? 'rgba(0,201,201,.06)' : 'transparent';
     var border = isTarget ? '2px solid #00c9c9' : '2px solid transparent';
-    html += `<div data-uid="${uid}" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:pointer;background:${bg};border-left:${border}">
-      <div style="width:22px;height:22px;border-radius:50%;background:${color}22;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${color};flex-shrink:0">${s.initials}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:11px;color:rgba(255,255,255,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}${isMine?' <span style="font-size:9px;color:rgba(255,255,255,.25)">(me)</span>':''}</div>
-        <div style="font-size:9px;color:rgba(255,255,255,.3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">${s.location||'—'}</div>
-      </div>
-      <div style="width:6px;height:6px;border-radius:50%;background:${s.online?'#1D9E75':'rgba(255,255,255,.15)'};flex-shrink:0"></div>
-    </div>`;
+    var aliasDisplay = s.alias && s.alias !== s.initials
+      ? '<span style="font-size:9px;color:#EF9F27;font-family:monospace;margin-left:3px">[' + s.alias + ']</span>'
+      : '';
+    var onlineIndicator = s.online
+      ? '<div style="width:6px;height:6px;border-radius:50%;background:#1D9E75;flex-shrink:0"></div>'
+      : '<div style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.15);flex-shrink:0"></div>';
+    html += '<div data-uid="' + uid + '" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:pointer;background:' + bg + ';border-left:' + border + '">'
+      + '<div style="width:22px;height:22px;border-radius:50%;background:' + color + '22;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:' + color + ';flex-shrink:0">' + s.initials + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:11px;color:rgba(255,255,255,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      + s.name + aliasDisplay
+      + (isMine ? ' <span style="font-size:9px;color:rgba(255,255,255,.25)">(me)</span>' : '')
+      + '</div>'
+      + '<div style="font-size:9px;color:rgba(255,255,255,.3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">' + (s.location||'—') + '</div>'
+      + '</div>'
+      + onlineIndicator
+      + '</div>';
   });
 
   if (!Object.keys(_sessions).length) {
@@ -1306,7 +1586,8 @@ function _renderSessionList() {
       var pill = p.querySelector('#phr-target-pill');
       var sess = _sessions[_cmdTarget];
       if (pill && sess) {
-        pill.textContent = sess.initials + ' ▾';
+        var label = sess.alias || sess.initials;
+        pill.textContent = label + ' ▾';
         pill.style.color = _sessionColor(_cmdTarget);
         pill.style.borderColor = 'rgba(255,255,255,.2)';
       }
@@ -1362,14 +1643,26 @@ function _renderLibrary() {
   }
 
   container.innerHTML = names.map(function(name) {
-    var lines = (_scripts[name]||'').split('\n').filter(function(l){ return l.trim() && !l.trim().startsWith('#'); }).length;
-    return `<div style="border:1px solid #0d1f2e;border-radius:4px;padding:8px 10px;margin-bottom:6px;cursor:pointer" data-script="${name}" onmouseover="this.style.borderColor='#1a3a5a'" onmouseout="this.style.borderColor='#0d1f2e'">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
-        <span style="font-size:11px;color:#EF9F27;font-weight:700">${name}</span>
-        <span style="font-size:10px;color:rgba(255,255,255,.25)">${lines} cmd${lines!==1?'s':''}</span>
-      </div>
-      <div style="font-size:10px;color:rgba(255,255,255,.3)">${(_scripts[name]||'').split('\n').find(function(l){ return l.trim().startsWith('#'); })||'(no description)'}</div>
-    </div>`;
+    var text  = _scripts[name] || '';
+    var lines = text.split('\n').filter(function(l){ return l.trim() && !l.trim().startsWith('#'); }).length;
+    var firstComment = text.split('\n').find(function(l){ return l.trim().startsWith('#') && !l.match(/requires:/i); }) || '(no description)';
+    var required = _parseScriptRequires(text);
+    var reqBadges = required.length
+      ? required.map(function(alias) {
+          var uid = _resolveTargetAlias(alias);
+          var live = uid && _sessions[uid] && _sessions[uid].online;
+          var col = live ? '#1D9E75' : 'rgba(255,255,255,.25)';
+          return '<span style="font-size:9px;font-family:monospace;color:' + col + ';border:1px solid ' + col + '44;border-radius:2px;padding:0 3px;margin-right:2px">' + alias + '</span>';
+        }).join('')
+      : '';
+    return '<div style="border:1px solid #0d1f2e;border-radius:4px;padding:8px 10px;margin-bottom:6px;cursor:pointer" data-script="' + name + '" onmouseover="this.style.borderColor=\'#1a3a5a\'" onmouseout="this.style.borderColor=\'#0d1f2e\'">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'
+      + '<span style="font-size:11px;color:#EF9F27;font-weight:700">' + name + '</span>'
+      + '<span style="font-size:10px;color:rgba(255,255,255,.25)">' + lines + ' cmd' + (lines !== 1 ? 's' : '') + '</span>'
+      + '</div>'
+      + (reqBadges ? '<div style="margin-bottom:4px">' + reqBadges + '</div>' : '')
+      + '<div style="font-size:10px;color:rgba(255,255,255,.3)">' + _escHtml(firstComment) + '</div>'
+      + '</div>';
   }).join('');
 
   container.querySelectorAll('[data-script]').forEach(function(el) {
@@ -1713,13 +2006,23 @@ window.addEventListener('message', function(ev) {
 
 // ── Expose public API ─────────────────────────────────────────────────────────
 window.CMDCenter = {
-  toggle:      _togglePanel,
-  run:         _runScript,
-  runLine:     _executeCommand,
-  saveScript:  _saveScript,
-  getScripts:  function() { return Object.keys(_scripts); },
-  appendLine:  _appendLine,
-  sessions:    function() { return _sessions; },
+  toggle:       _togglePanel,
+  run:          _runScript,
+  runLine:      _executeCommand,
+  saveScript:   _saveScript,
+  getScripts:   function() { return Object.keys(_scripts); },
+  appendLine:   _appendLine,
+  sessions:     function() { return _sessions; },
+  aliasMap:     function() { return _aliasMap; },
+  myAlias:      function() { return _myAlias; },
+  setAlias:     function(a) {
+    if (!a) return;
+    _myAlias = a.trim().toUpperCase();
+    if (_mySession) localStorage.setItem('phud:cmd:alias:' + _mySession.userId, _myAlias);
+    var ai = document.getElementById('phr-alias-input');
+    if (ai) ai.value = _myAlias;
+  },
+  resolveAlias: _resolveTargetAlias,
 };
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -1769,6 +2072,7 @@ async function _init() {
             userId:   _mySession.userId,
             name:     _mySession.name,
             initials: _mySession.initials,
+            alias:    _myAlias || _mySession.initials,
             location: _currentLocation(),
             ts:       Date.now(),
           });
