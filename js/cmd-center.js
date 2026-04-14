@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD8
+// cmd-center.js  ·  v20260412-CMD9
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD8',
+    'cmd-center':  'v20260412-CMD9',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD8 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD9 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -122,6 +122,7 @@ function _updateStatusEl() {
 
 function _connect() {
   if (!_supabase || !_mySession) return;
+  if (_channel) return; // already connected — don't re-subscribe
 
   _channel = _supabase.channel('cmd-center-' + FIRM_ID, {
     config: { presence: { key: _mySession.userId } }
@@ -1303,12 +1304,19 @@ async function _init() {
   if (!_mySession || _mySession.userId.startsWith('anon-')) {
     setTimeout(function() {
       _resolveSession();
-      _connect();
-      _hookAppEvents();
-      if (_panelEl) {
-        var statusEl = _panelEl.querySelector('#phr-status');
-        if (statusEl) statusEl.textContent = '● ' + (_mySession ? _mySession.name : 'unknown');
+      // Update session identity on existing channel if already connected
+      if (_channel && _mySession) {
+        _channel.track({
+          userId:   _mySession.userId,
+          name:     _mySession.name,
+          initials: _mySession.initials,
+          location: _currentLocation(),
+          ts:       Date.now(),
+        });
+      } else {
+        _connect();
       }
+      _hookAppEvents();
     }, 3000);
   }
 
