@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD18
+// cmd-center.js  ·  v20260412-CMD20
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD18',
+    'cmd-center':  'v20260412-CMD20',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD18 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD20 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1265,8 +1265,12 @@ function _hookAppEvents() {
 
   // ── Review / approval panel ───────────────────────────────────────────────
   _interceptProperty(window, 'openRequestReviewPanel', function(item) {
+    // item.title is like "Expense Report — Vaughn Staples — Manager Approval"
+    // Strip the step suffix to show just the document name
+    var rawTitle = item && item.title ? item.title : 'request';
+    var docTitle = rawTitle.replace(/\s+[—\-]+\s+[^—\-]+$/, '').trim() || rawTitle;
     if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
-      'Open Review "' + (item && item.title ? item.title : 'request') + '"');
+      'Open Review "' + docTitle + '"');
   });
   _interceptProperty(window, '_rrpSubmit', function(actionItemId, instanceId, decision) {
     if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
@@ -1284,9 +1288,19 @@ function _hookAppEvents() {
   });
 
   // ── MY REQUESTS routing events (emitted by mw-tabs.js) ───────────────────
-  _interceptProperty(window, '_mwResolveAndRoute', function(instanceId, steps, seq) {
-    if (_panelEl) _appendLine('SYS', 'result',
-      '→ routing step ' + seq + ' · instance ' + (instanceId||'').slice(0,8));
+  _interceptProperty(window, '_mwResolveAndRoute', function(instanceId, steps, seq, submitterResId, formName) {
+    // Look up who step seq routes to from the pre-resolved step chain
+    setTimeout(function() {
+      var inst = (window._myrInstances||[]).find(function(i){ return i.id === instanceId; });
+      var assignee = '';
+      try {
+        var notes = inst && inst.notes ? JSON.parse(inst.notes) : null;
+        var chain = notes && notes.step_chain;
+        if (chain && chain[seq]) assignee = ' → ' + (chain[seq].assignee_name || '');
+      } catch(e) {}
+      if (_panelEl) _appendLine('SYS', 'result',
+        '→ routed step ' + seq + assignee);
+    }, 500); // brief delay so notes are updated
   });
 }
 
