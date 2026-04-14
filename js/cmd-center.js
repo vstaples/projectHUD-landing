@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD6
+// cmd-center.js  ·  v20260412-CMD7
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,7 +27,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD6',
+    'cmd-center':  'v20260412-CMD7',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -107,6 +107,19 @@ function _currentLocation() {
 }
 
 // ── Connect to Realtime ───────────────────────────────────────────────────────
+function _updateStatusEl() {
+  if (!_panelEl) return;
+  var statusEl = _panelEl.querySelector('#phr-status');
+  if (!statusEl) return;
+  if (window._cmdConnected) {
+    statusEl.textContent = '● ' + (window._cmdSessionName || 'connected');
+    statusEl.style.color = '#1D9E75';
+  } else {
+    statusEl.textContent = 'connecting…';
+    statusEl.style.color = 'rgba(255,255,255,.3)';
+  }
+}
+
 function _connect() {
   if (!_supabase || !_mySession) return;
 
@@ -234,14 +247,10 @@ function _connect() {
         ts:       Date.now(),
       });
       _appendLine('SYS', 'sys', 'Connected · session: ' + _mySession.name);
-      // Update status dot and header immediately on confirmed connection
-      if (_panelEl) {
-        var statusEl = _panelEl.querySelector('#phr-status');
-        if (statusEl) {
-          statusEl.textContent = '● ' + _mySession.name;
-          statusEl.style.color = '#1D9E75';
-        }
-      }
+      // Store connection state so panel can pick it up when opened
+      window._cmdConnected = true;
+      window._cmdSessionName = _mySession ? _mySession.name : 'connected';
+      _updateStatusEl();
       _renderSessionList();
       // Location-only update — use a separate broadcast instead of track()
       // to avoid triggering leave/join cycles on every heartbeat
@@ -672,6 +681,7 @@ function _buildPanel() {
   _renderSessionList();
   _renderScriptList();
   _renderTranscript();
+  _updateStatusEl();
 }
 
 function _panelHTML() {
@@ -712,7 +722,7 @@ function _panelHTML() {
   <div style="flex:1;display:flex;flex-direction:column;min-width:0">
 
     <!-- Transcript tab -->
-    <div id="phr-pane-transcript" style="flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:1px" class="phr-pane"></div>
+    <div id="phr-pane-transcript" style="flex:1;overflow-y:auto;padding:8px 12px;display:block" class="phr-pane"></div>
     <div id="phr-pane-monitor" style="display:none;flex:1;overflow-y:auto;padding:8px 12px;flex-direction:column;gap:1px" class="phr-pane">
       <div style="font-size:10px;color:rgba(255,255,255,.25);padding:4px 0 8px;font-family:monospace">Session presence events — join / leave / location updates</div>
     </div>
@@ -1078,9 +1088,6 @@ function _appendLine(who, type, text) {
   var pane = p.querySelector('#phr-pane-transcript');
   if (!pane) return;
 
-  // Also append to monitor with full metadata
-  _appendMonitor('[' + who + '] ' + text);
-
   // Transcript shows command text only — clean, copy-paste ready for scripts
   // SYS result/error lines shown as comments; cmd lines shown bare
   var colors = {
@@ -1095,8 +1102,8 @@ function _appendLine(who, type, text) {
     : (who !== 'SYS' && who !== (_mySession && _mySession.initials) ? who + ': ' : '') + text;
 
   var div = document.createElement('div');
-  div.style.cssText = 'font-family:monospace;font-size:11px;line-height:1.7;color:' + color
-    + ';white-space:pre-wrap;word-break:break-word;padding:0 2px';
+  div.style.cssText = 'display:block;width:100%;font-family:monospace;font-size:11px;line-height:1.7;color:' + color
+    + ';white-space:pre-wrap;word-break:break-word;padding:0 2px;box-sizing:border-box';
   div.textContent = displayText;
 
   pane.appendChild(div);
@@ -1300,14 +1307,11 @@ async function _init() {
   _connect();
   _hookAppEvents();
 
-  // Update status once connected
-  setTimeout(function() {
-    if (_panelEl) {
-      var statusEl = _panelEl.querySelector('#phr-status');
-      if (statusEl) statusEl.textContent = '● ' + (_mySession ? _mySession.name : 'connected');
-      _renderSessionList();
-    }
-  }, 2000);
+  // Poll status every 2s until connected — covers cases where panel opens after connect
+  var _statusPoll = setInterval(function() {
+    _updateStatusEl();
+    if (window._cmdConnected) clearInterval(_statusPoll);
+  }, 1000);
 
   console.log('[CMD Center] initialized — Ctrl+Shift+` to toggle panel');
 }
