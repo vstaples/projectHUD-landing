@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD34
+// cmd-center.js  ·  v20260412-CMD35
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD34',
+    'cmd-center':  'v20260412-CMD35',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD34 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD35 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -65,6 +65,8 @@ var _execQueue   = [];     // pending async commands
 var _eventListeners = {};  // { eventName: [resolvers] }
 var _storeVars   = {};     // script variable storage { name: value }
 var _scriptRunning = false; // suppress hook double-logging during script execution
+var _scriptAborted = false; // set when panel closes mid-script
+var _scriptAborted = false;  // set by Stop button or form closure
 
 // ── Load Supabase JS client ───────────────────────────────────────────────────
 function _loadSupabase() {
@@ -512,7 +514,15 @@ var COMMANDS = {
   'Wait': async function(args) {
     var val = args[0];
     if (String(val).match(/^\d+$/)) {
-      await new Promise(function(r){ setTimeout(r, parseInt(val)); });
+      // Break wait into 100ms chunks so abort is responsive
+      var total = parseInt(val);
+      var elapsed = 0;
+      while (elapsed < total) {
+        if (_scriptAborted) return 'aborted';
+        var chunk = Math.min(100, total - elapsed);
+        await new Promise(function(r){ setTimeout(r, chunk); });
+        elapsed += chunk;
+      }
       return 'waited ' + val + 'ms';
     }
     if (val === 'ForEvent') {
@@ -682,62 +692,89 @@ async function _executeCommand(cmdLine, fromWho) {
 async function _runScript(scriptText, scriptName) {
   var lines = scriptText.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
   _scriptRunning = true;
+  _scriptAborted = false;
   _appendLine('SYS', 'sys', 'Script: ' + (scriptName||'inline') + ' · ' + lines.filter(function(l){ return !l.startsWith('#'); }).length + ' commands');
 
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
-    if (!line || line.startsWith('#')) continue;
-
-    var parsed = _parseLine(line);
-    if (!parsed) continue;
-
-    // Determine target session
-    var targetUserId = null;
-    if (parsed.target) {
-      // Match initials to session
-      var match = Object.entries(_sessions).find(function([uid, s]) {
-        return s.initials === parsed.target;
-      });
-      targetUserId = match ? match[0] : null;
-    }
-
-    if (targetUserId && targetUserId !== _mySession.userId) {
-      // Dispatch to remote session
-      _appendLine(parsed.target || 'SYS', 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
-      if (_channel) {
-        _channelSend({
-          type: 'broadcast', event: 'cmd',
-          payload: {
-            target: targetUserId,
-            from:   _mySession.initials,
-            cmd:    line.replace(/^[A-Z]+:\s*/, ''),
-            cmdId:  Date.now() + '-' + i,
-          }
-        });
-      }
-      // Wait for result with 30s timeout
-      try {
-        await _waitForEvent('result:' + targetUserId, 30000);
-      } catch(e) {
-        _appendLine('SYS', 'warn', 'Timeout waiting for ' + parsed.target);
-      }
-    } else {
-      // Execute locally
-      _appendLine(_mySession.initials, 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
-      try {
-        await _executeCommand(line.replace(/^[A-Z]+:\s*/, ''), _mySession.initials);
-      } catch(e) {
-        _appendLine('SYS', 'err', 'Script halted: ' + e.message);
+  try {
+    for (var i = 0; i < lines.length; i++) {
+      // Check abort flag — set by Stop button or form closure
+      if (_scriptAborted) {
+        _appendLine('SYS', 'warn', 'Script aborted at line ' + (i+1));
         break;
       }
-    }
 
-    // Small yield between commands
-    await new Promise(function(r){ setTimeout(r, 200); });
+      var line = lines[i];
+      if (!line || line.startsWith('#')) continue;
+
+      // Abort if panel was closed
+      if (_scriptAborted) {
+        _scriptAborted = false;
+        _appendLine('SYS', 'warn', 'Script aborted — panel closed');
+        break;
+      }
+
+      var parsed = _parseLine(line);
+      if (!parsed) continue;
+
+      // If this is a Form command, verify the overlay is still open
+      if (parsed.verb && parsed.verb.startsWith('Form ') && parsed.verb !== 'Form Open') {
+        var overlay = document.getElementById('myr-html-form-overlay') ||
+                      document.getElementById('myr-html-form-modal');
+        if (!overlay) {
+          _appendLine('SYS', 'warn', 'Form closed — script aborted at: ' + line);
+          break;
+        }
+      }
+
+      // Determine target session
+      var targetUserId = null;
+      if (parsed.target) {
+        var match = Object.entries(_sessions).find(function([uid, s]) {
+          return s.initials === parsed.target;
+        });
+        targetUserId = match ? match[0] : null;
+      }
+
+      if (targetUserId && targetUserId !== _mySession.userId) {
+        // Dispatch to remote session
+        _appendLine(parsed.target || 'SYS', 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
+        if (_channel) {
+          _channelSend({
+            type: 'broadcast', event: 'cmd',
+            payload: {
+              target: targetUserId,
+              from:   _mySession.initials,
+              cmd:    line.replace(/^[A-Z]+:\s*/, ''),
+              cmdId:  Date.now() + '-' + i,
+            }
+          });
+        }
+        try {
+          await _waitForEvent('result:' + targetUserId, 30000);
+        } catch(e) {
+          _appendLine('SYS', 'warn', 'Timeout waiting for ' + parsed.target);
+        }
+      } else {
+        // Execute locally
+        _appendLine(_mySession.initials, 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
+        try {
+          await _executeCommand(line.replace(/^[A-Z]+:\s*/, ''), _mySession.initials);
+        } catch(e) {
+          _appendLine('SYS', 'err', 'Script halted: ' + e.message);
+          break;
+        }
+      }
+
+      // Small yield between commands
+      await new Promise(function(r){ setTimeout(r, 200); });
+    }
+  } finally {
+    // Always clear running flag — even if script threw
+    _scriptRunning = false;
+    _scriptAborted = false;
   }
 
-  _scriptRunning = false;
-  _appendLine('SYS', 'result', '✓ Script complete · ' + (scriptName||'inline'));
+  _appendLine('SYS', 'result', _scriptAborted ? '■ Script stopped' : '✓ Script complete · ' + (scriptName||'inline'));
 }
 
 // ── Script storage ────────────────────────────────────────────────────────────
@@ -1003,7 +1040,13 @@ function _wirePanel() {
   var p = _panelEl;
 
   // Close/minimize dots
-  p.querySelector('#phr-close-dot').onclick = function() { _togglePanel(); };
+  p.querySelector('#phr-close-dot').onclick = function() {
+    if (_scriptRunning) {
+      _scriptAborted = true;
+      _scriptRunning = false;
+    }
+    _togglePanel();
+  };
   p.querySelector('#phr-min-dot').onclick   = function() { p.style.height = p.style.height === '36px' ? '520px' : '36px'; };
   p.querySelector('#phr-pop-dot').onclick = function() {
     _popOut();
@@ -1115,6 +1158,17 @@ function _wirePanel() {
     }
   });
   p.querySelector('#phr-run-cmd').onclick = _runCmd;
+
+  // Stop button aborts running script
+  var stopBtn = p.querySelector('#phr-stop-btn');
+  if (stopBtn) {
+    stopBtn.onclick = function() {
+      if (_scriptRunning) {
+        _scriptAborted = true;
+        _appendLine('SYS', 'warn', '■ Stop requested');
+      }
+    };
+  }
 
   // Copy transcript button
   var copyBtn = p.querySelector('#phr-copy-transcript');
@@ -1647,7 +1701,14 @@ setInterval(function() {
 // ── Listen for form actions posted from embedded form overlays ───────────────
 window.addEventListener('message', function(ev) {
   if (!ev.data || ev.data.type !== 'cmd:form_action') return;
-  if (_panelEl && !_scriptRunning) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd', ev.data.action);
+  if (_panelEl && !_scriptRunning) {
+    _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd', ev.data.action);
+  }
+  // If form is closed while script is running, abort the script
+  if (ev.data.action === 'Form Close' && _scriptRunning) {
+    _scriptAborted = true;
+    _appendLine('SYS', 'warn', 'Form closed — script aborted');
+  }
 });
 
 // ── Expose public API ─────────────────────────────────────────────────────────
@@ -1735,208 +1796,6 @@ async function _init() {
 
   console.log('[CMD Center] initialized — Ctrl+Shift+` to toggle panel');
 }
-
-// Seed a sample script if none exist
-setTimeout(function() {
-  if (!Object.keys(_scripts).length) {
-    _saveScript('test_expense_full',
-`# Full expense report signature loop test
-# Targets: VS (submitter), AK (manager), FH (finance)
-
-VS: Set Tab "MY REQUESTS"
-VS: Set SubTab "BROWSE"
-VS: Form Open "Expense Report"
-VS: Form Insert employee_name "Vaughn Staples"
-VS: Form Insert business_purpose "Client Visit"
-VS: Form Submit
-VS: Get instance_id
-Wait 2000
-VS: Set SubTab "ACTIVE"
-VS: Click "Review" $instance_id
-VS: Click "Approve"
-VS: Click "Approve"
-AK: Wait ForEvent "workflow_request.created"
-AK: Click "Review"
-AK: Click "Approve"
-FH: Wait ForEvent "workflow_request.created"
-FH: Click "Review"
-FH: Click "Approve"
-Log All steps complete`
-    );
-
-    _saveScript('test_expense_draft',
-`# Save and continue draft
-VS: Set Tab "MY REQUESTS"
-VS: Set SubTab "BROWSE"
-VS: Form Open "Expense Report"
-VS: Form Insert employee_name "Vaughn Staples"
-VS: Form Insert airfare 212.00`
-    );
-
-    _saveScript('verify_routing_chain',
-`# Verify current instance routing state
-VS: Get instance_id
-DB Get workflow_requests instance_id=eq.$instance_id
-DB Get coc_events entity_id=eq.$instance_id`
-    );
-
-    _saveScript('demo_expense_report',
-`# ── Expense Report Demo ─────────────────────────────────────────
-# Submits a complete expense report for Vaughn Staples
-# Trip: NovaBio client visit, Mar 31 – Apr 3, 2026
-# ────────────────────────────────────────────────────────────────
-
-# Navigate to MY REQUESTS > BROWSE
-VS: Set Tab "MY REQUESTS"
-Wait 1500
-VS: Set SubTab "BROWSE"
-Wait 1500
-
-# Open the Expense Report form
-VS: Form Open "Expense Report"
-Wait 2000
-
-# ── Employee Information ─────────────────────────────────────────
-VS: Form Insert "Employee Name" "Vaughn Staples"
-Wait 600
-VS: Form Insert "Trip Start Date" "2026-03-31"
-Wait 600
-VS: Form Insert "Trip End Date" "2026-04-03"
-Wait 600
-VS: Form Insert "Business Purpose" "Client Visit"
-Wait 600
-VS: Form Insert "Purpose Description" "NovaBio Quality System Implementation kick-off"
-Wait 600
-VS: Form Insert "Customer Name" "NovaBio Corp"
-Wait 600
-VS: Form Insert "Customer Location" "Boston, MA"
-Wait 1500
-
-# Scroll down to Daily Expenses grid
-VS: Form Scroll daily
-Wait 1000
-
-# ── Meals — 4 days (Mon–Thu) ─────────────────────────────────────
-VS: Form Insert breakfast[0] 18.50
-Wait 400
-VS: Form Insert lunch[0] 24.00
-Wait 400
-VS: Form Insert dinner[0] 68.00
-Wait 400
-VS: Form Insert breakfast[1] 16.75
-Wait 400
-VS: Form Insert lunch[1] 22.50
-Wait 400
-VS: Form Insert dinner[1] 94.00
-Wait 400
-VS: Form Insert breakfast[2] 19.00
-Wait 400
-VS: Form Insert lunch[2] 28.00
-Wait 400
-VS: Form Insert dinner[2] 112.00
-Wait 400
-VS: Form Insert lunch[3] 21.00
-Wait 1200
-
-# ── Transportation & Lodging ─────────────────────────────────────
-VS: Form Insert airfare[0] 387.00
-Wait 600
-VS: Form Insert lodging[0] 219.00
-Wait 400
-VS: Form Insert lodging[1] 219.00
-Wait 400
-VS: Form Insert lodging[2] 219.00
-Wait 400
-VS: Form Insert taxi[0] 42.00
-Wait 400
-VS: Form Insert taxi[3] 38.00
-Wait 1200
-
-# Scroll to Miscellaneous section
-VS: Form Scroll misc
-Wait 1000
-
-# ── Miscellaneous Expenses ───────────────────────────────────────
-VS: Form Insert "misc[0].description" "Conference materials & printing"
-Wait 400
-VS: Form Insert "misc[0].date" "2026-03-31"
-Wait 400
-VS: Form Insert "misc[0].type" "Billable"
-Wait 400
-VS: Form Insert "misc[0].amount" 47.50
-Wait 800
-
-VS: Form AddRow misc
-Wait 500
-VS: Form Insert "misc[1].description" "Client gift — NovaBio branded items"
-Wait 400
-VS: Form Insert "misc[1].date" "2026-04-01"
-Wait 400
-VS: Form Insert "misc[1].type" "Billable"
-Wait 400
-VS: Form Insert "misc[1].amount" 125.00
-Wait 1200
-
-# Scroll to Entertainment section
-VS: Form Scroll entertainment
-Wait 1000
-
-# ── Entertainment Detail ─────────────────────────────────────────
-VS: Form Insert "ent[0].date" "2026-04-01"
-Wait 400
-VS: Form Insert "ent[0].type" "Dinner"
-Wait 400
-VS: Form Insert "ent[0].guests" "Dr. Sarah Chen · CMO · NovaBio Corp"
-Wait 400
-VS: Form Insert "ent[0].purpose" "Q2 implementation roadmap alignment"
-Wait 400
-VS: Form Insert "ent[0].amount" 248.00
-Wait 800
-
-VS: Form AddRow ent
-Wait 500
-VS: Form Insert "ent[1].date" "2026-04-02"
-Wait 400
-VS: Form Insert "ent[1].type" "Lunch"
-Wait 400
-VS: Form Insert "ent[1].guests" "Marcus Webb · VP Ops · NovaBio Corp; Lisa Park · QA Lead · NovaBio Corp"
-Wait 400
-VS: Form Insert "ent[1].purpose" "Quality system gap analysis working session"
-Wait 400
-VS: Form Insert "ent[1].amount" 143.00
-Wait 1500
-
-# Scroll to top to review before saving
-VS: Form Scroll top
-Wait 2000
-
-# Save as draft
-Form Save
-Wait 2000
-
-# Close form
-Form Close
-Wait 1500
-
-# Capture draft ID and reopen
-Get Draft id
-Wait 500
-Continue Draft $draft_id
-Wait 2000
-
-# Scroll to top before submitting
-Form Scroll top
-Wait 1000
-
-# Submit for approval
-Form Submit
-Wait 1000
-Log Demo complete — expense report submitted for approval`
-    );
-
-    _renderScriptList && _renderScriptList();
-  }
-}, 500);
 
 _init();
 
