@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD14
+// cmd-center.js  ·  v20260412-CMD16
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD14',
+    'cmd-center':  'v20260412-CMD16',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD14 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD16 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1235,47 +1235,136 @@ function _hookAppEvents() {
     if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
       'Form Open "' + (type||'') + '"');
   });
+
+  // ── MY REQUESTS actions ──────────────────────────────────────────────────
+  _interceptProperty(window, 'myrWithdrawInstance', function(instanceId, title) {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Withdraw "' + (title||instanceId.slice(0,8)) + '"');
+  });
+  _interceptProperty(window, 'myrRecallToDraft_row', function(instanceId) {
+    var inst = (window._myrInstances||[]).find(function(i){ return i.id === instanceId; });
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Recall "' + (inst ? inst.title : instanceId.slice(0,8)) + '"');
+  });
+  _interceptProperty(window, 'myrResumeInstance', function(instanceId, title) {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Resume "' + (title||instanceId.slice(0,8)) + '"');
+  });
+  _interceptProperty(window, 'myrContinueDraft', function(formDefId, draftId) {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Continue Draft id=' + (draftId||'').slice(0,8));
+  });
+  _interceptProperty(window, 'myrDiscardDraft', function(draftId, name) {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Discard Draft "' + (name||draftId.slice(0,8)) + '"');
+  });
+  _interceptProperty(window, 'myrCloseInstance', function() {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Close instance panel');
+  });
+
+  // ── Review / approval panel ───────────────────────────────────────────────
+  _interceptProperty(window, 'openRequestReviewPanel', function(item) {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Open Review "' + (item && item.title ? item.title : 'request') + '"');
+  });
+  _interceptProperty(window, '_rrpSubmit', function(actionItemId, instanceId, decision) {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Click "' + (decision === 'approved' ? 'Approve' : 'Request Changes') + '"');
+  });
+
+  // ── Work queue items ──────────────────────────────────────────────────────
+  _interceptProperty(window, 'openInProgressPanel', function(item) {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Open Task "' + (item && item.title ? item.title : 'task') + '"');
+  });
+  _interceptProperty(window, 'saveInProgressUpdate', function(itemId) {
+    if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
+      'Save Update id=' + (itemId||'').slice(0,8));
+  });
+
+  // ── MY REQUESTS routing events (emitted by mw-tabs.js) ───────────────────
+  _interceptProperty(window, '_mwResolveAndRoute', function(instanceId, steps, seq) {
+    if (_panelEl) _appendLine('SYS', 'result',
+      '→ routing step ' + seq + ' · instance ' + (instanceId||'').slice(0,8));
+  });
 }
 
 // Intercept property assignment on an object.
 // Wraps the function with our observer each time it is set.
-function _interceptProperty(obj, prop, observer) {
-  var _realFn = obj[prop] || null;
-  var _lastObserverCall = 0; // debounce — prevent double-fire when two scripts assign same prop
+// Registry of observers — keyed by property name
+// Used by polling fallback when defineProperty isn't available
+var _interceptRegistry = {};
 
-  Object.defineProperty(obj, prop, {
-    configurable: true,
-    get: function() { return _realFn; },
-    set: function(newFn) {
-      var _capturedFn = newFn;
-      _realFn = function() {
-        var args = Array.prototype.slice.call(arguments);
-        _capturedFn.apply(this, args);
-        // Debounce observer: only fire once per 50ms window
-        var now = Date.now();
-        if (now - _lastObserverCall > 50) {
-          _lastObserverCall = now;
-          try { observer.apply(this, args); } catch(e) {}
-        }
-      };
-      _realFn._cmdHooked = true;
-    }
-  });
-  // Wrap existing value if already defined
-  if (_realFn) {
-    var existingFn = _realFn;
-    _realFn = function() {
+function _interceptProperty(obj, prop, observer) {
+  // Store observer for polling fallback
+  _interceptRegistry[prop] = { obj: obj, observer: observer, lastCall: 0 };
+
+  function _wrap(originalFn, obs) {
+    var lastCall = 0;
+    var wrapped = function() {
       var args = Array.prototype.slice.call(arguments);
-      existingFn.apply(this, args);
+      originalFn.apply(this, args);
       var now = Date.now();
-      if (now - _lastObserverCall > 50) {
-        _lastObserverCall = now;
-        try { observer.apply(this, args); } catch(e) {}
+      if (now - lastCall > 50) { // 50ms debounce
+        lastCall = now;
+        try { obs.apply(this, args); } catch(e) {}
       }
     };
-    _realFn._cmdHooked = true;
+    wrapped._cmdHooked = true;
+    wrapped._cmdOriginal = originalFn;
+    return wrapped;
+  }
+
+  // Try defineProperty first
+  try {
+    var desc = Object.getOwnPropertyDescriptor(obj, prop);
+    var canDefine = !desc || desc.configurable;
+    if (canDefine) {
+      var _realFn = (desc && desc.value) || null;
+      Object.defineProperty(obj, prop, {
+        configurable: true,
+        get: function() { return _realFn; },
+        set: function(newFn) {
+          if (newFn && newFn._cmdHooked) { _realFn = newFn; return; }
+          _realFn = _wrap(newFn, observer);
+        }
+      });
+      if (_realFn) _realFn = _wrap(_realFn, observer);
+      return; // defineProperty succeeded
+    }
+  } catch(e) {}
+
+  // Fallback: direct wrap if function already exists
+  if (obj[prop] && !obj[prop]._cmdHooked) {
+    obj[prop] = _wrap(obj[prop], observer);
   }
 }
+
+// Poll every 1s to re-wrap any functions that were replaced after our initial hook
+// This is the safety net for non-configurable properties
+setInterval(function() {
+  Object.keys(_interceptRegistry).forEach(function(prop) {
+    var entry = _interceptRegistry[prop];
+    var obj   = entry.obj;
+    var fn    = obj[prop];
+    if (fn && !fn._cmdHooked) {
+      // Function was replaced without going through our setter — re-wrap it
+      var lastCall = 0;
+      obj[prop] = function() {
+        var args = Array.prototype.slice.call(arguments);
+        fn.apply(this, args);
+        var now = Date.now();
+        if (now - lastCall > 50) {
+          lastCall = now;
+          try { entry.observer.apply(this, args); } catch(e) {}
+        }
+      };
+      obj[prop]._cmdHooked  = true;
+      obj[prop]._cmdOriginal = fn;
+    }
+  });
+}, 1000);
 
 // Retry hooking until the target functions are defined (they load after cmd-center.js)
 
@@ -1295,6 +1384,9 @@ window.CMDCenter = {
 async function _init() {
   _loadScripts();
   await _loadSupabase();
+  // Install property interceptors IMMEDIATELY — before mw-tabs.js assigns its functions
+  // These use defineProperty so they catch any assignment, past or future
+  _hookAppEvents();
   // Accept overrides — check sessionStorage for pop-out state
   var _popoutState = null;
   try {
@@ -1340,7 +1432,6 @@ async function _init() {
         } else {
           _connect();
         }
-        _hookAppEvents();
         _updateStatusEl();
       }
     }, 500);
@@ -1349,12 +1440,10 @@ async function _init() {
       clearInterval(_identityPoll);
       if (!_channel) {
         _connect();
-        _hookAppEvents();
       }
     }, 10000);
   } else {
     _connect();
-    _hookAppEvents();
   }
   // Poll status every 2s until connected — covers cases where panel opens after connect
   var _statusPoll = setInterval(function() {
