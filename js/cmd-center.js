@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36b
+// cmd-center.js  ·  v20260414-CMD36c
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36b',
+    'cmd-center':  'v20260414-CMD36c',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36b ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36c ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -837,8 +837,14 @@ async function _runScript(scriptText, scriptName) {
   var required = _parseScriptRequires(scriptText);
   if (required.length) {
     var missing = required.filter(function(alias) {
+      // Own session is always connected — check by alias or userId
+      if (_mySession) {
+        if (alias === _myAlias) return false;
+        if (alias === _mySession.initials) return false;
+      }
       var uid = _resolveTargetAlias(alias);
-      if (!uid) return true;                           // not in presence at all
+      if (!uid) return true;                           // not in aliasMap at all
+      if (_mySession && uid === _mySession.userId) return false; // own session
       var sess = _sessions[uid];
       return !sess || !sess.online;                    // offline
     });
@@ -944,10 +950,11 @@ function _showPreflightPanel(scriptName, required, missing, scriptText) {
     var missingAliases = missing;
 
     var rows = required.map(function(alias) {
-      var isLive = !missing.includes(alias);
+      var isOwn = _mySession && (alias === _myAlias || alias === _mySession.initials);
       var uid = _resolveTargetAlias(alias);
+      var isLive = isOwn || (uid && _sessions[uid] && _sessions[uid].online);
       var sess = uid ? _sessions[uid] : null;
-      var nameStr = sess ? sess.name : '—';
+      var nameStr = isOwn ? _mySession.name : (sess ? sess.name : '—');
       var dot = isLive
         ? '<span style="color:#1D9E75">●</span>'
         : '<span style="color:#E24B4A">○</span>';
