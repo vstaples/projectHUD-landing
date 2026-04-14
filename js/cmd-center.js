@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD12
+// cmd-center.js  ·  v20260412-CMD13
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD12',
+    'cmd-center':  'v20260412-CMD13',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD12 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD13 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -805,12 +805,20 @@ function _wirePanel() {
       });
       p.querySelectorAll('.phr-pane').forEach(function(pane) {
         var isActive = pane.id === 'phr-pane-' + _activeTab;
-        pane.style.display = isActive ? 'flex' : 'none';
-        if (isActive) {
-          pane.style.flexDirection = (pane.id === 'phr-pane-editor' || pane.id === 'phr-pane-monitor') ? 'column' : '';
+        if (!isActive) {
+          pane.style.display = 'none';
+        } else if (pane.id === 'phr-pane-transcript') {
+          pane.style.display = 'block'; // must stay block — flex causes line collapsing
+        } else {
+          pane.style.display = 'flex';
+          pane.style.flexDirection = 'column';
         }
       });
       if (_activeTab === 'library') _renderLibrary();
+      if (_activeTab === 'transcript') {
+        var tp = p.querySelector('#phr-pane-transcript');
+        if (tp) tp.scrollTop = tp.scrollHeight;
+      }
     };
   });
 
@@ -1233,27 +1241,37 @@ function _hookAppEvents() {
 // Wraps the function with our observer each time it is set.
 function _interceptProperty(obj, prop, observer) {
   var _realFn = obj[prop] || null;
+  var _lastObserverCall = 0; // debounce — prevent double-fire when two scripts assign same prop
+
   Object.defineProperty(obj, prop, {
     configurable: true,
     get: function() { return _realFn; },
     set: function(newFn) {
-      // Wrap the new function with our observer
+      var _capturedFn = newFn;
       _realFn = function() {
         var args = Array.prototype.slice.call(arguments);
-        newFn.apply(this, args);
-        try { observer.apply(this, args); } catch(e) {}
+        _capturedFn.apply(this, args);
+        // Debounce observer: only fire once per 50ms window
+        var now = Date.now();
+        if (now - _lastObserverCall > 50) {
+          _lastObserverCall = now;
+          try { observer.apply(this, args); } catch(e) {}
+        }
       };
-      // Preserve any properties set on the original (like _cmdHooked)
       _realFn._cmdHooked = true;
     }
   });
-  // If already defined, wrap it now
+  // Wrap existing value if already defined
   if (_realFn) {
     var existingFn = _realFn;
     _realFn = function() {
       var args = Array.prototype.slice.call(arguments);
       existingFn.apply(this, args);
-      try { observer.apply(this, args); } catch(e) {}
+      var now = Date.now();
+      if (now - _lastObserverCall > 50) {
+        _lastObserverCall = now;
+        try { observer.apply(this, args); } catch(e) {}
+      }
     };
     _realFn._cmdHooked = true;
   }
