@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD31
+// cmd-center.js  ·  v20260412-CMD32
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD31',
+    'cmd-center':  'v20260412-CMD32',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD31 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD32 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -121,6 +121,17 @@ function _updateStatusEl() {
   }
 }
 
+function _channelSend(payload) {
+  // Only send via WebSocket — avoid REST fallback which causes 401
+  if (!_channel) return;
+  try {
+    var state = _channel.socket && _channel.socket.conn && _channel.socket.conn.readyState;
+    // readyState 1 = OPEN
+    if (state !== undefined && state !== 1) return;
+    _channel.send(payload);
+  } catch(e) {}
+}
+
 function _connect() {
   if (!_supabase || !_mySession) return;
   if (_channel) return; // already connected — don't re-subscribe
@@ -197,7 +208,7 @@ function _connect() {
     _appendLine(d.from || 'SYS', 'cmd', d.cmd);
     _executeCommand(d.cmd, d.from).then(function(result) {
       if (result !== undefined) {
-        _channel.send({
+        _channelSend({
           type: 'broadcast', event: 'result',
           payload: { from: _mySession.userId, name: _mySession.name, result: result, cmdId: d.cmdId }
         });
@@ -263,7 +274,7 @@ function _connect() {
       if (!window._cmdCenterFullscreen) {
         setInterval(function() {
           if (!_channel) return;
-          _channel.send({
+          _channelSend({
             type: 'broadcast', event: 'location_update',
             payload: {
               userId:   _mySession.userId,
@@ -304,7 +315,7 @@ function _resolveEventListeners(eventName, data) {
 // ── Broadcast app events from this session ────────────────────────────────────
 window._cmdEmit = function(eventName, data) {
   if (!_channel || !_mySession) return;
-  _channel.send({
+  _channelSend({
     type: 'broadcast', event: 'app_event',
     payload: Object.assign({ event: eventName, from: _mySession.userId, name: _mySession.name }, data || {})
   });
@@ -640,7 +651,7 @@ async function _runScript(scriptText, scriptName) {
       // Dispatch to remote session
       _appendLine(parsed.target || 'SYS', 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
       if (_channel) {
-        _channel.send({
+        _channelSend({
           type: 'broadcast', event: 'cmd',
           payload: {
             target: targetUserId,
@@ -1052,7 +1063,7 @@ function _runCmd() {
   if (parsed && parsed.target && _mySession && parsed.target !== _mySession.initials) {
     var match = Object.entries(_sessions).find(function([uid, s]) { return s.initials === parsed.target; });
     if (match && _channel) {
-      _channel.send({
+      _channelSend({
         type: 'broadcast', event: 'cmd',
         payload: { target: match[0], from: _mySession.initials, cmd: cmd, cmdId: Date.now() }
       });
