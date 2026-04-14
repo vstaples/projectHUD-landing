@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD9
+// cmd-center.js  ·  v20260412-CMD10
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD9',
+    'cmd-center':  'v20260412-CMD10',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD9 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD10 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1199,15 +1199,25 @@ document.addEventListener('keydown', function(e) {
 // ── Intercept app events for transcript ──────────────────────────────────────
 // Hook into existing app functions to emit events
 function _hookAppEvents() {
-  // Delay hook until after all page scripts have loaded
-  // mw-tabs.js redefines uSwitchTab after cmd-center.js runs, overwriting our hook
-  if (document.readyState === 'complete') {
-    setTimeout(_tryHook, 500);
-  } else {
-    window.addEventListener('load', function() {
-      setTimeout(_tryHook, 500);
+  // my-work.html is injected dynamically AFTER window load, so we can't rely on
+  // load event. Instead run _tryHook on an interval until all hooks land,
+  // then use a MutationObserver to re-hook if the DOM is replaced.
+  _tryHook();
+
+  // Watch for dynamic script injections (my-work.html loaded into #view-user)
+  var observer = new MutationObserver(function(mutations) {
+    var hasNewScripts = mutations.some(function(m) {
+      return Array.from(m.addedNodes).some(function(n) {
+        return n.nodeName === 'SCRIPT' ||
+          (n.querySelectorAll && n.querySelectorAll('script').length > 0);
+      });
     });
-  }
+    if (hasNewScripts) {
+      // New scripts injected — re-run hooks after they execute
+      setTimeout(_tryHook, 800);
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
 // Retry hooking until the target functions are defined (they load after cmd-center.js)
@@ -1322,9 +1332,6 @@ async function _init() {
 
   _connect();
   _hookAppEvents();
-  // Safety net — re-run hook after 5s in case scripts loaded late
-  setTimeout(_tryHook, 5000);
-
   // Poll status every 2s until connected — covers cases where panel opens after connect
   var _statusPoll = setInterval(function() {
     _updateStatusEl();
