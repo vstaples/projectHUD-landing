@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD30
+// cmd-center.js  ·  v20260412-CMD31
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD30',
+    'cmd-center':  'v20260412-CMD31',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD30 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD31 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -689,17 +689,20 @@ function _loadScripts() {
 // Fetches a manifest at /scripts/index.json or falls back to known filenames
 async function _loadServerScripts() {
   try {
-    // Try manifest first
-    var manifestResp = await fetch('/scripts/index.json', { cache: 'no-store' }).catch(function(){ return null; });
+    // Try Vercel API route first (auto-enumerates /scripts/ directory)
+    // Falls back to /scripts/index.json manifest if API not available
     var filenames = [];
-
-    if (manifestResp && manifestResp.ok) {
-      var manifest = await manifestResp.json();
-      filenames = Array.isArray(manifest) ? manifest : (manifest.scripts || []);
+    var apiResp = await fetch('/api/scripts', { cache: 'no-store' }).catch(function(){ return null; });
+    if (apiResp && apiResp.ok) {
+      filenames = await apiResp.json();
     } else {
-      // No index.json — nothing to load automatically
-      // Add /scripts/index.json to your server to enable auto-loading
-      return;
+      var manifestResp = await fetch('/scripts/index.json', { cache: 'no-store' }).catch(function(){ return null; });
+      if (manifestResp && manifestResp.ok) {
+        var manifest = await manifestResp.json();
+        filenames = Array.isArray(manifest) ? manifest : (manifest.scripts || []);
+      } else {
+        return; // nothing to load
+      }
     }
 
     // Fetch and store each script file
