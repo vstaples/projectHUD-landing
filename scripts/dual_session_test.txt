@@ -11,11 +11,18 @@ VS: Set SubTab "BROWSE"
 VS: Form Open "Expense Report"
 Wait 2500
 VS: Form Insert "Employee Name" "Vaughn Staples"
+VS: Form Insert "Trip Start Date" "2026-04-14"
+VS: Form Insert "Trip End Date" "2026-04-14"
+VS: Form Insert "Business Purpose" "Client Visit"
+VS: Form Insert "Purpose Description" "Two-session CMD Center approval test"
+VS: Form Insert "Customer Name" "Apex Consulting Group"
+VS: Form Insert "Customer Location" "Phoenix, AZ"
+Wait 500
 VS: Form Submit
 Wait ForEvent "workflow_request.created" → $instance_id
 Log "Package live · $instance_id"
 
-# — step 1: VS reviews (submitter review) ————————————
+# — step 1: VS reviews ————————————————————————————————
 Wait 2000
 VS: Set SubTab "ACTIVE"
 Wait 1000
@@ -25,7 +32,7 @@ VS: Click "Approve"
 Wait ForEvent "workflow_request.resolved" where assignee=VS
 Log "Step 1 complete"
 
-# — step 2: VS approves (submitter approval) —————————
+# — step 2: VS approves ———————————————————————————————
 Wait 2000
 VS: Open Review "Expense Report" $instance_id
 Wait 1000
@@ -33,7 +40,7 @@ VS: Click "Approve"
 Wait ForEvent "workflow_request.resolved" where assignee=VS
 Log "Step 2 complete"
 
-# — step 3: AK approves (manager approval) ————————————
+# — step 3: AK approves ———————————————————————————————
 Wait 2000
 AK: Set Tab "MY REQUESTS"
 AK: Set SubTab "ACTIVE"
