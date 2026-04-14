@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD7
+// cmd-center.js  ·  v20260412-CMD8
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD7',
+    'cmd-center':  'v20260412-CMD8',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD1 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD8 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1198,7 +1198,15 @@ document.addEventListener('keydown', function(e) {
 // ── Intercept app events for transcript ──────────────────────────────────────
 // Hook into existing app functions to emit events
 function _hookAppEvents() {
-  _tryHook();
+  // Delay hook until after all page scripts have loaded
+  // mw-tabs.js redefines uSwitchTab after cmd-center.js runs, overwriting our hook
+  if (document.readyState === 'complete') {
+    setTimeout(_tryHook, 500);
+  } else {
+    window.addEventListener('load', function() {
+      setTimeout(_tryHook, 500);
+    });
+  }
 }
 
 // Retry hooking until the target functions are defined (they load after cmd-center.js)
@@ -1306,6 +1314,8 @@ async function _init() {
 
   _connect();
   _hookAppEvents();
+  // Safety net — re-run hook after 5s in case scripts loaded late
+  setTimeout(_tryHook, 5000);
 
   // Poll status every 2s until connected — covers cases where panel opens after connect
   var _statusPoll = setInterval(function() {
