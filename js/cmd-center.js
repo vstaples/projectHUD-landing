@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36a
+// cmd-center.js  ·  v20260414-CMD36b
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36a',
+    'cmd-center':  'v20260414-CMD36b',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36a ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36b ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -99,8 +99,9 @@ function _resolveSession() {
     initials: initials.toUpperCase(),
     firmId:   FIRM_ID,
   };
-  // Load persisted alias for this userId, or fall back to initials
-  if (!_myAlias) {
+  // Load persisted alias for this userId, or fall back to initials.
+  // Only load from localStorage once we have a real (non-anon) userId.
+  if (!_myAlias && !_mySession.userId.startsWith('anon-')) {
     _myAlias = localStorage.getItem('phud:cmd:alias:' + _mySession.userId) || _mySession.initials;
   }
 }
@@ -989,8 +990,22 @@ function _showPreflightPanel(scriptName, required, missing, scriptText) {
 
     var panel = document.getElementById('cmd-center-panel');
     if (panel) {
-      panel.style.position = 'relative'; // ensure overlay positions within panel
-      panel.appendChild(overlay);
+      // Use fixed positioning matching the panel's bounding rect.
+      // Do NOT mutate panel.style.position — it's position:fixed and changing
+      // it collapses layout and breaks the toggle hotkey.
+      var r = panel.getBoundingClientRect();
+      overlay.style.cssText = [
+        'position:fixed',
+        'left:'   + r.left   + 'px',
+        'top:'    + r.top    + 'px',
+        'width:'  + r.width  + 'px',
+        'height:' + r.height + 'px',
+        'background:rgba(4,7,16,.88)',
+        'display:flex;align-items:center;justify-content:center',
+        'z-index:100000',
+        'border-radius:8px',
+      ].join(';');
+      document.body.appendChild(overlay);
     } else {
       document.body.appendChild(overlay);
     }
@@ -2030,6 +2045,10 @@ window.CMDCenter = {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function _init() {
+  // Clean up any alias keys persisted under anon- userIds from previous sessions
+  Object.keys(localStorage).forEach(function(k) {
+    if (k.startsWith('phud:cmd:alias:anon-')) localStorage.removeItem(k);
+  });
   _loadScripts();
   _loadServerScripts(); // async — loads /scripts/*.txt in background
   await _loadSupabase();
