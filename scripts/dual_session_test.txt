@@ -19,7 +19,8 @@ VS: Form Insert "Customer Name" "Apex Consulting Group"
 VS: Form Insert "Customer Location" "Phoenix, AZ"
 Wait 500
 VS: Form Submit
-Wait ForEvent "workflow_request.created" → $instance_id
+Wait 3000
+DB Poll workflow_instances submitted_by_resource_id=eq.e1000001-0000-0000-0000-000000000001&status=eq.in_progress → $instance_id
 Log "Package live · $instance_id"
 
 # — step 1: VS reviews ————————————————————————————————
@@ -29,15 +30,15 @@ Wait 1000
 VS: Open Review "Expense Report" $instance_id
 Wait 1000
 VS: Click "Approve"
-Wait ForEvent "workflow_request.resolved" where assignee=VS
+Wait 3000
 Log "Step 1 complete"
 
 # — step 2: VS approves ———————————————————————————————
-Wait 2000
+Wait 1000
 VS: Open Review "Expense Report" $instance_id
 Wait 1000
 VS: Click "Approve"
-Wait ForEvent "workflow_request.resolved" where assignee=VS
+Wait 3000
 Log "Step 2 complete"
 
 # — step 3: AK approves ———————————————————————————————
@@ -48,10 +49,9 @@ Wait 1500
 AK: Open Review "Expense Report" $instance_id
 Wait 1000
 AK: Click "Approve"
-Wait ForEvent "workflow_request.resolved" where assignee=AK
+Wait 3000
 Log "Step 3 complete · AK approved"
 
 # — verify ————————————————————————————————————————————
-Wait 1000
-Assert instance_status "complete"
-Log "✓ Full chain confirmed · 3 steps · 2 sessions"
+DB Poll workflow_instances id=eq.$instance_id&status=eq.complete → $done
+Log "✓ Full chain confirmed · $instance_id"

@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36f
+// cmd-center.js  ·  v20260414-CMD36g
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36f',
+    'cmd-center':  'v20260414-CMD36g',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36f ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36g ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -772,6 +772,57 @@ var COMMANDS = {
     });
     var data = await resp.json();
     return JSON.stringify(data).slice(0, 200);
+  },
+
+  // DB Poll table filter=field.eq.value → $varname  [timeout=30000]
+  // Polls Supabase every 2s until a matching row appears, then stores its id.
+  // Example: DB Poll workflow_instances submitted_by_resource_id=eq.$myResId → $instance_id
+  // Example: DB Poll workflow_instances status=eq.in_progress → $instance_id
+  'DB Poll': async function(args) {
+    var table    = args[0];
+    var filter   = args[1] || '';
+    var storeAs  = null;
+    var timeoutMs = 30000;
+
+    // Parse → $varname and optional timeout= from remaining args
+    for (var pi = 2; pi < args.length; pi++) {
+      if ((args[pi] === '→' || args[pi] === '->') && args[pi+1]) {
+        storeAs = args[pi+1].replace(/^\$/, ''); pi++;
+      } else if (args[pi].startsWith('timeout=')) {
+        timeoutMs = parseInt(args[pi].split('=')[1]) || timeoutMs;
+      }
+    }
+
+    // Resolve $variables in filter
+    filter = filter.replace(/\$(\w+)/g, function(_, k) { return _storeVars[k] || ''; });
+
+    var url = SUPA_URL + '/rest/v1/' + table + '?select=id,status,title&order=created_at.desc&limit=1';
+    if (filter) url += '&' + filter;
+
+    var deadline = Date.now() + timeoutMs;
+    var found = null;
+    while (Date.now() < deadline) {
+      if (_scriptAborted) return 'aborted';
+      try {
+        var resp = await fetch(url, {
+          headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }
+        });
+        var rows = await resp.json();
+        if (rows && rows.length && rows[0].id) {
+          found = rows[0];
+          break;
+        }
+      } catch(e) {}
+      await new Promise(function(r){ setTimeout(r, 2000); });
+    }
+
+    if (!found) throw new Error('DB Poll timeout: no matching row in ' + table + ' after ' + (timeoutMs/1000) + 's');
+
+    if (storeAs) {
+      _storeVars[storeAs] = found.id;
+      _appendLine('SYS', 'result', '→ stored $' + storeAs + ' = ' + found.id);
+    }
+    return 'found: ' + found.id + (found.title ? ' · ' + found.title : '') + (found.status ? ' · ' + found.status : '');
   },
 
   // ── UI helpers ───────────────────────────────────────────────────────────────
