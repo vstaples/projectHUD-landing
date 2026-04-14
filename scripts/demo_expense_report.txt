@@ -1,19 +1,11 @@
-# ── Expense Report Demo ─────────────────────────────────────────
-# Submits a complete expense report for Vaughn Staples
-# Trip: NovaBio client visit, Mar 31 – Apr 3, 2026
-# ────────────────────────────────────────────────────────────────
-
-# Navigate to MY REQUESTS > BROWSE
 Set Tab "MY REQUESTS"
 Wait 1500
 Set SubTab "BROWSE"
 Wait 1500
 
-# Open the Expense Report form
 Form Open "Expense Report"
 Wait 2000
 
-# ── Employee Information ─────────────────────────────────────────
 Form Insert "Employee Name" "Vaughn Staples"
 Wait 600
 Form Insert "Trip Start Date" "2026-03-31"
@@ -29,11 +21,9 @@ Wait 600
 Form Insert "Customer Location" "Boston, MA"
 Wait 1500
 
-# Scroll down to Daily Expenses grid
 Form Scroll daily
 Wait 1000
 
-# ── Meals — 4 days (Mon–Thu) ─────────────────────────────────────
 Form Insert breakfast[0] 18.50
 Wait 400
 Form Insert lunch[0] 24.00
@@ -55,7 +45,6 @@ Wait 400
 Form Insert lunch[3] 21.00
 Wait 1200
 
-# ── Transportation & Lodging ─────────────────────────────────────
 Form Insert airfare[0] 387.00
 Wait 600
 Form Insert lodging[0] 219.00
@@ -69,11 +58,9 @@ Wait 400
 Form Insert taxi[3] 38.00
 Wait 1200
 
-# Scroll to Miscellaneous section
 Form Scroll misc
 Wait 1000
 
-# ── Miscellaneous Expenses ───────────────────────────────────────
 Form Insert "misc[0].description" "Conference materials & printing"
 Wait 400
 Form Insert "misc[0].date" "2026-03-31"
@@ -94,11 +81,9 @@ Wait 400
 Form Insert "misc[1].amount" 125.00
 Wait 1200
 
-# Scroll to Entertainment section
 Form Scroll entertainment
 Wait 1000
 
-# ── Entertainment Detail ─────────────────────────────────────────
 Form Insert "ent[0].date" "2026-04-01"
 Wait 400
 Form Insert "ent[0].type" "Dinner"
@@ -123,29 +108,23 @@ Wait 400
 Form Insert "ent[1].amount" 143.00
 Wait 1500
 
-# Scroll to top to review before saving
 Form Scroll top
 Wait 2000
 
-# Save as draft
 Form Save
 Wait 2000
 
-# Close form
 Form Close
 Wait 1500
 
-# Capture draft ID and reopen
 Get Draft id
 Wait 500
 Continue Draft $draft_id
 Wait 2000
 
-# Scroll to top before submitting
 Form Scroll top
 Wait 1000
 
-# Submit for approval
 Form Submit
 Wait 1000
 Log Demo complete — expense report submitted for approval

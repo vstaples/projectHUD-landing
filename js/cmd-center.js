@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD33
+// cmd-center.js  ·  v20260412-CMD34
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD33',
+    'cmd-center':  'v20260412-CMD34',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD33 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD34 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -108,6 +108,24 @@ function _currentLocation() {
 }
 
 // ── Connect to Realtime ───────────────────────────────────────────────────────
+function _startLiveClock() {
+  if (window._liveClockInterval) return; // already running
+  window._liveClockInterval = setInterval(function() {
+    if (!_panelEl) return;
+    var banner = _panelEl.querySelector('#phr-live-banner');
+    var timeEl = _panelEl.querySelector('#phr-live-time');
+    var dot    = _panelEl.querySelector('#phr-live-dot');
+    if (!banner) return;
+    banner.style.display = 'flex';
+    var now = new Date();
+    var ts = now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+    var ds = now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    if (timeEl) timeEl.textContent = 'LIVE  ' + ds + '  ' + ts;
+    // Pulse the dot
+    if (dot) dot.style.opacity = dot.style.opacity === '0.3' ? '1' : '0.3';
+  }, 1000);
+}
+
 function _updateStatusEl() {
   if (!_panelEl) return;
   var statusEl = _panelEl.querySelector('#phr-status');
@@ -268,6 +286,8 @@ function _connect() {
       window._cmdSessionName = _mySession ? _mySession.name : 'connected';
       _updateStatusEl();
       _renderSessionList();
+      // Start LIVE clock
+      _startLiveClock();
       // Location-only update — use a separate broadcast instead of track()
       // to avoid triggering leave/join cycles on every heartbeat
       // Only send location heartbeats from main window, not pop-out
@@ -824,13 +844,63 @@ function _buildPanel() {
   _renderScriptList();
   _renderTranscript();
   _updateStatusEl();
+  if (window._cmdConnected) _startLiveClock();
 }
 
 function _panelHTML() {
   return `
+<style>
+#phr-pane-transcript::-webkit-scrollbar,
+#phr-pane-monitor::-webkit-scrollbar,
+#phr-pane-library::-webkit-scrollbar,
+#phr-pane-editor::-webkit-scrollbar,
+#phr-sessions::-webkit-scrollbar,
+#phr-scripts::-webkit-scrollbar {
+  width:16px;height:16px;
+}
+#phr-pane-transcript::-webkit-scrollbar-track,
+#phr-pane-monitor::-webkit-scrollbar-track,
+#phr-pane-library::-webkit-scrollbar-track,
+#phr-sessions::-webkit-scrollbar-track,
+#phr-scripts::-webkit-scrollbar-track {
+  background:#d4d0c8;border:1px solid #a0a0a0;
+  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #808080;
+}
+#phr-pane-transcript::-webkit-scrollbar-thumb,
+#phr-pane-monitor::-webkit-scrollbar-thumb,
+#phr-pane-library::-webkit-scrollbar-thumb,
+#phr-sessions::-webkit-scrollbar-thumb,
+#phr-scripts::-webkit-scrollbar-thumb {
+  background:#c0c0c0;border:1px solid #808080;
+  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #404040;
+  min-height:20px;
+}
+#phr-pane-transcript::-webkit-scrollbar-thumb:hover,
+#phr-pane-monitor::-webkit-scrollbar-thumb:hover {
+  background:#a8a8a8;
+}
+#phr-pane-transcript::-webkit-scrollbar-button,
+#phr-pane-monitor::-webkit-scrollbar-button,
+#phr-pane-library::-webkit-scrollbar-button {
+  background:#c0c0c0;border:1px solid #808080;
+  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #404040;
+  width:16px;height:16px;display:block;
+}
+#phr-pane-transcript::-webkit-scrollbar-corner,
+#phr-pane-monitor::-webkit-scrollbar-corner {
+  background:#d4d0c8;
+}
+#phr-pane-transcript,#phr-pane-monitor,#phr-pane-library {
+  scrollbar-width:auto;scrollbar-color:#c0c0c0 #d4d0c8;
+}
+</style>
 <div id="phr-titlebar" style="background:#040710;border-bottom:1px solid #0d1f2e;padding:6px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0;cursor:move">
   <span style="font-size:11px;font-weight:700;color:#00c9c9;letter-spacing:.1em;flex-shrink:0">COMMAND CENTER</span>
   <span id="phr-status" style="font-size:10px;color:rgba(255,255,255,.3);flex-shrink:0">connecting…</span>
+  <div id="phr-live-banner" style="display:none;align-items:center;gap:5px;margin-left:4px">
+    <div id="phr-live-dot" style="width:7px;height:7px;border-radius:50%;background:#1D9E75;flex-shrink:0"></div>
+    <span id="phr-live-time" style="font-size:10px;font-family:monospace;color:#1D9E75;letter-spacing:.04em">LIVE</span>
+  </div>
   <div style="flex:1"></div>
   <button class="phr-tab-btn phr-tab-active" data-tab="transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,.3);border-radius:3px;background:rgba(0,201,201,.1);color:#00c9c9;cursor:pointer;font-family:monospace;letter-spacing:.05em">Transcript</button>
   <button class="phr-tab-btn" data-tab="monitor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;letter-spacing:.05em">Monitor</button>
