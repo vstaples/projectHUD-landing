@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD10
+// cmd-center.js  ·  v20260412-CMD11
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD10',
+    'cmd-center':  'v20260412-CMD11',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD10 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD11 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -240,13 +240,16 @@ function _connect() {
 
   _channel.subscribe(function(status) {
     if (status === 'SUBSCRIBED') {
-      _channel.track({
-        userId:   _mySession.userId,
-        name:     _mySession.name,
-        initials: _mySession.initials,
-        location: _currentLocation(),
-        ts:       Date.now(),
-      });
+      // Don't publish presence from pop-out window — it would create duplicate sessions
+      if (!window._cmdCenterFullscreen) {
+        _channel.track({
+          userId:   _mySession.userId,
+          name:     _mySession.name,
+          initials: _mySession.initials,
+          location: _currentLocation(),
+          ts:       Date.now(),
+        });
+      }
       _appendLine('SYS', 'sys', 'Connected · session: ' + _mySession.name);
       // Store connection state so panel can pick it up when opened
       window._cmdConnected = true;
@@ -255,18 +258,21 @@ function _connect() {
       _renderSessionList();
       // Location-only update — use a separate broadcast instead of track()
       // to avoid triggering leave/join cycles on every heartbeat
-      setInterval(function() {
-        if (!_channel) return;
-        _channel.send({
-          type: 'broadcast', event: 'location_update',
-          payload: {
-            userId:   _mySession.userId,
-            name:     _mySession.name,
-            initials: _mySession.initials,
-            location: _currentLocation(),
-          }
-        });
-      }, 10000);
+      // Only send location heartbeats from main window, not pop-out
+      if (!window._cmdCenterFullscreen) {
+        setInterval(function() {
+          if (!_channel) return;
+          _channel.send({
+            type: 'broadcast', event: 'location_update',
+            payload: {
+              userId:   _mySession.userId,
+              name:     _mySession.name,
+              initials: _mySession.initials,
+              location: _currentLocation(),
+            }
+          });
+        }, 10000);
+      }
     }
   });
 }
@@ -1149,15 +1155,16 @@ function _popOut() {
     return;
   }
 
-  // Store state in window name so pop-out can read it (avoids CSP issues with document.write)
-  win.name = JSON.stringify({
-    session:    _mySession,
-    scripts:    _scripts,
-    transcript: _transcript.slice(-100),
-    origin:     window.location.origin,
-  });
-  // Navigate to the standalone cmd-center page
-  win.location.href = window.location.origin + '/cmd-center.html';
+  // Pass state via sessionStorage key (survives same-origin navigation)
+  var stateKey = 'cmd-center:popout:' + Date.now();
+  try {
+    sessionStorage.setItem(stateKey, JSON.stringify({
+      session:    _mySession,
+      scripts:    _scripts,
+      transcript: _transcript.slice(-100),
+    }));
+  } catch(e) {}
+  win.location.href = window.location.origin + '/cmd-center.html?state=' + stateKey;
 
   // Hide the inline panel now that it's popped out
   if (_panelEl) {
@@ -1297,18 +1304,30 @@ window.CMDCenter = {
 async function _init() {
   _loadScripts();
   await _loadSupabase();
-  // Accept overrides from parent window (pop-out mode)
-  if (window._myResourceOverride) {
+  // Accept overrides — check sessionStorage for pop-out state
+  var _popoutState = null;
+  try {
+    var stateParam = new URLSearchParams(window.location.search).get('state');
+    if (stateParam) {
+      var raw = sessionStorage.getItem(stateParam);
+      if (raw) {
+        _popoutState = JSON.parse(raw);
+        sessionStorage.removeItem(stateParam); // clean up
+      }
+    }
+  } catch(e) {}
+
+  if (_popoutState && _popoutState.session) {
+    _mySession = _popoutState.session;
+  } else if (window._myResourceOverride) {
     _mySession = window._myResourceOverride;
   } else {
     _resolveSession();
   }
-  if (window._scriptsOverride) {
-    _scripts = window._scriptsOverride;
-  }
-  if (window._transcriptOverride) {
-    _transcript = window._transcriptOverride;
-  }
+  if (_popoutState && _popoutState.scripts)    _scripts    = _popoutState.scripts;
+  if (_popoutState && _popoutState.transcript) _transcript = _popoutState.transcript;
+  if (window._scriptsOverride)    _scripts    = window._scriptsOverride;
+  if (window._transcriptOverride) _transcript = window._transcriptOverride;
 
   // Retry identity resolution if resource not loaded yet
   if (!_mySession || _mySession.userId.startsWith('anon-')) {

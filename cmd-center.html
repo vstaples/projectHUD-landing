@@ -9,20 +9,11 @@ html, body { margin:0;padding:0;background:#060a10;height:100%;overflow:hidden;f
 </head>
 <body>
 <script>
+// Pop-out display mode — fullscreen, no presence publishing
 window._cmdCenterFullscreen = true;
-(function() {
-  try {
-    var state = window.name ? JSON.parse(window.name) : null;
-    if (state) {
-      if (state.session)    window._myResourceOverride = state.session;
-      if (state.scripts)    window._scriptsOverride    = state.scripts;
-      if (state.transcript) window._transcriptOverride = state.transcript;
-    }
-  } catch(e) {}
-})();
 </script>
 <script src="/js/config.js" onerror="void 0"></script>
-<script src="/js/cmd-center.js?v=20260412-CMD6"></script>
+<script src="/js/cmd-center.js?v=20260412-CMD11"></script>
 <script>
 window.addEventListener('load', function() {
   setTimeout(function() { if (window.CMDCenter) window.CMDCenter.toggle(); }, 300);
