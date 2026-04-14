@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD13
+// cmd-center.js  ·  v20260412-CMD14
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD13',
+    'cmd-center':  'v20260412-CMD14',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD13 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD14 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1320,28 +1320,42 @@ async function _init() {
   if (window._scriptsOverride)    _scripts    = window._scriptsOverride;
   if (window._transcriptOverride) _transcript = window._transcriptOverride;
 
-  // Retry identity resolution if resource not loaded yet
+  // Defer connection until identity is resolved
+  // cmd-center.js loads before compass.html sets _myResource, so we must wait
   if (!_mySession || _mySession.userId.startsWith('anon-')) {
-    setTimeout(function() {
+    // Poll every 500ms until identity resolves, then connect
+    var _identityPoll = setInterval(function() {
       _resolveSession();
-      // Update session identity on existing channel if already connected
-      if (_channel && _mySession) {
-        _channel.track({
-          userId:   _mySession.userId,
-          name:     _mySession.name,
-          initials: _mySession.initials,
-          location: _currentLocation(),
-          ts:       Date.now(),
-        });
-      } else {
-        _connect();
+      if (_mySession && !_mySession.userId.startsWith('anon-')) {
+        clearInterval(_identityPoll);
+        if (_channel) {
+          // Already connected — re-track with correct identity
+          _channel.track({
+            userId:   _mySession.userId,
+            name:     _mySession.name,
+            initials: _mySession.initials,
+            location: _currentLocation(),
+            ts:       Date.now(),
+          });
+        } else {
+          _connect();
+        }
+        _hookAppEvents();
+        _updateStatusEl();
       }
-      _hookAppEvents();
-    }, 3000);
+    }, 500);
+    // Give up after 10s and connect with whatever we have
+    setTimeout(function() {
+      clearInterval(_identityPoll);
+      if (!_channel) {
+        _connect();
+        _hookAppEvents();
+      }
+    }, 10000);
+  } else {
+    _connect();
+    _hookAppEvents();
   }
-
-  _connect();
-  _hookAppEvents();
   // Poll status every 2s until connected — covers cases where panel opens after connect
   var _statusPoll = setInterval(function() {
     _updateStatusEl();
