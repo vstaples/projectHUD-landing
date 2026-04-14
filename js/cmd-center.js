@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD27
+// cmd-center.js  ·  v20260412-CMD28
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD27',
+    'cmd-center':  'v20260412-CMD28',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD27 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD28 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -824,8 +824,14 @@ VS: Click &quot;Approve&quot;"
 
     <!-- Library tab -->
     <div id="phr-pane-library" style="display:none;flex:1;overflow-y:auto;padding:10px 12px" class="phr-pane">
-      <div style="font-size:10px;color:rgba(255,255,255,.3);margin-bottom:10px;line-height:1.7">
-        All saved scripts. Click to load into editor. Scripts are stored in browser localStorage.
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:10px;color:rgba(255,255,255,.3);line-height:1.7">
+          Click to load into editor. Scripts auto-load from /scripts/ on startup.
+        </div>
+        <button id="phr-refresh-scripts" title="Reload scripts from server"
+          style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,.3);border-radius:3px;
+                 background:transparent;color:#00c9c9;cursor:pointer;font-family:monospace;
+                 white-space:nowrap;flex-shrink:0;margin-left:8px">↻ Refresh</button>
       </div>
       <div id="phr-library-list"></div>
     </div>
@@ -877,7 +883,23 @@ function _wirePanel() {
           pane.style.flexDirection = 'column';
         }
       });
-      if (_activeTab === 'library') _renderLibrary();
+      if (_activeTab === 'library') {
+        _renderLibrary();
+        // Wire refresh button each time library tab opens
+        var refreshBtn = p.querySelector('#phr-refresh-scripts');
+        if (refreshBtn && !refreshBtn._wired) {
+          refreshBtn._wired = true;
+          refreshBtn.onclick = async function() {
+            var btn = this;
+            btn.textContent = '↻ …';
+            btn.disabled = true;
+            await _loadServerScripts();
+            _renderLibrary();
+            btn.textContent = '↻ Refresh';
+            btn.disabled = false;
+          };
+        }
+      }
       if (_activeTab === 'transcript') {
         var tp = p.querySelector('#phr-pane-transcript');
         if (tp) tp.scrollTop = tp.scrollHeight;
