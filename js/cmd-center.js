@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36
+// cmd-center.js  ·  v20260414-CMD36a
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36',
+    'cmd-center':  'v20260414-CMD36a',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36a ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1525,7 +1525,10 @@ function _runCmd() {
     }
   }
 
-  _executeCommand(fullCmd, _myAlias || (_mySession ? _mySession.initials : 'ME'));
+  // Catch rejections from Assert and other throwing commands so they
+  // surface as transcript error lines rather than unhandled promise rejections.
+  _executeCommand(fullCmd, _myAlias || (_mySession ? _mySession.initials : 'ME'))
+    .catch(function() { /* already logged to transcript in _executeCommand */ });
 }
 
 // ── Render helpers ────────────────────────────────────────────────────────────
