@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36e
+// cmd-center.js  ·  v20260414-CMD36f
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36e',
+    'cmd-center':  'v20260414-CMD36f',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36e ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36f ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -484,12 +484,10 @@ var COMMANDS = {
   },
 
   'Form Submit': async function(args) {
-    // Trigger submit button in the open form iframe
-    var iframe = document.querySelector('#myr-html-form-modal iframe, #myr-html-form-overlay iframe');
+    var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
     if (!iframe) return 'No form overlay open';
-    var btn = iframe.contentDocument && iframe.contentDocument.querySelector('[onclick*="submitForApproval"], .btn-p');
-    if (btn) { btn.click(); return 'submit triggered'; }
-    return 'Submit button not found in form';
+    iframe.contentWindow.postMessage({ source: 'cmd-center', cmd: 'Form Submit' }, '*');
+    return 'submit triggered';
   },
 
   'Form Insert': async function(args) {
