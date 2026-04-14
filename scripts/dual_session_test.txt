@@ -9,7 +9,7 @@ Assert session AK is connected
 VS: Set Tab "MY REQUESTS"
 VS: Set SubTab "BROWSE"
 VS: Form Open "Expense Report"
-Wait 1500
+Wait 2500
 VS: Form Insert "Employee Name" "Vaughn Staples"
 VS: Form Submit
 Wait ForEvent "workflow_request.created" → $instance_id

@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36d
+// cmd-center.js  ·  v20260414-CMD36e
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36d',
+    'cmd-center':  'v20260414-CMD36e',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36d ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36e ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -458,11 +458,24 @@ var COMMANDS = {
   // ── Forms ───────────────────────────────────────────────────────────────────
   'Form Open': async function(args) {
     var name = args[0];
-    var def = (window._myrFormDefs||[]).find(function(f){
-      return (f.source_name||'').toLowerCase().includes(name.toLowerCase());
+
+    // _myrFormDefs may not be populated yet if mw-core.js is still loading.
+    // Poll for up to 5s before giving up.
+    var defs = window._myrFormDefs || [];
+    if (!defs.length) {
+      for (var wi = 0; wi < 50; wi++) {
+        await new Promise(function(r){ setTimeout(r, 100); });
+        defs = window._myrFormDefs || [];
+        if (defs.length) break;
+      }
+    }
+
+    var def = defs.find(function(f){
+      return (f.source_name||'').toLowerCase() === name.toLowerCase() ||
+             (f.source_name||'').toLowerCase().includes(name.toLowerCase());
     });
-    if (!def) return 'Form not found: ' + name;
-    // Open the form launch overlay
+    if (!def) return 'Form not found: ' + name + ' (available: ' + defs.map(function(f){ return f.source_name; }).join(', ') + ')';
+
     if (typeof myrLaunchRequest === 'function') {
       await myrLaunchRequest('form', def.id);
       return 'form opened: ' + def.source_name;
@@ -926,10 +939,21 @@ async function _runScript(scriptText, scriptName) {
       var parsed = _parseLine(line);
       if (!parsed) continue;
 
-      // If this is a Form command, verify the overlay is still open
+      // If this is a Form command, verify the overlay is still open.
+      // Give it a short grace period — the overlay may still be animating in
+      // immediately after Form Open returns.
       if (parsed.verb && parsed.verb.startsWith('Form ') && parsed.verb !== 'Form Open') {
         var overlay = document.getElementById('myr-html-form-overlay') ||
                       document.getElementById('myr-html-form-modal');
+        if (!overlay) {
+          // Grace period: wait up to 1s for overlay to appear
+          for (var gi = 0; gi < 10; gi++) {
+            await new Promise(function(r){ setTimeout(r, 100); });
+            overlay = document.getElementById('myr-html-form-overlay') ||
+                      document.getElementById('myr-html-form-modal');
+            if (overlay) break;
+          }
+        }
         if (!overlay) {
           _appendLine('SYS', 'warn', 'Form closed — script aborted at: ' + line);
           break;
