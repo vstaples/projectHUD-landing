@@ -1,0 +1,1081 @@
+<meta charset="utf-8">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body,html{margin:0;padding:0;font-family:Arial,sans-serif;font-size:12px;background:#fff;color:#1a1a2e}
+.shell{max-width:960px;margin:0 auto;border-radius:12px;border:0.5px solid #2a2f3e;background:#fff;overflow:hidden}
+.hdr{background:#00c9c9;padding:14px 20px;display:flex;justify-content:space-between;align-items:center}
+.htitle{font-size:15px;font-weight:500;color:#003333}
+.hsub{font-size:10px;color:#005555;margin-top:2px}
+.rpills{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.rp{background:rgba(0,0,0,.2);color:#003333;font-size:9px;font-weight:500;padding:2px 10px;border-radius:8px}
+.ra{color:#003333;font-size:10px;font-weight:700}
+.body{padding:16px 20px}
+.sec{margin-bottom:18px}
+.sec-lbl{font-size:9px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;border-bottom:0.5px solid #e5e7eb;padding-bottom:4px;margin-bottom:8px;margin-top:16px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+.f{display:flex;flex-direction:column;gap:3px}
+.f label{font-size:11px;font-weight:500;color:#1a1a2e}
+.f input,.f select,.f textarea{font-family:Arial,sans-serif;font-size:12px;padding:5px 8px;border:0.5px solid #d1d5db;border-radius:5px;background:#f9fafb;color:#1a1a2e;width:100%}
+.f input[readonly]{background:#f3f4f6;color:#6b7280;cursor:default;border-color:#e5e7eb}
+.req{color:#E24B4A}
+.sys-badge{font-size:9px;background:#e5e7eb;color:#6b7280;padding:1px 5px;border-radius:3px;margin-left:3px}
+.cond-block{display:none;margin-top:8px;padding:10px 14px;border:0.5px solid #e5e7eb;border-radius:6px;background:#f9fafb}
+.cond-block.visible{display:block}
+.cond-label{font-size:9px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin-bottom:8px}
+.day-wrap{overflow-x:auto;margin-bottom:4px}
+.day-table{table-layout:fixed;width:100%;min-width:700px;border-collapse:collapse}
+.day-table th{background:#f9fafb;padding:5px 4px;font-size:10px;font-weight:500;color:#6b7280;border:0.5px solid #e5e7eb;text-align:center;white-space:nowrap}
+.day-table td{border:0.5px solid #e5e7eb;padding:1px 2px;font-size:11px;color:#1a1a2e}
+.cat-h{text-align:left!important;padding-left:6px!important;min-width:110px;width:110px}
+.cat{font-size:11px;color:#374151;padding:3px 6px;min-width:110px;width:110px}
+.today-col{background:#f0fdf4}
+.today-h{background:#f0fdf4}
+.sec-hdr td{background:#f9fafb;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;padding:4px 6px;border:0.5px solid #e5e7eb}
+.grand td{font-weight:700;background:#f9fafb;border:0.5px solid #e5e7eb}
+.total-cell,.total-h{text-align:right;padding-right:6px;font-family:monospace;white-space:nowrap;min-width:70px;width:70px}
+.day-table input[type="number"]{width:100%;border:none;background:transparent;text-align:right;padding:3px 4px;font-size:11px;font-family:monospace;color:#1a1a2e;outline:none}
+.day-table input[type="number"]:focus{background:#fff8e1;border-radius:2px}
+.misc-table,.ent-table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px}
+.misc-table th,.ent-table th{background:#f9fafb;padding:5px 8px;font-size:10px;font-weight:500;color:#6b7280;border:0.5px solid #e5e7eb;text-align:left}
+.misc-table td,.ent-table td{border:0.5px solid #e5e7eb;padding:2px 4px}
+.misc-table input,.ent-table input,.misc-table select,.ent-table select{width:100%;border:none;background:transparent;font-size:11px;font-family:Arial,sans-serif;padding:3px 4px;color:#1a1a2e;outline:none}
+.misc-total-row td{background:#f9fafb;font-size:11px;font-weight:600;padding:4px 8px}
+.del-btn{background:none;border:none;color:#9ca3af;cursor:pointer;font-size:12px;padding:2px 6px}
+.del-btn:hover{color:#e84040}
+.add-row-btn{background:none;border:none;color:#00c9c9;font-size:11px;font-weight:600;cursor:pointer;padding:4px 0;font-family:Arial,sans-serif}
+.totals-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.tot-block{border:0.5px solid #e5e7eb;border-radius:6px;padding:10px 14px;background:#f9fafb}
+.tot-title{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin-bottom:6px}
+.tot-row{display:flex;justify-content:space-between;font-size:11px;color:#374151;padding:2px 0}
+.tot-cat{color:#6b7280}
+.tot-val{font-family:monospace;font-weight:600;color:#1a1a2e}
+.cert-block{background:#f9fafb;border:0.5px solid #e5e7eb;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:11px;color:#374151;line-height:1.6}
+.sig-area{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:12px}
+.sig-lbl{font-size:10px;color:#6b7280;margin-top:3px}
+.ftr{padding:12px 20px;border-top:0.5px solid #e5e7eb;background:#f9fafb;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#6b7280;position:sticky;bottom:0;z-index:10}
+.btn-s{border:0.5px solid #d1d5db;background:transparent;border-radius:5px;padding:6px 12px;font-family:Arial,sans-serif;font-size:12px;font-weight:500;cursor:pointer;color:#374151}
+.btn-p{background:#00c9c9;color:#003333;border:none;border-radius:5px;padding:6px 16px;font-family:Arial,sans-serif;font-size:12px;font-weight:500;cursor:pointer}
+.btn-s:hover{background:#f3f4f6}
+.btn-p:hover{background:#00b5b5}
+</style>
+<div class="shell">
+  <div class="hdr">
+    <div>
+      <div class="htitle">Expense Report</div>
+      <div class="hsub" data-runtime="template_version">Cadence / Compass</div>
+    </div>
+    <div class="rpills">
+      <div class="rp">1 · Employee</div><div class="ra">→</div>
+      <div class="rp">2 · Proj/Func. Manager</div><div class="ra">→</div>
+      <div class="rp">3 · Finance / Exec Mgmt</div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <div class="sec" data-section="employee_info">
+      <div class="sec-lbl">Employee &amp; Trip Information</div>
+      <div class="g3" style="margin-bottom:8px">
+        <div class="f"><label>Employee Name <span class="req">*</span></label><input type="text" data-field-id="f01" data-label="Employee Name" data-required="true" data-section="employee_info" placeholder="Full legal name"></div>
+        <div class="f"><label>Employee ID <span class="sys-badge">auto</span></label><input type="text" data-field-id="f02" data-label="Employee ID" data-required="false" data-section="employee_info" readonly="" placeholder="Populated from system if on file"></div>
+        <div class="f"><label>Submission Date <span class="sys-badge">auto</span></label><input type="text" data-field-id="f03" data-label="Submission Date" data-required="false" data-section="employee_info" readonly="" id="sub-date"></div>
+      </div>
+      <div class="g2" style="margin-bottom:8px">
+        <div class="f"><label>Trip Start Date</label><input type="date" data-field-id="f04" data-label="Trip Start Date" data-required="true" data-section="employee_info" id="trip-start" oninput="onDateChange()"></div>
+        <div class="f"><label>Trip End Date</label><input type="date" data-field-id="f05" data-label="Trip End Date" data-required="true" data-section="employee_info" id="trip-end" oninput="onDateChange()"></div>
+      </div>
+      <div class="g2">
+        <div class="f">
+          <label>Business Purpose <span class="req">*</span></label>
+          <select data-field-id="f06" data-label="Business Purpose" data-required="true" data-section="employee_info" id="purpose-sel" onchange="toggleCustomer()">
+            <option value="">— Select —</option>
+            <option value="client">Client Visit</option>
+            <option value="client">Customer Meeting</option>
+            <option value="internal">Internal Meeting</option>
+            <option value="internal">Training / Seminar</option>
+            <option value="internal">Conference</option>
+            <option value="internal">Site Visit</option>
+            <option value="reimb">Consumable / Supply Reimbursement</option>
+            <option value="reimb">Equipment Purchase</option>
+            <option value="reimb">Software / Subscription</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="f"><label>Purpose Description</label><input type="text" data-field-id="f07" data-label="Purpose Description" data-required="false" data-section="employee_info" placeholder="Brief description of expenses"></div>
+      </div>
+      <div class="cond-block" id="customer-block">
+        <div class="cond-label">Client / Customer Details</div>
+        <div class="g2">
+          <div class="f"><label>Customer Name <span class="req">*</span></label><input type="text" data-field-id="f08" data-label="Customer Name" data-required="false" data-section="employee_info" placeholder="Company or individual name"></div>
+          <div class="f"><label>Customer Location <span class="req">*</span></label><input type="text" data-field-id="f09" data-label="Customer Location" data-required="false" data-section="employee_info" placeholder="City, State or Country"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" data-section="daily_expenses">
+      <div class="sec-lbl">Daily Expenses <span id="date-range-label" style="color:var(--color-text-tertiary);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px">— defaulting to 7 days from today · select dates to customize</span></div>
+      <div class="day-wrap">
+        <table class="day-table" id="day-table" style="table-layout:fixed;width:100%;min-width:700px">
+          <thead id="day-thead"><tr><th class="cat-h">Category</th><th class="" style="min-width:74px">Fri Apr 10</th><th class=" today-h" style="min-width:74px">Sat Apr 11</th><th class="" style="min-width:74px">Sun Apr 12</th><th class="" style="min-width:74px">Mon Apr 13</th><th class="" style="min-width:74px">Tue Apr 14</th><th class="" style="min-width:74px">Wed Apr 15</th><th class="" style="min-width:74px">Thu Apr 16</th><th class="total-h">Total</th></tr></thead>
+          <tbody id="day-tbody"><tr class="sec-hdr"><td colspan="9">Meals &amp; Entertainment</td></tr><tr><td class="cat">Breakfast</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="bkf" data-dk="2026-04-09" value="" oninput="recalcRow('bkf')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="bkf" data-dk="2026-04-10" value="" oninput="recalcRow('bkf')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="bkf" data-dk="2026-04-11" value="" oninput="recalcRow('bkf')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="bkf" data-dk="2026-04-12" value="" oninput="recalcRow('bkf')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="bkf" data-dk="2026-04-13" value="" oninput="recalcRow('bkf')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="bkf" data-dk="2026-04-14" value="" oninput="recalcRow('bkf')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="bkf" data-dk="2026-04-15" value="" oninput="recalcRow('bkf')"></td><td class="total-cell" id="rowtot-bkf">—</td></tr><tr><td class="cat">Lunch</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lnch" data-dk="2026-04-09" value="" oninput="recalcRow('lnch')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="lnch" data-dk="2026-04-10" value="" oninput="recalcRow('lnch')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lnch" data-dk="2026-04-11" value="" oninput="recalcRow('lnch')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lnch" data-dk="2026-04-12" value="" oninput="recalcRow('lnch')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lnch" data-dk="2026-04-13" value="" oninput="recalcRow('lnch')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lnch" data-dk="2026-04-14" value="" oninput="recalcRow('lnch')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lnch" data-dk="2026-04-15" value="" oninput="recalcRow('lnch')"></td><td class="total-cell" id="rowtot-lnch">—</td></tr><tr><td class="cat">Dinner</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="din" data-dk="2026-04-09" value="" oninput="recalcRow('din')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="din" data-dk="2026-04-10" value="" oninput="recalcRow('din')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="din" data-dk="2026-04-11" value="" oninput="recalcRow('din')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="din" data-dk="2026-04-12" value="" oninput="recalcRow('din')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="din" data-dk="2026-04-13" value="" oninput="recalcRow('din')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="din" data-dk="2026-04-14" value="" oninput="recalcRow('din')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="din" data-dk="2026-04-15" value="" oninput="recalcRow('din')"></td><td class="total-cell" id="rowtot-din">—</td></tr><tr><td class="cat">Entertainment</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ent" data-dk="2026-04-09" value="" oninput="recalcRow('ent')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="ent" data-dk="2026-04-10" value="" oninput="recalcRow('ent')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ent" data-dk="2026-04-11" value="" oninput="recalcRow('ent')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ent" data-dk="2026-04-12" value="" oninput="recalcRow('ent')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ent" data-dk="2026-04-13" value="" oninput="recalcRow('ent')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ent" data-dk="2026-04-14" value="" oninput="recalcRow('ent')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ent" data-dk="2026-04-15" value="" oninput="recalcRow('ent')"></td><td class="total-cell" id="rowtot-ent">—</td></tr><tr class="sec-hdr"><td colspan="9">Transportation &amp; Lodging</td></tr><tr><td class="cat">Airfare</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="air" data-dk="2026-04-09" value="" oninput="recalcRow('air')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="air" data-dk="2026-04-10" value="" oninput="recalcRow('air')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="air" data-dk="2026-04-11" value="" oninput="recalcRow('air')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="air" data-dk="2026-04-12" value="" oninput="recalcRow('air')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="air" data-dk="2026-04-13" value="" oninput="recalcRow('air')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="air" data-dk="2026-04-14" value="" oninput="recalcRow('air')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="air" data-dk="2026-04-15" value="" oninput="recalcRow('air')"></td><td class="total-cell" id="rowtot-air">—</td></tr><tr><td class="cat">Lodging</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lodge" data-dk="2026-04-09" value="" oninput="recalcRow('lodge')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="lodge" data-dk="2026-04-10" value="" oninput="recalcRow('lodge')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lodge" data-dk="2026-04-11" value="" oninput="recalcRow('lodge')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lodge" data-dk="2026-04-12" value="" oninput="recalcRow('lodge')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lodge" data-dk="2026-04-13" value="" oninput="recalcRow('lodge')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lodge" data-dk="2026-04-14" value="" oninput="recalcRow('lodge')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="lodge" data-dk="2026-04-15" value="" oninput="recalcRow('lodge')"></td><td class="total-cell" id="rowtot-lodge">—</td></tr><tr><td class="cat">Car Rental</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="car" data-dk="2026-04-09" value="" oninput="recalcRow('car')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="car" data-dk="2026-04-10" value="" oninput="recalcRow('car')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="car" data-dk="2026-04-11" value="" oninput="recalcRow('car')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="car" data-dk="2026-04-12" value="" oninput="recalcRow('car')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="car" data-dk="2026-04-13" value="" oninput="recalcRow('car')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="car" data-dk="2026-04-14" value="" oninput="recalcRow('car')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="car" data-dk="2026-04-15" value="" oninput="recalcRow('car')"></td><td class="total-cell" id="rowtot-car">—</td></tr><tr><td class="cat">Mileage (mi)</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="mile" data-dk="2026-04-09" value="" oninput="recalcRow('mile')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="mile" data-dk="2026-04-10" value="" oninput="recalcRow('mile')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="mile" data-dk="2026-04-11" value="" oninput="recalcRow('mile')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="mile" data-dk="2026-04-12" value="" oninput="recalcRow('mile')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="mile" data-dk="2026-04-13" value="" oninput="recalcRow('mile')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="mile" data-dk="2026-04-14" value="" oninput="recalcRow('mile')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="mile" data-dk="2026-04-15" value="" oninput="recalcRow('mile')"></td><td class="total-cell" id="rowtot-mile">—</td></tr><tr><td class="cat">Parking / Tolls</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="park" data-dk="2026-04-09" value="" oninput="recalcRow('park')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="park" data-dk="2026-04-10" value="" oninput="recalcRow('park')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="park" data-dk="2026-04-11" value="" oninput="recalcRow('park')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="park" data-dk="2026-04-12" value="" oninput="recalcRow('park')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="park" data-dk="2026-04-13" value="" oninput="recalcRow('park')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="park" data-dk="2026-04-14" value="" oninput="recalcRow('park')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="park" data-dk="2026-04-15" value="" oninput="recalcRow('park')"></td><td class="total-cell" id="rowtot-park">—</td></tr><tr><td class="cat">Taxi / Rideshare</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="taxi" data-dk="2026-04-09" value="" oninput="recalcRow('taxi')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="taxi" data-dk="2026-04-10" value="" oninput="recalcRow('taxi')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="taxi" data-dk="2026-04-11" value="" oninput="recalcRow('taxi')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="taxi" data-dk="2026-04-12" value="" oninput="recalcRow('taxi')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="taxi" data-dk="2026-04-13" value="" oninput="recalcRow('taxi')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="taxi" data-dk="2026-04-14" value="" oninput="recalcRow('taxi')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="taxi" data-dk="2026-04-15" value="" oninput="recalcRow('taxi')"></td><td class="total-cell" id="rowtot-taxi">—</td></tr><tr class="sec-hdr"><td colspan="9">Other</td></tr><tr><td class="cat">Phone / Internet</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="phone" data-dk="2026-04-09" value="" oninput="recalcRow('phone')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="phone" data-dk="2026-04-10" value="" oninput="recalcRow('phone')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="phone" data-dk="2026-04-11" value="" oninput="recalcRow('phone')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="phone" data-dk="2026-04-12" value="" oninput="recalcRow('phone')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="phone" data-dk="2026-04-13" value="" oninput="recalcRow('phone')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="phone" data-dk="2026-04-14" value="" oninput="recalcRow('phone')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="phone" data-dk="2026-04-15" value="" oninput="recalcRow('phone')"></td><td class="total-cell" id="rowtot-phone">—</td></tr><tr><td class="cat">Corporate Card</td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ccc" data-dk="2026-04-09" value="" oninput="recalcRow('ccc')"></td><td class=" today-col"><input type="number" placeholder="0.00" step="0.01" data-cat="ccc" data-dk="2026-04-10" value="" oninput="recalcRow('ccc')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ccc" data-dk="2026-04-11" value="" oninput="recalcRow('ccc')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ccc" data-dk="2026-04-12" value="" oninput="recalcRow('ccc')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ccc" data-dk="2026-04-13" value="" oninput="recalcRow('ccc')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ccc" data-dk="2026-04-14" value="" oninput="recalcRow('ccc')"></td><td class=""><input type="number" placeholder="0.00" step="0.01" data-cat="ccc" data-dk="2026-04-15" value="" oninput="recalcRow('ccc')"></td><td class="total-cell" id="rowtot-ccc">—</td></tr><tr class="grand"><td class="cat">Grand Total</td><td class="total-cell" id="coltot-2026-04-09">—</td><td class="total-cell" id="coltot-2026-04-10">—</td><td class="total-cell" id="coltot-2026-04-11">—</td><td class="total-cell" id="coltot-2026-04-12">—</td><td class="total-cell" id="coltot-2026-04-13">—</td><td class="total-cell" id="coltot-2026-04-14">—</td><td class="total-cell" id="coltot-2026-04-15">—</td><td class="total-cell" id="grandtot">$0.00</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sec" data-section="misc_expenses">
+      <div class="sec-lbl">Miscellaneous Expenses — itemized</div>
+      <table class="misc-table" id="misc-table">
+        <thead>
+          <tr>
+            <th style="width:36%">Description</th>
+            <th style="width:16%">Date</th>
+            <th style="width:18%">Type</th>
+            <th style="width:18%">Amount (USD)</th>
+            <th style="width:12%"></th>
+          </tr>
+        </thead>
+        <tbody id="misc-body"><tr><td><input type="text" placeholder="Item description"></td><td><input type="date"></td><td><select onchange="calcMisc()"><option value="billable">Billable</option><option value="nonbillable">Non-Billable</option></select></td><td><input type="number" placeholder="0.00" step="0.01" oninput="calcMisc()" style="font-family:monospace;text-align:right;width:100%;border:none;background:transparent;color:var(--color-text-primary);padding:3px 5px;outline:none"></td><td><button class="del-btn" onclick="delMiscRow(this)">✕</button></td></tr></tbody>
+        <tfoot>
+          <tr class="misc-total-row">
+            <td colspan="3">Billable: <span id="misc-bill" style="color:#3B6D11;font-family:monospace">$0.00</span> &nbsp;·&nbsp; Non-Billable: <span id="misc-nonbill" style="color:#854F0B;font-family:monospace">$0.00</span></td>
+            <td><span id="misc-total" style="font-family:monospace;color:var(--color-text-primary)">$0.00</span></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+      <button class="add-row-btn" onclick="addMiscRow()">+ Add item</button>
+    </div>
+
+    <div class="sec" data-section="entertainment">
+      <div class="sec-lbl">Entertainment Detail — required for all entertainment entries</div>
+      <table class="ent-table">
+        <thead>
+          <tr>
+            <th style="width:13%">Date</th>
+            <th style="width:16%">Type</th>
+            <th style="width:33%">Guests (name · title · company)</th>
+            <th style="width:27%">Business Purpose</th>
+            <th style="width:11%">Amount</th>
+          </tr>
+        </thead>
+        <tbody id="ent-body">
+          <tr><td><input type="date" class="ent-date"></td><td><input type="text" class="ent-type" placeholder="Dinner, Lunch…"></td><td><input type="text" class="ent-guests" placeholder="Name · Title · Company"></td><td><input type="text" class="ent-purpose" placeholder="Purpose"></td><td><input type="number" class="ent-amt" placeholder="0.00" style="font-family:monospace;text-align:right;width:100%;border:none;background:transparent;color:var(--color-text-primary);padding:3px 4px;outline:none" oninput="checkEntMatch()"></td></tr>
+          <tr><td><input type="date" class="ent-date"></td><td><input type="text" class="ent-type"></td><td><input type="text" class="ent-guests"></td><td><input type="text" class="ent-purpose"></td><td><input type="number" class="ent-amt" placeholder="0.00" style="font-family:monospace;text-align:right;width:100%;border:none;background:transparent;color:var(--color-text-primary);padding:3px 4px;outline:none" oninput="checkEntMatch()"></td></tr>
+        </tbody>
+      </table>
+      <button class="add-row-btn" onclick="addEntRow()">+ Add row</button>
+      <div id="ent-warn" style="display:none;margin-top:8px;padding:8px 12px;background:#fff3cd;border:1px solid #f0a030;border-radius:4px;font-size:11px;color:#7a5200">
+        &#9888; Entertainment Detail total does not match Daily Expenses Entertainment row. Please reconcile before submitting.
+      </div>
+    </div>
+
+    <div class="sec" data-section="settlement">
+      <div class="sec-lbl">Settlement Summary</div>
+      <div class="totals-grid">
+        <div class="tot-block">
+          <div class="tot-title">Expense Breakdown</div>
+          <div class="tot-row"><span class="tot-cat">Meals &amp; Entertainment</span><span class="tot-val" id="sum-meals">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Airfare</span><span class="tot-val" id="sum-air">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Lodging</span><span class="tot-val" id="sum-lodge">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Car Rental</span><span class="tot-val" id="sum-car">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Transport</span><span class="tot-val" id="sum-trans">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Miscellaneous</span><span class="tot-val" id="sum-misc">$0.00</span></div>
+          <div class="tot-row"><span class="tot-cat">Grand Total</span><span class="tot-val" id="sum-grand" style="font-size:14px;color:#3B6D11">$0.00</span></div>
+        </div>
+        <div class="tot-block">
+          <div class="tot-title">Settlement</div>
+          <div class="tot-row"><span class="tot-cat">Total Expenses</span><span class="tot-val" id="set-total">$0.00</span></div>
+          <div class="f" style="margin:6px 0"><label>Less: Corporate Card Charges</label><input type="number" data-field-id="f10" data-label="Corporate Card Charges" data-required="false" data-section="settlement" id="corp-card" placeholder="0.00" step="0.01" oninput="calcSettlement()" style="font-family:monospace"></div>
+          <div class="tot-row"><span class="tot-cat" style="font-weight:500">Net Due to Employee</span><span class="tot-val" id="set-due" style="color:#3B6D11;font-size:13px">$0.00</span></div>
+          <div style="border-top:0.5px solid var(--color-border-tertiary);padding-top:6px;margin-top:6px">
+            <div class="tot-row"><span class="tot-cat" style="font-weight:500">Total to Charge Company</span><span class="tot-val" id="set-charge" style="color:#854F0B;font-size:13px">$0.00</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" data-section="certification">
+      <div class="sec-lbl">Certification &amp; Approval</div>
+      <div class="cert-block">
+        <div style="font-size:11px;color:var(--color-text-secondary);line-height:1.5;margin-bottom:10px">I certify that all expenses on this report were incurred by me in the performance of my duties for the company and are accurate and compliant with company policy.</div>
+        <div class="sig-area">
+          <div>
+            <label style="font-size:11px;font-weight:500;color:#1a1a2e">Employee Signature</label>
+            <div style="border-bottom:1px solid #374151;height:32px;margin-top:8px"
+              data-field-id="f14" data-label="Employee Signature"
+              data-sig-role="submitter" data-required="false"></div>
+            <input type="date" data-field-id="f14d" data-label="Employee Signature Date"
+              data-sig-role="submitter" data-required="false"
+              style="font-family:Arial,sans-serif;font-size:11px;padding:3px 6px;border:0.5px solid #d1d5db;border-radius:4px;background:#f9fafb;color:#1a1a2e;width:100%;box-sizing:border-box;margin-top:6px">
+            <div class="sig-lbl">Employee Signature / Date</div>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:500;color:#1a1a2e">Manager Signature</label>
+            <div style="border-bottom:1px solid #374151;height:32px;margin-top:8px"
+              data-field-id="f15" data-label="Manager Signature"
+              data-sig-role="manager" data-required="false"></div>
+            <input type="date" data-field-id="f15d" data-label="Manager Signature Date"
+              data-sig-role="manager" data-required="false"
+              style="font-family:Arial,sans-serif;font-size:11px;padding:3px 6px;border:0.5px solid #d1d5db;border-radius:4px;background:#f9fafb;color:#1a1a2e;width:100%;box-sizing:border-box;margin-top:6px">
+            <div class="sig-lbl">Project / Functional Manager / Date</div>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:500;color:#1a1a2e">Finance Signature</label>
+            <div style="border-bottom:1px solid #374151;height:32px;margin-top:8px"
+              data-field-id="f16" data-label="Finance Signature"
+              data-sig-role="finance" data-required="false"></div>
+            <input type="date" data-field-id="f16d" data-label="Finance Signature Date"
+              data-sig-role="finance" data-required="false"
+              style="font-family:Arial,sans-serif;font-size:11px;padding:3px 6px;border:0.5px solid #d1d5db;border-radius:4px;background:#f9fafb;color:#1a1a2e;width:100%;box-sizing:border-box;margin-top:6px">
+            <div class="sig-lbl">Finance / Exec. Management / Date</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="ftr">
+    <div style="font-size:10px;color:var(--color-text-tertiary)">Step 1 of 3 · Employee Submission · Routes to Proj/Func. Manager then Finance/Exec. Mgmt</div>
+    <div style="display:flex;gap:8px">
+      <button type="button" class="btn-s" onclick="saveDraft()">Save Draft</button>
+      <button type="button" class="btn-p" onclick="submitForApproval()">Submit For Approval →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var CATS = [
+  {id:'bkf',  label:'Breakfast',        group:'meals'},
+  {id:'lnch', label:'Lunch',            group:'meals'},
+  {id:'din',  label:'Dinner',           group:'meals'},
+  {id:'ent',  label:'Entertainment',    group:'meals'},
+  {id:'air',  label:'Airfare',          group:'travel'},
+  {id:'lodge',label:'Lodging',          group:'travel'},
+  {id:'car',  label:'Car Rental',       group:'travel'},
+  {id:'mile', label:'Mileage (mi)',     group:'travel'},
+  {id:'park', label:'Parking / Tolls',  group:'travel'},
+  {id:'taxi', label:'Taxi / Rideshare', group:'travel'},
+  {id:'phone',label:'Phone / Internet', group:'other'},
+  {id:'ccc',  label:'Corporate Card',   group:'other'},
+];
+var GROUP_LABELS = {meals:'Meals & Entertainment', travel:'Transportation & Lodging', other:'Other'};
+var savedVals = {};
+
+function fmt(n){ return '$'+n.toFixed(2); }
+function dayKey(d){ return d.toISOString().slice(0,10); }
+
+function defaultDates() {
+  var dates = [];
+  var d = new Date(); d.setHours(0,0,0,0);
+  for (var i=0;i<7;i++){
+    dates.push(new Date(d));
+    d.setDate(d.getDate()+1);
+  }
+  return dates;
+}
+
+function getDates(start, end) {
+  var dates=[], cur=new Date(start+'T00:00:00'), last=new Date(end+'T00:00:00');
+  while(cur<=last){ dates.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
+  return dates;
+}
+
+function fmtCol(d) {
+  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var mons=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return days[d.getDay()]+' '+mons[d.getMonth()]+' '+d.getDate();
+}
+
+function buildTable(dates) {
+  var todayStr = dayKey(new Date());
+  var thead = document.getElementById('day-thead');
+  var tbody = document.getElementById('day-tbody');
+
+  // Save current values before rebuild
+  document.querySelectorAll('[data-cat]').forEach(function(inp){
+    var k = inp.dataset.cat+'|'+inp.dataset.dk;
+    savedVals[k] = inp.value;
+  });
+
+  var hrow = '<tr><th class="cat-h">Category</th>';
+  dates.forEach(function(d){
+    var dk = dayKey(d);
+    var cls = dk===todayStr ? ' today-h' : '';
+    hrow += '<th class="'+cls+'" style="min-width:74px">'+fmtCol(d)+'</th>';
+  });
+  hrow += '<th class="total-h">Total</th></tr>';
+  thead.innerHTML = hrow;
+
+  var lastGroup='', rows='';
+  CATS.forEach(function(cat){
+    if(cat.group!==lastGroup){
+      lastGroup=cat.group;
+      rows += '<tr class="sec-hdr"><td colspan="'+(dates.length+2)+'">'+GROUP_LABELS[cat.group]+'</td></tr>';
+    }
+    rows += '<tr><td class="cat">'+cat.label+'</td>';
+    dates.forEach(function(d){
+      var dk = dayKey(d);
+      var k = cat.id+'|'+dk;
+      var v = savedVals[k]||'';
+      var tdcls = dk===todayStr ? ' today-col' : '';
+      rows += '<td class="'+tdcls+'"><input type="number" placeholder="0.00" step="0.01" data-cat="'+cat.id+'" data-dk="'+dk+'" value="'+v+'" oninput="recalcRow(\''+cat.id+'\')"></td>';
+    });
+    rows += '<td class="total-cell" id="rowtot-'+cat.id+'">—</td></tr>';
+  });
+
+  rows += '<tr class="grand"><td class="cat">Grand Total</td>';
+  dates.forEach(function(d){
+    var dk = dayKey(d);
+    rows += '<td class="total-cell" id="coltot-'+dk+'">—</td>';
+  });
+  rows += '<td class="total-cell" id="grandtot">$0.00</td></tr>';
+  tbody.innerHTML = rows;
+
+  // Recalc all rows after build
+  CATS.forEach(function(c){ recalcRow(c.id); });
+  updateSummary();
+}
+
+function onDateChange(){
+  var s = document.getElementById('trip-start').value;
+  var e = document.getElementById('trip-end').value;
+  var lbl = document.getElementById('date-range-label');
+
+  if(!s && !e){ buildTable(defaultDates()); lbl.textContent='— defaulting to 7 days from today · select dates to customize'; return; }
+  if(s && !e){ var dates=getDates(s,s); for(var i=1;i<7;i++){var nx=new Date(dates[dates.length-1]);nx.setDate(nx.getDate()+1);dates.push(nx);} buildTable(dates); lbl.textContent='— '+fmtCol(dates[0])+' · set end date to finalize range'; return; }
+  if(!s && e){ buildTable(defaultDates()); return; }
+  var dates=getDates(s,e);
+  if(dates.length<1){buildTable(defaultDates());return;}
+  lbl.textContent='— '+dates.length+' day'+(dates.length>1?'s':'')+' · '+fmtCol(dates[0])+' to '+fmtCol(dates[dates.length-1]);
+  buildTable(dates);
+}
+
+function recalcRow(catId){ if(catId==='ent') setTimeout(checkEntMatch,50);
+  var inputs = document.querySelectorAll('[data-cat="'+catId+'"]');
+  var rowTot=0;
+  var byDay={};
+  inputs.forEach(function(inp){
+    var v=parseFloat(inp.value)||0;
+    rowTot+=v;
+    byDay[inp.dataset.dk]=(byDay[inp.dataset.dk]||0)+v;
+  });
+  var el=document.getElementById('rowtot-'+catId);
+  if(el) el.textContent=rowTot?fmt(rowTot):'—';
+
+  // Recalc col totals for affected days
+  Object.keys(byDay).forEach(function(dk){
+    var colInputs=document.querySelectorAll('[data-dk="'+dk+'"]');
+    var colTot=0;
+    colInputs.forEach(function(i){colTot+=parseFloat(i.value)||0;});
+    var cel=document.getElementById('coltot-'+dk);
+    if(cel) cel.textContent=colTot?fmt(colTot):'—';
+  });
+
+  // Grand total
+  var grand=0;
+  document.querySelectorAll('[data-cat]').forEach(function(i){grand+=parseFloat(i.value)||0;});
+  var gel=document.getElementById('grandtot');
+  if(gel) gel.textContent=grand?fmt(grand):'$0.00';
+  updateSummary();
+}
+
+function getCatTotal(id){
+  var t=0; document.querySelectorAll('[data-cat="'+id+'"]').forEach(function(i){t+=parseFloat(i.value)||0;}); return t;
+}
+
+function updateSummary(){
+  var meals=['bkf','lnch','din','ent'].reduce(function(s,id){return s+getCatTotal(id);},0);
+  var air=getCatTotal('air'), lodge=getCatTotal('lodge'), car=getCatTotal('car');
+  var trans=getCatTotal('mile')+getCatTotal('park')+getCatTotal('taxi');
+  var miscText=document.getElementById('misc-total');
+  var misc=miscText?parseFloat(miscText.textContent.replace('$',''))||0:0;
+  var other=getCatTotal('phone')+getCatTotal('ccc');
+  var grand=meals+air+lodge+car+trans+misc+other;
+  document.getElementById('sum-meals').textContent=fmt(meals);
+  document.getElementById('sum-air').textContent=fmt(air);
+  document.getElementById('sum-lodge').textContent=fmt(lodge);
+  document.getElementById('sum-car').textContent=fmt(car);
+  document.getElementById('sum-trans').textContent=fmt(trans);
+  document.getElementById('sum-misc').textContent=fmt(misc);
+  document.getElementById('sum-grand').textContent=fmt(grand);
+  document.getElementById('set-total').textContent=fmt(grand);
+  calcSettlement();
+}
+
+function calcSettlement(){
+  var total=parseFloat((document.getElementById('sum-grand').textContent||'0').replace('$',''))||0;
+  var ccc=parseFloat(document.getElementById('corp-card').value)||0;
+  document.getElementById('set-due').textContent=fmt(Math.max(0,total-ccc));
+  document.getElementById('set-charge').textContent=fmt(Math.max(0,ccc));
+}
+
+function calcMisc(){
+  var rows=document.querySelectorAll('#misc-body tr');
+  var bill=0,nonbill=0;
+  rows.forEach(function(r){
+    var amt=parseFloat(r.querySelector('input[type=number]')?r.querySelector('input[type=number]').value:0)||0;
+    var type=r.querySelector('select')?r.querySelector('select').value:'billable';
+    if(type==='billable') bill+=amt; else nonbill+=amt;
+  });
+  document.getElementById('misc-bill').textContent=fmt(bill);
+  document.getElementById('misc-nonbill').textContent=fmt(nonbill);
+  document.getElementById('misc-total').textContent=fmt(bill+nonbill);
+  updateSummary();
+}
+
+function addMiscRow(){
+  var tbody=document.getElementById('misc-body');
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td><input type="text" placeholder="Item description"></td>'
+    +'<td><input type="date"></td>'
+    +'<td><select onchange="calcMisc()"><option value="billable">Billable</option><option value="nonbillable">Non-Billable</option></select></td>'
+    +'<td><input type="number" placeholder="0.00" step="0.01" oninput="calcMisc()" style="font-family:monospace;text-align:right;width:100%;border:none;background:transparent;color:var(--color-text-primary);padding:3px 5px;outline:none"></td>'
+    +'<td><button class="del-btn" onclick="delMiscRow(this)">✕</button></td>';
+  tbody.appendChild(tr);
+}
+
+function delMiscRow(btn){
+  if(document.querySelectorAll('#misc-body tr').length<=1) return;
+  btn.closest('tr').remove(); calcMisc();
+}
+
+function addEntRow(){
+  var tbody=document.getElementById('ent-body');
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td><input type="date" class="ent-date"></td>'
+    +'<td><input type="text" class="ent-type" placeholder="Dinner, Lunch…"></td>'
+    +'<td><input type="text" class="ent-guests" placeholder="Name · Title · Company"></td>'
+    +'<td><input type="text" class="ent-purpose" placeholder="Purpose"></td>'
+    +'<td><input type="number" class="ent-amt" placeholder="0.00" oninput="checkEntMatch()" style="font-family:monospace;text-align:right;width:100%;border:none;background:transparent;color:var(--color-text-primary);padding:3px 4px;outline:none"></td>';
+  tbody.appendChild(tr);
+}
+
+function toggleCustomer(){
+  var val=document.getElementById('purpose-sel').value;
+  document.getElementById('customer-block').classList.toggle('visible', val==='client');
+}
+
+// Entertainment cross-check
+function checkEntMatch() {
+  var entRow = 0;
+  document.querySelectorAll('[data-cat="ent"]').forEach(function(i){ entRow += parseFloat(i.value)||0; });
+  var entDet = 0;
+  // Fix: tbody ID is 'ent-body', and amount inputs carry class 'ent-amt'
+  document.querySelectorAll('#ent-body .ent-amt').forEach(function(i){ entDet += parseFloat(i.value)||0; });
+  var w = document.getElementById('ent-warn');
+  if (w) w.style.display = (entRow > 0 && Math.abs(entRow - entDet) > 0.01) ? 'block' : 'none';
+}
+function saveDraft() {
+  // Notify CMD Center transcript
+  try { window.parent.postMessage({ type: 'cmd:form_action', action: 'Form Save' }, '*'); } catch(e) {}
+  var formData = {};
+
+  // 1. Named fields (data-label attributes) — covers all header fields + select elements
+  document.querySelectorAll('[data-field-id]').forEach(function(el) {
+    if (el.dataset.label) formData[el.dataset.label] = el.value || '';
+  });
+
+  // 2. Business Purpose display label (select shows value "client", label shows "Client Visit")
+  var purposeSel = document.getElementById('purpose-sel');
+  if (purposeSel) {
+    formData['_purpose_label'] = purposeSel.options[purposeSel.selectedIndex]
+      ? purposeSel.options[purposeSel.selectedIndex].text : '';
+  }
+
+  // 3. Daily expense grid — keyed as _grid_{cat}_{date} so restore can find each cell
+  //    by [data-cat][data-dk] after the table is rebuilt with the correct date range
+  document.querySelectorAll('[data-cat][data-dk]').forEach(function(el) {
+    var v = el.value ? el.value.trim() : '';
+    if (v && v !== '0' && v !== '0.00') {
+      formData['_grid_' + el.dataset.cat + '_' + el.dataset.dk] = v;
+    }
+  });
+
+  // 4. Miscellaneous expense rows — serialize each row as _misc_{index}_{field}
+  var miscRows = document.querySelectorAll('#misc-tbody tr');
+  miscRows.forEach(function(row, idx) {
+    var desc = row.querySelector('input[placeholder="Item description"]');
+    var date = row.querySelector('input[type="date"]');
+    var type = row.querySelector('select');
+    var amt  = row.querySelector('input[type="number"]');
+    if (desc && (desc.value || (amt && amt.value && amt.value !== '0'))) {
+      formData['_misc_' + idx + '_desc'] = desc ? desc.value : '';
+      formData['_misc_' + idx + '_date'] = date ? date.value : '';
+      formData['_misc_' + idx + '_type'] = type ? type.value : '';
+      formData['_misc_' + idx + '_amt']  = amt  ? amt.value  : '';
+    }
+  });
+
+  // 5. Entertainment detail rows
+  var entRows = document.querySelectorAll('#ent-body tr');
+  entRows.forEach(function(row, idx) {
+    var date = row.querySelector('input[type="date"]');
+    var type = row.querySelector('.ent-type');
+    var guests = row.querySelector('.ent-guests');
+    var purpose = row.querySelector('.ent-purpose');
+    var amt = row.querySelector('.ent-amt');
+    if (amt && amt.value && amt.value !== '0') {
+      formData['_ent_' + idx + '_date']    = date    ? date.value    : '';
+      formData['_ent_' + idx + '_type']    = type    ? type.value    : '';
+      formData['_ent_' + idx + '_guests']  = guests  ? guests.value  : '';
+      formData['_ent_' + idx + '_purpose'] = purpose ? purpose.value : '';
+      formData['_ent_' + idx + '_amt']     = amt     ? amt.value     : '';
+    }
+  });
+
+  // 6. Computed totals — so Active tab can display them without re-parsing the form
+  var grandTot = document.getElementById('grandtot');
+  if (grandTot) formData['_total_expenses'] = grandTot.textContent || '';
+  var setDue = document.getElementById('set-due');
+  if (setDue) formData['_net_due_employee'] = setDue.textContent || '';
+  var miscBill = document.getElementById('misc-billable');
+  if (miscBill) formData['_misc_billable'] = miscBill.textContent || '';
+  var miscNonBill = document.getElementById('misc-nonbillable');
+  if (miscNonBill) formData['_misc_nonbillable'] = miscNonBill.textContent || '';
+
+  window.parent.postMessage({
+    type: 'compass_form_save_draft',
+    formId: 'ee100010-0001-0001-0001-000000000001',
+    formData: formData
+  }, '*');
+}
+function submitForApproval() {
+  // Notify CMD Center transcript
+  try { window.parent.postMessage({ type: 'cmd:form_action', action: 'Form Submit' }, '*'); } catch(e) {}
+  var missing = [];
+  document.querySelectorAll('[data-required="true"]').forEach(function(el) {
+    if (el.readOnly || el.disabled || el.offsetParent === null) return;
+    var val = el.value ? el.value.trim() : '';
+    if (!val || val === '— Select —') {
+      var label = el.dataset.label || (el.closest('.f') && el.closest('.f').querySelector('label') ? el.closest('.f').querySelector('label').textContent.replace('*','').trim() : '') || el.placeholder || 'Unknown field';
+      missing.push(label);
+      el.style.borderColor = '#E24B4A'; el.style.background = '#fff5f5';
+    } else {
+      el.style.borderColor = ''; el.style.background = '';
+    }
+  });
+  if (missing.length) {
+    var p = document.getElementById('val-panel');
+    if (!p) { p = document.createElement('div'); p.id = 'val-panel'; p.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;background:#fff;border:1px solid #E24B4A;border-radius:6px;padding:12px 16px;max-width:280px;box-shadow:0 4px 16px rgba(0,0,0,.15);font-family:Arial,sans-serif;font-size:12px'; document.body.appendChild(p); }
+    p.innerHTML = '<div style="font-weight:700;color:#E24B4A;margin-bottom:8px">&#9888; Please complete:</div>' + missing.map(function(f){ return '<div style="color:#374151;padding:2px 0 2px 10px">&#8226; ' + f + '</div>'; }).join('') + '<button type="button" onclick="this.parentNode.remove()" style="margin-top:10px;width:100%;border:none;background:#f3f4f6;border-radius:4px;padding:4px;cursor:pointer;font-size:11px">Dismiss</button>';
+    return;
+  }
+  var p = document.getElementById('val-panel'); if (p) p.remove();
+  checkEntMatch();
+  var w = document.getElementById('ent-warn');
+  if (w && w.style.display !== 'none') { w.scrollIntoView({behavior:'smooth'}); return; }
+  // Serialize all form data for DB storage — mirrors saveDraft serialization
+  var formData = {};
+  // 1. Named fields
+  document.querySelectorAll('[data-field-id]').forEach(function(el) {
+    if (el.dataset.label) formData[el.dataset.label] = el.value || '';
+  });
+  // 2. Business purpose display label
+  var purposeSel = document.getElementById('purpose-sel');
+  if (purposeSel) formData['_purpose_label'] = purposeSel.options[purposeSel.selectedIndex]
+    ? purposeSel.options[purposeSel.selectedIndex].text : '';
+  // 3. Daily expense grid
+  document.querySelectorAll('[data-cat][data-dk]').forEach(function(el) {
+    var v = el.value ? el.value.trim() : '';
+    if (v && v !== '0' && v !== '0.00') {
+      formData['_grid_' + el.dataset.cat + '_' + el.dataset.dk] = v;
+    }
+  });
+  // 4. Miscellaneous expense rows
+  var miscRows = document.querySelectorAll('#misc-body tr');
+  miscRows.forEach(function(row, idx) {
+    var desc = row.querySelector('input[placeholder="Item description"]');
+    var date = row.querySelector('input[type="date"]');
+    var type = row.querySelector('select');
+    var amt  = row.querySelector('input[type="number"]');
+    if (amt && amt.value && amt.value !== '0') {
+      formData['_misc_' + idx + '_desc'] = desc ? desc.value : '';
+      formData['_misc_' + idx + '_date'] = date ? date.value : '';
+      formData['_misc_' + idx + '_type'] = type ? type.value : '';
+      formData['_misc_' + idx + '_amt']  = amt  ? amt.value  : '';
+    }
+  });
+  // 5. Entertainment detail rows
+  var entRows = document.querySelectorAll('#ent-body tr');
+  entRows.forEach(function(row, idx) {
+    var date    = row.querySelector('input[type="date"]');
+    var type    = row.querySelector('.ent-type');
+    var guests  = row.querySelector('.ent-guests');
+    var purpose = row.querySelector('.ent-purpose');
+    var amt     = row.querySelector('.ent-amt');
+    if (amt && amt.value && amt.value !== '0') {
+      formData['_ent_' + idx + '_date']    = date    ? date.value    : '';
+      formData['_ent_' + idx + '_type']    = type    ? type.value    : '';
+      formData['_ent_' + idx + '_guests']  = guests  ? guests.value  : '';
+      formData['_ent_' + idx + '_purpose'] = purpose ? purpose.value : '';
+      formData['_ent_' + idx + '_amt']     = amt     ? amt.value     : '';
+    }
+  });
+  // 6. Computed totals
+  var grandTot = document.getElementById('grandtot');
+  if (grandTot) formData['_total_expenses'] = grandTot.textContent || '';
+  var setDue = document.getElementById('set-due');
+  if (setDue) formData['_net_due_employee'] = setDue.textContent || '';
+  var miscBill = document.getElementById('misc-billable');
+  if (miscBill) formData['_misc_billable'] = miscBill.textContent || '';
+  var miscNonBill = document.getElementById('misc-nonbillable');
+  if (miscNonBill) formData['_misc_nonbillable'] = miscNonBill.textContent || '';
+  window.parent.postMessage({
+    type: 'compass_form_submit',
+    formId: 'ee100010-0001-0001-0001-000000000001',
+    formData: formData
+  }, '*');
+}
+// Wire ent cross-check
+var _origRecalcRow = recalcRow;
+// Init
+document.getElementById('sub-date').value=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+addMiscRow();
+buildTable(defaultDates());
+document.getElementById('date-range-label').textContent='— defaulting to 7 days from today · select dates to customize';
+</script>
+<script>
+// ── Inline signature.js ──────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// signature.js  ·  v20260412-SIG1
+// CadenceHUD — Shared Signature Module
+//
+// Provides interactive cursive signature fields for any Cadence HTML form,
+// whether rendered in:
+//   - Cadence Form Editor preview (pdf/HTML overlay)
+//   - Compass review panel (iframe via myrOpenAttachment)
+//   - Standalone form iframe (Compass MY REQUESTS)
+//
+// Pattern targeted:
+//   <div data-field-id="fXX" data-label="Role Signature"
+//        data-sig-role="submitter|manager|finance|..."
+//        style="border-bottom:...height:32px..."></div>
+//   <input type="date" data-field-id="fXXd" data-label="Role Signature Date"
+//          data-sig-role="submitter|manager|finance|...">
+//
+// API:
+//   CadenceSignature.activate(doc, options)
+//     Finds all signature divs in `doc`, converts them to cursive inputs.
+//     options:
+//       activeRole   {string}  — only this role's field is editable; others locked
+//       signerName   {string}  — pre-fill the active field with the signer's name
+//       onSign       {fn}      — callback(role, name, date) when a field is signed
+//       readOnly     {bool}    — lock all fields (review view with no pending sig)
+//
+//   CadenceSignature.loadFont(doc)
+//     Injects Dancing Script from Google Fonts into `doc`. Returns Promise.
+//     Safe to call multiple times — idempotent.
+//
+//   CadenceSignature.serialize(doc)
+//     Returns { [data-label]: value } for all signature + date fields.
+//     For use in saveDraft / submitForApproval serialization.
+//
+// Dependencies: none — fully self-contained.
+// ════════════════════════════════════════════════════════════════════════════
+
+console.log('%c[signature] v20260412-SIG1 — shared cursive signature module',
+  'background:#1a3a5a;color:#7dd3fc;font-weight:700;padding:2px 8px;border-radius:3px');
+
+(function(global) {
+
+  // ── Font loader ────────────────────────────────────────────────────────────
+  function loadFont(doc) {
+    doc = doc || document;
+    if (doc.getElementById('cad-sig-font')) return Promise.resolve();
+    return new Promise(function(resolve) {
+      var link = doc.createElement('link');
+      link.id   = 'cad-sig-font';
+      link.rel  = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap';
+      link.onload = resolve;
+      link.onerror = resolve; // fail gracefully — cursive will fall back to system font
+      (doc.head || doc.body).appendChild(link);
+
+      // Also inject the style rule that forces Dancing Script on sig inputs
+      if (!doc.getElementById('cad-sig-style')) {
+        var style = doc.createElement('style');
+        style.id = 'cad-sig-style';
+        style.textContent = [
+          '[data-cad-sig-input] {',
+          '  font-family: "Dancing Script", cursive !important;',
+          '  font-size: 20px !important;',
+          '  font-weight: 600 !important;',
+          '  color: #0a2280 !important;',
+          '  border: none !important;',
+          '  background: transparent !important;',
+          '  outline: none !important;',
+          '  width: 100% !important;',
+          '  height: 100% !important;',
+          '  padding: 0 6px !important;',
+          '  box-sizing: border-box !important;',
+          '  cursor: text !important;',
+          '}',
+          '[data-cad-sig-input]:disabled {',
+          '  cursor: not-allowed !important;',
+          '  color: #9ca3af !important;',
+          '}',
+          '[data-cad-sig-wrap] {',
+          '  position: relative;',
+          '  display: flex;',
+          '  align-items: center;',
+          '  background: rgba(0,0,0,.02);',
+          '  border-radius: 3px;',
+          '  transition: background .15s;',
+          '}',
+          '[data-cad-sig-wrap].active {',
+          '  background: rgba(59,130,246,.06);',
+          '  outline: 1px solid rgba(59,130,246,.3);',
+          '}',
+          '[data-cad-sig-wrap].signed {',
+          '  background: rgba(29,158,117,.05);',
+          '  outline: 1px solid rgba(29,158,117,.25);',
+          '}',
+        ].join('\n');
+        (doc.head || doc.body).appendChild(style);
+      }
+    });
+  }
+
+  // ── Activate ───────────────────────────────────────────────────────────────
+  function activate(doc, opts) {
+    doc  = doc  || document;
+    opts = opts || {};
+    var activeRole  = opts.activeRole  || null;  // role whose field is editable
+    var signerName  = opts.signerName  || '';    // pre-fill name for active role
+    var onSign      = opts.onSign      || null;  // callback(role, name, date)
+    var readOnly    = opts.readOnly    || false;  // lock all fields
+
+    // Find all signature divs — they have data-sig-role and no children yet
+    var sigDivs = doc.querySelectorAll('[data-sig-role][data-field-id]');
+    if (!sigDivs.length) return;
+
+    loadFont(doc).then(function() {
+      sigDivs.forEach(function(div) {
+        // Only target the <div> signature lines, not the date <input> fields
+        if (div.tagName !== 'DIV') return;
+
+        var role     = div.dataset.sigRole;
+        var fieldId  = div.dataset.fieldId;
+        var label    = div.dataset.label || 'Signature';
+        var isActive = !readOnly && (activeRole === null || role === activeRole);
+        var isSigned = false;
+
+        // ── Build the interactive wrapper ──────────────────────────────────
+        var wrap = doc.createElement('div');
+        wrap.setAttribute('data-cad-sig-wrap', '1');
+        wrap.style.cssText = div.style.cssText;  // inherit the border-bottom etc.
+        wrap.style.height  = '34px';
+
+        var inp = doc.createElement('input');
+        inp.type = 'text';
+        inp.setAttribute('data-cad-sig-input', '1');
+        inp.setAttribute('data-field-id', fieldId);
+        inp.setAttribute('data-label', label);
+        inp.setAttribute('data-sig-role', role);
+        inp.placeholder = isActive ? 'Type to sign…' : '';
+        inp.disabled    = !isActive;
+
+        // Pre-fill if signer name provided for this role
+        if (isActive && signerName) {
+          inp.value = signerName;
+          isSigned  = true;
+          wrap.classList.add('signed');
+          _autoDate(doc, role, isSigned);
+          if (onSign) onSign(role, signerName, _todayStr());
+        }
+
+        // Sign-on-type
+        if (isActive) {
+          wrap.classList.add('active');
+          inp.addEventListener('input', function() {
+            var signed = inp.value.trim().length > 1;
+            if (signed && !isSigned) {
+              isSigned = true;
+              wrap.classList.remove('active');
+              wrap.classList.add('signed');
+              _autoDate(doc, role, true);
+              if (onSign) onSign(role, inp.value.trim(), _todayStr());
+            } else if (!signed && isSigned) {
+              isSigned = false;
+              wrap.classList.remove('signed');
+              wrap.classList.add('active');
+              _autoDate(doc, role, false);
+            }
+          });
+        }
+
+        wrap.appendChild(inp);
+
+        // Signed check icon (hidden until signed)
+        var tick = doc.createElement('span');
+        tick.style.cssText = 'position:absolute;right:6px;font-size:12px;color:#1D9E75;' +
+          'opacity:0;transition:opacity .2s;pointer-events:none';
+        tick.textContent = '✓';
+        wrap.appendChild(tick);
+
+        if (isActive) {
+          inp.addEventListener('input', function() {
+            tick.style.opacity = inp.value.trim().length > 1 ? '1' : '0';
+          });
+        }
+
+        // Replace the static div with the interactive wrap
+        div.parentNode.replaceChild(wrap, div);
+      });
+    });
+  }
+
+  // ── Auto-date helper ───────────────────────────────────────────────────────
+  // Finds the date input paired with the same sig-role and fills it
+  function _autoDate(doc, role, fill) {
+    var today   = _todayStr();
+    var dateInp = doc.querySelector(
+      'input[type="date"][data-sig-role="' + role + '"]'
+    );
+    if (!dateInp) {
+      // Fallback: find by label proximity — any date input whose label contains
+      // the role keyword and "date"
+      var allDates = doc.querySelectorAll('input[type="date"]');
+      allDates.forEach(function(d) {
+        var lbl = (d.dataset.label || '').toLowerCase();
+        if (lbl.includes('date') && lbl.includes(role.slice(0, 4))) {
+          dateInp = d;
+        }
+      });
+    }
+    if (!dateInp) return;
+    dateInp.value = fill ? today : '';
+    // Flash green on fill
+    if (fill) {
+      dateInp.style.borderColor = '#1D9E75';
+      setTimeout(function() { dateInp.style.borderColor = ''; }, 1500);
+    }
+  }
+
+  // ── Serialize ──────────────────────────────────────────────────────────────
+  // Returns { [data-label]: value } for all activated signature inputs + dates
+  function serialize(doc) {
+    doc = doc || document;
+    var out = {};
+    // Activated signature inputs
+    doc.querySelectorAll('[data-cad-sig-input]').forEach(function(inp) {
+      if (inp.dataset.label && inp.value) {
+        out[inp.dataset.label] = inp.value;
+      }
+    });
+    // Paired date inputs
+    doc.querySelectorAll('input[type="date"][data-sig-role]').forEach(function(inp) {
+      if (inp.dataset.label && inp.value) {
+        out[inp.dataset.label] = inp.value;
+      }
+    });
+    return out;
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function _todayStr() {
+    // Returns yyyy-MM-dd — required format for <input type="date">
+    var d = new Date();
+    return d.getFullYear() + '-' +
+           (d.getMonth() + 1).toString().padStart(2, '0') + '-' +
+           d.getDate().toString().padStart(2, '0');
+  }
+
+  // ── Export ─────────────────────────────────────────────────────────────────
+  global.CadenceSignature = {
+    activate:  activate,
+    loadFont:  loadFont,
+    serialize: serialize,
+  };
+
+}(window));
+
+// ── Auto-activate on load ────────────────────────────────────────────────────
+// When opened standalone (submitter filling their own form), all sig fields active.
+// When opened via myrOpenAttachment with a role, the parent re-activates with
+// activeRole set, locking the other fields. The postMessage bridge handles this.
+document.addEventListener('DOMContentLoaded', function() {
+  CadenceSignature.activate(document, {
+    activeRole: null, // all active when standalone
+    onSign: function(role, name, date) {
+      console.log('[CadenceSignature] signed:', role, name, date);
+    }
+  });
+});
+
+// Listen for parent activation message (from myrOpenAttachment review context)
+window.addEventListener('message', function(ev) {
+  var d = ev.data;
+  if (!d || d.type !== 'cad:activate_signature') return;
+  CadenceSignature.activate(document, {
+    activeRole: d.role       || null,
+    signerName: d.signerName || '',
+    readOnly:   d.readOnly   || false,
+    onSign: function(role, name, date) {
+      window.parent.postMessage({
+        type:       'cad:signature_signed',
+        role:       role,
+        signerName: name,
+        date:       date,
+      }, '*');
+    }
+  });
+});
+
+// ── CMD Center command listener ───────────────────────────────────────────────
+window.addEventListener('message', function(ev) {
+  if (!ev.data || ev.data.source !== 'cmd-center') return;
+  var cmd   = ev.data.cmd;
+  var field = (ev.data.field || '');
+  var value = ev.data.value !== undefined ? String(ev.data.value) : '';
+  var index = ev.data.index !== undefined ? parseInt(ev.data.index) : 0;
+  if (cmd === 'Form Insert') { _cmdFormInsert(field, value, index); }
+  else if (cmd === 'Form AddRow') { _cmdFormAddRow(field); }
+  else if (cmd === 'Form Scroll') { _cmdFormScroll(ev.data.target); }
+});
+
+function _cmdTrigger(el) {
+  if (!el) return;
+  el.dispatchEvent(new Event('input',  { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function _cmdFormInsert(field, value, index) {
+  // Named fields (data-label)
+  var named = document.querySelector('[data-label="' + field + '"]');
+  if (named) { named.value = value; _cmdTrigger(named); return; }
+
+  var f = field.toLowerCase();
+
+  // Daily expense grid:
+  //   "airfare"         — fills today's column (or first)
+  //   "airfare[2]"      — fills column index 2 (0-based)
+  //   "airfare.2026-04-13" — fills specific date column
+  var CAT_MAP = {
+    breakfast:'bkf',lunch:'lnch',dinner:'din',entertainment:'ent',
+    airfare:'air',air:'air',lodging:'lodge',lodge:'lodge',
+    car:'car',carrental:'car',mileage:'mile',mile:'mile',
+    parking:'park',taxi:'taxi',rideshare:'taxi',
+    phone:'phone',internet:'phone',corporate:'ccc',card:'ccc',ccc:'ccc',
+    bkf:'bkf',lnch:'lnch',din:'din'
+  };
+  // Parse formats: "airfare[2]", "airfare.2026-04-13", "airfare"
+  var bracketM = f.match(/^([a-z]+)\[(\d+)\]$/);
+  var dotIdx   = f.indexOf('.');
+  var base, sub, colIdx;
+  if (bracketM) {
+    base   = bracketM[1];
+    sub    = null;
+    colIdx = parseInt(bracketM[2]);
+  } else if (dotIdx > -1) {
+    base   = f.slice(0, dotIdx);
+    sub    = f.slice(dotIdx + 1);
+    colIdx = null;
+  } else {
+    base   = f;
+    sub    = null;
+    colIdx = null;
+  }
+  var catId = CAT_MAP[base];
+  if (catId) {
+    var sel = null;
+    if (colIdx !== null) {
+      // Column index — get all inputs for this category and pick the nth
+      var all = Array.from(document.querySelectorAll('[data-cat="' + catId + '"]'));
+      sel = all[colIdx] || null;
+    } else if (sub && sub !== 'today') {
+      // Specific date key
+      sel = document.querySelector('[data-cat="' + catId + '"][data-dk="' + sub + '"]');
+    } else {
+      // No index — use today's column or first
+      var all = document.querySelectorAll('[data-cat="' + catId + '"]');
+      var today = null;
+      all.forEach(function(i){ if (i.closest('td') && i.closest('td').classList.contains('today-col')) today = i; });
+      sel = today || (all.length ? all[0] : null);
+    }
+    if (sel) { sel.value = value; _cmdTrigger(sel); return; }
+  }
+
+  // Misc table — "misc[0].description", "misc[last].amount"
+  var miscM = f.match(/misc(?:ellaneous)?\[(\d+|last)\]\.(\w+)/);
+  if (miscM) {
+    var rows = document.querySelectorAll('#misc-body tr');
+    var ri = miscM[1] === 'last' ? rows.length - 1 : parseInt(miscM[1]);
+    var row = rows[ri];
+    if (!row) return;
+    var cells = row.querySelectorAll('input,select');
+    var colMap = {description:0,desc:0,date:1,type:2,amount:3,amt:3};
+    var ci = colMap[miscM[2]];
+    if (ci !== undefined && cells[ci]) { cells[ci].value = value; _cmdTrigger(cells[ci]); }
+    return;
+  }
+
+  // Entertainment table — "ent[0].date", "ent[last].guests"
+  var entM = f.match(/ent(?:ertainment)?\[(\d+|last)\]\.(\w+)/);
+  if (entM) {
+    var rows = document.querySelectorAll('#ent-body tr');
+    var ri = entM[1] === 'last' ? rows.length - 1 : parseInt(entM[1]);
+    var row = rows[ri];
+    if (!row) return;
+    var clsMap = {date:'ent-date',type:'ent-type',guests:'ent-guests',purpose:'ent-purpose',amount:'ent-amt',amt:'ent-amt'};
+    var cls = clsMap[entM[2]];
+    if (cls) { var el = row.querySelector('.' + cls); if (el) { el.value = value; _cmdTrigger(el); } }
+    return;
+  }
+
+  console.warn('[CMD Form Insert] not found:', field);
+}
+
+function _cmdFormAddRow(table) {
+  var t = (table||'').toLowerCase().replace(/[^a-z]/g,'');
+  if (t === 'misc' || t === 'miscellaneous') { if (typeof addMiscRow === 'function') addMiscRow(); }
+  else if (t === 'ent' || t === 'entertainment') { if (typeof addEntRow === 'function') addEntRow(); }
+}
+
+function _cmdFormScroll(target) {
+  // Named section targets
+  var SECTION_MAP = {
+    top:           null,          // scroll to top
+    header:        'employee_info',
+    employee:      'employee_info',
+    daily:         'daily_expenses',
+    expenses:      'daily_expenses',
+    meals:         'daily_expenses',
+    misc:          'misc_expenses',
+    miscellaneous: 'misc_expenses',
+    entertainment: 'entertainment',
+    ent:           'entertainment',
+    settlement:    'settlement',
+    summary:       'settlement',
+    certification: 'certification',
+    signature:     'certification',
+    bottom:        'certification',
+  };
+
+  var t = String(target || '').toLowerCase().trim();
+  var num = parseFloat(t);
+
+  if (!isNaN(num)) {
+    // Numeric — scroll by pixel amount (positive=down, negative=up)
+    window.scrollBy({ top: num, behavior: 'smooth' });
+    return;
+  }
+
+  if (t === 'top') {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  var sectionId = SECTION_MAP[t] || t;
+  var el = document.querySelector('[data-section="' + sectionId + '"]') ||
+           document.getElementById(sectionId);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else {
+    window.scrollBy({ top: parseInt(t) || 300, behavior: 'smooth' });
+  }
+}
+
+</script>
