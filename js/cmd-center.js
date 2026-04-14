@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD26
+// cmd-center.js  ·  v20260412-CMD27
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD26',
+    'cmd-center':  'v20260412-CMD27',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD26 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD27 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -649,11 +649,59 @@ async function _runScript(scriptText, scriptName) {
 
 // ── Script storage ────────────────────────────────────────────────────────────
 function _loadScripts() {
+  // Load from localStorage
   var keys = Object.keys(localStorage).filter(function(k){ return k.startsWith('phud:script:'); });
   keys.forEach(function(k) {
     var name = k.replace('phud:script:', '');
     _scripts[name] = localStorage.getItem(k);
   });
+}
+
+// Auto-load scripts from /scripts/*.txt on the server
+// Fetches a manifest at /scripts/index.json or falls back to known filenames
+async function _loadServerScripts() {
+  try {
+    // Try manifest first
+    var manifestResp = await fetch('/scripts/index.json', { cache: 'no-store' }).catch(function(){ return null; });
+    var filenames = [];
+
+    if (manifestResp && manifestResp.ok) {
+      var manifest = await manifestResp.json();
+      filenames = Array.isArray(manifest) ? manifest : (manifest.scripts || []);
+    } else {
+      // No manifest — try fetching the scripts directory listing
+      // Fall back to scanning for known script names via HEAD requests
+      var knownNames = ['demo_expense_report', 'test_expense_full', 'test_expense_draft', 'verify_routing_chain'];
+      for (var i = 0; i < knownNames.length; i++) {
+        var headResp = await fetch('/scripts/' + knownNames[i] + '.txt', { method: 'HEAD', cache: 'no-store' }).catch(function(){ return null; });
+        if (headResp && headResp.ok) filenames.push(knownNames[i] + '.txt');
+      }
+    }
+
+    // Fetch and store each script file
+    var loaded = 0;
+    for (var j = 0; j < filenames.length; j++) {
+      var fname = filenames[j];
+      var name  = fname.replace(/\.txt$/i, '');
+      try {
+        var resp = await fetch('/scripts/' + fname, { cache: 'no-store' });
+        if (resp.ok) {
+          var text = await resp.text();
+          // Server scripts take precedence over localStorage versions
+          _scripts[name] = text;
+          localStorage.setItem('phud:script:' + name, text);
+          loaded++;
+        }
+      } catch(e) {}
+    }
+
+    if (loaded > 0) {
+      console.log('[CMD Center] loaded ' + loaded + ' script(s) from /scripts/');
+      if (_panelEl) { _renderScriptList(); _renderLibrary && _renderLibrary(); }
+    }
+  } catch(e) {
+    console.warn('[CMD Center] script auto-load failed:', e);
+  }
 }
 
 function _saveScript(name, text) {
@@ -1425,6 +1473,7 @@ window.CMDCenter = {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function _init() {
   _loadScripts();
+  _loadServerScripts(); // async — loads /scripts/*.txt in background
   await _loadSupabase();
   // Install property interceptors IMMEDIATELY — before mw-tabs.js assigns its functions
   // These use defineProperty so they catch any assignment, past or future
