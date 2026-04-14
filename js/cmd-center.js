@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD23
+// cmd-center.js  ·  v20260412-CMD24
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD23',
+    'cmd-center':  'v20260412-CMD24',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD23 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD24 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -369,19 +369,24 @@ var COMMANDS = {
 
   'Form Insert': async function(args) {
     var field = args[0];
-    var value = args[1];
-    var iframe = document.querySelector('#myr-html-form-modal iframe, #myr-html-form-overlay iframe');
-    if (!iframe || !iframe.contentDocument) return 'No form overlay open';
-    var doc = iframe.contentDocument;
-    // Try data-label match
-    var el = doc.querySelector('[data-label="' + field + '"]') ||
-             doc.querySelector('[placeholder*="' + field + '"]') ||
-             doc.getElementById(field);
-    if (!el) return 'Field not found: ' + field;
-    el.value = value;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+    var value = args[1] !== undefined ? args[1] : '';
+    // Find the form overlay iframe and dispatch via postMessage
+    var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
+    if (!iframe) return 'No form overlay open';
+    iframe.contentWindow.postMessage({
+      source: 'cmd-center', cmd: 'Form Insert', field: field, value: value
+    }, '*');
     return 'inserted ' + field + ' = ' + value;
+  },
+
+  'Form AddRow': async function(args) {
+    var table = args[0]; // "misc" or "ent"
+    var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
+    if (!iframe) return 'No form overlay open';
+    iframe.contentWindow.postMessage({
+      source: 'cmd-center', cmd: 'Form AddRow', field: table
+    }, '*');
+    return 'added row to ' + table;
   },
 
   'Form Close': async function(args) {
