@@ -1,0 +1,50 @@
+# Two-session approval test — expense report full chain
+# Requires: VS, AK
+
+# — preflight ——————————————————————————————————————————
+Assert session VS is connected
+Assert session AK is connected
+
+# — VS submits ————————————————————————————————————————
+VS: Set Tab "MY REQUESTS"
+VS: Set SubTab "BROWSE"
+VS: Form Open "Expense Report"
+Wait 1500
+VS: Form Insert "Employee Name" "Vaughn Staples"
+VS: Form Submit
+Wait ForEvent "workflow_request.created" → $instance_id
+Log "Package live · $instance_id"
+
+# — step 1: VS reviews (submitter review) ————————————
+Wait 2000
+VS: Set SubTab "ACTIVE"
+Wait 1000
+VS: Open Review "Expense Report" $instance_id
+Wait 1000
+VS: Click "Approve"
+Wait ForEvent "workflow_request.resolved" where assignee=VS
+Log "Step 1 complete"
+
+# — step 2: VS approves (submitter approval) —————————
+Wait 2000
+VS: Open Review "Expense Report" $instance_id
+Wait 1000
+VS: Click "Approve"
+Wait ForEvent "workflow_request.resolved" where assignee=VS
+Log "Step 2 complete"
+
+# — step 3: AK approves (manager approval) ————————————
+Wait 2000
+AK: Set Tab "MY REQUESTS"
+AK: Set SubTab "ACTIVE"
+Wait 1500
+AK: Open Review "Expense Report" $instance_id
+Wait 1000
+AK: Click "Approve"
+Wait ForEvent "workflow_request.resolved" where assignee=AK
+Log "Step 3 complete · AK approved"
+
+# — verify ————————————————————————————————————————————
+Wait 1000
+Assert instance_status "complete"
+Log "✓ Full chain confirmed · 3 steps · 2 sessions"

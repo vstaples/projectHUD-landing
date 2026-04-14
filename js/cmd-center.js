@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36c
+// cmd-center.js  ·  v20260414-CMD36d
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36c',
+    'cmd-center':  'v20260414-CMD36d',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36c ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36d ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -369,16 +369,35 @@ function _waitForEventFiltered(eventName, filterKey, filterVal, timeoutMs) {
         clearTimeout(timer);
         // No filter — resolve immediately
         if (!filterKey || !filterVal) { resolve(data); return; }
-        // Check common field names that might carry the assignee identity
+        // Build a set of acceptable values to match against.
+        // For assignee filter: accept the raw alias, the resolved userId,
+        // and the resolved resource_id (for events emitted by mw-events.js)
+        var acceptableVals = [filterVal];
+        if (filterKey === 'assignee') {
+          var resolvedUid = _resolveTargetAlias(filterVal.toUpperCase());
+          if (resolvedUid) {
+            acceptableVals.push(resolvedUid);
+            // Also accept the resource_id for this user if known from _sessions
+            var resolvedSess = _sessions[resolvedUid];
+            if (resolvedSess && resolvedSess.resourceId) acceptableVals.push(resolvedSess.resourceId);
+          }
+          // Own session: also accept _mySession.userId
+          if (_mySession && (filterVal === _myAlias || filterVal === _mySession.initials)) {
+            acceptableVals.push(_mySession.userId);
+          }
+        }
+        // Check common field names that might carry assignee identity
         var fields = [
-          data[filterKey],                     // exact key match
-          data.userId, data.user_id,           // user identity fields
-          data.resource_id, data.assigneeId,   // resource fields
-          data.from,                           // sender field
-        ];
+          data[filterKey],
+          data.userId, data.user_id,
+          data.resource_id, data.assigneeId,
+          data.from, data.assignee,
+        ].filter(Boolean).map(String);
+
         var matches = fields.some(function(f) {
-          return f && String(f) === String(filterVal);
+          return acceptableVals.some(function(v) { return f === String(v); });
         });
+
         if (matches) {
           resolve(data);
         } else {
@@ -535,6 +554,34 @@ var COMMANDS = {
   },
 
   // ── Work queue actions ───────────────────────────────────────────────────────
+  'Open Review': async function(args) {
+    // Open Review "Expense Report"
+    // Open Review "Expense Report" $instance_id
+    var title      = args[0];
+    var instanceId = args[1] ? (args[1].startsWith('$') ? (_storeVars[args[1].slice(1)] || '') : args[1]) : null;
+
+    // Try by instance_id first — most precise
+    if (instanceId) {
+      var btn = document.querySelector('.wi-action-btn[data-wi-id="' + instanceId + '"]') ||
+                Array.from(document.querySelectorAll('.wi-action-btn')).find(function(b){
+                  return b.dataset.wiId && b.dataset.wiId.startsWith(instanceId.slice(0,8));
+                });
+      if (btn) { btn.click(); return 'review opened: ' + instanceId.slice(0,8); }
+    }
+
+    // Fall back: find by title text match in work item rows
+    var allBtns = Array.from(document.querySelectorAll('.wi-action-btn'));
+    var matched = allBtns.find(function(b) {
+      var row = b.closest('[data-wi-id], .wi-row, .wi-item, li, tr');
+      return row && (row.textContent || '').toLowerCase().includes((title||'').toLowerCase());
+    });
+    if (matched) { matched.click(); return 'review opened: ' + title; }
+
+    // Last resort: first available action button
+    if (allBtns.length) { allBtns[0].click(); return 'review opened (first available)'; }
+    return 'Review panel not found for: ' + (title || 'request');
+  },
+
   'Click': async function(args) {
     var target = args[0];
     var scope  = args[1]; // optional: instance_id or selector
