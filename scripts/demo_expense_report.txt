@@ -135,11 +135,17 @@ Wait 2000
 Form Close
 Wait 1500
 
-# Switch to ACTIVE tab — draft appears here
-Set SubTab "ACTIVE"
+# Capture draft ID and reopen
+Get Draft id
+Wait 500
+Continue Draft $draft_id
 Wait 2000
 
-# Open draft and submit
+# Scroll to top before submitting
+Form Scroll top
+Wait 1000
+
+# Submit for approval
 Form Submit
 Wait 1000
 Log Demo complete — expense report submitted for approval

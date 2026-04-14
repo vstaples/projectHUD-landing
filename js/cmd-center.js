@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD32
+// cmd-center.js  ·  v20260412-CMD33
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD32',
+    'cmd-center':  'v20260412-CMD33',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD32 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD33 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -422,11 +422,21 @@ var COMMANDS = {
   },
 
   'Continue Draft': async function(args) {
-    // Opens the most recent draft from the ACTIVE tab
     var drafts = window._myrDrafts || [];
     if (!drafts.length) return 'No drafts found';
-    var draft = drafts[0]; // most recent
+    var draft;
+    if (args[0]) {
+      // Specific id or $variable
+      var targetId = args[0].startsWith('$') ? (_storeVars[args[0].slice(1)] || '') : args[0];
+      draft = drafts.find(function(d){ return d.id === targetId || d.id.startsWith(targetId); });
+      if (!draft) draft = drafts[0]; // fallback to most recent
+    } else {
+      draft = drafts[0]; // most recent
+    }
     if (typeof myrContinueDraft === 'function') {
+      // Switch to ACTIVE subtab first so draft is visible
+      if (typeof myrSwitchView === 'function') myrSwitchView('active');
+      await new Promise(function(r){ setTimeout(r, 500); });
       await myrContinueDraft(draft.form_def_id, draft.id);
       return 'opened draft: ' + draft.id.slice(0,8);
     }
@@ -502,12 +512,27 @@ var COMMANDS = {
   },
 
   'Get': async function(args) {
-    var key = args[0];
+    var key = args.join(' '); // support multi-word keys like "Draft id"
+    // Draft id — most recently saved draft
+    if (key === 'Draft id' || key === 'draft_id') {
+      var drafts = window._myrDrafts || [];
+      var id = drafts.length ? drafts[0].id : null;
+      _storeVars['draft_id'] = id;
+      return id || 'no draft found';
+    }
+    // Active instance id
     if (key === 'Active instance_id' || key === 'instance_id') {
       var inst = (window._myrInstances||[]).find(function(i){ return i.status === 'in_progress'; });
       var id = inst ? inst.id : null;
       _storeVars['instance_id'] = id;
       return id || 'no active instance found';
+    }
+    // Latest instance id (most recently created)
+    if (key === 'Latest instance_id') {
+      var insts = window._myrInstances || [];
+      var id = insts.length ? insts[0].id : null;
+      _storeVars['instance_id'] = id;
+      return id || 'no instance found';
     }
     if (_storeVars[key] !== undefined) return String(_storeVars[key]);
     return 'variable not found: ' + key;
@@ -517,6 +542,15 @@ var COMMANDS = {
   'Assert': async function(args) {
     var key   = args[0];
     var value = args[1];
+    // Support DB assertions — "Assert instance_status in_progress"
+    if (key === 'instance_status') {
+      var inst = (window._myrInstances||[]).find(function(i){
+        return i.id === _storeVars['instance_id'];
+      });
+      var actual = inst ? inst.status : 'not found';
+      if (actual === value) return '✓ PASS: instance status = ' + value;
+      throw new Error('✗ FAIL: expected status = ' + value + ' but got ' + actual);
+    }
     var actual = await COMMANDS['Get']([key]);
     if (actual === value) return '✓ PASS: ' + key + ' = ' + value;
     throw new Error('✗ FAIL: expected ' + key + ' = ' + value + ' but got ' + actual);
@@ -830,6 +864,10 @@ function _panelHTML() {
   <div style="flex:1;display:flex;flex-direction:column;min-width:0">
 
     <!-- Transcript tab -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 12px;border-bottom:1px solid #0d1f2e;flex-shrink:0;background:#040710">
+      <span style="font-size:9px;color:rgba(255,255,255,.2);letter-spacing:.08em;text-transform:uppercase">Commands only · copy-paste ready</span>
+      <button id="phr-copy-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">⎘ Copy</button>
+    </div>
     <div id="phr-pane-transcript" style="flex:1;overflow-y:auto;padding:8px 12px;display:block" class="phr-pane"></div>
     <div id="phr-pane-monitor" style="display:none;flex:1;overflow-y:auto;padding:8px 12px;flex-direction:column;gap:1px" class="phr-pane">
       <div style="font-size:10px;color:rgba(255,255,255,.25);padding:4px 0 8px;font-family:monospace">Session presence events — join / leave / location updates</div>
@@ -1007,6 +1045,27 @@ function _wirePanel() {
     }
   });
   p.querySelector('#phr-run-cmd').onclick = _runCmd;
+
+  // Copy transcript button
+  var copyBtn = p.querySelector('#phr-copy-transcript');
+  if (copyBtn) {
+    copyBtn.onclick = function() {
+      var lines = _transcript
+        .filter(function(l){ return l.type === 'cmd'; })
+        .map(function(l){ return l.text; })
+        .join('\n');
+      navigator.clipboard.writeText(lines).then(function() {
+        copyBtn.textContent = '✓ Copied';
+        setTimeout(function(){ copyBtn.textContent = '⎘ Copy'; }, 2000);
+      }).catch(function() {
+        var ta = document.createElement('textarea');
+        ta.value = lines; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy'); ta.remove();
+        copyBtn.textContent = '✓ Copied';
+        setTimeout(function(){ copyBtn.textContent = '⎘ Copy'; }, 2000);
+      });
+    };
+  }
 
   // Target pill cycling
   p.querySelector('#phr-target-pill').onclick = function() {
@@ -1782,23 +1841,25 @@ VS: Form Scroll top
 Wait 2000
 
 # Save as draft
-VS: Form Save
+Form Save
 Wait 2000
 
 # Close form
-VS: Form Close
+Form Close
 Wait 1500
 
-# Reopen from ACTIVE tab — continue draft
-VS: Set SubTab "ACTIVE"
-Wait 1500
+# Capture draft ID and reopen
+Get Draft id
+Wait 500
+Continue Draft $draft_id
+Wait 2000
+
+# Scroll to top before submitting
+Form Scroll top
+Wait 1000
 
 # Submit for approval
-VS: Continue Draft id=last
-Wait 2000
-VS: Form Scroll top
-Wait 1000
-VS: Form Submit
+Form Submit
 Wait 1000
 Log Demo complete — expense report submitted for approval`
     );
