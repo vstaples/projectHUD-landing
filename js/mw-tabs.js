@@ -3,6 +3,7 @@
 // VERSION: 20260412-MT6
 // ══════════════════════════════════════════════════════════
 console.log('%c[mw-tabs] v20260412-MT6 — blocked routing: caution flag + admin notify + Resume','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260412-MT9';
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1544,7 +1545,10 @@ function _myrOpenHtmlFormOverlay(title, url) {
   var closeBtn = document.createElement('button');
   closeBtn.innerHTML = '✕';
   closeBtn.style.cssText = 'background:none;border:none;color:#003333;font-size:16px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:3px;opacity:.7';
-  closeBtn.onclick = function() { overlay.remove(); };
+  closeBtn.onclick = function() {
+    overlay.remove();
+    try { window.postMessage({ type: 'cmd:form_action', action: 'Form Close' }, '*'); } catch(e) {}
+  };
 
   bar.appendChild(maxBtn);
   bar.appendChild(closeBtn);
@@ -1559,7 +1563,12 @@ function _myrOpenHtmlFormOverlay(title, url) {
   modal.appendChild(bar);
   modal.appendChild(iframe);
   overlay.appendChild(modal);
-  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) {
+      overlay.remove();
+      try { window.postMessage({ type: 'cmd:form_action', action: 'Form Close' }, '*'); } catch(e) {}
+    }
+  });
   document.body.appendChild(overlay);
 }
 
