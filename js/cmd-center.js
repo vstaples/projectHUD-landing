@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD5
+// cmd-center.js  ·  v20260412-CMD6
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,7 +27,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD5',
+    'cmd-center':  'v20260412-CMD6',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -647,13 +647,23 @@ function _buildPanel() {
 
   var el = document.createElement('div');
   el.id = 'cmd-center-panel';
-  el.style.cssText = [
-    'position:fixed;bottom:20px;right:20px;width:680px;height:520px',
-    'background:#060a10;border:1px solid #00c9c9;border-radius:8px',
-    'display:flex;flex-direction:column;z-index:99999;box-shadow:0 20px 60px rgba(0,0,0,.8)',
-    'font-family:monospace;overflow:hidden',
-    'resize:both',
-  ].join(';');
+  // In pop-out mode (flagged by window._cmdCenterFullscreen), fill the entire window
+  if (window._cmdCenterFullscreen) {
+    el.style.cssText = [
+      'position:fixed;inset:0;width:100vw;height:100vh',
+      'background:#060a10;border:none;border-radius:0',
+      'display:flex;flex-direction:column;z-index:99999',
+      'font-family:monospace;overflow:hidden',
+    ].join(';');
+  } else {
+    el.style.cssText = [
+      'position:fixed;bottom:20px;right:20px;width:680px;height:520px',
+      'background:#060a10;border:1px solid #00c9c9;border-radius:8px',
+      'display:flex;flex-direction:column;z-index:99999;box-shadow:0 20px 60px rgba(0,0,0,.8)',
+      'font-family:monospace;overflow:hidden',
+      'resize:both',
+    ].join(';');
+  }
 
   el.innerHTML = _panelHTML();
   document.body.appendChild(el);
@@ -1068,20 +1078,26 @@ function _appendLine(who, type, text) {
   var pane = p.querySelector('#phr-pane-transcript');
   if (!pane) return;
 
+  // Also append to monitor with full metadata
+  _appendMonitor('[' + who + '] ' + text);
+
+  // Transcript shows command text only — clean, copy-paste ready for scripts
+  // SYS result/error lines shown as comments; cmd lines shown bare
   var colors = {
     cmd:    '#00c9c9', result: '#1D9E75', warn: '#EF9F27',
     err:    '#E24B4A', sys:    'rgba(255,255,255,.3)', event: '#7dd3fc'
   };
   var color = colors[type] || 'rgba(255,255,255,.6)';
 
-  var whoColor = _mySession && who === _mySession.initials ? '#00c9c9' : '#EF9F27';
-  if (who === 'SYS') whoColor = 'rgba(255,255,255,.25)';
+  // For SYS lines prefix with # so they read as comments in scripts
+  var displayText = (type === 'sys' || type === 'result' || type === 'event')
+    ? '# ' + text
+    : (who !== 'SYS' && who !== (_mySession && _mySession.initials) ? who + ': ' : '') + text;
 
   var div = document.createElement('div');
-  div.style.cssText = 'display:table;width:100%;table-layout:fixed;font-size:11px;line-height:1.7;margin-bottom:1px';
-  div.innerHTML = '<span style="display:table-cell;color:rgba(255,255,255,.2);font-size:10px;white-space:nowrap;width:58px;vertical-align:top;padding-right:4px">' + ts + '</span>'
-    + '<span style="display:table-cell;font-size:10px;font-weight:700;color:' + whoColor + ';white-space:nowrap;width:28px;vertical-align:top;padding-right:6px">' + who + '</span>'
-    + '<span style="display:table-cell;color:' + color + ';overflow-wrap:anywhere;vertical-align:top">' + _escHtml(text) + '</span>';
+  div.style.cssText = 'font-family:monospace;font-size:11px;line-height:1.7;color:' + color
+    + ';white-space:pre-wrap;word-break:break-word;padding:0 2px';
+  div.textContent = displayText;
 
   pane.appendChild(div);
   pane.scrollTop = pane.scrollHeight;
