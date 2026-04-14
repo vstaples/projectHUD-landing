@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD21
+// cmd-center.js  ·  v20260412-CMD22
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD21',
+    'cmd-center':  'v20260412-CMD22',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD21 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD22 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1231,9 +1231,16 @@ function _hookAppEvents() {
     if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
       'Open "' + (inst ? inst.title : instanceId.slice(0,8)) + '"');
   });
-  _interceptProperty(window, 'myrLaunchRequest', function(type) {
+  _interceptProperty(window, 'myrLaunchRequest', function(type, templateId) {
+    // Look up the actual form name from _myrFormDefs or _myrTemplates
+    var name = '';
+    if (templateId) {
+      var fd = (window._myrFormDefs||[]).find(function(f){ return f.id === templateId; });
+      var tm = (window._myrTemplates||[]).find(function(t){ return t.id === templateId; });
+      name = (fd && fd.source_name) || (tm && tm.name) || templateId.slice(0,8);
+    }
     if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd',
-      'Form Open "' + (type||'') + '"');
+      'Form Open "' + (name || type || 'form') + '"');
   });
 
   // ── MY REQUESTS actions ──────────────────────────────────────────────────
@@ -1291,16 +1298,25 @@ function _hookAppEvents() {
   _interceptProperty(window, '_mwResolveAndRoute', function(instanceId, steps, seq, submitterResId, formName) {
     // Look up who step seq routes to from the pre-resolved step chain
     setTimeout(function() {
-      var inst = (window._myrInstances||[]).find(function(i){ return i.id === instanceId; });
-      var assignee = '';
-      try {
-        var notes = inst && inst.notes ? JSON.parse(inst.notes) : null;
-        var chain = notes && notes.step_chain;
-        if (chain && chain[seq]) assignee = ' → ' + (chain[seq].assignee_name || '');
-      } catch(e) {}
-      if (_panelEl) _appendLine('SYS', 'result',
-        '→ routed step ' + seq + assignee);
-    }, 500); // brief delay so notes are updated
+      // Re-fetch instance from DB to get latest notes (written async after routing)
+      var firmId = typeof FIRM_ID !== 'undefined' ? FIRM_ID : (window.PHUD && window.PHUD.FIRM_ID) || '';
+      var supaUrl = typeof SUPA_URL !== 'undefined' ? SUPA_URL : (window.PHUD && window.PHUD.SUPABASE_URL) || '';
+      var supaKey = typeof SUPA_KEY !== 'undefined' ? SUPA_KEY : (window.PHUD && window.PHUD.SUPABASE_KEY) || '';
+      fetch(supaUrl + '/rest/v1/workflow_instances?id=eq.' + instanceId + '&select=notes&limit=1', {
+        headers: { apikey: supaKey, Authorization: 'Bearer ' + supaKey }
+      }).then(function(r){ return r.json(); }).then(function(rows) {
+        var assignee = '';
+        try {
+          var notes = rows && rows[0] && rows[0].notes ? JSON.parse(rows[0].notes) : null;
+          var chain = notes && notes.step_chain;
+          if (chain && chain[seq]) assignee = ' → ' + (chain[seq].assignee_name || '');
+        } catch(e) {}
+        if (_panelEl) _appendLine('SYS', 'result',
+          '→ routed step ' + seq + assignee);
+      }).catch(function() {
+        if (_panelEl) _appendLine('SYS', 'result', '→ routed step ' + seq);
+      });
+    }, 1500); // wait for notes patch to complete
   });
 }
 
@@ -1373,6 +1389,12 @@ setInterval(function() {
 
 // Retry hooking until the target functions are defined (they load after cmd-center.js)
 
+
+// ── Listen for form actions posted from embedded form overlays ───────────────
+window.addEventListener('message', function(ev) {
+  if (!ev.data || ev.data.type !== 'cmd:form_action') return;
+  if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd', ev.data.action);
+});
 
 // ── Expose public API ─────────────────────────────────────────────────────────
 window.CMDCenter = {
