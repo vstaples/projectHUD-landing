@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD28
+// cmd-center.js  ·  v20260412-CMD30
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD28',
+    'cmd-center':  'v20260412-CMD30',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD28 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD30 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -64,6 +64,7 @@ var _cmdTarget   = 'ALL';  // current command target userId or 'ALL'
 var _execQueue   = [];     // pending async commands
 var _eventListeners = {};  // { eventName: [resolvers] }
 var _storeVars   = {};     // script variable storage { name: value }
+var _scriptRunning = false; // suppress hook double-logging during script execution
 
 // ── Load Supabase JS client ───────────────────────────────────────────────────
 function _loadSupabase() {
@@ -389,11 +390,36 @@ var COMMANDS = {
     return 'added row to ' + table;
   },
 
+  'Form Save': async function(args) {
+    var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
+    if (!iframe) return 'No form overlay open';
+    iframe.contentWindow.postMessage({ source: 'cmd-center', cmd: 'Form Save' }, '*');
+    return 'draft saved';
+  },
+
   'Form Close': async function(args) {
-    var overlay = document.getElementById('myr-html-form-modal') ||
-                  document.getElementById('myr-html-form-overlay');
-    if (overlay) { overlay.remove(); return 'form closed'; }
-    return 'no form overlay found';
+    // Remove all possible overlay variants
+    ['myr-html-form-modal','myr-html-form-overlay'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.remove();
+    });
+    // Also remove any lingering backdrop overlays (z-index 9000+)
+    document.querySelectorAll('[style*="backdrop-filter"]').forEach(function(el) {
+      if (el.style.zIndex >= 9000) el.remove();
+    });
+    return 'form closed';
+  },
+
+  'Continue Draft': async function(args) {
+    // Opens the most recent draft from the ACTIVE tab
+    var drafts = window._myrDrafts || [];
+    if (!drafts.length) return 'No drafts found';
+    var draft = drafts[0]; // most recent
+    if (typeof myrContinueDraft === 'function') {
+      await myrContinueDraft(draft.form_def_id, draft.id);
+      return 'opened draft: ' + draft.id.slice(0,8);
+    }
+    return 'myrContinueDraft not available';
   },
 
   'Form Scroll': async function(args) {
@@ -590,6 +616,7 @@ async function _executeCommand(cmdLine, fromWho) {
 // ── Run a multi-line script ───────────────────────────────────────────────────
 async function _runScript(scriptText, scriptName) {
   var lines = scriptText.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+  _scriptRunning = true;
   _appendLine('SYS', 'sys', 'Script: ' + (scriptName||'inline') + ' · ' + lines.filter(function(l){ return !l.startsWith('#'); }).length + ' commands');
 
   for (var i = 0; i < lines.length; i++) {
@@ -644,6 +671,7 @@ async function _runScript(scriptText, scriptName) {
     await new Promise(function(r){ setTimeout(r, 200); });
   }
 
+  _scriptRunning = false;
   _appendLine('SYS', 'result', '✓ Script complete · ' + (scriptName||'inline'));
 }
 
@@ -669,13 +697,9 @@ async function _loadServerScripts() {
       var manifest = await manifestResp.json();
       filenames = Array.isArray(manifest) ? manifest : (manifest.scripts || []);
     } else {
-      // No manifest — try fetching the scripts directory listing
-      // Fall back to scanning for known script names via HEAD requests
-      var knownNames = ['demo_expense_report', 'test_expense_full', 'test_expense_draft', 'verify_routing_chain'];
-      for (var i = 0; i < knownNames.length; i++) {
-        var headResp = await fetch('/scripts/' + knownNames[i] + '.txt', { method: 'HEAD', cache: 'no-store' }).catch(function(){ return null; });
-        if (headResp && headResp.ok) filenames.push(knownNames[i] + '.txt');
-      }
+      // No index.json — nothing to load automatically
+      // Add /scripts/index.json to your server to enable auto-loading
+      return;
     }
 
     // Fetch and store each script file
@@ -1420,7 +1444,9 @@ function _wrap(originalFn, obs, prop) {
     var last = _interceptRegistry[prop] ? (_interceptRegistry[prop].lastCall || 0) : 0;
     if (now - last > 100) { // 100ms debounce shared across all wrappers for this prop
       if (_interceptRegistry[prop]) _interceptRegistry[prop].lastCall = now;
-      try { obs.apply(this, args); } catch(e) {}
+      if (!_scriptRunning) { // suppress during script — runner logs commands itself
+        try { obs.apply(this, args); } catch(e) {}
+      }
     }
     return result; // return Promise or value to caller
   };
@@ -1478,7 +1504,7 @@ setInterval(function() {
 // ── Listen for form actions posted from embedded form overlays ───────────────
 window.addEventListener('message', function(ev) {
   if (!ev.data || ev.data.type !== 'cmd:form_action') return;
-  if (_panelEl) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd', ev.data.action);
+  if (_panelEl && !_scriptRunning) _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd', ev.data.action);
 });
 
 // ── Expose public API ─────────────────────────────────────────────────────────
