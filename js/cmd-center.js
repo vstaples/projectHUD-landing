@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260412-CMD20
+// cmd-center.js  ·  v20260412-CMD21
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260412-CMD20',
+    'cmd-center':  'v20260412-CMD21',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260412-CMD20 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260412-CMD21 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1314,13 +1314,14 @@ var _interceptRegistry = {};
 function _wrap(originalFn, obs, prop) {
   var wrapped = function() {
     var args = Array.prototype.slice.call(arguments);
-    originalFn.apply(this, args);
+    var result = originalFn.apply(this, args); // preserve return value (Promises etc.)
     var now  = Date.now();
     var last = _interceptRegistry[prop] ? (_interceptRegistry[prop].lastCall || 0) : 0;
     if (now - last > 100) { // 100ms debounce shared across all wrappers for this prop
       if (_interceptRegistry[prop]) _interceptRegistry[prop].lastCall = now;
       try { obs.apply(this, args); } catch(e) {}
     }
+    return result; // return Promise or value to caller
   };
   wrapped._cmdHooked   = true;
   wrapped._cmdOriginal = originalFn;
