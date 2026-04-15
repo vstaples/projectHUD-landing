@@ -25,34 +25,28 @@ Wait 4000
 DB Poll workflow_instances submitted_by_resource_id=eq.e1000001-0000-0000-0000-000000000001&status=eq.in_progress&created_at=gt.$submit_time → $instance_id
 Log "Package live · $instance_id"
 
-# — step 1: VS reviews ————————————————————————————————
+# — step 1: VS reviews (MY WORK queue) ———————————————
 Wait 2000
-VS: Set SubTab "ACTIVE"
+VS: Set Tab "MY WORK"
 Wait 1000
-VS: Open Review "Expense Report" $instance_id
+VS: Click "Review"
 Wait 1000
 VS: Click "Approve"
 Wait 3000
 Log "Step 1 complete"
 
-# — step 2: VS approves ———————————————————————————————
+# — step 2: VS approves (MY WORK queue) ——————————————
 Wait 1000
-VS: Open Review "Expense Report" $instance_id
+VS: Click "Review"
 Wait 1000
 VS: Click "Approve"
 Wait 3000
 Log "Step 2 complete"
 
-# — step 3: AK approves ———————————————————————————————
-# Fetch the exact workflow_request id assigned to AK for this instance
+# — step 3: AK approves (MY WORK queue) ——————————————
 Wait 2000
-Get Request id for AK → $wr_id
-Log "AK request: $wr_id"
-AK: Set Tab "MY REQUESTS"
-AK: Set SubTab "ACTIVE"
+AK: Set Tab "MY WORK"
 Wait 1500
-AK: Open Review "Expense Report" $instance_id
-Wait 1000
 AK: Click "Approve"
 Wait 3000
 Log "Step 3 complete · AK approved"

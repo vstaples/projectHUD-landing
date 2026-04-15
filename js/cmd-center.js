@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36m
+// cmd-center.js  ·  v20260414-CMD36n
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36m',
+    'cmd-center':  'v20260414-CMD36n',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36m ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36n ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -625,35 +625,48 @@ var COMMANDS = {
 
   'Click': async function(args) {
     var target = args[0];
-    var scope  = args[1]; // optional: instance_id or selector
+    var scope  = args[1];
 
     if (target === 'Approve') {
-      var btn = document.getElementById('rrp-approve-btn');
-      if (btn) { btn.click(); return 'approve clicked'; }
+      // First try the review panel approve button (open panel)
+      var rrpBtn = document.getElementById('rrp-approve-btn');
+      if (rrpBtn) { rrpBtn.click(); return 'approve clicked'; }
+      // Fall back: find Approve button in work queue by text
+      var queueBtn = Array.from(document.querySelectorAll('.wi-action-btn, button'))
+        .find(function(b){ return b.textContent.trim() === 'Approve'; });
+      if (queueBtn) { queueBtn.click(); return 'approve clicked (queue)'; }
       return 'Approve button not found — is review panel open?';
     }
-    if (target === 'Review' || target === 'Open') {
-      // Find the work item and click its action button
-      var wiBtn = document.querySelector('.wi-action-btn');
+
+    if (target === 'Review') {
+      // Find Review button in work queue
+      var wiBtn = Array.from(document.querySelectorAll('.wi-action-btn, button'))
+        .find(function(b){ return b.textContent.trim() === 'Review'; });
       if (scope) {
-        wiBtn = document.querySelector('.wi-action-btn[data-wi-id="' + scope + '"]') ||
-                Array.from(document.querySelectorAll('.wi-action-btn')).find(function(b){
-                  return b.dataset.wiId && b.dataset.wiId.startsWith(scope.slice(0,8));
-                });
+        var byId = document.querySelector('.wi-action-btn[data-wi-id="' + scope + '"]');
+        if (byId) wiBtn = byId;
       }
-      if (wiBtn) { wiBtn.click(); return 'review opened'; }
+      if (wiBtn) { wiBtn.click(); return 'review clicked'; }
       return 'Review button not found';
     }
+
     if (target === 'Request Changes') {
       var rejBtn = document.getElementById('rrp-reject-btn');
       if (rejBtn) { rejBtn.click(); return 'request changes clicked'; }
       return 'Request Changes button not found';
     }
+
     if (target === 'Resume') {
       var resumeBtn = document.querySelector('[onclick*="myrResumeInstance"]');
       if (resumeBtn) { resumeBtn.click(); return 'resume clicked'; }
       return 'Resume button not found';
     }
+
+    // Generic button search by text
+    var genericBtn = Array.from(document.querySelectorAll('button'))
+      .find(function(b){ return b.textContent.trim() === target; });
+    if (genericBtn) { genericBtn.click(); return 'clicked: ' + target; }
+
     return 'Unknown click target: ' + target;
   },
 
