@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260415-CMD37
+// cmd-center.js  ·  v20260415-CMD38
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260415-CMD37',
+    'cmd-center':  'v20260415-CMD38',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260415-CMD37 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260415-CMD38 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -68,6 +68,7 @@ var _eventListeners = {};  // { eventName: [resolvers] }
 var _storeVars   = {};     // script variable storage { name: value }
 var _scriptRunning = false; // suppress hook double-logging during script execution
 var _scriptAborted = false; // set when panel closes mid-script
+var _pauseResolve  = null;  // set by Pause command, cleared by Enter in command bar
 
 // ── Load Supabase JS client ───────────────────────────────────────────────────
 function _loadSupabase() {
@@ -949,6 +950,40 @@ var COMMANDS = {
   'Log': async function(args) {
     return args.join(' ');
   },
+
+  // ── Pause ─────────────────────────────────────────────────────────────────────
+  // Suspends script execution until operator hits Enter in the command bar.
+  // Puts the input into "resume mode" with a visual prompt.
+  'Pause': async function(args) {
+    var msg = args.join(' ') || 'paused — press Enter to continue';
+    _appendLine('SYS', 'warn', '⏸  ' + msg);
+    // Put command input into resume mode
+    var p = _panelEl;
+    var input = p && p.querySelector('#phr-cmd');
+    var pill  = p && p.querySelector('#phr-target-pill');
+    if (input) {
+      input.placeholder = 'Press Enter to resume ▶';
+      input.style.color = '#EF9F27';
+      if (pill) { pill.textContent = '⏸'; pill.style.color = '#EF9F27'; }
+      input.focus();
+    }
+    // Block until _pauseResolve is called (by Enter in the command bar)
+    await new Promise(function(resolve) {
+      _pauseResolve = resolve;
+    });
+    // Restore input
+    if (input) {
+      input.placeholder = 'Enter command…';
+      input.style.color = '#fff';
+      if (pill) {
+        var label = _cmdTarget === 'ALL' ? 'ALL' : (_sessions[_cmdTarget] ? (_sessions[_cmdTarget].alias || _sessions[_cmdTarget].initials) : 'ALL');
+        pill.textContent = label + ' ▾';
+        pill.style.color = _cmdTarget === 'ALL' ? '#00c9c9' : _sessionColor(_cmdTarget);
+      }
+    }
+    _appendLine('SYS', 'result', '▶ resumed');
+    return 'resumed';
+  },
 };
 
 // ── Parse a command line into [verb, ...args] ─────────────────────────────────
@@ -1167,6 +1202,8 @@ async function _runScript(scriptText, scriptName) {
     // Always clear running flag — even if script threw
     _scriptRunning = false;
     _scriptAborted = false;
+    // Release any pending Pause
+    if (_pauseResolve) { var r = _pauseResolve; _pauseResolve = null; r(); }
   }
 
   _appendLine('SYS', 'result', _scriptAborted ? '■ Script stopped' : '✓ Script complete · ' + (scriptName||'inline'));
@@ -1467,7 +1504,10 @@ function _panelHTML() {
     <!-- Transcript tab -->
     <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 12px;border-bottom:1px solid #0d1f2e;flex-shrink:0;background:#040710">
       <span style="font-size:9px;color:rgba(255,255,255,.2);letter-spacing:.08em;text-transform:uppercase">Commands only · copy-paste ready</span>
-      <button id="phr-copy-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">⎘ Copy</button>
+      <div style="display:flex;gap:5px">
+        <button id="phr-clear-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">✕ Clear</button>
+        <button id="phr-copy-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">⎘ Copy</button>
+      </div>
     </div>
     <div id="phr-pane-transcript" style="flex:1;overflow-y:auto;padding:8px 12px;display:block" class="phr-pane"></div>
     <div id="phr-pane-monitor" style="display:none;flex:1;overflow-y:auto;padding:8px 12px;flex-direction:column;gap:1px" class="phr-pane">
@@ -1698,6 +1738,17 @@ function _wirePanel() {
     };
   }
 
+  // Clear transcript button
+  var clearBtn = p.querySelector('#phr-clear-transcript');
+  if (clearBtn) {
+    clearBtn.onclick = function() {
+      _transcript = [];
+      var pane = p.querySelector('#phr-pane-transcript');
+      if (pane) pane.innerHTML = '';
+      _appendLine('SYS', 'sys', 'Transcript cleared');
+    };
+  }
+
   // Copy transcript button
   var copyBtn = p.querySelector('#phr-copy-transcript');
   if (copyBtn) {
@@ -1755,6 +1806,16 @@ function _runCmd() {
   if (!p) return;
   var input = p.querySelector('#phr-cmd');
   var cmd   = input.value.trim();
+
+  // If script is paused, Enter resumes regardless of input content
+  if (_pauseResolve) {
+    input.value = '';
+    var resume = _pauseResolve;
+    _pauseResolve = null;
+    resume();
+    return;
+  }
+
   if (!cmd) return;
   _cmdHistory.push(cmd);
   _cmdHistoryIdx = -1;

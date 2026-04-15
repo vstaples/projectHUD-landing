@@ -20,36 +20,35 @@ VS: Form Insert "Customer Name" "Apex Consulting Group"
 VS: Form Insert "Customer Location" "Phoenix, AZ"
 Wait 500
 VS: Form Submit
-Wait 3000
+Pause Form submitted — confirm form closed & entry visible in MY WORK queue
+Wait 1000
 Get Latest instance_id
 Log "Package live · $instance_id"
 
-# — step 1: VS reviews (MY WORK queue) ———————————————
+# — step 1: VS reviews ————————————————————————————————
 VS: Set Tab "MY WORK"
-Wait 1500
+Pause Ready to click Review for step 1 — confirm Review button visible in queue
 VS: Click "Review"
-Wait 1500
+Pause Review panel open — confirm panel visible on screen
 VS: Click "Approve"
-Wait 3000
+Pause Step 1 approved — confirm entry removed from queue
 Log "Step 1 complete"
 
-# — step 2: VS approves (MY WORK queue) ——————————————
-Wait 1500
+# — step 2: VS approves ———————————————————————————————
+Pause Ready for step 2 — confirm new Review button visible in queue
 VS: Click "Review"
-Wait 1500
+Pause Review panel open — confirm panel visible
 VS: Click "Approve"
-Wait 3000
+Pause Step 2 approved — confirm entry removed & routing to AK
 Log "Step 2 complete"
 
-# — step 3: AK opens panel then approves ——————————————
-Wait 2000
+# — step 3: AK approves ———————————————————————————————
 AK: Set Tab "MY WORK"
-Wait 1500
+Pause AK queue loaded — confirm Approve button visible on Angela's screen
 AK: Click "Approve"
-Wait 2000
+Pause AK panel open — confirm Document Review panel visible on Angela's screen
 AK: Click "Approve"
-Wait 3000
+Pause Step 3 complete — confirm entry removed from AK queue
 Log "Step 3 complete · AK approved"
 
-# — verify ————————————————————————————————————————————
 Log "✓ Chain confirmed · steps 1-3 complete · $instance_id"
