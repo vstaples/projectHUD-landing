@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36k
+// cmd-center.js  ·  v20260414-CMD36m
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36k',
+    'cmd-center':  'v20260414-CMD36m',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36k ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36m ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -579,30 +579,47 @@ var COMMANDS = {
 
   // ── Work queue actions ───────────────────────────────────────────────────────
   'Open Review': async function(args) {
-    // Open Review "Expense Report"
-    // Open Review "Expense Report" $instance_id
     var title      = args[0];
     var instanceId = args[1] ? (args[1].startsWith('$') ? (_storeVars[args[1].slice(1)] || '') : args[1]) : null;
 
-    // Try by instance_id first — most precise
+    var allBtns = Array.from(document.querySelectorAll('.wi-action-btn'));
+
+    // Strategy 1a: match by workflow_request id stored in $wr_id — most precise
+    var wrId = _storeVars['wr_id'];
+    if (wrId) {
+      var wrBtn = document.querySelector('.wi-action-btn[data-wi-id="' + wrId + '"]');
+      if (wrBtn) { wrBtn.click(); return 'review opened: wr ' + wrId.slice(0,8); }
+    }
+
+    // Strategy 1b: match by instance_id on data-wi-id
     if (instanceId) {
       var btn = document.querySelector('.wi-action-btn[data-wi-id="' + instanceId + '"]') ||
-                Array.from(document.querySelectorAll('.wi-action-btn')).find(function(b){
+                Array.from(allBtns).find(function(b){
                   return b.dataset.wiId && b.dataset.wiId.startsWith(instanceId.slice(0,8));
                 });
       if (btn) { btn.click(); return 'review opened: ' + instanceId.slice(0,8); }
     }
 
-    // Fall back: find by title text match in work item rows
-    var allBtns = Array.from(document.querySelectorAll('.wi-action-btn'));
-    var matched = allBtns.find(function(b) {
-      var row = b.closest('[data-wi-id], .wi-row, .wi-item, li, tr');
+    // Strategy 2: find an Approve button in a row containing the title text
+    var approveBtn = allBtns.find(function(b) {
+      if (b.textContent.trim() !== 'Approve') return false;
+      if (!title) return true;
+      var row = b.closest('[data-wi-id], .wi-row, .cmp-row, li, tr');
+      return !row || (row.textContent || '').toLowerCase().includes((title||'').toLowerCase());
+    });
+    if (approveBtn) { approveBtn.click(); return 'review opened: ' + title + ' (Approve btn)'; }
+
+    // Strategy 3: title text match on any button
+    var titleBtn = allBtns.find(function(b) {
+      var row = b.closest('[data-wi-id], .wi-row, .cmp-row, li, tr');
       return row && (row.textContent || '').toLowerCase().includes((title||'').toLowerCase());
     });
-    if (matched) { matched.click(); return 'review opened: ' + title; }
+    if (titleBtn) { titleBtn.click(); return 'review opened: ' + title; }
 
-    // Last resort: first available action button
-    if (allBtns.length) { allBtns[0].click(); return 'review opened (first available)'; }
+    // Strategy 4: first Approve button — last resort
+    var firstApprove = allBtns.find(function(b){ return b.textContent.trim() === 'Approve'; });
+    if (firstApprove) { firstApprove.click(); return 'review opened: first Approve'; }
+
     return 'Review panel not found for: ' + (title || 'request');
   },
 
@@ -736,7 +753,52 @@ var COMMANDS = {
       _storeVars['instance_id'] = id;
       return id || 'no instance found';
     }
-    if (_storeVars[key] !== undefined) return String(_storeVars[key]);
+    // Get Request id — fetch the open workflow_request id for $instance_id assigned to an alias
+    // Usage: Get Request id for AK → $wr_id
+    // Stores result in $wr_id (or specified variable)
+    if (key.startsWith('Request id')) {
+      var forAlias = null, storeAs = 'wr_id';
+      // Parse "Request id for AK → $wr_id"
+      var forMatch = key.match(/for\s+(\S+)/i);
+      if (forMatch) forAlias = forMatch[1].toUpperCase();
+      var arrowMatch = key.match(/→\s*\$?(\w+)/);
+      if (arrowMatch) storeAs = arrowMatch[1];
+
+      var instanceId = _storeVars['instance_id'] || '';
+      if (!instanceId) return 'no $instance_id stored — run DB Poll first';
+
+      // Resolve alias to userId
+      var targetUid = forAlias ? _resolveTargetAlias(forAlias) : null;
+      var targetSess = targetUid ? _sessions[targetUid] : null;
+
+      // Query workflow_requests for this instance — open, approver or reviewer role
+      var url = SUPA_URL + '/rest/v1/workflow_requests'
+        + '?select=id,role,status,resource_id'
+        + '&instance_id=eq.' + instanceId
+        + '&status=eq.open'
+        + '&limit=10';
+
+      try {
+        var resp = await fetch(url, {
+          headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }
+        });
+        var rows = await resp.json();
+        if (!rows || !rows.length) return 'no open workflow_requests for instance ' + instanceId.slice(0,8);
+
+        // If we have a target alias, find the row assigned to their resource
+        var match = rows[0]; // default to first
+        if (targetSess && targetSess.resourceId) {
+          var byResource = rows.find(function(r){ return r.resource_id === targetSess.resourceId; });
+          if (byResource) match = byResource;
+        }
+
+        _storeVars[storeAs] = match.id;
+        _appendLine('SYS', 'result', '→ stored $' + storeAs + ' = ' + match.id + ' (role: ' + match.role + ')');
+        return match.id;
+      } catch(e) {
+        return 'DB error: ' + e.message;
+      }
+    }
     return 'variable not found: ' + key;
   },
 

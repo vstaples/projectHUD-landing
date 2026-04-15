@@ -44,7 +44,10 @@ Wait 3000
 Log "Step 2 complete"
 
 # — step 3: AK approves ———————————————————————————————
+# Fetch the exact workflow_request id assigned to AK for this instance
 Wait 2000
+Get Request id for AK → $wr_id
+Log "AK request: $wr_id"
 AK: Set Tab "MY REQUESTS"
 AK: Set SubTab "ACTIVE"
 Wait 1500
