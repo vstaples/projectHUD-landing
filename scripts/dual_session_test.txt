@@ -19,16 +19,14 @@ VS: Form Insert "Purpose Description" "Two-session CMD Center approval test"
 VS: Form Insert "Customer Name" "Apex Consulting Group"
 VS: Form Insert "Customer Location" "Phoenix, AZ"
 Wait 500
-Store submit_time now
 VS: Form Submit
-Wait 4000
-DB Poll workflow_instances submitted_by_resource_id=eq.e1000001-0000-0000-0000-000000000001&status=eq.in_progress&created_at=gt.$submit_time → $instance_id
+Wait 3000
+Get Latest instance_id
 Log "Package live · $instance_id"
 
 # — step 1: VS reviews (MY WORK queue) ———————————————
-Wait 2000
 VS: Set Tab "MY WORK"
-Wait 1000
+Wait 1500
 VS: Click "Review"
 Wait 1000
 VS: Click "Approve"

@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36n
+// cmd-center.js  ·  v20260415-CMD37
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36n',
+    'cmd-center':  'v20260415-CMD37',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36n ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260415-CMD37 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -628,10 +628,18 @@ var COMMANDS = {
     var scope  = args[1];
 
     if (target === 'Approve') {
-      // First try the review panel approve button (open panel)
+      // First try the review panel approve button (already open)
       var rrpBtn = document.getElementById('rrp-approve-btn');
       if (rrpBtn) { rrpBtn.click(); return 'approve clicked'; }
-      // Fall back: find Approve button in work queue by text
+      // Try _myActiveRequestId — precise button targeting without DOM scanning
+      var instanceId = _storeVars['instance_id'];
+      var activeReqId = instanceId && window._myActiveRequestId
+        ? window._myActiveRequestId[instanceId] : null;
+      if (activeReqId) {
+        var preciseBtn = document.querySelector('.wi-action-btn[data-wi-id="' + activeReqId + '"]');
+        if (preciseBtn) { preciseBtn.click(); return 'approve clicked (precise: ' + activeReqId.slice(0,8) + ')'; }
+      }
+      // Fall back: find Approve button by text
       var queueBtn = Array.from(document.querySelectorAll('.wi-action-btn, button'))
         .find(function(b){ return b.textContent.trim() === 'Approve'; });
       if (queueBtn) { queueBtn.click(); return 'approve clicked (queue)'; }
@@ -639,13 +647,22 @@ var COMMANDS = {
     }
 
     if (target === 'Review') {
-      // Find Review button in work queue
-      var wiBtn = Array.from(document.querySelectorAll('.wi-action-btn, button'))
-        .find(function(b){ return b.textContent.trim() === 'Review'; });
-      if (scope) {
-        var byId = document.querySelector('.wi-action-btn[data-wi-id="' + scope + '"]');
-        if (byId) wiBtn = byId;
+      // Try _myActiveRequestId first — set by mw-tabs.js when request is for current user
+      var instanceId = _storeVars['instance_id'];
+      var activeReqId = instanceId && window._myActiveRequestId
+        ? window._myActiveRequestId[instanceId] : null;
+      if (activeReqId) {
+        var preciseBtn = document.querySelector('.wi-action-btn[data-wi-id="' + activeReqId + '"]');
+        if (preciseBtn) { preciseBtn.click(); return 'review clicked (precise: ' + activeReqId.slice(0,8) + ')'; }
       }
+      // Fall back: scope arg as explicit wi-id
+      if (scope) {
+        var scopeBtn = document.querySelector('.wi-action-btn[data-wi-id="' + scope + '"]');
+        if (scopeBtn) { scopeBtn.click(); return 'review clicked (scoped)'; }
+      }
+      // Fall back: find Review button by text
+      var wiBtn = Array.from(document.querySelectorAll('button'))
+        .find(function(b){ return b.textContent.trim() === 'Review'; });
       if (wiBtn) { wiBtn.click(); return 'review clicked'; }
       return 'Review button not found';
     }
@@ -759,12 +776,11 @@ var COMMANDS = {
       _storeVars['instance_id'] = id;
       return id || 'no active instance found';
     }
-    // Latest instance id (most recently created)
-    if (key === 'Latest instance_id') {
-      var insts = window._myrInstances || [];
-      var id = insts.length ? insts[0].id : null;
+    // Latest submitted instance — set by mw-tabs.js at submit time
+    if (key === 'Latest instance_id' || key === 'submitted instance_id') {
+      var id = window._lastSubmittedInstanceId || null;
       _storeVars['instance_id'] = id;
-      return id || 'no instance found';
+      return id || 'no submitted instance found';
     }
     // Get Request id — fetch the open workflow_request id for $instance_id assigned to an alias
     // Usage: Get Request id for AK → $wr_id
