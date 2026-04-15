@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260412-MT6
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260415-MT8 — blocked routing: caution flag + admin notify + Resume + CoC signer fix','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260415-MT9 — blocked routing: caution flag + admin notify + Resume + CoC signer fix','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 window._mwTabsVersion = 'v20260412-MT9';
 
 // ── Supabase URL/Key helpers ──────────────────────────────
@@ -1802,11 +1802,44 @@ window.addEventListener('message', function(ev) {
           console.warn('[compass_form_submit] step chain pre-resolve failed:', e);
         }
 
-        // Resolve role → resource and create workflow_request for step 1
+        // Resolve role → resource and create workflow_request for step 1.
+        // If step 1 is a submitter step, the act of submitting the form completes it —
+        // no additional review action is needed from the submitter. Auto-advance to step 2.
         if (firstStep && res && res.id) {
-          await window._mwResolveAndRoute(
-            instanceId, steps, firstStep.sequence_order, res.id, formName
-          ).catch(function(e) { console.warn('[compass_form_submit] routing failed:', e); });
+          var isSubmitterStep = firstStep.assignee_role === 'submitter' ||
+                                firstStep.assignee_type === 'submitter';
+          if (isSubmitterStep) {
+            // Write a CoC event marking step 1 complete via submission
+            await API.post('coc_events', {
+              id:                crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-s1'),
+              firm_id:           firmId,
+              entity_id:         instanceId,
+              entity_type:       'workflow_instance',
+              event_type:        'request.approved',
+              event_class:       'lifecycle',
+              severity:          'info',
+              event_notes:       JSON.stringify({ decision: 'approved', comments: 'Submitted by ' + res.name }),
+              actor_name:        res.name,
+              actor_resource_id: res.id,
+              occurred_at:       now,
+              created_at:        now,
+            }).catch(function(e) { console.warn('[compass_form_submit] step 1 CoC write failed:', e); });
+
+            // Find step 2 and route directly to it
+            var step2 = (steps || []).find(function(s) {
+              return s.step_type !== 'trigger' && s.sequence_order > firstStep.sequence_order;
+            });
+            if (step2) {
+              await window._mwResolveAndRoute(
+                instanceId, steps, step2.sequence_order, res.id, formName
+              ).catch(function(e) { console.warn('[compass_form_submit] step 2 routing failed:', e); });
+            }
+          } else {
+            // Non-submitter first step — create workflow_request normally
+            await window._mwResolveAndRoute(
+              instanceId, steps, firstStep.sequence_order, res.id, formName
+            ).catch(function(e) { console.warn('[compass_form_submit] routing failed:', e); });
+          }
         }
 
         compassToast('Submitted for approval — routing to ' + (firstStep ? firstStep.name : 'reviewers') + '.', 4000);
