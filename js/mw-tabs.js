@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260412-MT6
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260415-MT12 — blocked routing: caution flag + admin notify + Resume + CoC signer fix','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260415-MT13 — blocked routing: caution flag + admin notify + Resume + CoC signer fix','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 window._mwTabsVersion = 'v20260412-MT9';
 
 // ── Supabase URL/Key helpers ──────────────────────────────
@@ -1735,6 +1735,9 @@ window.addEventListener('message', function(ev) {
         console.log('%c[compass_form_submit] instance created: ' + instanceId + ' · template: ' + tmpl.id,
           'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
 
+        // Expose for CMD Center scripts — avoids DOM scraping or Supabase queries
+        window._lastSubmittedInstanceId = instanceId;
+
         // Write request.submitted CoC event — powers the Document Review Request panel.
         // The docs[] array makes the form appear as a clickable link in the review panel.
         // path: 'form:{formDefId}' is handled by myrOpenAttachment to render source_html.
@@ -2196,6 +2199,22 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
 
     console.log('%c[_mwResolveAndRoute] routed step ' + currentStepSeq + ' (' + step.assignee_role + ') → ' + assigneeName,
       'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
+
+    // Expose for CMD Center — if this request is for the current user, store it
+    // so scripts can call Click "Review" or Click "Approve" without DOM scraping.
+    if (window._myResource && assigneeResId === window._myResource.id) {
+      if (!window._myActiveRequestId) window._myActiveRequestId = {};
+      // Re-fetch to get the new row's id
+      var newReq = await API.get(
+        'workflow_requests?instance_id=eq.' + instanceId +
+        '&owner_resource_id=eq.' + assigneeResId +
+        '&status=eq.open&order=created_at.desc&select=id&limit=1'
+      ).catch(function(){ return []; });
+      if (newReq && newReq[0]) {
+        window._myActiveRequestId[instanceId] = newReq[0].id;
+        console.log('[_mwResolveAndRoute] _myActiveRequestId set:', newReq[0].id);
+      }
+    }
 
     // Update instance current_step_id
     await API.patch(
