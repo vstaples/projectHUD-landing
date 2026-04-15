@@ -21,9 +21,8 @@ VS: Form Insert "Customer Location" "Phoenix, AZ"
 Wait 500
 Store submit_time now
 VS: Form Submit
-Wait 4000
-VS: Form Close
-Wait 1000
+Wait ForEvent "compass_form_submit"
+Wait 2000
 DB Poll workflow_instances submitted_by_resource_id=eq.e1000001-0000-0000-0000-000000000001&status=eq.in_progress&created_at=gt.$submit_time → $instance_id
 Log "Package live · $instance_id"
 
