@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260412-MT6
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260415-MT9 — blocked routing: caution flag + admin notify + Resume + CoC signer fix','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260415-MT10 — blocked routing: caution flag + admin notify + Resume + CoC signer fix','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 window._mwTabsVersion = 'v20260412-MT9';
 
 // ── Supabase URL/Key helpers ──────────────────────────────
@@ -1655,8 +1655,10 @@ window.addEventListener('message', function(ev) {
           'The form must be published in Cadence before it can be submitted.'
         );
 
-        // 3. Load template steps so we can activate the first real step
-        var steps = await API.get(
+        // 3. Load template steps — use in-memory cache first (mw-core loads these),
+        //    fall back to DB query only if not cached.
+        var cachedSteps = (window._myrTmplSteps || {})[tmpl.id];
+        var steps = cachedSteps && cachedSteps.length ? cachedSteps : await API.get(
           'workflow_template_steps?template_id=eq.' + tmpl.id +
           '&order=sequence_order.asc&select=id,name,step_type,sequence_order,assignee_type,assignee_role'
         ).catch(function() { return []; });
@@ -2384,7 +2386,23 @@ function _myrStatusCell(inst, step, sColor) {
 
     if (s.sequence_order === 1) {
       stepDate     = submittedEvent ? fmtDt(submittedEvent.occurred_at) : fmtDt(inst.created_at);
-      // For completed step 1, show who actually signed; otherwise show assignee
+      // Step 1 with step_type 'form' is completed by the act of submission itself
+      var isFormStep = s.step_type === 'form';
+      approverName = chainAssignee;
+      // Always show as approved/submitted if instance exists
+      if (isFormStep) {
+        dot = '#1D9E75'; sc = '#1D9E75'; sl = 'Submitted';
+        return '<tr style="border-bottom:0.5px solid rgba(255,255,255,.08)">' +
+          '<td style="' + FA + 'color:#e8eef8;padding:6px 10px;white-space:nowrap">' +
+            '<div style="display:flex;align-items:center;gap:7px">' +
+              '<div style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0"></div>' + s.name +
+            '</div></td>' +
+          '<td style="' + FA + 'color:rgba(255,255,255,.6);padding:6px 10px;white-space:nowrap">' + stepDate + '</td>' +
+          '<td style="' + FA + 'padding:6px 10px;white-space:nowrap">' + approverName + '</td>' +
+          '<td style="padding:6px 10px"><span style="' + FA + 'font-weight:700;color:' + sc + '">' + sl + '</span></td>' +
+        '</tr>';
+      }
+      // For completed non-form step 1, show who actually signed; otherwise show assignee
       approverName = (isPast || isAllDone)
         ? (stepReq ? stepReq.owner_name : chainAssignee)
         : chainAssignee;
