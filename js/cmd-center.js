@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36h
+// cmd-center.js  ·  v20260414-CMD36i
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36h',
+    'cmd-center':  'v20260414-CMD36i',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36h ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36i ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -799,11 +799,16 @@ var COMMANDS = {
       }
     }
 
-    // Resolve $variables in filter
-    filter = filter.replace(/\$(\w+)/g, function(_, k) { return _storeVars[k] || ''; });
+    // Resolve $variables in filter, URL-encoding values that contain special chars
+    filter = filter.replace(/\$(\w+)/g, function(_, k) {
+      var val = _storeVars[k] || '';
+      // URL-encode values containing colons, plus, spaces (timestamps etc.)
+      return val.match(/[: +]/) ? encodeURIComponent(val) : val;
+    });
 
     var url = SUPA_URL + '/rest/v1/' + table + '?select=id,status,title,created_at&order=created_at.desc&limit=1';
     if (filter) url += '&' + filter;
+    _appendLine('SYS', 'sys', 'DB Poll: ' + url.replace(SUPA_URL, ''));
 
     var deadline = Date.now() + timeoutMs;
     var found = null;
@@ -2144,7 +2149,17 @@ setInterval(function() {
 
 // ── Listen for form actions posted from embedded form overlays ───────────────
 window.addEventListener('message', function(ev) {
-  if (!ev.data || ev.data.type !== 'cmd:form_action') return;
+  if (!ev.data) return;
+
+  // compass_form_submit — fired by mw-tabs.js after instance is created.
+  // Capture the formId so scripts can Wait ForEvent "compass_form_submit".
+  if (ev.data.type === 'compass_form_submit') {
+    _resolveEventListeners('compass_form_submit', ev.data);
+    if (_panelEl) _appendLine('SYS', 'event', 'form submitted · ' + (ev.data.formId||'').slice(0,8));
+    return;
+  }
+
+  if (ev.data.type !== 'cmd:form_action') return;
   if (_panelEl && !_scriptRunning) {
     _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd', ev.data.action);
   }
