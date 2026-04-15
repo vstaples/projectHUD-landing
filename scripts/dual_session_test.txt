@@ -18,11 +18,12 @@ VS: Form Insert "Purpose Description" "Two-session CMD Center approval test"
 VS: Form Insert "Customer Name" "Apex Consulting Group"
 VS: Form Insert "Customer Location" "Phoenix, AZ"
 Wait 500
+Store submit_time now
 VS: Form Submit
 Wait 1500
 VS: Form Close
 Wait 2000
-DB Poll workflow_instances submitted_by_resource_id=eq.e1000001-0000-0000-0000-000000000001&status=eq.in_progress → $instance_id
+DB Poll workflow_instances submitted_by_resource_id=eq.e1000001-0000-0000-0000-000000000001&status=eq.in_progress&created_at=gt.$submit_time → $instance_id
 Log "Package live · $instance_id"
 
 # — step 1: VS reviews ————————————————————————————————
@@ -54,6 +55,6 @@ AK: Click "Approve"
 Wait 3000
 Log "Step 3 complete · AK approved"
 
-# — verify: instance still in_progress (Finance step blocked — expected) ———
+# — verify ————————————————————————————————————————————
 DB Poll workflow_instances id=eq.$instance_id&status=eq.in_progress → $check
 Log "✓ Chain confirmed · steps 1-3 complete · Finance pending · $instance_id"

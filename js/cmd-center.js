@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36g
+// cmd-center.js  ·  v20260414-CMD36h
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36g',
+    'cmd-center':  'v20260414-CMD36h',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36g ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36h ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -689,6 +689,12 @@ var COMMANDS = {
   // ── Storage ──────────────────────────────────────────────────────────────────
   'Store': async function(args) {
     var key = args[0];
+    // Special value: "now" stores current ISO timestamp
+    if (args[1] === 'now' || (!args[1] && key === 'now')) {
+      var ts = new Date().toISOString();
+      _storeVars[key] = ts;
+      return 'stored ' + key + ' = ' + ts;
+    }
     var val = args[1] !== undefined ? args[1] : (_storeVars['_lastResult'] || '');
     _storeVars[key] = val;
     return 'stored ' + key + ' = ' + val;
@@ -796,7 +802,7 @@ var COMMANDS = {
     // Resolve $variables in filter
     filter = filter.replace(/\$(\w+)/g, function(_, k) { return _storeVars[k] || ''; });
 
-    var url = SUPA_URL + '/rest/v1/' + table + '?select=id,status,title&order=created_at.desc&limit=1';
+    var url = SUPA_URL + '/rest/v1/' + table + '?select=id,status,title,created_at&order=created_at.desc&limit=1';
     if (filter) url += '&' + filter;
 
     var deadline = Date.now() + timeoutMs;
