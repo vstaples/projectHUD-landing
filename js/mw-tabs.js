@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260412-MT6
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260415-MT11 — blocked routing: caution flag + admin notify + Resume + CoC signer fix','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260415-MT12 — blocked routing: caution flag + admin notify + Resume + CoC signer fix','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 window._mwTabsVersion = 'v20260412-MT9';
 
 // ── Supabase URL/Key helpers ──────────────────────────────
@@ -29,7 +29,8 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
         const hashBuf    = await crypto.subtle.digest('SHA-256', encoder.encode(bindingStr + rawToken));
         const tokenHmac  = Array.from(new Uint8Array(hashBuf))
           .map(b => b.toString(16).padStart(2,'0')).join('').slice(0,32);
-        await API.post('external_step_tokens', {
+        // Write token to DB — fire-and-forget, don't block notification on this
+        API.post('external_step_tokens', {
           firm_id:           _mwFirmId(),
           instance_id:       instanceId,
           template_step_id:  stepId || null,
