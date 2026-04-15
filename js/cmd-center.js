@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36j
+// cmd-center.js  ·  v20260414-CMD36k
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36j',
+    'cmd-center':  'v20260414-CMD36k',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36j ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36k ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -2176,10 +2176,18 @@ window.addEventListener('message', function(ev) {
   if (_panelEl && !_scriptRunning) {
     _appendLine(_mySession ? _mySession.initials : 'ME', 'cmd', ev.data.action);
   }
-  // If form is closed while script is running, abort the script
+  // If form is closed while script is running, abort the script —
+  // BUT only if we're not in a post-submit state (form closes itself after submitForApproval)
   if (ev.data.action === 'Form Close' && _scriptRunning) {
-    _scriptAborted = true;
-    _appendLine('SYS', 'warn', 'Form closed — script aborted');
+    // Check if the last form command was Form Submit — if so, close is expected
+    var lastFormCmd = _transcript.slice().reverse().find(function(l){
+      return l.type === 'cmd' && l.text && l.text.startsWith('Form ');
+    });
+    var postSubmit = lastFormCmd && lastFormCmd.text.trim() === 'Form Submit';
+    if (!postSubmit) {
+      _scriptAborted = true;
+      _appendLine('SYS', 'warn', 'Form closed — script aborted');
+    }
   }
 });
 
