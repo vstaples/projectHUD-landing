@@ -1,5 +1,5 @@
 // VERSION: 20260412-ME1
-console.log('%c[mw-events] v20260412-ME1 — next-step routing + cadenceRole resolution','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-events] v20260415-ME2 — next-step routing + cadenceRole resolution','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -1170,18 +1170,19 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       }
     }
 
+    // Close panel and show toast IMMEDIATELY — don't wait for notifications
     document.getElementById('req-review-panel')?.remove();
     compassToast(approved
       ? `✓ Request approved${comments?' — comments recorded':''}. Submitter notified.`
       : `↺ Changes requested${comments?' — feedback recorded':''}. Submitter notified.`
     );
 
-    // Email submitter — best-effort, 404 on endpoint is non-fatal
+    // Email submitter — fire-and-forget, never block UI on this
     if (inst?.submitted_by_resource_id) {
       try {
         const submitterRes = (_resources||[]).find(r => r.id === inst.submitted_by_resource_id);
         if (submitterRes?.email) {
-          await _myrNotify({
+          _myrNotify({
             toEmail: submitterRes.email, toName: submitterRes.name || inst.submitted_by_name,
             fromName: resName,
             stepName: approved ? 'Approved' : 'Changes requested',

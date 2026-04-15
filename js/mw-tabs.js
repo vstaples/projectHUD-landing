@@ -2,7 +2,7 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260412-MT6
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260415-MT10 — blocked routing: caution flag + admin notify + Resume + CoC signer fix','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-tabs] v20260415-MT11 — blocked routing: caution flag + admin notify + Resume + CoC signer fix','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 window._mwTabsVersion = 'v20260412-MT9';
 
 // ── Supabase URL/Key helpers ──────────────────────────────
@@ -57,8 +57,12 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
     const _notifyUrl = `${_mwSupaURL()}/functions/v1/notify-step-activated`;
     const _notifyKey = _mwSupaKey();
     console.log('[notify] approveUrl:', approveUrl, 'stepType:', stepType, 'has_action_buttons:', !!(approveUrl));
+    // 3-second timeout — notification is best-effort, never block UI on it
+    const _notifyAbort = new AbortController();
+    const _notifyTimer = setTimeout(() => _notifyAbort.abort(), 3000);
     const res = await fetch(_notifyUrl, {
       method:  'POST',
+      signal:  _notifyAbort.signal,
       headers: {
         'Content-Type':  'application/json',
         'apikey':        _notifyKey,
@@ -83,6 +87,7 @@ async function _myrNotify({ toEmail, toName, fromName, stepName, stepType, title
         outcomes:           [],
       }),
     });
+    clearTimeout(_notifyTimer);
     if (res.ok) {
       console.log('[MyRequests] Email sent to', toEmail);
     } else {
