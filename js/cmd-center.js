@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260415-CMD38
+// cmd-center.js  ·  v20260415-CMD39
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260415-CMD38',
+    'cmd-center':  'v20260415-CMD39',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260415-CMD38 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260415-CMD39 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -487,8 +487,21 @@ var COMMANDS = {
   'Form Submit': async function(args) {
     var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
     if (!iframe) return 'No form overlay open';
+    // Clear any previous value so we can detect the new one
+    var prevInstanceId = window._lastSubmittedInstanceId;
     iframe.contentWindow.postMessage({ source: 'cmd-center', cmd: 'Form Submit' }, '*');
-    return 'submit triggered';
+    // Wait up to 15s for the instance to be created (mw-tabs sets _lastSubmittedInstanceId)
+    for (var si = 0; si < 150; si++) {
+      await new Promise(function(r){ setTimeout(r, 100); });
+      if (window._lastSubmittedInstanceId && window._lastSubmittedInstanceId !== prevInstanceId) break;
+      if (_scriptAborted) return 'aborted';
+    }
+    var newId = window._lastSubmittedInstanceId;
+    if (newId && newId !== prevInstanceId) {
+      _storeVars['instance_id'] = newId;
+      return 'submitted · instance ' + newId.slice(0,8);
+    }
+    return 'submit triggered (instance id not yet available)';
   },
 
   'Form Insert': async function(args) {
@@ -1388,7 +1401,7 @@ function _buildPanel() {
     ].join(';');
   } else {
     el.style.cssText = [
-      'position:fixed;bottom:20px;right:20px;width:680px;height:520px',
+      'position:fixed;bottom:20px;right:20px;width:840px;height:520px',
       'background:#060a10;border:1px solid #00c9c9;border-radius:8px',
       'display:flex;flex-direction:column;z-index:99999;box-shadow:0 20px 60px rgba(0,0,0,.8)',
       'font-family:monospace;overflow:hidden',
@@ -1501,14 +1514,7 @@ function _panelHTML() {
   <!-- Main area -->
   <div style="flex:1;display:flex;flex-direction:column;min-width:0">
 
-    <!-- Transcript tab -->
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 12px;border-bottom:1px solid #0d1f2e;flex-shrink:0;background:#040710">
-      <span style="font-size:9px;color:rgba(255,255,255,.2);letter-spacing:.08em;text-transform:uppercase">Commands only · copy-paste ready</span>
-      <div style="display:flex;gap:5px">
-        <button id="phr-clear-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">✕ Clear</button>
-        <button id="phr-copy-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">⎘ Copy</button>
-      </div>
-    </div>
+    <!-- Transcript tab — no header row, buttons moved to bottom -->
     <div id="phr-pane-transcript" style="flex:1;overflow-y:auto;padding:8px 12px;display:block" class="phr-pane"></div>
     <div id="phr-pane-monitor" style="display:none;flex:1;overflow-y:auto;padding:8px 12px;flex-direction:column;gap:1px" class="phr-pane">
       <div style="font-size:10px;color:rgba(255,255,255,.25);padding:4px 0 8px;font-family:monospace">Session presence events — join / leave / location updates</div>
@@ -1516,13 +1522,8 @@ function _panelHTML() {
 
     <!-- Editor tab -->
     <div id="phr-pane-editor" style="display:none;flex:1;flex-direction:column" class="phr-pane">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-bottom:1px solid #0d1f2e;flex-shrink:0">
-        <input id="phr-script-name" placeholder="script-name" style="font-family:monospace;font-size:11px;background:transparent;border:none;outline:none;color:#EF9F27;width:160px">
-        <div style="display:flex;gap:5px">
-          <button id="phr-save-script" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.15);border-radius:3px;background:transparent;color:rgba(255,255,255,.5);cursor:pointer;font-family:monospace">Save</button>
-          <button id="phr-run-script" style="font-size:10px;padding:2px 8px;border:1px solid #1D9E75;border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;font-weight:700">▶ Run</button>
-          <button id="phr-del-script" style="font-size:10px;padding:2px 8px;border:1px solid rgba(226,75,74,.3);border-radius:3px;background:transparent;color:rgba(226,75,74,.6);cursor:pointer;font-family:monospace">Delete</button>
-        </div>
+      <div style="padding:6px 12px;border-bottom:1px solid #0d1f2e;flex-shrink:0">
+        <input id="phr-script-name" placeholder="script-name" style="font-family:monospace;font-size:11px;background:transparent;border:none;outline:none;color:#EF9F27;width:100%">
       </div>
       <textarea id="phr-editor" placeholder="# Script commands — one per line
 # Example:
@@ -1553,18 +1554,31 @@ VS: Click &quot;Approve&quot;"
       <div id="phr-library-list"></div>
     </div>
 
-    <!-- Script status bar -->
-    <div id="phr-script-bar" style="display:none;border-top:1px solid #0d1f2e;padding:5px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;background:#040710">
-      <span style="font-size:10px;color:rgba(255,255,255,.25)">RUNNING</span>
-      <span id="phr-running-name" style="font-size:10px;color:#EF9F27;font-weight:700;flex:1"></span>
-      <button id="phr-stop-btn" style="font-size:10px;padding:2px 8px;border:1px solid rgba(226,75,74,.4);border-radius:3px;background:transparent;color:#E24B4A;cursor:pointer;font-family:monospace">■ Stop</button>
-    </div>
+    <!-- Bottom action bar — Script status + transcript/editor actions + command input -->
+    <div style="border-top:1px solid #0d1f2e;flex-shrink:0;background:#040710">
 
-    <!-- Command bar -->
-    <div style="border-top:1px solid #0d1f2e;padding:7px 10px;display:flex;gap:7px;align-items:center;flex-shrink:0;background:#040710">
-      <div id="phr-target-pill" style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:3px;border:1px solid rgba(0,201,201,.3);background:rgba(0,201,201,.1);color:#00c9c9;cursor:pointer;flex-shrink:0;white-space:nowrap">ALL ▾</div>
-      <input id="phr-cmd" placeholder="Enter command…" style="flex:1;background:transparent;border:none;outline:none;font-family:monospace;font-size:12px;color:#fff;caret-color:#00c9c9">
-      <button id="phr-run-cmd" style="font-size:10px;font-weight:700;padding:4px 14px;border-radius:3px;border:none;background:#00c9c9;color:#003333;cursor:pointer;letter-spacing:.05em;font-family:monospace">RUN</button>
+      <!-- Script running status row -->
+      <div id="phr-script-bar" style="display:none;padding:4px 10px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #0d1f2e">
+        <span style="font-size:10px;color:rgba(255,255,255,.25)">RUNNING</span>
+        <span id="phr-running-name" style="font-size:10px;color:#EF9F27;font-weight:700;flex:1"></span>
+        <button id="phr-stop-btn" style="font-size:10px;padding:2px 8px;border:1px solid rgba(226,75,74,.4);border-radius:3px;background:transparent;color:#E24B4A;cursor:pointer;font-family:monospace">■ Stop</button>
+      </div>
+
+      <!-- Action buttons row: Clear, Copy, Save, Run, Delete -->
+      <div style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-bottom:1px solid #0d1f2e">
+        <button id="phr-clear-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">✕ Clear</button>
+        <button id="phr-copy-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">⎘ Copy</button>
+        <div style="width:1px;height:14px;background:rgba(255,255,255,.1);margin:0 2px"></div>
+        <button id="phr-save-script" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.15);border-radius:3px;background:transparent;color:rgba(255,255,255,.5);cursor:pointer;font-family:monospace">Save</button>
+        <button id="phr-run-script" style="font-size:10px;padding:2px 8px;border:1px solid #1D9E75;border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;font-weight:700">▶ Run</button>
+        <button id="phr-del-script" style="font-size:10px;padding:2px 8px;border:1px solid rgba(226,75,74,.3);border-radius:3px;background:transparent;color:rgba(226,75,74,.6);cursor:pointer;font-family:monospace">Delete</button>
+      </div>
+
+      <!-- Command input row -->
+      <div style="padding:7px 10px;display:flex;gap:7px;align-items:center">
+        <div id="phr-target-pill" style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:3px;border:1px solid rgba(0,201,201,.3);background:rgba(0,201,201,.1);color:#00c9c9;cursor:pointer;flex-shrink:0;white-space:nowrap">ALL ▾</div>
+        <input id="phr-cmd" placeholder="Enter command…" style="flex:1;background:transparent;border:none;outline:none;font-family:monospace;font-size:12px;color:#fff;caret-color:#00c9c9">
+      </div>
     </div>
   </div>
 </div>`;
@@ -1725,7 +1739,7 @@ function _wirePanel() {
       }
     }
   });
-  p.querySelector('#phr-run-cmd').onclick = _runCmd;
+  // Command input — Enter key runs the command (RUN button removed)
 
   // Stop button aborts running script
   var stopBtn = p.querySelector('#phr-stop-btn');
