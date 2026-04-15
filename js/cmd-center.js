@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260415-CMD39
+// cmd-center.js  ·  v20260415-CMD40
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260415-CMD39',
+    'cmd-center':  'v20260415-CMD40',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260415-CMD39 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260415-CMD40 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1129,6 +1129,13 @@ async function _runScript(scriptText, scriptName) {
   _scriptRunning = true;
   _scriptAborted = false;
   _appendLine('SYS', 'sys', 'Script: ' + (scriptName||'inline') + ' · ' + lines.filter(function(l){ return !l.startsWith('#'); }).length + ' commands');
+  // Show RUNNING label in bottom bar
+  if (_panelEl) {
+    var rl = _panelEl.querySelector('#phr-running-label');
+    var rn = _panelEl.querySelector('#phr-running-name');
+    if (rl) rl.style.display = 'inline';
+    if (rn) rn.textContent = scriptName || 'inline';
+  }
 
   try {
     for (var i = 0; i < lines.length; i++) {
@@ -1212,11 +1219,16 @@ async function _runScript(scriptText, scriptName) {
       await new Promise(function(r){ setTimeout(r, 200); });
     }
   } finally {
-    // Always clear running flag — even if script threw
     _scriptRunning = false;
     _scriptAborted = false;
-    // Release any pending Pause
     if (_pauseResolve) { var r = _pauseResolve; _pauseResolve = null; r(); }
+    // Hide RUNNING label
+    if (_panelEl) {
+      var rl = _panelEl.querySelector('#phr-running-label');
+      var rn = _panelEl.querySelector('#phr-running-name');
+      if (rl) rl.style.display = 'none';
+      if (rn) rn.textContent = '';
+    }
   }
 
   _appendLine('SYS', 'result', _scriptAborted ? '■ Script stopped' : '✓ Script complete · ' + (scriptName||'inline'));
@@ -1554,24 +1566,21 @@ VS: Click &quot;Approve&quot;"
       <div id="phr-library-list"></div>
     </div>
 
-    <!-- Bottom action bar — Script status + transcript/editor actions + command input -->
+    <!-- Bottom bar — single row: status + actions + stop -->
     <div style="border-top:1px solid #0d1f2e;flex-shrink:0;background:#040710">
 
-      <!-- Script running status row -->
-      <div id="phr-script-bar" style="display:none;padding:4px 10px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #0d1f2e">
-        <span style="font-size:10px;color:rgba(255,255,255,.25)">RUNNING</span>
+      <!-- Single unified action/status bar -->
+      <div id="phr-script-bar" style="padding:5px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #0d1f2e">
+        <span id="phr-running-label" style="font-size:10px;color:rgba(255,255,255,.25);display:none">RUNNING</span>
         <span id="phr-running-name" style="font-size:10px;color:#EF9F27;font-weight:700;flex:1"></span>
-        <button id="phr-stop-btn" style="font-size:10px;padding:2px 8px;border:1px solid rgba(226,75,74,.4);border-radius:3px;background:transparent;color:#E24B4A;cursor:pointer;font-family:monospace">■ Stop</button>
-      </div>
-
-      <!-- Action buttons row: Clear, Copy, Save, Run, Delete -->
-      <div style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-bottom:1px solid #0d1f2e">
         <button id="phr-clear-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">✕ Clear</button>
         <button id="phr-copy-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">⎘ Copy</button>
-        <div style="width:1px;height:14px;background:rgba(255,255,255,.1);margin:0 2px"></div>
+        <div style="width:1px;height:14px;background:rgba(255,255,255,.1)"></div>
         <button id="phr-save-script" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.15);border-radius:3px;background:transparent;color:rgba(255,255,255,.5);cursor:pointer;font-family:monospace">Save</button>
-        <button id="phr-run-script" style="font-size:10px;padding:2px 8px;border:1px solid #1D9E75;border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;font-weight:700">▶ Run</button>
         <button id="phr-del-script" style="font-size:10px;padding:2px 8px;border:1px solid rgba(226,75,74,.3);border-radius:3px;background:transparent;color:rgba(226,75,74,.6);cursor:pointer;font-family:monospace">Delete</button>
+        <div style="width:1px;height:14px;background:rgba(255,255,255,.1)"></div>
+        <button id="phr-run-script" style="font-size:10px;padding:2px 8px;border:1px solid #1D9E75;border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;font-weight:700">▶ Run</button>
+        <button id="phr-stop-btn" style="font-size:10px;padding:2px 8px;border:1px solid rgba(226,75,74,.4);border-radius:3px;background:transparent;color:#E24B4A;cursor:pointer;font-family:monospace">■ Stop</button>
       </div>
 
       <!-- Command input row -->
