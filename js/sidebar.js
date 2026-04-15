@@ -18,9 +18,12 @@ const Sidebar = (() => {
     pipeline:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="4" height="14" rx="1"/><rect x="8" y="8" width="4" height="11" rx="1"/><rect x="14" y="3" width="4" height="16" rx="1"/><rect x="20" y="10" width="2" height="9" rx="1"/></svg>`,
     cadence:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`,
     compass:      `<svg viewBox="-14 -14 28 28" fill="none"><circle r="12" stroke="currentColor" stroke-width="2"/><line x1="0" y1="-7" x2="0" y2="-12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="0" y1="7" x2="0" y2="12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="-7" y1="0" x2="-12" y2="0" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="7" y1="0" x2="12" y2="0" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M0,-10 L2.5,-2 L0,-1 L-2.5,-2Z" fill="currentColor"/><path d="M0,-10 L1.4,-6.5 L0,-5.8 L-1.4,-6.5Z" fill="#EF9F27"/><path d="M0,10 L2,2 L0,1 L-2,2Z" fill="currentColor" opacity=".5"/><circle r="1.8" fill="currentColor"/></svg>`,
+    aegis:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L3 6.5V12c0 5 3.5 9.2 9 10 5.5-.8 9-5 9-10V6.5L12 2z"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   };
 
   const TOOLBAR_ITEMS = [
+    { key: 'aegis',       label: 'Aegis — Command Surface', href: '/aegis.html', target: '_blank' },
+    null,
     { key: 'compass',      label: 'Compass',      href: '/compass.html' },
     { key: 'pipeline',     label: 'Pipeline',     href: '/pipeline.html' },
     { key: 'cadence',      label: 'CadenceHUD',   href: '/cadence.html' },
@@ -129,6 +132,8 @@ const Sidebar = (() => {
         z-index:9999; box-shadow:0 4px 14px rgba(0,0,0,0.5);
       }
       .ctx-btn:hover::after { opacity:1; }
+      .ctx-btn[href="/aegis.html"] { color:rgba(0,201,201,0.55); }
+      .ctx-btn[href="/aegis.html"]:hover { color:#00c9c9; background:rgba(0,201,201,0.1); }
     `;
     document.head.appendChild(s);
   }
@@ -143,7 +148,9 @@ const Sidebar = (() => {
       }
       const btn = document.createElement('a');
       btn.className = 'ctx-btn'; btn.href = item.href; btn.dataset.label = item.label;
+      if (item.target) btn.setAttribute('target', item.target);
       btn.innerHTML = ICONS[item.key] || '';
+      if (item.key === 'aegis') btn.style.cssText += ';color:rgba(0,201,201,0.6)';
       if (currentPage && window.location.pathname === item.href) btn.classList.add('active');
       bar.appendChild(btn);
     });
@@ -160,6 +167,7 @@ const Sidebar = (() => {
       { href: '/resources.html',          icon: '◎', label: 'Resources',  section: 'main'  },
       { href: '/resource-requests.html',  icon: '⬡', label: 'Requests',    section: 'main'  },
       { href: '/cadence.html',            icon: '⬡', label: 'CadenceHUD',  section: 'main'  },
+      { href: '/aegis.html',              icon: '⬡', label: 'Aegis',       section: 'admin', target: '_blank' },
       { href: '/audit-log.html',          icon: '▦', label: 'Audit Log',  section: 'admin' },
       { href: '/users.html',              icon: '◑', label: 'User Mgmt',  section: 'admin' },
     ];
