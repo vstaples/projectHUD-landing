@@ -1,5 +1,5 @@
 // VERSION: 20260412-ME1
-console.log('%c[mw-events] v20260415-ME3 — next-step routing + cadenceRole resolution','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-events] v20260415-ME4 — next-step routing + cadenceRole resolution','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -1131,8 +1131,8 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
             const submitterResId = instRow.submitted_by_resource_id;
             const formName = instRow.title || 'Expense Report';
 
-            // Write step_activated event for the next step
-            await API.post('workflow_step_instances', {
+            // Write step_activated event — fire-and-forget
+            API.post('workflow_step_instances', {
               firm_id:     _mwFirmId(),
               instance_id: instanceId,
               event_type:  'step_activated',
@@ -1141,15 +1141,16 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
               created_at:  now,
             }).catch(() => {});
 
-            // Update instance current_step_id + current_step_name
-            await API.patch(`workflow_instances?id=eq.${instanceId}`, {
+            // Update instance current_step_id + current_step_name — fire-and-forget
+            API.patch(`workflow_instances?id=eq.${instanceId}`, {
               current_step_id:   nextStep.id,
               current_step_name: nextStep.name,
               updated_at:        now,
             }).catch(() => {});
 
-            // Route the next step → creates workflow_requests for the right person
-            await window._mwResolveAndRoute(
+            // Route the next step — fire-and-forget so panel closes immediately.
+            // Routing (DB writes + notify) happens in background.
+            window._mwResolveAndRoute(
               instanceId, allSteps, nextStep.sequence_order, submitterResId, formName
             ).catch(e => console.warn('[rrpSubmit] next-step routing failed:', e));
 
