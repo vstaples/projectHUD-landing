@@ -936,6 +936,14 @@ window.addEventListener('message', function(ev) {
   else if (cmd === 'Form Scroll') { _cmdFormScroll(ev.data.target); }
   else if (cmd === 'Form Save') { saveDraft(); }
   else if (cmd === 'Form Submit') { submitForApproval(); }
+  else if (cmd === 'Form Select') {
+    var sel = document.querySelector('select[data-label="' + field + '"]');
+    if (!sel) sel = document.querySelector('#' + field);
+    if (sel) {
+      sel.value = value;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
 });
 
 function _cmdTrigger(el) {

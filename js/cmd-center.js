@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260414-CMD36i
+// cmd-center.js  ·  v20260414-CMD36j
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260414-CMD36i',
+    'cmd-center':  'v20260414-CMD36j',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260414-CMD36i ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260414-CMD36j ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -500,6 +500,19 @@ var COMMANDS = {
       source: 'cmd-center', cmd: 'Form Insert', field: field, value: value
     }, '*');
     return 'inserted ' + field + ' = ' + value;
+  },
+
+  // Form Select "field" "value" — for <select> dropdowns.
+  // Sets the value AND dispatches a real change event so onchange handlers fire.
+  'Form Select': async function(args) {
+    var field = args[0];
+    var value = args[1] !== undefined ? args[1] : '';
+    var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
+    if (!iframe) return 'No form overlay open';
+    iframe.contentWindow.postMessage({
+      source: 'cmd-center', cmd: 'Form Select', field: field, value: value
+    }, '*');
+    return 'selected ' + field + ' = ' + value;
   },
 
   'Form AddRow': async function(args) {

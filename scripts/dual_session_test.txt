@@ -13,16 +13,17 @@ Wait 2500
 VS: Form Insert "Employee Name" "Vaughn Staples"
 VS: Form Insert "Trip Start Date" "2026-04-14"
 VS: Form Insert "Trip End Date" "2026-04-14"
-VS: Form Insert "Business Purpose" "Client Visit"
+VS: Form Select "Business Purpose" "client"
+Wait 500
 VS: Form Insert "Purpose Description" "Two-session CMD Center approval test"
 VS: Form Insert "Customer Name" "Apex Consulting Group"
 VS: Form Insert "Customer Location" "Phoenix, AZ"
 Wait 500
 Store submit_time now
 VS: Form Submit
-Wait ForEvent "compass_form_submit"
+Wait 4000
 VS: Form Close
-Wait 2000
+Wait 1000
 DB Poll workflow_instances submitted_by_resource_id=eq.e1000001-0000-0000-0000-000000000001&status=eq.in_progress&created_at=gt.$submit_time → $instance_id
 Log "Package live · $instance_id"
 
