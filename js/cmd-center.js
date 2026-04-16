@@ -5,7 +5,7 @@ console.groupEnd();
 
 // CMD ENGINE v20260416-CMD41 — embedded in Aegis M1
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260415-CMD40
+// cmd-center.js  ·  v20260416-AE1
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -33,13 +33,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260415-CMD40',
+    'cmd-center':  'v20260416-AE1',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260415-CMD40 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260416-AE1 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
