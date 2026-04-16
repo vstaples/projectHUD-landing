@@ -1,11 +1,3 @@
-// Aegis version stamp — only on aegis.html
-if (window._aegisMode) {
-  console.group('%c AEGIS v20260416-AE1 ','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
-  console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
-  console.groupEnd();
-}
-
-// CMD ENGINE v20260416-CMD41 — embedded in Aegis M1
 // ════════════════════════════════════════════════════════════════════════════
 // cmd-center.js  ·  v20260416-CMD41
 // ProjectHUD Script Runner — multi-client orchestrator
@@ -31,6 +23,8 @@ if (window._aegisMode) {
 if (window._cmdCenterLoaded) return;
 window._cmdCenterLoaded = true;
 
+if (window._cmdCenterLoaded) return;
+window._cmdCenterLoaded = true;
 
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
@@ -41,7 +35,12 @@ window._cmdCenterLoaded = true;
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260416-CMD41 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  if (window._aegisMode) {
+  console.group('%c AEGIS v20260416-AE1 ','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
+  console.groupEnd();
+}
+console.group('%c CMD Center v20260416-CMD41 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -74,10 +73,9 @@ var _cmdTarget   = 'ALL';  // current command target userId or 'ALL'
 var _execQueue   = [];     // pending async commands
 var _eventListeners = {};  // { eventName: [resolvers] }
 var _storeVars   = {};     // script variable storage { name: value }
-var _scriptRunning = false;
-var _scriptAborted = false;
-var _pauseResolve  = null;
-var _leaveTimers   = {};
+var _scriptRunning = false; // suppress hook double-logging during script execution
+var _scriptAborted = false; // set when panel closes mid-script
+var _pauseResolve  = null;  // set by Pause command, cleared by Enter in command bar
 
 // ── Load Supabase JS client ───────────────────────────────────────────────────
 function _loadSupabase() {
@@ -174,7 +172,7 @@ function _connect() {
 
   _channel = _supabase.channel('cmd-center-' + FIRM_ID, {
     config: {
-      presence:  { key: _mySession.userId },
+      presence:  { key: _mySession.userId + ':' + (window._aegisMode ? 'aegis' : Math.random().toString(36).slice(2,7)) },
       broadcast: { self: true, ack: false },
     }
   });
@@ -184,20 +182,23 @@ function _connect() {
     var state = _channel.presenceState();
     var execP = Object.values(state).map(function(p){return p[0];}).filter(function(p){return p&&!p.aegisObserver;});
     console.log('[Aegis] presence sync — '+execP.length+' exec session(s): '+execP.map(function(p){return p.name||'?';}).join(', '));
-    _sessions = {}; _aliasMap = {};
+    _sessions = {};
+    _aliasMap = {};
     Object.entries(state).forEach(function([key, presences]) {
       var p = presences[0];
-      if (p) {
-        if (p.aegisObserver && _mySession && p.userId !== _mySession.userId) return;
-        _sessions[p.userId] = {name:p.name,initials:p.initials,alias:p.alias||p.initials,location:p.location,online:true,ts:p.ts,aegisObserver:p.aegisObserver||false};
-        _aliasMap[p.alias||p.initials] = p.userId;
-        try{localStorage.setItem('phud:cmd:session:'+p.userId,JSON.stringify(_sessions[p.userId]));}catch(e){}
-      }
+      if (!p || !p.userId) return;
+      if (p.aegisObserver && _mySession && p.userId !== _mySession.userId) return;
+      var _ex = _sessions[p.userId];
+      if (_ex && _ex.online && !_ex.aegisObserver && p.aegisObserver) return;
+      _sessions[p.userId] = {name:p.name,initials:p.initials,alias:p.alias||p.initials,location:p.location,online:true,ts:p.ts,aegisObserver:p.aegisObserver||false};
+      _aliasMap[p.alias||p.initials] = p.userId;
+      try{localStorage.setItem('phud:cmd:session:'+p.userId,JSON.stringify(_sessions[p.userId]));}catch(e){}
     });
     _renderSessionList();
   });
 
-  // _leaveTimers at module scope
+  // Track pending leave timers so we can cancel them if user re-joins
+  var _leaveTimers = {};
 
   _channel.on('presence', { event: 'join' }, function(data) {
     var p = data.newPresences && data.newPresences[0];
@@ -208,12 +209,15 @@ function _connect() {
       delete _leaveTimers[p.userId];
     }
     var isNew = !_sessions[p.userId];
-    _sessions[p.userId] = {
-      name: p.name, initials: p.initials, alias: p.alias || p.initials, location: p.location,
-      online: true, ts: Date.now(), lastSeen: Date.now()
-    };
-    // Rebuild aliasMap entry
-    _aliasMap[p.alias || p.initials] = p.userId;
+    var _exJ = _sessions[p.userId];
+    if (!_exJ || !_exJ.online || _exJ.aegisObserver || !p.aegisObserver) {
+      _sessions[p.userId] = {
+        name: p.name, initials: p.initials, alias: p.alias || p.initials, location: p.location,
+        online: true, ts: Date.now(), lastSeen: Date.now(), aegisObserver: p.aegisObserver || false,
+      };
+      _aliasMap[p.alias || p.initials] = p.userId;
+      try { localStorage.setItem('phud:cmd:session:' + p.userId, JSON.stringify(_sessions[p.userId])); } catch(e) {}
+    }
     _renderSessionList();
     if (isNew && _mySession && p.userId !== _mySession.userId) {
       _appendMonitor(p.name + ' joined');
@@ -244,8 +248,7 @@ function _connect() {
     var d = payload.payload;
     if (!d) return;
     if (d.target !== _mySession.userId && d.target !== 'ALL') return;
-    // Aegis is an observer/dispatcher — it never executes incoming commands
-    if (window._aegisMode) return;
+    if (window._aegisMode) return; // Aegis dispatches but never executes
     _appendLine(d.from || 'SYS', 'cmd', d.cmd);
     _executeCommand(d.cmd, d.from).then(function(result) {
       if (result !== undefined) {
@@ -296,12 +299,12 @@ function _connect() {
       // Don't publish presence from pop-out window — it would create duplicate sessions
       if (!window._cmdCenterFullscreen) {
         _channel.track({
-          userId:        _mySession.userId,
-          name:          _mySession.name,
-          initials:      _mySession.initials,
-          alias:         _myAlias || _mySession.initials,
-          location:      _currentLocation(),
-          ts:            Date.now(),
+          userId:   _mySession.userId,
+          name:     _mySession.name,
+          initials: _mySession.initials,
+          alias:    _myAlias || _mySession.initials,
+          location: _currentLocation(),
+          ts:       Date.now(),
           aegisObserver: window._aegisMode ? true : undefined,
         });
       }
@@ -1196,9 +1199,8 @@ async function _runScript(scriptText, scriptName) {
       }
 
       var _lv=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause'];
-      var _il=!parsed.target||_lv.indexOf(parsed.verb)!==-1;
-      if (targetUserId && !_il) {
-        // Dispatch via Realtime
+      if (targetUserId && (_lv.indexOf(parsed.verb)===-1)) {
+        // Dispatch via Realtime (non-local commands)
         _appendLine(parsed.target || 'SYS', 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
         if (_channel) {
           _channelSend({
@@ -1415,19 +1417,41 @@ function _buildPanel() {
   if (window._aegisMode) {
     _panelEl = document.getElementById('aegis-cmd-panel');
     if (!_panelEl) { console.warn('[CMD] aegis-cmd-panel not found'); return; }
-  } else {
-    var el = document.createElement('div');
-    el.id = 'cmd-center-panel';
-    el.style.cssText = window._cmdCenterFullscreen
-      ? 'position:fixed;inset:0;width:100vw;height:100vh;background:#060a10;border:none;border-radius:0;display:flex;flex-direction:column;z-index:99999;font-family:monospace;overflow:hidden'
-      : 'position:fixed;bottom:20px;right:20px;width:840px;height:520px;background:#060a10;border:1px solid #00c9c9;border-radius:8px;display:flex;flex-direction:column;z-index:99999;box-shadow:0 20px 60px rgba(0,0,0,.8);font-family:monospace;overflow:hidden;resize:both';
-    el.innerHTML = _panelHTML();
-    document.body.appendChild(el);
-    _panelEl = el;
+    _wirePanel(); _renderSessionList(); _renderScriptList(); _renderTranscript(); _updateStatusEl();
+    if (window._cmdConnected) _startLiveClock();
+    return;
   }
-  _wirePanel(); _renderSessionList(); _renderScriptList(); _renderTranscript(); _updateStatusEl();
+  var el = document.createElement('div');
+  el.id = 'cmd-center-panel';
+  // In pop-out mode (flagged by window._cmdCenterFullscreen), fill the entire window
+  if (window._cmdCenterFullscreen) {
+    el.style.cssText = [
+      'position:fixed;inset:0;width:100vw;height:100vh',
+      'background:#060a10;border:none;border-radius:0',
+      'display:flex;flex-direction:column;z-index:99999',
+      'font-family:monospace;overflow:hidden',
+    ].join(';');
+  } else {
+    el.style.cssText = [
+      'position:fixed;bottom:20px;right:20px;width:840px;height:520px',
+      'background:#060a10;border:1px solid #00c9c9;border-radius:8px',
+      'display:flex;flex-direction:column;z-index:99999;box-shadow:0 20px 60px rgba(0,0,0,.8)',
+      'font-family:monospace;overflow:hidden',
+      'resize:both',
+    ].join(';');
+  }
+
+  el.innerHTML = _panelHTML();
+  document.body.appendChild(el);
+  _panelEl = el;
+  _wirePanel();
+  _renderSessionList();
+  _renderScriptList();
+  _renderTranscript();
+  _updateStatusEl();
   if (window._cmdConnected) _startLiveClock();
 }
+
 function _panelHTML() {
   return `
 <style>
@@ -1593,16 +1617,14 @@ function _wirePanel() {
   var p = _panelEl;
 
   // Close/minimize dots
-  var cb = p.querySelector('#phr-close-dot');
-  if (cb) cb.onclick = function() {
-    if (_scriptRunning) { _scriptAborted = true; _scriptRunning = false; }
-    if (!window._aegisMode) _togglePanel();
+  p.querySelector('#phr-close-dot').onclick = function() {
+    if (_scriptRunning) {
+      _scriptAborted = true;
+      _scriptRunning = false;
+    }
+    _togglePanel();
   };
-  var mb = p.querySelector('#phr-min-dot');
-  if (mb) {
-    if (window._aegisMode) mb.style.display = 'none';
-    else mb.onclick = function() { p.style.height = p.style.height === '36px' ? '520px' : '36px'; };
-  }
+  p.querySelector('#phr-min-dot').onclick   = function() { p.style.height = p.style.height === '36px' ? '520px' : '36px'; };
   p.querySelector('#phr-pop-dot').onclick = function() {
     _popOut();
   };
@@ -1805,7 +1827,6 @@ function _wirePanel() {
 
   // Drag to move
   var tb = p.querySelector('#phr-titlebar');
-  if (tb && !window._aegisMode) {
   var dragging = false, ox = 0, oy = 0;
   tb.addEventListener('mousedown', function(e) {
     if (e.target.tagName === 'BUTTON') return;
@@ -1820,7 +1841,7 @@ function _wirePanel() {
     p.style.left = Math.max(0, e.clientX - ox) + 'px';
     p.style.top  = Math.max(0, e.clientY - oy) + 'px';
   });
-  document.addEventListener('mouseup', function() { dragging = false; }); }
+  document.addEventListener('mouseup', function() { dragging = false; });
 }
 
 function _runCmd() {
@@ -1854,11 +1875,10 @@ function _runCmd() {
 
   // Determine if dispatching to remote session
   var parsed = _parseLine(fullCmd);
-  var _rl=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause'];
   if (parsed && parsed.target) {
     var targetUserId = _resolveTargetAlias(parsed.target);
-    var _ri=_rl.indexOf(parsed.verb)!==-1;
-    if (targetUserId && _channel && !_ri) {
+    var _rl=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause'];
+    if (targetUserId && _channel && _rl.indexOf(parsed.verb)===-1) {
       _channelSend({
         type: 'broadcast', event: 'cmd',
         payload: { target: targetUserId, from: _myAlias || _mySession.initials, cmd: cmd, cmdId: Date.now() }
@@ -1893,7 +1913,7 @@ function _renderSessionList() {
 
   var html = '';
   Object.entries(_sessions).forEach(function([uid, s]) {
-    if (s.aegisObserver) return;
+    if (s.aegisObserver && !(_mySession && uid === _mySession.userId)) return;
     var color   = _sessionColor(uid);
     var isMine  = _mySession && uid === _mySession.userId;
     var isTarget = uid === _cmdTarget;
@@ -1905,7 +1925,7 @@ function _renderSessionList() {
     var onlineIndicator = s.online
       ? '<div style="width:6px;height:6px;border-radius:50%;background:#1D9E75;flex-shrink:0"></div>'
       : (_leaveTimers&&_leaveTimers[uid])
-        ? '<div style="width:6px;height:6px;border-radius:50%;background:#EF9F27;flex-shrink:0;animation:pulse 1.2s infinite"></div>'
+        ? '<div style="width:6px;height:6px;border-radius:50%;background:#EF9F27;flex-shrink:0"></div>'
         : '<div style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.15);flex-shrink:0"></div>';
     html += '<div data-uid="' + uid + '" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:pointer;background:' + bg + ';border-left:' + border + '">'
       + '<div style="width:22px;height:22px;border-radius:50%;background:' + color + '22;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:' + color + ';flex-shrink:0">' + s.initials + '</div>'
@@ -1952,7 +1972,10 @@ function _renderScriptList() {
   var names = Object.keys(_scripts).sort();
   var html = names.map(function(name) {
     var isActive = name === _activeScript;
-      return '<div data-script="'+name+'" style="display:flex;align-items:center;gap:5px;padding:4px 10px;cursor:pointer;'+(isActive?'color:#00c9c9':'color:rgba(255,255,255,.4)')+'"><span style="font-size:11px">'+(isActive?'&#9658;':'&#9671;')+'</span><span style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+name+'</span></div>';
+    return `<div data-script="${name}" style="display:flex;align-items:center;gap:5px;padding:4px 10px;cursor:pointer;${isActive?'color:#00c9c9':'color:rgba(255,255,255,.4)'}">
+      <span style="font-size:10px">${isActive?'▶':'◇'}</span>
+      <span style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</span>
+    </div>`;
   }).join('');
 
   if (!names.length) {
@@ -2116,7 +2139,7 @@ function _popOut() {
       transcript: _transcript.slice(-100),
     }));
   } catch(e) {}
-  win.location.href = window.location.origin + '/aegis.html?state=' + stateKey;
+  win.location.href = window.location.origin + '/cmd-center.html?state=' + stateKey;
 
   // Hide the inline panel now that it's popped out
   if (_panelEl) {
@@ -2137,15 +2160,14 @@ function _popOut() {
 
 function _togglePanel() {
   if (!_panelEl) { _buildPanel(); _panelOpen = true; return; }
-  if (!window._aegisMode) {
-    _panelEl.style.display = _panelOpen ? 'none' : 'flex';
-    _panelOpen = !_panelOpen;
-  }
+  if (!window._aegisMode) { _panelEl.style.display = _panelOpen ? 'none' : 'flex'; _panelOpen = !_panelOpen; }
 }
 
 // ── Keyboard shortcut: Ctrl+Shift+R ──────────────────────────────────────────
 document.addEventListener('keydown', function(e) {
-  if (!window._aegisMode && e.ctrlKey && e.shiftKey && (e.key === '`' || e.key === '~')) {
+  // Ctrl+Shift+` (backtick/tilde) — toggle CMD Center panel
+  // Avoids Ctrl+Shift+R which is Chrome hard-refresh
+  if (e.ctrlKey && e.shiftKey && (e.key === '`' || e.key === '~')) {
     e.preventDefault();
     _togglePanel();
   }
@@ -2390,7 +2412,8 @@ async function _init() {
   Object.keys(localStorage).forEach(function(k) {
     if (k.startsWith('phud:cmd:alias:anon-')) localStorage.removeItem(k);
   });
-  _loadScripts(); _loadServerScripts();
+  _loadScripts();
+  _loadServerScripts();
   try{Object.keys(localStorage).filter(function(k){return k.startsWith('phud:cmd:session:');}).forEach(function(k){var uid=k.replace('phud:cmd:session:','');var s=JSON.parse(localStorage.getItem(k));if(s&&uid&&!_sessions[uid]){s.online=false;_sessions[uid]=s;_aliasMap[s.alias||s.initials]=uid;}});}catch(e){}
   await _loadSupabase();
   if (!window._myResource && _supabase) {
@@ -2408,6 +2431,8 @@ async function _init() {
       }
     }catch(e){console.warn('[Aegis] identity resolve failed:',e.message);}
   }
+  // Install property interceptors IMMEDIATELY — before mw-tabs.js assigns its functions
+  // These use defineProperty so they catch any assignment, past or future
   _hookAppEvents();
   // Accept overrides — check sessionStorage for pop-out state
   var _popoutState = null;
@@ -2479,18 +2504,16 @@ async function _init() {
 
 window._sendToSession = function(alias, cmd) {
   var uid = _resolveTargetAlias(alias);
-  if (!uid) { console.warn('[CMD] unknown alias:', alias); return; }
-  if (!_channel) { console.warn('[CMD] not connected'); return; }
-  _channelSend({ type: 'broadcast', event: 'cmd',
-    payload: { target: uid, from: _myAlias || (window._aegisMode ? 'AEGIS' : 'OP'), cmd: cmd, cmdId: Date.now() } });
-  console.log('[CMD] sent to', alias, '('+uid.slice(0,8)+'...):', cmd);
+  if (!uid){console.warn('[CMD] unknown alias:',alias);return;}
+  if (!_channel){console.warn('[CMD] not connected');return;}
+  _channelSend({type:'broadcast',event:'cmd',payload:{target:uid,from:_myAlias||(window._aegisMode?'AEGIS':'OP'),cmd:cmd,cmdId:Date.now()}});
+  console.log('[CMD] sent to',alias,'('+uid.slice(0,8)+'...):',cmd);
 };
 window._aegisSessions = function() {
-  Object.entries(_sessions).forEach(function([uid, s]) {
-    console.log((s.alias||s.initials), s.name, '|', s.location, '|', s.online?'ONLINE':'offline', '|', uid.slice(0,8)+'...');
+  Object.entries(_sessions).forEach(function([uid,s]){
+    console.log((s.alias||s.initials),s.name,'|',s.location,'|',s.online?'ONLINE':'offline','|',uid.slice(0,8)+'...');
   });
 };
-
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){_init().then(function(){if(window._aegisMode)setTimeout(_buildPanel,50);});});}else{_init().then(function(){if(window._aegisMode)setTimeout(_buildPanel,50);});}
 
 })();
