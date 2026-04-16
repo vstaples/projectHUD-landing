@@ -26,18 +26,18 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD41',
+    'cmd-center':  'v20260416-CMD42',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
   if (window._aegisMode) {
-  console.group('%c AEGIS v20260416-AE1 ','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c AEGIS v20260416-AE2 ','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD41 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-CMD42 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -73,6 +73,7 @@ var _storeVars   = {};     // script variable storage { name: value }
 var _scriptRunning = false; // suppress hook double-logging during script execution
 var _scriptAborted = false; // set when panel closes mid-script
 var _pauseResolve  = null;  // set by Pause command, cleared by Enter in command bar
+var _leaveTimers   = {};    // { userId: timeoutId } — pending leave debounces; read by _renderSessionList
 
 // ── Load Supabase JS client ───────────────────────────────────────────────────
 function _loadSupabase() {
@@ -194,8 +195,7 @@ function _connect() {
     _renderSessionList();
   });
 
-  // Track pending leave timers so we can cancel them if user re-joins
-  var _leaveTimers = {};
+  // Leave timers tracked at module scope (see top) so _renderSessionList can read them
 
   _channel.on('presence', { event: 'join' }, function(data) {
     var p = data.newPresences && data.newPresences[0];
@@ -1822,23 +1822,25 @@ function _wirePanel() {
     this.style.borderColor = _cmdTarget === 'ALL' ? 'rgba(0,201,201,.3)' : 'rgba(255,255,255,.2)';
   };
 
-  // Drag to move
+  // Drag to move — only applies to floating panel; Aegis embeds into host DOM without a titlebar
   var tb = p.querySelector('#phr-titlebar');
-  var dragging = false, ox = 0, oy = 0;
-  tb.addEventListener('mousedown', function(e) {
-    if (e.target.tagName === 'BUTTON') return;
-    dragging = true;
-    ox = e.clientX - p.getBoundingClientRect().left;
-    oy = e.clientY - p.getBoundingClientRect().top;
-  });
-  document.addEventListener('mousemove', function(e) {
-    if (!dragging) return;
-    p.style.right = 'auto';
-    p.style.bottom = 'auto';
-    p.style.left = Math.max(0, e.clientX - ox) + 'px';
-    p.style.top  = Math.max(0, e.clientY - oy) + 'px';
-  });
-  document.addEventListener('mouseup', function() { dragging = false; });
+  if (tb) {
+    var dragging = false, ox = 0, oy = 0;
+    tb.addEventListener('mousedown', function(e) {
+      if (e.target.tagName === 'BUTTON') return;
+      dragging = true;
+      ox = e.clientX - p.getBoundingClientRect().left;
+      oy = e.clientY - p.getBoundingClientRect().top;
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      p.style.right = 'auto';
+      p.style.bottom = 'auto';
+      p.style.left = Math.max(0, e.clientX - ox) + 'px';
+      p.style.top  = Math.max(0, e.clientY - oy) + 'px';
+    });
+    document.addEventListener('mouseup', function() { dragging = false; });
+  }
 }
 
 function _runCmd() {
