@@ -272,6 +272,18 @@ const Sidebar = (() => {
         if (ph) ph.replaceWith(buildToolbar(activePage));
       }
     }
+    // Load cmd-center.js on every page so all sessions are visible to Aegis
+    // Guard: skip on aegis.html itself (it embeds the engine directly)
+    _loadCmdCenter();
+  }
+
+  function _loadCmdCenter() {
+    if (window._cmdCenterLoaded) return; // already loaded (e.g. compass.html loads it explicitly)
+    if (window._aegisMode) return;       // aegis.html has engine embedded inline
+    const s = document.createElement('script');
+    s.src = '/js/cmd-center.js';
+    s.onerror = () => console.warn('[Sidebar] cmd-center.js not found — session will not appear in Aegis');
+    document.head.appendChild(s);
   }
 
   return { init };
