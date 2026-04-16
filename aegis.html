@@ -2679,31 +2679,13 @@ var _cmdHistory    = [];
 var _cmdHistoryIdx = -1;
 
 function _buildPanel() {
+// In Aegis, the panel DOM already exists — point _panelEl at it and wire up
 if (_panelEl) return;
-
-var el = document.createElement('div');
-el.id = 'cmd-center-panel';
-// In pop-out mode (flagged by window._cmdCenterFullscreen), fill the entire window
-if (window._cmdCenterFullscreen) {
-  el.style.cssText = [
-    'position:fixed;inset:0;width:100vw;height:100vh',
-    'background:#060a10;border:none;border-radius:0',
-    'display:flex;flex-direction:column;z-index:99999',
-    'font-family:monospace;overflow:hidden',
-  ].join(';');
-} else {
-  el.style.cssText = [
-    'position:fixed;bottom:20px;right:20px;width:840px;height:520px',
-    'background:#060a10;border:1px solid #00c9c9;border-radius:8px',
-    'display:flex;flex-direction:column;z-index:99999;box-shadow:0 20px 60px rgba(0,0,0,.8)',
-    'font-family:monospace;overflow:hidden',
-    'resize:both',
-  ].join(';');
+_panelEl = document.getElementById('aegis-cmd-panel');
+if (!_panelEl) {
+  console.warn('[CMD] aegis-cmd-panel not found in DOM');
+  return;
 }
-
-el.innerHTML = _panelHTML();
-document.body.appendChild(el);
-_panelEl = el;
 _wirePanel();
 _renderSessionList();
 _renderScriptList();
@@ -3256,13 +3238,8 @@ var checkInterval = setInterval(function() {
 }
 
 function _togglePanel() {
-if (!_panelEl) {
-  _buildPanel();
-  _panelOpen = true;
-} else {
-  _panelEl.style.display = _panelOpen ? 'none' : 'flex';
-  _panelOpen = !_panelOpen;
-}
+// Aegis: Command module always visible — just ensure engine is wired
+if (!_panelEl) _buildPanel();
 }
 
 // Keyboard shortcut removed — Aegis uses left-nav for module switching
@@ -3578,6 +3555,8 @@ var _statusPoll = setInterval(function() {
 }, 1000);
 
 console.log('[CMD Center] initialized — Ctrl+Shift+` to toggle panel');
+// Wire the Aegis panel DOM as soon as init completes
+setTimeout(_buildPanel, 0);
 }
 
 window.aegisInitCMD = _init;
