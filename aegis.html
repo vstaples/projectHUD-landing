@@ -1271,6 +1271,7 @@ function _wireAegisCMDStyle(){
 }
 
 // ── Init on load ──
+window._aegisMode = true; // Aegis: observer/dispatcher only — no DOM execution
 document.addEventListener('DOMContentLoaded',function(){
   // Wire Aegis CMD visual tab styling
   _wireAegisCMDStyle();
@@ -1565,8 +1566,8 @@ _channel.on('broadcast', { event: 'app_event' }, function(payload) {
 
 _channel.subscribe(function(status) {
   if (status === 'SUBSCRIBED') {
-    // Don't publish presence from pop-out window — it would create duplicate sessions
-    if (!window._cmdCenterFullscreen) {
+    // Don't publish presence from pop-out or Aegis — would shadow the compass.html session
+    if (!window._cmdCenterFullscreen && !window._aegisMode) {
       _channel.track({
         userId:   _mySession.userId,
         name:     _mySession.name,
@@ -1576,7 +1577,7 @@ _channel.subscribe(function(status) {
         ts:       Date.now(),
       });
     }
-    _appendLine('SYS', 'sys', 'Connected · session: ' + _mySession.name);
+    _appendLine('SYS', 'sys', (window._aegisMode ? 'Aegis observer connected · ' : 'Connected · session: ') + _mySession.name);
     // Store connection state so panel can pick it up when opened
     window._cmdConnected = true;
     window._cmdSessionName = _mySession ? _mySession.name : 'connected';
@@ -1587,7 +1588,7 @@ _channel.subscribe(function(status) {
     // Location-only update — use a separate broadcast instead of track()
     // to avoid triggering leave/join cycles on every heartbeat
     // Only send location heartbeats from main window, not pop-out
-    if (!window._cmdCenterFullscreen) {
+    if (!window._cmdCenterFullscreen && !window._aegisMode) {
       setInterval(function() {
         if (!_channel) return;
         _channelSend({
@@ -2735,7 +2736,8 @@ if (aliasInput) {
     if (_mySession) localStorage.setItem('phud:cmd:alias:' + _mySession.userId, _myAlias);
     // Re-track presence with new alias so other sessions pick it up
     if (_channel && _mySession && !window._cmdCenterFullscreen) {
-      _channel.track({
+      if (!window._aegisMode) {
+          _channel.track({
         userId:   _mySession.userId,
         name:     _mySession.name,
         initials: _mySession.initials,
@@ -2743,6 +2745,7 @@ if (aliasInput) {
         location: _currentLocation(),
         ts:       Date.now(),
       });
+          }
     }
     // Update aliasMap locally so scripts can target immediately
     _aliasMap[_myAlias] = _mySession ? _mySession.userId : null;
@@ -3558,7 +3561,8 @@ if (!_mySession || _mySession.userId.startsWith('anon-')) {
       clearInterval(_identityPoll);
       if (_channel) {
         // Already connected — re-track with correct identity
-        _channel.track({
+        if (!window._aegisMode) {
+          _channel.track({
           userId:   _mySession.userId,
           name:     _mySession.name,
           initials: _mySession.initials,
@@ -3566,6 +3570,7 @@ if (!_mySession || _mySession.userId.startsWith('anon-')) {
           location: _currentLocation(),
           ts:       Date.now(),
         });
+          }
       } else {
         _connect();
       }
