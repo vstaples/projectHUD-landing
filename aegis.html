@@ -2390,19 +2390,29 @@ var lines = scriptText.split('\n').map(function(l){ return l.trim(); }).filter(B
 var required = _parseScriptRequires(scriptText);
 if (required.length) {
   var missing = required.filter(function(alias) {
-    // Own session is always connected — check by alias or userId
     if (_mySession) {
       if (alias === _myAlias) return false;
       if (alias === _mySession.initials) return false;
     }
     var uid = _resolveTargetAlias(alias);
     if (!uid) return true;                           // not in aliasMap at all
-    if (_mySession && uid === _mySession.userId) return false; // own session
     var sess = _sessions[uid];
     return !sess || !sess.online;                    // offline
   });
-  if (missing.length) {
-    var ok = _showPreflightPanel(scriptName || 'script', required, missing, scriptText);
+
+  // Also flag sessions that are connected but not on compass.html
+  var wrongContext = required.filter(function(alias) {
+    var uid = _resolveTargetAlias(alias);
+    if (!uid) return false; // already in missing
+    var sess = _sessions[uid];
+    if (!sess || !sess.online) return false; // already in missing
+    var loc = (sess.location || '').toUpperCase();
+    // Must be on COMPASS to execute form/tab/click commands
+    return loc.indexOf('COMPASS') === -1;
+  });
+
+  if (missing.length || wrongContext.length) {
+    var ok = await _showPreflightPanel(scriptName || 'script', required, missing, wrongContext, scriptText);
     if (!ok) return; // user cancelled
   }
 }
@@ -2526,7 +2536,7 @@ _appendLine('SYS', 'result', _scriptAborted ? '■ Script stopped' : '✓ Script
 // Shown when a script requires sessions that aren't live.
 // Returns true if the operator clicks Run Anyway, false if they cancel.
 // Non-blocking modal injected into the CMD Center panel.
-function _showPreflightPanel(scriptName, required, missing, scriptText) {
+function _showPreflightPanel(scriptName, required, missing, wrongContext, scriptText) {
 return new Promise(function(resolve) {
   var existing = document.getElementById('phr-preflight');
   if (existing) existing.remove();
@@ -2540,17 +2550,26 @@ return new Promise(function(resolve) {
     var isLive = isOwn || (uid && _sessions[uid] && _sessions[uid].online);
     var sess = uid ? _sessions[uid] : null;
     var nameStr = isOwn ? _mySession.name : (sess ? sess.name : '—');
-    var dot = isLive
-      ? '<span style="color:#1D9E75">●<\/span>'
-      : '<span style="color:#E24B4A">○<\/span>';
-    var loc = isLive && sess ? ('<span style="color:rgba(255,255,255,.3);font-size:11px"> · ' + (sess.location||'') + '<\/span>') : '';
-    var tag = isLive
-      ? '<span style="font-size:11px;color:#1D9E75;border:1px solid rgba(29,158,117,.3);border-radius:2px;padding:0 4px">LIVE<\/span>'
-      : '<span style="font-size:11px;color:#E24B4A;border:1px solid rgba(226,75,74,.3);border-radius:2px;padding:0 4px">MISSING<\/span>';
-    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+    var loc = (sess && sess.location) || (isOwn ? 'AEGIS · observer' : '');
+    var isMissing = missing.indexOf(alias) !== -1;
+    var isWrongCtx = (wrongContext || []).indexOf(alias) !== -1;
+    var dot = isMissing
+      ? '<span style="color:#E24B4A">○<\/span>'
+      : isWrongCtx
+        ? '<span style="color:#EF9F27">●<\/span>'
+        : '<span style="color:#1D9E75">●<\/span>';
+    var locSpan = loc
+      ? ' <span style="color:rgba(255,255,255,.3);font-size:11px"> · ' + loc + '<\/span>'
+      : '';
+    var tag = isMissing
+      ? '<span style="font-size:11px;color:#E24B4A;border:1px solid rgba(226,75,74,.3);border-radius:2px;padding:0 4px">NOT CONNECTED<\/span>'
+      : isWrongCtx
+        ? '<span style="font-size:11px;color:#EF9F27;border:1px solid rgba(239,159,39,.4);border-radius:2px;padding:0 4px">⚠ WRONG PAGE — OPEN COMPASS<\/span>'
+        : '<span style="font-size:11px;color:#1D9E75;border:1px solid rgba(29,158,117,.3);border-radius:2px;padding:0 4px">LIVE · COMPASS<\/span>';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
       + '<span style="font-size:11px;font-family:monospace;color:#EF9F27;min-width:32px">' + alias + '<\/span>'
       + dot + ' '
-      + '<span style="font-size:11px;color:rgba(255,255,255,.7);flex:1">' + nameStr + loc + '<\/span>'
+      + '<span style="font-size:11px;color:rgba(255,255,255,.7);flex:1">' + nameStr + locSpan + '<\/span>'
       + tag
       + '<\/div>';
   }).join('');
@@ -2567,11 +2586,14 @@ return new Promise(function(resolve) {
     '  <div style="font-size:11px;letter-spacing:.1em;color:rgba(255,255,255,.3);margin-bottom:8px">SESSION PREFLIGHT<\/div>',
     '  <div style="font-size:12px;color:#EF9F27;font-weight:700;margin-bottom:10px;font-family:monospace">' + scriptName + '<\/div>',
     '  <div style="margin-bottom:12px">' + rows + '<\/div>',
-    '  <div style="font-size:11px;color:#E24B4A;margin-bottom:12px">',
-    '    ' + missingAliases.length + ' required session' + (missingAliases.length !== 1 ? 's' : '') + ' not connected: ' + missingAliases.join(', '),
-    '  <\/div>',
-    '  <div style="font-size:11px;color:rgba(255,255,255,.35);margin-bottom:14px">',
-    '    Open a Compass window for each missing session and log in. Script will block when it reaches those steps.',
+    missingAliases.length ? '  <div style="font-size:11px;color:#E24B4A;margin-bottom:8px">'
+    + missingAliases.length + ' session' + (missingAliases.length !== 1 ? 's' : '') + ' not connected: ' + missingAliases.join(', ')
+    + '<\/div>' : '',
+  (wrongContext && wrongContext.length) ? '  <div style="font-size:11px;color:#EF9F27;margin-bottom:8px">'
+    + wrongContext.length + ' session' + (wrongContext.length !== 1 ? 's' : '') + ' open on wrong page — must be on Compass: ' + wrongContext.join(', ')
+    + '<\/div>' : '',
+  '  <div style="font-size:11px;color:rgba(255,255,255,.35);margin-bottom:14px">',
+    '    Open a Compass window for each session and log in. Scripts that control the UI require compass.html.',
     '  <\/div>',
     '  <div style="display:flex;gap:8px;justify-content:flex-end">',
     '    <button id="phr-pre-cancel" style="font-size:11px;padding:4px 12px;border:1px solid rgba(255,255,255,.15);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">Cancel<\/button>',
