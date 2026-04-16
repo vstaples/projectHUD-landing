@@ -2465,8 +2465,15 @@ try {
       targetUserId = _resolveTargetAlias(parsed.target);
     }
 
-    if (targetUserId && targetUserId !== _mySession.userId) {
-      // Dispatch to remote session
+    // Aegis is a command surface, not a DOM execution host.
+    // All targeted commands route via Realtime to the compass/cadence session that owns that alias.
+    // Only non-DOM commands (Assert, Log, Wait, Store, Get, DB*, Run, Pause) execute locally.
+    var localOnlyVerbs = ['Assert', 'Log', 'Wait', 'Store', 'Get', 'DB Poll', 'DB Get', 'Run', 'Pause'];
+    var isLocalOnly = !parsed.target || localOnlyVerbs.indexOf(parsed.verb) !== -1;
+
+    if (targetUserId && !isLocalOnly) {
+      // Dispatch to the compass/cadence session — even if targetUserId === _mySession.userId,
+      // because Aegis window doesn't have uSwitchTab / myrLaunchRequest etc.
       _appendLine(parsed.target || 'SYS', 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
       if (_channel) {
         _channelSend({
@@ -2485,7 +2492,7 @@ try {
         _appendLine('SYS', 'warn', 'Timeout waiting for ' + parsed.target);
       }
     } else {
-      // Execute locally
+      // Execute locally — non-DOM commands only (Assert, Log, Wait, Store, Get, DB*, Pause)
       _appendLine(_myAlias || _mySession.initials, 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
       try {
         await _executeCommand(line.replace(/^[A-Z]+:\s*/, ''), _myAlias || _mySession.initials);
@@ -2958,9 +2965,12 @@ _appendLine(_myAlias || (_mySession ? _mySession.initials : 'ME'), 'cmd', cmd);
 
 // Determine if dispatching to remote session
 var parsed = _parseLine(fullCmd);
+var _localOnlyVerbs = ['Assert', 'Log', 'Wait', 'Store', 'Get', 'DB Poll', 'DB Get', 'Run', 'Pause'];
 if (parsed && parsed.target) {
   var targetUserId = _resolveTargetAlias(parsed.target);
-  if (targetUserId && _mySession && targetUserId !== _mySession.userId && _channel) {
+  var _isLocalCmd = _localOnlyVerbs.indexOf(parsed.verb) !== -1;
+  // Dispatch all aliased DOM commands via Realtime — Aegis has no DOM to execute against
+  if (targetUserId && _channel && !_isLocalCmd) {
     _channelSend({
       type: 'broadcast', event: 'cmd',
       payload: { target: targetUserId, from: _myAlias || _mySession.initials, cmd: cmd, cmdId: Date.now() }
