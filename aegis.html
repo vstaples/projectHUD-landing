@@ -1350,6 +1350,7 @@ var _storeVars   = {};     // script variable storage { name: value }
 var _scriptRunning = false; // suppress hook double-logging during script execution
 var _scriptAborted = false; // set when panel closes mid-script
 var _pauseResolve  = null;  // set by Pause command, cleared by Enter in command bar
+var _leaveTimers   = {};    // hoisted from _connect() — tracks debounced leave events
 
 // ── Load Supabase JS client ───────────────────────────────────────────────────
 function _loadSupabase() {
@@ -1475,7 +1476,7 @@ _channel.on('presence', { event: 'sync' }, function() {
 });
 
 // Track pending leave timers so we can cancel them if user re-joins
-var _leaveTimers = {};
+// _leaveTimers declared at module scope above
 
 _channel.on('presence', { event: 'join' }, function(data) {
   var p = data.newPresences && data.newPresences[0];
