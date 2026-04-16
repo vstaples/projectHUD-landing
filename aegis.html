@@ -2700,14 +2700,12 @@ function _wirePanel() {
 var p = _panelEl;
 
 // Close/minimize dots
-p.querySelector('#phr-close-dot').onclick = function() {
-  if (_scriptRunning) {
-    _scriptAborted = true;
-    _scriptRunning = false;
-  }
-  _togglePanel();
+var closeBtn = p.querySelector('#phr-close-dot');
+if (closeBtn) closeBtn.onclick = function() {
+  if (_scriptRunning) { _scriptAborted = true; _scriptRunning = false; }
 };
-p.querySelector('#phr-min-dot').onclick   = function() { p.style.height = p.style.height === '36px' ? '520px' : '36px'; };
+var minBtn = p.querySelector('#phr-min-dot');
+if (minBtn) minBtn.style.display = 'none';
 p.querySelector('#phr-pop-dot').onclick = function() {
   _popOut();
 };
@@ -2908,23 +2906,25 @@ p.querySelector('#phr-target-pill').onclick = function() {
   this.style.borderColor = _cmdTarget === 'ALL' ? 'rgba(0,201,201,.3)' : 'rgba(255,255,255,.2)';
 };
 
-// Drag to move
+// Drag to move (floating panel only — no-op in Aegis embedded mode)
 var tb = p.querySelector('#phr-titlebar');
-var dragging = false, ox = 0, oy = 0;
-tb.addEventListener('mousedown', function(e) {
-  if (e.target.tagName === 'BUTTON') return;
-  dragging = true;
-  ox = e.clientX - p.getBoundingClientRect().left;
-  oy = e.clientY - p.getBoundingClientRect().top;
-});
-document.addEventListener('mousemove', function(e) {
-  if (!dragging) return;
-  p.style.right = 'auto';
-  p.style.bottom = 'auto';
-  p.style.left = Math.max(0, e.clientX - ox) + 'px';
-  p.style.top  = Math.max(0, e.clientY - oy) + 'px';
-});
-document.addEventListener('mouseup', function() { dragging = false; });
+if (tb) {
+  var dragging = false, ox = 0, oy = 0;
+  tb.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'BUTTON') return;
+    dragging = true;
+    ox = e.clientX - p.getBoundingClientRect().left;
+    oy = e.clientY - p.getBoundingClientRect().top;
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    p.style.right = 'auto';
+    p.style.bottom = 'auto';
+    p.style.left = Math.max(0, e.clientX - ox) + 'px';
+    p.style.top  = Math.max(0, e.clientY - oy) + 'px';
+  });
+  document.addEventListener('mouseup', function() { dragging = false; });
+}
 }
 
 function _runCmd() {
@@ -3579,8 +3579,13 @@ var _statusPoll = setInterval(function() {
 }, 1000);
 
 console.log('[CMD Center] initialized — Ctrl+Shift+` to toggle panel');
-// Wire the Aegis panel DOM as soon as init completes
-setTimeout(_buildPanel, 0);
+// Wire the Aegis panel DOM after DOM is fully ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _buildPanel);
+} else {
+  // DOM already ready — defer one tick so module CSS display:flex resolves
+  setTimeout(_buildPanel, 50);
+}
 }
 
 window.aegisInitCMD = _init;
