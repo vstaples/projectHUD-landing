@@ -2489,6 +2489,6 @@ window._aegisSessions = function() {
   });
 };
 
-if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){_init().then(function(){setTimeout(_buildPanel,50);});});}else{_init().then(function(){setTimeout(_buildPanel,50);});}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){_init().then(function(){if(window._aegisMode)setTimeout(_buildPanel,50);});});}else{_init().then(function(){if(window._aegisMode)setTimeout(_buildPanel,50);});}
 
 })();
