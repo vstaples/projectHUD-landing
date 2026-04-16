@@ -23,9 +23,6 @@
 if (window._cmdCenterLoaded) return;
 window._cmdCenterLoaded = true;
 
-if (window._cmdCenterLoaded) return;
-window._cmdCenterLoaded = true;
-
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
