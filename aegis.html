@@ -1421,14 +1421,19 @@ function _updateStatusEl() {
 }
 
 function _channelSend(payload) {
-  // Only send via WebSocket — avoid REST fallback which causes 401
   if (!_channel) return;
   try {
-    var state = _channel.socket && _channel.socket.conn && _channel.socket.conn.readyState;
-    // readyState 1 = OPEN
-    if (state !== undefined && state !== 1) return;
+    // Check WebSocket is OPEN (readyState 1) — do not fall back to REST (causes 401)
+    var sock = _channel.socket;
+    var conn = sock && (sock.conn || sock.transport);
+    var rs   = conn && conn.readyState;
+    if (rs !== undefined && rs !== 1) {
+      // Socket not open — retry once after 800ms when it should be recovered
+      setTimeout(function() { _channelSend(payload); }, 800);
+      return;
+    }
     _channel.send(payload);
-  } catch(e) {}
+  } catch(e) { console.warn('[CMD] channelSend error:', e.message); }
 }
 
 function _connect() {
@@ -1436,7 +1441,10 @@ function _connect() {
   if (_channel) return; // already connected — don't re-subscribe
 
   _channel = _supabase.channel('cmd-center-' + FIRM_ID, {
-    config: { presence: { key: _mySession.userId } }
+    config: {
+      presence:  { key: _mySession.userId },
+      broadcast: { self: true, ack: false },  // ack:false = no REST fallback, WebSocket only
+    }
   });
 
   // Presence: track who is online
@@ -3549,6 +3557,23 @@ async function _init() {
 
   console.log('[CMD Center] initialized — Ctrl+Shift+` to toggle panel');
 }
+
+// Debug helpers — callable from Aegis browser console:
+//   window._sendToSession('VS', 'Set View "compass"')
+//   window._aegisSessions()
+window._sendToSession = function(alias, cmd) {
+  var uid = _resolveTargetAlias(alias);
+  if (!uid) { console.warn('[Aegis] unknown alias:', alias); return; }
+  if (!_channel) { console.warn('[Aegis] not connected'); return; }
+  _channelSend({ type: 'broadcast', event: 'cmd',
+    payload: { target: uid, from: _myAlias || 'AEGIS', cmd: cmd, cmdId: Date.now() } });
+  console.log('[Aegis] sent to', alias, '('+uid.slice(0,8)+'...):', cmd);
+};
+window._aegisSessions = function() {
+  Object.entries(_sessions).forEach(function([uid, s]) {
+    console.log((s.alias||s.initials), s.name, '|', s.location, '|', s.online?'ONLINE':'offline', '|', uid.slice(0,8)+'...');
+  });
+};
 
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){_init().then(function(){setTimeout(_buildPanel,50);});});}else{_init().then(function(){setTimeout(_buildPanel,50);});}
 
