@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260415-CMD40
+// cmd-center.js  ·  v20260416-CMD41
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,13 +27,13 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260415-CMD40',
+    'cmd-center':  'v20260416-CMD41',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
-  console.group('%c CMD Center v20260415-CMD40 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c CMD Center v20260416-CMD41 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -2396,6 +2396,40 @@ async function _init() {
   _loadScripts();
   _loadServerScripts(); // async — loads /scripts/*.txt in background
   await _loadSupabase();
+
+  // Resolve identity from Supabase auth when _myResource isn't set by the host page
+  // Covers dashboard, cadence, and any page that doesn't explicitly set window._myResource
+  if (!window._myResource && _supabase) {
+    try {
+      var authResp = await _supabase.auth.getSession();
+      var authSess = authResp && authResp.data && authResp.data.session;
+      var authUser = authSess && authSess.user;
+      if (authUser) {
+        var accessToken = authSess.access_token || SUPA_KEY;
+        var resResp = await fetch(SUPA_URL + '/rest/v1/resources?user_id=eq.' + authUser.id + '&select=id,first_name,last_name,user_id,email&limit=1', {
+          headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + accessToken }
+        });
+        var resRows = await resResp.json();
+        if ((!resRows || !resRows[0]) && authUser.email) {
+          var resResp2 = await fetch(SUPA_URL + '/rest/v1/resources?email=eq.' + encodeURIComponent(authUser.email) + '&select=id,first_name,last_name,user_id,email&limit=1', {
+            headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + accessToken }
+          });
+          resRows = await resResp2.json();
+        }
+        if (resRows && resRows[0]) {
+          var r = resRows[0];
+          var fullName = ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || authUser.email || 'Operator';
+          window._myResource = { name: fullName, user_id: r.user_id || authUser.id, id: r.id };
+        } else {
+          var metaName = (authUser.user_metadata && (authUser.user_metadata.full_name || authUser.user_metadata.name)) || authUser.email || 'Operator';
+          window._myResource = { name: metaName, user_id: authUser.id };
+        }
+      }
+    } catch(e) {
+      console.warn('[CMD] identity resolve failed:', e.message);
+    }
+  }
+
   // Install property interceptors IMMEDIATELY — before mw-tabs.js assigns its functions
   // These use defineProperty so they catch any assignment, past or future
   _hookAppEvents();

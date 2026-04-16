@@ -1306,8 +1306,12 @@ document.addEventListener('DOMContentLoaded',function(){
 // Engine embedded in Aegis — single load guaranteed
 
 // Version banner — fires on every page load/refresh so you can confirm what's running
-(function() {
-var versions = {
+// Aegis version stamp
+console.group('%c AEGIS v20260416-AE1 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%cM1 Command · M2 Mission Control · M3 Forge · ProjectHUD Operations Surface', 'color:#00c9c9');
+console.groupEnd();
+
+(function() {var versions = {
   'cmd-center':  'v20260415-CMD40',
   'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
   'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
@@ -1452,6 +1456,8 @@ _channel = _supabase.channel('cmd-center-' + FIRM_ID, {
 // Presence: track who is online
 _channel.on('presence', { event: 'sync' }, function() {
   var state = _channel.presenceState();
+  var sessionNames = Object.values(state).map(function(p){ return p[0] ? (p[0].name || p[0].alias || '?') : '?'; });
+  console.log('[Aegis] presence sync — ' + sessionNames.length + ' session(s): ' + sessionNames.join(', '));
   _sessions = {};
   _aliasMap = {};
   Object.entries(state).forEach(function([key, presences]) {
@@ -3579,30 +3585,44 @@ try {
 await _loadSupabase();
 
 // Resolve identity from Supabase auth when _myResource isn't set by the host page
-// Runs on every page (dashboard, cadence, etc.) — not just aegis.html
 if (!window._myResource && _supabase) {
   try {
     var authResp = await _supabase.auth.getSession();
-    var authUser = authResp && authResp.data && authResp.data.session && authResp.data.session.user;
+    var authSess = authResp && authResp.data && authResp.data.session;
+    var authUser = authSess && authSess.user;
+    console.log('[Aegis] auth session:', authUser ? authUser.id.slice(0,8) + '…' : 'null');
     if (authUser) {
-      var accessToken = (authResp.data.session && authResp.data.session.access_token) || SUPA_KEY;
-      // Select first_name + last_name (resources table has no 'name' column)
-      var resResp = await fetch(SUPA_URL + '/rest/v1/resources?user_id=eq.' + authUser.id + '&select=id,first_name,last_name,user_id&limit=1', {
+      var accessToken = authSess.access_token || SUPA_KEY;
+      // Try matching by user_id first, then by email as fallback
+      var resUrl = SUPA_URL + '/rest/v1/resources?user_id=eq.' + authUser.id + '&select=id,first_name,last_name,user_id,email&limit=1';
+      var resResp = await fetch(resUrl, {
         headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + accessToken }
       });
       var resRows = await resResp.json();
+      console.log('[Aegis] resource row by user_id:', resRows && resRows.length, resRows && resRows[0] ? resRows[0].first_name : 'none');
+      // Fallback: match by email if user_id lookup returned nothing
+      if ((!resRows || !resRows[0]) && authUser.email) {
+        var resResp2 = await fetch(SUPA_URL + '/rest/v1/resources?email=eq.' + encodeURIComponent(authUser.email) + '&select=id,first_name,last_name,user_id,email&limit=1', {
+          headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + accessToken }
+        });
+        resRows = await resResp2.json();
+        console.log('[Aegis] resource row by email:', resRows && resRows.length, resRows && resRows[0] ? resRows[0].first_name : 'none');
+      }
       if (resRows && resRows[0]) {
         var r = resRows[0];
         var fullName = ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || authUser.email || 'Operator';
-        window._myResource = { name: fullName, user_id: r.user_id, id: r.id };
+        window._myResource = { name: fullName, user_id: r.user_id || authUser.id, id: r.id };
+        console.log('[Aegis] identity resolved:', fullName, '| user_id:', (r.user_id || authUser.id).slice(0,8) + '…');
       } else {
-        // No resource row — fall back to auth metadata
         var metaName = (authUser.user_metadata && (authUser.user_metadata.full_name || authUser.user_metadata.name)) || authUser.email || 'Operator';
         window._myResource = { name: metaName, user_id: authUser.id };
+        console.log('[Aegis] identity fallback to metadata:', metaName);
       }
+    } else {
+      console.warn('[Aegis] no auth session — user may not be logged in');
     }
   } catch(e) {
-    console.warn('[CMD] identity resolve failed:', e);
+    console.warn('[Aegis] identity resolve failed:', e.message);
   }
 }
 
@@ -3629,6 +3649,7 @@ if (_popoutState && _popoutState.session) {
 } else {
   _resolveSession();
 }
+console.log('[Aegis] session after resolve:', _mySession ? (_mySession.name + ' | ' + _mySession.userId.slice(0,8) + '…') : 'null');
 if (_popoutState && _popoutState.scripts)    _scripts    = _popoutState.scripts;
 if (_popoutState && _popoutState.transcript) _transcript = _popoutState.transcript;
 if (window._scriptsOverride)    _scripts    = window._scriptsOverride;
