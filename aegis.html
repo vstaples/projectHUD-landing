@@ -40,7 +40,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .live-lbl{font-size:11px;color:var(--gr)}
 .tbar-time{font-size:11px;color:var(--t3)}
 .av{width:26px;height:26px;border-radius:50%;background:var(--aqd);border:0.5px solid rgba(0,201,201,.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--aq);cursor:pointer}
-.popout{font-size:10px;color:var(--t3);background:transparent;border:0.5px solid var(--b2);border-radius:4px;padding:3px 8px;cursor:pointer;letter-spacing:.05em}
+.popout{font-size:11px;color:var(--t3);background:transparent;border:0.5px solid var(--b2);border-radius:4px;padding:3px 8px;cursor:pointer;letter-spacing:.05em}
 .popout:hover{color:var(--t2);border-color:var(--b3)}
 
 /* ── SHELL ── */
@@ -63,14 +63,14 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 /* ── SHARED COMPONENTS ── */
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 @keyframes blk{0%,100%{opacity:1}50%{opacity:.4}}
-.badge{font-size:10px;padding:1px 6px;border-radius:3px;white-space:nowrap;display:inline-block}
+.badge{font-size:11px;padding:1px 6px;border-radius:3px;white-space:nowrap;display:inline-block}
 .b-gr{background:var(--grd);color:var(--gr);border:0.5px solid rgba(63,186,122,.25)}
 .b-am{background:var(--amd);color:var(--am);border:0.5px solid rgba(239,159,39,.25)}
 .b-rd{background:var(--rdd);color:var(--rd);border:0.5px solid rgba(224,82,82,.25)}
 .b-aq{background:var(--aqd);color:var(--aq);border:0.5px solid rgba(0,201,201,.25)}
 .b-pu{background:var(--pud);color:var(--pu);border:0.5px solid rgba(157,126,232,.25)}
 .b-gy{background:var(--bg4);color:var(--t3);border:0.5px solid var(--b)}
-.btn{font-size:10px;padding:4px 11px;border-radius:4px;cursor:pointer;border:0.5px solid var(--b2);color:var(--t3);background:transparent;transition:all .1s;white-space:nowrap;font-family:var(--mono)}
+.btn{font-size:11px;padding:4px 11px;border-radius:4px;cursor:pointer;border:0.5px solid var(--b2);color:var(--t3);background:transparent;transition:all .1s;white-space:nowrap;font-family:var(--mono)}
 .btn:hover{background:var(--bg4);color:var(--t2);border-color:var(--b3)}
 .btn.aq{border-color:rgba(0,201,201,.35);color:var(--aq);background:var(--aqd)}
 .btn.aq:hover{background:var(--aqb)}
@@ -89,7 +89,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 <style>
 /* mod header */
 .mod-hd{padding:12px 16px 10px;border-bottom:0.5px solid var(--b);display:flex;align-items:center;justify-content:space-between;background:var(--bg2);flex-shrink:0}
-.mod-eyebrow{font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+.mod-eyebrow{font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
 .mod-title{font-size:15px;font-weight:500;color:var(--t);letter-spacing:.03em}
 .mod-title .hi{color:var(--aq)}.mod-title .hi-am{color:var(--am)}
 .mod-tabs-wrap{display:flex;gap:0;background:var(--bg3);border-radius:6px;border:0.5px solid var(--b);overflow:hidden}
@@ -101,17 +101,17 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 /* stat strip */
 .stat-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1px;background:var(--b);flex-shrink:0}
 .stat{background:var(--bg2);padding:10px 14px}
-.stat-lbl{font-size:10px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.stat-lbl{font-size:11px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
 .stat-val{font-size:20px;font-weight:500;color:var(--t);line-height:1}
 .stat-val.aq{color:var(--aq)}.stat-val.am{color:var(--am)}.stat-val.gr{color:var(--gr)}.stat-val.rd{color:var(--rd)}
-.stat-sub{font-size:10px;color:var(--t3);margin-top:3px}
+.stat-sub{font-size:11px;color:var(--t3);margin-top:3px}
 
 /* body grid */
 .body-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) minmax(0,.9fr);gap:1px;background:var(--b);flex:1;min-height:0;overflow:hidden}
 .col{background:var(--bg);display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .col-hd{padding:9px 13px 7px;border-bottom:0.5px solid var(--b);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.col-title{font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase}
-.col-act{font-size:10px;color:var(--aq);cursor:pointer;border:0.5px solid rgba(0,201,201,.25);border-radius:3px;padding:2px 7px}
+.col-title{font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase}
+.col-act{font-size:11px;color:var(--aq);cursor:pointer;border:0.5px solid rgba(0,201,201,.25);border-radius:3px;padding:2px 7px}
 .col-act:hover{background:var(--aqd)}
 .col-body{padding:9px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;flex:1}
 
@@ -123,16 +123,16 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .inst.ok{border-left:2px solid var(--gr);border-radius:0 7px 7px 0}
 .inst-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px}
 .inst-name{font-size:12px;font-weight:500;color:var(--t)}
-.inst-meta{font-size:10px;color:var(--t3);margin-bottom:5px}
+.inst-meta{font-size:11px;color:var(--t3);margin-bottom:5px}
 .step-chain{display:flex;gap:3px;align-items:center;margin-bottom:5px;flex-wrap:wrap}
-.sn{font-size:10px;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.sn{font-size:11px;padding:2px 7px;border-radius:3px;white-space:nowrap}
 .sn-done{background:rgba(63,186,122,.08);color:rgba(63,186,122,.6);border:0.5px solid rgba(63,186,122,.2)}
 .sn-act{background:var(--aqd);color:var(--aq);border:0.5px solid rgba(0,201,201,.3)}
 .sn-pend{background:var(--bg4);color:var(--t3);border:0.5px solid var(--b)}
 .sn-blk{background:var(--rdd);color:var(--rd);border:0.5px solid rgba(224,82,82,.3);animation:blk 1.6s infinite}
-.sarr{font-size:10px;color:var(--t3)}
+.sarr{font-size:11px;color:var(--t3)}
 .actors{display:flex;gap:5px;margin-bottom:7px}
-.actor{font-size:10px;color:var(--t3);background:var(--bg4);border:0.5px solid var(--b);border-radius:3px;padding:1px 6px}
+.actor{font-size:11px;color:var(--t3);background:var(--bg4);border:0.5px solid var(--b);border-radius:3px;padding:1px 6px}
 .actor.me{color:var(--aq);background:var(--aqd);border-color:rgba(0,201,201,.25)}
 .actor.pend{color:var(--am)}
 .iacts{display:flex;gap:5px;border-top:0.5px solid var(--b);padding-top:7px;flex-wrap:wrap}
@@ -142,14 +142,14 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .sess{background:var(--bg2);border:0.5px solid var(--b2);border-radius:7px;padding:8px 10px}
 .sess.me{border-color:rgba(0,201,201,.3);background:var(--aqd)}
 .sess-top{display:flex;align-items:center;gap:7px;margin-bottom:4px}
-.sess-av{width:24px;height:24px;border-radius:50%;background:var(--bg4);border:0.5px solid var(--b3);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:var(--t2);flex-shrink:0}
+.sess-av{width:24px;height:24px;border-radius:50%;background:var(--bg4);border:0.5px solid var(--b3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--t2);flex-shrink:0}
 .sess-av.aq{background:var(--aqd);border-color:rgba(0,201,201,.4);color:var(--aq)}
 .sess-av.pu{background:var(--pud);border-color:rgba(157,126,232,.35);color:var(--pu)}
 .sess-name{font-size:11px;font-weight:500;color:var(--t);flex:1}
 .sess-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.sess-view{font-size:10px;color:var(--aq);background:var(--aqd);border:0.5px solid rgba(0,201,201,.2);border-radius:3px;padding:1px 6px;margin-bottom:3px;display:inline-block}
-.sess-detail{font-size:10px;color:var(--t3)}
-.broadcast-btn{font-size:10px;color:var(--t3);background:transparent;border:0.5px solid var(--b);border-radius:4px;padding:5px 8px;cursor:pointer;text-align:left;width:100%;transition:all .1s}
+.sess-view{font-size:11px;color:var(--aq);background:var(--aqd);border:0.5px solid rgba(0,201,201,.2);border-radius:3px;padding:1px 6px;margin-bottom:3px;display:inline-block}
+.sess-detail{font-size:11px;color:var(--t3)}
+.broadcast-btn{font-size:11px;color:var(--t3);background:transparent;border:0.5px solid var(--b);border-radius:4px;padding:5px 8px;cursor:pointer;text-align:left;width:100%;transition:all .1s}
 .broadcast-btn:hover{border-color:var(--b2);color:var(--t2)}
 
 /* cadence health */
@@ -157,19 +157,19 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .ring-wrap{position:relative;width:52px;height:52px;flex-shrink:0}
 .ring-wrap svg{width:52px;height:52px}
 .ring-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--aq)}
-.hs-row{display:flex;gap:8px;align-items:center;font-size:10px;margin-bottom:3px}
+.hs-row{display:flex;gap:8px;align-items:center;font-size:11px;margin-bottom:3px}
 .hs-lbl{color:var(--t3);min-width:70px}
 .hs-val{color:var(--t)}.hs-val.gr{color:var(--gr)}.hs-val.am{color:var(--am)}
 .cal-grid{display:flex;gap:3px;padding:6px 13px 0}
 .cal-col{display:flex;flex-direction:column;gap:2px;align-items:center}
-.cal-row-lbl{font-size:9px;color:var(--t3);width:12px;text-align:right;margin-right:4px}
+.cal-row-lbl{font-size:11px;color:var(--t3);width:12px;text-align:right;margin-right:4px}
 .day-cell{width:10px;height:10px;border-radius:1px}
 .suite-row{display:flex;align-items:center;gap:8px;padding:6px 13px;border-bottom:0.5px solid var(--b);font-size:11px}
 .suite-row:last-child{border-bottom:none}
 .suite-name{flex:1;color:var(--t2)}
 .suite-bar-w{width:70px;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;flex-shrink:0}
 .suite-bar{height:100%;border-radius:2px}
-.suite-pct{font-size:10px;color:var(--t3);min-width:22px;text-align:right}
+.suite-pct{font-size:11px;color:var(--t3);min-width:22px;text-align:right}
 
 /* coc stream */
 .coc-item{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:0.5px solid var(--b)}
@@ -177,8 +177,8 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .coc-dot{width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0}
 .coc-body{flex:1;min-width:0}
 .coc-evt{font-size:11px;color:var(--t);margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.coc-meta{font-size:10px;color:var(--t3)}
-.coc-time{font-size:10px;color:var(--t3);flex-shrink:0;margin-top:1px}
+.coc-meta{font-size:11px;color:var(--t3)}
+.coc-time{font-size:11px;color:var(--t3);flex-shrink:0;margin-top:1px}
 
 /* ── MC FULL VIEWS (Instances / Sessions / CoC tabs) ── */
 .mc-view{display:none;flex:1;min-height:0;flex-direction:column;overflow:hidden}
@@ -188,7 +188,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .inst-full-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1px;background:var(--b);flex:1;overflow-y:auto}
 .inst-full-col{background:var(--bg);padding:12px;display:flex;flex-direction:column;gap:8px}
 .inst-filter-bar{padding:9px 14px;border-bottom:0.5px solid var(--b);display:flex;align-items:center;gap:8px;flex-shrink:0;background:var(--bg2)}
-.filter-pill{font-size:10px;padding:3px 10px;border-radius:12px;border:0.5px solid var(--b2);color:var(--t3);cursor:pointer;background:transparent;transition:all .1s}
+.filter-pill{font-size:11px;padding:3px 10px;border-radius:12px;border:0.5px solid var(--b2);color:var(--t3);cursor:pointer;background:transparent;transition:all .1s}
 .filter-pill:hover{border-color:var(--b3);color:var(--t2)}
 .filter-pill.on{background:var(--aqd);color:var(--aq);border-color:rgba(0,201,201,.35)}
 .filter-pill.on-rd{background:var(--rdd);color:var(--rd);border-color:rgba(224,82,82,.35)}
@@ -198,18 +198,18 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .idp-body{padding:12px 14px;overflow-y:auto;flex:1}
 .step-chain-full{display:flex;gap:0;align-items:stretch;margin-bottom:14px;overflow-x:auto}
 .scf-step{display:flex;flex-direction:column;align-items:center;min-width:100px}
-.scf-node{width:90px;padding:7px 8px;border-radius:5px;border:0.5px solid var(--b2);text-align:center;font-size:10px;background:var(--bg3)}
+.scf-node{width:90px;padding:7px 8px;border-radius:5px;border:0.5px solid var(--b2);text-align:center;font-size:11px;background:var(--bg3)}
 .scf-node.done{border-color:rgba(63,186,122,.3);background:var(--grd);color:var(--gr)}
 .scf-node.act{border-color:rgba(0,201,201,.4);background:var(--aqd);color:var(--aq)}
 .scf-node.blk{border-color:rgba(224,82,82,.4);background:var(--rdd);color:var(--rd);animation:blk 1.6s infinite}
 .scf-node.pend{color:var(--t3)}
-.scf-actor{font-size:9px;color:var(--t3);margin-top:3px;text-align:center}
+.scf-actor{font-size:11px;color:var(--t3);margin-top:3px;text-align:center}
 .scf-arr{display:flex;align-items:center;padding:0 4px;color:var(--t3);font-size:14px;padding-bottom:18px;flex-shrink:0}
 .coc-log{background:var(--bg5);border:0.5px solid var(--b);border-radius:5px;padding:9px 11px;margin-bottom:12px}
 .surg-acts{display:flex;gap:7px;flex-wrap:wrap;padding-top:10px;border-top:0.5px solid var(--b)}
 .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .mg-item{background:var(--bg3);border:0.5px solid var(--b);border-radius:5px;padding:8px 10px}
-.mg-lbl{font-size:10px;color:var(--t3);margin-bottom:2px}
+.mg-lbl{font-size:11px;color:var(--t3);margin-bottom:2px}
 .mg-val{font-size:11px;color:var(--t2)}
 .mg-val.rd{color:var(--rd)}.mg-val.am{color:var(--am)}.mg-val.gr{color:var(--gr)}.mg-val.aq{color:var(--aq)}
 
@@ -218,7 +218,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .sess-full-card{background:var(--bg2);border:0.5px solid var(--b2);border-radius:8px;overflow:hidden}
 .sfc-hd{padding:11px 14px;border-bottom:0.5px solid var(--b);display:flex;align-items:center;gap:12px}
 .sfc-body{padding:12px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
-.sfc-col-title{font-size:10px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.sfc-col-title{font-size:11px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
 .sfc-field{font-size:11px;margin-bottom:6px;display:flex;gap:6px}
 .sfc-key{color:var(--t3);min-width:110px;flex-shrink:0}
 .sfc-val{color:var(--t2)}
@@ -233,7 +233,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 /* coc full view */
 .coc-full-wrap{display:flex;flex:1;min-height:0;overflow:hidden}
 .coc-filters{width:200px;background:var(--bg2);border-right:0.5px solid var(--b);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
-.cf-sec{font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;padding:10px 12px 5px}
+.cf-sec{font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;padding:10px 12px 5px}
 .cf-item{display:flex;align-items:center;gap:7px;padding:6px 12px;cursor:pointer;font-size:11px;color:var(--t3);transition:all .1s;border-left:2px solid transparent}
 .cf-item:hover{background:var(--bg3);color:var(--t2)}
 .cf-item.on{background:var(--aqd);color:var(--aq);border-left-color:var(--aq)}
@@ -245,9 +245,9 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .cfi-body{flex:1;min-width:0}
 .cfi-evt{font-size:12px;font-weight:500;color:var(--t);margin-bottom:2px}
 .cfi-meta{font-size:11px;color:var(--t2);margin-bottom:2px}
-.cfi-detail{font-size:10px;color:var(--t3)}
+.cfi-detail{font-size:11px;color:var(--t3)}
 .cfi-right{text-align:right;flex-shrink:0}
-.cfi-time{font-size:10px;color:var(--t3);margin-bottom:4px}
+.cfi-time{font-size:11px;color:var(--t3);margin-bottom:4px}
 .coc-full-summary{background:var(--bg3);border:0.5px solid var(--b);border-radius:5px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:var(--t3);display:flex;gap:16px}
 .cfs-item .cfs-val{font-size:16px;font-weight:500;color:var(--t);display:block}
 </style>
@@ -258,22 +258,22 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 <style>
 .cmd-wrap{display:flex;flex:1;min-height:0}
 .sess-bar{width:198px;background:var(--bg2);border-right:0.5px solid var(--b);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
-.sb-sec{font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;padding:10px 12px 6px}
+.sb-sec{font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;padding:10px 12px 6px}
 .sb-alias{padding:0 12px 8px;border-bottom:0.5px solid var(--b)}
 .alias-field{background:var(--bg3);border:0.5px solid var(--b2);border-radius:4px;padding:4px 8px;font-size:11px;color:var(--aq);display:flex;align-items:center;gap:6px}
 .alias-pill{background:var(--aqb);border:0.5px solid rgba(0,201,201,.4);border-radius:3px;padding:1px 7px;font-size:11px;color:var(--aq)}
 .sess-item{display:flex;align-items:flex-start;gap:7px;padding:7px 12px;cursor:pointer;border-left:2px solid transparent;transition:all .1s}
 .sess-item.me{border-left-color:var(--aq);background:var(--aqd)}
 .sess-item:hover:not(.me){background:var(--bg3)}
-.si-av{width:22px;height:22px;border-radius:50%;background:var(--bg4);border:0.5px solid var(--b2);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;color:var(--t2);flex-shrink:0;margin-top:1px}
+.si-av{width:22px;height:22px;border-radius:50%;background:var(--bg4);border:0.5px solid var(--b2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--t2);flex-shrink:0;margin-top:1px}
 .si-av.aq{background:var(--aqd);border-color:rgba(0,201,201,.35);color:var(--aq)}
 .si-av.pu{background:var(--pud);border-color:rgba(157,126,232,.3);color:var(--pu)}
 .si-info{flex:1;min-width:0}
 .si-name{font-size:11px;font-weight:500;color:var(--t);margin-bottom:1px}
-.si-detail{font-size:10px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-detail{font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .si-dot{width:5px;height:5px;border-radius:50%;margin-top:4px;flex-shrink:0}
 .assert-panel{padding:7px 12px;border-top:0.5px solid var(--b);border-bottom:0.5px solid var(--b)}
-.assert-box{background:var(--bg5);border:0.5px solid var(--b2);border-radius:4px;padding:6px 8px;font-size:10px;line-height:1.8}
+.assert-box{background:var(--bg5);border:0.5px solid var(--b2);border-radius:4px;padding:6px 8px;font-size:11px;line-height:1.8}
 .scripts-list{flex:1;overflow-y:auto}
 .script-row{display:flex;align-items:center;gap:7px;padding:6px 12px;cursor:pointer;transition:background .1s}
 .script-row:hover{background:var(--bg3)}
@@ -281,8 +281,8 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .sr-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
 .sr-name{font-size:11px;color:var(--t2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sr-name.on{color:var(--aq)}
-.sr-cmds{font-size:10px;color:var(--t3)}
-.new-script{margin:8px 10px;padding:6px;background:transparent;border:0.5px solid rgba(0,201,201,.3);border-radius:4px;color:var(--aq);font-size:10px;text-align:center;cursor:pointer;font-family:var(--mono)}
+.sr-cmds{font-size:11px;color:var(--t3)}
+.new-script{margin:8px 10px;padding:6px;background:transparent;border:0.5px solid rgba(0,201,201,.3);border-radius:4px;color:var(--aq);font-size:11px;text-align:center;cursor:pointer;font-family:var(--mono)}
 .new-script:hover{background:var(--aqd)}
 /* cmd main */
 .cmd-main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
@@ -291,35 +291,35 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .ct:hover{color:var(--t2)}
 .ct.on{color:var(--aq);border-bottom-color:var(--aq)}
 .ct-right{margin-left:auto;display:flex;align-items:center;gap:8px;padding:0 12px}
-.run-badge{font-size:10px;color:var(--am);background:var(--amd);border:0.5px solid rgba(239,159,39,.3);border-radius:3px;padding:2px 8px;animation:pulse 1.4s infinite}
-.live-badge{font-size:10px;color:var(--gr);background:var(--grd);border:0.5px solid rgba(63,186,122,.3);border-radius:3px;padding:2px 8px}
+.run-badge{font-size:11px;color:var(--am);background:var(--amd);border:0.5px solid rgba(239,159,39,.3);border-radius:3px;padding:2px 8px;animation:pulse 1.4s infinite}
+.live-badge{font-size:11px;color:var(--gr);background:var(--grd);border:0.5px solid rgba(63,186,122,.3);border-radius:3px;padding:2px 8px}
 /* cmd tab views */
 .cmd-view{display:none;flex:1;flex-direction:column;min-height:0}
 .cmd-view.on{display:flex}
 /* transcript */
 .transcript{flex:1;overflow-y:auto;padding:10px;background:var(--bg5);font-size:12px;display:flex;flex-direction:column;gap:2px}
-.tr-sec{font-size:10px;color:var(--t3);padding:5px 0 3px;border-bottom:0.5px solid var(--b);margin-bottom:3px;letter-spacing:.05em}
+.tr-sec{font-size:11px;color:var(--t3);padding:5px 0 3px;border-bottom:0.5px solid var(--b);margin-bottom:3px;letter-spacing:.05em}
 .tr-line{display:flex;align-items:flex-start;gap:9px;padding:2px 0;line-height:1.5}
-.tr-t{font-size:10px;color:var(--t3);min-width:52px;margin-top:2px;flex-shrink:0}
-.tr-tgt{font-size:10px;padding:1px 6px;border-radius:3px;margin-top:1px;flex-shrink:0;font-weight:500}
+.tr-t{font-size:11px;color:var(--t3);min-width:52px;margin-top:2px;flex-shrink:0}
+.tr-tgt{font-size:11px;padding:1px 6px;border-radius:3px;margin-top:1px;flex-shrink:0;font-weight:500}
 .tt-all{background:var(--bg4);color:var(--t3);border:0.5px solid var(--b)}
 .tt-vs{background:var(--aqd);color:var(--aq);border:0.5px solid rgba(0,201,201,.25)}
 .tt-ak{background:var(--pud);color:var(--pu);border:0.5px solid rgba(157,126,232,.25)}
 .tr-cmd{color:var(--t);flex:1}
 .kw{color:var(--aq)}.str{color:var(--gr)}.num{color:var(--am)}.tgt{color:var(--pu)}.vr{color:var(--am)}
-.tr-res{font-size:10px;flex:1;padding-left:4px}
+.tr-res{font-size:11px;flex:1;padding-left:4px}
 .tr-res.ok{color:rgba(63,186,122,.7)}.tr-res.warn{color:var(--am)}.tr-res.err{color:var(--rd)}
 .tr-cursor{width:8px;height:12px;background:var(--aq);animation:blk .8s step-end infinite;border-radius:1px}
 .tr-running{display:flex;align-items:center;gap:8px;padding:4px 0}
 /* monitor */
 .monitor-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--b);flex:1;overflow-y:auto}
 .mon-pnl{background:var(--bg);padding:12px 14px}
-.mon-title{font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.mon-title{font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
 .mon-sess{display:flex;align-items:center;gap:9px;padding:7px 10px;background:var(--bg2);border-radius:6px;border:0.5px solid var(--b2);margin-bottom:6px}
 /* editor */
 .editor-top{padding:8px 12px;border-bottom:0.5px solid var(--b);display:flex;align-items:center;gap:8px;background:var(--bg2);flex-shrink:0}
 .editor-name{font-size:12px;color:var(--t2);background:var(--bg3);border:0.5px solid var(--b2);border-radius:4px;padding:4px 10px;flex:1}
-.ed-req{font-size:10px;color:var(--aq);background:var(--aqd);border:0.5px solid rgba(0,201,201,.25);border-radius:3px;padding:2px 8px}
+.ed-req{font-size:11px;color:var(--aq);background:var(--aqd);border:0.5px solid rgba(0,201,201,.25);border-radius:3px;padding:2px 8px}
 .editor-body{flex:1;background:var(--bg5);padding:12px 14px;overflow-y:auto;font-size:12px;line-height:2;color:var(--t2)}
 .hl-run{background:var(--amd);border-left:2px solid var(--am);padding:0 8px;border-radius:0 4px 4px 0}
 /* library */
@@ -329,7 +329,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .lib-card.on{border-color:rgba(0,201,201,.35);background:var(--aqd)}
 .lc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:5px}
 .lc-name{font-size:13px;font-weight:500;color:var(--t)}
-.lc-cmds{font-size:10px;color:var(--t3)}
+.lc-cmds{font-size:11px;color:var(--t3)}
 .lc-tags{display:flex;gap:5px;margin-bottom:5px}
 .lt-vs{background:var(--aqd);color:var(--aq);border:0.5px solid rgba(0,201,201,.25)}
 .lt-ak{background:var(--pud);color:var(--pu);border:0.5px solid rgba(157,126,232,.25)}
@@ -344,13 +344,13 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .cmd-ipt{flex:1;background:transparent;border:none;outline:none;font-size:12px;color:var(--t);padding:0 12px;height:100%;font-family:var(--mono)}
 .cmd-ipt::placeholder{color:var(--t3)}
 .cmd-acts{display:flex;gap:0;height:100%;border-left:0.5px solid var(--b)}
-.ca{font-size:10px;padding:0 11px;background:transparent;border:none;border-right:0.5px solid var(--b);color:var(--t3);cursor:pointer;height:100%;transition:all .1s;font-family:var(--mono);white-space:nowrap}
+.ca{font-size:11px;padding:0 11px;background:transparent;border:none;border-right:0.5px solid var(--b);color:var(--t3);cursor:pointer;height:100%;transition:all .1s;font-family:var(--mono);white-space:nowrap}
 .ca:hover{background:var(--bg4);color:var(--t2)}
 .ca.run{color:var(--aq);background:var(--aqd);border-color:rgba(0,201,201,.25)}
 .ca.run:hover{background:var(--aqb)}
 .ca.stop{color:var(--rd);background:var(--rdd);border-color:rgba(224,82,82,.25);border-right:none}
 .ca.stop:hover{background:rgba(224,82,82,.2)}
-.cmd-status{background:var(--bg2);border-top:0.5px solid var(--b);padding:4px 12px;display:flex;align-items:center;gap:12px;font-size:10px;color:var(--t3);flex-shrink:0}
+.cmd-status{background:var(--bg2);border-top:0.5px solid var(--b);padding:4px 12px;display:flex;align-items:center;gap:12px;font-size:11px;color:var(--t3);flex-shrink:0}
 .cs-run{color:var(--am);display:flex;align-items:center;gap:6px}
 .cs-rdot{width:5px;height:5px;border-radius:50%;background:var(--am);animation:pulse 1.2s infinite}
 </style>
@@ -361,12 +361,12 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 <style>
 .forge-wrap{display:flex;flex:1;min-height:0}
 .forge-nav{width:186px;background:var(--bg2);border-right:0.5px solid var(--b);display:flex;flex-direction:column;flex-shrink:0}
-.fn-hd{padding:11px 13px 8px;border-bottom:0.5px solid var(--b);flex-shrink:0;font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase}
+.fn-hd{padding:11px 13px 8px;border-bottom:0.5px solid var(--b);flex-shrink:0;font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase}
 .fn-item{display:flex;align-items:center;gap:9px;padding:8px 13px;cursor:pointer;border-left:2px solid transparent;transition:all .1s;font-size:11px;color:var(--t3)}
 .fn-item:hover{background:var(--bg3);color:var(--t2)}
 .fn-item.on{background:var(--amd);color:var(--am);border-left-color:var(--am)}
 .fn-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
-.fn-bdg{margin-left:auto;font-size:10px;padding:1px 5px;border-radius:3px}
+.fn-bdg{margin-left:auto;font-size:11px;padding:1px 5px;border-radius:3px}
 .fn-bdg.warn{background:var(--rdd);color:var(--rd);border:0.5px solid rgba(224,82,82,.25)}
 .fn-bdg.ok{background:var(--grd);color:var(--gr);border:0.5px solid rgba(63,186,122,.25)}
 .fn-bdg.aq{background:var(--aqd);color:var(--aq);border:0.5px solid rgba(0,201,201,.25)}
@@ -374,24 +374,24 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .forge-panel{display:none;flex:1;flex-direction:column;overflow:hidden}
 .forge-panel.on{display:flex}
 .fp-hd{padding:11px 15px 9px;border-bottom:0.5px solid var(--b);display:flex;align-items:center;justify-content:space-between;background:var(--bg2);flex-shrink:0}
-.fp-eyebrow{font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+.fp-eyebrow{font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
 .fp-title{font-size:14px;font-weight:500;color:var(--t)}
 .fp-title .hi-am{color:var(--am)}.fp-title .hi{color:var(--aq)}
 .fp-body{flex:1;overflow-y:auto;padding:11px 13px}
 /* resource table */
 .res-tbl{width:100%;border-collapse:collapse;font-size:11px}
-.res-tbl th{font-size:10px;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;padding:6px 9px;border-bottom:0.5px solid var(--b2);text-align:left;font-weight:500;background:var(--bg2)}
+.res-tbl th{font-size:11px;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;padding:6px 9px;border-bottom:0.5px solid var(--b2);text-align:left;font-weight:500;background:var(--bg2)}
 .res-tbl td{padding:7px 9px;border-bottom:0.5px solid var(--b);vertical-align:middle}
 .res-tbl tr:hover td{background:var(--bg3)}
 .res-tbl tr.sel td{background:var(--amd)}
-.res-av{width:23px;height:23px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500}
-.r-name{color:var(--t);font-weight:500}.r-sub{color:var(--t3);font-size:10px}
-.r-id{color:var(--t3);font-size:10px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.res-av{width:23px;height:23px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500}
+.r-name{color:var(--t);font-weight:500}.r-sub{color:var(--t3);font-size:11px}
+.r-id{color:var(--t3);font-size:11px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .alias-pill{background:var(--aqd);border:0.5px solid rgba(0,201,201,.35);border-radius:3px;padding:2px 8px;color:var(--aq);font-size:11px;cursor:pointer}
 .alias-pill:hover{background:var(--aqb)}
 .alias-pill.unset{background:var(--bg4);border-color:var(--b);color:var(--t3)}
 .row-acts{display:flex;gap:4px;justify-content:flex-end}
-.ra{font-size:10px;padding:2px 7px;border-radius:3px;cursor:pointer;border:0.5px solid var(--b);color:var(--t3);background:transparent}
+.ra{font-size:11px;padding:2px 7px;border-radius:3px;cursor:pointer;border:0.5px solid var(--b);color:var(--t3);background:transparent}
 .ra:hover{background:var(--bg4);color:var(--t2)}
 /* instance surgeon */
 .ic{background:var(--bg2);border:0.5px solid var(--b2);border-radius:8px;margin-bottom:8px;overflow:hidden}
@@ -400,23 +400,23 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .ic-hd{padding:9px 13px;display:flex;align-items:center;gap:9px;border-bottom:0.5px solid var(--b);cursor:pointer}
 .ic-hd:hover{background:var(--bg3)}
 .ic-name{font-size:12px;font-weight:500;color:var(--t);flex:1}
-.ic-id{font-size:10px;color:var(--t3)}
+.ic-id{font-size:11px;color:var(--t3)}
 .ic-body{padding:11px 13px}
 .step-chain-s{display:flex;gap:0;align-items:stretch;margin-bottom:11px;overflow-x:auto}
 .scs-step{display:flex;flex-direction:column;align-items:center;min-width:85px}
-.scs-node{width:78px;padding:5px 7px;border-radius:5px;border:0.5px solid var(--b2);text-align:center;font-size:10px;background:var(--bg3)}
+.scs-node{width:78px;padding:5px 7px;border-radius:5px;border:0.5px solid var(--b2);text-align:center;font-size:11px;background:var(--bg3)}
 .scs-node.done{border-color:rgba(63,186,122,.3);background:var(--grd);color:var(--gr)}
 .scs-node.act{border-color:rgba(0,201,201,.4);background:var(--aqd);color:var(--aq)}
 .scs-node.blk{border-color:rgba(224,82,82,.4);background:var(--rdd);color:var(--rd);animation:blk 1.6s infinite}
 .scs-node.pend{color:var(--t3)}
-.scs-actor{font-size:9px;color:var(--t3);margin-top:3px;text-align:center}
+.scs-actor{font-size:11px;color:var(--t3);margin-top:3px;text-align:center}
 .scs-arr{display:flex;align-items:center;padding:0 3px;color:var(--t3);font-size:12px;padding-bottom:16px;flex-shrink:0}
 .ic-meta-row{display:flex;gap:12px;margin-bottom:9px;flex-wrap:wrap}
-.ic-meta{font-size:10px;color:var(--t3)}
+.ic-meta{font-size:11px;color:var(--t3)}
 .ic-meta span{color:var(--t2)}
 .ic-meta span.rd{color:var(--rd)}
 .coc-log-s{background:var(--bg5);border:0.5px solid var(--b);border-radius:5px;padding:7px 9px;margin-bottom:9px}
-.cl-line{font-size:10px;color:var(--t3);padding:2px 0;display:flex;gap:7px}
+.cl-line{font-size:11px;color:var(--t3);padding:2px 0;display:flex;gap:7px}
 .cl-line .ce{color:var(--aq)}.cl-line .ca2{color:var(--t2)}.cl-line .ct{color:var(--t3);margin-left:auto}
 .surg-acts{display:flex;gap:6px;flex-wrap:wrap;padding-top:9px;border-top:0.5px solid var(--b)}
 /* template registry */
@@ -425,41 +425,41 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .tc-name{font-size:12px;font-weight:500;color:var(--t);flex:1}
 .tc-body{padding:9px 13px;display:flex;gap:13px;align-items:flex-start}
 .tc-meta{flex:1}
-.tc-field{font-size:10px;margin-bottom:3px}
+.tc-field{font-size:11px;margin-bottom:3px}
 .tc-lbl{color:var(--t3);min-width:95px;display:inline-block}
 .tc-val{color:var(--t2)}
 .tc-steps{flex:1}
 .step-pills{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
-.sp{font-size:10px;padding:2px 8px;border-radius:3px;border:0.5px solid var(--b)}
+.sp{font-size:11px;padding:2px 8px;border-radius:3px;border:0.5px solid var(--b)}
 .sp-form{background:var(--aqd);color:var(--aq);border-color:rgba(0,201,201,.25)}
 .sp-appr{background:var(--grd);color:var(--gr);border-color:rgba(63,186,122,.25)}
 .sp-sign{background:var(--pud);color:var(--pu);border-color:rgba(157,126,232,.25)}
 .sp-mtg{background:var(--bg4);color:var(--t3);border-color:var(--b)}
 .tc-acts{display:flex;gap:6px;padding:8px 13px;border-top:0.5px solid var(--b)}
 /* form inspector */
-.fv-tbl{width:100%;border-collapse:collapse;font-size:10px}
+.fv-tbl{width:100%;border-collapse:collapse;font-size:11px}
 .fv-tbl th{color:var(--t3);letter-spacing:.07em;padding:5px 7px;border-bottom:0.5px solid var(--b2);text-align:center;font-weight:500}
 .fv-tbl th:first-child{text-align:left}
 .fv-tbl td{padding:5px 7px;border-bottom:0.5px solid var(--b);text-align:center;vertical-align:middle}
 .fv-tbl td:first-child{text-align:left;color:var(--t2)}
 .fv-tbl tr:hover td{background:var(--bg3)}
-.vc{width:17px;height:17px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:10px}
+.vc{width:17px;height:17px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:11px}
 .vc-e{background:var(--aqd);color:var(--aq);border:0.5px solid rgba(0,201,201,.25)}
 .vc-r{background:var(--bg4);color:var(--t3);border:0.5px solid var(--b)}
-.fv-sec td{background:var(--bg3);color:var(--t3);font-size:10px;padding:3px 7px;letter-spacing:.05em}
+.fv-sec td{background:var(--bg3);color:var(--t3);font-size:11px;padding:3px 7px;letter-spacing:.05em}
 /* dev bench */
 .ver-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:14px}
-.ver-tbl th{font-size:10px;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;padding:5px 9px;border-bottom:0.5px solid var(--b2);text-align:left;font-weight:500;background:var(--bg2)}
+.ver-tbl th{font-size:11px;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;padding:5px 9px;border-bottom:0.5px solid var(--b2);text-align:left;font-weight:500;background:var(--bg2)}
 .ver-tbl td{padding:7px 9px;border-bottom:0.5px solid var(--b);vertical-align:middle}
 .ver-tbl tr:hover td{background:var(--bg3)}
 .ver-file{color:var(--aq)}.ver-stamp{color:var(--am)}.ver-ok{color:var(--gr)}.ver-bad{color:var(--rd)}
 .warn-banner{font-size:11px;color:var(--am);background:var(--amd);border:0.5px solid rgba(239,159,39,.25);border-radius:5px;padding:8px 12px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .ir-row{display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-bottom:0.5px solid var(--b);font-size:11px}
 .ir-row:last-child{border-bottom:none}
-.ir-icon{width:15px;height:15px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:1px}
+.ir-icon{width:15px;height:15px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px}
 .ir-ok{background:var(--grd);color:var(--gr)}.ir-warn{background:var(--amd);color:var(--am)}
 .ir-text{color:var(--t2);flex:1;line-height:1.5}
-.ir-rule-label{color:var(--t3);font-size:10px;margin-top:1px}
+.ir-rule-label{color:var(--t3);font-size:11px;margin-top:1px}
 /* trigger rules */
 .tr-panel .rule-card{background:var(--bg2);border:0.5px solid var(--b2);border-radius:8px;margin-bottom:8px;overflow:hidden}
 .tr-panel .rule-card.active{border-left:2px solid var(--aq);border-radius:0 8px 8px 0}
@@ -470,7 +470,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 .rc-expr{background:var(--bg5);border:0.5px solid var(--b);border-radius:4px;padding:8px 10px;font-size:11px;color:var(--t2);line-height:1.8;margin-bottom:9px;font-family:var(--mono)}
 .rc-expr .if-kw{color:var(--pu)}.rc-expr .and-kw{color:var(--pu)}.rc-expr .then-kw{color:var(--am)}.rc-expr .val{color:var(--gr)}.rc-expr .field{color:var(--aq)}
 .rc-meta-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:9px}
-.rc-meta{font-size:10px;color:var(--t3)}.rc-meta span{color:var(--t2)}
+.rc-meta{font-size:11px;color:var(--t3)}.rc-meta span{color:var(--t2)}
 .rc-acts{display:flex;gap:6px;border-top:0.5px solid var(--b);padding-top:8px}
 </style>
 
@@ -616,15 +616,15 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
             <div class="ring-wrap"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="22" fill="none" stroke="var(--bg4)" stroke-width="4"/><circle cx="26" cy="26" r="22" fill="none" stroke="#00c9c9" stroke-width="4" stroke-dasharray="138.2 138.2" stroke-dashoffset="17.97" stroke-linecap="round" transform="rotate(-90 26 26)"/></svg><div class="ring-pct">87%</div></div>
             <div><div class="hs-row"><span class="hs-lbl">certified</span><span class="hs-val gr">3 / 4</span></div><div class="hs-row"><span class="hs-lbl">failing tests</span><span class="hs-val gr">0</span></div><div class="hs-row"><span class="hs-lbl">suite runs (30d)</span><span class="hs-val">359</span></div><div class="hs-row"><span class="hs-lbl">oldest cert</span><span class="hs-val am">2d</span></div><div class="hs-row"><span class="hs-lbl">attention</span><span class="hs-val am">Design Review</span></div></div>
           </div>
-          <div style="padding:6px 13px 2px;font-size:10px;color:var(--t3);letter-spacing:.07em">DAILY HEALTH · APR 9–16</div>
+          <div style="padding:6px 13px 2px;font-size:11px;color:var(--t3);letter-spacing:.07em">DAILY HEALTH · APR 9–16</div>
           <div style="display:grid;grid-template-columns:16px repeat(9,1fr);gap:2px;padding:4px 13px 8px;align-items:center">
             <div></div>
-            <div style="font-size:9px;color:var(--t3);text-align:center">9</div><div style="font-size:9px;color:var(--t3);text-align:center">10</div><div style="font-size:9px;color:var(--t3);text-align:center">11</div><div style="font-size:9px;color:var(--t3);text-align:center">12</div><div style="font-size:9px;color:var(--t3);text-align:center">13</div><div style="font-size:9px;color:var(--t3);text-align:center">14</div><div style="font-size:9px;color:var(--t3);text-align:center">15</div><div style="font-size:9px;color:var(--t3);text-align:center">16</div><div></div>
-            <div style="font-size:9px;color:var(--t3)">M</div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--aq);border:0.5px solid rgba(0,201,201,.5)"></div><div></div>
-            <div style="font-size:9px;color:var(--t3)">T</div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--am)"></div><div class="day-cell" style="background:var(--aq);border:0.5px solid rgba(0,201,201,.5)"></div><div></div>
-            <div style="font-size:9px;color:var(--t3)">W</div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--aq);border:0.5px solid rgba(0,201,201,.5)"></div><div></div>
-            <div style="font-size:9px;color:var(--t3)">T</div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--aq);border:0.5px solid rgba(0,201,201,.5)"></div><div></div>
-            <div style="font-size:9px;color:var(--t3)">F</div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--aq);border:0.5px solid rgba(0,201,201,.5)"></div><div></div>
+            <div style="font-size:11px;color:var(--t3);text-align:center">9</div><div style="font-size:11px;color:var(--t3);text-align:center">10</div><div style="font-size:11px;color:var(--t3);text-align:center">11</div><div style="font-size:11px;color:var(--t3);text-align:center">12</div><div style="font-size:11px;color:var(--t3);text-align:center">13</div><div style="font-size:11px;color:var(--t3);text-align:center">14</div><div style="font-size:11px;color:var(--t3);text-align:center">15</div><div style="font-size:11px;color:var(--t3);text-align:center">16</div><div></div>
+            <div style="font-size:11px;color:var(--t3)">M</div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--aq);border:0.5px solid rgba(0,201,201,.5)"></div><div></div>
+            <div style="font-size:11px;color:var(--t3)">T</div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--am)"></div><div class="day-cell" style="background:var(--aq);border:0.5px solid rgba(0,201,201,.5)"></div><div></div>
+            <div style="font-size:11px;color:var(--t3)">W</div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--aq);border:0.5px solid rgba(0,201,201,.5)"></div><div></div>
+            <div style="font-size:11px;color:var(--t3)">T</div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--aq);border:0.5px solid rgba(0,201,201,.5)"></div><div></div>
+            <div style="font-size:11px;color:var(--t3)">F</div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--bg4)"></div><div class="day-cell" style="background:var(--gr)"></div><div class="day-cell" style="background:var(--aq);border:0.5px solid rgba(0,201,201,.5)"></div><div></div>
           </div>
           <div class="suite-row"><span class="suite-name">Expense Report v1.2</span><div class="suite-bar-w"><div class="suite-bar" style="width:100%;background:var(--gr)"></div></div><span class="suite-pct">100%</span><span class="badge b-gr" style="margin-left:6px">certified</span></div>
           <div class="suite-row"><span class="suite-name">PTO Request v1.0</span><div class="suite-bar-w"><div class="suite-bar" style="width:100%;background:var(--gr)"></div></div><span class="suite-pct">100%</span><span class="badge b-gr" style="margin-left:6px">certified</span></div>
@@ -653,17 +653,17 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
   <!-- INSTANCES FULL VIEW -->
   <div class="mc-view" id="mc-instances">
     <div class="inst-filter-bar">
-      <span style="font-size:10px;color:var(--t3);margin-right:4px">Filter:</span>
+      <span style="font-size:11px;color:var(--t3);margin-right:4px">Filter:</span>
       <button class="filter-pill on" onclick="toggleFilter(this)">All 18</button>
       <button class="filter-pill on-rd" onclick="toggleFilter(this)">Blocked 2</button>
       <button class="filter-pill on-am" onclick="toggleFilter(this)">Waiting 5</button>
       <button class="filter-pill" onclick="toggleFilter(this)">In progress 11</button>
-      <span style="margin-left:auto;font-size:10px;color:var(--t3)">Click any instance to inspect</span>
+      <span style="margin-left:auto;font-size:11px;color:var(--t3)">Click any instance to inspect</span>
     </div>
     <div style="display:flex;flex:1;min-height:0;overflow:hidden">
       <div style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px;background:var(--bg)">
         <!-- Blocked -->
-        <div style="font-size:10px;color:var(--t3);letter-spacing:.08em;padding:4px 0 2px">BLOCKED · 2</div>
+        <div style="font-size:11px;color:var(--t3);letter-spacing:.08em;padding:4px 0 2px">BLOCKED · 2</div>
         <div class="inst bl" onclick="selectInstance('drs0041')">
           <div class="inst-top"><span class="inst-name">Design Review Signoff</span><span class="badge b-rd">blocked · 3h 04m</span></div>
           <div class="inst-meta">e-drs-0041 · Flexscope · template v0.14 · launched Apr 16 at 10:48</div>
@@ -677,7 +677,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
           <div class="actors"><span class="actor">RC submitted</span><span class="actor me pend" style="color:var(--rd)">VS — not started</span></div>
         </div>
         <!-- Waiting -->
-        <div style="font-size:10px;color:var(--t3);letter-spacing:.08em;padding:8px 0 2px">AWAITING ACTION · 5</div>
+        <div style="font-size:11px;color:var(--t3);letter-spacing:.08em;padding:8px 0 2px">AWAITING ACTION · 5</div>
         <div class="inst wn" onclick="selectInstance('er0038')">
           <div class="inst-top"><span class="inst-name">Expense Report · NovaBio QMS</span><span class="badge b-am">awaiting AK · 2h 14m</span></div>
           <div class="inst-meta">e-er-0038 · Angela Kim · step 3 of 3</div>
@@ -691,7 +691,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
           <div class="actors"><span class="actor me">VS submitted</span><span class="actor pend">AK · next</span></div>
         </div>
         <!-- In progress -->
-        <div style="font-size:10px;color:var(--t3);letter-spacing:.08em;padding:8px 0 2px">IN PROGRESS · 11</div>
+        <div style="font-size:11px;color:var(--t3);letter-spacing:.08em;padding:8px 0 2px">IN PROGRESS · 11</div>
         <div class="inst ok" onclick="selectInstance('pco0033')">
           <div class="inst-top"><span class="inst-name">Project Change Order · Flexscope</span><span class="badge b-gr">in progress · 18m</span></div>
           <div class="inst-meta">e-pco-0033 · RC · step 1 of 3</div>
@@ -712,7 +712,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
           <span style="font-size:12px;font-weight:500;color:var(--t);flex:1" id="idp-name">Design Review Signoff</span>
         </div>
         <div class="idp-body" id="idp-body">
-          <div style="font-size:10px;color:var(--t3);margin-bottom:8px">e-drs-0041 · Flexscope · template v0.14</div>
+          <div style="font-size:11px;color:var(--t3);margin-bottom:8px">e-drs-0041 · Flexscope · template v0.14</div>
           <div class="step-chain-full">
             <div class="scf-step"><div class="scf-node done">Submitted</div><div class="scf-actor">VS · form</div></div>
             <div class="scf-arr">›</div>
@@ -728,7 +728,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
             <div class="mg-item"><div class="mg-lbl">Template</div><div class="mg-val">Design Review v0.14</div></div>
             <div class="mg-item"><div class="mg-lbl">Submitted by</div><div class="mg-val aq">VS</div></div>
           </div>
-          <div style="font-size:10px;color:var(--t3);letter-spacing:.07em;margin-bottom:6px">RECENT COC EVENTS</div>
+          <div style="font-size:11px;color:var(--t3);letter-spacing:.07em;margin-bottom:6px">RECENT COC EVENTS</div>
           <div class="coc-log">
             <div class="coc-item" style="padding:4px 0;border-bottom:0.5px solid var(--b)"><div class="coc-dot" style="background:var(--rd)"></div><div class="coc-body"><div class="coc-evt" style="font-size:11px">instance.blocked</div><div class="coc-meta">Finance assignee_id unresolved</div></div><div class="coc-time">3h</div></div>
             <div class="coc-item" style="padding:4px 0;border-bottom:0.5px solid var(--b)"><div class="coc-dot" style="background:var(--gr)"></div><div class="coc-body"><div class="coc-evt" style="font-size:11px">request.approved · step 2</div><div class="coc-meta">VS · manager approval</div></div><div class="coc-time">3h 1m</div></div>
@@ -752,14 +752,14 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
   <div class="mc-view" id="mc-sessions">
     <div class="sessions-full">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <span style="font-size:10px;color:var(--t3);letter-spacing:.08em">CONNECTED SESSIONS · 2 LIVE</span>
+        <span style="font-size:11px;color:var(--t3);letter-spacing:.08em">CONNECTED SESSIONS · 2 LIVE</span>
         <button class="btn aq">Broadcast to all →</button>
       </div>
       <!-- VS session card -->
       <div class="sess-full-card" style="border-left:2px solid var(--aq);border-radius:0 8px 8px 0">
         <div class="sfc-hd">
           <div class="sess-av aq" style="width:30px;height:30px;font-size:11px">VS</div>
-          <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--t)">Vaughn Staples <span style="font-size:10px;color:var(--t3)">(me)</span></div><div style="font-size:10px;color:var(--t3)">alias VS · CMD40 · connected 1h 52m</div></div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--t)">Vaughn Staples <span style="font-size:11px;color:var(--t3)">(me)</span></div><div style="font-size:11px;color:var(--t3)">alias VS · CMD40 · connected 1h 52m</div></div>
           <span class="badge b-gr">live</span>
           <button class="btn aq" style="margin-left:8px">Send command →</button>
         </div>
@@ -770,7 +770,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
             <div class="sfc-field"><span class="sfc-key">Active tab</span><span class="sfc-val">MY WORK</span></div>
             <div class="sfc-field"><span class="sfc-key">Last action</span><span class="sfc-val">Click "Approve" · 2m ago</span></div>
             <div class="sfc-field"><span class="sfc-key">Script running</span><span class="sfc-val am">dual_session_test · line 28</span></div>
-            <div class="sfc-field"><span class="sfc-key">Resource ID</span><span class="sfc-val" style="font-size:10px">e1000001-0000...</span></div>
+            <div class="sfc-field"><span class="sfc-key">Resource ID</span><span class="sfc-val" style="font-size:11px">e1000001-0000...</span></div>
           </div>
           <div>
             <div class="sfc-col-title">window.* globals</div>
@@ -782,7 +782,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
           </div>
           <div>
             <div class="sfc-col-title">Assert results</div>
-            <div class="assert-result"><div class="assert-pass">✓ Assert session VS is connected — PASS</div><div style="color:var(--t3);font-size:10px;margin-top:3px">alias confirmed · presence active · CMD40</div></div>
+            <div class="assert-result"><div class="assert-pass">✓ Assert session VS is connected — PASS</div><div style="color:var(--t3);font-size:11px;margin-top:3px">alias confirmed · presence active · CMD40</div></div>
             <div style="margin-top:8px">
               <div class="sfc-col-title">Direct commands</div>
               <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -798,7 +798,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
       <div class="sess-full-card">
         <div class="sfc-hd">
           <div class="sess-av pu" style="width:30px;height:30px;font-size:11px">AK</div>
-          <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--t)">Angela Kim</div><div style="font-size:10px;color:var(--t3)">alias AK · connected · idle 4m</div></div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--t)">Angela Kim</div><div style="font-size:11px;color:var(--t3)">alias AK · connected · idle 4m</div></div>
           <span class="badge b-am">idle 4m</span>
           <button class="btn" style="margin-left:8px">Send command →</button>
         </div>
@@ -809,7 +809,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
             <div class="sfc-field"><span class="sfc-key">Active tab</span><span class="sfc-val">MY WORK</span></div>
             <div class="sfc-field"><span class="sfc-key">Last action</span><span class="sfc-val">Tab navigation · 4m ago</span></div>
             <div class="sfc-field"><span class="sfc-key">Script running</span><span class="sfc-val am">dual_session_test · waiting</span></div>
-            <div class="sfc-field"><span class="sfc-key">Resource ID</span><span class="sfc-val" style="font-size:10px">c40b70c7-71db...</span></div>
+            <div class="sfc-field"><span class="sfc-key">Resource ID</span><span class="sfc-val" style="font-size:11px">c40b70c7-71db...</span></div>
           </div>
           <div>
             <div class="sfc-col-title">window.* globals</div>
@@ -821,7 +821,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
           </div>
           <div>
             <div class="sfc-col-title">Assert results</div>
-            <div class="assert-result"><div class="assert-pass">✓ Assert session AK is connected — PASS</div><div style="color:var(--am);font-size:10px;margin-top:3px">alias confirmed · idle 4m — may need wake command</div></div>
+            <div class="assert-result"><div class="assert-pass">✓ Assert session AK is connected — PASS</div><div style="color:var(--am);font-size:11px;margin-top:3px">alias confirmed · idle 4m — may need wake command</div></div>
             <div style="margin-top:8px">
               <div class="sfc-col-title">Direct commands</div>
               <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -836,7 +836,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
       <!-- add session -->
       <div style="background:var(--bg2);border:0.5px dashed var(--b2);border-radius:8px;padding:16px;text-align:center;cursor:pointer" onclick="showComingSoon('Add Session — open a new Chrome profile, navigate to compass.html, log in, then set your alias in the Command sidebar')">
         <div style="font-size:11px;color:var(--t3);margin-bottom:4px">+ Add session</div>
-        <div style="font-size:10px;color:var(--t3)">Open a new Chrome profile · navigate to compass.html · set alias</div>
+        <div style="font-size:11px;color:var(--t3)">Open a new Chrome profile · navigate to compass.html · set alias</div>
       </div>
     </div>
   </div>
@@ -871,7 +871,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
           <div class="cfs-item"><span class="cfs-val" style="color:var(--rd)">2</span>blocks</div>
           <div class="cfs-item"><span class="cfs-val" style="color:var(--aq)">3</span>certs issued</div>
           <div class="cfs-item"><span class="cfs-val" style="color:var(--am)">4</span>pending</div>
-          <div style="margin-left:auto;font-size:10px;color:var(--t3)">Last event 2m ago · Realtime</div>
+          <div style="margin-left:auto;font-size:11px;color:var(--t3)">Last event 2m ago · Realtime</div>
         </div>
         <div class="coc-full-item"><div class="cfi-dot" style="background:var(--gr)"></div><div class="cfi-body"><div class="cfi-evt">request.approved · Expense Report · step 2</div><div class="cfi-meta">Actor: VS (Vaughn Staples) · Instance e-er-0038 · NovaBio QMS</div><div class="cfi-detail">Manager approval · panel closed immediately · routing fired to AK step 3 · fire-and-forget</div></div><div class="cfi-right"><div class="cfi-time">2m ago · 01:50:01</div><span class="badge b-gr">approval</span></div></div>
         <div class="coc-full-item"><div class="cfi-dot" style="background:var(--aq)"></div><div class="cfi-body"><div class="cfi-evt">cert.issued · Expense Report v1.2 · CERT-20260416-ER-002</div><div class="cfi-meta">Actor: Cadence BIST engine · 6/6 coverage paths passing</div><div class="cfi-detail">All routing paths verified — clean path, reset path ×3, escalation path — cleared for release</div></div><div class="cfi-right"><div class="cfi-time">22m ago · 01:30:14</div><span class="badge b-aq">cert</span></div></div>
@@ -920,9 +920,9 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
       <!-- Sessions -->
       <div style="border-bottom:0.5px solid var(--b);padding-bottom:6px">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px 5px">
-          <span style="font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase">Sessions</span>
+          <span style="font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase">Sessions</span>
           <div style="display:flex;align-items:center;gap:5px">
-            <span style="font-size:10px;color:var(--t3)">alias</span>
+            <span style="font-size:11px;color:var(--t3)">alias</span>
             <input id="phr-alias-input" maxlength="4" placeholder="VS"
               style="width:34px;font-family:monospace;font-size:11px;font-weight:500;background:var(--aqd);border:0.5px solid rgba(0,201,201,.35);border-radius:3px;color:var(--aq);text-align:center;outline:none;padding:2px 3px;text-transform:uppercase">
           </div>
@@ -931,10 +931,10 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
       </div>
 
       <!-- Scripts -->
-      <div style="font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;padding:8px 12px 5px">Scripts</div>
+      <div style="font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;padding:8px 12px 5px">Scripts</div>
       <div id="phr-scripts" style="flex:1;overflow-y:auto;padding-bottom:4px"></div>
       <div style="border-top:0.5px solid var(--b);padding:7px 10px">
-        <button id="phr-new-script" style="width:100%;font-family:monospace;font-size:10px;font-weight:500;padding:5px;border:0.5px solid rgba(0,201,201,.3);border-radius:4px;background:transparent;color:var(--aq);cursor:pointer;letter-spacing:.05em">+ New Script</button>
+        <button id="phr-new-script" style="width:100%;font-family:monospace;font-size:11px;font-weight:500;padding:5px;border:0.5px solid rgba(0,201,201,.3);border-radius:4px;background:transparent;color:var(--aq);cursor:pointer;letter-spacing:.05em">+ New Script</button>
       </div>
     </div>
 
@@ -949,9 +949,9 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
         <button class="phr-tab-btn ct" data-tab="library" style="font-size:11px;padding:10px 16px;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--t3);cursor:pointer;font-family:monospace;letter-spacing:.03em">Library</button>
         <div style="flex:1"></div>
         <div style="display:flex;align-items:center;gap:0;border-left:0.5px solid var(--b)">
-          <button id="phr-pop-dot" title="Pop out to new window" style="font-size:10px;padding:0 12px;height:100%;border:none;border-right:0.5px solid var(--b);background:transparent;color:var(--t3);cursor:pointer;font-family:monospace">↗ pop out</button>
-          <button id="phr-min-dot" title="Minimize" style="font-size:10px;padding:0 12px;height:100%;border:none;border-right:0.5px solid var(--b);background:transparent;color:var(--t3);cursor:pointer;font-family:monospace">—</button>
-          <button id="phr-close-dot" title="Close panel" style="font-size:10px;padding:0 12px;height:100%;border:none;background:transparent;color:rgba(224,82,82,.6);cursor:pointer;font-family:monospace">✕</button>
+          <button id="phr-pop-dot" title="Pop out to new window" style="font-size:11px;padding:0 12px;height:100%;border:none;border-right:0.5px solid var(--b);background:transparent;color:var(--t3);cursor:pointer;font-family:monospace">↗ pop out</button>
+          <button id="phr-min-dot" title="Minimize" style="font-size:11px;padding:0 12px;height:100%;border:none;border-right:0.5px solid var(--b);background:transparent;color:var(--t3);cursor:pointer;font-family:monospace">—</button>
+          <button id="phr-close-dot" title="Close panel" style="font-size:11px;padding:0 12px;height:100%;border:none;background:transparent;color:rgba(224,82,82,.6);cursor:pointer;font-family:monospace">✕</button>
         </div>
       </div>
 
@@ -959,7 +959,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
       <div id="phr-pane-transcript" class="phr-pane" style="flex:1;overflow-y:auto;padding:8px 12px;display:block;background:var(--bg5);font-size:12px"></div>
 
       <div id="phr-pane-monitor" class="phr-pane" style="display:none;flex:1;overflow-y:auto;padding:8px 12px;flex-direction:column;gap:1px;background:var(--bg5)">
-        <div style="font-size:10px;color:var(--t3);padding:4px 0 8px">Session presence events — join / leave / location updates</div>
+        <div style="font-size:11px;color:var(--t3);padding:4px 0 8px">Session presence events — join / leave / location updates</div>
       </div>
 
       <div id="phr-pane-editor" class="phr-pane" style="display:none;flex:1;flex-direction:column">
@@ -982,8 +982,8 @@ VS: Click &quot;Approve&quot;"
 
       <div id="phr-pane-library" class="phr-pane" style="display:none;flex:1;overflow-y:auto;padding:10px 12px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div style="font-size:10px;color:var(--t3);line-height:1.7">Click to load into editor. Scripts auto-load from /scripts/ on startup.</div>
-          <button id="phr-refresh-scripts" style="font-size:10px;padding:3px 9px;border:0.5px solid rgba(0,201,201,.3);border-radius:3px;background:transparent;color:var(--aq);cursor:pointer;font-family:monospace;white-space:nowrap;margin-left:8px;flex-shrink:0">↻ Refresh</button>
+          <div style="font-size:11px;color:var(--t3);line-height:1.7">Click to load into editor. Scripts auto-load from /scripts/ on startup.</div>
+          <button id="phr-refresh-scripts" style="font-size:11px;padding:3px 9px;border:0.5px solid rgba(0,201,201,.3);border-radius:3px;background:transparent;color:var(--aq);cursor:pointer;font-family:monospace;white-space:nowrap;margin-left:8px;flex-shrink:0">↻ Refresh</button>
         </div>
         <div id="phr-library-list"></div>
       </div>
@@ -1087,9 +1087,9 @@ VS: Click &quot;Approve&quot;"
       <div class="forge-panel" id="fp-templates">
         <div class="fp-hd"><div><div class="fp-eyebrow">Forge · Templates</div><div class="fp-title">Workflow <span class="hi">templates</span></div></div><button class="btn aq">+ New template</button></div>
         <div class="fp-body">
-          <div class="tmpl-card"><div class="tc-hd"><span class="tc-name">Expense Report</span><span class="badge b-gr" style="margin-right:6px">v1.2 · published</span><span style="font-size:10px;color:var(--t3)">Cert 22m ago · 6/6 paths</span><span style="font-size:10px;color:var(--gr);margin-left:auto">form_def ee100010</span></div><div class="tc-body"><div class="tc-meta"><div class="tc-field"><span class="tc-lbl">form_def</span><span class="tc-val">ee100010-0001...</span></div><div class="tc-field"><span class="tc-lbl">companion</span><span class="tc-val">5f772b14-9237...</span></div><div class="tc-field"><span class="tc-lbl">trigger</span><span class="tc-val">form_submit</span></div><div class="tc-field"><span class="tc-lbl">step 1 auto-adv</span><span class="tc-val" style="color:var(--gr)">enabled</span></div></div><div class="tc-steps"><div style="font-size:10px;color:var(--t3);margin-bottom:4px">Step chain</div><div class="step-pills"><span class="sp sp-form">1 · Submission · form</span><span class="sp sp-appr">2 · Manager · VS</span><span class="sp sp-appr">3 · Finance · AK</span></div></div></div><div class="tc-acts"><button class="btn">View in Cadence</button><button class="btn">Compare versions</button><button class="btn">Simulate</button><button class="btn am" style="margin-left:auto">Promote to live</button></div></div>
-          <div class="tmpl-card"><div class="tc-hd"><span class="tc-name">Design Review Signoff</span><span class="badge b-am" style="margin-right:6px">v0.14 · draft</span><span style="font-size:10px;color:var(--rd)">Never certified · 0/18 paths</span><span style="font-size:10px;color:var(--rd);margin-left:auto">blocking 1 instance</span></div><div class="tc-body"><div class="tc-meta"><div class="tc-field"><span class="tc-lbl">trigger</span><span class="tc-val">manual_launch</span></div><div class="tc-field"><span class="tc-lbl">status</span><span class="tc-val" style="color:var(--am)">draft — not in Compass</span></div><div class="tc-field"><span class="tc-lbl">Finance step</span><span class="tc-val" style="color:var(--rd)">assignee null</span></div></div><div class="tc-steps"><div style="font-size:10px;color:var(--t3);margin-bottom:4px">Step chain</div><div class="step-pills"><span class="sp sp-form">1 · DR Form</span><span class="sp sp-form">2 · DR Approval Form</span><span class="sp sp-appr">3 · Approval</span><span class="sp sp-sign">4 · Sign-off</span><span class="sp sp-mtg">5 · Meeting</span></div></div></div><div class="tc-acts"><button class="btn">View in Cadence</button><button class="btn">Write test scripts</button><button class="btn rd">Assign Finance contact first →</button></div></div>
-          <div class="tmpl-card"><div class="tc-hd"><span class="tc-name">Planned Time Off Request</span><span class="badge b-gr" style="margin-right:6px">v1.0 · published</span><span style="font-size:10px;color:var(--t3)">Cert 2d ago · 2/2 paths</span></div><div class="tc-body"><div class="tc-meta"><div class="tc-field"><span class="tc-lbl">trigger</span><span class="tc-val">form_submit</span></div><div class="tc-field"><span class="tc-lbl">status</span><span class="tc-val" style="color:var(--gr)">published</span></div></div><div class="tc-steps"><div style="font-size:10px;color:var(--t3);margin-bottom:4px">Step chain</div><div class="step-pills"><span class="sp sp-form">1 · PTO Submission</span><span class="sp sp-appr">2 · Manager Approval</span><span class="sp sp-appr">3 · HR Notify</span></div></div></div><div class="tc-acts"><button class="btn">View in Cadence</button><button class="btn">Compare versions</button><button class="btn">Simulate</button></div></div>
+          <div class="tmpl-card"><div class="tc-hd"><span class="tc-name">Expense Report</span><span class="badge b-gr" style="margin-right:6px">v1.2 · published</span><span style="font-size:11px;color:var(--t3)">Cert 22m ago · 6/6 paths</span><span style="font-size:11px;color:var(--gr);margin-left:auto">form_def ee100010</span></div><div class="tc-body"><div class="tc-meta"><div class="tc-field"><span class="tc-lbl">form_def</span><span class="tc-val">ee100010-0001...</span></div><div class="tc-field"><span class="tc-lbl">companion</span><span class="tc-val">5f772b14-9237...</span></div><div class="tc-field"><span class="tc-lbl">trigger</span><span class="tc-val">form_submit</span></div><div class="tc-field"><span class="tc-lbl">step 1 auto-adv</span><span class="tc-val" style="color:var(--gr)">enabled</span></div></div><div class="tc-steps"><div style="font-size:11px;color:var(--t3);margin-bottom:4px">Step chain</div><div class="step-pills"><span class="sp sp-form">1 · Submission · form</span><span class="sp sp-appr">2 · Manager · VS</span><span class="sp sp-appr">3 · Finance · AK</span></div></div></div><div class="tc-acts"><button class="btn">View in Cadence</button><button class="btn">Compare versions</button><button class="btn">Simulate</button><button class="btn am" style="margin-left:auto">Promote to live</button></div></div>
+          <div class="tmpl-card"><div class="tc-hd"><span class="tc-name">Design Review Signoff</span><span class="badge b-am" style="margin-right:6px">v0.14 · draft</span><span style="font-size:11px;color:var(--rd)">Never certified · 0/18 paths</span><span style="font-size:11px;color:var(--rd);margin-left:auto">blocking 1 instance</span></div><div class="tc-body"><div class="tc-meta"><div class="tc-field"><span class="tc-lbl">trigger</span><span class="tc-val">manual_launch</span></div><div class="tc-field"><span class="tc-lbl">status</span><span class="tc-val" style="color:var(--am)">draft — not in Compass</span></div><div class="tc-field"><span class="tc-lbl">Finance step</span><span class="tc-val" style="color:var(--rd)">assignee null</span></div></div><div class="tc-steps"><div style="font-size:11px;color:var(--t3);margin-bottom:4px">Step chain</div><div class="step-pills"><span class="sp sp-form">1 · DR Form</span><span class="sp sp-form">2 · DR Approval Form</span><span class="sp sp-appr">3 · Approval</span><span class="sp sp-sign">4 · Sign-off</span><span class="sp sp-mtg">5 · Meeting</span></div></div></div><div class="tc-acts"><button class="btn">View in Cadence</button><button class="btn">Write test scripts</button><button class="btn rd">Assign Finance contact first →</button></div></div>
+          <div class="tmpl-card"><div class="tc-hd"><span class="tc-name">Planned Time Off Request</span><span class="badge b-gr" style="margin-right:6px">v1.0 · published</span><span style="font-size:11px;color:var(--t3)">Cert 2d ago · 2/2 paths</span></div><div class="tc-body"><div class="tc-meta"><div class="tc-field"><span class="tc-lbl">trigger</span><span class="tc-val">form_submit</span></div><div class="tc-field"><span class="tc-lbl">status</span><span class="tc-val" style="color:var(--gr)">published</span></div></div><div class="tc-steps"><div style="font-size:11px;color:var(--t3);margin-bottom:4px">Step chain</div><div class="step-pills"><span class="sp sp-form">1 · PTO Submission</span><span class="sp sp-appr">2 · Manager Approval</span><span class="sp sp-appr">3 · HR Notify</span></div></div></div><div class="tc-acts"><button class="btn">View in Cadence</button><button class="btn">Compare versions</button><button class="btn">Simulate</button></div></div>
         </div>
       </div>
 
@@ -1122,7 +1122,7 @@ VS: Click &quot;Approve&quot;"
         <div class="fp-body">
           <div style="font-size:11px;color:var(--t3);background:var(--bg2);border:0.5px solid var(--b);border-radius:5px;padding:9px 11px;margin-bottom:12px;line-height:1.7">Rules are evaluated at <span style="color:var(--aq)">compass_form_submit</span> time inside mw-tabs.js, before routing begins. Each rule that fires writes a <span style="color:var(--aq)">trigger.fired</span> CoC event for full auditability. Active rules are automatically added as coverage paths in Cadence Simulator.</div>
           <div class="rule-card active">
-            <div class="rc-hd"><span class="badge b-aq">active</span><span class="rc-name">Expense Report — high-value Finance escalation</span><span style="font-size:10px;color:var(--t3)">Created Apr 16 · by VS</span></div>
+            <div class="rc-hd"><span class="badge b-aq">active</span><span class="rc-name">Expense Report — high-value Finance escalation</span><span style="font-size:11px;color:var(--t3)">Created Apr 16 · by VS</span></div>
             <div class="rc-body">
               <div class="rc-expr"><span class="if-kw">IF</span>   form_def = <span class="val">Expense Report</span><br><span class="and-kw">AND</span>  field[<span class="field">Grand Total</span>] &gt; <span class="val">5000</span><br><span class="then-kw">THEN</span> override step 3 assignee  →  Finance Senior (<span class="field">resource_id</span>)<br>     add step 4                →  CFO Sign-off (approval)<br>     coc_event_label           =  <span class="val">"trigger.finance_escalation"</span></div>
               <div class="rc-meta-row"><div class="rc-meta">Form scope: <span>Expense Report</span></div><div class="rc-meta">Condition field: <span>Grand Total</span></div><div class="rc-meta">Operator: <span>gt</span></div><div class="rc-meta">Threshold: <span>$5,000</span></div><div class="rc-meta">Cadence paths: <span style="color:var(--gr)">2 auto-generated</span></div></div>
@@ -1130,7 +1130,7 @@ VS: Click &quot;Approve&quot;"
             </div>
           </div>
           <div class="rule-card active">
-            <div class="rc-hd"><span class="badge b-aq">active</span><span class="rc-name">Project Change Order — risk level CFO notification</span><span style="font-size:10px;color:var(--t3)">Created Apr 14 · by VS</span></div>
+            <div class="rc-hd"><span class="badge b-aq">active</span><span class="rc-name">Project Change Order — risk level CFO notification</span><span style="font-size:11px;color:var(--t3)">Created Apr 14 · by VS</span></div>
             <div class="rc-body">
               <div class="rc-expr"><span class="if-kw">IF</span>   form_def = <span class="val">Project Change Order</span><br><span class="and-kw">AND</span>  field[<span class="field">Risk Level</span>] = <span class="val">"critical"</span><br><span class="then-kw">THEN</span> add step after PM review  →  CFO Notification (notify)<br>     coc_event_label           =  <span class="val">"trigger.cfo_risk_notify"</span></div>
               <div class="rc-meta-row"><div class="rc-meta">Form scope: <span>Project Change Order</span></div><div class="rc-meta">Condition field: <span>Risk Level</span></div><div class="rc-meta">Operator: <span>eq</span></div><div class="rc-meta">Threshold: <span>"critical"</span></div><div class="rc-meta">Cadence paths: <span style="color:var(--gr)">2 auto-generated</span></div></div>
@@ -1138,7 +1138,7 @@ VS: Click &quot;Approve&quot;"
             </div>
           </div>
           <div class="rule-card inactive">
-            <div class="rc-hd"><span class="badge b-gy">inactive</span><span class="rc-name">PTO Request — consecutive days director approval</span><span style="font-size:10px;color:var(--t3)">Created Apr 12 · deactivated Apr 14</span></div>
+            <div class="rc-hd"><span class="badge b-gy">inactive</span><span class="rc-name">PTO Request — consecutive days director approval</span><span style="font-size:11px;color:var(--t3)">Created Apr 12 · deactivated Apr 14</span></div>
             <div class="rc-body">
               <div class="rc-expr" style="opacity:.6"><span class="if-kw">IF</span>   form_def = <span class="val">Planned Time Off Request</span><br><span class="and-kw">AND</span>  field[<span class="field">Duration (Days)</span>] &gt;= <span class="val">10</span><br><span class="then-kw">THEN</span> add step 3  →  Director Approval</div>
               <div class="rc-acts"><button class="btn gr">Reactivate</button><button class="btn">Edit rule</button><button class="btn rd" style="margin-left:auto">Delete</button></div>
@@ -1151,7 +1151,7 @@ VS: Click &quot;Approve&quot;"
       <div class="forge-panel" id="fp-devbench">
         <div class="fp-hd"><div><div class="fp-eyebrow">Forge · Dev bench</div><div class="fp-title">Version register <span class="hi">&amp; Iron Rules</span></div></div><button class="btn gr">Generate handoff MD</button></div>
         <div class="fp-body">
-          <div style="font-size:10px;color:var(--t3);letter-spacing:.08em;margin-bottom:7px">DEPLOYED FILE VERSIONS</div>
+          <div style="font-size:11px;color:var(--t3);letter-spacing:.08em;margin-bottom:7px">DEPLOYED FILE VERSIONS</div>
           <table class="ver-tbl">
             <thead><tr><th>File</th><th>Internal stamp</th><th>Cache-bust tag</th><th>Match</th><th>Last modified</th></tr></thead>
             <tbody>
@@ -1163,7 +1163,7 @@ VS: Click &quot;Approve&quot;"
             </tbody>
           </table>
           <div class="warn-banner"><span>⚠</span><span>mw-tabs.js cache-bust tag prefix is <strong>20260412</strong> but internal stamp is <strong>v20260415-MT13</strong>. Update compass.html cache-bust tag. P0 fix required.</span></div>
-          <div style="font-size:10px;color:var(--t3);letter-spacing:.08em;margin-bottom:7px">IRON RULES · AUTOMATED CHECK</div>
+          <div style="font-size:11px;color:var(--t3);letter-spacing:.08em;margin-bottom:7px">IRON RULES · AUTOMATED CHECK</div>
           <div class="ir-row"><div class="ir-icon ir-ok">✓</div><div class="ir-text">`var` only in cadence.html inline JS — no violations detected<div class="ir-rule-label">Rule: var only in cadence.html inline JS</div></div></div>
           <div class="ir-row"><div class="ir-icon ir-warn">!</div><div class="ir-text">mw-tabs.js cache-bust date prefix does not match internal version stamp. Update compass.html.<div class="ir-rule-label">Rule: cache-bust tag must match internal version stamp</div></div></div>
           <div class="ir-row"><div class="ir-icon ir-ok">✓</div><div class="ir-text">No hard deletes on CoC or cert rows in recent DB writes<div class="ir-rule-label">Rule: no hard deletes on CoC/cert rows</div></div></div>
@@ -1214,7 +1214,7 @@ function showComingSoon(label){
   ov.id='coming-soon-ov';
   ov.style.cssText='position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(6,10,16,.75)';
   ov.innerHTML='<div style="background:var(--bg2);border:0.5px solid var(--b3);border-radius:10px;padding:28px 36px;text-align:center;max-width:320px">'
-    +'<div style="font-size:10px;color:var(--t3);letter-spacing:.1em;margin-bottom:8px">COMING IN NEXT BUILD<\/div>'
+    +'<div style="font-size:11px;color:var(--t3);letter-spacing:.1em;margin-bottom:8px">COMING IN NEXT BUILD<\/div>'
     +'<div style="font-size:16px;color:var(--t);font-weight:500;margin-bottom:16px">'+label+'<\/div>'
     +'<button onclick="document.getElementById(\x27coming-soon-ov\x27).remove();switchMod(\x27cmd\x27)" class="btn aq">← Back to Command<\/button>'
     +'<\/div>';
@@ -2535,14 +2535,14 @@ return new Promise(function(resolve) {
     var dot = isLive
       ? '<span style="color:#1D9E75">●<\/span>'
       : '<span style="color:#E24B4A">○<\/span>';
-    var loc = isLive && sess ? ('<span style="color:rgba(255,255,255,.3);font-size:9px"> · ' + (sess.location||'') + '<\/span>') : '';
+    var loc = isLive && sess ? ('<span style="color:rgba(255,255,255,.3);font-size:11px"> · ' + (sess.location||'') + '<\/span>') : '';
     var tag = isLive
-      ? '<span style="font-size:9px;color:#1D9E75;border:1px solid rgba(29,158,117,.3);border-radius:2px;padding:0 4px">LIVE<\/span>'
-      : '<span style="font-size:9px;color:#E24B4A;border:1px solid rgba(226,75,74,.3);border-radius:2px;padding:0 4px">MISSING<\/span>';
+      ? '<span style="font-size:11px;color:#1D9E75;border:1px solid rgba(29,158,117,.3);border-radius:2px;padding:0 4px">LIVE<\/span>'
+      : '<span style="font-size:11px;color:#E24B4A;border:1px solid rgba(226,75,74,.3);border-radius:2px;padding:0 4px">MISSING<\/span>';
     return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
-      + '<span style="font-size:10px;font-family:monospace;color:#EF9F27;min-width:32px">' + alias + '<\/span>'
+      + '<span style="font-size:11px;font-family:monospace;color:#EF9F27;min-width:32px">' + alias + '<\/span>'
       + dot + ' '
-      + '<span style="font-size:10px;color:rgba(255,255,255,.7);flex:1">' + nameStr + loc + '<\/span>'
+      + '<span style="font-size:11px;color:rgba(255,255,255,.7);flex:1">' + nameStr + loc + '<\/span>'
       + tag
       + '<\/div>';
   }).join('');
@@ -2556,18 +2556,18 @@ return new Promise(function(resolve) {
   ].join(';');
   overlay.innerHTML = [
     '<div style="background:#0a1220;border:1px solid rgba(0,201,201,.25);border-radius:6px;padding:16px 18px;width:320px;max-width:90%">',
-    '  <div style="font-size:10px;letter-spacing:.1em;color:rgba(255,255,255,.3);margin-bottom:8px">SESSION PREFLIGHT<\/div>',
+    '  <div style="font-size:11px;letter-spacing:.1em;color:rgba(255,255,255,.3);margin-bottom:8px">SESSION PREFLIGHT<\/div>',
     '  <div style="font-size:12px;color:#EF9F27;font-weight:700;margin-bottom:10px;font-family:monospace">' + scriptName + '<\/div>',
     '  <div style="margin-bottom:12px">' + rows + '<\/div>',
-    '  <div style="font-size:10px;color:#E24B4A;margin-bottom:12px">',
+    '  <div style="font-size:11px;color:#E24B4A;margin-bottom:12px">',
     '    ' + missingAliases.length + ' required session' + (missingAliases.length !== 1 ? 's' : '') + ' not connected: ' + missingAliases.join(', '),
     '  <\/div>',
-    '  <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:14px">',
+    '  <div style="font-size:11px;color:rgba(255,255,255,.35);margin-bottom:14px">',
     '    Open a Compass window for each missing session and log in. Script will block when it reaches those steps.',
     '  <\/div>',
     '  <div style="display:flex;gap:8px;justify-content:flex-end">',
-    '    <button id="phr-pre-cancel" style="font-size:10px;padding:4px 12px;border:1px solid rgba(255,255,255,.15);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">Cancel<\/button>',
-    '    <button id="phr-pre-run" style="font-size:10px;padding:4px 12px;border:1px solid rgba(239,159,39,.4);border-radius:3px;background:rgba(239,159,39,.1);color:#EF9F27;cursor:pointer;font-family:monospace;font-weight:700">Run anyway ▶<\/button>',
+    '    <button id="phr-pre-cancel" style="font-size:11px;padding:4px 12px;border:1px solid rgba(255,255,255,.15);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">Cancel<\/button>',
+    '    <button id="phr-pre-run" style="font-size:11px;padding:4px 12px;border:1px solid rgba(239,159,39,.4);border-radius:3px;background:rgba(239,159,39,.1);color:#EF9F27;cursor:pointer;font-family:monospace;font-weight:700">Run anyway ▶<\/button>',
     '  <\/div>',
     '<\/div>',
   ].join('');
@@ -3001,26 +3001,26 @@ Object.entries(_sessions).forEach(function([uid, s]) {
   var bg = isTarget ? 'rgba(0,201,201,.06)' : 'transparent';
   var border = isTarget ? '2px solid #00c9c9' : '2px solid transparent';
   var aliasDisplay = s.alias && s.alias !== s.initials
-    ? '<span style="font-size:9px;color:#EF9F27;font-family:monospace;margin-left:3px">[' + s.alias + ']<\/span>'
+    ? '<span style="font-size:11px;color:#EF9F27;font-family:monospace;margin-left:3px">[' + s.alias + ']<\/span>'
     : '';
   var onlineIndicator = s.online
     ? '<div style="width:6px;height:6px;border-radius:50%;background:#1D9E75;flex-shrink:0"><\/div>'
     : '<div style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.15);flex-shrink:0"><\/div>';
   html += '<div data-uid="' + uid + '" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:pointer;background:' + bg + ';border-left:' + border + '">'
-    + '<div style="width:22px;height:22px;border-radius:50%;background:' + color + '22;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:' + color + ';flex-shrink:0">' + s.initials + '<\/div>'
+    + '<div style="width:22px;height:22px;border-radius:50%;background:' + color + '22;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:' + color + ';flex-shrink:0">' + s.initials + '<\/div>'
     + '<div style="flex:1;min-width:0">'
     + '<div style="font-size:11px;color:rgba(255,255,255,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
     + s.name + aliasDisplay
-    + (isMine ? ' <span style="font-size:9px;color:rgba(255,255,255,.25)">(me)<\/span>' : '')
+    + (isMine ? ' <span style="font-size:11px;color:rgba(255,255,255,.25)">(me)<\/span>' : '')
     + '<\/div>'
-    + '<div style="font-size:9px;color:rgba(255,255,255,.3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">' + (s.location||'—') + '<\/div>'
+    + '<div style="font-size:11px;color:rgba(255,255,255,.3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">' + (s.location||'—') + '<\/div>'
     + '<\/div>'
     + onlineIndicator
     + '<\/div>';
 });
 
 if (!Object.keys(_sessions).length) {
-  html = '<div style="font-size:10px;color:rgba(255,255,255,.2);padding:8px 10px">No sessions yet<\/div>';
+  html = '<div style="font-size:11px;color:rgba(255,255,255,.2);padding:8px 10px">No sessions yet<\/div>';
 }
 
 container.innerHTML = html;
@@ -3052,13 +3052,13 @@ var names = Object.keys(_scripts).sort();
 var html = names.map(function(name) {
   var isActive = name === _activeScript;
   return '<div data-script="' + name + '" style="display:flex;align-items:center;gap:5px;padding:4px 10px;cursor:pointer;' + (isActive?'color:#00c9c9':'color:rgba(255,255,255,.4)') + '">'
-    + '<span style="font-size:10px">' + (isActive?'&#9658;':'&#9671;') + '<\/span>'
-    + '<span style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + name + '<\/span>'
+    + '<span style="font-size:11px">' + (isActive?'&#9658;':'&#9671;') + '<\/span>'
+    + '<span style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + name + '<\/span>'
     + '<\/div>';
 }).join('');
 
 if (!names.length) {
-  html = '<div style="font-size:10px;color:rgba(255,255,255,.2);padding:6px 10px">No scripts saved<\/div>';
+  html = '<div style="font-size:11px;color:rgba(255,255,255,.2);padding:6px 10px">No scripts saved<\/div>';
 }
 
 container.innerHTML = html;
@@ -3099,16 +3099,16 @@ container.innerHTML = names.map(function(name) {
         var uid = _resolveTargetAlias(alias);
         var live = uid && _sessions[uid] && _sessions[uid].online;
         var col = live ? '#1D9E75' : 'rgba(255,255,255,.25)';
-        return '<span style="font-size:9px;font-family:monospace;color:' + col + ';border:1px solid ' + col + '44;border-radius:2px;padding:0 3px;margin-right:2px">' + alias + '<\/span>';
+        return '<span style="font-size:11px;font-family:monospace;color:' + col + ';border:1px solid ' + col + '44;border-radius:2px;padding:0 3px;margin-right:2px">' + alias + '<\/span>';
       }).join('')
     : '';
   return '<div style="border:1px solid #0d1f2e;border-radius:4px;padding:8px 10px;margin-bottom:6px;cursor:pointer" data-script="' + name + '" onmouseover="this.style.borderColor=\'#1a3a5a\'" onmouseout="this.style.borderColor=\'#0d1f2e\'">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'
     + '<span style="font-size:11px;color:#EF9F27;font-weight:700">' + name + '<\/span>'
-    + '<span style="font-size:10px;color:rgba(255,255,255,.25)">' + lines + ' cmd' + (lines !== 1 ? 's' : '') + '<\/span>'
+    + '<span style="font-size:11px;color:rgba(255,255,255,.25)">' + lines + ' cmd' + (lines !== 1 ? 's' : '') + '<\/span>'
     + '<\/div>'
     + (reqBadges ? '<div style="margin-bottom:4px">' + reqBadges + '<\/div>' : '')
-    + '<div style="font-size:10px;color:rgba(255,255,255,.3)">' + _escHtml(firstComment) + '<\/div>'
+    + '<div style="font-size:11px;color:rgba(255,255,255,.3)">' + _escHtml(firstComment) + '<\/div>'
     + '<\/div>';
 }).join('');
 
@@ -3133,7 +3133,7 @@ var pane = p.querySelector('#phr-pane-monitor');
 if (!pane) return;
 var div = document.createElement('div');
 div.style.cssText = 'display:table;width:100%;font-size:11px;line-height:1.7;margin-bottom:1px';
-div.innerHTML = '<span style="display:table-cell;color:rgba(255,255,255,.2);font-size:10px;white-space:nowrap;width:58px;vertical-align:top">' + ts + '<\/span>'
+div.innerHTML = '<span style="display:table-cell;color:rgba(255,255,255,.2);font-size:11px;white-space:nowrap;width:58px;vertical-align:top">' + ts + '<\/span>'
   + '<span style="display:table-cell;color:rgba(125,211,252,.7);vertical-align:top">' + _escHtml(text) + '<\/span>';
 pane.appendChild(div);
 pane.scrollTop = pane.scrollHeight;
@@ -3486,6 +3486,30 @@ Object.keys(localStorage).forEach(function(k) {
 _loadScripts();
 _loadServerScripts(); // async — loads /scripts/*.txt in background
 await _loadSupabase();
+
+// Resolve identity from Supabase auth session when running standalone (no mw-tabs.js)
+if (!window._myResource && _supabase) {
+  try {
+    var authResp = await _supabase.auth.getSession();
+    var authUser = authResp && authResp.data && authResp.data.session && authResp.data.session.user;
+    if (authUser) {
+      var resResp = await fetch(SUPA_URL + '/rest/v1/resources?user_id=eq.' + authUser.id + '&select=id,name,user_id&limit=1', {
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + (authResp.data.session.access_token || SUPA_KEY) }
+      });
+      var resRows = await resResp.json();
+      if (resRows && resRows[0]) {
+        window._myResource = { name: resRows[0].name, user_id: resRows[0].user_id, id: resRows[0].id };
+      } else {
+        // No resource row — use auth user metadata
+        var fullName = (authUser.user_metadata && authUser.user_metadata.full_name) || authUser.email || 'Operator';
+        window._myResource = { name: fullName, user_id: authUser.id };
+      }
+    }
+  } catch(e) {
+    console.warn('[CMD] identity resolve failed:', e);
+  }
+}
+
 // Install property interceptors IMMEDIATELY — before mw-tabs.js assigns its functions
 // These use defineProperty so they catch any assignment, past or future
 _hookAppEvents();
