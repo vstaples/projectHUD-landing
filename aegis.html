@@ -3577,22 +3577,27 @@ try {
 
 await _loadSupabase();
 
-// Resolve identity from Supabase auth session when running standalone (no mw-tabs.js)
+// Resolve identity from Supabase auth when _myResource isn't set by the host page
+// Runs on every page (dashboard, cadence, etc.) — not just aegis.html
 if (!window._myResource && _supabase) {
   try {
     var authResp = await _supabase.auth.getSession();
     var authUser = authResp && authResp.data && authResp.data.session && authResp.data.session.user;
     if (authUser) {
-      var resResp = await fetch(SUPA_URL + '/rest/v1/resources?user_id=eq.' + authUser.id + '&select=id,name,user_id&limit=1', {
-        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + (authResp.data.session.access_token || SUPA_KEY) }
+      var accessToken = (authResp.data.session && authResp.data.session.access_token) || SUPA_KEY;
+      // Select first_name + last_name (resources table has no 'name' column)
+      var resResp = await fetch(SUPA_URL + '/rest/v1/resources?user_id=eq.' + authUser.id + '&select=id,first_name,last_name,user_id&limit=1', {
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + accessToken }
       });
       var resRows = await resResp.json();
       if (resRows && resRows[0]) {
-        window._myResource = { name: resRows[0].name, user_id: resRows[0].user_id, id: resRows[0].id };
+        var r = resRows[0];
+        var fullName = ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || authUser.email || 'Operator';
+        window._myResource = { name: fullName, user_id: r.user_id, id: r.id };
       } else {
-        // No resource row — use auth user metadata
-        var fullName = (authUser.user_metadata && authUser.user_metadata.full_name) || authUser.email || 'Operator';
-        window._myResource = { name: fullName, user_id: authUser.id };
+        // No resource row — fall back to auth metadata
+        var metaName = (authUser.user_metadata && (authUser.user_metadata.full_name || authUser.user_metadata.name)) || authUser.email || 'Operator';
+        window._myResource = { name: metaName, user_id: authUser.id };
       }
     }
   } catch(e) {
