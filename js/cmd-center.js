@@ -149,14 +149,17 @@ function _updateStatusEl() {
 }
 
 function _channelSend(payload) {
-  // Only send via WebSocket — avoid REST fallback which causes 401
   if (!_channel) return;
   try {
-    var state = _channel.socket && _channel.socket.conn && _channel.socket.conn.readyState;
-    // readyState 1 = OPEN
-    if (state !== undefined && state !== 1) return;
+    var sock = _channel.socket;
+    var conn = sock && (sock.conn || sock.transport);
+    var rs   = conn && conn.readyState;
+    if (rs !== undefined && rs !== 1) {
+      setTimeout(function() { _channelSend(payload); }, 800);
+      return;
+    }
     _channel.send(payload);
-  } catch(e) {}
+  } catch(e) { console.warn('[CMD] channelSend error:', e.message); }
 }
 
 function _connect() {
@@ -164,7 +167,10 @@ function _connect() {
   if (_channel) return; // already connected — don't re-subscribe
 
   _channel = _supabase.channel('cmd-center-' + FIRM_ID, {
-    config: { presence: { key: _mySession.userId } }
+    config: {
+      presence:  { key: _mySession.userId },
+      broadcast: { self: true, ack: false },
+    }
   });
 
   // Presence: track who is online

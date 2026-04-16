@@ -1293,12 +1293,13 @@ console.groupEnd();
 
 (function() {
 'use strict';
+window._cmdCenterLoaded = true; // prevent sidebar.js injecting a second copy
 
 
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260415-CMD40',
+    'cmd-center':  'v20260416-CMD41',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
