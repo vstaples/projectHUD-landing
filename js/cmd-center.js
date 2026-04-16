@@ -1,7 +1,9 @@
-// Aegis version stamp
-console.group('%c AEGIS v20260416-AE1 ','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
-console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
-console.groupEnd();
+// Aegis version stamp — only on aegis.html
+if (window._aegisMode) {
+  console.group('%c AEGIS v20260416-AE1 ','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
+  console.groupEnd();
+}
 
 // CMD ENGINE v20260416-CMD41 — embedded in Aegis M1
 // ════════════════════════════════════════════════════════════════════════════
@@ -82,7 +84,7 @@ function _loadSupabase() {
   return new Promise(function(resolve) {
     if (window.supabase) { resolve(); return; }
     var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+    s.src = '/js/supabase.js';
     s.onload = function() {
       _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
         realtime: { params: { eventsPerSecond: 10 } }
