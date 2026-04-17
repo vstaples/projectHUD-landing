@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD48
+// cmd-center.js  ·  v20260416-CMD49
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -26,7 +26,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD48',
+    'cmd-center':  'v20260416-CMD49',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -37,7 +37,7 @@ window._cmdCenterLoaded = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD48 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-CMD49 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1713,18 +1713,20 @@ VS: Click &quot;Approve&quot;"
 function _wirePanel() {
   var p = _panelEl;
 
-  // Close/minimize dots
-  p.querySelector('#phr-close-dot').onclick = function() {
+  // Close/minimize dots — guarded because Aegis removed the pop-out; null.onclick
+  // throws and aborts the rest of _wirePanel (tab switching, script clicks, etc.)
+  var closeDot = p.querySelector('#phr-close-dot');
+  if (closeDot) closeDot.onclick = function() {
     if (_scriptRunning) {
       _scriptAborted = true;
       _scriptRunning = false;
     }
     _togglePanel();
   };
-  p.querySelector('#phr-min-dot').onclick   = function() { p.style.height = p.style.height === '36px' ? '520px' : '36px'; };
-  p.querySelector('#phr-pop-dot').onclick = function() {
-    _popOut();
-  };
+  var minDot = p.querySelector('#phr-min-dot');
+  if (minDot) minDot.onclick = function() { p.style.height = p.style.height === '36px' ? '520px' : '36px'; };
+  var popDot = p.querySelector('#phr-pop-dot');
+  if (popDot) popDot.onclick = function() { _popOut(); };
 
   // Alias input — lets operator set their session alias (VS, AK, etc.)
   var aliasInput = p.querySelector('#phr-alias-input');
