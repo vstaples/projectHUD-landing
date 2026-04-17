@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD47
+// cmd-center.js  ·  v20260416-CMD48
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -26,7 +26,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD47',
+    'cmd-center':  'v20260416-CMD48',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -37,7 +37,7 @@ window._cmdCenterLoaded = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD47 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-CMD48 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1605,9 +1605,9 @@ function _panelHTML() {
   </div>
   <div style="flex:1"></div>
   <button class="phr-tab-btn phr-tab-active" data-tab="transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,.3);border-radius:3px;background:rgba(0,201,201,.1);color:#00c9c9;cursor:pointer;font-family:monospace;letter-spacing:.05em">Transcript</button>
-  <button class="phr-tab-btn" data-tab="monitor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace;letter-spacing:.05em">Monitor</button>
-  <button class="phr-tab-btn" data-tab="editor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace;letter-spacing:.05em">Editor</button>
-  <button class="phr-tab-btn" data-tab="library" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace;letter-spacing:.05em">Library</button>
+  <button class="phr-tab-btn" data-tab="monitor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#ffffff;cursor:pointer;font-family:monospace;letter-spacing:.05em">Monitor</button>
+  <button class="phr-tab-btn" data-tab="editor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#ffffff;cursor:pointer;font-family:monospace;letter-spacing:.05em">Editor</button>
+  <button class="phr-tab-btn" data-tab="library" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#ffffff;cursor:pointer;font-family:monospace;letter-spacing:.05em">Library</button>
   <div style="width:1px;height:16px;background:rgba(0,201,201,0.22);margin:0 2px;flex-shrink:0"></div>
   <button id="phr-pop-dot" title="Pop out to new window" style="font-size:11px;padding:2px 7px;border:1px solid rgba(29,158,117,.4);border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;flex-shrink:0">⤢ Pop Out</button>
   <button id="phr-min-dot" title="Minimize" style="font-size:11px;padding:2px 7px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace;flex-shrink:0">—</button>
@@ -1766,7 +1766,7 @@ function _wirePanel() {
       _activeTab = btn.dataset.tab;
       p.querySelectorAll('.phr-tab-btn').forEach(function(b) {
         b.style.background  = b === btn ? 'rgba(0,201,201,.1)' : 'transparent';
-        b.style.color       = b === btn ? '#00c9c9' : '#EF9F27';
+        b.style.color       = b === btn ? '#00c9c9' : '#ffffff';
         b.style.borderColor = b === btn ? 'rgba(0,201,201,.3)' : 'rgba(0,201,201,0.28)';
       });
       p.querySelectorAll('.phr-pane').forEach(function(pane) {
@@ -2071,7 +2071,7 @@ function _renderScriptList() {
   var names = Object.keys(_scripts).sort();
   var html = names.map(function(name) {
     var isActive = name === _activeScript;
-    return `<div data-script="${name}" style="display:flex;align-items:center;gap:5px;padding:4px 10px;cursor:pointer;${isActive?'color:#00c9c9':'color:#EF9F27'}">
+    return `<div data-script="${name}" style="display:flex;align-items:center;gap:5px;padding:4px 10px;cursor:pointer;${isActive?'color:#00c9c9':'color:#ffffff'}">
       <span style="font-size:10px">${isActive?'▶':'◇'}</span>
       <span style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</span>
     </div>`;
@@ -2175,12 +2175,16 @@ function _appendLine(who, type, text) {
     cmd:    '#00c9c9', result: '#1D9E75', warn: '#EF9F27',
     err:    '#E24B4A', sys:    '#EF9F27', event: '#7dd3fc'
   };
-  var color = colors[type] || '#cfe9e9';
 
   // For SYS lines prefix with # so they read as comments in scripts
-  var displayText = (type === 'sys' || type === 'result' || type === 'event')
+  var isComment = (type === 'sys' || type === 'result' || type === 'event');
+  var displayText = isComment
     ? '# ' + text
     : (who !== 'SYS' && who !== (_mySession && _mySession.initials) ? who + ': ' : '') + text;
+
+  // Any line rendered as a '#' comment is beige for readability;
+  // warn/err keep their semantic colors (amber/red) since they don't get '#' prefix.
+  var color = isComment ? '#E8DCC4' : (colors[type] || '#cfe9e9');
 
   var div = document.createElement('div');
   div.style.cssText = 'display:block;width:100%;font-family:monospace;font-size:11px;line-height:1.7;color:' + color
