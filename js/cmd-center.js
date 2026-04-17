@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD46
+// cmd-center.js  ·  v20260416-CMD47
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -26,7 +26,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD46',
+    'cmd-center':  'v20260416-CMD47',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -37,7 +37,7 @@ window._cmdCenterLoaded = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD46 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-CMD47 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -290,7 +290,15 @@ function _connect() {
   // Results: receive results from other sessions
   _channel.on('broadcast', { event: 'result' }, function(payload) {
     var d = payload.payload;
-    if (!d || d.from === _mySession.userId) return;
+    if (!d) return;
+    // Self-echo skip: a session should ignore its own acks coming back via
+    // broadcast.self=true. EXCEPT when we are Aegis — Aegis never acks (it
+    // never executes cmds, see cmd handler above), so any 'result' arriving
+    // here is from a target exec session. If that target shares Aegis's
+    // userId (the operator ran Aegis + an exec tab in the same browser with
+    // the same auth), the userId-match check would incorrectly swallow the
+    // ack and cause 30s dispatch timeouts. Aegis is exempt.
+    if (!window._aegisMode && d.from === _mySession.userId) return;
     var sess = _sessions[d.from];
     var who  = sess ? sess.initials : d.name || '??';
     _appendLine(who, 'result', '→ ' + d.result);
