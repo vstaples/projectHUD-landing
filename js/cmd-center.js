@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD49
+// cmd-center.js  ·  v20260416-CMD50
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -26,7 +26,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD49',
+    'cmd-center':  'v20260416-CMD50',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -37,7 +37,7 @@ window._cmdCenterLoaded = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD49 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-CMD50 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1002,6 +1002,7 @@ var COMMANDS = {
   'Pause': async function(args) {
     var msg = args.join(' ') || 'paused — press Enter to continue';
     _appendLine('SYS', 'warn', '⏸  ' + msg);
+    var _pauseStart = Date.now();
     // Put command input into resume mode
     var p = _panelEl;
     var input = p && p.querySelector('#phr-cmd');
@@ -1026,8 +1027,12 @@ var COMMANDS = {
         pill.style.color = _cmdTarget === 'ALL' ? '#00c9c9' : _sessionColor(_cmdTarget);
       }
     }
-    _appendLine('SYS', 'result', '▶ resumed');
-    return 'resumed';
+    var _elapsedMs = Date.now() - _pauseStart;
+    var _elapsedStr = _elapsedMs >= 1000
+      ? (_elapsedMs / 1000).toFixed(1) + 's'
+      : _elapsedMs + 'ms';
+    _appendLine('SYS', 'result', '▶ resumed after ' + _elapsedStr);
+    return 'resumed after ' + _elapsedStr;
   },
 };
 
