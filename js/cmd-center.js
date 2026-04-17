@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260418-CMD54
+// cmd-center.js  ·  v20260418-CMD55
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -30,7 +30,7 @@ var DEBUG_EVENTS = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260418-CMD54',
+    'cmd-center':  'v20260418-CMD55',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -41,7 +41,7 @@ var DEBUG_EVENTS = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD54 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD55 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -328,6 +328,8 @@ function _connect() {
   // B1 (CMD54): envelope unwrap. Resolve with INNER payload so local and
   // remote listeners see identical data. Self-echo check accepts canonical
   // source_session with back-compat fallback to `from`. See Iron Rule 20.
+  // CMD55: also push to retention buffer (post-self-echo) so a late
+  // Wait ForEvent can match a past emit within the retention window.
   _channel.on('broadcast', { event: 'app_event' }, function(payload) {
     var d = payload.payload;
     if (!d) return;
@@ -336,6 +338,7 @@ function _connect() {
     var eventName = d.event_type || d.event;
     var inner     = d.payload || d;  // unwrap envelope; fall back for legacy emits
     if (DEBUG_EVENTS) console.log('[cmd-center] recv', eventName, inner);
+    _pushEventBuffer(eventName, inner);
     _resolveEventListeners(eventName, inner);
   });
 
@@ -383,8 +386,14 @@ function _connect() {
 }
 
 // ── Event listener system for Wait ForEvent ───────────────────────────────────
+// CMD55: scan retention buffer before queueing forward, so a Wait registered
+// after the emit fired still resolves within the 30s window.
 function _waitForEvent(eventName, timeoutMs) {
   return new Promise(function(resolve, reject) {
+    // Replay: any buffered entry for this event_type matches unconditionally.
+    var hit = _scanEventBuffer(eventName, function() { return true; });
+    if (hit) { resolve(hit.data); return; }
+
     if (!_eventListeners[eventName]) _eventListeners[eventName] = [];
     var timer = setTimeout(function() {
       _eventListeners[eventName] = (_eventListeners[eventName]||[]).filter(function(r){ return r !== resolver; });
@@ -405,14 +414,90 @@ function _resolveEventListeners(eventName, data) {
   listeners.forEach(function(r) { r(data); });
 }
 
+// ── Event retention buffer (B1 follow-up / CMD55) ─────────────────────────────
+// Wait ForEvent only listens going forward. An emit that fires before the
+// Wait is registered was lost. The probe script exposed this: location.ready
+// fires during the Compass-load Pause, well before the user hits Enter.
+//
+// Retention: 30 seconds per event_type, keyed on event_type. Both local
+// emits (from _cmdEmit) and remote receives (from the app_event handler)
+// push. _waitForEvent and _waitForEventFiltered scan the buffer for the
+// newest matching entry within the retention window before queueing forward.
+// Self-echo filtering is already applied upstream (line-310 handler drops
+// own-session broadcasts before _pushEventBuffer is called on the receive
+// path), so replay respects self-echo without any extra check here.
+var _EVENT_BUFFER_MS = 30000;
+var _eventBuffer = {}; // { eventName: [ {ts, data}, ... ] } — newest at end
+
+function _pushEventBuffer(eventName, data) {
+  if (!eventName) return;
+  var now = Date.now();
+  var arr = _eventBuffer[eventName] || (_eventBuffer[eventName] = []);
+  arr.push({ ts: now, data: data });
+  // Purge entries older than retention window. Array is time-ordered so a
+  // single loop from the front is sufficient.
+  var cutoff = now - _EVENT_BUFFER_MS;
+  var i = 0;
+  while (i < arr.length && arr[i].ts < cutoff) i++;
+  if (i > 0) arr.splice(0, i);
+}
+
+// Scan the retention buffer for the newest entry matching `predicate`.
+// Returns {ts, data} or null. Expired entries are purged in-line.
+function _scanEventBuffer(eventName, predicate) {
+  var arr = _eventBuffer[eventName];
+  if (!arr || !arr.length) return null;
+  var cutoff = Date.now() - _EVENT_BUFFER_MS;
+  // Walk newest to oldest so we return the freshest match.
+  for (var i = arr.length - 1; i >= 0; i--) {
+    var entry = arr[i];
+    if (entry.ts < cutoff) break; // everything before is also expired
+    if (predicate(entry.data)) return entry;
+  }
+  return null;
+}
+
 // ── Filtered event wait ───────────────────────────────────────────────────────
 // Like _waitForEvent but only resolves when the event data matches a filter.
 // filterKey: field to check (e.g. 'assignee', 'userId', 'resource_id')
 // filterVal: expected value — compared against common data fields
 // Non-matching events re-queue the listener so it keeps waiting.
+// CMD55: scan retention buffer before queueing forward. Predicate logic is
+// shared between buffer scan and live match to guarantee identical semantics.
 function _waitForEventFiltered(eventName, filterKey, filterVal, timeoutMs) {
   return new Promise(function(resolve, reject) {
     var deadline = Date.now() + (timeoutMs || 60000);
+
+    // Build the predicate once. Captures filterKey/filterVal and the
+    // session alias resolution at the moment the Wait was registered.
+    var acceptableVals = [filterVal];
+    if (filterKey === 'assignee' && filterVal) {
+      var resolvedUid = _resolveTargetAlias(filterVal.toUpperCase());
+      if (resolvedUid) {
+        acceptableVals.push(resolvedUid);
+        var resolvedSess = _sessions[resolvedUid];
+        if (resolvedSess && resolvedSess.resourceId) acceptableVals.push(resolvedSess.resourceId);
+      }
+      if (_mySession && (filterVal === _myAlias || filterVal === _mySession.initials)) {
+        acceptableVals.push(_mySession.userId);
+      }
+    }
+    function matchesFilter(data) {
+      if (!filterKey || !filterVal) return true;
+      var fields = [
+        data[filterKey],
+        data.userId, data.user_id,
+        data.resource_id, data.assigneeId,
+        data.from, data.assignee,
+      ].filter(Boolean).map(String);
+      return fields.some(function(f) {
+        return acceptableVals.some(function(v) { return f === String(v); });
+      });
+    }
+
+    // Replay: scan buffer for the newest matching entry within retention.
+    var hit = _scanEventBuffer(eventName, matchesFilter);
+    if (hit) { resolve(hit.data); return; }
 
     function attempt() {
       if (!_eventListeners[eventName]) _eventListeners[eventName] = [];
@@ -425,38 +510,7 @@ function _waitForEventFiltered(eventName, filterKey, filterVal, timeoutMs) {
 
       var resolver = function(data) {
         clearTimeout(timer);
-        // No filter — resolve immediately
-        if (!filterKey || !filterVal) { resolve(data); return; }
-        // Build a set of acceptable values to match against.
-        // For assignee filter: accept the raw alias, the resolved userId,
-        // and the resolved resource_id (for events emitted by mw-events.js)
-        var acceptableVals = [filterVal];
-        if (filterKey === 'assignee') {
-          var resolvedUid = _resolveTargetAlias(filterVal.toUpperCase());
-          if (resolvedUid) {
-            acceptableVals.push(resolvedUid);
-            // Also accept the resource_id for this user if known from _sessions
-            var resolvedSess = _sessions[resolvedUid];
-            if (resolvedSess && resolvedSess.resourceId) acceptableVals.push(resolvedSess.resourceId);
-          }
-          // Own session: also accept _mySession.userId
-          if (_mySession && (filterVal === _myAlias || filterVal === _mySession.initials)) {
-            acceptableVals.push(_mySession.userId);
-          }
-        }
-        // Check common field names that might carry assignee identity
-        var fields = [
-          data[filterKey],
-          data.userId, data.user_id,
-          data.resource_id, data.assigneeId,
-          data.from, data.assignee,
-        ].filter(Boolean).map(String);
-
-        var matches = fields.some(function(f) {
-          return acceptableVals.some(function(v) { return f === String(v); });
-        });
-
-        if (matches) {
+        if (matchesFilter(data)) {
           resolve(data);
         } else {
           // Event didn't match filter — re-queue and keep waiting
@@ -496,6 +550,7 @@ window._cmdEmit = function(eventName, data) {
   };
   _channelSend({ type: 'broadcast', event: 'app_event', payload: envelope });
   if (DEBUG_EVENTS) console.log('[cmd-center] emit', eventName, data || {});
+  _pushEventBuffer(eventName, data || {});
   _resolveEventListeners(eventName, data);
 };
 
