@@ -1,6 +1,7 @@
 # Two-session approval test — expense report full chain
-# Requires: VS, AK connected (anywhere in ProjectHUD)
-# Aegis drives both sessions to Compass itself before running the chain.
+# .... Version 1.0
+# Requires: VS, AK
+# Notes: Aegis drives both sessions to Compass itself before the chain runs.
 
 # — preflight · presence ————————————————————————————————
 Assert session VS is connected

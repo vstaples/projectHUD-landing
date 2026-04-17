@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD41
+// cmd-center.js  ·  v20260416-CMD45
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -26,7 +26,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD41',
+    'cmd-center':  'v20260416-CMD44',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -37,7 +37,7 @@ window._cmdCenterLoaded = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD44 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-CMD45 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1111,10 +1111,14 @@ async function _executeCommand(cmdLine, fromWho) {
 // ── Parse script header for Requires: directive ───────────────────────────────
 // Scans comment lines at top of script for:  # Requires: VS, AK, DN
 // Returns array of alias strings, or [] if not found.
-// Tokens are filtered to alias-shaped strings only (1–4 uppercase letters/digits,
-// leading letter) so freeform trailing prose in the comment is ignored — e.g.
+//
+// Parses comma/whitespace-separated tokens left-to-right and stops at the first
+// token that doesn't match alias-shape (1–4 uppercase letters/digits, leading
+// letter). This prevents freeform trailing prose from leaking in — English words
+// that happen to match alias shape (IN, TO, OR, etc.) still terminate parsing
+// as soon as the first non-alias word appears, so e.g.
 //   # Requires: VS, AK connected (anywhere in ProjectHUD)
-// yields ['VS', 'AK'], not ['VS','AK','CONNECTED','(ANYWHERE','IN','PROJECTHUD)'].
+// stops at "CONNECTED" and yields ['VS', 'AK'].
 function _parseScriptRequires(scriptText) {
   var lines = scriptText.split('\n');
   var ALIAS_RE = /^[A-Z][A-Z0-9]{0,3}$/;
@@ -1124,9 +1128,15 @@ function _parseScriptRequires(scriptText) {
     if (!line.startsWith('#') && !line.startsWith('//')) break; // past header
     var m = line.match(/requires:\s*(.+)/i);
     if (m) {
-      return m[1].split(/[\s,]+/)
+      var tokens = m[1].split(/[\s,]+/)
         .map(function(s){ return s.trim().toUpperCase(); })
-        .filter(function(s){ return ALIAS_RE.test(s); });
+        .filter(Boolean);
+      var out = [];
+      for (var j = 0; j < tokens.length; j++) {
+        if (!ALIAS_RE.test(tokens[j])) break; // first non-alias ends the list
+        out.push(tokens[j]);
+      }
+      return out;
     }
   }
   return [];
