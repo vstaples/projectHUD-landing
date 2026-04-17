@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD45
+// cmd-center.js  ·  v20260416-CMD46
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -26,7 +26,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD44',
+    'cmd-center':  'v20260416-CMD46',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -37,11 +37,11 @@ window._cmdCenterLoaded = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD45 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-CMD46 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
-      'color:rgba(255,255,255,.4);font-family:monospace',
+      'color:#EF9F27;font-family:monospace',
       'color:#EF9F27;font-family:monospace;font-weight:700');
   });
   console.groupEnd();
@@ -149,7 +149,7 @@ function _updateStatusEl() {
     statusEl.style.color = '#1D9E75';
   } else {
     statusEl.textContent = 'connecting…';
-    statusEl.style.color = 'rgba(255,255,255,.3)';
+    statusEl.style.color = '#EF9F27';
   }
 }
 
@@ -1108,6 +1108,25 @@ async function _executeCommand(cmdLine, fromWho) {
   }
 }
 
+// ── Parse script header for Version: directive ────────────────────────────────
+// Scans comment lines at top of script for:  # Version: 1.0   /   # Ver: 1.3-beta
+// Returns the version string as-is (trimmed), or null if not found.
+// Accepted keys: Version, Ver, v (case-insensitive). The whole rest of the line
+// is captured so freeform version strings like "1.0 · 2026-04-17" are preserved.
+function _parseScriptVersion(scriptText) {
+  var lines = scriptText.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    if (!line.startsWith('#') && !line.startsWith('//')) break; // past header
+    // Strip leading comment markers and stray punctuation (e.g. "# .... Version 1.0")
+    var body = line.replace(/^[#\/\s.·—\-]+/, '');
+    var m = body.match(/^(?:version|ver|v)\s*[:=]?\s*(.+)$/i);
+    if (m) return m[1].trim();
+  }
+  return null;
+}
+
 // ── Parse script header for Requires: directive ───────────────────────────────
 // Scans comment lines at top of script for:  # Requires: VS, AK, DN
 // Returns array of alias strings, or [] if not found.
@@ -1170,6 +1189,12 @@ async function _runScript(scriptText, scriptName) {
   _scriptRunning = true;
   _scriptAborted = false;
   _appendLine('SYS', 'sys', 'Script: ' + (scriptName||'inline') + ' · ' + lines.filter(function(l){ return !l.startsWith('#'); }).length + ' commands');
+  var _scriptVersion = _parseScriptVersion(scriptText);
+  if (_scriptVersion) {
+    _appendLine('SYS', 'sys', 'Version: ' + _scriptVersion);
+  } else {
+    _appendLine('SYS', 'sys', 'Version: (no # Version: header found)');
+  }
   // Show RUNNING label in bottom bar
   if (_panelEl) {
     var rl = _panelEl.querySelector('#phr-running-label');
@@ -1296,14 +1321,14 @@ function _showPreflightPanel(scriptName, required, missing, scriptText) {
         var dot = isLive
           ? '<span style="color:#1D9E75">●</span>'
           : '<span style="color:#E24B4A">○</span>';
-        var loc = isLive && sess ? ('<span style="color:rgba(255,255,255,.3);font-size:9px"> · ' + (sess.location||'') + '</span>') : '';
+        var loc = isLive && sess ? ('<span style="color:#EF9F27;font-size:9px"> · ' + (sess.location||'') + '</span>') : '';
         var tag = isLive
           ? '<span style="font-size:9px;color:#1D9E75;border:1px solid rgba(29,158,117,.3);border-radius:2px;padding:0 4px">LIVE</span>'
           : '<span style="font-size:9px;color:#E24B4A;border:1px solid rgba(226,75,74,.3);border-radius:2px;padding:0 4px">MISSING</span>';
-        return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+        return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(0,201,201,0.18)">'
           + '<span style="font-size:10px;font-family:monospace;color:#EF9F27;min-width:32px">' + alias + '</span>'
           + dot + ' '
-          + '<span style="font-size:10px;color:rgba(255,255,255,.7);flex:1">' + nameStr + loc + '</span>'
+          + '<span style="font-size:10px;color:#cfe9e9;flex:1">' + nameStr + loc + '</span>'
           + tag
           + '</div>';
       }).join('');
@@ -1326,17 +1351,17 @@ function _showPreflightPanel(scriptName, required, missing, scriptText) {
     ].join(';');
     overlay.innerHTML = [
       '<div style="background:#0a1220;border:1px solid rgba(0,201,201,.25);border-radius:6px;padding:16px 18px;width:320px;max-width:90%">',
-      '  <div style="font-size:10px;letter-spacing:.1em;color:rgba(255,255,255,.3);margin-bottom:8px">SESSION PREFLIGHT</div>',
+      '  <div style="font-size:10px;letter-spacing:.1em;color:#EF9F27;margin-bottom:8px">SESSION PREFLIGHT</div>',
       '  <div style="font-size:12px;color:#EF9F27;font-weight:700;margin-bottom:10px;font-family:monospace">' + scriptName + '</div>',
       '  <div id="phr-pre-rows" style="margin-bottom:12px">' + _buildRowsHTML() + '</div>',
       '  <div id="phr-pre-status" style="font-size:10px;color:#E24B4A;margin-bottom:12px">',
       '    ' + missing.length + ' required session' + (missing.length !== 1 ? 's' : '') + ' not connected: ' + missing.join(', '),
       '  </div>',
-      '  <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:14px">',
+      '  <div style="font-size:10px;color:#EF9F27;margin-bottom:14px">',
       '    Open a Compass window for each missing session and log in. Script will block when it reaches those steps.',
       '  </div>',
       '  <div style="display:flex;gap:8px;justify-content:flex-end">',
-      '    <button id="phr-pre-cancel" style="font-size:10px;padding:4px 12px;border:1px solid rgba(255,255,255,.15);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">Cancel</button>',
+      '    <button id="phr-pre-cancel" style="font-size:10px;padding:4px 12px;border:1px solid rgba(0,201,201,0.35);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace">Cancel</button>',
       '    <button id="phr-pre-run" style="font-size:10px;padding:4px 12px;border:1px solid rgba(239,159,39,.4);border-radius:3px;background:rgba(239,159,39,.1);color:#EF9F27;cursor:pointer;font-family:monospace;font-weight:700">Run anyway ▶</button>',
       '  </div>',
       '</div>',
@@ -1565,19 +1590,19 @@ function _panelHTML() {
 </style>
 <div id="phr-titlebar" style="background:#040710;border-bottom:1px solid #0d1f2e;padding:6px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0;cursor:move">
   <span style="font-size:11px;font-weight:700;color:#00c9c9;letter-spacing:.1em;flex-shrink:0">COMMAND CENTER</span>
-  <span id="phr-status" style="font-size:10px;color:rgba(255,255,255,.3);flex-shrink:0">connecting…</span>
+  <span id="phr-status" style="font-size:10px;color:#EF9F27;flex-shrink:0">connecting…</span>
   <div id="phr-live-banner" style="display:none;align-items:center;gap:5px;margin-left:4px">
     <div id="phr-live-dot" style="width:7px;height:7px;border-radius:50%;background:#1D9E75;flex-shrink:0"></div>
     <span id="phr-live-time" style="font-size:10px;font-family:monospace;color:#1D9E75;letter-spacing:.04em">LIVE</span>
   </div>
   <div style="flex:1"></div>
   <button class="phr-tab-btn phr-tab-active" data-tab="transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,.3);border-radius:3px;background:rgba(0,201,201,.1);color:#00c9c9;cursor:pointer;font-family:monospace;letter-spacing:.05em">Transcript</button>
-  <button class="phr-tab-btn" data-tab="monitor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;letter-spacing:.05em">Monitor</button>
-  <button class="phr-tab-btn" data-tab="editor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;letter-spacing:.05em">Editor</button>
-  <button class="phr-tab-btn" data-tab="library" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;letter-spacing:.05em">Library</button>
-  <div style="width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 2px;flex-shrink:0"></div>
+  <button class="phr-tab-btn" data-tab="monitor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace;letter-spacing:.05em">Monitor</button>
+  <button class="phr-tab-btn" data-tab="editor" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace;letter-spacing:.05em">Editor</button>
+  <button class="phr-tab-btn" data-tab="library" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace;letter-spacing:.05em">Library</button>
+  <div style="width:1px;height:16px;background:rgba(0,201,201,0.22);margin:0 2px;flex-shrink:0"></div>
   <button id="phr-pop-dot" title="Pop out to new window" style="font-size:11px;padding:2px 7px;border:1px solid rgba(29,158,117,.4);border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;flex-shrink:0">⤢ Pop Out</button>
-  <button id="phr-min-dot" title="Minimize" style="font-size:11px;padding:2px 7px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace;flex-shrink:0">—</button>
+  <button id="phr-min-dot" title="Minimize" style="font-size:11px;padding:2px 7px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace;flex-shrink:0">—</button>
   <button id="phr-close-dot" title="Close" style="font-size:11px;padding:2px 7px;border:1px solid rgba(226,75,74,.4);border-radius:3px;background:rgba(226,75,74,.1);color:#E24B4A;cursor:pointer;font-family:monospace;flex-shrink:0">✕</button>
 </div>
 
@@ -1588,9 +1613,9 @@ function _panelHTML() {
 
     <div style="border-bottom:1px solid #0d1f2e">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px 3px">
-        <div style="font-size:9px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.25);text-transform:uppercase">Sessions</div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:.14em;color:#EF9F27;text-transform:uppercase">Sessions</div>
         <div style="display:flex;align-items:center;gap:4px" title="Your alias — used in scripts as VS:, AK:, etc.">
-          <span style="font-size:9px;color:rgba(255,255,255,.2)">alias</span>
+          <span style="font-size:9px;color:#EF9F27">alias</span>
           <input id="phr-alias-input" maxlength="4"
             style="width:34px;font-family:monospace;font-size:10px;font-weight:700;background:rgba(239,159,39,.08);border:1px solid rgba(239,159,39,.25);border-radius:2px;color:#EF9F27;text-align:center;outline:none;padding:1px 3px;text-transform:uppercase"
             placeholder="VS">
@@ -1599,7 +1624,7 @@ function _panelHTML() {
       <div id="phr-sessions" style="padding-bottom:4px"></div>
     </div>
 
-    <div style="font-size:9px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.25);padding:7px 10px 3px;text-transform:uppercase">Scripts</div>
+    <div style="font-size:9px;font-weight:700;letter-spacing:.14em;color:#EF9F27;padding:7px 10px 3px;text-transform:uppercase">Scripts</div>
     <div id="phr-scripts" style="flex:1;overflow-y:auto;padding-bottom:4px"></div>
 
     <div style="border-top:1px solid #0d1f2e;padding:6px 8px">
@@ -1613,7 +1638,7 @@ function _panelHTML() {
     <!-- Transcript tab — no header row, buttons moved to bottom -->
     <div id="phr-pane-transcript" style="flex:1;overflow-y:auto;padding:8px 12px;display:block" class="phr-pane"></div>
     <div id="phr-pane-monitor" style="display:none;flex:1;overflow-y:auto;padding:8px 12px;flex-direction:column;gap:1px" class="phr-pane">
-      <div style="font-size:10px;color:rgba(255,255,255,.25);padding:4px 0 8px;font-family:monospace">Session presence events — join / leave / location updates</div>
+      <div style="font-size:10px;color:#EF9F27;padding:4px 0 8px;font-family:monospace">Session presence events — join / leave / location updates</div>
     </div>
 
     <!-- Editor tab -->
@@ -1633,13 +1658,13 @@ Wait 2000
 VS: Set SubTab &quot;ACTIVE&quot;
 VS: Click &quot;Review&quot; $instance_id
 VS: Click &quot;Approve&quot;"
-        style="flex:1;width:100%;background:#040710;border:none;outline:none;color:rgba(255,255,255,.75);font-family:monospace;font-size:11px;padding:10px 12px;resize:none;line-height:1.7"></textarea>
+        style="flex:1;width:100%;background:#040710;border:none;outline:none;color:#ffffff;font-family:monospace;font-size:11px;padding:10px 12px;resize:none;line-height:1.7"></textarea>
     </div>
 
     <!-- Library tab -->
     <div id="phr-pane-library" style="display:none;flex:1;overflow-y:auto;padding:10px 12px" class="phr-pane">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:10px;color:rgba(255,255,255,.3);line-height:1.7">
+        <div style="font-size:10px;color:#EF9F27;line-height:1.7">
           Click to load into editor. Scripts auto-load from /scripts/ on startup.
         </div>
         <button id="phr-refresh-scripts" title="Reload scripts from server"
@@ -1655,14 +1680,14 @@ VS: Click &quot;Approve&quot;"
 
       <!-- Single unified action/status bar -->
       <div id="phr-script-bar" style="padding:5px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #0d1f2e">
-        <span id="phr-running-label" style="font-size:10px;color:rgba(255,255,255,.25);display:none">RUNNING</span>
+        <span id="phr-running-label" style="font-size:10px;color:#EF9F27;display:none">RUNNING</span>
         <span id="phr-running-name" style="font-size:10px;color:#EF9F27;font-weight:700;flex:1"></span>
-        <button id="phr-clear-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">✕ Clear</button>
-        <button id="phr-copy-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:monospace">⎘ Copy</button>
-        <div style="width:1px;height:14px;background:rgba(255,255,255,.1)"></div>
-        <button id="phr-save-script" style="font-size:10px;padding:2px 8px;border:1px solid rgba(255,255,255,.15);border-radius:3px;background:transparent;color:rgba(255,255,255,.5);cursor:pointer;font-family:monospace">Save</button>
+        <button id="phr-clear-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace">✕ Clear</button>
+        <button id="phr-copy-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace">⎘ Copy</button>
+        <div style="width:1px;height:14px;background:rgba(0,201,201,0.22)"></div>
+        <button id="phr-save-script" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.35);border-radius:3px;background:transparent;color:#cfe9e9;cursor:pointer;font-family:monospace">Save</button>
         <button id="phr-del-script" style="font-size:10px;padding:2px 8px;border:1px solid rgba(226,75,74,.3);border-radius:3px;background:transparent;color:rgba(226,75,74,.6);cursor:pointer;font-family:monospace">Delete</button>
-        <div style="width:1px;height:14px;background:rgba(255,255,255,.1)"></div>
+        <div style="width:1px;height:14px;background:rgba(0,201,201,0.22)"></div>
         <button id="phr-run-script" style="font-size:10px;padding:2px 8px;border:1px solid #1D9E75;border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;font-weight:700">▶ Run</button>
         <button id="phr-stop-btn" style="font-size:10px;padding:2px 8px;border:1px solid rgba(226,75,74,.4);border-radius:3px;background:transparent;color:#E24B4A;cursor:pointer;font-family:monospace">■ Stop</button>
       </div>
@@ -1733,8 +1758,8 @@ function _wirePanel() {
       _activeTab = btn.dataset.tab;
       p.querySelectorAll('.phr-tab-btn').forEach(function(b) {
         b.style.background  = b === btn ? 'rgba(0,201,201,.1)' : 'transparent';
-        b.style.color       = b === btn ? '#00c9c9' : 'rgba(255,255,255,.4)';
-        b.style.borderColor = b === btn ? 'rgba(0,201,201,.3)' : 'rgba(255,255,255,.12)';
+        b.style.color       = b === btn ? '#00c9c9' : '#EF9F27';
+        b.style.borderColor = b === btn ? 'rgba(0,201,201,.3)' : 'rgba(0,201,201,0.28)';
       });
       p.querySelectorAll('.phr-pane').forEach(function(pane) {
         var isActive = pane.id === 'phr-pane-' + _activeTab;
@@ -1886,7 +1911,7 @@ function _wirePanel() {
     var label = _cmdTarget === 'ALL' ? 'ALL' : (sess ? sess.initials : _cmdTarget);
     this.textContent = label + ' ▾';
     this.style.color = _cmdTarget === 'ALL' ? '#00c9c9' : _sessionColor(_cmdTarget);
-    this.style.borderColor = _cmdTarget === 'ALL' ? 'rgba(0,201,201,.3)' : 'rgba(255,255,255,.2)';
+    this.style.borderColor = _cmdTarget === 'ALL' ? 'rgba(0,201,201,.3)' : 'rgba(0,201,201,0.45)';
   };
 
   // Drag to move — only applies to floating panel; Aegis embeds into host DOM without a titlebar
@@ -1992,22 +2017,22 @@ function _renderSessionList() {
       ? '<div style="width:6px;height:6px;border-radius:50%;background:#1D9E75;flex-shrink:0"></div>'
       : (_leaveTimers&&_leaveTimers[uid])
         ? '<div style="width:6px;height:6px;border-radius:50%;background:#EF9F27;flex-shrink:0"></div>'
-        : '<div style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.15);flex-shrink:0"></div>';
+        : '<div style="width:6px;height:6px;border-radius:50%;background:rgba(0,201,201,0.35);flex-shrink:0"></div>';
     html += '<div data-uid="' + uid + '" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:pointer;background:' + bg + ';border-left:' + border + '">'
       + '<div style="width:22px;height:22px;border-radius:50%;background:' + color + '22;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:' + color + ';flex-shrink:0">' + s.initials + '</div>'
       + '<div style="flex:1;min-width:0">'
-      + '<div style="font-size:11px;color:rgba(255,255,255,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      + '<div style="font-size:11px;color:#ffffff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
       + s.name + aliasDisplay
-      + (isMine ? ' <span style="font-size:9px;color:rgba(255,255,255,.25)">(me)</span>' : '')
+      + (isMine ? ' <span style="font-size:9px;color:#EF9F27">(me)</span>' : '')
       + '</div>'
-      + '<div style="font-size:9px;color:rgba(255,255,255,.3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">' + (s.location||'—') + '</div>'
+      + '<div style="font-size:9px;color:#EF9F27;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">' + (s.location||'—') + '</div>'
       + '</div>'
       + onlineIndicator
       + '</div>';
   });
 
   if (!Object.keys(_sessions).length) {
-    html = '<div style="font-size:10px;color:rgba(255,255,255,.2);padding:8px 10px">No sessions yet</div>';
+    html = '<div style="font-size:10px;color:#EF9F27;padding:8px 10px">No sessions yet</div>';
   }
 
   container.innerHTML = html;
@@ -2023,7 +2048,7 @@ function _renderSessionList() {
         var label = sess.alias || sess.initials;
         pill.textContent = label + ' ▾';
         pill.style.color = _sessionColor(_cmdTarget);
-        pill.style.borderColor = 'rgba(255,255,255,.2)';
+        pill.style.borderColor = 'rgba(0,201,201,0.45)';
       }
     };
   });
@@ -2038,14 +2063,14 @@ function _renderScriptList() {
   var names = Object.keys(_scripts).sort();
   var html = names.map(function(name) {
     var isActive = name === _activeScript;
-    return `<div data-script="${name}" style="display:flex;align-items:center;gap:5px;padding:4px 10px;cursor:pointer;${isActive?'color:#00c9c9':'color:rgba(255,255,255,.4)'}">
+    return `<div data-script="${name}" style="display:flex;align-items:center;gap:5px;padding:4px 10px;cursor:pointer;${isActive?'color:#00c9c9':'color:#EF9F27'}">
       <span style="font-size:10px">${isActive?'▶':'◇'}</span>
       <span style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</span>
     </div>`;
   }).join('');
 
   if (!names.length) {
-    html = '<div style="font-size:10px;color:rgba(255,255,255,.2);padding:6px 10px">No scripts saved</div>';
+    html = '<div style="font-size:10px;color:#EF9F27;padding:6px 10px">No scripts saved</div>';
   }
 
   container.innerHTML = html;
@@ -2072,7 +2097,7 @@ function _renderLibrary() {
 
   var names = Object.keys(_scripts).sort();
   if (!names.length) {
-    container.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.3)">No saved scripts.</div>';
+    container.innerHTML = '<div style="font-size:11px;color:#EF9F27">No saved scripts.</div>';
     return;
   }
 
@@ -2085,17 +2110,17 @@ function _renderLibrary() {
       ? required.map(function(alias) {
           var uid = _resolveTargetAlias(alias);
           var live = uid && _sessions[uid] && _sessions[uid].online;
-          var col = live ? '#1D9E75' : 'rgba(255,255,255,.25)';
+          var col = live ? '#1D9E75' : '#EF9F27';
           return '<span style="font-size:9px;font-family:monospace;color:' + col + ';border:1px solid ' + col + '44;border-radius:2px;padding:0 3px;margin-right:2px">' + alias + '</span>';
         }).join('')
       : '';
     return '<div style="border:1px solid #0d1f2e;border-radius:4px;padding:8px 10px;margin-bottom:6px;cursor:pointer" data-script="' + name + '" onmouseover="this.style.borderColor=\'#1a3a5a\'" onmouseout="this.style.borderColor=\'#0d1f2e\'">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'
       + '<span style="font-size:11px;color:#EF9F27;font-weight:700">' + name + '</span>'
-      + '<span style="font-size:10px;color:rgba(255,255,255,.25)">' + lines + ' cmd' + (lines !== 1 ? 's' : '') + '</span>'
+      + '<span style="font-size:10px;color:#EF9F27">' + lines + ' cmd' + (lines !== 1 ? 's' : '') + '</span>'
       + '</div>'
       + (reqBadges ? '<div style="margin-bottom:4px">' + reqBadges + '</div>' : '')
-      + '<div style="font-size:10px;color:rgba(255,255,255,.3)">' + _escHtml(firstComment) + '</div>'
+      + '<div style="font-size:10px;color:#EF9F27">' + _escHtml(firstComment) + '</div>'
       + '</div>';
   }).join('');
 
@@ -2120,7 +2145,7 @@ function _appendMonitor(text) {
   if (!pane) return;
   var div = document.createElement('div');
   div.style.cssText = 'display:table;width:100%;font-size:11px;line-height:1.7;margin-bottom:1px';
-  div.innerHTML = '<span style="display:table-cell;color:rgba(255,255,255,.2);font-size:10px;white-space:nowrap;width:58px;vertical-align:top">' + ts + '</span>'
+  div.innerHTML = '<span style="display:table-cell;color:#EF9F27;font-size:10px;white-space:nowrap;width:58px;vertical-align:top">' + ts + '</span>'
     + '<span style="display:table-cell;color:rgba(125,211,252,.7);vertical-align:top">' + _escHtml(text) + '</span>';
   pane.appendChild(div);
   pane.scrollTop = pane.scrollHeight;
@@ -2140,9 +2165,9 @@ function _appendLine(who, type, text) {
   // SYS result/error lines shown as comments; cmd lines shown bare
   var colors = {
     cmd:    '#00c9c9', result: '#1D9E75', warn: '#EF9F27',
-    err:    '#E24B4A', sys:    'rgba(255,255,255,.3)', event: '#7dd3fc'
+    err:    '#E24B4A', sys:    '#EF9F27', event: '#7dd3fc'
   };
-  var color = colors[type] || 'rgba(255,255,255,.6)';
+  var color = colors[type] || '#cfe9e9';
 
   // For SYS lines prefix with # so they read as comments in scripts
   var displayText = (type === 'sys' || type === 'result' || type === 'event')

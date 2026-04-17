@@ -1,5 +1,5 @@
 # Two-session approval test — expense report full chain
-# .... Version 1.0
+# Version: 1.0
 # Requires: VS, AK
 # Notes: Aegis drives both sessions to Compass itself before the chain runs.
 

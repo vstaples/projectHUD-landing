@@ -9,9 +9,19 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
+  /* ── AEGIS PALETTE · FULL SATURATION ─────────────────────────────────────────
+   * IRON RULE: no muted grays. Every text/icon tier pops.
+   *   --t   : primary  →  pure white             (#ffffff)
+   *   --t2  : secondary →  cyan-tinted near-white (#cfe9e9)
+   *   --t3  : tertiary  →  amber accent          (#EF9F27)
+   *   --b*  : borders   →  cyan-tinted (not white-alpha)
+   * No --t3 equivalent below #EF9F27 saturation. No body text below 80% luminance.
+   * If you find yourself wanting a "dimmer gray" — use --t2 or add structure,
+   * don't dim text. See handoff doc · Iron Rule 10.
+   * ─────────────────────────────────────────────────────────────────────────── */
   --bg:#060a10;--bg2:#0d1117;--bg3:#131920;--bg4:#1a2230;--bg5:#0a0f16;
-  --b:rgba(255,255,255,0.07);--b2:rgba(255,255,255,0.13);--b3:rgba(255,255,255,0.22);
-  --t:#dde3ec;--t2:#8a95a3;--t3:#4e5a68;
+  --b:rgba(0,201,201,0.18);--b2:rgba(0,201,201,0.28);--b3:rgba(0,201,201,0.45);
+  --t:#ffffff;--t2:#cfe9e9;--t3:#EF9F27;
   --aq:#00c9c9;--aqd:rgba(0,201,201,0.10);--aqb:rgba(0,201,201,0.18);
   --am:#EF9F27;--amd:rgba(239,159,39,0.10);--amb:rgba(239,159,39,0.18);
   --gr:#3fba7a;--grd:rgba(63,186,122,0.10);
