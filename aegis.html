@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <title>Aegis — ProjectHUD Operations Command Surface</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -21,8 +24,13 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 
 /* ── TOPBAR ── */
 .topbar{height:44px;background:var(--bg2);border-bottom:0.5px solid var(--b2);display:flex;align-items:center;padding:0 14px;gap:0;flex-shrink:0;z-index:10}
-.logo{display:flex;align-items:center;gap:8px;padding-right:16px;border-right:0.5px solid var(--b);flex-shrink:0}
-.logo svg{width:20px;height:20px;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:9px;padding-right:16px;border-right:0.5px solid var(--b);flex-shrink:0}
+.logo svg{width:22px;height:22px;flex-shrink:0;display:block}
+.logo .wm{font-family:'Rajdhani','Rajdhani Fallback',sans-serif;font-size:18px;font-weight:700;letter-spacing:.2em;line-height:1;white-space:nowrap}
+.logo .wm .wm-ae{color:#fff}
+.logo .wm .wm-gis{color:var(--aq)}
+.logo .wm-sub{font-size:10px;font-family:var(--mono);color:var(--t3);letter-spacing:.16em;text-transform:uppercase;margin-left:2px;line-height:1}
+/* legacy single-tone wordmark class kept for any code paths that still reference it */
 .logo-text{font-size:13px;font-weight:500;letter-spacing:.16em;color:var(--aq)}
 .logo-sep{font-size:11px;color:var(--t3);margin:0 8px}
 .mod-crumb{font-size:12px;color:var(--t2);letter-spacing:.05em;flex-shrink:0}
@@ -480,8 +488,17 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="logo">
-    <svg viewBox="0 0 22 22" fill="none"><path d="M11 2L3 5.5V11c0 4.4 3.4 8.2 8 9 4.6-.8 8-4.6 8-9V5.5L11 2z" fill="rgba(0,201,201,.12)" stroke="#00c9c9" stroke-width="1"/><path d="M8 11l2 2 4-4" stroke="#00c9c9" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <span class="logo-text">Aegis</span>
+    <svg viewBox="0 0 90 90" aria-hidden="true">
+      <circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#1a3050" stroke-width="1.5"/>
+      <circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/>
+      <polygon points="45,18 58,62 45,54 32,62" fill="#0e1e38" stroke="#2a4a70" stroke-width="1"/>
+      <line x1="45" y1="18" x2="45" y2="54" stroke="#4d9fff" stroke-width="1.5" opacity="0.5"/>
+      <line x1="32" y1="62" x2="58" y2="62" stroke="#4d9fff" stroke-width="2" opacity="0.6"/>
+      <path d="M 72 20 A 36 36 0 0 1 81 45 A 36 36 0 0 1 45 81" fill="none" stroke="#00c9c9" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="72" cy="20" r="4" fill="#00c9c9"/>
+    </svg>
+    <span class="wm"><span class="wm-ae">AE</span><span class="wm-gis">GIS</span></span>
+    <span class="wm-sub">Command System</span>
   </div>
   <span class="logo-sep">/</span>
   <span class="mod-crumb" id="crumb">M1 · <span class="hi">Command</span></span>

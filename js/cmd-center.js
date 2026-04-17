@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD43
+// cmd-center.js  ·  v20260416-CMD41
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -26,7 +26,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD43',
+    'cmd-center':  'v20260416-CMD41',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -37,7 +37,7 @@ window._cmdCenterLoaded = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-43 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-CMD44 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1111,15 +1111,22 @@ async function _executeCommand(cmdLine, fromWho) {
 // ── Parse script header for Requires: directive ───────────────────────────────
 // Scans comment lines at top of script for:  # Requires: VS, AK, DN
 // Returns array of alias strings, or [] if not found.
+// Tokens are filtered to alias-shaped strings only (1–4 uppercase letters/digits,
+// leading letter) so freeform trailing prose in the comment is ignored — e.g.
+//   # Requires: VS, AK connected (anywhere in ProjectHUD)
+// yields ['VS', 'AK'], not ['VS','AK','CONNECTED','(ANYWHERE','IN','PROJECTHUD)'].
 function _parseScriptRequires(scriptText) {
   var lines = scriptText.split('\n');
+  var ALIAS_RE = /^[A-Z][A-Z0-9]{0,3}$/;
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].trim();
     if (!line) continue;
     if (!line.startsWith('#') && !line.startsWith('//')) break; // past header
     var m = line.match(/requires:\s*(.+)/i);
     if (m) {
-      return m[1].split(/[\s,]+/).map(function(s){ return s.trim().toUpperCase(); }).filter(Boolean);
+      return m[1].split(/[\s,]+/)
+        .map(function(s){ return s.trim().toUpperCase(); })
+        .filter(function(s){ return ALIAS_RE.test(s); });
     }
   }
   return [];
@@ -1268,29 +1275,37 @@ function _showPreflightPanel(scriptName, required, missing, scriptText) {
     var existing = document.getElementById('phr-preflight');
     if (existing) existing.remove();
 
-    var liveAliases   = required.filter(function(a){ return !missing.includes(a); });
-    var missingAliases = missing;
-
-    var rows = required.map(function(alias) {
-      var isOwn = _mySession && (alias === _myAlias || alias === _mySession.initials);
-      var uid = _resolveTargetAlias(alias);
-      var isLive = isOwn || (uid && _sessions[uid] && _sessions[uid].online);
-      var sess = uid ? _sessions[uid] : null;
-      var nameStr = isOwn ? _mySession.name : (sess ? sess.name : '—');
-      var dot = isLive
-        ? '<span style="color:#1D9E75">●</span>'
-        : '<span style="color:#E24B4A">○</span>';
-      var loc = isLive && sess ? ('<span style="color:rgba(255,255,255,.3);font-size:9px"> · ' + (sess.location||'') + '</span>') : '';
-      var tag = isLive
-        ? '<span style="font-size:9px;color:#1D9E75;border:1px solid rgba(29,158,117,.3);border-radius:2px;padding:0 4px">LIVE</span>'
-        : '<span style="font-size:9px;color:#E24B4A;border:1px solid rgba(226,75,74,.3);border-radius:2px;padding:0 4px">MISSING</span>';
-      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
-        + '<span style="font-size:10px;font-family:monospace;color:#EF9F27;min-width:32px">' + alias + '</span>'
-        + dot + ' '
-        + '<span style="font-size:10px;color:rgba(255,255,255,.7);flex:1">' + nameStr + loc + '</span>'
-        + tag
-        + '</div>';
-    }).join('');
+    // Rebuild rows + status each tick against current _sessions state.
+    function _buildRowsHTML() {
+      return required.map(function(alias) {
+        var isOwn = _mySession && (alias === _myAlias || alias === _mySession.initials);
+        var uid = _resolveTargetAlias(alias);
+        var isLive = isOwn || (uid && _sessions[uid] && _sessions[uid].online);
+        var sess = uid ? _sessions[uid] : null;
+        var nameStr = isOwn ? _mySession.name : (sess ? sess.name : '—');
+        var dot = isLive
+          ? '<span style="color:#1D9E75">●</span>'
+          : '<span style="color:#E24B4A">○</span>';
+        var loc = isLive && sess ? ('<span style="color:rgba(255,255,255,.3);font-size:9px"> · ' + (sess.location||'') + '</span>') : '';
+        var tag = isLive
+          ? '<span style="font-size:9px;color:#1D9E75;border:1px solid rgba(29,158,117,.3);border-radius:2px;padding:0 4px">LIVE</span>'
+          : '<span style="font-size:9px;color:#E24B4A;border:1px solid rgba(226,75,74,.3);border-radius:2px;padding:0 4px">MISSING</span>';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+          + '<span style="font-size:10px;font-family:monospace;color:#EF9F27;min-width:32px">' + alias + '</span>'
+          + dot + ' '
+          + '<span style="font-size:10px;color:rgba(255,255,255,.7);flex:1">' + nameStr + loc + '</span>'
+          + tag
+          + '</div>';
+      }).join('');
+    }
+    function _currentMissing() {
+      return required.filter(function(alias) {
+        var isOwn = _mySession && (alias === _myAlias || alias === _mySession.initials);
+        if (isOwn) return false;
+        var uid = _resolveTargetAlias(alias);
+        return !(uid && _sessions[uid] && _sessions[uid].online);
+      });
+    }
 
     var overlay = document.createElement('div');
     overlay.id = 'phr-preflight';
@@ -1303,9 +1318,9 @@ function _showPreflightPanel(scriptName, required, missing, scriptText) {
       '<div style="background:#0a1220;border:1px solid rgba(0,201,201,.25);border-radius:6px;padding:16px 18px;width:320px;max-width:90%">',
       '  <div style="font-size:10px;letter-spacing:.1em;color:rgba(255,255,255,.3);margin-bottom:8px">SESSION PREFLIGHT</div>',
       '  <div style="font-size:12px;color:#EF9F27;font-weight:700;margin-bottom:10px;font-family:monospace">' + scriptName + '</div>',
-      '  <div style="margin-bottom:12px">' + rows + '</div>',
-      '  <div style="font-size:10px;color:#E24B4A;margin-bottom:12px">',
-      '    ' + missingAliases.length + ' required session' + (missingAliases.length !== 1 ? 's' : '') + ' not connected: ' + missingAliases.join(', '),
+      '  <div id="phr-pre-rows" style="margin-bottom:12px">' + _buildRowsHTML() + '</div>',
+      '  <div id="phr-pre-status" style="font-size:10px;color:#E24B4A;margin-bottom:12px">',
+      '    ' + missing.length + ' required session' + (missing.length !== 1 ? 's' : '') + ' not connected: ' + missing.join(', '),
       '  </div>',
       '  <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:14px">',
       '    Open a Compass window for each missing session and log in. Script will block when it reaches those steps.',
@@ -1339,11 +1354,39 @@ function _showPreflightPanel(scriptName, required, missing, scriptText) {
       document.body.appendChild(overlay);
     }
 
+    // Live refresh: every 1s, rebuild rows and status from current _sessions.
+    // If all required aliases come online, auto-resolve and proceed.
+    var _pollId = setInterval(function() {
+      if (!document.getElementById('phr-preflight')) { clearInterval(_pollId); return; }
+      var rowsEl   = overlay.querySelector('#phr-pre-rows');
+      var statusEl = overlay.querySelector('#phr-pre-status');
+      if (rowsEl) rowsEl.innerHTML = _buildRowsHTML();
+      var nowMissing = _currentMissing();
+      if (statusEl) {
+        if (nowMissing.length === 0) {
+          statusEl.style.color = '#1D9E75';
+          statusEl.textContent = '✓ All required sessions connected — proceeding…';
+        } else {
+          statusEl.style.color = '#E24B4A';
+          statusEl.textContent = nowMissing.length + ' required session' + (nowMissing.length !== 1 ? 's' : '') + ' not connected: ' + nowMissing.join(', ');
+        }
+      }
+      if (nowMissing.length === 0) {
+        clearInterval(_pollId);
+        setTimeout(function() {
+          if (overlay.parentNode) overlay.remove();
+          resolve(true);
+        }, 600);
+      }
+    }, 1000);
+
     overlay.querySelector('#phr-pre-cancel').onclick = function() {
+      clearInterval(_pollId);
       overlay.remove();
       resolve(false);
     };
     overlay.querySelector('#phr-pre-run').onclick = function() {
+      clearInterval(_pollId);
       overlay.remove();
       resolve(true);
     };
