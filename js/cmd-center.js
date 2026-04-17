@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD51
+// cmd-center.js  ·  v20260416-CMD52
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -26,7 +26,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD51',
+    'cmd-center':  'v20260416-CMD52',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -37,7 +37,7 @@ window._cmdCenterLoaded = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD51 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-CMD52 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -531,7 +531,9 @@ var COMMANDS = {
     var newId = window._lastSubmittedInstanceId;
     if (newId && newId !== prevInstanceId) {
       _storeVars['instance_id'] = newId;
-      return 'submitted · instance ' + newId.slice(0,8);
+      // Return full UUID in ack so Aegis can capture it into its own _storeVars.
+      // Transcript rendering truncates on display — see _appendLine.
+      return 'submitted · instance ' + newId;
     }
     return 'submit triggered (instance id not yet available)';
   },
@@ -1283,7 +1285,20 @@ async function _runScript(scriptText, scriptName) {
           });
         }
         try {
-          await _waitForEvent('result:' + targetUserId, 30000);
+          var _ackData = await _waitForEvent('result:' + targetUserId, 30000);
+          // Propagate key vars from remote ack into local _storeVars so the
+          // rest of the script (running locally on Aegis) can reference them.
+          // Form Submit acks with 'submitted · instance XXXXXXXX' — extract the id.
+          // The target stored the full UUID in its own _storeVars; we capture
+          // the prefix here, which is sufficient for Log lines. For exact UUID
+          // matching via $instance_id, add 'Store instance_id' to the script.
+          if (_ackData && typeof _ackData.result === 'string') {
+            var _m = _ackData.result.match(/^submitted · instance ([a-f0-9-]+)/i);
+            if (_m) {
+              _storeVars['instance_id'] = _m[1];
+              _appendLine('SYS', 'sys', 'captured $instance_id = ' + _m[1]);
+            }
+          }
         } catch(e) {
           _appendLine('SYS', 'warn', 'Timeout waiting for ' + parsed.target);
         }
@@ -2381,13 +2396,36 @@ function _hookAppEvents() {
         headers: { apikey: supaKey, Authorization: 'Bearer ' + supaKey }
       }).then(function(r){ return r.json(); }).then(function(rows) {
         var assignee = '';
+        var assigneeResId = null;
         try {
           var notes = rows && rows[0] && rows[0].notes ? JSON.parse(rows[0].notes) : null;
           var chain = notes && notes.step_chain;
-          if (chain && chain[seq]) assignee = ' → ' + (chain[seq].assignee_name || '');
+          if (chain && chain[seq]) {
+            assignee = ' → ' + (chain[seq].assignee_name || '');
+            assigneeResId = chain[seq].assignee_resource_id || null;
+          }
         } catch(e) {}
         if (_panelEl) _appendLine('SYS', 'result',
           '→ routed step ' + seq + assignee);
+
+        // If the local user is the new assignee (i.e., submit-and-self-route),
+        // the work queue won't auto-refresh — trigger it. Skip on Aegis since
+        // Aegis doesn't render My Work. Guarded heavily: only if
+        // _mwLoadUserView exists, we have an identified local resource, and
+        // the assignee matches.
+        if (!window._aegisMode
+            && assigneeResId
+            && window._myResource
+            && window._myResource.id === assigneeResId
+            && typeof window._mwLoadUserView === 'function') {
+          // Invalidate cache flag so reload actually re-fetches
+          if (typeof window._viewLoaded === 'object') window._viewLoaded['user'] = false;
+          try {
+            window._mwLoadUserView();
+          } catch(e) {
+            console.warn('[cmd-center] auto-refresh after route failed:', e);
+          }
+        }
       }).catch(function() {
         if (_panelEl) _appendLine('SYS', 'result', '→ routed step ' + seq);
       });
