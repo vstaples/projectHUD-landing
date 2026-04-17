@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD53
+// cmd-center.js  ·  v20260418-CMD54
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -23,10 +23,14 @@
 if (window._cmdCenterLoaded) return;
 window._cmdCenterLoaded = true;
 
+// B1 (CMD54): flip to false before production release once policy consumers
+// are quiet. When true, both emit and receive paths log one line per event.
+var DEBUG_EVENTS = true;
+
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD53',
+    'cmd-center':  'v20260418-CMD54',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -37,7 +41,7 @@ window._cmdCenterLoaded = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD53 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD54 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -74,6 +78,20 @@ var _scriptRunning = false; // suppress hook double-logging during script execut
 var _scriptAborted = false; // set when panel closes mid-script
 var _pauseResolve  = null;  // set by Pause command, cleared by Enter in command bar
 var _leaveTimers   = {};    // { userId: timeoutId } — pending leave debounces; read by _renderSessionList
+
+// ── UUID helper (B1/CMD54) ────────────────────────────────────────────────────
+// Used by _cmdEmit to stamp a protocol-compliant event_id on every envelope.
+// Prefers native crypto.randomUUID; falls back to a v4-shaped pseudo-UUID for
+// any environment without it (old Safari, some iframe sandboxes).
+function _uuid() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
+    return v.toString(16);
+  });
+}
 
 // ── Load Supabase JS client ───────────────────────────────────────────────────
 function _loadSupabase() {
@@ -307,10 +325,18 @@ function _connect() {
   });
 
   // App events: other sessions broadcast what they're doing
+  // B1 (CMD54): envelope unwrap. Resolve with INNER payload so local and
+  // remote listeners see identical data. Self-echo check accepts canonical
+  // source_session with back-compat fallback to `from`. See Iron Rule 20.
   _channel.on('broadcast', { event: 'app_event' }, function(payload) {
     var d = payload.payload;
-    if (!d || d.from === _mySession.userId) return;
-    _resolveEventListeners(d.event, d);
+    if (!d) return;
+    var senderId  = d.source_session || d.from;
+    if (senderId === _mySession.userId) return;
+    var eventName = d.event_type || d.event;
+    var inner     = d.payload || d;  // unwrap envelope; fall back for legacy emits
+    if (DEBUG_EVENTS) console.log('[cmd-center] recv', eventName, inner);
+    _resolveEventListeners(eventName, inner);
   });
 
   _channel.subscribe(function(status) {
@@ -445,13 +471,31 @@ function _waitForEventFiltered(eventName, filterKey, filterVal, timeoutMs) {
 }
 
 // ── Broadcast app events from this session ────────────────────────────────────
+// B1 (CMD54): protocol-compliant envelope per HUD Ecosystem Protocol v0.1.
+// Canonical fields: protocol_version, event_type, event_id, source_product,
+// source_session, ts, firm_id, payload. Back-compat shims (event, from, name)
+// are kept at top level so the line-310 handler and any legacy consumer keep
+// working during the transition; remove in a future major bump.
+// Local listeners receive the INNER payload (same as remote after line-310
+// unwrap). See handoff Iron Rule 20.
 window._cmdEmit = function(eventName, data) {
   if (!_channel || !_mySession) return;
-  _channelSend({
-    type: 'broadcast', event: 'app_event',
-    payload: Object.assign({ event: eventName, from: _mySession.userId, name: _mySession.name }, data || {})
-  });
-  // Also resolve local listeners
+  var envelope = {
+    protocol_version: 1,
+    event_type:       eventName,
+    event_id:         _uuid(),
+    source_product:   'projecthud',
+    source_session:   _mySession.userId,
+    ts:               Date.now(),
+    firm_id:          FIRM_ID,
+    payload:          data || {},
+    // Back-compat shims
+    event:            eventName,
+    from:             _mySession.userId,
+    name:             _mySession.name,
+  };
+  _channelSend({ type: 'broadcast', event: 'app_event', payload: envelope });
+  if (DEBUG_EVENTS) console.log('[cmd-center] emit', eventName, data || {});
   _resolveEventListeners(eventName, data);
 };
 

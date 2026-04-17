@@ -1,0 +1,30 @@
+# Version: 1.0
+# Requires: VS
+# B1 emit probe — submits a tiny form and listens for all seven events.
+# Will time out on events that haven't been wired yet; that is diagnostic.
+
+Assert session VS is connected
+
+VS: Set View "compass"
+Pause Compass loading — press Enter when LIVE
+
+# Probe emit #1
+Wait ForEvent "location.ready" timeout=5000
+
+# Probe emits #2, #3, #5
+VS: Set Tab "MY REQUESTS"
+VS: Set SubTab "BROWSE"
+VS: Form Open "Expense Report"
+VS: Form Insert employee_name "Vaughn Staples"
+VS: Form Insert trip_start_date "2026-04-14"
+VS: Form Insert trip_end_date "2026-04-14"
+VS: Form Select business_purpose "client"
+VS: Form Insert purpose_description "B1 event probe"
+VS: Form Insert customer_name "Apex Consulting Group"
+VS: Form Submit
+
+Wait ForEvent "form.submitted" timeout=10000 → $instance_id
+Wait ForEvent "instance.launched" timeout=5000
+Wait ForEvent "workflow_request.created" where assignee=VS timeout=10000
+
+Log "✓ B1 emits 1, 2, 3, 5 verified for instance $instance_id"

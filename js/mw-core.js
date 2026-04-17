@@ -1,5 +1,6 @@
-// VERSION: 20260412-MC2
-console.log('%c[mw-core] v20260412-MC2 — filter cancelled instances from workflow_requests queue','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260418-CMD54
+window._mwCoreVersion = 'v20260418-CMD54';
+console.log('%c[mw-core] v20260418-CMD54 — B1 event bus: location.ready emit','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1930,6 +1931,17 @@ window.showCardPopup = function(type, cardEl) {
       }
     })();
 
+    // ── Emit #1: location.ready (B1 / CMD54) ──────────────────────────────
+    // Fires once after the My Work view is fully rendered. Unblocks the
+    // 20s Compass-load Pause in dual_session_test. Location string convention:
+    // "{view}.{tab}" lowercase, snake_case. This file's scope is compass.my_work.
+    if (typeof window._cmdEmit === 'function' && _myResource) {
+      window._cmdEmit('location.ready', {
+        location:    'compass.my_work',
+        resource_id: _myResource.id || null,
+        user_id:     _myResource.user_id || null,
+      });
+    }
 
   } catch (e) {
     console.error('[Compass] _mwLoadUserView error:', e);

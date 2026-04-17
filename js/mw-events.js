@@ -1,5 +1,6 @@
-// VERSION: 20260412-ME1
-console.log('%c[mw-events] v20260415-ME4 — next-step routing + cadenceRole resolution','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260418-CMD54
+window._mwEventsVersion = 'v20260418-CMD54';
+console.log('%c[mw-events] v20260418-CMD54 — B1 event bus: workflow_request.resolved, instance.completed','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -1075,12 +1076,27 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
 
     // If approved, notify submitter via a new action item in their My Work
     //    Fetch instance to get submitted_by_resource_id
+    // B1 (CMD54): also pull current_step_id so we can derive `seq` for emit #4.
     let inst = null;
+    let resolvedSeq = null;
     if (instanceId) {
       const instRows = await API.get(
-        `workflow_instances?id=eq.${instanceId}&select=submitted_by_resource_id,submitted_by_name,title&limit=1`
+        `workflow_instances?id=eq.${instanceId}&select=submitted_by_resource_id,submitted_by_name,title,current_step_id&limit=1`
       ).catch(()=>[]);
       inst = instRows?.[0];
+
+      // Derive seq from current_step_id (one tiny extra GET per resolution —
+      // acceptable: _rrpSubmit is not a hot path).
+      if (inst?.current_step_id) {
+        try {
+          const stepRows = await API.get(
+            `workflow_template_steps?id=eq.${inst.current_step_id}&select=sequence_order&limit=1`
+          ).catch(()=>[]);
+          if (stepRows && stepRows[0] && stepRows[0].sequence_order != null) {
+            resolvedSeq = stepRows[0].sequence_order;
+          }
+        } catch(_) {}
+      }
 
       // Only notify submitter when changes are requested — that requires their action.
       // Approvals are visible via step color + CoC; no queue item needed.
@@ -1103,6 +1119,23 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       // Other reviewers will see the amber step color in the submitter's My Requests view.
     }
 
+    // ── Emit #4: workflow_request.resolved (B1 / CMD54) ─────────────────────
+    // Closes the loop on routing policies and feeds velocity counters (Class 2).
+    // CommandHUD cancels any pending dispatch requests keyed to this request.
+    // `decision` normalises to the ecosystem-contract vocabulary: the raw
+    // parameter value 'rejected' maps to 'changes_requested' because the
+    // actual semantic in this flow is changes-requested (see request.changes_requested
+    // CoC event and the "Changes requested" UI copy).
+    if (typeof window._cmdEmit === 'function' && instanceId) {
+      window._cmdEmit('workflow_request.resolved', {
+        instance_id:           instanceId,
+        seq:                   resolvedSeq,
+        resolver_resource_id:  resId,
+        resolver_name:         resName,
+        decision:              approved ? 'approved' : 'changes_requested',
+      });
+    }
+
     // ── Advance to next template step via resolution engine ──────────────────
     // After a successful approval, look up the current step sequence and route
     // the next step. This is what moves the instance from step 1 → 2 → 3 → 4.
@@ -1110,14 +1143,14 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       try {
         const instFull = await API.get(
           `workflow_instances?id=eq.${instanceId}` +
-          `&select=id,template_id,form_def_id,current_step_id,submitted_by_resource_id,title&limit=1`
+          `&select=id,template_id,form_def_id,current_step_id,submitted_by_resource_id,title,launched_at&limit=1`
         ).catch(() => []);
         const instRow = instFull?.[0];
         if (instRow && instRow.template_id) {
           // Load all template steps
           const allSteps = await API.get(
             `workflow_template_steps?template_id=eq.${instRow.template_id}` +
-            `&order=sequence_order.asc&select=id,name,step_type,sequence_order,assignee_type,assignee_role`
+            `&order=sequence_order.asc&select=id,name,step_type,sequence_order,assignee_type,assignee_role,template_id`
           ).catch(() => []);
 
           // Find the current step and the next one
@@ -1164,6 +1197,26 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
               updated_at: now,
             }).catch(() => {});
             console.log('[rrpSubmit] workflow complete — no further steps');
+
+            // ── Emit #6: instance.completed (B1 / CMD54) ────────────────
+            // End-of-lifecycle event. Feeds duration statistics (Class 4/6
+            // anomaly detection) and terminates Wait ForEvent listeners
+            // keyed on this instance. `final_status` normalises to the
+            // ecosystem-contract vocabulary ('complete' | 'cancelled');
+            // the DB column stores 'completed'.
+            if (typeof window._cmdEmit === 'function') {
+              let elapsedMs = null;
+              if (instRow.launched_at) {
+                const launchedMs = Date.parse(instRow.launched_at);
+                if (!isNaN(launchedMs)) elapsedMs = Date.now() - launchedMs;
+              }
+              window._cmdEmit('instance.completed', {
+                instance_id:   instanceId,
+                template_id:   instRow.template_id || null,
+                final_status:  'complete',
+                elapsed_ms:    elapsedMs,
+              });
+            }
           }
         }
       } catch(e) {

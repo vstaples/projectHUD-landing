@@ -1,9 +1,33 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260412-MT6
+// VERSION: 20260418-CMD54
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260415-MT13 — blocked routing: caution flag + admin notify + Resume + CoC signer fix','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260412-MT9';
+console.log('%c[mw-tabs] v20260418-CMD54 — B1 event bus: form.submitted, instance.launched, workflow_request.created, instance.blocked','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260418-CMD54';
+
+// ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
+// Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
+// Inspects known field names, strips currency prefixes/commas, returns a
+// Number or null. Warns once per form whose fields match none of the list
+// so B6's author knows which keys to add.
+var _MW_AMOUNT_FIELDS = ['amount', 'total_amount', 'expense_total', 'budget'];
+var _mwAmountWarned = {};
+function _mwExtractAmount(formData, formName) {
+  if (!formData) return null;
+  for (var i = 0; i < _MW_AMOUNT_FIELDS.length; i++) {
+    var raw = formData[_MW_AMOUNT_FIELDS[i]];
+    if (raw != null && raw !== '') {
+      var n = Number(String(raw).replace(/[$,\s]/g, ''));
+      if (!isNaN(n)) return n;
+    }
+  }
+  if (!_mwAmountWarned[formName]) {
+    _mwAmountWarned[formName] = true;
+    console.warn('[mw-tabs] form.submitted: no amount field matched for',
+      JSON.stringify(formName), '· available keys:', Object.keys(formData));
+  }
+  return null;
+}
 
 // ── Supabase URL/Key helpers ──────────────────────────────
 // SUPA_URL/SUPA_KEY/FIRM_ID are defined in config.js but may be block-scoped
@@ -1666,7 +1690,7 @@ window.addEventListener('message', function(ev) {
         var cachedSteps = (window._myrTmplSteps || {})[tmpl.id];
         var steps = cachedSteps && cachedSteps.length ? cachedSteps : await API.get(
           'workflow_template_steps?template_id=eq.' + tmpl.id +
-          '&order=sequence_order.asc&select=id,name,step_type,sequence_order,assignee_type,assignee_role'
+          '&order=sequence_order.asc&select=id,name,step_type,sequence_order,assignee_type,assignee_role,template_id'
         ).catch(function() { return []; });
         var firstStep = (steps || []).find(function(s) { return s.step_type !== 'trigger'; });
 
@@ -1691,6 +1715,19 @@ window.addEventListener('message', function(ev) {
         var inst = instRows && instRows[0];
         if (!inst || !inst.id) throw new Error('Instance creation returned no row');
         var instanceId = inst.id;
+
+        // ── Emit #5: instance.launched (B1 / CMD54) ──────────────────────
+        // Fires in the same logical transaction as the workflow_instances
+        // insert. Feeds M2 live feed, Class 2 velocity counters, Class 5
+        // precondition checks.
+        if (typeof window._cmdEmit === 'function') {
+          window._cmdEmit('instance.launched', {
+            instance_id:             instanceId,
+            template_id:             tmpl.id,
+            template_name:           tmpl.name || formName,
+            submitter_resource_id:   res ? res.id : null,
+          });
+        }
 
         // 5. Write trigger event (instance_launched)
         await API.post('workflow_step_instances', {
@@ -1737,6 +1774,20 @@ window.addEventListener('message', function(ev) {
 
         // Expose for CMD Center scripts — avoids DOM scraping or Supabase queries
         window._lastSubmittedInstanceId = instanceId;
+
+        // ── Emit #2: form.submitted (B1 / CMD54) ─────────────────────────
+        // Canonical "a form was just submitted" event. Consumed by future
+        // policies (Class 1 threshold on amount), Wait ForInstance, and
+        // CommandHUD agent-pipeline triggers. Payload field names are locked.
+        if (typeof window._cmdEmit === 'function') {
+          window._cmdEmit('form.submitted', {
+            instance_id:            instanceId,
+            form_name:              formName,
+            submitter_resource_id:  res ? res.id      : null,
+            submitter_user_id:      res ? res.user_id : null,
+            amount:                 _mwExtractAmount(d.formData, formName),
+          });
+        }
 
         // Write request.submitted CoC event — powers the Document Review Request panel.
         // The docs[] array makes the form appear as a clickable link in the review panel.
@@ -2115,6 +2166,19 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
         updated_at:        new Date().toISOString(),
       }).catch(function() {});
 
+      // ── Emit #7: instance.blocked (B1 / CMD54) ───────────────────────────
+      // Fires on non-fatal routing halt (unresolved role, missing assignee).
+      // Replaces the hand-maintained M2 mock. CommandHUD may trigger
+      // critical-urgency dispatches for blocked instances past a threshold.
+      if (typeof window._cmdEmit === 'function') {
+        window._cmdEmit('instance.blocked', {
+          instance_id: instanceId,
+          seq:         currentStepSeq,
+          reason:      'missing_role',
+          details:     roleLabel + ' not assigned for role "' + step.assignee_role + '" at step ' + currentStepSeq,
+        });
+      }
+
       // Layer 2: Notify ALL admins via workflow_action_items
       // Tagged with instance_id so they can be batch-resolved when the issue is fixed
       try {
@@ -2197,6 +2261,23 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
       created_at:       now,
     });
 
+    // ── Emit #3: workflow_request.created (B1 / CMD54) ──────────────────────
+    // Fires at the routing site (not in the cmd-center.js transcript intercept)
+    // so every routed request emits, not only those the intercept catches on
+    // Compass. `role` carries the Cadence role (manager/finance/legal/hr/
+    // submitter) which is what policies predicate on — the DB's workflow_requests
+    // role column is coarser ('approver'/'reviewer').
+    if (typeof window._cmdEmit === 'function') {
+      window._cmdEmit('workflow_request.created', {
+        instance_id:            instanceId,
+        seq:                    currentStepSeq,
+        assignee_resource_id:   assigneeResId,
+        assignee_name:          assigneeName,
+        role:                   step.assignee_role || null,
+        template_id:            step.template_id || null,
+      });
+    }
+
     console.log('%c[_mwResolveAndRoute] routed step ' + currentStepSeq + ' (' + step.assignee_role + ') → ' + assigneeName,
       'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
 
@@ -2248,7 +2329,7 @@ window.myrResumeInstance = async function(instanceId, title, evt) {
     // Load template steps
     var steps = await API.get(
       'workflow_template_steps?template_id=eq.' + inst.template_id +
-      '&order=sequence_order.asc&select=id,name,step_type,sequence_order,assignee_type,assignee_role'
+      '&order=sequence_order.asc&select=id,name,step_type,sequence_order,assignee_type,assignee_role,template_id'
     ).catch(function() { return []; });
 
     var currentStep = (steps||[]).find(function(s) { return s.id === inst.current_step_id; });
