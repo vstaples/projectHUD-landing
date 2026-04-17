@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD52
+// cmd-center.js  ·  v20260416-CMD53
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -26,7 +26,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD52',
+    'cmd-center':  'v20260416-CMD53',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -37,7 +37,7 @@ window._cmdCenterLoaded = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD52 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-CMD53 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -824,10 +824,13 @@ var COMMANDS = {
       _storeVars['instance_id'] = id;
       return id || 'no active instance found';
     }
-    // Latest submitted instance — set by mw-tabs.js at submit time
+    // Latest submitted instance — set locally by mw-tabs.js at submit time
+    // OR captured from a remote target's Form Submit ack (see dispatch loop).
+    // Prefer the local window global if set (freshest), then fall back to
+    // whatever was already stashed in _storeVars (remote ack), then null.
     if (key === 'Latest instance_id' || key === 'submitted instance_id') {
-      var id = window._lastSubmittedInstanceId || null;
-      _storeVars['instance_id'] = id;
+      var id = window._lastSubmittedInstanceId || _storeVars['instance_id'] || null;
+      if (id) _storeVars['instance_id'] = id;
       return id || 'no submitted instance found';
     }
     // Get Request id — fetch the open workflow_request id for $instance_id assigned to an alias
@@ -1100,9 +1103,16 @@ async function _executeCommand(cmdLine, fromWho) {
   var parsed = _parseLine(cmdLine);
   if (!parsed) return;
 
-  // Variable substitution — replace $varname with stored value
+  // Variable substitution — replace $varname with stored value. If the var
+  // is unset, leave the literal '$varname' in place (previously this fell
+  // back to the entire argument string, causing duplication like
+  // 'Package live · Package live · $instance_id').
   var args = (parsed.args||[]).map(function(a) {
-    return a.replace(/\$(\w+)/g, function(_, k) { return _storeVars[k] || a; });
+    return a.replace(/\$(\w+)/g, function(whole, k) {
+      return (_storeVars[k] !== undefined && _storeVars[k] !== null && _storeVars[k] !== '')
+        ? _storeVars[k]
+        : whole;
+    });
   });
 
   if (!parsed.verb) {
