@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD50
+// cmd-center.js  ·  v20260416-CMD51
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -26,7 +26,7 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD50',
+    'cmd-center':  'v20260416-CMD51',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -37,7 +37,7 @@ window._cmdCenterLoaded = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD50 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-CMD51 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1240,7 +1240,10 @@ async function _runScript(scriptText, scriptName) {
       // If this is a Form command, verify the overlay is still open.
       // Give it a short grace period — the overlay may still be animating in
       // immediately after Form Open returns.
-      if (parsed.verb && parsed.verb.startsWith('Form ') && parsed.verb !== 'Form Open') {
+      // AEGIS-EXEMPT: on Aegis, the form overlay lives on the target session's
+      // DOM (Compass), not on Aegis's. Aegis is dispatching, not executing, so
+      // the local-DOM overlay check is meaningless and would falsely abort.
+      if (!window._aegisMode && parsed.verb && parsed.verb.startsWith('Form ') && parsed.verb !== 'Form Open') {
         var overlay = document.getElementById('myr-html-form-overlay') ||
                       document.getElementById('myr-html-form-modal');
         if (!overlay) {
