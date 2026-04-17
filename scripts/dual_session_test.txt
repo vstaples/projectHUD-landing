@@ -1,9 +1,21 @@
 # Two-session approval test — expense report full chain
-# Requires: VS, AK
+# Requires: VS, AK connected (anywhere in ProjectHUD)
+# Aegis drives both sessions to Compass itself before running the chain.
 
-# — preflight ——————————————————————————————————————————
+# — preflight · presence ————————————————————————————————
 Assert session VS is connected
 Assert session AK is connected
+
+# — preflight · navigate both sessions to Compass ————————
+# MY REQUESTS / MY WORK tabs only exist inside Compass. Dashboard and
+# project-detail pages will silently fail tab commands. Send both sessions
+# to Compass first and let the view mount.
+VS: Set View "compass"
+AK: Set View "compass"
+Wait 3000
+VS: Set Tab "MY WORK"
+AK: Set Tab "MY WORK"
+Wait 1500
 
 # — VS submits ————————————————————————————————————————
 VS: Set Tab "MY REQUESTS"

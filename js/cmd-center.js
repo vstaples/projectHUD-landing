@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260416-CMD41
+// cmd-center.js  ·  v20260416-CMD43
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -26,18 +26,18 @@ window._cmdCenterLoaded = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260416-CMD42',
+    'cmd-center':  'v20260416-CMD43',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
     'mw-team':     typeof window._mwTeamVersion !== 'undefined' ? window._mwTeamVersion : '—',
   };
   if (window._aegisMode) {
-  console.group('%c AEGIS v20260416-AE2 ','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+  console.group('%c AEGIS v20260416-AE1 ','background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260416-CMD42 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260416-43 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -248,12 +248,26 @@ function _connect() {
     if (window._aegisMode) return; // Aegis dispatches but never executes
     _appendLine(d.from || 'SYS', 'cmd', d.cmd);
     _executeCommand(d.cmd, d.from).then(function(result) {
-      if (result !== undefined) {
-        _channelSend({
-          type: 'broadcast', event: 'result',
-          payload: { from: _mySession.userId, name: _mySession.name, result: result, cmdId: d.cmdId }
-        });
-      }
+      // Always ack so the dispatcher doesn't time out. Undefined → true (completed).
+      _channelSend({
+        type: 'broadcast', event: 'result',
+        payload: {
+          from: _mySession.userId, name: _mySession.name,
+          result: result === undefined ? true : result,
+          cmdId: d.cmdId,
+        }
+      });
+    }).catch(function(err) {
+      // Execution threw — still ack, but carry the error so the dispatcher can see it.
+      _appendLine('SYS', 'err', 'Cmd failed: ' + (err && err.message ? err.message : err));
+      _channelSend({
+        type: 'broadcast', event: 'result',
+        payload: {
+          from: _mySession.userId, name: _mySession.name,
+          result: { error: (err && err.message) ? err.message : String(err) },
+          cmdId: d.cmdId,
+        }
+      });
     });
   });
 
