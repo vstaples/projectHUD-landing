@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD62 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD62a ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -782,6 +782,25 @@ window._cmdEmit = function(eventName, data) {
     name:             _mySession.name,
   };
   if (DEBUG_EVENTS) console.log('[cmd-center] emit', eventName, data || {});
+
+  // CMD62 / Iron Rule 25: register our own event_id in the dedup store
+  // BEFORE the local fan-out below. The broadcast round-trips via
+  // Supabase (broadcast.self=true on both channels) and re-enters via
+  // _handleAppEvent; on Aegis that self-receive passes the Rule 15
+  // Aegis exemption (not skipped), and without this registration the
+  // dedup check would also pass (event_id not yet seen), causing
+  // _fanoutAppEventListeners to fire a second time and the M2 feed
+  // to render the event twice (CoC stream double-render observed in
+  // CMD62 post-deploy smoke test on manual _cmdEmit calls). Applies
+  // to any tab that both emits and listens; Aegis is the primary
+  // surface today but any future same-tab emit+listen is latent for
+  // this same bug. _pushEventBuffer is not affected because the wire
+  // receipt's buffer push is skipped alongside the fan-out (both
+  // live after the dedup gate in _handleAppEvent).
+  if (envelope.event_id) {
+    _seenEventIds[envelope.event_id] = Date.now();
+    _purgeSeenEventIds();
+  }
 
   // CMD60: gate on the SUBSCRIBED-derived flag, not raw WebSocket
   // readyState. The Supabase client's own `.send()` handles transport
