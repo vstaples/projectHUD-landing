@@ -649,40 +649,6 @@ window._cmdEmit = function(eventName, data) {
   _fanoutAppEventListeners(eventName, data || {});
 };
 
-// ── Public API namespace (CMD61 / Brief M2-FEED-1) ────────────────────────────
-// Subscribe to every app_event broadcast, local or remote, after self-echo
-// filter + envelope unwrap. Callback receives (eventName, innerPayload).
-// Fire-and-forget; no unsubscribe (M2 panel is long-lived).
-// `recentEvents(n)` returns the N newest buffered entries across all event
-// types, newest-first, shaped as {eventName, data, ts}. Capped at whatever
-// is in the 30s retention window.
-window.CMDCenter = window.CMDCenter || {};
-window.CMDCenter.onAppEvent = function(callback) {
-  if (typeof callback !== 'function') return;
-  _m2FeedListeners.push(callback);
-};
-window.CMDCenter.recentEvents = function(n) {
-  var max = (typeof n === 'number' && n > 0) ? n : 20;
-  var out = [];
-  for (var eventName in _eventBuffer) {
-    if (!Object.prototype.hasOwnProperty.call(_eventBuffer, eventName)) continue;
-    var arr = _eventBuffer[eventName];
-    for (var i = 0; i < arr.length; i++) {
-      out.push({ eventName: eventName, data: arr[i].data, ts: arr[i].ts });
-    }
-  }
-  out.sort(function(a, b) { return b.ts - a.ts; }); // newest first
-  return out.slice(0, max);
-};
-window.CMDCenter.sessions = function() {
-  // Shallow copy so callers can't mutate internal presence state.
-  var out = {};
-  for (var uid in _sessions) {
-    if (Object.prototype.hasOwnProperty.call(_sessions, uid)) out[uid] = _sessions[uid];
-  }
-  return out;
-};
-
 // ── Command registry ──────────────────────────────────────────────────────────
 var COMMANDS = {
 
@@ -2793,6 +2759,28 @@ window.CMDCenter = {
     if (ai) ai.value = _myAlias;
   },
   resolveAlias: _resolveTargetAlias,
+  // ── M2 feed API (CMD61 / Brief M2-FEED-1) ────────────────────────────────
+  // Subscribe to every app_event broadcast, local or remote, after self-echo
+  // filter + envelope unwrap. Callback receives (eventName, innerPayload).
+  // Fire-and-forget; no unsubscribe (M2 panel is long-lived).
+  onAppEvent:   function(callback) {
+    if (typeof callback === 'function') _m2FeedListeners.push(callback);
+  },
+  // Returns the N newest buffered entries across all event_types, newest-first,
+  // shaped as {eventName, data, ts}. Capped at what remains in the 30s window.
+  recentEvents: function(n) {
+    var max = (typeof n === 'number' && n > 0) ? n : 20;
+    var out = [];
+    for (var eventName in _eventBuffer) {
+      if (!Object.prototype.hasOwnProperty.call(_eventBuffer, eventName)) continue;
+      var arr = _eventBuffer[eventName];
+      for (var i = 0; i < arr.length; i++) {
+        out.push({ eventName: eventName, data: arr[i].data, ts: arr[i].ts });
+      }
+    }
+    out.sort(function(a, b) { return b.ts - a.ts; });
+    return out.slice(0, max);
+  },
 };
 
 // ── Init ──────────────────────────────────────────────────────────────────────
