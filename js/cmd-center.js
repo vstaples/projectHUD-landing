@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260418-CMD56
+// cmd-center.js  ·  v20260418-CMD57
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -30,7 +30,7 @@ var DEBUG_EVENTS = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260418-CMD56',
+    'cmd-center':  'v20260418-CMD57',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -41,7 +41,7 @@ var DEBUG_EVENTS = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD56 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD57 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -330,11 +330,17 @@ function _connect() {
   // source_session with back-compat fallback to `from`. See Iron Rule 20.
   // CMD55: also push to retention buffer (post-self-echo) so a late
   // Wait ForEvent can match a past emit within the retention window.
+  // CMD57 (Iron Rule 15 restated): Aegis is exempt from the self-echo skip.
+  // One human running Aegis + Compass tabs under the same auth has
+  // `d.source_session === _mySession.userId` on every Compass emit, which
+  // the naive filter would discard as a self-echo. Aegis never emits
+  // app_events (guarded by _aegisMode in mw-* modules), so any app_event
+  // reaching Aegis is by definition from a different tab.
   _channel.on('broadcast', { event: 'app_event' }, function(payload) {
     var d = payload.payload;
     if (!d) return;
     var senderId  = d.source_session || d.from;
-    if (senderId === _mySession.userId) return;
+    if (!window._aegisMode && senderId === _mySession.userId) return;
     var eventName = d.event_type || d.event;
     var inner     = d.payload || d;  // unwrap envelope; fall back for legacy emits
     if (DEBUG_EVENTS) console.log('[cmd-center] recv', eventName, inner);
