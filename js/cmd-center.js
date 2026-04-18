@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260418-CMD57
+// cmd-center.js  ·  v20260418-CMD58
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -30,7 +30,7 @@ var DEBUG_EVENTS = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260418-CMD57',
+    'cmd-center':  'v20260418-CMD58',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -41,7 +41,7 @@ var DEBUG_EVENTS = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD57 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD58 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -462,6 +462,20 @@ function _flushOutboundQueue() {
   }
   if (DEBUG_EVENTS) console.log('[cmd-center] flushed outbound queue ·', drained, 'envelope(s)');
 }
+
+// CMD58: expose for diagnostics + allow external manual flush.
+window._cmdOutboundQueue = _outboundQueue;
+window._cmdFlushOutbound = _flushOutboundQueue;
+window._cmdSocketReady   = _socketReady;
+
+// CMD58: safety-net interval drain. SUBSCRIBED fires once; if the first
+// flush ran before any emit queued (common when page bootstrap is faster
+// than the subscribe callback), subsequent queued emits have no trigger.
+// A 500ms poll flushes whenever the socket is OPEN and the queue is
+// non-empty. No-op when empty. Stops nothing — purely additive.
+setInterval(function() {
+  if (_outboundQueue.length && _socketReady()) _flushOutboundQueue();
+}, 500);
 
 function _pushEventBuffer(eventName, data) {
   if (!eventName) return;
