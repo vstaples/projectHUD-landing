@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260418-CMD59
+// VERSION: 20260418-CMD60
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260418-CMD59 — B1 event bus: form.submitted, instance.launched, workflow_request.created, instance.blocked','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260418-CMD59';
+console.log('%c[mw-tabs] v20260418-CMD60 — B1 event bus: form.submitted, instance.launched, workflow_request.created, instance.blocked','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260418-CMD60';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).

@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260418-CMD59
+// cmd-center.js  ·  v20260418-CMD60
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -30,7 +30,7 @@ var DEBUG_EVENTS = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260418-CMD59',
+    'cmd-center':  'v20260418-CMD60',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -41,7 +41,7 @@ var DEBUG_EVENTS = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD59 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD60 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -172,14 +172,14 @@ function _updateStatusEl() {
 }
 
 function _channelSend(payload) {
-  // Only send via WebSocket — avoid REST fallback which causes 401
+  // CMD60: no readyState short-circuit. Let supabase-js route via WS
+  // when OPEN or REST when not. CMD59 put a user JWT on realtime via
+  // setAuth(), which is what makes the REST /realtime/v1/api/broadcast
+  // fallback succeed instead of 401-ing. The pre-existing short-circuit
+  // was written before setAuth was wired and has been silently dropping
+  // broadcasts during every Phoenix heartbeat reconnect on Compass.
   if (!_channel) return;
-  try {
-    var state = _channel.socket && _channel.socket.conn && _channel.socket.conn.readyState;
-    // readyState 1 = OPEN
-    if (state !== undefined && state !== 1) return;
-    _channel.send(payload);
-  } catch(e) {}
+  try { _channel.send(payload); } catch(e) {}
 }
 
 function _connect() {
@@ -468,7 +468,7 @@ function _socketReady() {
 
 function _flushOutboundQueue() {
   if (!_outboundQueue.length) return;
-  if (!_socketReady()) return;
+  if (!window._cmdConnected) return;
   var drained = 0;
   while (_outboundQueue.length) {
     var env = _outboundQueue.shift();
@@ -483,13 +483,11 @@ window._cmdOutboundQueue = _outboundQueue;
 window._cmdFlushOutbound = _flushOutboundQueue;
 window._cmdSocketReady   = _socketReady;
 
-// CMD58: safety-net interval drain. SUBSCRIBED fires once; if the first
-// flush ran before any emit queued (common when page bootstrap is faster
-// than the subscribe callback), subsequent queued emits have no trigger.
-// A 500ms poll flushes whenever the socket is OPEN and the queue is
-// non-empty. No-op when empty. Stops nothing — purely additive.
+// CMD58/60: safety-net interval drain. Flushes whenever we've seen
+// SUBSCRIBED and the queue is non-empty. Let the Supabase client handle
+// WebSocket vs REST transport.
 setInterval(function() {
-  if (_outboundQueue.length && _socketReady()) _flushOutboundQueue();
+  if (_outboundQueue.length && window._cmdConnected) _flushOutboundQueue();
 }, 500);
 
 function _pushEventBuffer(eventName, data) {
@@ -613,10 +611,14 @@ window._cmdEmit = function(eventName, data) {
   };
   if (DEBUG_EVENTS) console.log('[cmd-center] emit', eventName, data || {});
 
-  // CMD56: queue outbound if socket not OPEN; drain on SUBSCRIBED.
-  // Local listener resolution + retention buffer push stay synchronous so
-  // same-session Waits work regardless of socket state.
-  if (_socketReady()) {
+  // CMD60: gate on the SUBSCRIBED-derived flag, not raw WebSocket
+  // readyState. The Supabase client's own `.send()` handles transport
+  // selection (WebSocket primary, REST fallback with auto-retry).
+  // Short-circuiting on readyState !== 1 blocks emits during normal
+  // Phoenix heartbeat reconnects — presence still works through the
+  // same reconnect path because the client handles it transparently.
+  // Queue only while we haven't seen SUBSCRIBED at all (pre-bootstrap).
+  if (window._cmdConnected) {
     _channelSend({ type: 'broadcast', event: 'app_event', payload: envelope });
   } else {
     if (_outboundQueue.length >= _OUTBOUND_QUEUE_CAP) {
