@@ -195,6 +195,10 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 /* coc stream */
 .coc-item{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:0.5px solid var(--b)}
 .coc-item:last-child{border-bottom:none}
+.m2f-pill{font-size:9px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border:0.5px solid var(--b);border-radius:3px;cursor:pointer;background:transparent}
+.m2f-pill:hover{color:var(--t2);border-color:var(--b3)}
+.m2f-pill.on{color:var(--aq);background:var(--aqd);border-color:rgba(0,201,201,.35)}
+.m2f-empty{font-size:12px;color:var(--t3);padding:6px 0;font-style:italic}
 .coc-dot{width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0}
 .coc-body{flex:1;min-width:0}
 .coc-evt{font-size:11px;color:var(--t);margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -665,17 +669,17 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
       </div>
       <!-- CoC Stream -->
       <div class="col">
-        <div class="col-hd"><span class="col-title">CoC event stream · live</span><span class="col-act" onclick="switchMC('coc',document.querySelectorAll('.mt')[3])">full view</span></div>
-        <div class="col-body">
-          <div class="coc-item"><div class="coc-dot" style="background:var(--gr)"></div><div class="coc-body"><div class="coc-evt">request.approved · Expense Report</div><div class="coc-meta">VS · e-er-0038 · step 2</div></div><div class="coc-time">2m</div></div>
-          <div class="coc-item"><div class="coc-dot" style="background:var(--aq)"></div><div class="coc-body"><div class="coc-evt">cert.issued · Expense Report v1.2</div><div class="coc-meta">Cadence BIST · 6/6 paths · CERT-20260416</div></div><div class="coc-time">22m</div></div>
-          <div class="coc-item"><div class="coc-dot" style="background:var(--aq)"></div><div class="coc-body"><div class="coc-evt">step.activated · AK · step 3</div><div class="coc-meta">AK · e-er-0038 · routed from step 2</div></div><div class="coc-time">24m</div></div>
-          <div class="coc-item"><div class="coc-dot" style="background:var(--rd)"></div><div class="coc-body"><div class="coc-evt">instance.blocked · Design Review</div><div class="coc-meta">Finance contact unassigned · e-drs-0041</div></div><div class="coc-time">1h</div></div>
-          <div class="coc-item"><div class="coc-dot" style="background:var(--gr)"></div><div class="coc-body"><div class="coc-evt">request.approved · step 1 auto-advance</div><div class="coc-meta">VS submitter · e-er-0038 · CoC auto-written</div></div><div class="coc-time">1h 2m</div></div>
-          <div class="coc-item"><div class="coc-dot" style="background:var(--gr)"></div><div class="coc-body"><div class="coc-evt">form.submitted · Expense Report</div><div class="coc-meta">VS · $1,547.75 · Phoenix AZ</div></div><div class="coc-time">1h 4m</div></div>
-          <div class="coc-item"><div class="coc-dot" style="background:var(--am)"></div><div class="coc-body"><div class="coc-evt">workflow_request.created · AK</div><div class="coc-meta">e-er-0038 · approver · step 2 activated</div></div><div class="coc-time">1h 5m</div></div>
-          <div class="coc-item"><div class="coc-dot" style="background:var(--aq)"></div><div class="coc-body"><div class="coc-evt">instance.launched · Project Change Order</div><div class="coc-meta">RC · e-pco-0033 · Flexscope</div></div><div class="coc-time">1h 45m</div></div>
-          <div class="coc-item"><div class="coc-dot" style="background:var(--aq)"></div><div class="coc-body"><div class="coc-evt">suite.run.complete · 359 runs</div><div class="coc-meta">Cadence BIST · 87% pass · 31 failed</div></div><div class="coc-time">2h</div></div>
+        <div class="col-hd">
+          <span class="col-title">CoC event stream · live</span>
+          <span style="display:flex;gap:4px;align-items:center">
+            <span class="m2f-pill on" data-m2f-filter="signal" onclick="_m2FeedSetFilter('signal',this)">signal</span>
+            <span class="m2f-pill" data-m2f-filter="noise" onclick="_m2FeedSetFilter('noise',this)">noise</span>
+            <span class="m2f-pill" data-m2f-filter="all" onclick="_m2FeedSetFilter('all',this)">all</span>
+            <span class="col-act" onclick="switchMC('coc',document.querySelectorAll('.mt')[3])">full view</span>
+          </span>
+        </div>
+        <div id="m2-coc-feed" class="col-body">
+          <!-- Populated by M2 feed JS (CMD61 / Brief M2-FEED-1) -->
         </div>
       </div>
     </div>
@@ -897,22 +901,12 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
       </div>
       <div class="coc-stream-full">
         <div class="coc-full-summary">
-          <div class="cfs-item"><span class="cfs-val">47</span>events today</div>
-          <div class="cfs-item"><span class="cfs-val" style="color:var(--gr)">31</span>approvals</div>
-          <div class="cfs-item"><span class="cfs-val" style="color:var(--rd)">2</span>blocks</div>
-          <div class="cfs-item"><span class="cfs-val" style="color:var(--aq)">3</span>certs issued</div>
-          <div class="cfs-item"><span class="cfs-val" style="color:var(--am)">4</span>pending</div>
-          <div style="margin-left:auto;font-size:10px;color:var(--t3)">Last event 2m ago · Realtime</div>
+          <div class="cfs-item"><span class="cfs-val" id="mc-coc-summary-count">0</span>events · 30s buffer</div>
+          <div style="margin-left:auto;font-size:10px;color:var(--t3)">Realtime · current filter applies</div>
         </div>
-        <div class="coc-full-item"><div class="cfi-dot" style="background:var(--gr)"></div><div class="cfi-body"><div class="cfi-evt">request.approved · Expense Report · step 2</div><div class="cfi-meta">Actor: VS (Vaughn Staples) · Instance e-er-0038 · NovaBio QMS</div><div class="cfi-detail">Manager approval · panel closed immediately · routing fired to AK step 3 · fire-and-forget</div></div><div class="cfi-right"><div class="cfi-time">2m ago · 01:50:01</div><span class="badge b-gr">approval</span></div></div>
-        <div class="coc-full-item"><div class="cfi-dot" style="background:var(--aq)"></div><div class="cfi-body"><div class="cfi-evt">cert.issued · Expense Report v1.2 · CERT-20260416-ER-002</div><div class="cfi-meta">Actor: Cadence BIST engine · 6/6 coverage paths passing</div><div class="cfi-detail">All routing paths verified — clean path, reset path ×3, escalation path — cleared for release</div></div><div class="cfi-right"><div class="cfi-time">22m ago · 01:30:14</div><span class="badge b-aq">cert</span></div></div>
-        <div class="coc-full-item"><div class="cfi-dot" style="background:var(--aq)"></div><div class="cfi-body"><div class="cfi-evt">step.activated · step 3 · Angela Kim</div><div class="cfi-meta">Instance e-er-0038 · workflow_request created · approver role</div><div class="cfi-detail">Routed from VS step 2 approval · _myActiveRequestId set in AK session · notify attempted (Resend sandbox)</div></div><div class="cfi-right"><div class="cfi-time">24m ago · 01:28:07</div><span class="badge b-aq">routing</span></div></div>
-        <div class="coc-full-item"><div class="cfi-dot" style="background:var(--rd)"></div><div class="cfi-body"><div class="cfi-evt">instance.blocked · Design Review Signoff</div><div class="cfi-meta">Instance e-drs-0041 · routing halted · Finance assignee_id = null</div><div class="cfi-detail">Step 3 assignee lookup returned null — Finance contact not set in User Management. Resume requires Forge resource assignment.</div></div><div class="cfi-right"><div class="cfi-time">1h ago · 00:52:44</div><span class="badge b-rd">blocked</span></div></div>
-        <div class="coc-full-item"><div class="cfi-dot" style="background:var(--gr)"></div><div class="cfi-body"><div class="cfi-evt">request.approved · Design Review · step 2</div><div class="cfi-meta">Actor: VS · Instance e-drs-0041 · manager approval</div><div class="cfi-detail">Approval recorded · CoC event written · routing to step 3 attempted · Finance lookup failed immediately</div></div><div class="cfi-right"><div class="cfi-time">1h 1m ago · 00:51:32</div><span class="badge b-gr">approval</span></div></div>
-        <div class="coc-full-item"><div class="cfi-dot" style="background:var(--gr)"></div><div class="cfi-body"><div class="cfi-evt">request.approved · step 1 auto-advance · Expense Report</div><div class="cfi-meta">Actor: VS (submitter) · Instance e-er-0038 · auto-CoC</div><div class="cfi-detail">Step 1 assignee_role=submitter + step_type=form detected · CoC written automatically · skipped to step 2 routing</div></div><div class="cfi-right"><div class="cfi-time">1h 2m ago · 00:50:31</div><span class="badge b-gr">approval</span></div></div>
-        <div class="coc-full-item"><div class="cfi-dot" style="background:var(--am)"></div><div class="cfi-body"><div class="cfi-evt">form.submitted · Expense Report</div><div class="cfi-meta">Actor: VS · Instance e-er-0038 · $1,547.75 · Phoenix AZ · Apex Consulting Group</div><div class="cfi-detail">Form submitted via CMD script dual_session_test · _lastSubmittedInstanceId set · step 1 auto-advance triggered</div></div><div class="cfi-right"><div class="cfi-time">1h 4m ago · 00:48:19</div><span class="badge b-am">submission</span></div></div>
-        <div class="coc-full-item"><div class="cfi-dot" style="background:var(--aq)"></div><div class="cfi-body"><div class="cfi-evt">instance.launched · Project Change Order</div><div class="cfi-meta">Actor: RC (Robert Chen) · Instance e-pco-0033 · Flexscope</div><div class="cfi-detail">Template Project Change Order v0.2 · manual form open · step 1 active · RC completing form</div></div><div class="cfi-right"><div class="cfi-time">1h 45m ago · 00:07:02</div><span class="badge b-aq">routing</span></div></div>
-        <div class="coc-full-item"><div class="cfi-dot" style="background:var(--aq)"></div><div class="cfi-body"><div class="cfi-evt">suite.run.complete · Cadence BIST</div><div class="cfi-meta">Actor: Cadence system · 359 total runs · 312 passed · 31 failed · 16 no run</div><div class="cfi-detail">87% pass rate · oldest cert 2d · Design Review 0/18 coverage paths — certification blocked</div></div><div class="cfi-right"><div class="cfi-time">2h ago · 23:52:11</div><span class="badge b-aq">cert</span></div></div>
+        <div id="mc-coc-feed" style="display:flex;flex-direction:column;gap:6px;padding:8px 12px">
+          <!-- Populated by M2 feed JS (CMD61 / Brief M2-FEED-1). Same renderer as Overview column, cap 100. -->
+        </div>
       </div>
     </div>
   </div>
@@ -1303,7 +1297,258 @@ document.addEventListener('DOMContentLoaded',function(){
   // switchForge default to resources
   switchForge('resources');
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// M2 Live CoC Feed (CMD61 / Brief M2-FEED-1)
+// Consumes the app_event broadcast channel via CMDCenter.onAppEvent.
+// Renders into #m2-coc-feed (Overview column) and #mc-coc-feed (full view).
+// No new emits, no new commands — pure presentation layer.
+// ═══════════════════════════════════════════════════════════════════════════
+(function(){
+  var OVERVIEW_CAP = 20;
+  var FULL_CAP     = 100;
+  var NOISE_TYPES  = { 'location.ready':1, 'location.changed':1, 'tab_switch':1 };
+
+  var _filter = 'signal';         // 'signal' | 'noise' | 'all'
+  var _items  = [];               // [{eventName, data, ts}, ...] newest first
+  var _mounted = false;
+
+  // ── Formatting ────────────────────────────────────────────────────────────
+  function _short(s) { return (s && typeof s === 'string') ? s.slice(0,8) : '?'; }
+  function _fmtAmount(n) {
+    if (n == null || n === '') return null;
+    var num = typeof n === 'number' ? n : parseFloat(n);
+    if (isNaN(num)) return String(n);
+    return '$' + num.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  function _fmtElapsed(ms) {
+    if (ms == null) return '';
+    var s = Math.floor(ms/1000);
+    if (s < 60) return s + 's';
+    var m = Math.floor(s/60); s = s % 60;
+    if (m < 60) return m + 'm ' + s + 's';
+    var h = Math.floor(m/60); m = m % 60;
+    return h + 'h ' + m + 'm';
+  }
+  function _relTime(ts) {
+    var d = Date.now() - ts;
+    if (d < 10000) return 'just now';
+    if (d < 60000) return Math.floor(d/1000) + 's';
+    if (d < 3600000) return Math.floor(d/60000) + 'm';
+    if (d < 86400000) return Math.floor(d/3600000) + 'h';
+    return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }
+  function _resolveName(id) {
+    if (!id) return null;
+    var sessions = (window.CMDCenter && window.CMDCenter.sessions) ? window.CMDCenter.sessions() : {};
+    var s = sessions[id];
+    if (s && s.name) return s.name;
+    if (s && s.initials) return s.initials;
+    return _short(id);
+  }
+  function _esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  // Per-event formatters. Return {color, title, meta} or null to hide.
+  function _format(eventName, p) {
+    p = p || {};
+    switch (eventName) {
+      case 'form.submitted': {
+        var who = p.submitter_name || _resolveName(p.submitter_id || p.resource_id) || _short(p.resource_id);
+        var amt = _fmtAmount(p.amount);
+        return {
+          color:'var(--gr)',
+          title:'form.submitted · ' + (p.form_name || 'form'),
+          meta: who + ' · ' + (amt || '—')
+        };
+      }
+      case 'instance.launched': {
+        return {
+          color:'var(--aq)',
+          title:'instance.launched · ' + (p.template_name || _short(p.template_id) || 'template'),
+          meta: _short(p.instance_id)
+        };
+      }
+      case 'instance.completed': {
+        return {
+          color:'var(--gr)',
+          title:'instance.completed · ' + (p.template_name || _short(p.instance_id)),
+          meta: (p.final_status || 'completed') + ' · ' + _fmtElapsed(p.elapsed_ms)
+        };
+      }
+      case 'instance.blocked': {
+        return {
+          color:'var(--rd)',
+          title:'instance.blocked · ' + (p.template_name || _short(p.instance_id)),
+          meta: (p.reason || 'blocked') + (p.details ? ' · ' + p.details : '')
+        };
+      }
+      case 'workflow_request.created': {
+        var assignee = p.assignee_name || _resolveName(p.assignee_id) || _short(p.assignee_id);
+        return {
+          color:'var(--am)',
+          title:'wf_request.created · step ' + (p.seq != null ? p.seq : '?'),
+          meta:'→ ' + assignee + (p.role ? ' · ' + p.role : '')
+        };
+      }
+      case 'workflow_request.resolved': {
+        var dec = p.decision || 'resolved';
+        var color = 'var(--gr)';
+        if (dec === 'changes_requested') color = 'var(--am)';
+        else if (dec === 'declined' || dec === 'rejected') color = 'var(--rd)';
+        var resolver = p.resolver_name || _resolveName(p.resolver_id) || _short(p.resolver_id);
+        return {
+          color: color,
+          title:'wf_request.resolved · step ' + (p.seq != null ? p.seq : '?'),
+          meta: dec + ' · by ' + resolver
+        };
+      }
+      case 'location.ready':
+      case 'location.changed':
+      case 'tab_switch':
+        return null; // rendered only via filter decision
+      default: {
+        var j;
+        try { j = JSON.stringify(p); } catch(e) { j = '{…}'; }
+        if (j.length > 80) j = j.slice(0,80) + '…';
+        return { color:'var(--pu)', title:_esc(eventName), meta: j };
+      }
+    }
+  }
+
+  // ── Filter ────────────────────────────────────────────────────────────────
+  function _passesFilter(eventName) {
+    if (_filter === 'all') return true;
+    var isNoise = !!NOISE_TYPES[eventName];
+    if (_filter === 'noise') return isNoise;
+    return !isNoise; // 'signal'
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  function _renderItem(eventName, data, ts) {
+    var f = _format(eventName, data);
+    if (!f) {
+      // Unknown mapping but not explicitly hidden — fall through to default.
+      if (NOISE_TYPES[eventName]) {
+        f = { color:'var(--t3)', title: eventName, meta: _short(data && data.resource_id) };
+      } else {
+        return null;
+      }
+    }
+    return {
+      html: '<div class="coc-item" data-evt="' + _esc(eventName) + '" data-ts="' + ts + '">' +
+              '<div class="coc-dot" style="background:' + f.color + '"></div>' +
+              '<div class="coc-body">' +
+                '<div class="coc-evt">' + _esc(f.title) + '</div>' +
+                '<div class="coc-meta">' + _esc(f.meta) + '</div>' +
+              '</div>' +
+              '<div class="coc-time">' + _esc(_relTime(ts)) + '</div>' +
+            '</div>'
+    };
+  }
+
+  function _paint() {
+    var overview = document.getElementById('m2-coc-feed');
+    var full     = document.getElementById('mc-coc-feed');
+    if (!overview && !full) return;
+
+    var visible = _items.filter(function(it){ return _passesFilter(it.eventName); });
+
+    if (overview) {
+      var slice = visible.slice(0, OVERVIEW_CAP);
+      if (!slice.length) {
+        overview.innerHTML = '<div class="m2f-empty">No events in the last 30 seconds matching current filter.</div>';
+      } else {
+        var html = '';
+        for (var i = 0; i < slice.length; i++) {
+          var r = _renderItem(slice[i].eventName, slice[i].data, slice[i].ts);
+          if (r) html += r.html;
+        }
+        overview.innerHTML = html || '<div class="m2f-empty">No events in the last 30 seconds matching current filter.</div>';
+      }
+    }
+    if (full) {
+      var fslice = visible.slice(0, FULL_CAP);
+      if (!fslice.length) {
+        full.innerHTML = '<div class="m2f-empty">No events matching current filter.</div>';
+      } else {
+        var fhtml = '';
+        for (var j = 0; j < fslice.length; j++) {
+          var fr = _renderItem(fslice[j].eventName, fslice[j].data, fslice[j].ts);
+          if (fr) fhtml += fr.html;
+        }
+        full.innerHTML = fhtml || '<div class="m2f-empty">No events matching current filter.</div>';
+      }
+    }
+  }
+
+  function _refreshRelTimesOnly() {
+    // Cheaper than full repaint: just rewrite .coc-time text in place.
+    var nodes = document.querySelectorAll('#m2-coc-feed .coc-item, #mc-coc-feed .coc-item');
+    for (var i = 0; i < nodes.length; i++) {
+      var ts = parseInt(nodes[i].getAttribute('data-ts'), 10);
+      if (!isNaN(ts)) {
+        var t = nodes[i].querySelector('.coc-time');
+        if (t) t.textContent = _relTime(ts);
+      }
+    }
+  }
+
+  // ── Public glue ───────────────────────────────────────────────────────────
+  window._m2FeedSetFilter = function(mode, el) {
+    _filter = mode;
+    var pills = document.querySelectorAll('.m2f-pill');
+    for (var i = 0; i < pills.length; i++) pills[i].classList.remove('on');
+    if (el) el.classList.add('on');
+    _paint();
+  };
+
+  function _onEvent(eventName, data) {
+    _items.unshift({ eventName: eventName, data: data || {}, ts: Date.now() });
+    // Cap memory — keep enough for the full view regardless of filter.
+    if (_items.length > FULL_CAP * 2) _items.length = FULL_CAP * 2;
+    _paint();
+  }
+
+  function _mount() {
+    if (_mounted) return;
+    if (!window.CMDCenter || !window.CMDCenter.onAppEvent) return; // not ready yet
+    _mounted = true;
+
+    // Seed from the 30s retention buffer so opening Aegis mid-activity
+    // doesn't show an empty column. recentEvents returns newest-first.
+    try {
+      var seed = window.CMDCenter.recentEvents(FULL_CAP) || [];
+      for (var i = seed.length - 1; i >= 0; i--) {
+        // Push oldest-first so unshift in _onEvent leaves newest at head.
+        _items.unshift({ eventName: seed[i].eventName, data: seed[i].data || {}, ts: seed[i].ts });
+      }
+    } catch(e) { /* seed is best-effort */ }
+
+    window.CMDCenter.onAppEvent(_onEvent);
+    _paint();
+    setInterval(_refreshRelTimesOnly, 5000);
+  }
+
+  // CMDCenter is defined by cmd-center.js, which loads after this script tag.
+  // Poll briefly until it's available, then mount once.
+  var _tries = 0;
+  var _t = setInterval(function(){
+    _tries++;
+    if (window.CMDCenter && window.CMDCenter.onAppEvent) {
+      clearInterval(_t);
+      _mount();
+    } else if (_tries > 200) { // ~10s ceiling
+      clearInterval(_t);
+      console.warn('[m2-feed] CMDCenter never appeared — feed will not render');
+    }
+  }, 50);
+})();
 </script>
-<script src="/js/cmd-center.js?v=20260418-CMD60"></script>
+<script src="/js/cmd-center.js?v=20260418-CMD61"></script>
 </body>
 </html>

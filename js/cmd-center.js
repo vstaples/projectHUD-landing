@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260418-CMD60
+// cmd-center.js  ·  v20260418-CMD61
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -30,7 +30,7 @@ var DEBUG_EVENTS = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260418-CMD60',
+    'cmd-center':  'v20260418-CMD61',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -41,7 +41,7 @@ var DEBUG_EVENTS = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD60 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD61 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -361,6 +361,7 @@ function _connect() {
     if (DEBUG_EVENTS) console.log('[cmd-center] recv', eventName, inner);
     _pushEventBuffer(eventName, inner);
     _resolveEventListeners(eventName, inner);
+    _fanoutAppEventListeners(eventName, inner);
   });
 
   _channel.subscribe(function(status) {
@@ -451,6 +452,20 @@ function _resolveEventListeners(eventName, data) {
 // path), so replay respects self-echo without any extra check here.
 var _EVENT_BUFFER_MS = 30000;
 var _eventBuffer = {}; // { eventName: [ {ts, data}, ... ] } — newest at end
+
+// ── M2 feed listeners (CMD61 / Brief M2-FEED-1) ───────────────────────────────
+// Long-lived subscribers registered via window.CMDCenter.onAppEvent. Invoked
+// after self-echo filter + envelope unwrap + buffer push on the receive path,
+// and after buffer push on the local-emit path, so listeners see identical
+// (eventName, innerPayload) shape regardless of origin. See Iron Rule 20.
+var _m2FeedListeners = [];
+function _fanoutAppEventListeners(eventName, data) {
+  if (!_m2FeedListeners.length) return;
+  for (var i = 0; i < _m2FeedListeners.length; i++) {
+    try { _m2FeedListeners[i](eventName, data); }
+    catch (e) { if (DEBUG_EVENTS) console.warn('[cmd-center] M2 listener threw:', e); }
+  }
+}
 
 // ── Outbound emit queue (B1 follow-up / CMD56) ────────────────────────────────
 // When _cmdEmit fires before the realtime socket is OPEN (readyState 1), the
@@ -631,6 +646,41 @@ window._cmdEmit = function(eventName, data) {
 
   _pushEventBuffer(eventName, data || {});
   _resolveEventListeners(eventName, data);
+  _fanoutAppEventListeners(eventName, data || {});
+};
+
+// ── Public API namespace (CMD61 / Brief M2-FEED-1) ────────────────────────────
+// Subscribe to every app_event broadcast, local or remote, after self-echo
+// filter + envelope unwrap. Callback receives (eventName, innerPayload).
+// Fire-and-forget; no unsubscribe (M2 panel is long-lived).
+// `recentEvents(n)` returns the N newest buffered entries across all event
+// types, newest-first, shaped as {eventName, data, ts}. Capped at whatever
+// is in the 30s retention window.
+window.CMDCenter = window.CMDCenter || {};
+window.CMDCenter.onAppEvent = function(callback) {
+  if (typeof callback !== 'function') return;
+  _m2FeedListeners.push(callback);
+};
+window.CMDCenter.recentEvents = function(n) {
+  var max = (typeof n === 'number' && n > 0) ? n : 20;
+  var out = [];
+  for (var eventName in _eventBuffer) {
+    if (!Object.prototype.hasOwnProperty.call(_eventBuffer, eventName)) continue;
+    var arr = _eventBuffer[eventName];
+    for (var i = 0; i < arr.length; i++) {
+      out.push({ eventName: eventName, data: arr[i].data, ts: arr[i].ts });
+    }
+  }
+  out.sort(function(a, b) { return b.ts - a.ts; }); // newest first
+  return out.slice(0, max);
+};
+window.CMDCenter.sessions = function() {
+  // Shallow copy so callers can't mutate internal presence state.
+  var out = {};
+  for (var uid in _sessions) {
+    if (Object.prototype.hasOwnProperty.call(_sessions, uid)) out[uid] = _sessions[uid];
+  }
+  return out;
 };
 
 // ── Command registry ──────────────────────────────────────────────────────────
