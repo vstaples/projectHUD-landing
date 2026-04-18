@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260418-CMD58
+// cmd-center.js  ·  v20260418-CMD59
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -30,7 +30,7 @@ var DEBUG_EVENTS = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260418-CMD58',
+    'cmd-center':  'v20260418-CMD59',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -41,7 +41,7 @@ var DEBUG_EVENTS = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD58 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD59 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -185,6 +185,21 @@ function _channelSend(payload) {
 function _connect() {
   if (!_supabase || !_mySession) return;
   if (_channel) return; // already connected — don't re-subscribe
+
+  // CMD59: attach the user's JWT to realtime before creating the channel.
+  // Without this, realtime uses only the anon apikey; on Compass the
+  // WebSocket handshake is accepted briefly, then closed by the server,
+  // leaving readyState at CLOSED and every broadcast stranded on REST
+  // fallback with 401. Aegis got lucky because it has fewer concurrent
+  // REST calls so the initial WS stayed alive longer; the race could
+  // bite it too. Fetch fresh (auto-refreshes expired tokens); fall back
+  // to anon key if Auth module is unavailable.
+  try {
+    var token = (typeof Auth !== 'undefined' && Auth.getToken && Auth.getToken()) || SUPA_KEY;
+    if (_supabase.realtime && typeof _supabase.realtime.setAuth === 'function') {
+      _supabase.realtime.setAuth(token);
+    }
+  } catch(e) { console.warn('[cmd-center] realtime.setAuth failed:', e); }
 
   _channel = _supabase.channel('cmd-center-' + FIRM_ID, {
     config: {
