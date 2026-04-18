@@ -1,6 +1,6 @@
-// VERSION: 20260418-CMD55
-window._mwCoreVersion = 'v20260418-CMD55';
-console.log('%c[mw-core] v20260418-CMD55 — B1 event bus: location.ready emit','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260418-CMD56
+window._mwCoreVersion = 'v20260418-CMD56';
+console.log('%c[mw-core] v20260418-CMD56 — B1 event bus: location.ready emit','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {

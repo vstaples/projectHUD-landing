@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260418-CMD55
+// cmd-center.js  ·  v20260418-CMD56
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -30,7 +30,7 @@ var DEBUG_EVENTS = true;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260418-CMD55',
+    'cmd-center':  'v20260418-CMD56',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -41,7 +41,7 @@ var DEBUG_EVENTS = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD55 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD56 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -344,6 +344,8 @@ function _connect() {
 
   _channel.subscribe(function(status) {
     if (status === 'SUBSCRIBED') {
+      // CMD56: flush any envelopes queued before the socket was OPEN.
+      _flushOutboundQueue();
       // Don't publish presence from pop-out window — it would create duplicate sessions
       if (!window._cmdCenterFullscreen) {
         _channel.track({
@@ -428,6 +430,32 @@ function _resolveEventListeners(eventName, data) {
 // path), so replay respects self-echo without any extra check here.
 var _EVENT_BUFFER_MS = 30000;
 var _eventBuffer = {}; // { eventName: [ {ts, data}, ... ] } — newest at end
+
+// ── Outbound emit queue (B1 follow-up / CMD56) ────────────────────────────────
+// When _cmdEmit fires before the realtime socket is OPEN (readyState 1), the
+// broadcast is silently dropped by _channelSend. This stranded the probe's
+// location.ready on Compass — the emit ran mid-subscribe. Queue unsent
+// envelopes in-memory, FIFO, cap at 50; drain on SUBSCRIBED.
+var _OUTBOUND_QUEUE_CAP = 50;
+var _outboundQueue = []; // [ envelope, ... ]
+
+function _socketReady() {
+  if (!_channel) return false;
+  var state = _channel.socket && _channel.socket.conn && _channel.socket.conn.readyState;
+  return state === 1;
+}
+
+function _flushOutboundQueue() {
+  if (!_outboundQueue.length) return;
+  if (!_socketReady()) return;
+  var drained = 0;
+  while (_outboundQueue.length) {
+    var env = _outboundQueue.shift();
+    try { _channel.send({ type: 'broadcast', event: 'app_event', payload: env }); } catch(e) {}
+    drained++;
+  }
+  if (DEBUG_EVENTS) console.log('[cmd-center] flushed outbound queue ·', drained, 'envelope(s)');
+}
 
 function _pushEventBuffer(eventName, data) {
   if (!eventName) return;
@@ -548,8 +576,22 @@ window._cmdEmit = function(eventName, data) {
     from:             _mySession.userId,
     name:             _mySession.name,
   };
-  _channelSend({ type: 'broadcast', event: 'app_event', payload: envelope });
   if (DEBUG_EVENTS) console.log('[cmd-center] emit', eventName, data || {});
+
+  // CMD56: queue outbound if socket not OPEN; drain on SUBSCRIBED.
+  // Local listener resolution + retention buffer push stay synchronous so
+  // same-session Waits work regardless of socket state.
+  if (_socketReady()) {
+    _channelSend({ type: 'broadcast', event: 'app_event', payload: envelope });
+  } else {
+    if (_outboundQueue.length >= _OUTBOUND_QUEUE_CAP) {
+      var evicted = _outboundQueue.shift();
+      if (DEBUG_EVENTS) console.log('[cmd-center] outbound queue full · evicting oldest ·', evicted && evicted.event_type);
+    }
+    _outboundQueue.push(envelope);
+    if (DEBUG_EVENTS) console.log('[cmd-center] queued outbound ·', eventName, '· depth=' + _outboundQueue.length);
+  }
+
   _pushEventBuffer(eventName, data || {});
   _resolveEventListeners(eventName, data);
 };
