@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260418-CMD61
+// cmd-center.js  ·  v20260418-CMD62
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -27,10 +27,16 @@ window._cmdCenterLoaded = true;
 // are quiet. When true, both emit and receive paths log one line per event.
 var DEBUG_EVENTS = true;
 
+// CMD62: off by default. When true, adds per-channel source tagging to
+// dedup-dropped app_event logs for cutover diagnosis. Leave false in
+// normal operation; flip true briefly during the B1.5 → B1.6 window
+// if a double-fire is suspected. See Brief B1.5 §7.
+var DEBUG_CHANNEL_SOURCE = false;
+
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260418-CMD61',
+    'cmd-center':  'v20260418-CMD62',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -41,7 +47,7 @@ var DEBUG_EVENTS = true;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD61 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD62 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -61,7 +67,12 @@ var FIRM_ID  = (typeof PHUD !== 'undefined' && PHUD.FIRM_ID) ||
 
 // ── State ─────────────────────────────────────────────────────────────────────
 var _supabase    = null;   // Supabase JS client
-var _channel     = null;   // shared presence + command channel
+var _channel     = null;   // target channel (hud:{firm_id}) — Contract 1 compliant
+var _channelLegacy = null; // legacy channel (cmd-center-{firm_id}) — CMD62 dual-subscribe
+// CMD62: dual-subscribe readiness. Both flags must be true before _cmdConnected
+// flips true and the outbound queue drains. See Brief B1.5 §4.
+var _channelReady       = false;
+var _channelLegacyReady = false;
 var _mySession   = null;   // this browser's session identity
 var _myAlias     = null;   // short alias set by operator, e.g. "VS" or "AK" — persisted in localStorage
 var _sessions    = {};     // { userId: { name, initials, alias, location, online, ts } }
@@ -178,8 +189,20 @@ function _channelSend(payload) {
   // fallback succeed instead of 401-ing. The pre-existing short-circuit
   // was written before setAuth was wired and has been silently dropping
   // broadcasts during every Phoenix heartbeat reconnect on Compass.
-  if (!_channel) return;
-  try { _channel.send(payload); } catch(e) {}
+  //
+  // CMD62: dual-write to both target and legacy channels during the
+  // cutover window. Stale (pre-CMD62) tabs subscribe only to the legacy
+  // channel; CMD62+ tabs subscribe to both. Emitting on both ensures
+  // both populations receive every broadcast. Removed in B1.6 after
+  // operator-confirmed full tab refresh. See Brief B1.5 §3.
+  if (!_channel && !_channelLegacy) return;
+  _safeSendOn(_channel,       payload);
+  _safeSendOn(_channelLegacy, payload);
+}
+
+function _safeSendOn(ch, payload) {
+  if (!ch) return;
+  try { ch.send(payload); } catch(e) {}
 }
 
 function _connect() {
@@ -201,36 +224,72 @@ function _connect() {
     }
   } catch(e) { console.warn('[cmd-center] realtime.setAuth failed:', e); }
 
-  _channel = _supabase.channel('cmd-center-' + FIRM_ID, {
+  // CMD62: dual-subscribe cutover. Protocol Contract 1 specifies
+  // `hud:{firm_id}` as the canonical channel. During transition, we
+  // subscribe to BOTH the target and legacy channels so CMD62+ tabs
+  // and pre-CMD62 (legacy-only) tabs remain mutually addressable.
+  // Hard cutover would create a window where old and new tabs cannot
+  // see each other — dispatched cmds time out, app_events go
+  // undelivered. Removed in B1.6 after operator-confirmed full refresh.
+  // See Brief B1.5 §1.
+  var TARGET_CHANNEL_NAME = 'hud:' + FIRM_ID;
+  var LEGACY_CHANNEL_NAME = 'cmd-center-' + FIRM_ID;
+  var _presenceSuffix     = window._aegisMode ? 'aegis' : Math.random().toString(36).slice(2,7);
+  var _channelConfig = {
     config: {
-      presence:  { key: _mySession.userId + ':' + (window._aegisMode ? 'aegis' : Math.random().toString(36).slice(2,7)) },
+      presence:  { key: _mySession.userId + ':' + _presenceSuffix },
       broadcast: { self: true, ack: false },
     }
-  });
+  };
 
-  // Presence: track who is online
-  _channel.on('presence', { event: 'sync' }, function() {
-    var state = _channel.presenceState();
-    var execP = Object.values(state).map(function(p){return p[0];}).filter(function(p){return p&&!p.aegisObserver;});
+  _channel       = _supabase.channel(TARGET_CHANNEL_NAME, _channelConfig);
+  _channelLegacy = _supabase.channel(LEGACY_CHANNEL_NAME, _channelConfig);
+
+  // ── Inbound handlers (named so we can register the SAME function on
+  //    both channels; Rule 15 self-echo exemption, Rule 20 envelope
+  //    unwrap, Rule 22 retention replay all live inside these bodies,
+  //    so registering on both channels preserves every invariant
+  //    mechanically). See Brief B1.5 §2.
+
+  function _handlePresenceSync() {
+    // With dual-subscribe, presence is published on both channels
+    // independently. We merge presenceState() across both so the
+    // _sessions map is channel-agnostic: a legacy-only tab appears via
+    // the legacy channel's state, a CMD62+ tab appears in both. Last
+    // presence wins per userId; exec presence beats aegisObserver when
+    // both are visible for the same userId.
+    var merged = {};
+    [_channel, _channelLegacy].forEach(function(ch) {
+      if (!ch) return;
+      var state;
+      try { state = ch.presenceState(); } catch(e) { return; }
+      if (!state) return;
+      Object.entries(state).forEach(function(kv) {
+        var presences = kv[1];
+        var p = presences && presences[0];
+        if (!p || !p.userId) return;
+        var existing = merged[p.userId];
+        if (existing && existing.aegisObserver && !p.aegisObserver) {
+          merged[p.userId] = p;
+        } else if (!existing) {
+          merged[p.userId] = p;
+        }
+      });
+    });
+    var execP = Object.values(merged).filter(function(p){return p&&!p.aegisObserver;});
     console.log('[Aegis] presence sync — '+execP.length+' exec session(s): '+execP.map(function(p){return p.name||'?';}).join(', '));
     _sessions = {};
     _aliasMap = {};
-    Object.entries(state).forEach(function([key, presences]) {
-      var p = presences[0];
-      if (!p || !p.userId) return;
+    Object.values(merged).forEach(function(p) {
       if (p.aegisObserver && _mySession && p.userId !== _mySession.userId) return;
-      var _ex = _sessions[p.userId];
-      if (_ex && _ex.online && !_ex.aegisObserver && p.aegisObserver) return;
       _sessions[p.userId] = {name:p.name,initials:p.initials,alias:p.alias||p.initials,location:p.location,online:true,ts:p.ts,aegisObserver:p.aegisObserver||false};
       _aliasMap[p.alias||p.initials] = p.userId;
       try{localStorage.setItem('phud:cmd:session:'+p.userId,JSON.stringify(_sessions[p.userId]));}catch(e){}
     });
     _renderSessionList();
-  });
+  }
 
-  // Leave timers tracked at module scope (see top) so _renderSessionList can read them
-
-  _channel.on('presence', { event: 'join' }, function(data) {
+  function _handlePresenceJoin(data) {
     var p = data.newPresences && data.newPresences[0];
     if (!p) return;
     // Cancel any pending leave timer for this user
@@ -252,14 +311,16 @@ function _connect() {
     if (isNew && _mySession && p.userId !== _mySession.userId) {
       _appendMonitor(p.name + ' joined');
     }
-  });
+  }
 
-  _channel.on('presence', { event: 'leave' }, function(data) {
+  function _handlePresenceLeave(data) {
     var p = data.leftPresences && data.leftPresences[0];
     if (!p) return;
     var uid = p.userId;
     // Debounce 8s — Supabase fires leave on every track() update.
     // If they re-join within 8s it was just a presence update, not a true disconnect.
+    // CMD62: with dual-channel, a single logical "leave" may fire once per
+    // channel; the debounce absorbs that exactly as it absorbs track-update churn.
     if (_leaveTimers[uid]) clearTimeout(_leaveTimers[uid]);
     _leaveTimers[uid] = setTimeout(function() {
       delete _leaveTimers[uid];
@@ -271,14 +332,18 @@ function _connect() {
         _appendMonitor(sess.name + ' left');
       }
     }, 30000);
-  });
+  }
 
   // Commands: receive commands addressed to this session
-  _channel.on('broadcast', { event: 'cmd' }, function(payload) {
+  function _handleCmd(payload) {
     var d = payload.payload;
     if (!d) return;
     if (d.target !== _mySession.userId && d.target !== 'ALL') return;
     if (window._aegisMode) return; // Aegis dispatches but never executes
+    // CMD62: cmdId dedup — with broadcast.self=true on both channels,
+    // every cmd arrives twice on a CMD62↔CMD62 pair. Drop the duplicate.
+    if (d.cmdId && _seenCmdIds[d.cmdId]) return;
+    if (d.cmdId) { _seenCmdIds[d.cmdId] = Date.now(); _purgeSeenCmdIds(); }
     _appendLine(d.from || 'SYS', 'cmd', d.cmd);
     _executeCommand(d.cmd, d.from).then(function(result) {
       // Always ack so the dispatcher doesn't time out. Undefined → true (completed).
@@ -302,10 +367,10 @@ function _connect() {
         }
       });
     });
-  });
+  }
 
   // Location updates — keep session location current without track() churn
-  _channel.on('broadcast', { event: 'location_update' }, function(payload) {
+  function _handleLocationUpdate(payload) {
     var d = payload.payload;
     if (!d || !d.userId) return;
     if (_sessions[d.userId]) {
@@ -318,10 +383,10 @@ function _connect() {
         _appendMonitor(d.name + ' → ' + d.location);
       }
     }
-  });
+  }
 
   // Results: receive results from other sessions
-  _channel.on('broadcast', { event: 'result' }, function(payload) {
+  function _handleResult(payload) {
     var d = payload.payload;
     if (!d) return;
     // Self-echo skip: a session should ignore its own acks coming back via
@@ -330,14 +395,18 @@ function _connect() {
     // here is from a target exec session. If that target shares Aegis's
     // userId (the operator ran Aegis + an exec tab in the same browser with
     // the same auth), the userId-match check would incorrectly swallow the
-    // ack and cause 30s dispatch timeouts. Aegis is exempt.
+    // ack and cause 30s dispatch timeouts. Aegis is exempt. (Rule 15.)
     if (!window._aegisMode && d.from === _mySession.userId) return;
+    // CMD62: cmdId dedup — dual-channel delivery otherwise shows the
+    // dispatcher two ack lines per command.
+    if (d.cmdId && _seenResultIds[d.cmdId]) return;
+    if (d.cmdId) { _seenResultIds[d.cmdId] = Date.now(); _purgeSeenResultIds(); }
     var sess = _sessions[d.from];
     var who  = sess ? sess.initials : d.name || '??';
     _appendLine(who, 'result', '→ ' + d.result);
     // Resolve any waiting ForEvent listeners
     _resolveEventListeners('result:' + d.from, d);
-  });
+  }
 
   // App events: other sessions broadcast what they're doing
   // B1 (CMD54): envelope unwrap. Resolve with INNER payload so local and
@@ -351,60 +420,120 @@ function _connect() {
   // the naive filter would discard as a self-echo. Aegis never emits
   // app_events (guarded by _aegisMode in mw-* modules), so any app_event
   // reaching Aegis is by definition from a different tab.
-  _channel.on('broadcast', { event: 'app_event' }, function(payload) {
+  // CMD62 (Iron Rule 25): event_id dedup. With dual-subscribe and
+  // broadcast.self=true on both channels, every app_event arrives
+  // twice at every listener. The retention buffer keys on event_type
+  // only — it does NOT dedup by event_id — so a second receipt would
+  // double-fire _resolveEventListeners and _fanoutAppEventListeners
+  // (M2 feed would show duplicates, Wait ForEvent would get a second
+  // resolve it ignores, retention buffer would carry two entries for
+  // the same logical event). Dedup at handler entry, post-self-echo,
+  // pre-buffer. 30s TTL matches retention window.
+  function _handleAppEvent(payload) {
     var d = payload.payload;
     if (!d) return;
     var senderId  = d.source_session || d.from;
     if (!window._aegisMode && senderId === _mySession.userId) return;
+    // CMD62 / Iron Rule 25: event_id dedup across dual-channel receipts.
+    if (d.event_id && _seenEventIds[d.event_id]) {
+      if (DEBUG_CHANNEL_SOURCE) console.log('[cmd-center] dup app_event dropped ·', d.event_type || d.event, '·', d.event_id);
+      return;
+    }
+    if (d.event_id) { _seenEventIds[d.event_id] = Date.now(); _purgeSeenEventIds(); }
     var eventName = d.event_type || d.event;
     var inner     = d.payload || d;  // unwrap envelope; fall back for legacy emits
     if (DEBUG_EVENTS) console.log('[cmd-center] recv', eventName, inner);
     _pushEventBuffer(eventName, inner);
     _resolveEventListeners(eventName, inner);
     _fanoutAppEventListeners(eventName, inner);
-  });
+  }
+
+  // Register handlers on BOTH channels. See Brief B1.5 §2.
+  _channel.on(      'presence',  { event: 'sync'  },            _handlePresenceSync);
+  _channelLegacy.on('presence',  { event: 'sync'  },            _handlePresenceSync);
+  _channel.on(      'presence',  { event: 'join'  },            _handlePresenceJoin);
+  _channelLegacy.on('presence',  { event: 'join'  },            _handlePresenceJoin);
+  _channel.on(      'presence',  { event: 'leave' },            _handlePresenceLeave);
+  _channelLegacy.on('presence',  { event: 'leave' },            _handlePresenceLeave);
+  _channel.on(      'broadcast', { event: 'cmd'             }, _handleCmd);
+  _channelLegacy.on('broadcast', { event: 'cmd'             }, _handleCmd);
+  _channel.on(      'broadcast', { event: 'location_update' }, _handleLocationUpdate);
+  _channelLegacy.on('broadcast', { event: 'location_update' }, _handleLocationUpdate);
+  _channel.on(      'broadcast', { event: 'result'          }, _handleResult);
+  _channelLegacy.on('broadcast', { event: 'result'          }, _handleResult);
+  _channel.on(      'broadcast', { event: 'app_event'       }, _handleAppEvent);
+  _channelLegacy.on('broadcast', { event: 'app_event'       }, _handleAppEvent);
+
+  // Shared SUBSCRIBED finalizer — runs once, when the SECOND of the two
+  // channels reports SUBSCRIBED. This is the both-channels-ready gate
+  // from Brief B1.5 §4–5: operator-visible "Connected" banner, LIVE
+  // clock, outbound queue drain, and location heartbeat must not fire
+  // until dual-subscribe is complete, otherwise stale (legacy-only)
+  // tabs are dark for anything emitted in the gap.
+  var _bothReadyFired = false;
+  function _onBothChannelsReady() {
+    if (_bothReadyFired) return;
+    if (!(_channelReady && _channelLegacyReady)) return;
+    _bothReadyFired = true;
+    if (DEBUG_EVENTS) console.log('[cmd-center] both channels ready · flushing', _outboundQueue.length, 'queued outbound');
+    // Flip the connected flag BEFORE draining so _flushOutboundQueue's
+    // guard (`if (!window._cmdConnected) return;`) passes.
+    window._cmdConnected    = true;
+    window._cmdSessionName  = _mySession ? _mySession.name : 'connected';
+    _flushOutboundQueue();
+    _appendLine('SYS', 'sys', 'Connected · session: ' + _mySession.name);
+    _updateStatusEl();
+    _renderSessionList();
+    _startLiveClock();
+    // Location heartbeat — send on both channels via _channelSend.
+    // Only from main window (not pop-out), and never from Aegis.
+    if (!window._cmdCenterFullscreen && !window._aegisMode) {
+      setInterval(function() {
+        if (!_channel && !_channelLegacy) return;
+        _channelSend({
+          type: 'broadcast', event: 'location_update',
+          payload: {
+            userId:   _mySession.userId,
+            name:     _mySession.name,
+            initials: _mySession.initials,
+            location: _currentLocation(),
+          }
+        });
+      }, 10000);
+    }
+  }
+
+  function _trackPresenceOn(ch) {
+    if (window._cmdCenterFullscreen) return; // pop-out suppresses presence
+    try {
+      ch.track({
+        userId:   _mySession.userId,
+        name:     _mySession.name,
+        initials: _mySession.initials,
+        alias:    _myAlias || _mySession.initials,
+        location: _currentLocation(),
+        ts:       Date.now(),
+        aegisObserver: window._aegisMode ? true : undefined,
+      });
+    } catch(e) {}
+  }
 
   _channel.subscribe(function(status) {
     if (status === 'SUBSCRIBED') {
-      // CMD56: flush any envelopes queued before the socket was OPEN.
-      _flushOutboundQueue();
-      // Don't publish presence from pop-out window — it would create duplicate sessions
-      if (!window._cmdCenterFullscreen) {
-        _channel.track({
-          userId:   _mySession.userId,
-          name:     _mySession.name,
-          initials: _mySession.initials,
-          alias:    _myAlias || _mySession.initials,
-          location: _currentLocation(),
-          ts:       Date.now(),
-          aegisObserver: window._aegisMode ? true : undefined,
-        });
-      }
-      _appendLine('SYS', 'sys', 'Connected · session: ' + _mySession.name);
-      // Store connection state so panel can pick it up when opened
-      window._cmdConnected = true;
-      window._cmdSessionName = _mySession ? _mySession.name : 'connected';
-      _updateStatusEl();
-      _renderSessionList();
-      // Start LIVE clock
-      _startLiveClock();
-      // Location-only update — use a separate broadcast instead of track()
-      // to avoid triggering leave/join cycles on every heartbeat
-      // Only send location heartbeats from main window, not pop-out
-      if (!window._cmdCenterFullscreen && !window._aegisMode) {
-        setInterval(function() {
-          if (!_channel) return;
-          _channelSend({
-            type: 'broadcast', event: 'location_update',
-            payload: {
-              userId:   _mySession.userId,
-              name:     _mySession.name,
-              initials: _mySession.initials,
-              location: _currentLocation(),
-            }
-          });
-        }, 10000);
-      }
+      if (DEBUG_EVENTS) console.log('[cmd-center] subscribed to ' + TARGET_CHANNEL_NAME);
+      _channelReady = true;
+      // Presence is published on each channel independently (Brief B1.5 §4).
+      _trackPresenceOn(_channel);
+      _onBothChannelsReady();
+    }
+  });
+
+  _channelLegacy.subscribe(function(status) {
+    if (status === 'SUBSCRIBED') {
+      if (DEBUG_EVENTS) console.log('[cmd-center] subscribed to ' + LEGACY_CHANNEL_NAME + ' (legacy)');
+      _channelLegacyReady = true;
+      _trackPresenceOn(_channelLegacy);
+      _onBothChannelsReady();
     }
   });
 }
@@ -437,6 +566,30 @@ function _resolveEventListeners(eventName, data) {
   _eventListeners[eventName] = [];
   listeners.forEach(function(r) { r(data); });
 }
+
+// ── Dual-channel dedup stores (CMD62 / Iron Rule 25) ──────────────────────────
+// With dual-subscribe + broadcast.self=true on both channels, every
+// outbound broadcast arrives TWICE at every listener (once per channel).
+// Dedup by the broadcast's natural id: app_event→event_id,
+// cmd→cmdId, result→cmdId. Separate stores so we don't collide across
+// broadcast types. 30s TTL matches the retention buffer window; a
+// duplicate arrival beyond that is (a) vanishingly unlikely given both
+// channels share the same WS, and (b) less harmful than memory growth.
+// Dedup is applied at handler entry, AFTER self-echo filtering and
+// BEFORE the retention buffer push (so replay machinery never sees a
+// duplicate). location_update has no natural id and is idempotent
+// (last-write-wins on _sessions[uid].location), so it is exempt.
+var _DEDUP_TTL_MS   = 30000;
+var _seenEventIds   = {}; // { event_id: ts }
+var _seenCmdIds     = {}; // { cmdId:   ts }  — cmd path
+var _seenResultIds  = {}; // { cmdId:   ts }  — result path (different store: a cmd and its ack can share id)
+function _purgeSeenIds(store) {
+  var cutoff = Date.now() - _DEDUP_TTL_MS;
+  for (var k in store) { if (store[k] < cutoff) delete store[k]; }
+}
+function _purgeSeenEventIds()  { _purgeSeenIds(_seenEventIds);  }
+function _purgeSeenCmdIds()    { _purgeSeenIds(_seenCmdIds);    }
+function _purgeSeenResultIds() { _purgeSeenIds(_seenResultIds); }
 
 // ── Event retention buffer (B1 follow-up / CMD55) ─────────────────────────────
 // Wait ForEvent only listens going forward. An emit that fires before the
@@ -487,7 +640,11 @@ function _flushOutboundQueue() {
   var drained = 0;
   while (_outboundQueue.length) {
     var env = _outboundQueue.shift();
-    try { _channel.send({ type: 'broadcast', event: 'app_event', payload: env }); } catch(e) {}
+    // CMD62: route through _channelSend so flushed envelopes go to both
+    // target and legacy channels, same as live emits. A direct
+    // _channel.send() here would strand stale (legacy-only) tabs for
+    // every envelope queued pre-SUBSCRIBED.
+    _channelSend({ type: 'broadcast', event: 'app_event', payload: env });
     drained++;
   }
   if (DEBUG_EVENTS) console.log('[cmd-center] flushed outbound queue ·', drained, 'envelope(s)');
@@ -1971,16 +2128,20 @@ function _wirePanel() {
       _myAlias = newAlias;
       // Persist for this userId
       if (_mySession) localStorage.setItem('phud:cmd:alias:' + _mySession.userId, _myAlias);
-      // Re-track presence with new alias so other sessions pick it up
-      if (_channel && _mySession && !window._cmdCenterFullscreen) {
-        _channel.track({
+      // Re-track presence with new alias so other sessions pick it up.
+      // CMD62: re-track on both channels so stale (legacy-only) tabs
+      // see the alias update too.
+      if (_mySession && !window._cmdCenterFullscreen) {
+        var _trackPayload = {
           userId:   _mySession.userId,
           name:     _mySession.name,
           initials: _mySession.initials,
           alias:    _myAlias,
           location: _currentLocation(),
           ts:       Date.now(),
-        });
+        };
+        if (_channel)       { try { _channel.track(_trackPayload);       } catch(e) {} }
+        if (_channelLegacy) { try { _channelLegacy.track(_trackPayload); } catch(e) {} }
       }
       // Update aliasMap locally so scripts can target immediately
       _aliasMap[_myAlias] = _mySession ? _mySession.userId : null;
@@ -2845,15 +3006,17 @@ async function _init() {
       if (_mySession && !_mySession.userId.startsWith('anon-')) {
         clearInterval(_identityPoll);
         if (_channel) {
-          // Already connected — re-track with correct identity
-          _channel.track({
+          // Already connected — re-track with correct identity on both channels (CMD62)
+          var _idTrackPayload = {
             userId:   _mySession.userId,
             name:     _mySession.name,
             initials: _mySession.initials,
             alias:    _myAlias || _mySession.initials,
             location: _currentLocation(),
             ts:       Date.now(),
-          });
+          };
+          try { _channel.track(_idTrackPayload); } catch(e) {}
+          if (_channelLegacy) { try { _channelLegacy.track(_idTrackPayload); } catch(e) {} }
         } else {
           _connect();
         }
