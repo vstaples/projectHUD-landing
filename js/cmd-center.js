@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260419-CMD65
+// cmd-center.js  ·  v20260419-CMD66
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260419-CMD65',
+    'cmd-center':  'v20260419-CMD66',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260419-CMD65 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260419-CMD66 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1235,6 +1235,83 @@ var COMMANDS = {
     if (genericBtn) { genericBtn.click(); return 'clicked: ' + target; }
 
     return 'Unknown click target: ' + target;
+  },
+
+  // ── Click ForInstance (B-UI-3 / CMD66) ───────────────────────────────────────
+  // Click ForInstance <$var|uuid> "<button_label>" [timeout=<ms>]
+  //
+  // Instance-scoped click. Resolves the queue row for the given instance_id
+  // via window._myActiveRequestId (instance_id → workflow_request_id), then
+  // scopes to the row containing [data-wi-id="<wrid>"] and clicks the button
+  // whose textContent matches <button_label>. Remedies Rule 30 — DOM-first
+  // action commands on lists are unsafe without explicit addressability.
+  //
+  // Default timeout: 0 (no polling). Typical caller precedes with
+  // Wait ForQueueRow $instance_id to <alias>, so the row is already present.
+  'Click ForInstance': async function(args) {
+    if (!args[0] || !args[1]) {
+      throw new Error('Click ForInstance: usage: Click ForInstance <$var|uuid> "<button_label>" [timeout=<ms>]');
+    }
+    var raw = args[0];
+    var instanceId = raw.startsWith('$') ? (_storeVars[raw.slice(1)] || '') : raw;
+    if (!instanceId) {
+      throw new Error('Click ForInstance: no instance id (variable ' + raw + ' is empty)');
+    }
+    var label = args[1];
+    var timeoutMs = 0;
+    for (var i = 2; i < args.length; i++) {
+      var tm = String(args[i]).match(/^timeout=(\d+)$/);
+      if (tm) { timeoutMs = parseInt(tm[1], 10); continue; }
+    }
+    var idShown = String(instanceId).slice(0, 8);
+
+    // Resolve instance → workflow_request_id → row. _myActiveRequestId is
+    // populated by mw-tabs.js when a request routes to the current user
+    // (the same mapping the existing Click "Review" uses for precise
+    // targeting). Poll for up to timeoutMs if not yet present.
+    var started = Date.now();
+    var row = null;
+    var wrid = null;
+    while (true) {
+      wrid = (window._myActiveRequestId && window._myActiveRequestId[instanceId]) || null;
+      if (wrid) {
+        var anchor = document.querySelector('[data-wi-id="' + wrid + '"]');
+        if (anchor) {
+          // Ascend to nearest row container for scoping. Covers <tr>, ARIA
+          // rows, and common list-row class names. Falls back to anchor
+          // element itself if no container found.
+          row = anchor.closest('tr, [role="row"], .wi-row, .queue-row, li') || anchor.parentElement || anchor;
+          if (row) break;
+        }
+      }
+      if (timeoutMs <= 0 || (Date.now() - started) >= timeoutMs) break;
+      await new Promise(function(r){ setTimeout(r, 100); });
+      if (_scriptAborted) return 'aborted';
+    }
+
+    if (!row) {
+      throw new Error('Click ForInstance: no row for instance ' + idShown +
+        ' (check Wait ForQueueRow resolved before click, or queue was cleared between wait and click)');
+    }
+
+    // Find button in row by text (case-insensitive trim match)
+    var wanted = String(label).trim().toLowerCase();
+    var candidates = Array.from(row.querySelectorAll('button, [role="button"]'));
+    var btn = candidates.find(function(b){
+      return (b.textContent || '').trim().toLowerCase() === wanted;
+    });
+
+    if (!btn) {
+      var available = candidates
+        .map(function(b){ return (b.textContent || '').trim(); })
+        .filter(function(t){ return t.length > 0; });
+      var avail = available.length ? ' (available: ' + available.join(', ') + ')' : '';
+      throw new Error('Click ForInstance: found row for instance ' + idShown +
+        ' but no "' + label + '" button' + avail);
+    }
+
+    btn.click();
+    return 'Click ForInstance: ' + label + ' · ' + idShown;
   },
 
   // ── Wait ─────────────────────────────────────────────────────────────────────
