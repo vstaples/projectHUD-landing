@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260419-CMD67
+// cmd-center.js  ·  v20260419-CMD68
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260419-CMD67',
+    'cmd-center':  'v20260419-CMD68',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260419-CMD67 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260419-CMD68 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -403,7 +403,14 @@ function _connect() {
     if (d.cmdId) { _seenResultIds[d.cmdId] = Date.now(); _purgeSeenResultIds(); }
     var sess = _sessions[d.from];
     var who  = sess ? sess.initials : d.name || '??';
-    _appendLine(who, 'result', '→ ' + d.result);
+    // B-UI-3.3 (CMD68): unwrap structured error acks so remote throws
+    // surface as diagnostic err lines instead of '[object Object]'.
+    // Receive-side _handleCmd packages throws as {error:"..."} (line ~365).
+    if (d.result && typeof d.result === 'object' && d.result.error) {
+      _appendLine(who, 'err', '✗ ' + d.result.error);
+    } else {
+      _appendLine(who, 'result', '→ ' + d.result);
+    }
     // Resolve any waiting ForEvent listeners
     _resolveEventListeners('result:' + d.from, d);
   }
