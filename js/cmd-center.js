@@ -403,6 +403,7 @@ function _connect() {
     if (d.cmdId) { _seenResultIds[d.cmdId] = Date.now(); _purgeSeenResultIds(); }
     var sess = _sessions[d.from];
     var who  = sess ? sess.initials : d.name || '??';
+    console.log('[ack] result type:', typeof d.result, 'value:', d.result);
     _appendLine(who, 'result', '→ ' + d.result);
     // Resolve any waiting ForEvent listeners
     _resolveEventListeners('result:' + d.from, d);
@@ -1994,6 +1995,7 @@ async function _runScript(scriptText, scriptName) {
       var _lv=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
                'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow'];
       if (targetUserId && (_lv.indexOf(parsed.verb)===-1)) {
+        console.log('[dispatch] REMOTE', parsed.verb, '→', parsed.target);
         // Dispatch via Realtime (non-local commands)
         _appendLine(parsed.target || 'SYS', 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
         if (_channel) {
@@ -2026,6 +2028,7 @@ async function _runScript(scriptText, scriptName) {
           _appendLine('SYS', 'warn', 'Timeout waiting for ' + parsed.target);
         }
       } else {
+        console.log('[dispatch] LOCAL', parsed.verb, parsed.target || '(no target)');
         // Execute locally
         _appendLine(_myAlias || _mySession.initials, 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
         try {
@@ -2731,12 +2734,14 @@ function _runCmd() {
     var _rl=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
              'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow'];
     if (targetUserId && _channel && _rl.indexOf(parsed.verb)===-1) {
+      console.log('[dispatch] REMOTE', parsed.verb, '→', parsed.target);
       _channelSend({
         type: 'broadcast', event: 'cmd',
         payload: { target: targetUserId, from: _myAlias || _mySession.initials, cmd: cmd, cmdId: Date.now() }
       });
       return;
     }
+    console.log('[dispatch] LOCAL', parsed.verb, parsed.target || '(no target)');
   }
 
   // Catch rejections from Assert and other throwing commands so they
