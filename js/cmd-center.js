@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260419-CMD64
+// cmd-center.js  ·  v20260419-CMD64a
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260419-CMD64',
+    'cmd-center':  'v20260419-CMD64a',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260419-CMD64 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260419-CMD64a ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -429,12 +429,30 @@ function _connect() {
   // resolve it ignores, retention buffer would carry two entries for
   // the same logical event). Dedup at handler entry, post-self-echo,
   // pre-buffer. 30s TTL matches retention window.
+  // CMD64a (Iron Rule 15 amended — third revision): self-echo filter
+  // REMOVED from _handleAppEvent entirely. `_mySession.userId` matches every
+  // tab authenticated as the same user — not just the emitter's own tab.
+  // Two Compass tabs open for the same operator (legitimate: monitoring,
+  // multi-device, duplicate tab, incognito + normal) would both drop each
+  // other's app_events as self-echo, breaking B-UI-1 Work Queue reactivity
+  // on any non-emitting tab. Rule 25's event_id dedup already correctly
+  // suppresses the emitter's own wire self-receive (the emitter registers
+  // the event_id in _seenEventIds before the local fan-out, so the round-
+  // trip drops at the dedup gate). The userId-based filter was always a
+  // coarse proxy for "same tab" that happened to work only because the
+  // second tab case wasn't exercised. Now it is.
+  // History retained: CMD47 added the Aegis exemption to _handleResult;
+  // CMD57 added the same exemption to _handleAppEvent; this (CMD64a)
+  // removes the app_event filter entirely in favor of the event_id
+  // mechanism that supersedes it. _handleCmd and _handleResult are
+  // intentionally unchanged — they key on cmdId dedup (Rule 25) plus
+  // target-match (cmd) / from-match (result), both of which handle the
+  // twin-tab case correctly without the _aegisMode guard.
   function _handleAppEvent(payload) {
     var d = payload.payload;
     if (!d) return;
-    var senderId  = d.source_session || d.from;
-    if (!window._aegisMode && senderId === _mySession.userId) return;
-    // CMD62 / Iron Rule 25: event_id dedup across dual-channel receipts.
+    // CMD62 / Iron Rule 25: event_id dedup across dual-channel receipts
+    // AND across the emitter's own wire self-receive (Rule 15 successor).
     if (d.event_id && _seenEventIds[d.event_id]) {
       if (DEBUG_CHANNEL_SOURCE) console.log('[cmd-center] dup app_event dropped ·', d.event_type || d.event, '·', d.event_id);
       return;
