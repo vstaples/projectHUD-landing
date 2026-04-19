@@ -1,0 +1,34 @@
+# Version: 1.0
+# Requires: VS
+# B-UI-2 probe — Wait ForQueueRow both single-field and compound.
+
+Assert session VS is connected
+
+VS: Set View "compass"
+Wait ForLocation VS "compass.my_work" timeout=30000
+
+VS: Set Tab "MY REQUESTS"
+VS: Set SubTab "BROWSE"
+VS: Form Open "Expense Report"
+Pause Form open — confirm Expense Report modal is visible
+
+VS: Form Insert "Employee Name" "Vaughn Staples"
+VS: Form Insert "Trip Start Date" "2026-04-14"
+VS: Form Insert "Trip End Date" "2026-04-14"
+VS: Form Select "Business Purpose" "client"
+VS: Form Insert "Purpose Description" "B-UI-2 probe"
+VS: Form Insert "Customer Name" "Apex Consulting Group"
+VS: Form Submit
+
+Wait ForEvent "form.submitted" → $instance_id
+Wait ForInstance $instance_id for launched
+
+VS: Set Tab "MY WORK"
+
+# Single-field match
+Wait ForQueueRow $instance_id
+
+# Compound match (same event; proves both paths work)
+Wait ForQueueRow $instance_id to VS
+
+Log "✓ B-UI-2 probe complete · $instance_id"

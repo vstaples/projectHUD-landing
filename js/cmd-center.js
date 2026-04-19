@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260419-CMD64c
+// cmd-center.js  ·  v20260419-CMD65
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260419-CMD64c',
+    'cmd-center':  'v20260419-CMD65',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260419-CMD64c ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260419-CMD65 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -800,43 +800,46 @@ async function _resolveResourceIdForUserId(userId) {
   return null;
 }
 
-// ── Compound-filter wait: Wait ForRoute (B2 / CMD63) ──────────────────────────
-// workflow_request.created must match BOTH instance_id AND assignee_resource_id.
-// _waitForEventFiltered supports only a single filterKey/filterVal, so we wait
-// on instance_id and re-check the assignee on each match. The naive recursive
-// re-queue against _waitForEventFiltered is broken under buffer replay: each
-// recursion re-scans the same retention buffer and returns the same stale
-// entry, so if the buffer contains a non-matching emit (e.g. seq-2 submitter
-// emit when we want the seq-3 manager emit), the recursion loops on the
-// stale entry until timeout. Observed 2026-04-19 on dual_session_test v1.2:
-// seq-2 (VS=submitter) sat in buffer when Wait ForRoute to AK registered,
-// _waitForEventFiltered returned it, compound check failed, next recursion
-// returned the same stale entry again.
+// ── Compound-filter wait primitive (B2 / CMD63b; DRY'd in CMD65) ─────────────
+// Shared core for any Wait command that must match on TWO payload fields.
+// _waitForEventFiltered supports only a single filterKey/filterVal, so naive
+// re-queue against it is broken under buffer replay: each recursion re-scans
+// the retention buffer and returns the same stale entry, so if the buffer
+// contains a non-matching emit the recursion loops on the stale entry until
+// timeout. Observed 2026-04-19 on dual_session_test v1.2: seq-2 (VS=submitter)
+// sat in buffer when Wait ForRoute to AK registered, _waitForEventFiltered
+// returned it, compound check failed, next recursion returned it again.
 //
-// Fix: single initial compound-aware buffer scan (find newest match with
-// BOTH instance_id AND assignee_resource_id), then if no hit, register a
-// forward-only listener with compound predicate applied inside the
-// resolver. Non-matching forward emits re-queue the listener (same pattern
-// as _waitForEventFiltered's internal re-queue), but there is no buffer
-// re-scan on re-queue, so stale entries don't reappear.
-function _waitForRoute(instanceId, assigneeResourceId, timeoutMs) {
+// Pattern (Iron Rule 27): single initial compound-aware buffer scan (newest
+// match with BOTH fields), then if no hit, register a forward-only listener
+// with compound predicate applied inside the resolver. Non-matching forward
+// emits re-queue the listener, but there is no buffer re-scan on re-queue,
+// so stale entries don't reappear.
+//
+// Callers: _waitForRoute (workflow_request.created; CMD63b), _waitForQueueRow
+// (work_queue.rendered; CMD65 / B-UI-2). If a third caller lands, keep DRY'ing.
+function _waitForCompoundEvent(eventName, primaryKey, primaryVal, secondaryKey, secondaryVal, timeoutMs, errLabel) {
   return new Promise(function(resolve, reject) {
     timeoutMs = timeoutMs || 30000;
     function compoundMatch(data) {
       if (!data) return false;
-      if (data.instance_id !== instanceId) return false;
-      var actual = data.assignee_resource_id || data.resource_id || data.assigneeId;
-      return actual === assigneeResourceId;
+      if (data[primaryKey] !== primaryVal) return false;
+      // Tolerate the same resource_id aliases _waitForRoute originally accepted.
+      var actual = data[secondaryKey];
+      if (actual == null && secondaryKey === 'assignee_resource_id') {
+        actual = data.resource_id || data.assigneeId;
+      }
+      return actual === secondaryVal;
     }
-    // Initial buffer scan — newest compound match within retention.
-    var hit = _scanEventBuffer('workflow_request.created', compoundMatch);
+    // Initial buffer scan — newest compound match within retention (Rule 22).
+    var hit = _scanEventBuffer(eventName, compoundMatch);
     if (hit) { resolve(hit.data); return; }
-    // No buffer hit — register forward listener with compound re-queue.
-    var eventName = 'workflow_request.created';
+    // No buffer hit — register forward listener with compound re-queue (Rule 27).
     if (!_eventListeners[eventName]) _eventListeners[eventName] = [];
     var timer = setTimeout(function() {
       _eventListeners[eventName] = (_eventListeners[eventName]||[]).filter(function(r){ return r !== resolver; });
-      reject(new Error('Timeout waiting for route of ' + instanceId + ' to ' + assigneeResourceId));
+      reject(new Error('Timeout waiting for ' + (errLabel || eventName)
+        + ' [' + primaryKey + '=' + primaryVal + ', ' + secondaryKey + '=' + secondaryVal + ']'));
     }, timeoutMs);
     var resolver = function(data) {
       if (compoundMatch(data)) {
@@ -849,6 +852,41 @@ function _waitForRoute(instanceId, assigneeResourceId, timeoutMs) {
     };
     _eventListeners[eventName].push(resolver);
   });
+}
+
+// ── Wait ForRoute (B2 / CMD63b) ──────────────────────────────────────────────
+// Thin wrapper over _waitForCompoundEvent for workflow_request.created.
+function _waitForRoute(instanceId, assigneeResourceId, timeoutMs) {
+  return _waitForCompoundEvent(
+    'workflow_request.created',
+    'instance_id', instanceId,
+    'assignee_resource_id', assigneeResourceId,
+    timeoutMs,
+    'route of ' + instanceId + ' to ' + assigneeResourceId
+  );
+}
+
+// ── Wait ForQueueRow (B-UI-2 / CMD65) ────────────────────────────────────────
+// Consumes the B-UI-1 work_queue.rendered emit. Single-field mode matches on
+// instance_id only (any operator's queue); compound mode additionally matches
+// assignee_resource_id so the wait resolves only when the specified alias's
+// Compass tab has rendered the row. Default timeout 15s — queue renders are
+// fast once the emit fires; shorter than ForInstance's 60s.
+function _waitForQueueRow(instanceId, assigneeResourceId, timeoutMs) {
+  if (assigneeResourceId == null) {
+    // Single-field — existing buffer-replay + forward-queue path (Rule 22).
+    return _waitForEventFiltered(
+      'work_queue.rendered', 'instance_id', instanceId, timeoutMs || 15000
+    );
+  }
+  // Compound — shared helper, same Rule 27 pattern as _waitForRoute.
+  return _waitForCompoundEvent(
+    'work_queue.rendered',
+    'instance_id', instanceId,
+    'assignee_resource_id', assigneeResourceId,
+    timeoutMs || 15000,
+    'queue row for ' + instanceId + ' on ' + assigneeResourceId
+  );
 }
 
 
@@ -1353,6 +1391,44 @@ var COMMANDS = {
     return 'form.opened: ' + formName;
   },
 
+  // Wait ForQueueRow <$var|uuid> [to <alias>] [timeout=<ms>]
+  // Consumes work_queue.rendered (B-UI-1). Structurally identical to
+  // Wait ForRoute: single-field match on instance_id, or compound match
+  // with assignee_resource_id when "to <alias>" is supplied.
+  'Wait ForQueueRow': async function(args) {
+    if (!args[0]) throw new Error('Wait ForQueueRow: usage: Wait ForQueueRow <$var|uuid> [to <alias>] [timeout=<ms>]');
+    var raw = args[0];
+    var instanceId = raw.startsWith('$') ? (_storeVars[raw.slice(1)] || '') : raw;
+    if (!instanceId) throw new Error('Wait ForQueueRow: no instance id (variable ' + raw + ' is empty)');
+    var toIdx = args.indexOf('to');
+    var alias = null;
+    var resourceId = null;
+    var tailStart = 1;
+    if (toIdx >= 0) {
+      if (!args[toIdx+1]) throw new Error('Wait ForQueueRow: missing alias after "to"');
+      alias = args[toIdx+1];
+      tailStart = toIdx + 2;
+    }
+    var timeoutMs = 15000;
+    for (var i = tailStart; i < args.length; i++) {
+      var tm = String(args[i]).match(/^timeout=(\d+)$/);
+      if (tm) timeoutMs = parseInt(tm[1], 10);
+    }
+    if (alias) {
+      var uid = _resolveTargetAlias(String(alias).toUpperCase());
+      if (!uid) throw new Error("Wait ForQueueRow: unknown alias '" + alias + "'");
+      var sess = _sessions[uid];
+      resourceId = (sess && sess.resourceId) || await _resolveResourceIdForUserId(uid);
+      if (!resourceId) throw new Error("Wait ForQueueRow: could not resolve resource_id for alias '" + alias + "' (userId " + uid.slice(0,8) + ")");
+    }
+    var data = await _waitForQueueRow(instanceId, resourceId, timeoutMs);
+    var seq = (data && data.seq);
+    if (alias) {
+      return 'work_queue.rendered → ' + alias + (seq != null ? ' (step ' + seq + ')' : '');
+    }
+    return 'work_queue.rendered: ' + instanceId.slice(0,8) + (seq != null ? ' (step ' + seq + ')' : '');
+  },
+
   // ── Storage ──────────────────────────────────────────────────────────────────
   'Store': async function(args) {
     var key = args[0];
@@ -1839,7 +1915,7 @@ async function _runScript(scriptText, scriptName) {
       }
 
       var _lv=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
-               'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm'];
+               'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow'];
       if (targetUserId && (_lv.indexOf(parsed.verb)===-1)) {
         // Dispatch via Realtime (non-local commands)
         _appendLine(parsed.target || 'SYS', 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
@@ -2576,7 +2652,7 @@ function _runCmd() {
   if (parsed && parsed.target) {
     var targetUserId = _resolveTargetAlias(parsed.target);
     var _rl=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
-             'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm'];
+             'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow'];
     if (targetUserId && _channel && _rl.indexOf(parsed.verb)===-1) {
       _channelSend({
         type: 'broadcast', event: 'cmd',
