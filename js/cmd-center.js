@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260419-CMD64a
+// cmd-center.js  ·  v20260419-CMD64c
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260419-CMD64a',
+    'cmd-center':  'v20260419-CMD64c',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260419-CMD64a ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260419-CMD64c ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -429,7 +429,7 @@ function _connect() {
   // resolve it ignores, retention buffer would carry two entries for
   // the same logical event). Dedup at handler entry, post-self-echo,
   // pre-buffer. 30s TTL matches retention window.
-  // CMD64a (Iron Rule 15 amended — third revision): self-echo filter
+  // CMD64c (Iron Rule 15 amended — third revision): self-echo filter
   // REMOVED from _handleAppEvent entirely. `_mySession.userId` matches every
   // tab authenticated as the same user — not just the emitter's own tab.
   // Two Compass tabs open for the same operator (legitimate: monitoring,
@@ -442,7 +442,7 @@ function _connect() {
   // coarse proxy for "same tab" that happened to work only because the
   // second tab case wasn't exercised. Now it is.
   // History retained: CMD47 added the Aegis exemption to _handleResult;
-  // CMD57 added the same exemption to _handleAppEvent; this (CMD64a)
+  // CMD57 added the same exemption to _handleAppEvent; this (CMD64c)
   // removes the app_event filter entirely in favor of the event_id
   // mechanism that supersedes it. _handleCmd and _handleResult are
   // intentionally unchanged — they key on cmdId dedup (Rule 25) plus
