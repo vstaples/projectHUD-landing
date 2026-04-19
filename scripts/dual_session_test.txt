@@ -45,7 +45,7 @@ Log "Package live · $instance_id"
 # — step 1: VS reviews ————————————————————————————————
 VS: Set Tab "MY WORK"
 Wait ForRoute $instance_id to VS
-Pause Confirm request appears in Vaughn's work queue
+# Pause Confirm request appears in Vaughn's work queue
 # TODO (B-UI-1): replace with Wait ForQueueRow via work_queue.rendered emit
 VS: Click "Review"
 Pause Confirm popup review form is raised
@@ -57,7 +57,7 @@ Log "Step 1 complete"
 # — step 2: AK approves ———————————————————————————————
 AK: Set Tab "MY TIME"
 AK: Set Tab "MY WORK"
-Pause Confirm request appears in Angela's work queue
+# Pause Confirm request appears in Angela's work queue
 # TODO (B-UI-1): replace with Wait ForQueueRow via work_queue.rendered emit
 AK: Click "Approve"
 Pause Confirm Document Review panel is visible on Angela's screen
