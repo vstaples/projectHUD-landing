@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260418-CMD63a
+// cmd-center.js  ·  v20260418-CMD63b
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260418-CMD63a',
+    'cmd-center':  'v20260418-CMD63b',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD63a ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD63b ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -785,32 +785,51 @@ async function _resolveResourceIdForUserId(userId) {
 // ── Compound-filter wait: Wait ForRoute (B2 / CMD63) ──────────────────────────
 // workflow_request.created must match BOTH instance_id AND assignee_resource_id.
 // _waitForEventFiltered supports only a single filterKey/filterVal, so we wait
-// on instance_id and re-check the assignee on each match. Mirrors the re-queue
-// pattern inside _waitForEventFiltered itself (line ~746). No shared-API change.
-// Rule 22 (buffer scan) is preserved because each iteration calls through
-// _waitForEventFiltered, which scans the buffer on every registration.
+// on instance_id and re-check the assignee on each match. The naive recursive
+// re-queue against _waitForEventFiltered is broken under buffer replay: each
+// recursion re-scans the same retention buffer and returns the same stale
+// entry, so if the buffer contains a non-matching emit (e.g. seq-2 submitter
+// emit when we want the seq-3 manager emit), the recursion loops on the
+// stale entry until timeout. Observed 2026-04-19 on dual_session_test v1.2:
+// seq-2 (VS=submitter) sat in buffer when Wait ForRoute to AK registered,
+// _waitForEventFiltered returned it, compound check failed, next recursion
+// returned the same stale entry again.
+//
+// Fix: single initial compound-aware buffer scan (find newest match with
+// BOTH instance_id AND assignee_resource_id), then if no hit, register a
+// forward-only listener with compound predicate applied inside the
+// resolver. Non-matching forward emits re-queue the listener (same pattern
+// as _waitForEventFiltered's internal re-queue), but there is no buffer
+// re-scan on re-queue, so stale entries don't reappear.
 function _waitForRoute(instanceId, assigneeResourceId, timeoutMs) {
   return new Promise(function(resolve, reject) {
-    var deadline = Date.now() + (timeoutMs || 30000);
-    function step() {
-      var remaining = Math.max(0, deadline - Date.now());
-      if (remaining <= 0) {
-        reject(new Error('Timeout waiting for route of ' + instanceId + ' to ' + assigneeResourceId));
-        return;
-      }
-      _waitForEventFiltered('workflow_request.created', 'instance_id', instanceId, remaining)
-        .then(function(data) {
-          var actual = data.assignee_resource_id || data.resource_id || data.assigneeId;
-          if (actual === assigneeResourceId) {
-            resolve(data);
-          } else {
-            // Non-match on assignee — loop and wait for the next matching instance_id.
-            step();
-          }
-        })
-        .catch(reject);
+    timeoutMs = timeoutMs || 30000;
+    function compoundMatch(data) {
+      if (!data) return false;
+      if (data.instance_id !== instanceId) return false;
+      var actual = data.assignee_resource_id || data.resource_id || data.assigneeId;
+      return actual === assigneeResourceId;
     }
-    step();
+    // Initial buffer scan — newest compound match within retention.
+    var hit = _scanEventBuffer('workflow_request.created', compoundMatch);
+    if (hit) { resolve(hit.data); return; }
+    // No buffer hit — register forward listener with compound re-queue.
+    var eventName = 'workflow_request.created';
+    if (!_eventListeners[eventName]) _eventListeners[eventName] = [];
+    var timer = setTimeout(function() {
+      _eventListeners[eventName] = (_eventListeners[eventName]||[]).filter(function(r){ return r !== resolver; });
+      reject(new Error('Timeout waiting for route of ' + instanceId + ' to ' + assigneeResourceId));
+    }, timeoutMs);
+    var resolver = function(data) {
+      if (compoundMatch(data)) {
+        clearTimeout(timer);
+        resolve(data);
+      } else {
+        _eventListeners[eventName] = _eventListeners[eventName] || [];
+        _eventListeners[eventName].push(resolver);
+      }
+    };
+    _eventListeners[eventName].push(resolver);
   });
 }
 

@@ -43,11 +43,11 @@ Log "Package live · $instance_id"
 
 # — step 1: VS reviews ————————————————————————————————
 VS: Set Tab "MY WORK"
-Wait ForRoute $instance_id to VS timeout=15000
+Wait ForRoute $instance_id to VS 
 VS: Click "Review"
 Pause Confirm popup review form is raised
 VS: Click "Approve"
-Wait ForRoute $instance_id to AK timeout=15000
+Wait ForRoute $instance_id to AK 
 Log "Step 1 complete"
 
 # — step 2: AK approves ———————————————————————————————
