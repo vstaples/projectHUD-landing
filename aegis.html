@@ -604,36 +604,9 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
     <div class="body-grid">
       <!-- Instance feed -->
       <div class="col">
-        <div class="col-hd"><span class="col-title">Instance feed · 18 active</span><span class="col-act" onclick="switchMC('instances',document.querySelectorAll('.mt')[1])">view all</span></div>
-        <div class="col-body">
-          <div class="inst bl">
-            <div class="inst-top"><span class="inst-name">Design Review Signoff</span><span class="badge b-rd">blocked</span></div>
-            <div class="inst-meta">e-drs-0041 · Flexscope · 3h ago</div>
-            <div class="step-chain"><span class="sn sn-done">submitted</span><span class="sarr">›</span><span class="sn sn-done">VS approved</span><span class="sarr">›</span><span class="sn sn-blk">Finance — no contact</span></div>
-            <div class="actors"><span class="actor me">VS ✓</span><span class="actor">Finance — unassigned</span></div>
-            <div class="iacts"><button class="btn am">Assign contact →</button><button class="btn">Inspect CoC</button><button class="btn">Force-route</button></div>
-          </div>
-          <div class="inst wn">
-            <div class="inst-top"><span class="inst-name">Expense Report · NovaBio QMS</span><span class="badge b-am">awaiting AK</span></div>
-            <div class="inst-meta">e-er-0038 · Angela Kim · step 3 · 2h 14m</div>
-            <div class="step-chain"><span class="sn sn-done">submitted</span><span class="sarr">›</span><span class="sn sn-done">VS approved</span><span class="sarr">›</span><span class="sn sn-act">AK approving</span></div>
-            <div class="actors"><span class="actor me">VS ✓</span><span class="actor pend">AK · pending</span></div>
-            <div class="iacts"><button class="btn aq">Remind AK →</button><button class="btn">Inspect CoC</button></div>
-          </div>
-          <div class="inst ok">
-            <div class="inst-top"><span class="inst-name">PTO Request · Vaughn Staples</span><span class="badge b-gr">in progress</span></div>
-            <div class="inst-meta">e-pto-0035 · VS · step 2 · 45m</div>
-            <div class="step-chain"><span class="sn sn-done">submitted</span><span class="sarr">›</span><span class="sn sn-act">mgr approval</span><span class="sarr">›</span><span class="sn sn-pend">HR notify</span></div>
-            <div class="actors"><span class="actor me">VS submitted</span><span class="actor">AK · next</span></div>
-            <div class="iacts"><button class="btn">Inspect CoC</button><button class="btn">View timeline</button></div>
-          </div>
-          <div class="inst ok">
-            <div class="inst-top"><span class="inst-name">Project Change Order · Flexscope</span><span class="badge b-gr">in progress</span></div>
-            <div class="inst-meta">e-pco-0033 · RC · step 1 · 18m</div>
-            <div class="step-chain"><span class="sn sn-act">RC completing form</span><span class="sarr">›</span><span class="sn sn-pend">PM review</span><span class="sarr">›</span><span class="sn sn-pend">client sign-off</span></div>
-            <div class="actors"><span class="actor">RC · active</span></div>
-            <div class="iacts"><button class="btn">Inspect CoC</button></div>
-          </div>
+        <div class="col-hd"><span class="col-title" id="m2-instance-feed-title">Instance feed</span><span class="col-act" onclick="switchMC('instances',document.querySelectorAll('.mt')[1])">view all</span></div>
+        <div id="m2-instance-feed" class="col-body">
+          <!-- Populated by Instance Feed JS (CMD64 / Brief B-UI-1). -->
         </div>
       </div>
       <!-- Sessions + Cadence -->
@@ -1407,6 +1380,17 @@ document.addEventListener('DOMContentLoaded',function(){
           meta: dec + ' · by ' + resolver
         };
       }
+      case 'work_queue.rendered': {
+        // B-UI-1 (CMD64): fires on the operator's own Compass tab after
+        // their work queue has presented a newly routed row. Signal-class,
+        // cyan dot mirroring instance.launched's aq.
+        var assignee = _resolveName(p.assignee_resource_id) || _short(p.assignee_resource_id);
+        return {
+          color:'var(--aq)',
+          title:'work_queue.rendered · step ' + (p.seq != null ? p.seq : '?'),
+          meta:'→ ' + assignee
+        };
+      }
       case 'location.ready':
       case 'location.changed':
       case 'tab_switch':
@@ -1548,7 +1532,219 @@ document.addEventListener('DOMContentLoaded',function(){
     }
   }, 50);
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// M2 Overview Instance Feed (CMD64 / Brief B-UI-1)
+// ═══════════════════════════════════════════════════════════════════════════
+// Consumes the same app_event broadcast channel as the CoC feed via
+// CMDCenter.onAppEvent. Renders into #m2-instance-feed. Cap: 6 cards
+// (chosen by B-UI-1 Out-of-scope guidance — no existing code set a cap).
+//
+// Unlike the CoC feed (append-on-emit, time-based), this feed is instance-
+// keyed: instance.launched inserts a card at top, workflow_request.resolved
+// updates the current-step indicator on an existing card, instance.completed
+// and instance.blocked update the card's status pill.
+//
+// Iron Rules honored:
+//   15 — Aegis self-echo filter applied upstream by cmd-center.js; not
+//        relevant here (Aegis never emits these events).
+//   20 — listeners receive inner payload; we read data.instance_id etc.
+//   22 — on-mount seed via recentEvents(50) catches events that fired
+//        before subscription registered.
+//   25 — event_id dedup is upstream; no-op here.
+//   27 — no compound-predicate re-check against the buffer; each event
+//        maps to a single instance-card mutation.
+(function(){
+  var CARD_CAP = 6;
+
+  // Keyed by instance_id. Value carries the data we use to render.
+  // On new instance.launched we prepend to _order; on updates we mutate
+  // the existing entry in place and repaint. Cards that fall off the
+  // end of _order when length > CARD_CAP are simply not rendered.
+  var _cards = {}; // { instance_id: { instance_id, template_name, submitter_resource_id, seq, status, reason, launched_ts } }
+  var _order = []; // [instance_id, ...] newest first
+  var _mounted = false;
+
+  function _shortId(s) { return (s && typeof s === 'string') ? s.slice(0,8) : '?'; }
+  function _esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function _resolveNameLocal(id) {
+    if (!id) return null;
+    var sessions = (window.CMDCenter && window.CMDCenter.sessions) ? window.CMDCenter.sessions() : {};
+    for (var uid in sessions) {
+      if (!Object.prototype.hasOwnProperty.call(sessions, uid)) continue;
+      var s = sessions[uid];
+      // Presence entries don't carry resource_id today (Rule 26 workaround via
+      // DB lookup is in cmd-center for Wait ForRoute). For display-only name
+      // resolution we fall back to initials if the caller is looking up by
+      // resource_id and no match is found.
+      if (s && s.resourceId === id) return s.name || s.initials;
+    }
+    return null;
+  }
+  function _relTime(ts) {
+    if (!ts) return '';
+    var d = Date.now() - ts;
+    if (d < 10000) return 'just now';
+    if (d < 60000) return Math.floor(d/1000) + 's';
+    if (d < 3600000) return Math.floor(d/60000) + 'm';
+    if (d < 86400000) return Math.floor(d/3600000) + 'h';
+    return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }
+
+  // Map card status → .inst class + badge HTML.
+  function _statusChrome(card) {
+    switch (card.status) {
+      case 'blocked':
+        return { cls: 'bl', badgeCls: 'b-rd', badgeText: 'blocked' };
+      case 'completed':
+        return { cls: 'ok', badgeCls: 'b-gr', badgeText: _esc(card.final_status || 'completed') };
+      case 'active':
+      default:
+        return { cls: 'ok', badgeCls: 'b-gr', badgeText: card.seq != null ? 'step ' + card.seq : 'in progress' };
+    }
+  }
+
+  function _renderCard(card) {
+    var chrome = _statusChrome(card);
+    var submitter = _resolveNameLocal(card.submitter_resource_id) || _shortId(card.submitter_resource_id);
+    var name = _esc(card.template_name || 'Instance ' + _shortId(card.instance_id));
+    var meta = _shortId(card.instance_id) + ' · ' + _esc(submitter) + ' · ' + _relTime(card.launched_ts);
+    var reasonLine = '';
+    if (card.status === 'blocked' && card.reason) {
+      reasonLine = '<div class="inst-meta" style="color:var(--rd);margin-top:4px">' + _esc(card.reason) + '</div>';
+    }
+    return '<div class="inst ' + chrome.cls + '" data-instance-id="' + _esc(card.instance_id) + '">' +
+             '<div class="inst-top">' +
+               '<span class="inst-name">' + name + '</span>' +
+               '<span class="badge ' + chrome.badgeCls + '">' + chrome.badgeText + '</span>' +
+             '</div>' +
+             '<div class="inst-meta">' + meta + '</div>' +
+             reasonLine +
+           '</div>';
+  }
+
+  function _paint() {
+    var mount = document.getElementById('m2-instance-feed');
+    if (!mount) return;
+    var titleEl = document.getElementById('m2-instance-feed-title');
+    if (titleEl) {
+      var activeCount = 0;
+      for (var k in _cards) {
+        if (!Object.prototype.hasOwnProperty.call(_cards, k)) continue;
+        if (_cards[k].status !== 'completed') activeCount++;
+      }
+      titleEl.textContent = 'Instance feed · ' + activeCount + ' active';
+    }
+    if (!_order.length) {
+      mount.innerHTML = '<div class="m2f-empty" style="padding:10px;color:var(--t3);font-size:11px">No instances in the last 30 seconds. Submit a form or wait for activity.</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < _order.length && i < CARD_CAP; i++) {
+      var card = _cards[_order[i]];
+      if (card) html += _renderCard(card);
+    }
+    mount.innerHTML = html;
+  }
+
+  function _upsertCard(instanceId, patch, isNew) {
+    if (!instanceId) return;
+    if (isNew && !_cards[instanceId]) {
+      _cards[instanceId] = patch;
+      _order.unshift(instanceId);
+      // Trim: when we exceed CARD_CAP, drop the oldest from _order but keep
+      // the data in _cards in case a later resolved event arrives for it
+      // (we ignore it, per brief Part 2 "if the instance card isn't present,
+      // ignore"). Trimming _order keeps render cost bounded.
+      if (_order.length > CARD_CAP * 3) _order.length = CARD_CAP * 3;
+    } else if (_cards[instanceId]) {
+      for (var k in patch) {
+        if (Object.prototype.hasOwnProperty.call(patch, k)) _cards[instanceId][k] = patch[k];
+      }
+    }
+    // If this is an update for an instance we don't have a card for, silently
+    // ignore (matches brief Part 2 specification).
+  }
+
+  function _handleEvent(eventName, data) {
+    if (!data) return;
+    var id = data.instance_id;
+    if (!id) return;
+    switch (eventName) {
+      case 'instance.launched':
+        _upsertCard(id, {
+          instance_id:           id,
+          template_id:           data.template_id || null,
+          template_name:         data.template_name || null,
+          submitter_resource_id: data.submitter_resource_id || null,
+          status:                'active',
+          seq:                   1,
+          launched_ts:           Date.now(),
+        }, true);
+        _paint();
+        return;
+      case 'workflow_request.resolved':
+        // The resolved event marks the end of a step; the next step's seq is
+        // conventionally seq+1. If the emit fired last for this instance,
+        // seq+1 is what the current step is now.
+        var nextSeq = (data.seq != null) ? data.seq + 1 : null;
+        _upsertCard(id, { seq: nextSeq }, false);
+        _paint();
+        return;
+      case 'instance.completed':
+        _upsertCard(id, {
+          status:       'completed',
+          final_status: data.final_status || 'completed',
+        }, false);
+        _paint();
+        return;
+      case 'instance.blocked':
+        _upsertCard(id, {
+          status: 'blocked',
+          reason: data.reason || data.details || 'blocked',
+        }, false);
+        _paint();
+        return;
+    }
+  }
+
+  function _mount() {
+    if (_mounted) return;
+    if (!window.CMDCenter || !window.CMDCenter.onAppEvent) return;
+    _mounted = true;
+
+    // Seed from the 30s retention buffer, oldest-first so final state wins
+    // (e.g., an instance.launched followed by instance.blocked both in the
+    // buffer should land us on blocked).
+    try {
+      var seed = window.CMDCenter.recentEvents(50) || [];
+      for (var i = seed.length - 1; i >= 0; i--) {
+        _handleEvent(seed[i].eventName, seed[i].data);
+      }
+    } catch (e) { /* seed is best-effort */ }
+
+    window.CMDCenter.onAppEvent(_handleEvent);
+    _paint();
+  }
+
+  var _tries = 0;
+  var _t = setInterval(function(){
+    _tries++;
+    if (window.CMDCenter && window.CMDCenter.onAppEvent) {
+      clearInterval(_t);
+      _mount();
+    } else if (_tries > 200) {
+      clearInterval(_t);
+      console.warn('[m2-instance-feed] CMDCenter never appeared — feed will not render');
+    }
+  }, 50);
+})();
 </script>
-<script src="/js/cmd-center.js?v=20260418-CMD62"></script>
+<script src="/js/cmd-center.js?v=v20260419-CMD64"></script>
 </body>
 </html>

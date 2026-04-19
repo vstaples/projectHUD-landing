@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260418-CMD63
+// VERSION: 20260419-CMD64
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260418-CMD63 — B2 form.opened emit + compass_form_ready handler','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260418-CMD63';
+console.log('%c[mw-tabs] v20260419-CMD64 — B-UI-1 Work Queue reactivity + work_queue.rendered emit','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260419-CMD64';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -2930,3 +2930,159 @@ window.populateDeltaStrip = function() {
   }
   renderDeltaStrip(deltas);
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Work Queue reactivity (B-UI-1 / CMD64)
+// ═══════════════════════════════════════════════════════════════════════════
+// Problem: MY WORK queue renders from a DB query at tab-mount time only. A
+// workflow_request.created emit reaches this tab via the event bus but the
+// queue ignores it — the user sees a stale list until they switch tabs or
+// refresh. Same class of gap as the Instance Feed non-reactivity flagged
+// during B1.5 smoke.
+//
+// Fix: subscribe to CMDCenter.onAppEvent. On a workflow_request.created
+// whose assignee_resource_id matches _myResource.id, re-run the existing
+// mount-time render via window._mwLoadUserView(). On resolved events where
+// the resolver is the current operator, same re-render (row disappears).
+//
+// After the re-render's DOM commits, emit work_queue.rendered carrying
+// {workflow_request_id, instance_id, seq, assignee_resource_id, template_id}
+// so scripts can wait on a clickable row (future Wait ForQueueRow).
+//
+// Iron Rules honored:
+//   15 — onAppEvent listeners sit downstream of the Aegis self-echo filter.
+//   20 — listeners receive inner payload, not envelope.
+//   22 — on-mount buffer scan via recentEvents(50) catches events that
+//        fired between DB query start and subscription registration.
+//   25 — dedup runs at handler entry, before onAppEvent fan-out; no impact.
+//   27 — no compound-predicate re-check against the buffer; the subscription
+//        applies a single filter once per event.
+(function() {
+  // Guard against double-mount (module is loaded once per tab, but a
+  // refresh re-evaluates the IIFE; the _cmdCenterLoaded guard in
+  // cmd-center.js does the same).
+  if (window._mwWorkQueueReactive) return;
+  window._mwWorkQueueReactive = true;
+
+  // Remember the workflow_request_ids we've already emitted work_queue.rendered
+  // for. Prevents duplicate emits if _mwLoadUserView re-renders unchanged rows.
+  // Keyed by workflow_request.id; values are ts. No TTL — the map is
+  // bounded by active-queue size (typically <50), which is cheaper than
+  // reasoning about TTL edge cases.
+  var _renderedRequestIds = {};
+
+  function _myResId() {
+    return (window._myResource && window._myResource.id) || null;
+  }
+
+  // After a re-render triggered by workflow_request.created, fire
+  // work_queue.rendered with the payload from that same event. The re-render
+  // is itself async (DB query + DOM paint); schedule the emit via rAF so
+  // the DOM commit has occurred. One rAF is enough for innerHTML-style
+  // updates — if _mwLoadUserView uses a longer async pipeline, the emit
+  // still lands after the pipeline unwinds because rAF runs before paint
+  // but after synchronous render passes in the current tick.
+  //
+  // The emit payload comes from the triggering event, NOT from a DOM query.
+  // This is deliberate: the event is the source of truth for workflow_request
+  // metadata; the DOM is only the presentation layer. Any future consumer
+  // (policy engine, scripts) should treat work_queue.rendered as "this
+  // workflow_request is now presented to the assignee" — the queryability
+  // of the DOM row is implied by the emit's timing, not its payload.
+  function _emitRenderedOnce(evtPayload) {
+    var wrid = evtPayload && evtPayload.workflow_request_id;
+    if (!wrid) return;
+    if (_renderedRequestIds[wrid]) return;
+    _renderedRequestIds[wrid] = Date.now();
+    requestAnimationFrame(function() {
+      if (typeof window._cmdEmit !== 'function') return;
+      window._cmdEmit('work_queue.rendered', {
+        workflow_request_id:  wrid,
+        instance_id:          evtPayload.instance_id || null,
+        seq:                  (evtPayload.seq != null ? evtPayload.seq : null),
+        assignee_resource_id: evtPayload.assignee_resource_id || null,
+        template_id:          evtPayload.template_id || null,
+      });
+    });
+  }
+
+  // Core handler — called by both live onAppEvent and the on-mount buffer
+  // scan. Returns true if the event triggered a re-render (caller doesn't
+  // use this today, but keeps the contract clean).
+  function _handleEvent(eventName, data) {
+    if (!data) return false;
+    var myResId = _myResId();
+    if (!myResId) return false;
+
+    if (eventName === 'workflow_request.created') {
+      if (data.assignee_resource_id !== myResId) return false;
+      // A new row is inbound for this operator. Re-render the queue and
+      // then announce the row is clickable.
+      if (typeof window._mwLoadUserView === 'function') {
+        try { window._mwLoadUserView(); } catch (e) {
+          console.warn('[mw-tabs] _mwLoadUserView threw during reactive refresh:', e);
+        }
+      }
+      _emitRenderedOnce(data);
+      return true;
+    }
+
+    if (eventName === 'workflow_request.resolved') {
+      if (data.resolver_resource_id !== myResId) return false;
+      // The operator resolved their own task — the row should disappear
+      // (or update badge if changes_requested). Let the existing renderer
+      // handle the visual transition; it re-queries workflow_requests and
+      // the resolved row naturally drops out of the "open" filter.
+      // No work_queue.rendered emit on resolved — the emit's purpose is
+      // "a new queue item is now clickable," not "an old one is gone."
+      if (data.workflow_request_id) delete _renderedRequestIds[data.workflow_request_id];
+      if (typeof window._mwLoadUserView === 'function') {
+        try { window._mwLoadUserView(); } catch (e) {
+          console.warn('[mw-tabs] _mwLoadUserView threw during reactive refresh:', e);
+        }
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  // Poll briefly until CMDCenter is ready (cmd-center.js loads after
+  // mw-tabs.js on compass.html; mirror the pattern M2-FEED-1 uses in
+  // aegis.html).
+  function _mount() {
+    if (!window.CMDCenter || !window.CMDCenter.onAppEvent) return false;
+
+    // On-mount buffer scan — catch events that fired in the 30s retention
+    // window before this subscription registered. Typical case: user opens
+    // Compass seconds after a colleague's Approve click routed the next step
+    // to them. The initial DB query already picks those up, so we're really
+    // catching the narrower window between "DB query fires" and "subscription
+    // registered" — but the dedup via _renderedRequestIds keeps us honest
+    // either way.
+    try {
+      var recent = window.CMDCenter.recentEvents(50) || [];
+      for (var i = recent.length - 1; i >= 0; i--) {
+        var r = recent[i];
+        if (r.eventName === 'workflow_request.created' || r.eventName === 'workflow_request.resolved') {
+          _handleEvent(r.eventName, r.data);
+        }
+      }
+    } catch (e) { /* seed is best-effort */ }
+
+    window.CMDCenter.onAppEvent(_handleEvent);
+    return true;
+  }
+
+  if (!_mount()) {
+    var _tries = 0;
+    var _t = setInterval(function() {
+      _tries++;
+      if (_mount()) { clearInterval(_t); return; }
+      if (_tries > 200) {
+        clearInterval(_t);
+        console.warn('[mw-tabs] CMDCenter never appeared — Work Queue reactivity will not mount');
+      }
+    }, 50);
+  }
+})();
