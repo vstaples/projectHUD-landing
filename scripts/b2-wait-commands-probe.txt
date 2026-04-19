@@ -1,0 +1,27 @@
+# Version: 1.0
+# Requires: VS
+# B2 Wait commands probe — no Pauses, all typed waits.
+
+Assert session VS is connected
+
+VS: Set View "compass"
+Wait ForLocation VS "compass.my_work" timeout=30000
+
+VS: Set Tab "MY REQUESTS"
+VS: Set SubTab "BROWSE"
+VS: Form Open "Expense Report"
+Wait ForForm "Expense Report"
+
+VS: Form Insert employee_name "Vaughn Staples"
+VS: Form Insert trip_start_date "2026-04-14"
+VS: Form Insert trip_end_date "2026-04-14"
+VS: Form Select business_purpose "client"
+VS: Form Insert purpose_description "B2 probe"
+VS: Form Insert customer_name "Apex Consulting Group"
+VS: Form Submit
+
+Wait ForEvent "form.submitted" → $instance_id
+Wait ForInstance $instance_id for launched
+Wait ForRoute $instance_id to VS
+
+Log "✓ B2 probe complete · $instance_id"

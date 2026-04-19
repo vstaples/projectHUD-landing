@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260418-CMD62
+// cmd-center.js  ·  v20260418-CMD63
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260418-CMD62',
+    'cmd-center':  'v20260418-CMD63',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD62a ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD63 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -757,7 +757,39 @@ function _waitForEventFiltered(eventName, filterKey, filterVal, timeoutMs) {
   });
 }
 
-// ── Broadcast app events from this session ────────────────────────────────────
+// ── Compound-filter wait: Wait ForRoute (B2 / CMD63) ──────────────────────────
+// workflow_request.created must match BOTH instance_id AND assignee_resource_id.
+// _waitForEventFiltered supports only a single filterKey/filterVal, so we wait
+// on instance_id and re-check the assignee on each match. Mirrors the re-queue
+// pattern inside _waitForEventFiltered itself (line ~746). No shared-API change.
+// Rule 22 (buffer scan) is preserved because each iteration calls through
+// _waitForEventFiltered, which scans the buffer on every registration.
+function _waitForRoute(instanceId, assigneeResourceId, timeoutMs) {
+  return new Promise(function(resolve, reject) {
+    var deadline = Date.now() + (timeoutMs || 30000);
+    function step() {
+      var remaining = Math.max(0, deadline - Date.now());
+      if (remaining <= 0) {
+        reject(new Error('Timeout waiting for route of ' + instanceId + ' to ' + assigneeResourceId));
+        return;
+      }
+      _waitForEventFiltered('workflow_request.created', 'instance_id', instanceId, remaining)
+        .then(function(data) {
+          var actual = data.assignee_resource_id || data.resource_id || data.assigneeId;
+          if (actual === assigneeResourceId) {
+            resolve(data);
+          } else {
+            // Non-match on assignee — loop and wait for the next matching instance_id.
+            step();
+          }
+        })
+        .catch(reject);
+    }
+    step();
+  });
+}
+
+
 // B1 (CMD54): protocol-compliant envelope per HUD Ecosystem Protocol v0.1.
 // Canonical fields: protocol_version, event_type, event_id, source_product,
 // source_session, ts, firm_id, payload. Back-compat shims (event, from, name)
@@ -1162,6 +1194,98 @@ var COMMANDS = {
         + (data && data.instanceId ? ' · instance ' + data.instanceId : '');
     }
     return 'unknown Wait argument: ' + val;
+  },
+
+  // ── Typed Wait commands (B2 / CMD63) ────────────────────────────────────────
+  // Thin typed wrappers over _waitForEventFiltered. They exist for script
+  // readability; filter/buffer/timeout semantics are inherited unchanged.
+  // Rules honored: 15 (Aegis self-echo exempt, via _waitForEventFiltered),
+  // 20 (listeners receive inner payload), 22 (buffer scan precedes forward
+  // queue), 23 (outbound emit queue — N/A here; these are receive-side),
+  // 25 (event_id dedup — N/A; dedup fires before fan-out, we see the single
+  // already-deduped inner payload). These commands never dispatch remotely;
+  // they always run locally on the tab authoring the script (typically Aegis).
+
+  // Wait ForLocation <alias> "<location>" [timeout=<ms>]
+  'Wait ForLocation': async function(args) {
+    var alias = args[0];
+    var location = args[1];
+    if (!alias || !location) throw new Error('Wait ForLocation: usage: Wait ForLocation <alias> "<location>" [timeout=<ms>]');
+    var timeoutMs = 30000;
+    for (var i = 2; i < args.length; i++) {
+      var tm = String(args[i]).match(/^timeout=(\d+)$/);
+      if (tm) timeoutMs = parseInt(tm[1], 10);
+    }
+    var uid = _resolveTargetAlias(String(alias).toUpperCase());
+    if (!uid) throw new Error("Wait ForLocation: unknown alias '" + alias + "'");
+    var sess = _sessions[uid];
+    var resourceId = sess && sess.resourceId;
+    // location.ready payload carries resource_id; fall back to userId for legacy emits.
+    var filterVal = resourceId || uid;
+    var filterKey = resourceId ? 'resource_id' : 'userId';
+    var data = await _waitForEventFiltered('location.ready', filterKey, filterVal, timeoutMs);
+    var loc = (data && (data.location || data.page)) || location;
+    return 'location.ready received: ' + alias + ' @ ' + loc;
+  },
+
+  // Wait ForInstance <$var|uuid> [for <state>] [timeout=<ms>]
+  // Accepted states: launched, completed, blocked. Default: launched.
+  'Wait ForInstance': async function(args) {
+    if (!args[0]) throw new Error('Wait ForInstance: usage: Wait ForInstance <$var|uuid> [for <state>] [timeout=<ms>]');
+    var raw = args[0];
+    var instanceId = raw.startsWith('$') ? (_storeVars[raw.slice(1)] || '') : raw;
+    if (!instanceId) throw new Error('Wait ForInstance: no instance id (variable ' + raw + ' is empty)');
+    var state = 'launched';
+    var timeoutMs = 60000;
+    for (var i = 1; i < args.length; i++) {
+      if (args[i] === 'for' && args[i+1]) { state = String(args[i+1]).toLowerCase(); i++; continue; }
+      var tm = String(args[i]).match(/^timeout=(\d+)$/);
+      if (tm) { timeoutMs = parseInt(tm[1], 10); continue; }
+    }
+    var stateMap = { launched: 'instance.launched', completed: 'instance.completed', blocked: 'instance.blocked' };
+    var eventName = stateMap[state];
+    if (!eventName) throw new Error("Wait ForInstance: unknown state '" + state + "' (expected launched|completed|blocked)");
+    var data = await _waitForEventFiltered(eventName, 'instance_id', instanceId, timeoutMs);
+    var idShown = String(instanceId).slice(0, 8);
+    return 'instance.' + state + ': ' + idShown;
+  },
+
+  // Wait ForRoute <$var|uuid> to <alias> [timeout=<ms>]
+  'Wait ForRoute': async function(args) {
+    if (!args[0]) throw new Error('Wait ForRoute: usage: Wait ForRoute <$var|uuid> to <alias> [timeout=<ms>]');
+    var raw = args[0];
+    var instanceId = raw.startsWith('$') ? (_storeVars[raw.slice(1)] || '') : raw;
+    if (!instanceId) throw new Error('Wait ForRoute: no instance id (variable ' + raw + ' is empty)');
+    // Expect: "to" <alias>
+    var toIdx = args.indexOf('to');
+    if (toIdx < 0 || !args[toIdx+1]) throw new Error('Wait ForRoute: missing "to <alias>"');
+    var alias = args[toIdx+1];
+    var timeoutMs = 30000;
+    for (var i = toIdx+2; i < args.length; i++) {
+      var tm = String(args[i]).match(/^timeout=(\d+)$/);
+      if (tm) timeoutMs = parseInt(tm[1], 10);
+    }
+    var uid = _resolveTargetAlias(String(alias).toUpperCase());
+    if (!uid) throw new Error("Wait ForRoute: unknown alias '" + alias + "'");
+    var sess = _sessions[uid];
+    var resourceId = sess && sess.resourceId;
+    if (!resourceId) throw new Error("Wait ForRoute: alias '" + alias + "' has no resource_id (session " + uid.slice(0,8) + " not fully registered)");
+    var data = await _waitForRoute(instanceId, resourceId, timeoutMs);
+    var seq = (data && (data.step_seq || data.sequence_order));
+    return 'workflow_request.created → ' + alias + (seq ? ' (step ' + seq + ')' : '');
+  },
+
+  // Wait ForForm "<form_name>" [timeout=<ms>]
+  'Wait ForForm': async function(args) {
+    var formName = args[0];
+    if (!formName) throw new Error('Wait ForForm: usage: Wait ForForm "<form_name>" [timeout=<ms>]');
+    var timeoutMs = 10000;
+    for (var i = 1; i < args.length; i++) {
+      var tm = String(args[i]).match(/^timeout=(\d+)$/);
+      if (tm) timeoutMs = parseInt(tm[1], 10);
+    }
+    await _waitForEventFiltered('form.opened', 'form_name', formName, timeoutMs);
+    return 'form.opened: ' + formName;
   },
 
   // ── Storage ──────────────────────────────────────────────────────────────────
@@ -1649,7 +1773,8 @@ async function _runScript(scriptText, scriptName) {
         targetUserId = _resolveTargetAlias(parsed.target);
       }
 
-      var _lv=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause'];
+      var _lv=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
+               'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm'];
       if (targetUserId && (_lv.indexOf(parsed.verb)===-1)) {
         // Dispatch via Realtime (non-local commands)
         _appendLine(parsed.target || 'SYS', 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
@@ -2385,7 +2510,8 @@ function _runCmd() {
   var parsed = _parseLine(fullCmd);
   if (parsed && parsed.target) {
     var targetUserId = _resolveTargetAlias(parsed.target);
-    var _rl=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause'];
+    var _rl=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
+             'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm'];
     if (targetUserId && _channel && _rl.indexOf(parsed.verb)===-1) {
       _channelSend({
         type: 'broadcast', event: 'cmd',

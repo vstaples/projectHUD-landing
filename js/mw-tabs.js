@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260418-CMD60
+// VERSION: 20260418-CMD63
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260418-CMD60 — B1 event bus: form.submitted, instance.launched, workflow_request.created, instance.blocked','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260418-CMD60';
+console.log('%c[mw-tabs] v20260418-CMD63 — B2 form.opened emit + compass_form_ready handler','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260418-CMD63';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -1333,7 +1333,7 @@ window.addEventListener('DOMContentLoaded', function() {
     var html = fd.source_html.replace('</body>', restoreScript + '</body>');
     if (!html.includes('</body>')) html = fd.source_html + restoreScript;
     var blob = new Blob([html], {type:'text/html;charset=utf-8'});
-    _myrOpenHtmlFormOverlay(fd.source_name, URL.createObjectURL(blob));
+    _myrOpenHtmlFormOverlay(fd.source_name, URL.createObjectURL(blob), fd.id);
   } catch(e) {
     console.error('[myrContinueDraft] failed:', e);
     compassToast('Could not open draft — please try again.', 3000);
@@ -1395,7 +1395,7 @@ window.myrLaunchRequest = async function(type, templateId) {
           }
         } catch(e) { url = null; }
         if (url) {
-          _myrOpenHtmlFormOverlay(formDef.source_name || 'Form', url);
+          _myrOpenHtmlFormOverlay(formDef.source_name || 'Form', url, formDef.id);
           return;
         }
       }
@@ -1474,7 +1474,7 @@ body,html{margin:0;padding:0;font-family:Arial,sans-serif;font-size:12px;backgro
           : CADENCE_FORM_CSS + fd2.source_html;
         const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
-        _myrOpenHtmlFormOverlay(fd2.source_name || 'Form', blobUrl);
+        _myrOpenHtmlFormOverlay(fd2.source_name || 'Form', blobUrl, fd2.id);
         return;
       }
     } catch(e) { console.warn('[myrLaunchRequest] source_html fallback error:', e); }
@@ -1541,7 +1541,21 @@ body,html{margin:0;padding:0;font-family:Arial,sans-serif;font-size:12px;backgro
   }
 };
 
-function _myrOpenHtmlFormOverlay(title, url) {
+// B2 (CMD63): parent-side tracking of the currently-open form overlay.
+// Source of truth for the form.opened emit's form_name: parent knows what
+// it opened regardless of whether the iframe bootstrap echoes back a name.
+// Populated by _myrOpenHtmlFormOverlay; cleared on overlay close.
+window._myrCurrentForm = null; // { form_name, form_def_id, opened_at }
+
+function _myrOpenHtmlFormOverlay(title, url, formDefId) {
+  // B2: stash canonical form name + def id so the compass_form_ready
+  // postMessage handler (below) can build a protocol-compliant payload
+  // without trusting the iframe to re-send identifiers it already received.
+  window._myrCurrentForm = {
+    form_name:   title || 'Form',
+    form_def_id: formDefId || null,
+    opened_at:   Date.now(),
+  };
   var existing = document.getElementById('myr-html-form-overlay');
   if (existing) existing.remove();
   var overlay = document.createElement('div');
@@ -1577,6 +1591,7 @@ function _myrOpenHtmlFormOverlay(title, url) {
   closeBtn.style.cssText = 'background:none;border:none;color:#003333;font-size:16px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:3px;opacity:.7';
   closeBtn.onclick = function() {
     overlay.remove();
+    window._myrCurrentForm = null;
     try { window.postMessage({ type: 'cmd:form_action', action: 'Form Close' }, '*'); } catch(e) {}
   };
 
@@ -1596,6 +1611,7 @@ function _myrOpenHtmlFormOverlay(title, url) {
   overlay.addEventListener('click', function(e) {
     if (e.target === overlay) {
       overlay.remove();
+      window._myrCurrentForm = null;
       try { window.postMessage({ type: 'cmd:form_action', action: 'Form Close' }, '*'); } catch(e) {}
     }
   });
@@ -1609,10 +1625,40 @@ window.addEventListener('message', function(ev) {
   // MT1 security: only process Cadence form messages.
   // Blob URL iframes have origin 'null' — that's the only expected source.
   // Reject anything else that isn't the same origin (e.g. injected cross-origin frames).
-  var knownTypes = ['compass_form_save_draft', 'compass_form_submit', 'compass_form_error'];
+  var knownTypes = ['compass_form_save_draft', 'compass_form_submit', 'compass_form_error', 'compass_form_ready'];
   if (knownTypes.indexOf(d.type) === -1) return; // not a Cadence form message — ignore
   if (ev.origin !== 'null' && ev.origin !== window.location.origin) {
     console.warn('[mw-tabs] postMessage from unexpected origin rejected:', ev.origin);
+    return;
+  }
+  // B2 (CMD63): form.opened emit. Iframe bootstrap signals "fields are
+  // queryable" with { type: 'compass_form_ready', form_name?, form_def_id? }.
+  // Parent is the source of truth for form_name/form_def_id (captured at
+  // Form Open time in _myrCurrentForm); iframe-supplied values are accepted
+  // as fallback only. If _myrCurrentForm is null (overlay already closed,
+  // or ready fires before the setter — shouldn't happen), the emit is
+  // still sent using iframe-supplied values if any, else skipped with a
+  // warn. The iframe sender is a pending Cadence-side migration
+  // (workflow_form_definitions.source_html bootstrap); until that ships,
+  // this handler simply never fires and Wait ForForm times out
+  // diagnostically at its configured timeout. See handoff B2 follow-up.
+  if (d.type === 'compass_form_ready') {
+    var cur = window._myrCurrentForm || {};
+    var formName  = cur.form_name   || d.form_name   || null;
+    var formDefId = cur.form_def_id || d.form_def_id || null;
+    if (!formName) {
+      console.warn('[mw-tabs] compass_form_ready received with no form_name (parent state and iframe payload both empty) — form.opened not emitted');
+      return;
+    }
+    var res = window._myResource || {};
+    if (typeof window._cmdEmit === 'function') {
+      window._cmdEmit('form.opened', {
+        form_name:          formName,
+        form_def_id:        formDefId,
+        opener_resource_id: res.id      || null,
+        opener_user_id:     res.user_id || null,
+      });
+    }
     return;
   }
   if (d.type === 'compass_form_save_draft') {
@@ -1768,6 +1814,7 @@ window.addEventListener('message', function(ev) {
 
         // 8. Close overlay — only on success so user keeps their form on failure
         if (overlay) overlay.remove();
+        window._myrCurrentForm = null;
 
         console.log('%c[compass_form_submit] instance created: ' + instanceId + ' · template: ' + tmpl.id,
           'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
@@ -2023,9 +2070,7 @@ window.addEventListener('DOMContentLoaded', function() {
     if (!html.includes('</body>')) html = fd.source_html + restoreScript;
     var blob    = new Blob([html], { type: 'text/html;charset=utf-8' });
     var blobUrl = URL.createObjectURL(blob);
-    _myrOpenHtmlFormOverlay(fd.source_name || 'Form', blobUrl);
-
-    // Send activation message to the iframe after it loads
+    _myrOpenHtmlFormOverlay(fd.source_name || 'Form', blobUrl, fd.id);
     // role comes from the path: 'form:{formDefId}:{instanceId}:{role}'
     var sigRole    = parts[2] || null;
     var signerName = (window._myResource && window._myResource.name) || '';
@@ -2787,7 +2832,7 @@ window.addEventListener('DOMContentLoaded', function() {
     var html = fd.source_html.replace('<\/body>', restoreScript + '<\/body>');
     if (!html.includes('<\/body>')) html = fd.source_html + restoreScript;
     var blob = new Blob([html], {type:'text/html;charset=utf-8'});
-    _myrOpenHtmlFormOverlay(fd.source_name, URL.createObjectURL(blob));
+    _myrOpenHtmlFormOverlay(fd.source_name, URL.createObjectURL(blob), fd.id);
     setTimeout(function() {
       var bar = document.querySelector('#myr-html-form-modal > div');
       if (!bar) return;
