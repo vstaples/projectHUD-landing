@@ -281,7 +281,7 @@ const Sidebar = (() => {
     if (window._cmdCenterLoaded) return; // already loaded (e.g. compass.html loads it explicitly)
     if (window._aegisMode) return;       // aegis.html has engine embedded inline
     const s = document.createElement('script');
-    s.src = '/js/cmd-center.js?v=v20260419-CMD66';
+    s.src = '/js/cmd-center.js?v=v20260419-CMD68';
     s.onerror = () => console.warn('[Sidebar] cmd-center.js not found — session will not appear in Aegis');
     document.head.appendChild(s);
   }
