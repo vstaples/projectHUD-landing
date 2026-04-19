@@ -1,32 +1,32 @@
 # Two-session approval test — expense report full chain
-# Version: 1.1
+# Version: 1.2
 # Requires: VS, AK
-# Notes: Aegis drives both sessions to Compass itself before the chain runs.
-#        Pause-to-continue replaces fixed Waits on steps where real-world
-#        timing varies (page navigation, form mount). Resume message reports
-#        elapsed time so fixed Waits can be tuned after measurement.
+# Notes: B2 migration — machine-observable Pauses replaced with typed Wait
+#        commands. UI-modal-render Pauses retained (Review popup, Document
+#        Review panel) since no machine event signals their mount. Form
+#        Open Pause retained pending Cadence iframe `compass_form_ready`
+#        migration.
 
 # — preflight · presence ————————————————————————————————
 Assert session VS is connected
 Assert session AK is connected
 
 # — preflight · navigate both sessions to Compass ————————
-# MY REQUESTS / MY WORK tabs only exist inside Compass. Dashboard and
-# project-detail pages will silently fail tab commands. Send both sessions
-# to Compass first and let the view mount — Compass load can take 10-15s
-# under load, so Pause here rather than Wait.
+# Both sessions navigate to Compass in parallel; Wait ForLocation resolves
+# per-session on location.ready emit.
 VS: Set View "compass"
 AK: Set View "compass"
-Pause Both sessions navigating to Compass — press Enter when both show LIVE
+Wait ForLocation VS "compass.my_work" timeout=30000
+Wait ForLocation AK "compass.my_work" timeout=30000
 VS: Set Tab "MY WORK"
 AK: Set Tab "MY WORK"
-Pause Both tabs should be on MY WORK — press Enter to continue
 
 # — VS submits ————————————————————————————————————————
 VS: Set Tab "MY REQUESTS"
 VS: Set SubTab "BROWSE"
 VS: Form Open "Expense Report"
 Pause Form open — confirm Expense Report modal is visible on Vaughn's screen
+# TODO: replace with Wait ForForm after Cadence iframe migration
 VS: Form Insert "Employee Name" "Vaughn Staples"
 VS: Form Insert "Trip Start Date" "2026-04-14"
 VS: Form Insert "Trip End Date" "2026-04-14"
@@ -37,27 +37,26 @@ VS: Form Insert "Customer Name" "Apex Consulting Group"
 VS: Form Insert "Customer Location" "Phoenix, AZ"
 Wait 500
 VS: Form Submit
-Pause Form submitted — confirm form closed
-Get Latest instance_id
+Wait ForEvent "form.submitted" → $instance_id
+Wait ForInstance $instance_id for launched
 Log "Package live · $instance_id"
 
 # — step 1: VS reviews ————————————————————————————————
 VS: Set Tab "MY WORK"
-Pause Confirm request appears in Vaughn's work queue
+Wait ForRoute $instance_id to VS timeout=15000
 VS: Click "Review"
 Pause Confirm popup review form is raised
 VS: Click "Approve"
-Pause Approved — confirm entry removed & routing to AK
+Wait ForRoute $instance_id to AK timeout=15000
 Log "Step 1 complete"
 
 # — step 2: AK approves ———————————————————————————————
 AK: Set Tab "MY TIME"
 AK: Set Tab "MY WORK"
-Pause Confirm request appears in Angela's work queue
 AK: Click "Approve"
 Pause Confirm Document Review panel is visible on Angela's screen
 AK: Click "Approve"
-Pause Step 2 complete — confirm entry removed from AK queue
+Wait ForInstance $instance_id for completed timeout=30000
 Log "Step 2 complete · AK approved"
 
 Log "✓ Chain confirmed · steps 1-3 complete · $instance_id"
