@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260418-CMD63
+// cmd-center.js  ·  v20260418-CMD63a
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260418-CMD63',
+    'cmd-center':  'v20260418-CMD63a',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260418-CMD63 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260418-CMD63a ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -757,6 +757,31 @@ function _waitForEventFiltered(eventName, filterKey, filterVal, timeoutMs) {
   });
 }
 
+// ── resource_id lookup cache (B2 / CMD63a) ────────────────────────────────────
+// Session objects published via presence carry initials/alias/name/location but
+// NOT resource_id (confirmed empirically on live probe). Commands that need
+// resource_id (Wait ForRoute, and latently Get Request id for <alias>) must
+// resolve userId → resource_id via a DB lookup. Cache by userId indefinitely;
+// resource_id is immutable per protocol Contract 3.
+var _resourceIdByUserId = {}; // { userId: resource_id }
+
+async function _resolveResourceIdForUserId(userId) {
+  if (!userId) return null;
+  if (_resourceIdByUserId[userId]) return _resourceIdByUserId[userId];
+  try {
+    var resp = await fetch(
+      SUPA_URL + '/rest/v1/resources?user_id=eq.' + encodeURIComponent(userId) + '&select=id&limit=1',
+      { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } }
+    );
+    var rows = await resp.json();
+    var rid = rows && rows[0] && rows[0].id;
+    if (rid) { _resourceIdByUserId[userId] = rid; return rid; }
+  } catch (e) {
+    if (DEBUG_EVENTS) console.warn('[cmd-center] _resolveResourceIdForUserId failed:', e);
+  }
+  return null;
+}
+
 // ── Compound-filter wait: Wait ForRoute (B2 / CMD63) ──────────────────────────
 // workflow_request.created must match BOTH instance_id AND assignee_resource_id.
 // _waitForEventFiltered supports only a single filterKey/filterVal, so we wait
@@ -1268,8 +1293,11 @@ var COMMANDS = {
     var uid = _resolveTargetAlias(String(alias).toUpperCase());
     if (!uid) throw new Error("Wait ForRoute: unknown alias '" + alias + "'");
     var sess = _sessions[uid];
-    var resourceId = sess && sess.resourceId;
-    if (!resourceId) throw new Error("Wait ForRoute: alias '" + alias + "' has no resource_id (session " + uid.slice(0,8) + " not fully registered)");
+    // Presence payloads don't carry resource_id; resolve via DB on first use,
+    // cache thereafter. Falls through cleanly if the alias is live but the
+    // resource row hasn't been provisioned yet.
+    var resourceId = (sess && sess.resourceId) || await _resolveResourceIdForUserId(uid);
+    if (!resourceId) throw new Error("Wait ForRoute: could not resolve resource_id for alias '" + alias + "' (userId " + uid.slice(0,8) + ")");
     var data = await _waitForRoute(instanceId, resourceId, timeoutMs);
     var seq = (data && (data.step_seq || data.sequence_order));
     return 'workflow_request.created → ' + alias + (seq ? ' (step ' + seq + ')' : '');

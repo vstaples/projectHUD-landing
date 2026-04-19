@@ -1,6 +1,8 @@
-# Version: 1.0
+# Version: 1.1
 # Requires: VS
 # B2 Wait commands probe — no Pauses, all typed waits.
+# v1.1: Form Insert/Select use quoted human labels (data-label match),
+#       matching dual_session_test v1.1 convention.
 
 Assert session VS is connected
 
@@ -12,12 +14,14 @@ VS: Set SubTab "BROWSE"
 VS: Form Open "Expense Report"
 Wait ForForm "Expense Report"
 
-VS: Form Insert employee_name "Vaughn Staples"
-VS: Form Insert trip_start_date "2026-04-14"
-VS: Form Insert trip_end_date "2026-04-14"
-VS: Form Select business_purpose "client"
-VS: Form Insert purpose_description "B2 probe"
-VS: Form Insert customer_name "Apex Consulting Group"
+VS: Form Insert "Employee Name" "Vaughn Staples"
+VS: Form Insert "Trip Start Date" "2026-04-14"
+VS: Form Insert "Trip End Date" "2026-04-14"
+VS: Form Select "Business Purpose" "client"
+Wait 500
+VS: Form Insert "Purpose Description" "B2 probe"
+VS: Form Insert "Customer Name" "Apex Consulting Group"
+VS: Form Insert "Customer Location" "Phoenix, AZ"
 VS: Form Submit
 
 Wait ForEvent "form.submitted" → $instance_id
