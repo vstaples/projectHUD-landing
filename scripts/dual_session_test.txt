@@ -2,18 +2,19 @@
 # Version: 1.2
 # Requires: VS, AK
 # Notes: B2 migration — machine-observable Pauses replaced with typed Wait
-#        commands. UI-modal-render Pauses retained (Review popup, Document
-#        Review panel) since no machine event signals their mount. Form
-#        Open Pause retained pending Cadence iframe `compass_form_ready`
-#        migration.
+#        commands. Three Pause categories retained:
+#        (a) Form-render pending Cadence iframe compass_form_ready migration
+#            → TODO: Wait ForForm
+#        (b) UI-render-gap: observable with a not-yet-built emit
+#            → TODO (B-UI-1): Wait ForQueueRow via work_queue.rendered
+#        (c) UI modal render (Review popup, Document Review panel) — same
+#            category as (b), awaiting B-UI-1 or successor emit.
 
 # — preflight · presence ————————————————————————————————
 Assert session VS is connected
 Assert session AK is connected
 
 # — preflight · navigate both sessions to Compass ————————
-# Both sessions navigate to Compass in parallel; Wait ForLocation resolves
-# per-session on location.ready emit.
 VS: Set View "compass"
 AK: Set View "compass"
 Wait ForLocation VS "compass.my_work" timeout=30000
@@ -26,7 +27,7 @@ VS: Set Tab "MY REQUESTS"
 VS: Set SubTab "BROWSE"
 VS: Form Open "Expense Report"
 Pause Form open — confirm Expense Report modal is visible on Vaughn's screen
-# TODO: replace with Wait ForForm after Cadence iframe migration
+# TODO: replace with Wait ForForm after Cadence iframe compass_form_ready migration
 VS: Form Insert "Employee Name" "Vaughn Staples"
 VS: Form Insert "Trip Start Date" "2026-04-14"
 VS: Form Insert "Trip End Date" "2026-04-14"
@@ -43,18 +44,24 @@ Log "Package live · $instance_id"
 
 # — step 1: VS reviews ————————————————————————————————
 VS: Set Tab "MY WORK"
-Wait ForRoute $instance_id to VS 
+Wait ForRoute $instance_id to VS
+Pause Confirm request appears in Vaughn's work queue
+# TODO (B-UI-1): replace with Wait ForQueueRow via work_queue.rendered emit
 VS: Click "Review"
 Pause Confirm popup review form is raised
+# TODO (B-UI-1 successor): replace with Wait ForModal via modal.opened emit
 VS: Click "Approve"
-Wait ForRoute $instance_id to AK 
+Wait ForRoute $instance_id to AK
 Log "Step 1 complete"
 
 # — step 2: AK approves ———————————————————————————————
 AK: Set Tab "MY TIME"
 AK: Set Tab "MY WORK"
+Pause Confirm request appears in Angela's work queue
+# TODO (B-UI-1): replace with Wait ForQueueRow via work_queue.rendered emit
 AK: Click "Approve"
 Pause Confirm Document Review panel is visible on Angela's screen
+# TODO (B-UI-1 successor): replace with Wait ForModal via modal.opened emit
 AK: Click "Approve"
 Wait ForInstance $instance_id for completed timeout=30000
 Log "Step 2 complete · AK approved"
