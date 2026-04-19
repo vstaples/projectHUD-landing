@@ -1,11 +1,26 @@
-# Version: 1.0
-# Requires: VS
-# B-UI-2 probe — Wait ForQueueRow both single-field and compound.
+# Version: 1.1
+# Requires: VS, AK
+# B-UI-2 probe — Wait ForQueueRow, dual-session.
+#
+# Brief v1.0's single-session probe was wrong: VS is the submitter and
+# cannot observe their own queue-row render — the B-UI-1 reactive
+# subscription correctly gates on _myResource.id === assignee_resource_id,
+# so work_queue.rendered fires on the assignee's tab only. VS never
+# becomes the assignee for their own submission; step 1 (submitter-typed)
+# auto-completes and step 2 routes to VS's manager (AK).
+#
+# v1.1 rewrites the probe to match dual_session_test's structure: VS
+# submits, the emit fires on AK's tab, VS observes it over the app_event
+# bus via Wait ForQueueRow $instance_id to AK. Single-field mode is
+# exercised by a second call which resolves from the retention buffer.
 
 Assert session VS is connected
+Assert session AK is connected
 
 VS: Set View "compass"
+AK: Set View "compass"
 Wait ForLocation VS "compass.my_work" timeout=30000
+Wait ForLocation AK "compass.my_work" timeout=30000
 
 VS: Set Tab "MY REQUESTS"
 VS: Set SubTab "BROWSE"
@@ -16,19 +31,20 @@ VS: Form Insert "Employee Name" "Vaughn Staples"
 VS: Form Insert "Trip Start Date" "2026-04-14"
 VS: Form Insert "Trip End Date" "2026-04-14"
 VS: Form Select "Business Purpose" "client"
-VS: Form Insert "Purpose Description" "B-UI-2 probe"
+VS: Form Insert "Purpose Description" "B-UI-2 probe v1.1"
 VS: Form Insert "Customer Name" "Apex Consulting Group"
 VS: Form Submit
 
 Wait ForEvent "form.submitted" → $instance_id
 Wait ForInstance $instance_id for launched
+Wait ForRoute $instance_id to AK
 
-VS: Set Tab "MY WORK"
+# Compound match — fires when AK's Compass tab renders the new queue row.
+# This is the primary assertion of B-UI-2.
+Wait ForQueueRow $instance_id to AK
 
-# Single-field match
+# Single-field match — same emit, second wait; resolves from retention
+# buffer. Proves both code paths work against one emit.
 Wait ForQueueRow $instance_id
-
-# Compound match (same event; proves both paths work)
-Wait ForQueueRow $instance_id to VS
 
 Log "✓ B-UI-2 probe complete · $instance_id"
