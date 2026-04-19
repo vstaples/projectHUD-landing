@@ -1,0 +1,48 @@
+# Version: 1.0
+# Requires: VS, AK
+# B-UI-3.1 probe — Click ForInstance routes remotely when prefixed.
+
+Assert session VS is connected
+Assert session AK is connected
+
+VS: Set View "compass"
+AK: Set View "compass"
+Wait ForLocation VS "compass.my_work" timeout=30000
+Wait ForLocation AK "compass.my_work" timeout=30000
+
+# VS submits (as in dual_session_test)
+VS: Set Tab "MY REQUESTS"
+VS: Set SubTab "BROWSE"
+VS: Form Open "Expense Report"
+Pause Form open — confirm Expense Report modal is visible
+
+VS: Form Insert "Employee Name" "Vaughn Staples"
+VS: Form Insert "Trip Start Date" "2026-04-14"
+VS: Form Insert "Trip End Date" "2026-04-14"
+VS: Form Select "Business Purpose" "client"
+VS: Form Insert "Purpose Description" "B-UI-3.1 remote dispatch probe"
+VS: Form Insert "Customer Name" "Remote Dispatch Corp"
+VS: Form Submit
+
+Wait ForEvent "form.submitted" → $instance_id
+Wait ForInstance $instance_id for launched
+
+# VS's own step-1 self-review
+VS: Set Tab "MY WORK"
+Wait ForQueueRow $instance_id to VS
+VS: Click ForInstance $instance_id "Review"
+
+Pause Review popup raised for VS — approve manually
+
+# After VS approves, step-2 routes to AK
+Wait ForRoute $instance_id to AK
+
+# THE TEST: AK: Click ForInstance must route remotely.
+AK: Set Tab "MY WORK"
+Wait ForQueueRow $instance_id to AK
+AK: Click ForInstance $instance_id "Review"
+
+Pause Review popup raised for AK — confirm the opened form is
+      "Remote Dispatch Corp" (not a stale row)
+
+Log "✓ B-UI-3.1 probe complete · target $instance_id"
