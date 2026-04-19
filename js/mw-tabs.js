@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260419-CMD64
+// VERSION: 20260419-CMD69
 // ══════════════════════════════════════════════════════════
 console.log('%c[mw-tabs] v20260419-CMD69 — B-UI-3.2: serialize _myActiveRequestId write before workflow_request.created emit (closes Click ForInstance race)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 window._mwTabsVersion = 'v20260419-CMD69';
