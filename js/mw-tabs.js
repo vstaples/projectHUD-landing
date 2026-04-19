@@ -2,8 +2,8 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260419-CMD64
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260419-CMD65 — B-UI-1 Work Queue reactivity + work_queue.rendered emit (CMD65: workflow_request_id in emit payload)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260419-CMD65';
+console.log('%c[mw-tabs] v20260419-CMD69 — B-UI-3.2: serialize _myActiveRequestId write before workflow_request.created emit (closes Click ForInstance race)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260419-CMD69';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -2310,7 +2310,28 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
     });
     var newRequestId = (insertedReq && insertedReq[0] && insertedReq[0].id) || null;
 
-    // ── Emit #3: workflow_request.created (B1 / CMD54; CMD65 hotfix) ────────
+    console.log('%c[_mwResolveAndRoute] routed step ' + currentStepSeq + ' (' + step.assignee_role + ') → ' + assigneeName,
+      'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
+
+    // Expose for CMD Center — if this request is for the current user, store it
+    // so scripts can call Click "Review" or Click "Approve" without DOM scraping.
+    //
+    // B-UI-3.2 (CMD69): this write MUST happen BEFORE the workflow_request.created
+    // emit. The emit triggers B-UI-1's reactive handler which fires work_queue.rendered
+    // via rAF (~16ms); Wait ForQueueRow resolves; Click ForInstance then reads
+    // _myActiveRequestId[instance_id]. If the map write is downstream of the emit,
+    // Click ForInstance throws "no row for instance" because the map is empty at
+    // click time. Pre-fix, the write trailed the emit plus an awaited API.get
+    // round-trip (50–200ms) — the race was deterministic, not time-sensitive.
+    // Post-fix, the write is synchronous-after-INSERT using the row id captured
+    // from the POST's return=representation (no second HTTP round-trip needed —
+    // newRequestId was already available at line ~2311).
+    if (window._myResource && assigneeResId === window._myResource.id && newRequestId) {
+      if (!window._myActiveRequestId) window._myActiveRequestId = {};
+      window._myActiveRequestId[instanceId] = newRequestId;
+    }
+
+    // ── Emit #3: workflow_request.created (B1 / CMD54; CMD65 hotfix; CMD69 reorder) ──
     // Fires at the routing site (not in the cmd-center.js transcript intercept)
     // so every routed request emits, not only those the intercept catches on
     // Compass. `role` carries the Cadence role (manager/finance/legal/hr/
@@ -2323,6 +2344,12 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
     // Absence caused every work_queue.rendered emit to silently no-op since
     // B-UI-1 shipped; surfaced by B-UI-2's probe. Additive change; no
     // downstream consumer breaks.
+    //
+    // CMD69 reorder (B-UI-3.2): moved from line ~2327 (pre-_myActiveRequestId write)
+    // to here (post-write). Serializes the map write as a precondition of the
+    // emit. For the not-for-current-user branch, the map write is skipped but
+    // the emit still fires — other consumers (reactive subscription on the
+    // assignee's own tab, M2 feed) require it. That branch's timing is unchanged.
     if (typeof window._cmdEmit === 'function') {
       window._cmdEmit('workflow_request.created', {
         workflow_request_id:    newRequestId,
@@ -2333,25 +2360,6 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
         role:                   step.assignee_role || null,
         template_id:            step.template_id || null,
       });
-    }
-
-    console.log('%c[_mwResolveAndRoute] routed step ' + currentStepSeq + ' (' + step.assignee_role + ') → ' + assigneeName,
-      'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
-
-    // Expose for CMD Center — if this request is for the current user, store it
-    // so scripts can call Click "Review" or Click "Approve" without DOM scraping.
-    if (window._myResource && assigneeResId === window._myResource.id) {
-      if (!window._myActiveRequestId) window._myActiveRequestId = {};
-      // Re-fetch to get the new row's id
-      var newReq = await API.get(
-        'workflow_requests?instance_id=eq.' + instanceId +
-        '&owner_resource_id=eq.' + assigneeResId +
-        '&status=eq.open&order=created_at.desc&select=id&limit=1'
-      ).catch(function(){ return []; });
-      if (newReq && newReq[0]) {
-        window._myActiveRequestId[instanceId] = newReq[0].id;
-        console.log('[_mwResolveAndRoute] _myActiveRequestId set:', newReq[0].id);
-      }
     }
 
     // Update instance current_step_id
