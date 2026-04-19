@@ -2,8 +2,8 @@
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
 // VERSION: 20260419-CMD64
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260419-CMD64 — B-UI-1 Work Queue reactivity + work_queue.rendered emit','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260419-CMD64';
+console.log('%c[mw-tabs] v20260419-CMD65 — B-UI-1 Work Queue reactivity + work_queue.rendered emit (CMD65: workflow_request_id in emit payload)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260419-CMD65';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -2291,8 +2291,11 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
       return;
     }
 
-    // Create the workflow_request
-    await API.post('workflow_requests', {
+    // Create the workflow_request. Capture the inserted row so the
+    // new row's id is available for the workflow_request.created emit.
+    // Supabase REST with default Prefer: return=representation returns
+    // the inserted row(s) as an array.
+    var insertedReq = await API.post('workflow_requests', {
       firm_id:          firmId,
       instance_id:      instanceId,
       role:             dbRole,
@@ -2305,15 +2308,24 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
       due_date:         null,
       created_at:       now,
     });
+    var newRequestId = (insertedReq && insertedReq[0] && insertedReq[0].id) || null;
 
-    // ── Emit #3: workflow_request.created (B1 / CMD54) ──────────────────────
+    // ── Emit #3: workflow_request.created (B1 / CMD54; CMD65 hotfix) ────────
     // Fires at the routing site (not in the cmd-center.js transcript intercept)
     // so every routed request emits, not only those the intercept catches on
     // Compass. `role` carries the Cadence role (manager/finance/legal/hr/
     // submitter) which is what policies predicate on — the DB's workflow_requests
     // role column is coarser ('approver'/'reviewer').
+    //
+    // CMD65 hotfix: include workflow_request_id. B-UI-1's _emitRenderedOnce
+    // dedups by workflow_request_id and bails early when it's absent — an
+    // omission in B1's original payload (Brief B1 v1.1 Emit #3 didn't list it).
+    // Absence caused every work_queue.rendered emit to silently no-op since
+    // B-UI-1 shipped; surfaced by B-UI-2's probe. Additive change; no
+    // downstream consumer breaks.
     if (typeof window._cmdEmit === 'function') {
       window._cmdEmit('workflow_request.created', {
+        workflow_request_id:    newRequestId,
         instance_id:            instanceId,
         seq:                    currentStepSeq,
         assignee_resource_id:   assigneeResId,

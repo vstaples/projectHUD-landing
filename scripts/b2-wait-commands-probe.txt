@@ -1,31 +1,64 @@
-# Version: 1.1
-# Requires: VS
-# B2 Wait commands probe — no Pauses, all typed waits.
-# v1.1: Form Insert/Select use quoted human labels (data-label match),
-#       matching dual_session_test v1.1 convention.
+# Version: 1.3
+# Requires: VS, AK
+# B-UI-2 probe — Wait ForQueueRow, dual-session.
+#
+# v1.0 was single-session (wrong — submitter cannot observe own queue).
+# v1.1 was dual-session but omitted VS:/AK: prefixes on action commands;
+#      Aegis ran every Set/Form line locally on itself instead of
+#      dispatching to Compass. Timed out on Set Tab because Aegis has
+#      no tabs to set.
+# v1.2 was wrong — routed from form-submit directly to AK, but step 1
+#      of the Expense Report template routes to VS first (submitter
+#      reviews own submission). VS must Click "Review" + "Approve"
+#      before the route to AK fires.
+# v1.3 adds VS's step-1 review/approve between the form submit and the
+#      AK route, matching dual_session_test v1.3's flow exactly.
 
+# — preflight · presence ———————————————————————————————
 Assert session VS is connected
+Assert session AK is connected
 
+# — preflight · navigate both sessions to Compass ————————
 VS: Set View "compass"
+AK: Set View "compass"
 Wait ForLocation VS "compass.my_work" timeout=30000
+Wait ForLocation AK "compass.my_work" timeout=30000
+VS: Set Tab "MY WORK"
+AK: Set Tab "MY WORK"
 
+# — VS submits ———————————————————————————————————————
 VS: Set Tab "MY REQUESTS"
 VS: Set SubTab "BROWSE"
 VS: Form Open "Expense Report"
-Wait ForForm "Expense Report"
+Pause Form open — confirm Expense Report modal is visible on Vaughn's screen
 
 VS: Form Insert "Employee Name" "Vaughn Staples"
 VS: Form Insert "Trip Start Date" "2026-04-14"
 VS: Form Insert "Trip End Date" "2026-04-14"
 VS: Form Select "Business Purpose" "client"
-Wait 500
-VS: Form Insert "Purpose Description" "B2 probe"
+VS: Form Insert "Purpose Description" "B-UI-2 probe v1.2"
 VS: Form Insert "Customer Name" "Apex Consulting Group"
-VS: Form Insert "Customer Location" "Phoenix, AZ"
 VS: Form Submit
 
 Wait ForEvent "form.submitted" → $instance_id
 Wait ForInstance $instance_id for launched
-Wait ForRoute $instance_id to VS
 
-Log "✓ B2 probe complete · $instance_id"
+# — step 1: VS reviews & approves ———————————————————————
+VS: Set Tab "MY WORK"
+Wait ForRoute $instance_id to VS
+VS: Click "Review"
+Pause Confirm popup review form is raised on Vaughn's screen
+VS: Click "Approve"
+Wait ForRoute $instance_id to AK
+
+AK: Set Tab "MY WORK"
+
+# — B-UI-2 primary assertion ————————————————————————————
+# Compound match — fires when AK's Compass tab renders the new queue row.
+Wait ForQueueRow $instance_id to AK
+
+# Single-field match — same emit, second wait; resolves from retention
+# buffer. Proves both code paths work against one emit.
+Wait ForQueueRow $instance_id
+
+Log "✓ B-UI-2 probe complete · $instance_id"

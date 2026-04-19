@@ -1,46 +1,70 @@
-# Version: 1.1
+# Version: 1.4
 # Requires: VS, AK
 # B-UI-2 probe — Wait ForQueueRow, dual-session.
 #
-# Brief v1.0's single-session probe was wrong: VS is the submitter and
-# cannot observe their own queue-row render — the B-UI-1 reactive
-# subscription correctly gates on _myResource.id === assignee_resource_id,
-# so work_queue.rendered fires on the assignee's tab only. VS never
-# becomes the assignee for their own submission; step 1 (submitter-typed)
-# auto-completes and step 2 routes to VS's manager (AK).
-#
-# v1.1 rewrites the probe to match dual_session_test's structure: VS
-# submits, the emit fires on AK's tab, VS observes it over the app_event
-# bus via Wait ForQueueRow $instance_id to AK. Single-field mode is
-# exercised by a second call which resolves from the retention buffer.
+# v1.0 was single-session (wrong — submitter cannot observe own queue).
+# v1.1 was dual-session but omitted VS:/AK: prefixes on action commands;
+#      Aegis ran every Set/Form line locally on itself instead of
+#      dispatching to Compass. Timed out on Set Tab because Aegis has
+#      no tabs to set.
+# v1.2 was wrong — routed from form-submit directly to AK, but step 1
+#      of the Expense Report template routes to VS first (submitter
+#      reviews own submission). VS must Click "Review" + "Approve"
+#      before the route to AK fires.
+# v1.3 added step-1 review but Click "Review" races the DOM render:
+#      Wait ForRoute resolves on emit immediately after the DB write;
+#      the queue row for the new instance hasn't mounted yet. Click
+#      "Review" then picks the first Review button in the DOM — which
+#      is whatever stale row sorted first.
+# v1.4 inserts Wait ForQueueRow before each Click "Review" so the DOM
+#      is known to have the new row mounted. This is what
+#      Wait ForQueueRow exists for. (Click "Review" is still
+#      instance-blind — picks first DOM match — but with the new row
+#      present, first-match resolves correctly when queue state is
+#      clean. Instance-blind Click is a deferred open question.)
 
+# — preflight · presence ———————————————————————————————
 Assert session VS is connected
 Assert session AK is connected
 
+# — preflight · navigate both sessions to Compass ————————
 VS: Set View "compass"
 AK: Set View "compass"
 Wait ForLocation VS "compass.my_work" timeout=30000
 Wait ForLocation AK "compass.my_work" timeout=30000
+VS: Set Tab "MY WORK"
+AK: Set Tab "MY WORK"
 
+# — VS submits ———————————————————————————————————————
 VS: Set Tab "MY REQUESTS"
 VS: Set SubTab "BROWSE"
 VS: Form Open "Expense Report"
-Pause Form open — confirm Expense Report modal is visible
+Pause Form open — confirm Expense Report modal is visible on Vaughn's screen
 
 VS: Form Insert "Employee Name" "Vaughn Staples"
 VS: Form Insert "Trip Start Date" "2026-04-14"
 VS: Form Insert "Trip End Date" "2026-04-14"
 VS: Form Select "Business Purpose" "client"
-VS: Form Insert "Purpose Description" "B-UI-2 probe v1.1"
+VS: Form Insert "Purpose Description" "B-UI-2 probe v1.2"
 VS: Form Insert "Customer Name" "Apex Consulting Group"
 VS: Form Submit
 
 Wait ForEvent "form.submitted" → $instance_id
 Wait ForInstance $instance_id for launched
+
+# — step 1: VS reviews & approves ———————————————————————
+VS: Set Tab "MY WORK"
+Wait ForRoute $instance_id to VS
+Wait ForQueueRow $instance_id to VS
+VS: Click "Review"
+Pause Confirm popup review form is raised on Vaughn's screen
+VS: Click "Approve"
 Wait ForRoute $instance_id to AK
 
+AK: Set Tab "MY WORK"
+
+# — B-UI-2 primary assertion ————————————————————————————
 # Compound match — fires when AK's Compass tab renders the new queue row.
-# This is the primary assertion of B-UI-2.
 Wait ForQueueRow $instance_id to AK
 
 # Single-field match — same emit, second wait; resolves from retention
