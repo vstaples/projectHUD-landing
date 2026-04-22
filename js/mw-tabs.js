@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260419-CMD69
+// VERSION: 20260419-CMD70
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260419-CMD69 — B-UI-3.2: serialize _myActiveRequestId write before workflow_request.created emit (closes Click ForInstance race)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260419-CMD69';
+console.log('%c[mw-tabs] v20260419-CMD70 — B-UI-3.4: await _mwLoadUserView before work_queue.rendered emit (closes DOM-anchor leg of Click ForInstance race)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260419-CMD70';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -2996,19 +2996,21 @@ window.populateDeltaStrip = function() {
   }
 
   // After a re-render triggered by workflow_request.created, fire
-  // work_queue.rendered with the payload from that same event. The re-render
-  // is itself async (DB query + DOM paint); schedule the emit via rAF so
-  // the DOM commit has occurred. One rAF is enough for innerHTML-style
-  // updates — if _mwLoadUserView uses a longer async pipeline, the emit
-  // still lands after the pipeline unwinds because rAF runs before paint
-  // but after synchronous render passes in the current tick.
+  // work_queue.rendered with the payload from that same event. Callers in
+  // _handleEvent now await `_mwLoadUserView` before invoking this, so by
+  // the time we're here the synchronous innerHTML assignment that writes
+  // the .wi-row / .wi-action-btn elements has already committed to the
+  // DOM. The single rAF below pushes the emit past the next paint tick
+  // as a belt-and-suspenders guard — any future consumer that wants to
+  // interact with layout (not just query DOM) benefits from the extra
+  // tick without changing the contract.
   //
   // The emit payload comes from the triggering event, NOT from a DOM query.
   // This is deliberate: the event is the source of truth for workflow_request
   // metadata; the DOM is only the presentation layer. Any future consumer
   // (policy engine, scripts) should treat work_queue.rendered as "this
-  // workflow_request is now presented to the assignee" — the queryability
-  // of the DOM row is implied by the emit's timing, not its payload.
+  // workflow_request is now presented to the assignee AND [data-wi-id] is
+  // queryable" — the latter postcondition is what B-UI-3.4 tightens.
   function _emitRenderedOnce(evtPayload) {
     var wrid = evtPayload && evtPayload.workflow_request_id;
     if (!wrid) return;
@@ -3029,6 +3031,14 @@ window.populateDeltaStrip = function() {
   // Core handler — called by both live onAppEvent and the on-mount buffer
   // scan. Returns true if the event triggered a re-render (caller doesn't
   // use this today, but keeps the contract clean).
+  //
+  // B-UI-3.4 (CMD70): `_mwLoadUserView` is async. The CMD64 implementation
+  // invoked it without awaiting and then scheduled the emit via rAF. rAF
+  // fires before the awaited DB query inside `_mwLoadUserView` resolves, so
+  // `work_queue.rendered` landed before `[data-wi-id="<wrid>"]` was in the
+  // DOM — the second leg of the Click ForInstance precondition race
+  // B-UI-3.2 surfaced. Fix: await the render Promise, then emit. A single
+  // rAF inside `_emitRenderedOnce` remains as a paint-commit guard.
   function _handleEvent(eventName, data) {
     if (!data) return false;
     var myResId = _myResId();
@@ -3039,11 +3049,19 @@ window.populateDeltaStrip = function() {
       // A new row is inbound for this operator. Re-render the queue and
       // then announce the row is clickable.
       if (typeof window._mwLoadUserView === 'function') {
-        try { window._mwLoadUserView(); } catch (e) {
-          console.warn('[mw-tabs] _mwLoadUserView threw during reactive refresh:', e);
-        }
+        Promise.resolve()
+          .then(function() { return window._mwLoadUserView(); })
+          .then(function() { _emitRenderedOnce(data); })
+          .catch(function(e) {
+            console.warn('[mw-tabs] _mwLoadUserView threw during reactive refresh:', e);
+            // Still emit — a downstream consumer waiting on
+            // work_queue.rendered should fail via its own timeout rather
+            // than hang because the renderer threw.
+            _emitRenderedOnce(data);
+          });
+      } else {
+        _emitRenderedOnce(data);
       }
-      _emitRenderedOnce(data);
       return true;
     }
 
