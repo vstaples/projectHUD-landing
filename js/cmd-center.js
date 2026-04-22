@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260419-CMD70
+// cmd-center.js  ·  v20260419-CMD71
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260419-CMD70',
+    'cmd-center':  'v20260419-CMD71',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260419-CMD70 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260419-CMD71 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -1817,6 +1817,24 @@ function _resolveTargetAlias(targetStr) {
   return match ? match[0] : null;
 }
 
+// ── Variable substitution on a whole command string (B-UI-5 / CMD71) ──────────
+// Replaces $varname tokens against the module-scoped _storeVars table.
+// Used by _executeCommand's per-arg substitution AND by the three dispatch
+// sites that send commands cross-session (script path ~L2012, runLine path
+// ~L2743, window._sendToSession ~L3419). Variables must resolve on the
+// SENDER (Aegis) before transmission — the receiver's _storeVars is empty
+// for sender-captured values. If a var is unset, the literal '$varname' is
+// preserved verbatim, matching _executeCommand's existing fallback so the
+// receiver's error surfaces clearly rather than silently collapsing.
+function _resolveVarsInCmd(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/\$(\w+)/g, function(whole, k) {
+    return (_storeVars[k] !== undefined && _storeVars[k] !== null && _storeVars[k] !== '')
+      ? _storeVars[k]
+      : whole;
+  });
+}
+
 // ── Execute a single command ──────────────────────────────────────────────────
 async function _executeCommand(cmdLine, fromWho) {
   var parsed = _parseLine(cmdLine);
@@ -2002,14 +2020,19 @@ async function _runScript(scriptText, scriptName) {
                'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow'];
       if (targetUserId && (_lv.indexOf(parsed.verb)===-1)) {
         // Dispatch via Realtime (non-local commands)
-        _appendLine(parsed.target || 'SYS', 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
+        // B-UI-5 / CMD71: resolve $variables against Aegis's _storeVars
+        // BEFORE transmission. Receiver has no access to sender-captured
+        // vars; the wire must carry resolved literals.
+        var _bareLine = line.replace(/^[A-Z]+:\s*/, '');
+        var _resolvedLine = _resolveVarsInCmd(_bareLine);
+        _appendLine(parsed.target || 'SYS', 'cmd', _resolvedLine);
         if (_channel) {
           _channelSend({
             type: 'broadcast', event: 'cmd',
             payload: {
               target: targetUserId,
               from:   _myAlias || _mySession.initials,
-              cmd:    line.replace(/^[A-Z]+:\s*/, ''),
+              cmd:    _resolvedLine,
               cmdId:  Date.now() + '-' + i,
             }
           });
@@ -2738,9 +2761,12 @@ function _runCmd() {
     var _rl=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
              'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow'];
     if (targetUserId && _channel && _rl.indexOf(parsed.verb)===-1) {
+      // B-UI-5 / CMD71: resolve $variables against Aegis's _storeVars
+      // before transmission. See _resolveVarsInCmd and script-path dispatch.
+      var _resolvedCmd = _resolveVarsInCmd(cmd);
       _channelSend({
         type: 'broadcast', event: 'cmd',
-        payload: { target: targetUserId, from: _myAlias || _mySession.initials, cmd: cmd, cmdId: Date.now() }
+        payload: { target: targetUserId, from: _myAlias || _mySession.initials, cmd: _resolvedCmd, cmdId: Date.now() }
       });
       return;
     }
@@ -3416,8 +3442,11 @@ window._sendToSession = function(alias, cmd) {
   var uid = _resolveTargetAlias(alias);
   if (!uid){console.warn('[CMD] unknown alias:',alias);return;}
   if (!_channel){console.warn('[CMD] not connected');return;}
-  _channelSend({type:'broadcast',event:'cmd',payload:{target:uid,from:_myAlias||(window._aegisMode?'AEGIS':'OP'),cmd:cmd,cmdId:Date.now()}});
-  console.log('[CMD] sent to',alias,'('+uid.slice(0,8)+'...):',cmd);
+  // B-UI-5 / CMD71: resolve $variables against Aegis's _storeVars before
+  // transmission. Receiver has no access to sender-captured vars.
+  var resolvedCmd = _resolveVarsInCmd(cmd);
+  _channelSend({type:'broadcast',event:'cmd',payload:{target:uid,from:_myAlias||(window._aegisMode?'AEGIS':'OP'),cmd:resolvedCmd,cmdId:Date.now()}});
+  console.log('[CMD] sent to',alias,'('+uid.slice(0,8)+'...):',resolvedCmd);
 };
 window._aegisSessions = function() {
   Object.entries(_sessions).forEach(function([uid,s]){
