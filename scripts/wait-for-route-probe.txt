@@ -1,0 +1,48 @@
+# Version: 1.0
+# Purpose: Diagnose why Wait ForRoute times out despite the route firing.
+#
+# What to observe:
+# 1. Console should show `emit workflow_request.created` after step-2 resolve
+# 2. Console should show `recv workflow_request.created` on the OTHER tab
+# 3. Wait ForRoute should either resolve OR time out at 10s
+# 4. If it times out, the event logs above will tell us what's firing vs what the Wait expects
+
+Assert session VS is connected
+Assert session AK is connected
+
+VS: Set View "compass"
+AK: Set View "compass"
+
+Wait ForLocation VS "compass.my_work" timeout=30000
+Wait ForLocation AK "compass.my_work" timeout=30000
+
+VS: Set Tab "MY REQUESTS"
+VS: Set SubTab "BROWSE"
+
+VS: Form Open "Expense Report"
+VS: Form Insert "Employee Name" "Vaughn Staples"
+VS: Form Insert "Trip Start Date" "2026-04-14"
+VS: Form Insert "Trip End Date" "2026-04-14"
+VS: Form Select "Business Purpose" "client"
+VS: Form Insert "Purpose Description" "Wait ForRoute investigation"
+VS: Form Insert "Customer Name" "Test"
+VS: Form Submit
+
+Wait ForEvent "form.submitted" → $instance_id
+Wait ForInstance $instance_id for launched
+
+VS: Set Tab "MY WORK"
+Wait ForQueueRow $instance_id to VS
+
+Log "About to click Review — after approval, route should fire to AK"
+VS: Click ForInstance $instance_id "Review"
+
+Pause Review popup raised — approve manually, then observe what happens
+# After you approve: step 3 should route to AK
+# Watch the console — you should see workflow_request.created fire with assignee AK
+# Then Wait ForRoute will either resolve or time out at 10s
+
+Log "Starting Wait ForRoute with 10s timeout — watch console for events"
+Wait ForRoute $instance_id to AK timeout=10000
+
+Log "If you got here, Wait ForRoute resolved — probe successful"
