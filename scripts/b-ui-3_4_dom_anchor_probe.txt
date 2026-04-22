@@ -1,0 +1,69 @@
+# Version: 1.0
+# Requires: VS
+# B-UI-3.4 probe — DOM-anchor leg of the Click ForInstance
+# precondition race closes.
+#
+# Under CMD69 (pre-fix): the reactive handler in mw-tabs.js called
+#   _mwLoadUserView() without awaiting its async DB+render pipeline,
+#   then scheduled work_queue.rendered via requestAnimationFrame.
+#   rAF fired before the awaited innerHTML write committed
+#   [data-wi-id="<wrid>"] to the DOM. Wait ForQueueRow would
+#   resolve, then Click ForInstance would immediately throw
+#   "no row for instance <uuid_prefix>".
+#
+# Under CMD70 (post-fix): the handler awaits _mwLoadUserView, then
+#   emits. work_queue.rendered is a true postcondition — the DOM
+#   anchor is queryable by the time any consumer sees the emit.
+#
+# Pass criterion: this script runs clean with zero transcript
+# errors. The critical line is the Click ForInstance — if it
+# throws "no row for instance ...", the fix regressed.
+#
+# Rule 33 (provisional) gate: both precondition legs of
+# Click ForInstance are exercised here —
+#   (a) _myActiveRequestId[instance_id] populated (B-UI-3.2 / CMD69)
+#   (b) [data-wi-id="<wrid>"] queryable                 (B-UI-3.4 / CMD70)
+# Success of this probe without either hand-insertion of Pauses
+# OR fallback polling promotes Rule 33 from provisional to live.
+
+Assert session VS is connected
+
+VS: Set View "compass"
+Wait ForLocation VS "compass.my_work" timeout=30000
+
+VS: Set Tab "MY REQUESTS"
+VS: Set SubTab "BROWSE"
+VS: Form Open "Expense Report"
+Pause Form open — confirm Expense Report modal is visible
+
+VS: Form Insert "Employee Name" "Vaughn Staples"
+VS: Form Insert "Trip Start Date" "2026-04-14"
+VS: Form Insert "Trip End Date" "2026-04-14"
+VS: Form Select "Business Purpose" "client"
+VS: Form Insert "Purpose Description" "B-UI-3.4 probe — DOM-anchor race"
+VS: Form Insert "Customer Name" "Anchor Corp"
+VS: Form Submit
+
+Wait ForEvent "form.submitted" → $instance_id
+Wait ForInstance $instance_id for launched
+
+VS: Set Tab "MY WORK"
+
+# The Wait ForQueueRow below resolves on work_queue.rendered.
+# Under CMD70, the emit follows the awaited _mwLoadUserView, so
+# by the time this Wait resolves, [data-wi-id="<wrid>"] is in
+# the DOM. Under CMD69, it was not — the next line would throw.
+Wait ForQueueRow $instance_id to VS
+
+# The critical line. If the DOM-anchor leg is closed, this
+# succeeds and Aegis logs:
+#   → Click ForInstance: Review · <uuid_prefix>
+# If CMD70 regressed or the fix is incomplete, Aegis logs:
+#   ✗ Click ForInstance: no row for instance <uuid_prefix>
+#     (check Wait ForQueueRow resolved before click, or queue
+#      was cleared between wait and click)
+VS: Click ForInstance $instance_id "Review"
+
+Pause Confirm Review modal opened for "Anchor Corp" (B-UI-3.4 pass)
+
+Log "✓ B-UI-3.4 probe complete · instance $instance_id · CMD70 DOM-anchor leg closed"
