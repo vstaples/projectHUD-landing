@@ -2329,12 +2329,6 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
     if (window._myResource && assigneeResId === window._myResource.id && newRequestId) {
       if (!window._myActiveRequestId) window._myActiveRequestId = {};
       window._myActiveRequestId[instanceId] = newRequestId;
-      console.log('[B-UI-3.2 trace] map-write ts=' + Date.now() + ' instance=' + instanceId.slice(0,8) + ' wrid=' + newRequestId.slice(0,8));
-    } else {
-      console.log('[B-UI-3.2 trace] map-write SKIPPED ts=' + Date.now() +
-        ' _myResource=' + (window._myResource ? window._myResource.id : 'null') +
-        ' assigneeResId=' + assigneeResId +
-        ' newRequestId=' + newRequestId);
     }
 
     // ── Emit #3: workflow_request.created (B1 / CMD54; CMD65 hotfix; CMD69 reorder) ──
@@ -2357,7 +2351,6 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
     // the emit still fires — other consumers (reactive subscription on the
     // assignee's own tab, M2 feed) require it. That branch's timing is unchanged.
     if (typeof window._cmdEmit === 'function') {
-      console.log('[B-UI-3.2 trace] emit ts=' + Date.now() + ' wrid=' + (newRequestId ? newRequestId.slice(0,8) : 'null'));
       window._cmdEmit('workflow_request.created', {
         workflow_request_id:    newRequestId,
         instance_id:            instanceId,
