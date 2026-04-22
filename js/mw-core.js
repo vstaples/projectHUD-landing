@@ -1,6 +1,6 @@
-// VERSION: 20260418-CMD60
-window._mwCoreVersion = 'v20260418-CMD60';
-console.log('%c[mw-core] v20260418-CMD60 — B1 event bus: location.ready emit','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260422-CMD72
+window._mwCoreVersion = 'v20260422-CMD72';
+console.log('%c[mw-core] v20260422-CMD72 — B-UI-6: poll no longer re-renders work tab (reactive handler owns it)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1367,14 +1367,27 @@ window._mwLoadUserView = async function() {
               window.loadUserRequests && window.loadUserRequests();
               window._mwWorkStale = true;
             } else if (activeTab === 'work') {
-              // User is on work tab — use lightweight refresh to update items in place.
-              // _mwRefreshWorkItems re-fetches action items and re-renders the list
-              // without resetting tab state or triggering compass.html tab restoration.
-              if (window._mwRefreshWorkItems) {
-                window._mwRefreshWorkItems();
-              } else {
-                window._mwWorkStale = true;
-              }
+              // B-UI-6 (CMD72) — Do NOT re-render here.
+              //
+              // Pre-CMD72 this branch called window._mwRefreshWorkItems(),
+              // which re-fetched work items and invoked _mwLoadUserView().
+              // That was redundant: B-UI-1's reactive handler in mw-tabs.js
+              // (fired on workflow_request.created / .resolved for the
+              // current operator) already re-renders within <1s of the
+              // event landing. The poll's 10s tick then fired a SECOND
+              // full re-render of #user-content, tearing down the
+              // data-wi-id anchors that a cross-session Click ForInstance
+              // had just resolved against.
+              //
+              // The poll still runs for its other purposes (stepChanged
+              // detection for submitters on the requests tab, stale
+              // marking for inactive tabs, _knownActionIds/_knownReviewIds
+              // seeding). We only eliminate the render duplication on the
+              // one branch where reactivity now covers the same ground.
+              //
+              // If the reactive handler is ever disabled, the poll will
+              // still catch up on the next tab switch via _mwWorkStale,
+              // so the work tab never goes permanently stale.
             } else {
               // Any other tab — mark both stale.
               window._mwWorkStale = true;
