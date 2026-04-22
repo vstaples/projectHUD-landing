@@ -1279,6 +1279,8 @@ var COMMANDS = {
     var started = Date.now();
     var row = null;
     var wrid = null;
+    console.log('[B-UI-3.2 trace] click-lookup ts=' + Date.now() + ' instance=' + String(instanceId).slice(0,8) +
+      ' map=' + JSON.stringify(window._myActiveRequestId || {}));
     while (true) {
       wrid = (window._myActiveRequestId && window._myActiveRequestId[instanceId]) || null;
       if (wrid) {
