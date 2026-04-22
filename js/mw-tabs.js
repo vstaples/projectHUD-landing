@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260419-CMD70
+// VERSION: 20260419-CMD71
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260419-CMD70 — B-UI-3.4: await _mwLoadUserView before work_queue.rendered emit (closes DOM-anchor leg of Click ForInstance race)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260419-CMD70';
+console.log('%c[mw-tabs] v20260419-CMD71 — B-UI-3.4: await _mwLoadUserView before work_queue.rendered emit (closes DOM-anchor leg of Click ForInstance race)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260419-CMD71';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -3032,7 +3032,7 @@ window.populateDeltaStrip = function() {
   // scan. Returns true if the event triggered a re-render (caller doesn't
   // use this today, but keeps the contract clean).
   //
-  // B-UI-3.4 (CMD70): `_mwLoadUserView` is async. The CMD64 implementation
+  // B-UI-3.4 (CMD71): `_mwLoadUserView` is async. The CMD64 implementation
   // invoked it without awaiting and then scheduled the emit via rAF. rAF
   // fires before the awaited DB query inside `_mwLoadUserView` resolves, so
   // `work_queue.rendered` landed before `[data-wi-id="<wrid>"]` was in the
