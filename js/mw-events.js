@@ -1,6 +1,6 @@
-// VERSION: 20260423-CMD78b
-window._mwEventsVersion = 'v20260423-CMD78b';
-console.log('%c[mw-events] v20260423-CMD78b — B-UI-9 v2.0: approval-failure observability (Part A emit instance.approval_failed + Part B CoC write + Part C admin notify via shared helper)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260423-CMD78d
+window._mwEventsVersion = 'v20260423-CMD78d';
+console.log('%c[mw-events] v20260423-CMD78d — B-UI-9 v2.0: approval-failure observability (Parts A/B/C/D + extended fan-out: step-advance silent-drop now surfaces to approver/submitter/admin/audit alongside terminal-PATCH throw)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -1114,33 +1114,23 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
     // If approved, notify submitter via a new action item in their My Work
     //    Fetch instance to get submitted_by_resource_id
     // B1 (CMD54): also pull current_step_id so we can derive `seq` for emit #4.
-    // B-UI-9 (CMD78b) Part E (revised): widen SELECT minimally — add id,
-    // template_id, form_def_id, launched_at so the step-advance block can
-    // reuse this `inst` on the happy path instead of a redundant second GET.
-    // Part E-v1 ship (CMD78b) added submitted_by_name to the widened SELECT,
-    // which broke Ron's finance-approval terminal path in production: Ron's
-    // RLS on workflow_instances tolerates the column set used here BUT NOT
-    // the combination with submitted_by_name. Symptom was a silently-empty
-    // GET → step-advance warning → row never completed. Removing
-    // submitted_by_name from this SELECT restores Ron's read path.
-    // submitted_by_name is still available on the changes-requested branch
-    // via its own code path (line ~1158 reads inst.submitted_by_name from
-    // this GET; on Ron's path !approved is false so that line is unreached).
-    // Not load-bearing for a known failure mode beyond this one; framing
-    // stays: defensive hardening of the step-advance path. See handoff.
     let inst = null;
     let resolvedSeq = null;
     if (instanceId) {
+      // B-UI-9 (CMD78) Part E REVERTED: Part E widened this SELECT and removed
+      // the second GET at the step-advance block below. Two successive ships
+      // (v1 with submitted_by_name, v2 without) both reproduced the same
+      // failure — Ron's terminal approval returns empty from this GET,
+      // step-advance skipped, instance stays in_progress. Hypothesis (RLS
+      // column incompatibility) was wrong. Reverting to the exact pre-B-UI-9
+      // SELECT and second-GET pattern. One-line instrumentation added so the
+      // next ship's logs show whether this GET returns [], returns a row with
+      // null fields, or throws.
       const instRows = await API.get(
-        `workflow_instances?id=eq.${instanceId}&select=id,template_id,form_def_id,current_step_id,submitted_by_resource_id,title,launched_at&limit=1`
-      ).catch(()=>[]);
+        `workflow_instances?id=eq.${instanceId}&select=submitted_by_resource_id,submitted_by_name,title,current_step_id&limit=1`
+      ).catch((e)=>{ console.warn('[rrpSubmit] early inst GET threw:', e && e.message); return []; });
       inst = instRows?.[0];
-
-      // On the changes-requested (!approved) branch below, submitted_by_name
-      // is used for a workflow_action_items row's owner_name. Fetch it with
-      // a secondary narrow GET ONLY on that branch to keep the approved-path
-      // SELECT minimal and RLS-safe. Guard is outside this block so we
-      // don't inflate the approved-path latency.
+      console.log('[rrpSubmit DIAG] early GET', { instanceId, rowCount: (instRows||[]).length, hasCurrentStepId: !!inst?.current_step_id, hasSubmittedBy: !!inst?.submitted_by_resource_id });
 
       // Derive seq from current_step_id (one tiny extra GET per resolution —
       // acceptable: _rrpSubmit is not a hot path).
@@ -1159,18 +1149,6 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       // Approvals are visible via step color + CoC; no queue item needed.
       // Note: do NOT guard on resId !== submitted_by — submitter may also be a reviewer.
       if (!approved && inst?.submitted_by_resource_id) {
-        // B-UI-9 (CMD78b) Part E: submitted_by_name intentionally excluded from
-        // the main SELECT above (RLS incompatibility with Ron's session).
-        // Fetch it here on the changes-requested branch only, via a narrow
-        // secondary GET. Best-effort; fall back to empty owner_name if the
-        // GET also fails.
-        let submitterName = '';
-        try {
-          const nameRows = await API.get(
-            `workflow_instances?id=eq.${instanceId}&select=submitted_by_name&limit=1`
-          ).catch(()=>[]);
-          submitterName = (nameRows && nameRows[0] && nameRows[0].submitted_by_name) || '';
-        } catch(_) {}
         await API.post('workflow_action_items', {
           id:                crypto.randomUUID(),
           firm_id:           _mwFirmId(),
@@ -1179,7 +1157,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
           body:              comments || 'Changes were requested. Please revise and resubmit.',
           status:            'open',
           owner_resource_id: inst.submitted_by_resource_id,
-          owner_name:        submitterName,
+          owner_name:        inst.submitted_by_name || '',
           created_by_name:   resName,
         }).catch(()=>{});
       }
@@ -1209,23 +1187,142 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
     // After a successful approval, look up the current step sequence and route
     // the next step. This is what moves the instance from step 1 → 2 → 3 → 4.
     if (approved && instanceId && typeof window._mwResolveAndRoute === 'function') {
+      // ── B-UI-9 (CMD78c+) Parts A/B/C invocation helper ────────────────────
+      // Factored from the terminal-PATCH catch block (below) so any failure
+      // mode that prevents an approved workflow from advancing — terminal
+      // PATCH throws, OR step-advance GET returns unexpectedly empty /
+      // throws (e.g., client-side URL block, extension, network filter
+      // silently dropping workflow_instances requests) — fans out the same
+      // non-console notification chain to approver (toast), submitter
+      // (⚠ + tooltip via emit), admin (workflow_action_items), and audit
+      // (coc_event).
+      //
+      // Production precedent for the step-advance-GET silent-failure path:
+      // a single Ron's Firefox session with a stale BLOCK URL rule matching
+      // `workflow_instances`. `.catch(()=>[])` at the GET site turned a real
+      // 4xx/net-error into an empty array, `inst` undefined, step-advance
+      // silently skipped, instance stalled in_progress. No user-visible
+      // signal. B-UI-9 v2.0's original scope assumed only terminal-PATCH
+      // failure; this extension covers the earlier silent-drop class too.
+      const _fanOutApprovalFailure = function(errMsg, ctx) {
+        var attemptedAt = new Date().toISOString();
+
+        // Part A — emit
+        if (typeof window._cmdEmit === 'function') {
+          window._cmdEmit('instance.approval_failed', {
+            instance_id:          instanceId,
+            workflow_request_id:  null,
+            approver_resource_id: resId,
+            approver_name:        resName,
+            seq:                  resolvedSeq,
+            error_message:        errMsg,
+            attempted_at:         attemptedAt,
+            failure_stage:        ctx || 'unknown',
+          });
+        }
+
+        // Part B — CoC write
+        API.post('coc_events', {
+          id:           crypto.randomUUID(),
+          firm_id:      firmId,
+          entity_id:    instanceId,
+          entity_type:  'workflow_instance',
+          event_type:   'request.approval_failed',
+          event_class:  'lifecycle',
+          severity:     'warning',
+          event_notes:  JSON.stringify({
+            approver_name:  resName,
+            seq:            resolvedSeq,
+            error_message:  errMsg,
+            attempted_at:   attemptedAt,
+            failure_stage:  ctx || 'unknown',
+          }),
+          actor_name:        resName,
+          actor_resource_id: resId,
+          occurred_at:       attemptedAt,
+          created_at:        attemptedAt,
+        }).catch(function(e){ console.warn('[_rrpSubmit] approval_failed CoC write failed:', e && e.message); });
+
+        // Part C — admin notification via shared helper
+        if (typeof window._notifyAdminsOfIssue === 'function') {
+          (async function() {
+            var submitterRes = null;
+            try {
+              // Use inst.submitted_by_resource_id from the earlier (working)
+              // GET at line ~1128 when available; falls back to null if
+              // that path was also empty. Admins-via-users-table path still
+              // fires without the manager-fallback.
+              var submitterResId = inst && inst.submitted_by_resource_id;
+              if (submitterResId) {
+                var subRows = await API.get(
+                  'resources?id=eq.' + submitterResId + '&select=id,name,manager_id&limit=1'
+                ).catch(function(){ return []; });
+                submitterRes = subRows && subRows[0] || null;
+              }
+            } catch(_) {}
+            var formName = (inst && inst.title) || 'Document review';
+            var adminTitle = '⚠ Approval did not save: ' + formName;
+            var adminBody  = 'Approver ' + resName + ' attempted to approve "' + formName +
+              '" but the workflow could not advance (' + errMsg + ' · stage=' + (ctx||'unknown') + '). ' +
+              'The approver has been asked to retry. If the failure persists, investigate client network/extension ' +
+              'blocks, RLS, schema, or service availability on workflow_instances.';
+            await window._notifyAdminsOfIssue(
+              instanceId, firmId, submitterRes,
+              adminTitle, adminBody,
+              '_rrpSubmit.approval_failed'
+            );
+          })();
+        }
+
+        // Approver-side toast
+        if (typeof window.compassToast === 'function') {
+          window.compassToast('Approval did not save — please try again.', 4000);
+        }
+        // Close review panel — approver is done with this attempt; retry
+        // opens the panel fresh from their queue.
+        var panel = document.getElementById('req-review-panel');
+        if (panel && panel.remove) panel.remove();
+      };
+      // ── end fan-out helper ───────────────────────────────────────────────
+
       try {
-        // B-UI-9 (CMD78b) Part E: reuse `inst` loaded above at line ~1120
-        // instead of re-fetching. Pre-Part E this block did a second
-        // workflow_instances GET whose result was named `instRow`; that GET
-        // collided with verification-harness URL-blocks matching
-        // `workflow_instances?id=eq.*` and, when empty, silently no-op'd the
-        // entire step-advance. Reusing `inst` (now widened to include
-        // template_id/form_def_id/launched_at at line ~1121) removes the
-        // redundant round trip. If `inst` is missing template_id — which
-        // should be unreachable in practice since submission writes it —
-        // log rather than silently skip.
-        const instRow = inst;
-        if (!instRow) {
-          console.warn('[rrpSubmit] step-advance skipped: inst unavailable (earlier GET returned empty)', { instanceId });
-        } else if (!instRow.template_id) {
-          console.warn('[rrpSubmit] step-advance skipped: template_id missing on instance', { instanceId, instRow });
-        } else {
+        // B-UI-9 Part E REVERTED: restored original second-GET pattern.
+        // Instrumentation: explicit threw-flag lets the empty-row check
+        // downstream distinguish "GET threw (network/URL block)" from
+        // "GET returned 200 empty (RLS deny)". Both now fan out the
+        // failure notification chain rather than silently no-opping.
+        let stepAdvanceGetThrew = false;
+        let stepAdvanceErrMsg = null;
+        const instFull = await API.get(
+          `workflow_instances?id=eq.${instanceId}` +
+          `&select=id,template_id,form_def_id,current_step_id,submitted_by_resource_id,title,launched_at&limit=1`
+        ).catch((e) => {
+          stepAdvanceGetThrew = true;
+          stepAdvanceErrMsg = (e && e.message) || String(e);
+          console.warn('[rrpSubmit] step-advance GET threw:', stepAdvanceErrMsg);
+          return [];
+        });
+        const instRow = instFull?.[0];
+        console.log('[rrpSubmit DIAG] step-advance GET', { instanceId, rowCount: (instFull||[]).length, hasTemplateId: !!instRow?.template_id, hasCurrentStepId: !!instRow?.current_step_id, threw: stepAdvanceGetThrew });
+
+        if (!instRow || !instRow.template_id) {
+          // B-UI-9 (CMD78c+): step-advance GET failed in a way that
+          // prevents workflow advancement. Formerly this branch was
+          // silent — the `.catch(()=>[])` wrapper turned thrown errors
+          // and empty-200 responses alike into a no-op. Now invoke the
+          // same Parts A/B/C fan-out the terminal-PATCH catch uses so
+          // the approver sees a toast, the submitter's row shows ⚠,
+          // admins get notified, and the audit trail records the
+          // failed attempt.
+          var reason = stepAdvanceGetThrew
+            ? 'step-advance GET threw (possible network block / extension / RLS): ' + stepAdvanceErrMsg
+            : (instRow ? 'step-advance GET returned row missing template_id' : 'step-advance GET returned empty — workflow_instances unreachable or RLS-denied');
+          console.error('[_rrpSubmit] step-advance failed:', reason);
+          _fanOutApprovalFailure(reason, 'step_advance_get');
+          return;
+        }
+
+        {
           // Load all template steps
           const allSteps = await API.get(
             `workflow_template_steps?template_id=eq.${instRow.template_id}` +
@@ -1294,94 +1391,14 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
             } catch (err) {
               console.error('[_rrpSubmit] terminal PATCH failed', err);
 
-              // ── B-UI-9 (CMD78b) Parts A/B/C: approval-failure observability
-              // Iron Rule 34 extended — a state-change outcome must mirror to
-              // every actor who needs to know. B-UI-8 Part B already covers
-              // the approver (error toast below, unchanged). B-UI-9 adds:
-              //   Part A — emit instance.approval_failed onto the bus so
-              //            Aegis / submitter-session subscribers receive it.
-              //            Emit fires BEFORE the toast so cross-actor signal
-              //            goes out even if compassToast is unavailable.
-              //   Part B — write a coc_event with event_type
-              //            'request.approval_failed' so the audit surface
-              //            sees the failed attempt. Matches the direct-post
-              //            pattern used elsewhere in this file for
-              //            request.submitted / request.approved / etc.
-              //   Part C — notify admins via window._notifyAdminsOfIssue
-              //            (mw-tabs.js CMD78b extracted helper). Same surface
-              //            admins learn about instance.blocked through.
-              // workflow_request_id not in scope at this site; null per
-              // Scenario D default. resolvedSeq derived earlier at line ~1133.
-              var attemptedAt = new Date().toISOString();
-              var errMsg = (err && err.message) || String(err);
-
-              // Part A — emit onto bus
-              if (typeof window._cmdEmit === 'function') {
-                window._cmdEmit('instance.approval_failed', {
-                  instance_id:          instanceId,
-                  workflow_request_id:  null,
-                  approver_resource_id: resId,
-                  approver_name:        resName,
-                  seq:                  resolvedSeq,
-                  error_message:        errMsg,
-                  attempted_at:         attemptedAt,
-                });
-              }
-
-              // Part B — CoC write (fire-and-forget; audit is best-effort)
-              API.post('coc_events', {
-                id:           crypto.randomUUID(),
-                firm_id:      firmId,
-                entity_id:    instanceId,
-                entity_type:  'workflow_instance',
-                event_type:   'request.approval_failed',
-                event_class:  'lifecycle',
-                severity:     'warning',
-                event_notes:  JSON.stringify({
-                  approver_name:  resName,
-                  seq:            resolvedSeq,
-                  error_message:  errMsg,
-                  attempted_at:   attemptedAt,
-                }),
-                actor_name:        resName,
-                actor_resource_id: resId,
-                occurred_at:       attemptedAt,
-                created_at:        attemptedAt,
-              }).catch(function(e){ console.warn('[_rrpSubmit] approval_failed CoC write failed:', e && e.message); });
-
-              // Part C — admin notification via shared helper.
-              // Fetch submitter resource row for the manager_id fallback, to
-              // match _mwResolveAndRoute's data flow exactly. Best-effort; if
-              // fetch fails we pass null and admins-via-users-table still fire.
-              if (typeof window._notifyAdminsOfIssue === 'function') {
-                (async function() {
-                  var submitterRes = null;
-                  try {
-                    var submitterResId = instRow && instRow.submitted_by_resource_id;
-                    if (submitterResId) {
-                      var subRows = await API.get(
-                        'resources?id=eq.' + submitterResId + '&select=id,name,manager_id&limit=1'
-                      ).catch(function(){ return []; });
-                      submitterRes = subRows && subRows[0] || null;
-                    }
-                  } catch(_) {}
-                  var formName = (instRow && instRow.title) || 'Document review';
-                  var adminTitle = '⚠ Approval did not save: ' + formName;
-                  var adminBody  = 'Approver ' + resName + ' attempted to approve "' + formName +
-                    '" but the save failed (' + errMsg + '). The approver has been asked to retry. ' +
-                    'If the failure persists, investigate RLS / schema / service availability on workflow_instances.';
-                  await window._notifyAdminsOfIssue(
-                    instanceId, firmId, submitterRes,
-                    adminTitle, adminBody,
-                    '_rrpSubmit.approval_failed'
-                  );
-                })();
-              }
-              // ── end B-UI-9 block ──────────────────────────────────────────
-
-              if (typeof window.compassToast === 'function') {
-                window.compassToast('Approval did not save — please try again.', 4000);
-              }
+              // B-UI-9 (CMD78c+) Parts A/B/C: approval-failure observability.
+              // Factored into the _fanOutApprovalFailure helper at the top of
+              // this `if (approved ...)` block so both failure modes —
+              // step-advance GET silent-drop and terminal PATCH throw —
+              // share the same emit / CoC write / admin-notify / toast chain.
+              // Iron Rule 34 extended: state-change outcome must mirror to
+              // every actor. Toast is fired inside the helper.
+              _fanOutApprovalFailure((err && err.message) || String(err), 'terminal_patch');
               // Do NOT fire instance.completed — DB state did not change.
               return;
             }
