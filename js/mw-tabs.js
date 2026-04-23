@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260419-CMD71
+// VERSION: 20260422-CMD73
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260419-CMD71 — B-UI-3.4: await _mwLoadUserView before work_queue.rendered emit (closes DOM-anchor leg of Click ForInstance race)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260419-CMD71';
+console.log('%c[mw-tabs] v20260422-CMD73 — B-UI-6.1: receive-path _myActiveRequestId write (cross-session Click ForInstance resolves)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260422-CMD73';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -3046,6 +3046,45 @@ window.populateDeltaStrip = function() {
 
     if (eventName === 'workflow_request.created') {
       if (data.assignee_resource_id !== myResId) return false;
+
+      // CMD73 (B-UI-6.1): mirror the routing-side _myActiveRequestId write
+      // on the receive path.
+      //
+      // On the routing session, _mwResolveAndRoute (mw-tabs.js:2329) writes
+      // _myActiveRequestId[instance_id] = workflow_request.id synchronously
+      // before emitting workflow_request.created. Click ForInstance's wrid
+      // lookup (cmd-center.js:1283) reads this map to resolve instance_id →
+      // wrid, then queries [data-wi-id="<wrid>"]. Pre-CMD73, the receive
+      // session (AK when VS routes to AK) had no equivalent write: the map
+      // stayed empty for instance_ids the operator didn't personally route.
+      // Cross-session Click ForInstance always threw "no row for instance"
+      // even though B-UI-1's render committed the data-wi-id anchor on time.
+      //
+      // Latent defect exposed by B-UI-5 (CMD71) making cross-session
+      // dispatch reliable. Single-session probes (B-UI-3.4) never hit it
+      // because the routing and clicking sessions were identical — the
+      // routing-side write covered the click.
+      //
+      // INTENTIONAL ASYMMETRY — do not "symmetrize" by adding a condition:
+      // The routing-side write at mw-tabs.js:2329 guards with
+      //   assigneeResId === window._myResource.id
+      // because _mwResolveAndRoute runs on the routing session's behalf for
+      // ALL assignees (self and others) — the guard filters the write to
+      // only the self-routing case, so the routing operator's own map
+      // receives only their own wrids.
+      //
+      // THIS handler (B-UI-1 _handleEvent) is only reached on the assignee's
+      // own session, AND line 3048 above already filtered on
+      //   data.assignee_resource_id !== myResId → return false
+      // so by the time execution reaches here, the event IS for this
+      // operator. The write below is therefore unconditional by design;
+      // copying the routing-side guard would re-check a filter that already
+      // passed upstream and — if misread — could turn into a no-op.
+      if (data.workflow_request_id && data.instance_id) {
+        if (!window._myActiveRequestId) window._myActiveRequestId = {};
+        window._myActiveRequestId[data.instance_id] = data.workflow_request_id;
+      }
+
       // A new row is inbound for this operator. Re-render the queue and
       // then announce the row is clickable.
       if (typeof window._mwLoadUserView === 'function') {
