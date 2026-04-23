@@ -1,6 +1,6 @@
-// VERSION: 20260423-CMD74
-window._mwEventsVersion = 'v20260423-CMD74';
-console.log('%c[mw-events] v20260423-CMD74 — B-UI-4: modal.opened emit (Review Request + Resubmit panels)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260423-CMD77
+window._mwEventsVersion = 'v20260423-CMD77';
+console.log('%c[mw-events] v20260423-CMD77 — B-UI-8 Part B: terminal PATCH error propagation + schema-drift/step-name hotfix reconciliation','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -1228,12 +1228,35 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
               ' (' + nextStep.assignee_role + ') — ' + nextStep.name,
               'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
           } else {
-            // No next step — workflow complete
-            await API.patch(`workflow_instances?id=eq.${instanceId}`, {
-              status:     'complete',
-              current_step_name: 'Completed',
-              updated_at: now,
-            }).catch(() => {});
+            // B-UI-8 (CMD77): three changes under one version bump —
+            //   (1) schema-drift hotfix: status 'completed' → 'complete'
+            //       (workflow_instances_status_check enforces 'complete')
+            //   (2) current_step_name: 'Completed' added so HISTORY rows
+            //       display "Completed" rather than retaining last in-flight
+            //       step label
+            //   (3) Part B error propagation: silent .catch(() => {})
+            //       previously swallowed PATCH failures, causing downstream
+            //       instance.completed emit to fire on un-persisted state.
+            //       B-UI-7 ship verification surfaced this (schema-drift
+            //       false-completion regression). Rule 34 intra-session
+            //       analog: write success is a precondition for the
+            //       state-change emit.
+            var patchOk = false;
+            try {
+              await API.patch(`workflow_instances?id=eq.${instanceId}`, {
+                status:     'complete',
+                current_step_name: 'Completed',
+                updated_at: now,
+              });
+              patchOk = true;
+            } catch (err) {
+              console.error('[_rrpSubmit] terminal PATCH failed', err);
+              if (typeof window.compassToast === 'function') {
+                window.compassToast('Approval did not save — please try again.', 4000);
+              }
+              // Do NOT fire instance.completed — DB state did not change.
+              return;
+            }
             console.log('[rrpSubmit] workflow complete — no further steps');
 
             // ── Emit #6: instance.completed (B1 / CMD54) ────────────────
@@ -1241,7 +1264,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
             // anomaly detection) and terminates Wait ForEvent listeners
             // keyed on this instance. `final_status` normalises to the
             // ecosystem-contract vocabulary ('complete' | 'cancelled');
-            // the DB column stores 'completed'.
+            // the DB column stores 'complete'.
             if (typeof window._cmdEmit === 'function') {
               let elapsedMs = null;
               if (instRow.launched_at) {

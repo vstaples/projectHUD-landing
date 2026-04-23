@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260423-CMD76
+// VERSION: 20260423-CMD77
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260423-CMD76 — B-UI-7: reactive MY REQUESTS ACTIVE → HISTORY migrations (completed/withdrawn/recalled)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260423-CMD76';
+console.log('%c[mw-tabs] v20260423-CMD77 — B-UI-8 Part A: Signature Loop tooltip cache completeness (widen filter + schema-drift \'completed\'→\'complete\')','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260423-CMD77';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -912,8 +912,20 @@ window.loadUserRequests = async function() {
         window._myrTmplSteps[s.template_id].push(s);
       });
     }
-    // Fetch CoC events + workflow_requests for all active instances to power Signature Loop Status
-    var instIds = (instances||[]).filter(function(i){ return i.status === 'in_progress' || i.status === 'blocked'; }).map(function(i){ return i.id; });
+    // B-UI-8 (CMD77): Part A — tooltip cache completeness.
+    // Previous filter excluded terminal-state instances from CoC +
+    // workflow_requests cache population, causing Signature Loop Status
+    // tooltip to render "Waiting" for HISTORY rows even when all requests
+    // were resolved in DB. Widening the filter matches the eager-load
+    // pattern already established for _myrInstances itself. Both sibling
+    // caches (_myrInstCoc, _myrInstReqs) share the filter. See B-UI-7
+    // ship verification for the observation.
+    var instIds = (instances||[]).filter(function(i){
+      return i.status === 'in_progress'
+          || i.status === 'blocked'
+          || i.status === 'complete'
+          || i.status === 'cancelled';
+    }).map(function(i){ return i.id; });
     window._myrInstCoc = {};
     window._myrInstReqs = {};
     if (instIds.length) {
@@ -2544,7 +2556,12 @@ function _myrStatusCell(inst, step, sColor) {
     var isActive  = s.name === inst.current_step_name;
     var isFuture  = s.sequence_order > currentSeq;
     var isBlocked = isActive && inst.status === 'blocked';
-    var isAllDone = inst.status === 'completed';
+    // B-UI-8 (CMD77): Part A — schema-drift correction. DB check constraint
+    // workflow_instances_status_check stores 'complete', not 'completed'.
+    // Previous string mismatch caused isAllDone to evaluate false for
+    // terminal rows, collapsing post-submit steps into the "Waiting"
+    // branch even when cache data was present.
+    var isAllDone = inst.status === 'complete';
 
     // Determine approver and date from CoC events
     var approvalEvent = approvedEvents[idx - 1]; // offset by 1 since trigger is step 0
