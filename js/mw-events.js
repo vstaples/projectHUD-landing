@@ -1,9 +1,138 @@
-// VERSION: 20260423-CMD78d
-window._mwEventsVersion = 'v20260423-CMD78d';
-console.log('%c[mw-events] v20260423-CMD78d — B-UI-9 v2.0: approval-failure observability (Parts A/B/C/D + extended fan-out: step-advance silent-drop now surfaces to approver/submitter/admin/audit alongside terminal-PATCH throw)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260423-CMD78e
+window._mwEventsVersion = 'v20260423-CMD78e';
+console.log('%c[mw-events] v20260423-CMD78e — B-UI-9 v2.0: approval-failure observability (blocking modal + workflow_requests rollback for retry)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
+
+// ── B-UI-9 (CMD78e) — Approval-failure blocking modal ───────────────────────
+// Replaces the transient 4s compassToast that was auto-dismissing before the
+// approver could read it. This modal requires explicit dismissal via "OK" or
+// Escape. Tells the approver that (a) the workflow did not advance, (b) their
+// request row has been restored to their queue for retry, (c) an admin has
+// been notified, and (d) the likely cause (network block / extension / RLS /
+// connectivity).
+//
+// Keep fonts ≥ 11pt per Aegis UI rule. No animation beyond a simple fade-in
+// to avoid competing with the CoC event that fires simultaneously.
+window._rrpFailureModal = function(errMsg, stage) {
+  // Guard against duplicate invocations
+  var existing = document.getElementById('rrp-failure-modal-overlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'rrp-failure-modal-overlay';
+  overlay.setAttribute('role', 'alertdialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'rrp-failure-modal-title');
+  overlay.setAttribute('aria-describedby', 'rrp-failure-modal-body');
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:100000',
+    'background:rgba(10,14,22,.75)',
+    'display:flex', 'align-items:center', 'justify-content:center',
+    'font-family:Arial,sans-serif',
+  ].join(';');
+
+  var stageLabel = (stage === 'terminal_patch')
+    ? 'The final save to the database failed.'
+    : (stage === 'step_advance_get')
+    ? 'Your browser could not reach the workflow service to advance the request.'
+    : 'An unexpected error prevented the workflow from advancing.';
+
+  var modal = document.createElement('div');
+  modal.style.cssText = [
+    'background:#141a26',
+    'border:1px solid #E24B4A',
+    'border-radius:8px',
+    'max-width:520px',
+    'width:92%',
+    'padding:0',
+    'box-shadow:0 12px 48px rgba(0,0,0,.8)',
+    'overflow:hidden',
+  ].join(';');
+
+  // Header — red banner
+  var header = document.createElement('div');
+  header.style.cssText = [
+    'background:rgba(226,75,74,.15)',
+    'border-bottom:1px solid rgba(226,75,74,.4)',
+    'padding:12px 18px',
+    'display:flex', 'align-items:center', 'gap:10px',
+  ].join(';');
+  header.innerHTML =
+    '<span style="font-size:20px;line-height:1">⚠</span>' +
+    '<span id="rrp-failure-modal-title" style="font-size:13px;font-weight:700;color:#E24B4A;letter-spacing:.08em;text-transform:uppercase">' +
+      'Approval Did Not Save' +
+    '</span>';
+
+  // Body
+  var body = document.createElement('div');
+  body.id = 'rrp-failure-modal-body';
+  body.style.cssText = 'padding:18px;color:#e8eef8;font-size:13px;line-height:1.55;';
+  body.innerHTML =
+    '<p style="margin:0 0 12px 0;font-size:13px">' +
+      '<strong>The approval was not recorded.</strong> ' + stageLabel +
+    '</p>' +
+    '<p style="margin:0 0 12px 0;font-size:13px">' +
+      'The request has been <strong>returned to your work queue</strong> so you can try again. ' +
+      'An administrator has been notified.' +
+    '</p>' +
+    '<p style="margin:0 0 12px 0;font-size:12px;color:rgba(255,255,255,.6)">' +
+      '<strong>Likely causes:</strong> ad-blocker / privacy extension, VPN or corporate firewall, ' +
+      'temporary network outage, or a browser URL-block rule. ' +
+      'If the error persists after retry, contact your administrator.' +
+    '</p>' +
+    '<details style="margin-top:10px">' +
+      '<summary style="font-size:11px;color:rgba(255,255,255,.45);cursor:pointer">Technical detail</summary>' +
+      '<pre style="margin:6px 0 0 0;padding:8px;background:rgba(0,0,0,.3);border-radius:4px;font-family:var(--font-mono,monospace);font-size:11px;color:rgba(255,255,255,.55);white-space:pre-wrap;word-break:break-word">' +
+        (errMsg || 'unknown') +
+        (stage ? ('\n\nstage: ' + stage) : '') +
+      '</pre>' +
+    '</details>';
+
+  // Footer — OK button
+  var footer = document.createElement('div');
+  footer.style.cssText = 'padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:flex-end;';
+  var okBtn = document.createElement('button');
+  okBtn.type = 'button';
+  okBtn.textContent = 'OK';
+  okBtn.style.cssText = [
+    'font-family:Arial,sans-serif',
+    'font-size:12px',
+    'font-weight:700',
+    'letter-spacing:.08em',
+    'text-transform:uppercase',
+    'padding:8px 20px',
+    'border:1px solid #E24B4A',
+    'background:rgba(226,75,74,.15)',
+    'color:#E24B4A',
+    'border-radius:4px',
+    'cursor:pointer',
+    'min-width:80px',
+  ].join(';');
+  okBtn.onmouseover = function(){ okBtn.style.background = 'rgba(226,75,74,.25)'; };
+  okBtn.onmouseout  = function(){ okBtn.style.background = 'rgba(226,75,74,.15)'; };
+
+  var dismiss = function() {
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    document.removeEventListener('keydown', onKey);
+  };
+  var onKey = function(e) {
+    if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); dismiss(); }
+  };
+  okBtn.addEventListener('click', dismiss);
+  document.addEventListener('keydown', onKey);
+
+  footer.appendChild(okBtn);
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Focus the OK button so Enter/Space dismiss works immediately
+  setTimeout(function(){ try { okBtn.focus(); } catch(_) {} }, 0);
+};
 
 // ── CSS for inline panels ─────────────────────────────────
 (function() {
@@ -1274,14 +1403,56 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
           })();
         }
 
-        // Approver-side toast
-        if (typeof window.compassToast === 'function') {
-          window.compassToast('Approval did not save — please try again.', 4000);
+        // B-UI-9 (CMD78e): ROLLBACK the workflow_requests.status='resolved'
+        // PATCH from line ~1083. That PATCH fired optimistically before we
+        // knew whether the workflow could actually advance. On failure,
+        // Ron's queue row would silently disappear, leaving him with no
+        // way to retry without admin intervention. Rolling back to
+        // status='open' restores the row to his queue so he can retry
+        // after resolving the underlying issue (per the modal instructions).
+        // Best-effort — if the rollback itself fails, the admin notification
+        // and audit trail still document the failure. After the rollback,
+        // trigger a local view refresh so the approver's work-queue UI
+        // re-fetches and re-renders the restored row without waiting for a
+        // natural poll tick.
+        var rollbackPromise;
+        if (isWrRow) {
+          rollbackPromise = API.patch('workflow_requests?id=eq.' + actionItemId, {
+            status:     'open',
+            updated_at: new Date().toISOString(),
+          }).catch(function(e){ console.warn('[_rrpSubmit] workflow_requests rollback failed:', e && e.message); });
+        } else {
+          rollbackPromise = API.patch('workflow_action_items?id=eq.' + actionItemId, {
+            status:     'open',
+            updated_at: new Date().toISOString(),
+          }).catch(function(e){ console.warn('[_rrpSubmit] workflow_action_items rollback failed:', e && e.message); });
         }
-        // Close review panel — approver is done with this attempt; retry
-        // opens the panel fresh from their queue.
+        // Refresh local view once the rollback settles so the restored row
+        // re-appears in the approver's queue. Fire-and-forget; modal will
+        // display regardless of refresh timing.
+        if (rollbackPromise && typeof window._mwLoadUserView === 'function') {
+          rollbackPromise.then(function(){ try { window._mwLoadUserView(); } catch(_) {} });
+        }
+
+        // Close the review panel before presenting the modal so it doesn't
+        // sit visually underneath / compete for focus.
         var panel = document.getElementById('req-review-panel');
         if (panel && panel.remove) panel.remove();
+
+        // Approver-side blocking modal. Replaces the transient compassToast
+        // per operator requirement (the 4s toast was dismissing before the
+        // approver could read it and understand that the workflow did not
+        // advance). The modal requires explicit dismissal, and its copy
+        // tells Ron the row has been restored to his queue for retry.
+        if (typeof window._rrpFailureModal === 'function') {
+          window._rrpFailureModal(errMsg, ctx);
+        } else {
+          // Fallback to toast if modal helper is somehow missing (should
+          // not happen — helper is defined at module load below).
+          if (typeof window.compassToast === 'function') {
+            window.compassToast('Approval did not save — please try again.', 4000);
+          }
+        }
       };
       // ── end fan-out helper ───────────────────────────────────────────────
 
