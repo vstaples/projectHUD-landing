@@ -1,6 +1,6 @@
-// VERSION: 20260423-CMD78g
-window._mwEventsVersion = 'v20260423-CMD78g';
-console.log('%c[mw-events] v20260423-CMD78g — B-UI-9 v2.0: approval-failure observability (re-entrancy guard + awaited rollback prevents concurrent-submit race)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260423-CMD78g2
+window._mwEventsVersion = 'v20260423-CMD78g2';
+console.log('%c[mw-events] v20260423-CMD78g2 — B-UI-9 v2.0: workflow_request.resolved emit gated on confirmed success (no more stale-queue UI on rollback)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -1165,7 +1165,7 @@ window._rsbSubmit = async function(actionItemId, instanceId) {
 
 
 // ── Review panel submit ───────────────────────────────────
-// B-UI-9 (CMD78g): per-instance re-entrancy guard. An approver who clicks
+// B-UI-9 (CMD78f): per-instance re-entrancy guard. An approver who clicks
 // Approve, sees a failure, dismisses the modal, clicks the restored queue
 // row, and rapid-fires Approve again can otherwise land two concurrent
 // _rrpSubmit invocations for the same instance. Their workflow_requests
@@ -1315,19 +1315,36 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
     }
 
     // ── Emit #4: workflow_request.resolved (B1 / CMD54) ─────────────────────
-    // Closes the loop on routing policies and feeds velocity counters (Class 2).
-    // CommandHUD cancels any pending dispatch requests keyed to this request.
-    // `decision` normalises to the ecosystem-contract vocabulary: the raw
-    // parameter value 'rejected' maps to 'changes_requested' because the
-    // actual semantic in this flow is changes-requested (see request.changes_requested
-    // CoC event and the "Changes requested" UI copy).
-    if (typeof window._cmdEmit === 'function' && instanceId) {
+    // CMD78g2: emit moved from this pre-advancement location to fire only on
+    // confirmed success. The earlier unconditional emit fired regardless of
+    // whether the workflow actually advanced — on a step-advance or
+    // terminal-PATCH failure, the rollback at _fanOutApprovalFailure
+    // (helper below) returned the workflow_requests row to status='open',
+    // but the already-emitted workflow_request.resolved caused Ron's
+    // mw-tabs.js:3233 subscriber to call _mwLoadUserView() and filter the
+    // (now-resolved-in-local-view) row out of his queue. The DB was
+    // correct (open), the local UI was stale. Gating the emit on confirmed
+    // success eliminates the race at the semantic layer: the emit now
+    // describes what actually happened.
+    //
+    // Changes-requested path: emit fires immediately below, since the PATCH
+    // itself IS the terminal state change for that branch.
+    //
+    // Approved path: emit fires after step-advance succeeds — either at
+    // "advanced to step N" (non-terminal) or after the successful terminal
+    // PATCH (final step, before instance.completed).
+    //
+    // Ordering with other emits preserved: this emit still fires before any
+    // downstream cross-session emits (workflow_request.created for the next
+    // assignee, instance.completed). The failure-path fan-out does not emit
+    // this event; the rollback is invisible to subscribers, as intended.
+    if (!approved && typeof window._cmdEmit === 'function' && instanceId) {
       window._cmdEmit('workflow_request.resolved', {
         instance_id:           instanceId,
         seq:                   resolvedSeq,
         resolver_resource_id:  resId,
         resolver_name:         resName,
-        decision:              approved ? 'approved' : 'changes_requested',
+        decision:              'changes_requested',
       });
     }
 
@@ -1435,7 +1452,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
         // re-fetches and re-renders the restored row without waiting for a
         // natural poll tick.
         //
-        // CMD78g: AWAIT the rollback before returning. The re-entrancy
+        // CMD78f: AWAIT the rollback before returning. The re-entrancy
         // guard (_rrpInFlight) releases when this async function's caller
         // returns; if the rollback were merely fire-and-forget, a rapid
         // second click could land a fresh 'resolved' PATCH while the
@@ -1566,6 +1583,26 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
             console.log('%c[rrpSubmit] advanced to step ' + nextStep.sequence_order +
               ' (' + nextStep.assignee_role + ') — ' + nextStep.name,
               'background:#1a4a2a;color:#3de08a;padding:2px 8px;border-radius:3px');
+
+            // ── Emit #4 (approved, non-terminal): workflow_request.resolved ──
+            // CMD78g2: emit deferred to here so it fires only when the workflow
+            // has actually advanced. Ordering: before the next-assignee's
+            // workflow_request.created emit fires from _mwResolveAndRoute
+            // (that emit is inside the fire-and-forget path above, which
+            // ran before this await-chained success log). In practice the
+            // emit bus buffers and both arrive in-order; subscribers treat
+            // this emit as "this approver's task is done" and the
+            // workflow_request.created emit as "the next assignee has a
+            // task." A rollback on failure never reaches this line.
+            if (typeof window._cmdEmit === 'function') {
+              window._cmdEmit('workflow_request.resolved', {
+                instance_id:           instanceId,
+                seq:                   resolvedSeq,
+                resolver_resource_id:  resId,
+                resolver_name:         resName,
+                decision:              'approved',
+              });
+            }
           } else {
             // B-UI-8 (CMD77): three changes under one version bump —
             //   (1) schema-drift hotfix: status 'completed' → 'complete'
@@ -1603,6 +1640,25 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
               return;
             }
             console.log('[rrpSubmit] workflow complete — no further steps');
+
+            // ── Emit #4 (approved, terminal): workflow_request.resolved ──
+            // CMD78g2: emit deferred to here so it fires only when the
+            // terminal PATCH actually confirmed. If the PATCH threw, the
+            // catch above invoked _fanOutApprovalFailure which rolled the
+            // workflow_requests row back to status='open' and returned
+            // before reaching this point — so this emit correctly elides
+            // on failure. Ordering: fires before instance.completed, as
+            // subscribers expect the terminal-approver's resolution to be
+            // visible before the instance-lifecycle completion event.
+            if (typeof window._cmdEmit === 'function') {
+              window._cmdEmit('workflow_request.resolved', {
+                instance_id:           instanceId,
+                seq:                   resolvedSeq,
+                resolver_resource_id:  resId,
+                resolver_name:         resName,
+                decision:              'approved',
+              });
+            }
 
             // ── Emit #6: instance.completed (B1 / CMD54) ────────────────
             // End-of-lifecycle event. Feeds duration statistics (Class 4/6
