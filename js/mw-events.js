@@ -13,7 +13,7 @@ function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID 
 // been notified, and (d) the likely cause (network block / extension / RLS /
 // connectivity).
 //
-// Keep fonts ≥ 11pt per Aegis UI rule. No animation beyond a simple fade-in
+// Keep fonts ≥ 11pt per Aegis UI rules. No animation beyond a simple fade-in
 // to avoid competing with the CoC event that fires simultaneously.
 window._rrpFailureModal = function(errMsg, stage) {
   // Guard against duplicate invocations
