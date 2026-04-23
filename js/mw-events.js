@@ -1231,6 +1231,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
             // No next step — workflow complete
             await API.patch(`workflow_instances?id=eq.${instanceId}`, {
               status:     'complete',
+              current_step_name: 'Completed',
               updated_at: now,
             }).catch(() => {});
             console.log('[rrpSubmit] workflow complete — no further steps');
