@@ -1,6 +1,6 @@
-// VERSION: 20260423-CMD78e
-window._mwEventsVersion = 'v20260423-CMD78e';
-console.log('%c[mw-events] v20260423-CMD78e — B-UI-9 v2.0: approval-failure observability (blocking modal + workflow_requests rollback for retry)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260423-CMD78f
+window._mwEventsVersion = 'v20260423-CMD78f';
+console.log('%c[mw-events] v20260423-CMD78f — B-UI-9 v2.0: approval-failure observability (re-entrancy guard + awaited rollback prevents concurrent-submit race)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -1165,7 +1165,26 @@ window._rsbSubmit = async function(actionItemId, instanceId) {
 
 
 // ── Review panel submit ───────────────────────────────────
+// B-UI-9 (CMD78f): per-instance re-entrancy guard. An approver who clicks
+// Approve, sees a failure, dismisses the modal, clicks the restored queue
+// row, and rapid-fires Approve again can otherwise land two concurrent
+// _rrpSubmit invocations for the same instance. Their workflow_requests
+// PATCHes (the first call's failure-path rollback to 'open', the second
+// call's fresh fire-and-forget to 'resolved') race; whichever lands last
+// wins, and the queue row can end up permanently removed. Map entry
+// written on entry, cleared in finally so both success and failure paths
+// release it. No UI-level "please wait" — the button is already disabled
+// (line ~1176) and the modal covers the panel; this guard is defense
+// against edge cases where the approver re-opens the panel from the
+// queue row mid-flight.
+window._rrpInFlight = window._rrpInFlight || {};
 window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
+  if (instanceId && window._rrpInFlight[instanceId]) {
+    console.warn('[_rrpSubmit] concurrent invocation for instance already in flight — ignoring', { instanceId });
+    return;
+  }
+  if (instanceId) window._rrpInFlight[instanceId] = true;
+  try {
   const comments = document.getElementById('rrp-comments')?.value?.trim() || '';
   const firmId   = _mwFirmId();
   const resName  = _myResource?.name || 'Unknown';
@@ -1333,7 +1352,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       // silently skipped, instance stalled in_progress. No user-visible
       // signal. B-UI-9 v2.0's original scope assumed only terminal-PATCH
       // failure; this extension covers the earlier silent-drop class too.
-      const _fanOutApprovalFailure = function(errMsg, ctx) {
+      const _fanOutApprovalFailure = async function(errMsg, ctx) {
         var attemptedAt = new Date().toISOString();
 
         // Part A — emit
@@ -1415,6 +1434,15 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
         // trigger a local view refresh so the approver's work-queue UI
         // re-fetches and re-renders the restored row without waiting for a
         // natural poll tick.
+        //
+        // CMD78f: AWAIT the rollback before returning. The re-entrancy
+        // guard (_rrpInFlight) releases when this async function's caller
+        // returns; if the rollback were merely fire-and-forget, a rapid
+        // second click could land a fresh 'resolved' PATCH while the
+        // rollback was still in flight, and whichever settled last would
+        // win — typically the second click's PATCH, silently removing
+        // the row again. Awaiting ensures the DB is stable before the
+        // modal invites retry.
         var rollbackPromise;
         if (isWrRow) {
           rollbackPromise = API.patch('workflow_requests?id=eq.' + actionItemId, {
@@ -1427,11 +1455,12 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
             updated_at: new Date().toISOString(),
           }).catch(function(e){ console.warn('[_rrpSubmit] workflow_action_items rollback failed:', e && e.message); });
         }
+        await rollbackPromise;
         // Refresh local view once the rollback settles so the restored row
-        // re-appears in the approver's queue. Fire-and-forget; modal will
-        // display regardless of refresh timing.
-        if (rollbackPromise && typeof window._mwLoadUserView === 'function') {
-          rollbackPromise.then(function(){ try { window._mwLoadUserView(); } catch(_) {} });
+        // re-appears in the approver's queue. Fire-and-forget on the view
+        // refresh itself; modal will display regardless of refresh timing.
+        if (typeof window._mwLoadUserView === 'function') {
+          try { window._mwLoadUserView(); } catch(_) {}
         }
 
         // Close the review panel before presenting the modal so it doesn't
@@ -1489,7 +1518,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
             ? 'step-advance GET threw (possible network block / extension / RLS): ' + stepAdvanceErrMsg
             : (instRow ? 'step-advance GET returned row missing template_id' : 'step-advance GET returned empty — workflow_instances unreachable or RLS-denied');
           console.error('[_rrpSubmit] step-advance failed:', reason);
-          _fanOutApprovalFailure(reason, 'step_advance_get');
+          await _fanOutApprovalFailure(reason, 'step_advance_get');
           return;
         }
 
@@ -1569,7 +1598,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
               // share the same emit / CoC write / admin-notify / toast chain.
               // Iron Rule 34 extended: state-change outcome must mirror to
               // every actor. Toast is fired inside the helper.
-              _fanOutApprovalFailure((err && err.message) || String(err), 'terminal_patch');
+              await _fanOutApprovalFailure((err && err.message) || String(err), 'terminal_patch');
               // Do NOT fire instance.completed — DB state did not change.
               return;
             }
@@ -1690,5 +1719,11 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
       const btn = document.getElementById(id);
       if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     });
+  }
+  } finally {
+    // Release re-entrancy guard regardless of success / handled failure /
+    // unexpected throw. Keyed by instance_id so a different instance can
+    // still submit concurrently.
+    if (instanceId) delete window._rrpInFlight[instanceId];
   }
 };
