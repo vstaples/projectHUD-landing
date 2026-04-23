@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260423-CMD75
+// VERSION: 20260423-CMD76
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260423-CMD75 — B-UI-7a: instance.withdrawn + instance.recalled emits (terminal event mirrors)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260423-CMD75';
+console.log('%c[mw-tabs] v20260423-CMD76 — B-UI-7: reactive MY REQUESTS ACTIVE → HISTORY migrations (completed/withdrawn/recalled)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260423-CMD76';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -3191,6 +3191,172 @@ window.populateDeltaStrip = function() {
       if (_tries > 200) {
         clearInterval(_t);
         console.warn('[mw-tabs] CMDCenter never appeared — Work Queue reactivity will not mount');
+      }
+    }, 50);
+  }
+})();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// B-UI-7 (CMD76): Reactive MY REQUESTS ACTIVE → HISTORY migrations
+// ══════════════════════════════════════════════════════════════════════════════
+// Subscribes to the terminal instance event family and migrates the local
+// submitter's cached row without requiring a hard refresh. Architectural
+// reference: B-UI-1's _mwWorkQueueReactive IIFE above — same mount pattern,
+// same on-mount buffer scan (Rule 22), same CMDCenter.onAppEvent subscription.
+//
+// Scope:
+//   instance.completed   → flip cached status='complete',  re-render (migrate to HISTORY)
+//   instance.withdrawn   → flip cached status='cancelled', re-render (migrate to HISTORY)
+//   instance.recalled    → flip cached status='cancelled' + trigger loadUserRequests
+//                          to pick up the restored form_drafts row. Recall uniquely
+//                          has a draft-restoration side effect (B-UI-7a mw-tabs.js:2738)
+//                          that the local cache cannot synthesize from event payload
+//                          alone, so we delegate to the server round-trip. The ACTIVE
+//                          row still disappears immediately via the local status flip;
+//                          the Drafts-section update arrives ~600ms later with the
+//                          loadUserRequests refresh.
+//
+// Deliberately NOT subscribed: instance.blocked. Blocked instances remain in
+// ACTIVE with the ⚠ icon per existing design (mw-tabs.js:1064 _myrHasMissingApprover).
+// The ⚠ is missing-signatory metadata that travels with the instance; it is
+// not a signal to migrate.
+//
+// Reject handling: non-applicable. Per B-UI-7a Step 2 (Scenario B), rejection
+// in this product = "request changes" — workflow stays in_progress, loops back
+// to submitter via a new workflow_action_items row. The existing
+// workflow_request.resolved {decision: 'changes_requested'} emit is the
+// canonical signal; no ACTIVE→HISTORY migration occurs.
+//
+// Idempotence (Rule 25): if the same terminal event fires twice (transport
+// retry, late echo), the second invocation finds the row already in terminal
+// status → "no-op · row-not-in-active" log line + return. _cmdEmit's event_id
+// dedup handles the wire-level dupe; this handler's local status check handles
+// the logical dupe.
+//
+// Iron Rules honored:
+//   15 — onAppEvent listeners sit downstream of Aegis self-echo filter.
+//   20 — one listener path added, covering three event names via a dispatch switch.
+//   22 — on-mount buffer scan via recentEvents(50); catches events that fired
+//        between loadUserRequests completion and subscription registration.
+//   25 — handler is idempotent; second fire no-ops via row-not-in-active branch.
+//   31 — every non-trivial path produces a transcript-legible dev-console log
+//        with instance_id and cause (event name).
+//   32 — runtime evidence is the permanent log lines + operator visual
+//        confirmation of row migration. No transient instrumentation.
+//   34 — non-applicable by architectural choice. The handler reads only local
+//        session state (_myrInstances); no cross-session mirroring concern.
+// ══════════════════════════════════════════════════════════════════════════════
+(function() {
+  if (window._myrRequestsReactive) return;
+  window._myrRequestsReactive = true;
+
+  var TERMINAL_EVENTS = {
+    'instance.completed': 'complete',
+    'instance.withdrawn': 'cancelled',
+    'instance.recalled':  'cancelled',
+  };
+
+  function _handleTerminal(eventName, data) {
+    if (!TERMINAL_EVENTS.hasOwnProperty(eventName)) return false;
+    var instanceId = data && data.instance_id;
+    if (!instanceId) {
+      console.warn('[my-requests] terminal event missing instance_id', eventName, data);
+      return false;
+    }
+
+    var insts = window._myrInstances || [];
+    var idx = -1;
+    for (var i = 0; i < insts.length; i++) {
+      if (insts[i] && insts[i].id === instanceId) { idx = i; break; }
+    }
+
+    // Row not in local cache — either another user's instance, or already
+    // migrated this session, or the event is for an instance we never owned.
+    // Rule 31: log the no-op to keep silent-dismissal debugging tractable.
+    if (idx === -1) {
+      console.log('[my-requests] no-op · instance_id=' + instanceId + ' reason=row-not-in-active');
+      return false;
+    }
+
+    var current = insts[idx].status;
+    if (current === 'complete' || current === 'cancelled') {
+      // Idempotent no-op: row is already terminal (prior invocation handled it,
+      // or the server refresh landed first).
+      console.log('[my-requests] no-op · instance_id=' + instanceId + ' reason=already-migrated');
+      return false;
+    }
+
+    // Flip the cached status. _myrRenderActive / _myrRenderHistory /
+    // _myrUpdateRequestBadges all derive from _myrInstances by filter; one
+    // re-render repoints ACTIVE, HISTORY, and the count badge coherently.
+    insts[idx].status = TERMINAL_EVENTS[eventName];
+    // For withdrawn: match the withdraw PATCH's current_step_name write
+    // (mw-tabs.js:1052) so HISTORY's status-column renderer shows "Withdrawn"
+    // rather than whatever the step was when the row was completed.
+    if (eventName === 'instance.withdrawn') {
+      insts[idx].current_step_name = 'Withdrawn';
+    }
+
+    if (typeof _myrRenderAll === 'function') {
+      try { _myrRenderAll(); } catch (e) {
+        console.warn('[my-requests] _myrRenderAll threw during reactive migration:', e);
+      }
+    }
+
+    // Recall has a draft-restoration side effect (form_drafts POST at
+    // mw-tabs.js:2738) that the local cache cannot synthesize. Trigger a
+    // server refresh to pick up the restored draft row in the Drafts section.
+    // The ACTIVE-row removal is already visible from the status flip + render
+    // above; this is purely for the Drafts-section update.
+    if (eventName === 'instance.recalled') {
+      if (typeof window.loadUserRequests === 'function') {
+        setTimeout(function() { window.loadUserRequests(); }, 600);
+      }
+      console.log('[my-requests] ACTIVE → removed · instance_id=' + instanceId + ' cause=' + eventName);
+      return true;
+    }
+
+    // Completed / withdrawn: migrate to HISTORY. Because HISTORY is eagerly
+    // rendered from the same _myrInstances array (mw-tabs.js:1383), the
+    // re-render above already put the row in HISTORY's filtered view. The
+    // HISTORY count (part of _myrUpdateRequestBadges' same derivation) also
+    // syncs automatically — no separate add/increment helpers needed.
+    console.log('[my-requests] HISTORY ← added · instance_id=' + instanceId + ' cause=' + eventName);
+    console.log('[my-requests] ACTIVE → HISTORY · instance_id=' + instanceId + ' cause=' + eventName);
+    return true;
+  }
+
+  function _mount() {
+    if (!window.CMDCenter || !window.CMDCenter.onAppEvent) return false;
+
+    // On-mount buffer scan (Rule 22) — catches terminal events that fired in
+    // the retention window before this subscription registered. Typical case:
+    // user opens MY REQUESTS seconds after a colleague's approval completed
+    // their instance. The initial DB query already reflects the terminal
+    // status, so the handler's "already-migrated" no-op branch fires — which
+    // is correct and transcript-legible.
+    try {
+      var recent = window.CMDCenter.recentEvents(50) || [];
+      for (var i = recent.length - 1; i >= 0; i--) {
+        var r = recent[i];
+        if (r && TERMINAL_EVENTS.hasOwnProperty(r.eventName)) {
+          _handleTerminal(r.eventName, r.data);
+        }
+      }
+    } catch (e) { /* seed is best-effort */ }
+
+    window.CMDCenter.onAppEvent(_handleTerminal);
+    return true;
+  }
+
+  if (!_mount()) {
+    var _tries = 0;
+    var _t = setInterval(function() {
+      _tries++;
+      if (_mount()) { clearInterval(_t); return; }
+      if (_tries > 200) {
+        clearInterval(_t);
+        console.warn('[mw-tabs] CMDCenter never appeared — MY REQUESTS reactivity will not mount');
       }
     }, 50);
   }
