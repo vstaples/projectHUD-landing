@@ -1,6 +1,6 @@
-// VERSION: 20260423-CMD77
-window._mwEventsVersion = 'v20260423-CMD77';
-console.log('%c[mw-events] v20260423-CMD77 — B-UI-8 Part B: terminal PATCH error propagation + schema-drift/step-name hotfix reconciliation','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260423-CMD78
+window._mwEventsVersion = 'v20260423-CMD78';
+console.log('%c[mw-events] v20260423-CMD78 — B-UI-9 v2.0: approval-failure observability (Part A emit instance.approval_failed + Part B CoC write + Part C admin notify via shared helper)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -1251,6 +1251,92 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
               patchOk = true;
             } catch (err) {
               console.error('[_rrpSubmit] terminal PATCH failed', err);
+
+              // ── B-UI-9 (CMD78) Parts A/B/C: approval-failure observability
+              // Iron Rule 34 extended — a state-change outcome must mirror to
+              // every actor who needs to know. B-UI-8 Part B already covers
+              // the approver (error toast below, unchanged). B-UI-9 adds:
+              //   Part A — emit instance.approval_failed onto the bus so
+              //            Aegis / submitter-session subscribers receive it.
+              //            Emit fires BEFORE the toast so cross-actor signal
+              //            goes out even if compassToast is unavailable.
+              //   Part B — write a coc_event with event_type
+              //            'request.approval_failed' so the audit surface
+              //            sees the failed attempt. Matches the direct-post
+              //            pattern used elsewhere in this file for
+              //            request.submitted / request.approved / etc.
+              //   Part C — notify admins via window._notifyAdminsOfIssue
+              //            (mw-tabs.js CMD78 extracted helper). Same surface
+              //            admins learn about instance.blocked through.
+              // workflow_request_id not in scope at this site; null per
+              // Scenario D default. resolvedSeq derived earlier at line ~1133.
+              var attemptedAt = new Date().toISOString();
+              var errMsg = (err && err.message) || String(err);
+
+              // Part A — emit onto bus
+              if (typeof window._cmdEmit === 'function') {
+                window._cmdEmit('instance.approval_failed', {
+                  instance_id:          instanceId,
+                  workflow_request_id:  null,
+                  approver_resource_id: resId,
+                  approver_name:        resName,
+                  seq:                  resolvedSeq,
+                  error_message:        errMsg,
+                  attempted_at:         attemptedAt,
+                });
+              }
+
+              // Part B — CoC write (fire-and-forget; audit is best-effort)
+              API.post('coc_events', {
+                id:           crypto.randomUUID(),
+                firm_id:      firmId,
+                entity_id:    instanceId,
+                entity_type:  'workflow_instance',
+                event_type:   'request.approval_failed',
+                event_class:  'lifecycle',
+                severity:     'warning',
+                event_notes:  JSON.stringify({
+                  approver_name:  resName,
+                  seq:            resolvedSeq,
+                  error_message:  errMsg,
+                  attempted_at:   attemptedAt,
+                }),
+                actor_name:        resName,
+                actor_resource_id: resId,
+                occurred_at:       attemptedAt,
+                created_at:        attemptedAt,
+              }).catch(function(e){ console.warn('[_rrpSubmit] approval_failed CoC write failed:', e && e.message); });
+
+              // Part C — admin notification via shared helper.
+              // Fetch submitter resource row for the manager_id fallback, to
+              // match _mwResolveAndRoute's data flow exactly. Best-effort; if
+              // fetch fails we pass null and admins-via-users-table still fire.
+              if (typeof window._notifyAdminsOfIssue === 'function') {
+                (async function() {
+                  var submitterRes = null;
+                  try {
+                    var submitterResId = instRow && instRow.submitted_by_resource_id;
+                    if (submitterResId) {
+                      var subRows = await API.get(
+                        'resources?id=eq.' + submitterResId + '&select=id,name,manager_id&limit=1'
+                      ).catch(function(){ return []; });
+                      submitterRes = subRows && subRows[0] || null;
+                    }
+                  } catch(_) {}
+                  var formName = (instRow && instRow.title) || 'Document review';
+                  var adminTitle = '⚠ Approval did not save: ' + formName;
+                  var adminBody  = 'Approver ' + resName + ' attempted to approve "' + formName +
+                    '" but the save failed (' + errMsg + '). The approver has been asked to retry. ' +
+                    'If the failure persists, investigate RLS / schema / service availability on workflow_instances.';
+                  await window._notifyAdminsOfIssue(
+                    instanceId, firmId, submitterRes,
+                    adminTitle, adminBody,
+                    '_rrpSubmit.approval_failed'
+                  );
+                })();
+              }
+              // ── end B-UI-9 block ──────────────────────────────────────────
+
               if (typeof window.compassToast === 'function') {
                 window.compassToast('Approval did not save — please try again.', 4000);
               }

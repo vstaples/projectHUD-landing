@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260423-CMD77
+// VERSION: 20260423-CMD78
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260423-CMD77 — B-UI-8 Part A: Signature Loop tooltip cache completeness (widen filter + schema-drift \'completed\'→\'complete\')','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260423-CMD77';
+console.log('%c[mw-tabs] v20260423-CMD78 — B-UI-9 v2.0: approval-failure observability (⚠ icon + tooltip extension + _notifyAdminsOfIssue helper lift-and-shift)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260423-CMD78';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -1100,6 +1100,22 @@ function _myrHasMissingApprover(inst) {
   } catch(_) { return false; }
 }
 
+// B-UI-9 (CMD78): Returns true if this instance has an unresolved approval
+// attempt failure — i.e., a 'request.approval_failed' CoC event exists and
+// the instance has NOT since transitioned to 'complete'. Recovery is implicit:
+// when the approver retries and the terminal PATCH succeeds, inst.status
+// flips to 'complete' (per B-UI-7's reactive subscriber) and this returns
+// false — the ⚠ icon then travels into HISTORY as historical metadata, per
+// B-UI-7 handoff's "⚠ is instance-level metadata; it travels into HISTORY"
+// convention. Iron Rule 34 extended: user-visible failure signal mirrored
+// across approver (toast · B-UI-8), audit (CoC · B-UI-9 Part B), and
+// submitter (this helper · B-UI-9 Part D).
+function _myrInstHasFailedApproval(inst) {
+  if (!inst || inst.status === 'complete' || inst.status === 'cancelled') return false;
+  var cocEvts = (window._myrInstCoc || {})[inst.id] || [];
+  return cocEvts.some(function(e) { return e.event_type === 'request.approval_failed'; });
+}
+
 function _myrRenderGroupedTable(instances, isHistory) {
   const esc = s => !s ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const FA = 'font-family:Arial,sans-serif;';
@@ -1160,7 +1176,12 @@ function _myrRenderGroupedTable(instances, isHistory) {
         var step = inst.current_step_name || inst.status || '—';
         var sColor = statusColor[inst.status] || '#EF9F27';
         var hasMissing = _myrHasMissingApprover(inst);
-        if (inst.status === 'blocked') { step = '⚠ ' + step; }
+        // B-UI-9 (CMD78): extend ⚠ trigger to include unresolved approval
+        // failures. Pre-B-UI-9 only blocked-routing got the prefix; now
+        // approval-failed instances share the same row-level marker per
+        // Part D (Iron Rule 34 extended — multi-actor visibility).
+        var hasFailedApproval = _myrInstHasFailedApproval(inst);
+        if (inst.status === 'blocked' || hasFailedApproval) { step = '⚠ ' + step; }
         else if (hasMissing) { sColor = '#EF9F27'; } // keep amber but flag in popup
         html += `<tr onclick="myrOpenInstance('${inst.id}')" style="cursor:pointer;border-bottom:0.5px solid rgba(255,255,255,.05);transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
           <td style="${FA}font-size:13px;color:rgba(255,255,255,.6);padding:8px 10px;white-space:nowrap">${esc(date)}</td>
@@ -1190,7 +1211,9 @@ function _myrRenderGroupedTable(instances, isHistory) {
         var date = inst.created_at ? new Date(inst.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
         var step = inst.current_step_name || inst.status || '—';
         var sColor = statusColor[inst.status] || '#EF9F27';
-        if (inst.status === 'blocked') step = '⚠ ' + step;
+        // B-UI-9 (CMD78): ⚠ prefix also applies to unresolved approval failures.
+        var hasFailedApprovalCard = _myrInstHasFailedApproval(inst);
+        if (inst.status === 'blocked' || hasFailedApprovalCard) step = '⚠ ' + step;
         var cardMissing = _myrHasMissingApprover(inst) && inst.status !== 'blocked';
         html += `<div onclick="myrOpenInstance('${inst.id}')" style="padding:10px 12px;border:0.5px solid rgba(255,255,255,.07);border-radius:4px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
           <div>
@@ -2139,6 +2162,60 @@ window.addEventListener('DOMContentLoaded', function() {
   }
 };
 
+// ── _notifyAdminsOfIssue — shared admin-notification helper ──────────────────
+// B-UI-9 (CMD78): lift-and-shift extraction of the inline admin-notify block
+// that was previously embedded in _mwResolveAndRoute (at pre-B-UI-9 lines
+// 2255-2292 for the blocked-routing case). Two call sites now:
+//   1. _mwResolveAndRoute (blocked-routing) — unchanged copy/targeting/timing
+//   2. _rrpSubmit catch block (approval-failed) — new per B-UI-9 Part C
+// Behavior-preserving: the targeting logic (admin users via users table +
+// submitter's manager as fallback), the workflow_action_items row shape,
+// the Promise.all parallel post pattern, and the success console.log format
+// are byte-for-byte identical to the pre-extraction inline block. Only the
+// title/body strings are parameterised so callers can supply issue-specific
+// copy ("Routing blocked: …" vs "Approval save failed: …"). Caller also
+// supplies a logTag so the success line ("notified N admin(s) of …") matches
+// the original shape per-call-site.
+// Rule 20: one new listener path at the module surface. The two existing
+// and future caller-sides are bounded; no listener proliferation.
+window._notifyAdminsOfIssue = async function(instanceId, firmId, submitterRes, title, body, logTag) {
+  try {
+    var adminUsers = await API.get(
+      'resources?firm_id=eq.' + firmId +
+      '&select=id,name,user_id&is_active=eq.true'
+    ).catch(function() { return []; });
+    // Find admin users by cross-referencing users table
+    var userRows = await API.get(
+      'users?firm_id=eq.' + firmId + '&is_admin=eq.true&select=id,name,resource_id'
+    ).catch(function() { return []; });
+    var adminResIds = (userRows||[]).map(function(u){ return u.resource_id; }).filter(Boolean);
+    // Also include the submitter's manager as a fallback
+    if (submitterRes && submitterRes.manager_id) adminResIds.push(submitterRes.manager_id);
+    var uniqueAdminResIds = adminResIds.filter(function(id, i, a){ return a.indexOf(id) === i; });
+
+    if (uniqueAdminResIds.length) {
+      await Promise.all(uniqueAdminResIds.map(function(adminResId) {
+        return API.post('workflow_action_items', {
+          firm_id:           firmId,
+          instance_id:       instanceId,
+          title:             title,
+          body:              body,
+          status:            'open',
+          owner_resource_id: adminResId,
+          owner_name:        (adminUsers||[]).find(function(r){ return r.id===adminResId; })?.name || 'Admin',
+          created_by_name:   'Cadence Workflow Engine',
+          created_at:        new Date().toISOString(),
+        }).catch(function() {});
+      }));
+      console.log('[' + (logTag || '_notifyAdminsOfIssue') + '] notified ' + uniqueAdminResIds.length + ' admin(s) of ' + (logTag === '_mwResolveAndRoute' ? 'routing block' : 'issue'));
+    }
+    return uniqueAdminResIds.length;
+  } catch(e) {
+    console.warn('[' + (logTag || '_notifyAdminsOfIssue') + '] admin notification failed:', e);
+    return 0;
+  }
+};
+
 // ── _mwResolveAndRoute — Resolution Engine ───────────────────────────────────
 // Maps workflow template step roles to actual resource IDs and creates
 // workflow_requests rows so the right people see the request in their queue.
@@ -2254,42 +2331,20 @@ window._mwResolveAndRoute = async function(instanceId, templateSteps, currentSte
 
       // Layer 2: Notify ALL admins via workflow_action_items
       // Tagged with instance_id so they can be batch-resolved when the issue is fixed
-      try {
-        var adminUsers = await API.get(
-          'resources?firm_id=eq.' + firmId +
-          '&select=id,name,user_id&is_active=eq.true'
-        ).catch(function() { return []; });
-        // Find admin users by cross-referencing users table
-        var userRows = await API.get(
-          'users?firm_id=eq.' + firmId + '&is_admin=eq.true&select=id,name,resource_id'
-        ).catch(function() { return []; });
-        var adminResIds = (userRows||[]).map(function(u){ return u.resource_id; }).filter(Boolean);
-        // Also include the submitter's manager as a fallback
-        if (submitterRes && submitterRes.manager_id) adminResIds.push(submitterRes.manager_id);
-        var uniqueAdminResIds = adminResIds.filter(function(id, i, a){ return a.indexOf(id) === i; });
-
-        if (uniqueAdminResIds.length) {
-          var adminActionTitle = '⚠ Routing blocked: ' + roleLabel + ' not assigned';
-          var adminActionBody  = 'The workflow "' + formName + '" is blocked because ' + blockedMsg +
-            ' Click "Resume" on the request in MY REQUESTS to continue routing once the contact is assigned.';
-          await Promise.all(uniqueAdminResIds.map(function(adminResId) {
-            return API.post('workflow_action_items', {
-              firm_id:           firmId,
-              instance_id:       instanceId,
-              title:             adminActionTitle,
-              body:              adminActionBody,
-              status:            'open',
-              owner_resource_id: adminResId,
-              owner_name:        (adminUsers||[]).find(function(r){ return r.id===adminResId; })?.name || 'Admin',
-              created_by_name:   'Cadence Workflow Engine',
-              created_at:        new Date().toISOString(),
-            }).catch(function() {});
-          }));
-          console.log('[_mwResolveAndRoute] notified ' + uniqueAdminResIds.length + ' admin(s) of routing block');
-        }
-      } catch(e) {
-        console.warn('[_mwResolveAndRoute] admin notification failed:', e);
-      }
+      // B-UI-9 (CMD78): lift-and-shifted into window._notifyAdminsOfIssue so
+      // the approval-failed path (mw-events.js _rrpSubmit catch block) can
+      // fan out to the same admin surface via the same row shape. Title and
+      // body copy here are byte-identical to the pre-extraction inline block;
+      // the helper's logTag arg ('_mwResolveAndRoute') preserves the original
+      // console.log shape "notified N admin(s) of routing block".
+      var adminActionTitle = '⚠ Routing blocked: ' + roleLabel + ' not assigned';
+      var adminActionBody  = 'The workflow "' + formName + '" is blocked because ' + blockedMsg +
+        ' Click "Resume" on the request in MY REQUESTS to continue routing once the contact is assigned.';
+      await window._notifyAdminsOfIssue(
+        instanceId, firmId, submitterRes,
+        adminActionTitle, adminActionBody,
+        '_mwResolveAndRoute'
+      );
 
       // Surface toast to whoever triggered this
       if (typeof compassToast === 'function') {
@@ -2546,6 +2601,14 @@ function _myrStatusCell(inst, step, sColor) {
   var approvedEvents = cocEvts.filter(function(e){ return e.event_type === 'request.approved'; });
   var submittedEvent = cocEvts.find(function(e){ return e.event_type === 'request.submitted'; });
   var blockedEvent   = cocEvts.find(function(e){ return e.event_type === 'request.blocked'; });
+  // B-UI-9 (CMD78): unresolved approval-attempt failure — CoC event exists
+  // and the instance hasn't completed. On recovery (retry succeeds →
+  // inst.status flips to 'complete' via B-UI-7 subscriber) this evaluates
+  // false and the row migrates to HISTORY normally. Iron Rule 34 extended:
+  // submitter's local session sees the failure signal that B-UI-8's toast
+  // showed the approver and B-UI-9 Part B wrote to audit.
+  var hasFailedApproval = (inst.status !== 'complete' && inst.status !== 'cancelled') &&
+    cocEvts.some(function(e){ return e.event_type === 'request.approval_failed'; });
 
   // Find current step sequence_order to know which steps are before/after
   var currentStep = steps.find(function(s){ return s.name === inst.current_step_name; });
@@ -2662,6 +2725,13 @@ function _myrStatusCell(inst, step, sColor) {
       dot = '#1D9E75'; sc = '#1D9E75'; sl = 'Approved';
     } else if (isBlocked) {
       dot = '#E24B4A'; sc = '#E24B4A'; sl = 'Blocked';
+    } else if (isActive && hasFailedApproval) {
+      // B-UI-9 (CMD78): active step where the most recent approval attempt
+      // failed. Swaps "In Progress" for a red "Attempt failed — contact
+      // admin" to mirror the approver's transient toast into the submitter's
+      // persistent tooltip surface. Clears automatically on retry-success
+      // (inst.status → 'complete' → isAllDone true → "Approved" branch).
+      dot = '#E24B4A'; sc = '#E24B4A'; sl = 'Attempt failed — contact admin';
     } else if (isActive) {
       dot = '#00c9c9'; sc = '#EF9F27'; sl = 'In Progress';
     } else {
@@ -2683,11 +2753,18 @@ function _myrStatusCell(inst, step, sColor) {
       '<td style="padding:6px 10px"><span style="' + FA + 'font-weight:700;color:' + sc + '">' + sl + '</span></td>' +
     '</tr>';
   }).join('');
+  // B-UI-9 (CMD78): tooltip chrome reddens for unresolved approval failure
+  // just as it does for blocked-routing. Reuses the red palette already
+  // defined for blocked — the semantic ("action required") is analogous.
+  var ttRed = (inst.status === 'blocked') || hasFailedApproval;
+  var ttHdr = (inst.status === 'blocked')
+    ? 'ACTION REQUIRED — ROUTING BLOCKED'
+    : (hasFailedApproval ? 'ACTION REQUIRED — APPROVAL DID NOT SAVE' : 'Signature Loop Status');
   var tt = steps.length ? '<div class="myr-sig-tt" style="display:none;position:absolute;bottom:calc(100% + 8px);right:0;background:#111620;border:1px solid rgba(0,201,201,.4);border-radius:6px;z-index:9999;min-width:500px;box-shadow:0 8px 32px rgba(0,0,0,.7);overflow:hidden;font-size:11px">' +
-    '<div style="background:' + (inst.status==='blocked'?'rgba(226,75,74,.12)':'rgba(0,201,201,.12)') + ';padding:6px 12px;border-bottom:0.5px solid ' + (inst.status==='blocked'?'rgba(226,75,74,.3)':'rgba(0,201,201,.3)') + ';display:flex;align-items:center;gap:8px">' +
-      (inst.status==='blocked'?'<span style="font-size:13px">⚠</span>':'') +
-      '<span style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:' + (inst.status==='blocked'?'#E24B4A':'#00c9c9') + ';letter-spacing:.08em;text-transform:uppercase">' +
-      (inst.status==='blocked'?'ACTION REQUIRED — ROUTING BLOCKED':'Signature Loop Status') +
+    '<div style="background:' + (ttRed?'rgba(226,75,74,.12)':'rgba(0,201,201,.12)') + ';padding:6px 12px;border-bottom:0.5px solid ' + (ttRed?'rgba(226,75,74,.3)':'rgba(0,201,201,.3)') + ';display:flex;align-items:center;gap:8px">' +
+      (ttRed?'<span style="font-size:13px">⚠</span>':'') +
+      '<span style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:' + (ttRed?'#E24B4A':'#00c9c9') + ';letter-spacing:.08em;text-transform:uppercase">' +
+      ttHdr +
       '</span>' +
     '</div>' +
     '<table style="border-collapse:collapse;width:100%;font-size:11px">' +
