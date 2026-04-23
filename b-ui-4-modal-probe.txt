@@ -1,0 +1,12 @@
+# Script: b-ui-4_modal_probe · exercises modal.opened / Wait ForModal
+# Version: 1.0 · 2026-04-23
+
+Form Submit
+Wait ForEvent "form.submitted" → $instance_id
+Wait ForInstance $instance_id for launched
+Wait ForQueueRow $instance_id to VS
+Click ForInstance $instance_id "Review"
+Wait ForModal "Document Review Request" for reviewer
+Log "✓ Reviewer modal opened for $instance_id"
+# Close the modal to proceed — operator confirms Pause below can be Pause-free when B-UI-4 ships
+Pause Confirm Document Review panel is visible · press Enter to continue test

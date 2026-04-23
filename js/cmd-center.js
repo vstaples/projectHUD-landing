@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260419-CMD71
+// cmd-center.js  ·  v20260423-CMD74
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260419-CMD71',
+    'cmd-center':  'v20260423-CMD74',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260419-CMD71 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260423-CMD74 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -897,6 +897,29 @@ function _waitForQueueRow(instanceId, assigneeResourceId, timeoutMs) {
 }
 
 
+// ── Wait ForModal (B-UI-4 / CMD74) ───────────────────────────────────────────
+// Consumes the B-UI-4 modal.opened emit (mw-events.js Site 1 / Site 2).
+// Single-field mode matches on modal_name only; compound mode additionally
+// matches role ('reviewer' | 'approver' | 'submitter_resubmit') so the wait
+// resolves only when the specified flow's modal mounts. Default timeout 10s
+// — modal renders are fast once appendChild fires; no DB-gated content path.
+// Same Rule 22 / Rule 27 discipline as _waitForQueueRow via shared helpers.
+function _waitForModal(modalName, role, timeoutMs) {
+  if (role == null) {
+    return _waitForEventFiltered(
+      'modal.opened', 'modal_name', modalName, timeoutMs || 10000
+    );
+  }
+  return _waitForCompoundEvent(
+    'modal.opened',
+    'modal_name', modalName,
+    'role', role,
+    timeoutMs || 10000,
+    'modal "' + modalName + '" for ' + role
+  );
+}
+
+
 // B1 (CMD54): protocol-compliant envelope per HUD Ecosystem Protocol v0.1.
 // Canonical fields: protocol_version, event_type, event_id, source_product,
 // source_session, ts, firm_id, payload. Back-compat shims (event, from, name)
@@ -1513,6 +1536,36 @@ var COMMANDS = {
     return 'work_queue.rendered: ' + instanceId.slice(0,8) + (seq != null ? ' (step ' + seq + ')' : '');
   },
 
+  // Wait ForModal "<modal_name>" [for <role>] [timeout=<ms>]
+  // Consumes modal.opened (B-UI-4). Single-field match on modal_name, or
+  // compound match with role when "for <role>" is supplied. Role values:
+  // reviewer | approver | submitter_resubmit. Mirrors Wait ForQueueRow's
+  // optional-modifier shape.
+  'Wait ForModal': async function(args) {
+    var modalName = args[0];
+    if (!modalName) throw new Error('Wait ForModal: usage: Wait ForModal "<modal_name>" [for <role>] [timeout=<ms>]');
+    var forIdx = args.indexOf('for');
+    var role = null;
+    var tailStart = 1;
+    if (forIdx >= 0) {
+      if (!args[forIdx+1]) throw new Error('Wait ForModal: missing role after "for"');
+      role = String(args[forIdx+1]);
+      var validRoles = ['reviewer','approver','submitter_resubmit'];
+      if (validRoles.indexOf(role) < 0) throw new Error("Wait ForModal: unknown role '" + role + "' (expected reviewer|approver|submitter_resubmit)");
+      tailStart = forIdx + 2;
+    }
+    var timeoutMs = 10000;
+    for (var i = tailStart; i < args.length; i++) {
+      var tm = String(args[i]).match(/^timeout=(\d+)$/);
+      if (tm) timeoutMs = parseInt(tm[1], 10);
+    }
+    await _waitForModal(modalName, role, timeoutMs);
+    if (role) {
+      return 'modal.opened: ' + modalName + ' (' + role + ')';
+    }
+    return 'modal.opened: ' + modalName;
+  },
+
   // ── Storage ──────────────────────────────────────────────────────────────────
   'Store': async function(args) {
     var key = args[0];
@@ -2017,7 +2070,7 @@ async function _runScript(scriptText, scriptName) {
       }
 
       var _lv=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
-               'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow'];
+               'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow','Wait ForModal'];
       if (targetUserId && (_lv.indexOf(parsed.verb)===-1)) {
         // Dispatch via Realtime (non-local commands)
         // B-UI-5 / CMD71: resolve $variables against Aegis's _storeVars
@@ -2759,7 +2812,7 @@ function _runCmd() {
   if (parsed && parsed.target) {
     var targetUserId = _resolveTargetAlias(parsed.target);
     var _rl=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
-             'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow'];
+             'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow','Wait ForModal'];
     if (targetUserId && _channel && _rl.indexOf(parsed.verb)===-1) {
       // B-UI-5 / CMD71: resolve $variables against Aegis's _storeVars
       // before transmission. See _resolveVarsInCmd and script-path dispatch.

@@ -1,6 +1,6 @@
-// VERSION: 20260418-CMD60
-window._mwEventsVersion = 'v20260418-CMD60';
-console.log('%c[mw-events] v20260418-CMD60 — B1 event bus: workflow_request.resolved, instance.completed','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260423-CMD74
+window._mwEventsVersion = 'v20260423-CMD74';
+console.log('%c[mw-events] v20260423-CMD74 — B-UI-4: modal.opened emit (Review Request + Resubmit panels)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -659,6 +659,31 @@ window.openRequestReviewPanel = async function openRequestReviewPanel(item) {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
   document.getElementById('rrp-comments')?.focus();
+
+  // B-UI-4 (CMD74): fire modal.opened after DOM commit. The
+  // appendChild above is synchronous and the subtree is queryable
+  // immediately; the rAF is a belt-and-suspenders paint-tick guard
+  // mirroring B-UI-1's work_queue.rendered pattern. The Wait ForModal
+  // consumer can query form fields and buttons inside the overlay
+  // immediately after resolve.
+  //
+  // Role literal is derived here at the emit boundary, not forwarded
+  // from item._wrRole directly. This pins Wait ForModal's match
+  // target to a stable one-of-two vocabulary ('reviewer' | 'approver')
+  // even if _wrRole's internal values change. The protocol surface
+  // owns its vocabulary independent of internal field churn. Site 2
+  // (Resubmit panel) uses the same emit-boundary pattern with literal
+  // 'submitter_resubmit'.
+  if (typeof window._cmdEmit === 'function') {
+    requestAnimationFrame(function() {
+      window._cmdEmit('modal.opened', {
+        modal_id:    'req-review-panel',
+        modal_name:  'Document Review Request',
+        instance_id: item.instanceId || null,
+        role:        (item && item._wrRole === 'approver') ? 'approver' : 'reviewer',
+      });
+    });
+  }
 }
 
 // ── Resubmit Panel ────────────────────────────────────────────────────────────
@@ -835,6 +860,18 @@ window.openResubmitPanel = async function openResubmitPanel(item) {
 
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
+
+  // B-UI-4 (CMD74): fire modal.opened after DOM commit.
+  if (typeof window._cmdEmit === 'function') {
+    requestAnimationFrame(function() {
+      window._cmdEmit('modal.opened', {
+        modal_id:    'req-resubmit-panel',
+        modal_name:  'Resubmit for Review',
+        instance_id: item.instanceId || null,
+        role:        'submitter_resubmit',
+      });
+    });
+  }
 
   // Store context for submit handler
   window._rsbContext = { reviewers, approver, submittedDetails, firmId };
