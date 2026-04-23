@@ -1114,11 +1114,19 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
     // If approved, notify submitter via a new action item in their My Work
     //    Fetch instance to get submitted_by_resource_id
     // B1 (CMD54): also pull current_step_id so we can derive `seq` for emit #4.
+    // B-UI-9 (CMD78) Part E: widen SELECT to include template_id, form_def_id,
+    // and launched_at so the step-advance block below (line ~1180) can reuse
+    // this `inst` directly instead of doing a redundant second GET for
+    // essentially the same row. Eliminates the silent-skip code smell at the
+    // old guard (`if (instRow && instRow.template_id)`) when the second GET
+    // returned empty for any reason (RLS, transient, verification-harness
+    // URL-block). See handoff B-UI-9 Part E for honest framing: defensive
+    // hardening, not load-bearing for a known production defect.
     let inst = null;
     let resolvedSeq = null;
     if (instanceId) {
       const instRows = await API.get(
-        `workflow_instances?id=eq.${instanceId}&select=submitted_by_resource_id,submitted_by_name,title,current_step_id&limit=1`
+        `workflow_instances?id=eq.${instanceId}&select=id,template_id,form_def_id,current_step_id,submitted_by_resource_id,submitted_by_name,title,launched_at&limit=1`
       ).catch(()=>[]);
       inst = instRows?.[0];
 
@@ -1178,12 +1186,22 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
     // the next step. This is what moves the instance from step 1 → 2 → 3 → 4.
     if (approved && instanceId && typeof window._mwResolveAndRoute === 'function') {
       try {
-        const instFull = await API.get(
-          `workflow_instances?id=eq.${instanceId}` +
-          `&select=id,template_id,form_def_id,current_step_id,submitted_by_resource_id,title,launched_at&limit=1`
-        ).catch(() => []);
-        const instRow = instFull?.[0];
-        if (instRow && instRow.template_id) {
+        // B-UI-9 (CMD78) Part E: reuse `inst` loaded above at line ~1120
+        // instead of re-fetching. Pre-Part E this block did a second
+        // workflow_instances GET whose result was named `instRow`; that GET
+        // collided with verification-harness URL-blocks matching
+        // `workflow_instances?id=eq.*` and, when empty, silently no-op'd the
+        // entire step-advance. Reusing `inst` (now widened to include
+        // template_id/form_def_id/launched_at at line ~1121) removes the
+        // redundant round trip. If `inst` is missing template_id — which
+        // should be unreachable in practice since submission writes it —
+        // log rather than silently skip.
+        const instRow = inst;
+        if (!instRow) {
+          console.warn('[rrpSubmit] step-advance skipped: inst unavailable (earlier GET returned empty)', { instanceId });
+        } else if (!instRow.template_id) {
+          console.warn('[rrpSubmit] step-advance skipped: template_id missing on instance', { instanceId, instRow });
+        } else {
           // Load all template steps
           const allSteps = await API.get(
             `workflow_template_steps?template_id=eq.${instRow.template_id}` +
