@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260423-CMD76
+// VERSION: 20260423-CMD77
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260423-CMD76 — B-UI-7: reactive MY REQUESTS ACTIVE → HISTORY migrations (completed/withdrawn/recalled)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260423-CMD76';
+console.log('%c[mw-tabs] v20260423-CMD77 — B-UI-7 hotfix: cache-refresh on terminal events (Signature Loop tooltip freshness)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260423-CMD77';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -3303,15 +3303,30 @@ window.populateDeltaStrip = function() {
       }
     }
 
-    // Recall has a draft-restoration side effect (form_drafts POST at
-    // mw-tabs.js:2738) that the local cache cannot synthesize. Trigger a
-    // server refresh to pick up the restored draft row in the Drafts section.
-    // The ACTIVE-row removal is already visible from the status flip + render
-    // above; this is purely for the Drafts-section update.
+    // All terminal events trigger a background server refresh after 600ms.
+    // Rationale: the client-side status flip + _myrRenderAll above makes ACTIVE
+    // → HISTORY migration instant (B-UI-7's reactive-first premise), but the
+    // Signature Loop Status hover tooltip reads sibling caches
+    // (_myrInstReqs at mw-tabs.js:918, _myrInstCoc at mw-tabs.js:917) that
+    // this handler cannot synthesize from the event payload alone. Those
+    // caches only hold in-flight instances per the loadUserRequests filter
+    // at mw-tabs.js:916; a freshly-completed instance leaves no trace until
+    // the next server refresh, so the tooltip renders "Waiting" rows. The
+    // 600ms delayed reload invalidates the caches wholesale and the next
+    // hover renders the resolved workflow_requests rows.
+    //
+    // Additionally for recalled: the form_drafts row restored by B-UI-7a's
+    // emit site (mw-tabs.js:2738) needs to appear in the Drafts section.
+    // loadUserRequests repopulates _myrDrafts by the same call.
+    //
+    // _myrLoadPending at mw-tabs.js:872 coalesces concurrent calls, so the
+    // local recalling session's own setTimeout at mw-tabs.js:2761 and this
+    // handler's call collapse to one server round-trip.
+    if (typeof window.loadUserRequests === 'function') {
+      setTimeout(function() { window.loadUserRequests(); }, 600);
+    }
+
     if (eventName === 'instance.recalled') {
-      if (typeof window.loadUserRequests === 'function') {
-        setTimeout(function() { window.loadUserRequests(); }, 600);
-      }
       console.log('[my-requests] ACTIVE → removed · instance_id=' + instanceId + ' cause=' + eventName);
       return true;
     }
