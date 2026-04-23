@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260423-CMD78
+// VERSION: 20260423-CMD78h
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260423-CMD78 — B-UI-9 v2.0: approval-failure observability (⚠ icon + tooltip extension + _notifyAdminsOfIssue helper lift-and-shift)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260423-CMD78';
+console.log('%c[mw-tabs] v20260423-CMD78h — B-UI-9 v2.0: ⚠ caution-flag moved to white suffix after status text (convention unified with missing-approver badge)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260423-CMD78h';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -1176,13 +1176,12 @@ function _myrRenderGroupedTable(instances, isHistory) {
         var step = inst.current_step_name || inst.status || '—';
         var sColor = statusColor[inst.status] || '#EF9F27';
         var hasMissing = _myrHasMissingApprover(inst);
-        // B-UI-9 (CMD78): extend ⚠ trigger to include unresolved approval
-        // failures. Pre-B-UI-9 only blocked-routing got the prefix; now
-        // approval-failed instances share the same row-level marker per
-        // Part D (Iron Rule 34 extended — multi-actor visibility).
+        // B-UI-9 (CMD78h): caution-flag convention is a WHITE suffix ⚠
+        // placed AFTER the status text — see _myrStatusCell cautionSuffix.
+        // Per-inst hasFailedApproval is still computed for tooltip-chrome
+        // reddening and is passed through `inst` into _myrStatusCell.
         var hasFailedApproval = _myrInstHasFailedApproval(inst);
-        if (inst.status === 'blocked' || hasFailedApproval) { step = '⚠ ' + step; }
-        else if (hasMissing) { sColor = '#EF9F27'; } // keep amber but flag in popup
+        if (hasMissing) { sColor = '#EF9F27'; } // keep amber but flag in popup
         html += `<tr onclick="myrOpenInstance('${inst.id}')" style="cursor:pointer;border-bottom:0.5px solid rgba(255,255,255,.05);transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
           <td style="${FA}font-size:13px;color:rgba(255,255,255,.6);padding:8px 10px;white-space:nowrap">${esc(date)}</td>
           <td style="${FA}font-size:13px;color:rgba(255,255,255,.7);padding:8px 10px">${esc(purpose)}</td>
@@ -1211,9 +1210,11 @@ function _myrRenderGroupedTable(instances, isHistory) {
         var date = inst.created_at ? new Date(inst.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
         var step = inst.current_step_name || inst.status || '—';
         var sColor = statusColor[inst.status] || '#EF9F27';
-        // B-UI-9 (CMD78): ⚠ prefix also applies to unresolved approval failures.
+        // B-UI-9 (CMD78h): caution-flag convention is a WHITE suffix ⚠
+        // placed AFTER the status text, not a prefix. Matches the convention
+        // of the adjacent `cardMissing` suffix below.
         var hasFailedApprovalCard = _myrInstHasFailedApproval(inst);
-        if (inst.status === 'blocked' || hasFailedApprovalCard) step = '⚠ ' + step;
+        var cardCaution = (inst.status === 'blocked' || hasFailedApprovalCard);
         var cardMissing = _myrHasMissingApprover(inst) && inst.status !== 'blocked';
         html += `<div onclick="myrOpenInstance('${inst.id}')" style="padding:10px 12px;border:0.5px solid rgba(255,255,255,.07);border-radius:4px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
           <div>
@@ -1221,7 +1222,7 @@ function _myrRenderGroupedTable(instances, isHistory) {
             <div style="${FA}font-size:11px;color:rgba(255,255,255,.35)">${esc(date)}</div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em;white-space:nowrap">${esc(step)}${cardMissing?' ⚠':''}</span>
+            <span style="${FA}font-size:10px;font-weight:700;color:${sColor};letter-spacing:.05em;white-space:nowrap">${esc(step)}</span>${cardCaution?'<span style="margin-left:5px;font-size:11px;color:#ffffff">⚠</span>':''}${cardMissing?'<span style="margin-left:5px;font-size:11px;color:#ffffff">⚠</span>':''}
             ${!isHistory ? `<button onclick="myrWithdrawInstance('${inst.id}','${esc(inst.title)}',event)" title="Withdraw" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px" onmouseover="this.style.color='#e84040'" onmouseout="this.style.color='rgba(255,255,255,.25)'">🗑</button>` : ''}
           </div>
         </div>`;
@@ -2778,10 +2779,20 @@ function _myrStatusCell(inst, step, sColor) {
     '</table></div>' : '';
   var hasMissingApprover = _myrHasMissingApprover(inst);
   var warningBadge = (hasMissingApprover && inst.status !== 'blocked')
-    ? '<span title="One or more approvers not assigned" style="margin-left:5px;font-size:12px;cursor:help">⚠</span>'
+    ? '<span title="One or more approvers not assigned" style="margin-left:5px;font-size:12px;color:#ffffff;cursor:help">⚠</span>'
+    : '';
+  // B-UI-9 (CMD78h): caution-flag convention — ⚠ is a WHITE suffix icon
+  // placed AFTER the status text, not a colored prefix. Matches the
+  // convention already used by the card-layout `cardMissing` suffix (line
+  // ~1224) and the existing `warningBadge` directly above. Applies to both
+  // unresolved approval failures and blocked-routing rows; the (amber /
+  // red) status text carries the state, the ⚠ icon just flags that human
+  // attention is needed.
+  var cautionSuffix = (hasFailedApproval || inst.status === 'blocked')
+    ? '<span style="margin-left:5px;font-size:12px;color:#ffffff">⚠</span>'
     : '';
   return '<div style="display:inline-block;position:relative;font-size:11px" onmouseenter="var t=this.querySelector(\'.myr-sig-tt\');if(t)t.style.display=\'block\'" onmouseleave="var t=this.querySelector(\'.myr-sig-tt\');if(t)t.style.display=\'none\'">' +
-    '<span style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:' + sColor + ';letter-spacing:.05em;cursor:default">' + step + '</span>' + warningBadge + tt +
+    '<span style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:' + sColor + ';letter-spacing:.05em;cursor:default">' + step + '</span>' + cautionSuffix + warningBadge + tt +
   '</div>';
 }
 
