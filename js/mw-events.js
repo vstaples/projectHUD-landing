@@ -1,6 +1,6 @@
-// VERSION: 20260423-CMD78f
-window._mwEventsVersion = 'v20260423-CMD78f';
-console.log('%c[mw-events] v20260423-CMD78f — B-UI-9 v2.0: approval-failure observability (re-entrancy guard + awaited rollback prevents concurrent-submit race)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260423-CMD78g
+window._mwEventsVersion = 'v20260423-CMD78g';
+console.log('%c[mw-events] v20260423-CMD78g — B-UI-9 v2.0: approval-failure observability (re-entrancy guard + awaited rollback prevents concurrent-submit race)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -13,7 +13,7 @@ function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID 
 // been notified, and (d) the likely cause (network block / extension / RLS /
 // connectivity).
 //
-// Keep fonts ≥ 11pt per Aegis UI rules. No animation beyond a simple fade-in
+// Keep fonts ≥ 11pt per Aegis UI rule. No animation beyond a simple fade-in
 // to avoid competing with the CoC event that fires simultaneously.
 window._rrpFailureModal = function(errMsg, stage) {
   // Guard against duplicate invocations
@@ -1165,7 +1165,7 @@ window._rsbSubmit = async function(actionItemId, instanceId) {
 
 
 // ── Review panel submit ───────────────────────────────────
-// B-UI-9 (CMD78f): per-instance re-entrancy guard. An approver who clicks
+// B-UI-9 (CMD78g): per-instance re-entrancy guard. An approver who clicks
 // Approve, sees a failure, dismisses the modal, clicks the restored queue
 // row, and rapid-fires Approve again can otherwise land two concurrent
 // _rrpSubmit invocations for the same instance. Their workflow_requests
@@ -1435,7 +1435,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
         // re-fetches and re-renders the restored row without waiting for a
         // natural poll tick.
         //
-        // CMD78f: AWAIT the rollback before returning. The re-entrancy
+        // CMD78g: AWAIT the rollback before returning. The re-entrancy
         // guard (_rrpInFlight) releases when this async function's caller
         // returns; if the rollback were merely fire-and-forget, a rapid
         // second click could land a fresh 'resolved' PATCH while the
