@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260422-CMD73
+// VERSION: 20260422-CMD74
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260422-CMD73 — B-UI-6.1: receive-path _myActiveRequestId write (cross-session Click ForInstance resolves)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260422-CMD73';
+console.log('%c[mw-tabs] v20260422-CMD74 — B-UI-6.1: receive-path _myActiveRequestId write (cross-session Click ForInstance resolves)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260422-CMD74';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -3047,14 +3047,14 @@ window.populateDeltaStrip = function() {
     if (eventName === 'workflow_request.created') {
       if (data.assignee_resource_id !== myResId) return false;
 
-      // CMD73 (B-UI-6.1): mirror the routing-side _myActiveRequestId write
+      // CMD74 (B-UI-6.1): mirror the routing-side _myActiveRequestId write
       // on the receive path.
       //
       // On the routing session, _mwResolveAndRoute (mw-tabs.js:2329) writes
       // _myActiveRequestId[instance_id] = workflow_request.id synchronously
       // before emitting workflow_request.created. Click ForInstance's wrid
       // lookup (cmd-center.js:1283) reads this map to resolve instance_id →
-      // wrid, then queries [data-wi-id="<wrid>"]. Pre-CMD73, the receive
+      // wrid, then queries [data-wi-id="<wrid>"]. Pre-CMD74, the receive
       // session (AK when VS routes to AK) had no equivalent write: the map
       // stayed empty for instance_ids the operator didn't personally route.
       // Cross-session Click ForInstance always threw "no row for instance"

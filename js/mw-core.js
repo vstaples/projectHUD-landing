@@ -1,6 +1,6 @@
-// VERSION: 20260422-CMD72
-window._mwCoreVersion = 'v20260422-CMD72';
-console.log('%c[mw-core] v20260422-CMD72 — B-UI-6: poll no longer re-renders work tab (reactive handler owns it)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260422-CMD74
+window._mwCoreVersion = 'v20260422-CMD74';
+console.log('%c[mw-core] v20260422-CMD74 — B-UI-6: poll no longer re-renders work tab (reactive handler owns it)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1367,9 +1367,9 @@ window._mwLoadUserView = async function() {
               window.loadUserRequests && window.loadUserRequests();
               window._mwWorkStale = true;
             } else if (activeTab === 'work') {
-              // B-UI-6 (CMD72) — Do NOT re-render here.
+              // B-UI-6 (CMD74) — Do NOT re-render here.
               //
-              // Pre-CMD72 this branch called window._mwRefreshWorkItems(),
+              // Pre-CMD74 this branch called window._mwRefreshWorkItems(),
               // which re-fetched work items and invoked _mwLoadUserView().
               // That was redundant: B-UI-1's reactive handler in mw-tabs.js
               // (fired on workflow_request.created / .resolved for the
