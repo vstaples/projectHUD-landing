@@ -1,6 +1,6 @@
-// VERSION: 20260423-CMD78
-window._mwEventsVersion = 'v20260423-CMD78';
-console.log('%c[mw-events] v20260423-CMD78 — B-UI-9 v2.0: approval-failure observability (Part A emit instance.approval_failed + Part B CoC write + Part C admin notify via shared helper)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260423-CMD78a
+window._mwEventsVersion = 'v20260423-CMD78a';
+console.log('%c[mw-events] v20260423-CMD78a — B-UI-9 v2.0: approval-failure observability (Part A emit instance.approval_failed + Part B CoC write + Part C admin notify via shared helper)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts
 function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
@@ -1114,7 +1114,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
     // If approved, notify submitter via a new action item in their My Work
     //    Fetch instance to get submitted_by_resource_id
     // B1 (CMD54): also pull current_step_id so we can derive `seq` for emit #4.
-    // B-UI-9 (CMD78) Part E: widen SELECT to include template_id, form_def_id,
+    // B-UI-9 (CMD78a) Part E: widen SELECT to include template_id, form_def_id,
     // and launched_at so the step-advance block below (line ~1180) can reuse
     // this `inst` directly instead of doing a redundant second GET for
     // essentially the same row. Eliminates the silent-skip code smell at the
@@ -1186,7 +1186,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
     // the next step. This is what moves the instance from step 1 → 2 → 3 → 4.
     if (approved && instanceId && typeof window._mwResolveAndRoute === 'function') {
       try {
-        // B-UI-9 (CMD78) Part E: reuse `inst` loaded above at line ~1120
+        // B-UI-9 (CMD78a) Part E: reuse `inst` loaded above at line ~1120
         // instead of re-fetching. Pre-Part E this block did a second
         // workflow_instances GET whose result was named `instRow`; that GET
         // collided with verification-harness URL-blocks matching
@@ -1270,7 +1270,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
             } catch (err) {
               console.error('[_rrpSubmit] terminal PATCH failed', err);
 
-              // ── B-UI-9 (CMD78) Parts A/B/C: approval-failure observability
+              // ── B-UI-9 (CMD78a) Parts A/B/C: approval-failure observability
               // Iron Rule 34 extended — a state-change outcome must mirror to
               // every actor who needs to know. B-UI-8 Part B already covers
               // the approver (error toast below, unchanged). B-UI-9 adds:
@@ -1284,7 +1284,7 @@ window._rrpSubmit = async function(actionItemId, instanceId, decision, wrRole) {
               //            pattern used elsewhere in this file for
               //            request.submitted / request.approved / etc.
               //   Part C — notify admins via window._notifyAdminsOfIssue
-              //            (mw-tabs.js CMD78 extracted helper). Same surface
+              //            (mw-tabs.js CMD78a extracted helper). Same surface
               //            admins learn about instance.blocked through.
               // workflow_request_id not in scope at this site; null per
               // Scenario D default. resolvedSeq derived earlier at line ~1133.
