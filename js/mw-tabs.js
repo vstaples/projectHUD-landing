@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260422-CMD74
+// VERSION: 20260423-CMD75
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260422-CMD74 — B-UI-6.1: receive-path _myActiveRequestId write (cross-session Click ForInstance resolves)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260422-CMD74';
+console.log('%c[mw-tabs] v20260423-CMD75 — B-UI-7a: instance.withdrawn + instance.recalled emits (terminal event mirrors)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260423-CMD75';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -1051,6 +1051,22 @@ window.myrWithdrawInstance = async function(instanceId, title, evt) {
       'workflow_instances?id=eq.' + instanceId + '&firm_id=eq.' + firmId,
       { status: 'cancelled', current_step_name: 'Withdrawn' }
     );
+
+    // ── B-UI-7a (CMD75): emit instance.withdrawn ─────────────────────────────
+    // Fires immediately after the PATCH commits, BEFORE the local
+    // loadUserRequests refresh. Cross-surface consumers (MY REQUESTS reactive
+    // handler per B-UI-7, Aegis scripts, future dashboards) react in parallel
+    // with local refresh, not after it. Rule 34 inverse: cross-surface state
+    // transitions mirror onto the event bus. No rAF — post-PATCH emit does
+    // not depend on DOM commit.
+    if (typeof window._cmdEmit === 'function') {
+      window._cmdEmit('instance.withdrawn', {
+        instance_id:              instanceId,
+        withdrawn_by_resource_id: (_myResource && _myResource.id) || null,
+        reason:                   null,
+      });
+    }
+
     compassToast('Request withdrawn.', 2500);
     if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 500);
   } catch(e) {
@@ -2725,6 +2741,22 @@ window.myrRecallToDraft_row = async function(instanceId, evt) {
       form_data:   inst.form_data || {},
       updated_at:  new Date().toISOString(),
     });
+
+    // ── B-UI-7a (CMD75): emit instance.recalled ──────────────────────────────
+    // Distinct from instance.withdrawn per operator decision: recall has the
+    // draft-restoration side effect (form_drafts insert above) and different
+    // user intent (return-to-editable) vs withdraw's terminate-and-forget.
+    // Emits after both PATCH and draft-restore commit, before local refresh.
+    // Rule 34 inverse: cross-surface state transitions mirror onto the event
+    // bus. No rAF — post-PATCH emit does not depend on DOM commit.
+    if (typeof window._cmdEmit === 'function') {
+      window._cmdEmit('instance.recalled', {
+        instance_id:             instanceId,
+        recalled_by_resource_id: resId || null,
+        reason:                  null,
+      });
+    }
+
     compassToast('Recalled to Draft.', 2500);
     if (typeof loadUserRequests === 'function') setTimeout(loadUserRequests, 600);
   } catch(e) {
