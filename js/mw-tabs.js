@@ -1,9 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // MY WORK — SUITE TABS: MEETINGS, CALENDAR, CONCERNS
-// VERSION: 20260423-CMD78h
+// VERSION: 20260424-CMD79
 // ══════════════════════════════════════════════════════════
-console.log('%c[mw-tabs] v20260423-CMD78h — B-UI-9 v2.0: ⚠ caution-flag moved to white suffix after status text (convention unified with missing-approver badge)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
-window._mwTabsVersion = 'v20260423-CMD78h';
+console.log('%c[mw-tabs] v20260424-CMD79 — B-UI-10: compass_form_ready bootstrap injected into every Compass-rendered form iframe; activates B2 form.opened / Wait ForForm chain','background:#1a7f3a;color:#fff;font-weight:700;padding:2px 8px;border-radius:3px');
+window._mwTabsVersion = 'v20260424-CMD79';
 
 // ── B1 (CMD54): amount extraction from form.submitted payloads ────────────
 // Consumed by Class 1 threshold policies (e.g. Expense ≥ $5,000 → inject CFO).
@@ -1384,6 +1384,16 @@ window.addEventListener('DOMContentLoaded', function() {
 <\/script>`;
     var html = fd.source_html.replace('</body>', restoreScript + '</body>');
     if (!html.includes('</body>')) html = fd.source_html + restoreScript;
+    // B-UI-10 (CMD79): inject compass_form_ready bootstrap alongside existing
+    // restoreScript. Order: restoreScript → bootstrap, both before </body>.
+    // No ordering dependency: bootstrap tests structural field presence
+    // (static HTML), restoreScript populates values after (setTimeout 400ms).
+    var _bootstrap1 = _myrBuildFormReadyBootstrap(fd.source_name, fd.id);
+    if (html.includes('</body>')) {
+      html = html.replace('</body>', _bootstrap1 + '</body>');
+    } else {
+      html = html + _bootstrap1;
+    }
     var blob = new Blob([html], {type:'text/html;charset=utf-8'});
     _myrOpenHtmlFormOverlay(fd.source_name, URL.createObjectURL(blob), fd.id);
   } catch(e) {
@@ -1447,8 +1457,29 @@ window.myrLaunchRequest = async function(type, templateId) {
           }
         } catch(e) { url = null; }
         if (url) {
-          _myrOpenHtmlFormOverlay(formDef.source_name || 'Form', url, formDef.id);
-          return;
+          // B-UI-10 (CMD79): fetch storage HTML, inject compass_form_ready
+          // bootstrap, re-blob, then open overlay. On any fetch failure
+          // (CORS, network, 404), fall back to direct URL load — bootstrap
+          // not injected, Wait ForForm times out, overlay still renders.
+          // Graceful degradation per brief Scenario A.
+          try {
+            const htmlText = await fetch(url).then(r => {
+              if (!r.ok) throw new Error('fetch ' + r.status);
+              return r.text();
+            });
+            const _bootstrap2 = _myrBuildFormReadyBootstrap(formDef.source_name || 'Form', formDef.id);
+            let injected = htmlText.includes('</body>')
+              ? htmlText.replace('</body>', _bootstrap2 + '</body>')
+              : htmlText + _bootstrap2;
+            const blob2   = new Blob([injected], { type: 'text/html;charset=utf-8' });
+            const blobUrl2 = URL.createObjectURL(blob2);
+            _myrOpenHtmlFormOverlay(formDef.source_name || 'Form', blobUrl2, formDef.id);
+            return;
+          } catch(fetchErr) {
+            console.warn('[myrLaunchRequest] storage fetch failed, falling back to direct URL load (Wait ForForm will time out for this form):', fetchErr);
+            _myrOpenHtmlFormOverlay(formDef.source_name || 'Form', url, formDef.id);
+            return;
+          }
         }
       }
     } catch(e) { console.warn('[myrLaunchRequest] form load error:', e); }
@@ -1521,9 +1552,18 @@ body,html{margin:0;padding:0;font-family:Arial,sans-serif;font-size:12px;backgro
 .btn-s:hover{background:#f3f4f6}.btn-p:hover{background:#00b5b5}
 </style>`;
         // Only inject if source_html doesn't already have its own style block
-        const html = fd2.source_html.includes('<style>') 
+        let html = fd2.source_html.includes('<style>') 
           ? fd2.source_html 
           : CADENCE_FORM_CSS + fd2.source_html;
+        // B-UI-10 (CMD79): inject compass_form_ready bootstrap before </body>
+        // (or append if missing). Compass-side injection per B-UI-10: Cadence
+        // form HTML stays pure; signaling concern lives with Compass.
+        const _bootstrap3 = _myrBuildFormReadyBootstrap(fd2.source_name || 'Form', fd2.id);
+        if (html.includes('</body>')) {
+          html = html.replace('</body>', _bootstrap3 + '</body>');
+        } else {
+          html = html + _bootstrap3;
+        }
         const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
         _myrOpenHtmlFormOverlay(fd2.source_name || 'Form', blobUrl, fd2.id);
@@ -1598,6 +1638,44 @@ body,html{margin:0;padding:0;font-family:Arial,sans-serif;font-size:12px;backgro
 // it opened regardless of whether the iframe bootstrap echoes back a name.
 // Populated by _myrOpenHtmlFormOverlay; cleared on overlay close.
 window._myrCurrentForm = null; // { form_name, form_def_id, opened_at }
+
+// B-UI-10 (CMD79): iframe-side bootstrap for the compass_form_ready handshake.
+// Returns a <script> block to inject into every Compass-rendered form iframe.
+// The IIFE waits for DOM to contain at least one input/select/textarea
+// (form fields queryable), then postMessages { type:'compass_form_ready',
+// form_name, form_def_id } to the parent. The parent-side handler below
+// at ~1697 translates this to the form.opened emit, which unblocks
+// Wait ForForm per B2's contract.
+//
+// Compass-side injection (not Cadence-side, not DB migration) keeps the
+// signaling concern with the platform that cares about it; Cadence continues
+// to author pure form HTML. The snippet is wrapped in try/catch to prevent
+// iframe errors from surfacing, and uses an IIFE to avoid polluting the
+// iframe's global namespace.
+function _myrBuildFormReadyBootstrap(formName, formDefId) {
+  var fn  = JSON.stringify(formName || '');
+  var fid = JSON.stringify(formDefId || null);
+  return '\n<script>\n' +
+    '(function(){\n' +
+    '  function signalReady(){\n' +
+    '    var hasField = !!document.querySelector("input,select,textarea");\n' +
+    '    if (!hasField) { requestAnimationFrame(signalReady); return; }\n' +
+    '    try {\n' +
+    '      parent.postMessage({\n' +
+    '        type:        "compass_form_ready",\n' +
+    '        form_name:   ' + fn  + ',\n' +
+    '        form_def_id: ' + fid + '\n' +
+    '      }, "*");\n' +
+    '    } catch(e) {}\n' +
+    '  }\n' +
+    '  if (document.readyState === "complete" || document.readyState === "interactive") {\n' +
+    '    requestAnimationFrame(signalReady);\n' +
+    '  } else {\n' +
+    '    document.addEventListener("DOMContentLoaded", function(){ requestAnimationFrame(signalReady); });\n' +
+    '  }\n' +
+    '})();\n' +
+    '<\/script>\n';
+}
 
 function _myrOpenHtmlFormOverlay(title, url, formDefId) {
   // B2: stash canonical form name + def id so the compass_form_ready
@@ -2120,10 +2198,18 @@ window.addEventListener('DOMContentLoaded', function() {
 
     var html = fd.source_html.replace('</body>', restoreScript + '</body>');
     if (!html.includes('</body>')) html = fd.source_html + restoreScript;
+    // B-UI-10 (CMD79): inject compass_form_ready bootstrap — review-mode
+    // overlay also signals readiness (fields structurally present before
+    // 400ms disable). Consistency: every Compass-rendered form iframe emits.
+    var _bootstrap4 = _myrBuildFormReadyBootstrap(fd.source_name || 'Form', fd.id);
+    if (html.includes('</body>')) {
+      html = html.replace('</body>', _bootstrap4 + '</body>');
+    } else {
+      html = html + _bootstrap4;
+    }
     var blob    = new Blob([html], { type: 'text/html;charset=utf-8' });
     var blobUrl = URL.createObjectURL(blob);
     _myrOpenHtmlFormOverlay(fd.source_name || 'Form', blobUrl, fd.id);
-    // role comes from the path: 'form:{formDefId}:{instanceId}:{role}'
     var sigRole    = parts[2] || null;
     var signerName = (window._myResource && window._myResource.name) || '';
     setTimeout(function() {
@@ -2988,6 +3074,15 @@ window.addEventListener('DOMContentLoaded', function() {
 <\/script>`;
     var html = fd.source_html.replace('<\/body>', restoreScript + '<\/body>');
     if (!html.includes('<\/body>')) html = fd.source_html + restoreScript;
+    // B-UI-10 (CMD79): inject compass_form_ready bootstrap — review-mode
+    // instance view also signals readiness. Consistency: every Compass-
+    // rendered form iframe emits the handshake.
+    var _bootstrap5 = _myrBuildFormReadyBootstrap(fd.source_name, fd.id);
+    if (html.includes('<\/body>')) {
+      html = html.replace('<\/body>', _bootstrap5 + '<\/body>');
+    } else {
+      html = html + _bootstrap5;
+    }
     var blob = new Blob([html], {type:'text/html;charset=utf-8'});
     _myrOpenHtmlFormOverlay(fd.source_name, URL.createObjectURL(blob), fd.id);
     setTimeout(function() {
