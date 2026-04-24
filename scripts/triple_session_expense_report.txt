@@ -1,0 +1,74 @@
+# Triple-session approval test — expense report full chain
+# Version: 1.5
+# Requires: VS, AK, RW
+# Notes: B-UI-3.4 migration (CMD70).
+#        Candidate cleanup (not in v1.4 scope):
+#        - Lines 19 and 23 `Wait 500` hand-waits — predate B2 typed Waits
+#        - AK's Set Tab "MY TIME" / "MY WORK" tab-twiddle at step 2 —
+#          may no longer be needed with reactive queues + CMD70
+
+# — preflight · presence ————————————————————————————————
+Assert session VS is connected
+Assert session AK is connected
+Assert session RW is connected
+
+# — preflight · navigate all sessions to Compass ————————
+VS: Set View "compass"
+AK: Set View "compass"
+RW: Set View "compass"
+Wait ForLocation VS "compass.my_work" timeout=30000
+Wait ForLocation AK "compass.my_work" timeout=30000
+Wait ForLocation RW "compass.my_work" timeout=30000
+VS: Set Tab "MY WORK"
+AK: Set Tab "MY WORK"
+RW: Set Tab "MY WORK"
+
+# — VS submits ————————————————————————————————————————
+VS: Set Tab "MY REQUESTS"
+VS: Set SubTab "BROWSE"
+VS: Form Open "Expense Report"
+Wait ForForm "Expense Report" timeout=5000
+VS: Form Insert "Employee Name" "Vaughn Staples"
+VS: Form Insert "Trip Start Date" "2026-04-14"
+VS: Form Insert "Trip End Date" "2026-04-14"
+VS: Form Select "Business Purpose" "client"
+Wait 500
+VS: Form Insert "Purpose Description" "Two-session CMD Center approval test"
+VS: Form Insert "Customer Name" "Apex Consulting Group"
+VS: Form Insert "Customer Location" "Phoenix, AZ"
+Wait 500
+VS: Form Submit
+Wait ForEvent "form.submitted" → $instance_id
+Wait ForInstance $instance_id for launched
+Log "Package live · $instance_id"
+
+# — step 1: VS reviews ————————————————————————————————
+VS: Set Tab "MY WORK"
+Wait ForRoute $instance_id to VS
+Wait ForQueueRow $instance_id to VS
+VS: Click ForInstance $instance_id "Review"
+Wait ForModal "Document Review Request" timeout=5000
+VS: Click "Approve"
+Wait ForRoute $instance_id to AK
+Log "Step 1 complete"
+
+# — step 2: AK approves ———————————————————————————————
+AK: Set Tab "MY TIME"
+AK: Set Tab "MY WORK"
+Wait ForQueueRow $instance_id to AK
+AK: Click ForInstance $instance_id "Approve"
+Wait ForModal "Document Review Request" timeout=5000
+AK: Click "Approve"
+Wait ForRoute $instance_id to RW
+Log "Step 2 complete · AK approved"
+
+# — step 3: RW approves (Finance, seq 4) —
+RW: Set Tab "MY WORK"
+Wait ForQueueRow $instance_id to RW
+RW: Click ForInstance $instance_id "Approve"
+Wait ForModal "Document Review Request" timeout=5000
+RW: Click "Approve"
+Wait ForInstance $instance_id for completed timeout=15000
+Log "Step 3 complete · RW approved"
+
+Log "✓ Chain confirmed · steps 1-3 complete · $instance_id"

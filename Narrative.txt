@@ -1,0 +1,24 @@
+The demo will present activities as follows.
+
+Simulate 3-Person Team:  Director, Principal Engineer, Program Manager
+- Scenario:  Engaging with new client to earn contract to design & build concept prototype of 4K HD-capable endoscope.
+- Scripted Demo: Presents introduction of Pipeline sub-module of ProjectHUD; navigates findings, meeting minutes, action items, proposal, etc. tabs.  
+                 Culminates with demonstration of WBS estimator, automated proposal generator, & conversion of WBS into an actual project plan.
+- Duration:  10 Minutes
+
+Simulate ProjectHUD Admin "Setting Up Shop"
+- Scenario:  Setting up the organization's users within ProjectHUD's USER MANAGEMENT branch.
+- Scripted Demo:  Add 10 or so users complete with their basic info, who's their individual team, & skills.  Complete ROLES & RATES, add USER LOGINS, & organize org chart ... latter defining their management structure for signator reasons.
+- Demo Time:  5 minutes
+
+Simulate Project Manager "Getting Organized"
+- Scenario:  Project Manager is now handed a new "project" with template plan either expressed from WBS, manually entered, or imported as an Excel file/CSV file.
+             PM needs to organize phases, assign resources, specify calendar durations, link dependencies, balance loading.
+- Scripted Demo:  Imports CSV file, performs above tasks, examines critical path, assesses resource heatmap, presents PERT analysis.
+- Demo Time:  20 minutes
+
+Simulate Project In-Progress Across Project Team
+- Scenario:  Individual users begin using Compass to effect "real work".  Transition tasks complete, accrue time, submit time reports, organize kanban calendar activities, 
+             file expense reports.  PM monitors & directs activities, managers monitor KPIs, external clients examine their portal.
+- Scripted Demo:  Aegis uses Mission Control to pop "users" to the forefront; Compass sequences through multitude of activities.
+Demo Time:  15 minutes
