@@ -1,0 +1,35 @@
+# Version: 1.0
+# Requires: VS
+# CMD89 spotlight presentation layer probe.
+
+Log "Probe start"
+
+# Mode 1: transitional caption (no spotlight)
+Set NarrateTarget VS
+Narrate "Welcome. Beginning the spotlight probe."
+Pause "Caption should appear bottom-center on VS Compass. Press Enter."
+
+# Mode 2: spotlight + caption (default pause)
+Narrate "This spotlights the page header." -spotlight "h1"
+Log "Advanced past header spotlight."
+
+# Mode 3: spotlight + caption with timeout (auto-advance 3s)
+Narrate "This auto-advances in 3 seconds." -spotlight "h1" -timeout 3000
+Log "Auto-advanced via timeout."
+
+# Mode 4: replace-on-new-show
+Narrate "First message — will be replaced." -spotlight "h1"
+# Operator does NOT advance; instead, the next line replaces the first
+Narrate "Second message — replaced cleanly." -spotlight "h1"
+Pause "Confirm clean replace, no double-overlay. Press Enter."
+
+# Mode 5: invalid selector (graceful fallback)
+Narrate "This selector matches nothing." -spotlight "#does-not-exist"
+Pause "Caption should appear at bottom-center, no dim/spotlight. Press Enter."
+
+# Mode 6: bare Narrate to Aegis (no overlay expected)
+Set NarrateTarget Aegis
+Narrate "This should produce no visible overlay on Aegis." -pause
+Log "Aegis -pause advanced via Enter."
+
+Log "✓ Probe complete"

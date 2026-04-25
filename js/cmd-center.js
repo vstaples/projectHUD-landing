@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD88
+// cmd-center.js  ·  v20260425-CMD89
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD88',
+    'cmd-center':  'v20260425-CMD89',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD88 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD89 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -89,15 +89,18 @@ var _scriptRunning = false; // suppress hook double-logging during script execut
 var _scriptAborted = false; // set when panel closes mid-script
 var _pauseResolve  = null;  // set by Pause command, cleared by Enter in command bar
 var _leaveTimers   = {};    // { userId: timeoutId } — pending leave debounces; read by _renderSessionList
-// CMD87 / Brief Aegis Demo Primitives: Narrate + DOFile state
-var _narrateAdvance = null; // set by Narrate -pause, resolved on triangle click or Enter
-var _narrateKeyHandler = null; // installed-while-banner-visible keydown listener (capture phase)
-var _narrateVisible = false;   // true while banner is showing (any mode)
+// CMD89 / Brief CMD89 spotlight presentation layer: Narrate + DOFile state.
+// Replaces the CMD87/CMD88 banner state. Visual surface is a dim+hole
+// spotlight overlay plus a caption card (compass.html). Aegis is operator-
+// facing only — no visible overlay; Enter advances -pause for script flow.
+var _narrateAdvance = null; // set by Narrate -pause (Aegis-local), resolved on Enter
+var _narrateKeyHandler = null; // installed-while-pause-pending keydown listener (capture phase)
+var _narrateVisible = false;   // true while a -pause is awaiting Enter on Aegis
 var _doFileChain    = [];   // current DOFile call stack — names only, for depth guard + error reporting
 // CMD87b / Brief Aegis Remote Narration: cross-session narrate state
-// _narrateTarget: 'Aegis' = render local (CMD87 behavior); else alias of remote
-// session whose Compass tab will render the banner. Reset to 'Aegis' on each
-// _runScript entry per §7 ("do not persist across script runs").
+// _narrateTarget: 'Aegis' = render local (operator-only Enter advance); else
+// alias of remote session whose Compass tab will render the spotlight + caption.
+// Reset to 'Aegis' on each _runScript entry per §7 ("do not persist across script runs").
 var _narrateTarget = 'Aegis';
 // On Aegis: latest narrate_id awaiting remote advance, so a subsequent Narrate
 // can auto-advance the prior remote -pause (§3-q6 cross-session stacking).
@@ -110,6 +113,8 @@ var _compassActiveNarrateId = null;
 // On Compass: keydown listener for local Enter-to-advance (mirror of the
 // Aegis _narrateKeyHandler; same Enter advance semantics §3-q3).
 var _compassNarrateKeyHandler = null;
+// On Compass: timeout id for -timeout auto-advance, so a replace can clear it.
+var _compassTimeoutId = null;
 
 // ── UUID helper (B1/CMD54) ────────────────────────────────────────────────────
 // Used by _cmdEmit to stamp a protocol-compliant event_id on every envelope.
@@ -2144,117 +2149,231 @@ var COMMANDS = {
     return 'resumed after ' + _elapsedStr;
   },
 
-  // ── Narrate (CMD87 / Brief Aegis Demo Primitives) ────────────────────────────
-  // Display a yellow banner with a message. Renders locally on Aegis by
-  // default (CMD87 behavior); CMD87b adds a remote path that renders on a
-  // target Compass session when Set NarrateTarget redirects.
-  //   Narrate "<message>"           — banner shown; auto-hides on next Narrate
-  //   Narrate "<message>" -pause    — banner shown with advance triangle;
-  //                                   blocks until operator clicks ▶ (or hits
-  //                                   Enter on Aegis-local; on remote, the
-  //                                   audience clicks the triangle on Compass)
-  // §3-q3 (LOCKED): Aegis-local — Enter or triangle click advances; Esc inert.
-  //                 Remote — triangle click on the target's Compass advances;
-  //                 no keyboard advance on Aegis (input modality stays where
-  //                 the display is, §3-q3 of CMD87b brief).
-  // §3-q4: replace immediately. _showBanner / _narrateRemoteAdvance both
-  //        auto-resolve any prior pending -pause.
-  // §3-q8 (CMD87): emits 'narration.shown' for the local path (legacy M2 feed).
-  // CMD87b protocol: remote path emits 'narrate.show' (Aegis → target) and
-  //   awaits 'narrate.advance' (target → Aegis). 'narrate.cleared' is emitted
-  //   by the Compass side when the banner hides (§3-q7 audit emit).
+  // ── Narrate (CMD89 / Brief CMD89 spotlight presentation layer) ───────────────
+  // Replaces the CMD87/CMD88 yellow banner with a cinematic spotlight + caption
+  // surface. Aegis is operator-facing only (no overlay). Compass renders the
+  // dim+hole spotlight and the caption card per §2 spec.
+  //   Narrate "<msg>"                              — caption only, bottom-center
+  //   Narrate "<msg>" -pause                       — caption + advance affordance, blocks
+  //   Narrate "<msg>" -spotlight "<selector>"      — spotlight + caption, blocks
+  //   Narrate "<msg>" -spotlight "<sel>" -timeout N — spotlight + caption, auto-advances after N ms
+  // §3 precedence: -timeout wins over default-pause. -pause is preserved for
+  //   backward compatibility but redundant when -spotlight is present.
+  // §3 selector match-none: caption appears at bottom-center, no dim/spotlight.
+  // §3 selector matches multiple: spotlight the FIRST (querySelector).
+  // §5 preservation: emits 'narration.shown' on local path; 'narrate.show' /
+  //   'narrate.advance' / 'narrate.cleared' on remote path. Replace-on-new-show
+  //   auto-advances the prior pending -pause.
   // Aegis-local (Rule 29): runs unprefixed; registered in _lv and _rl.
-  // §3-q9: if remote target isn't online at runtime, fall back to Aegis-local
-  //   for that narration with a warning. Don't halt the script.
   'Narrate': async function(args) {
-    // Detect -pause flag (last arg)
+    // Parse flags. Args may contain: -pause, -spotlight "<sel>", -timeout <n>.
+    // Strip flags from args; remainder is the message.
     var paused = false;
-    if (args.length && args[args.length-1] === '-pause') {
-      paused = true;
-      args = args.slice(0, -1);
+    var spotlight = null;
+    var timeout = null;
+    var msgTokens = [];
+    for (var i = 0; i < args.length; i++) {
+      var a = args[i];
+      if (a === '-pause') { paused = true; continue; }
+      if (a === '-spotlight') {
+        spotlight = (i + 1 < args.length) ? args[++i] : null;
+        continue;
+      }
+      if (a === '-timeout') {
+        timeout = (i + 1 < args.length) ? parseInt(args[++i], 10) : null;
+        if (isNaN(timeout)) timeout = null;
+        continue;
+      }
+      msgTokens.push(a);
     }
-    var msg = args.join(' ');
-    // Empty message + no -pause = explicit clear (alternative to next Narrate).
-    if (!msg && !paused) {
-      // Local clear path unchanged. For remote, no-op (last narrate.show
-      // remains visible on target until the next Narrate replaces it; an
-      // explicit "Narrate ''" while remote-targeted does not propagate a
-      // clear in v1 — out of scope per §7 keep-it-simple).
-      _hideBanner();
+    var msg = msgTokens.join(' ');
+
+    // Spotlight implies pause unless -timeout overrides (-timeout always wins).
+    if (spotlight) paused = true;
+    var hasTimeout = (timeout !== null && timeout > 0);
+
+    // Empty message + no -pause/-spotlight = explicit clear.
+    if (!msg && !paused && !spotlight) {
+      _hideSpotlight();
       return 'narrate cleared';
     }
-    if (!msg) return 'Narrate: -pause requires a message';
+    if (!msg) return 'Narrate: -pause/-spotlight requires a message';
 
-    // ── Local path ───────────────────────────────────────────────────────────
+    // ── Local path (Aegis) ───────────────────────────────────────────────────
+    // Aegis is operator-facing only — no visible overlay. Emit the legacy
+    // narration.shown event, console-log, and (if blocking) wait for Enter.
     if (_narrateTarget === 'Aegis') {
-      _showBanner(msg, paused);
       if (window._cmdEmit) {
-        window._cmdEmit('narration.shown', { message: msg, paused: paused, ts: Date.now() });
+        window._cmdEmit('narration.shown', {
+          message: msg, paused: paused, spotlight: spotlight || null,
+          timeout: hasTimeout ? timeout : null, ts: Date.now()
+        });
       }
-      if (paused) {
-        await _waitForBannerAdvance();
-        _hideBanner();
+      if (paused || hasTimeout) {
+        // Auto-advance any prior pending Aegis-local -pause so a new one is reachable.
+        if (_narrateAdvance) {
+          var prev = _narrateAdvance; _narrateAdvance = null; prev();
+        }
+        var advanceMode = hasTimeout
+          ? '(auto-advance ' + timeout + 'ms)'
+          : '— press Enter to advance';
+        console.log('[narrate] "' + msg + '" ' + advanceMode);
+        if (hasTimeout) {
+          await new Promise(function(r){ setTimeout(r, timeout); });
+          return 'narrate advanced (timeout)';
+        }
+        await _waitForSpotlightAdvance();
         return 'narrate advanced';
       }
+      console.log('[narrate] "' + msg + '"');
       return 'narrate: ' + (msg.length > 40 ? msg.slice(0, 40) + '…' : msg);
     }
 
-    // ── Remote path (CMD87b) ─────────────────────────────────────────────────
-    // Re-resolve alias at runtime — the alias may have come online (or gone
-    // offline) since `Set NarrateTarget` ran. §3-q9 fallback on offline.
+    // ── Remote path (Compass via _narrateTarget alias) ───────────────────────
     var targetUid = _resolveTargetAlias(_narrateTarget);
     if (!targetUid) {
       _appendLine('SYS', 'warn', 'NarrateTarget ' + _narrateTarget +
-        ' not online; falling back to Aegis-local');
-      _showBanner(msg, paused);
-      if (paused) {
-        await _waitForBannerAdvance();
-        _hideBanner();
+        ' not online; falling back to Aegis-local (silent)');
+      if (window._cmdEmit) {
+        window._cmdEmit('narration.shown', {
+          message: msg, paused: paused, spotlight: spotlight || null,
+          timeout: hasTimeout ? timeout : null, ts: Date.now()
+        });
+      }
+      if (paused || hasTimeout) {
+        if (_narrateAdvance) { var p2 = _narrateAdvance; _narrateAdvance = null; p2(); }
+        console.log('[narrate-fallback] "' + msg + '"' +
+          (hasTimeout ? ' (auto-advance ' + timeout + 'ms)' : ' — press Enter'));
+        if (hasTimeout) {
+          await new Promise(function(r){ setTimeout(r, timeout); });
+          return 'narrate advanced (local fallback, timeout)';
+        }
+        await _waitForSpotlightAdvance();
         return 'narrate advanced (local fallback)';
       }
       return 'narrate (local fallback): ' + (msg.length > 40 ? msg.slice(0, 40) + '…' : msg);
     }
 
-    // §3-q6 cross-session: auto-advance any pending remote -pause before
-    // showing the new banner — otherwise the new banner replaces on the
-    // target but Aegis is still parked on the old _waitForEventFiltered.
+    // §3-q6: auto-advance any pending remote -pause before showing the new one.
     if (_narrateRemoteAdvance) {
-      var prev = _narrateRemoteAdvance; _narrateRemoteAdvance = null; prev();
+      var prev2 = _narrateRemoteAdvance; _narrateRemoteAdvance = null; prev2();
     }
 
-    // Generate narrate_id (Rule 31 payload completeness — separate from the
-    // envelope event_id _cmdEmit stamps). This is the narration's own id;
-    // it survives re-emit and matches advance to show.
     var nid = _uuid();
     window._cmdEmit('narrate.show', {
       target:     targetUid,
       narrate_id: nid,
       message:    msg,
-      paused:     paused
+      paused:     paused,
+      spotlight:  spotlight || null,
+      timeout:    hasTimeout ? timeout : null
     });
 
-    if (paused) {
-      // §3-q6 cross-target / replace-while-pending. The closure resolves the
-      // local _waitForEventFiltered without round-tripping a fake advance
-      // through Supabase or polluting the M2 audit feed. Direct listener
-      // resolution: matches the predicate (narrate_id === nid) and clears.
-      // The real target's banner remains visible until its own next
-      // narrate.show or until the operator clicks — acceptable per §3-q6.
-      var racePromise = _waitForEventFiltered('narrate.advance', 'narrate_id', nid, 120000);
+    if (paused || hasTimeout) {
+      // For -timeout: wait locally; the Compass side also auto-advances on its
+      // own timer. Whichever fires first resolves the pending await.
+      if (hasTimeout) {
+        var timeoutPromise = new Promise(function(r){ setTimeout(r, timeout); });
+        var racePromise = _waitForEventFiltered('narrate.advance', 'narrate_id', nid, timeout + 5000);
+        _narrateRemoteAdvance = function() {
+          _resolveEventListeners('narrate.advance', { narrate_id: nid, ts: Date.now(), synthetic: true });
+        };
+        try { await Promise.race([timeoutPromise, racePromise]); } catch (e) {}
+        _narrateRemoteAdvance = null;
+        return 'narrate sent: ' + _narrateTarget + ' (timeout-advanced)';
+      }
+      var racePromise2 = _waitForEventFiltered('narrate.advance', 'narrate_id', nid, 120000);
       _narrateRemoteAdvance = function() {
         _resolveEventListeners('narrate.advance', { narrate_id: nid, ts: Date.now(), synthetic: true });
       };
       try {
-        await racePromise;
+        await racePromise2;
       } catch (e) {
         _appendLine('SYS', 'warn', 'Narrate advance timed out (' +
           nid.slice(0, 8) + '); continuing');
-        // Don't halt — §3-q5 fallback. Operator may have walked away.
       }
       _narrateRemoteAdvance = null;
       return 'narrate sent: ' + _narrateTarget + ' (advanced)';
     }
     return 'narrate sent: ' + _narrateTarget;
+  },
+
+  // ── Spotlight (CMD89 §3 bonus verb) ──────────────────────────────────────────
+  // Pure visual focus — no caption text. Operator narrates verbally. Same
+  // dim+hole rendering as `Narrate -spotlight`, same advance behavior.
+  //   Spotlight "<selector>"                — blocks until advance
+  //   Spotlight "<selector>" -timeout 4000  — auto-advances after N ms
+  // Aegis-local (Rule 29): runs unprefixed; registered in _lv and _rl.
+  'Spotlight': async function(args) {
+    var timeout = null;
+    var selTokens = [];
+    for (var i = 0; i < args.length; i++) {
+      if (args[i] === '-timeout') {
+        timeout = (i + 1 < args.length) ? parseInt(args[++i], 10) : null;
+        if (isNaN(timeout)) timeout = null;
+        continue;
+      }
+      selTokens.push(args[i]);
+    }
+    var selector = selTokens.join(' ');
+    if (!selector) return 'Spotlight: missing selector';
+    var hasTimeout = (timeout !== null && timeout > 0);
+
+    if (_narrateTarget === 'Aegis') {
+      // Aegis-side: silent, but block on Enter (or timeout) for script flow.
+      console.log('[spotlight] "' + selector + '" ' +
+        (hasTimeout ? '(auto-advance ' + timeout + 'ms)' : '— press Enter to advance'));
+      if (hasTimeout) {
+        await new Promise(function(r){ setTimeout(r, timeout); });
+        return 'spotlight advanced (timeout)';
+      }
+      if (_narrateAdvance) { var prev = _narrateAdvance; _narrateAdvance = null; prev(); }
+      await _waitForSpotlightAdvance();
+      return 'spotlight advanced';
+    }
+
+    var targetUid = _resolveTargetAlias(_narrateTarget);
+    if (!targetUid) {
+      _appendLine('SYS', 'warn', 'NarrateTarget ' + _narrateTarget +
+        ' not online; spotlight skipped');
+      return 'spotlight skipped (offline target)';
+    }
+
+    if (_narrateRemoteAdvance) {
+      var prev2 = _narrateRemoteAdvance; _narrateRemoteAdvance = null; prev2();
+    }
+    var nid = _uuid();
+    // Send as narrate.show with empty message + spotlight selector. The Compass
+    // renderer treats empty-message as caption-suppressed (pure visual).
+    window._cmdEmit('narrate.show', {
+      target:     targetUid,
+      narrate_id: nid,
+      message:    '',
+      paused:     true,
+      spotlight:  selector,
+      timeout:    hasTimeout ? timeout : null,
+      caption_suppressed: true
+    });
+
+    if (hasTimeout) {
+      var timeoutPromise = new Promise(function(r){ setTimeout(r, timeout); });
+      var racePromise = _waitForEventFiltered('narrate.advance', 'narrate_id', nid, timeout + 5000);
+      _narrateRemoteAdvance = function() {
+        _resolveEventListeners('narrate.advance', { narrate_id: nid, ts: Date.now(), synthetic: true });
+      };
+      try { await Promise.race([timeoutPromise, racePromise]); } catch (e) {}
+      _narrateRemoteAdvance = null;
+      return 'spotlight sent: ' + _narrateTarget + ' (timeout-advanced)';
+    }
+    var racePromise2 = _waitForEventFiltered('narrate.advance', 'narrate_id', nid, 120000);
+    _narrateRemoteAdvance = function() {
+      _resolveEventListeners('narrate.advance', { narrate_id: nid, ts: Date.now(), synthetic: true });
+    };
+    try { await racePromise2; } catch (e) {
+      _appendLine('SYS', 'warn', 'Spotlight advance timed out (' + nid.slice(0,8) + '); continuing');
+    }
+    _narrateRemoteAdvance = null;
+    return 'spotlight sent: ' + _narrateTarget + ' (advanced)';
   },
 
   // ── DOFile (CMD87 / Brief Aegis Demo Primitives) ─────────────────────────────
@@ -2455,119 +2574,216 @@ function _parseScriptRequires(scriptText) {
   return [];
 }
 
-// ── Narrate banner helpers (CMD87 / Brief Aegis Demo Primitives) ─────────────
-// Banner DOM lives in aegis.html between the M1 tab bar and the panes.
-// Three states: hidden (display:none), transient (visible, no triangle, hides
-// on next command), paused (visible, triangle showing, awaits Enter or click).
-// Stacking rule (§3-q4): replace immediately. If a -pause is currently
-// awaiting and a new Narrate fires, the pending advance is auto-resolved
-// before the new banner shows — otherwise the new banner would be unreachable.
-function _showBanner(msg, paused) {
-  var banner   = document.getElementById('phr-narrate-banner');
-  var msgEl    = document.getElementById('phr-narrate-banner-msg');
-  var advEl    = document.getElementById('phr-narrate-banner-advance');
-  if (!banner || !msgEl || !advEl) return;
-  // Stacking: auto-advance any pending -pause so the new banner is reachable
-  if (_narrateAdvance) {
-    var prev = _narrateAdvance; _narrateAdvance = null; prev();
-  }
-  msgEl.textContent     = msg;
-  advEl.style.display   = paused ? 'block' : 'none';
-  banner.classList.add('visible');
-  banner.style.display  = 'flex';
-  _narrateVisible       = true;
-}
-function _hideBanner() {
-  var banner = document.getElementById('phr-narrate-banner');
-  if (banner) {
-    banner.classList.remove('visible');
-    banner.style.display = 'none';
-  }
+// ── Spotlight helpers — Aegis side (CMD89) ────────────────────────────────────
+// Aegis is operator-facing only; no overlay is rendered. The only Aegis-side
+// surface is an Enter-key listener for -pause flow control. _waitForSpotlightAdvance
+// returns a Promise that resolves on Enter (capture phase, preempts the command
+// bar's Pause Enter handler, identical semantics to CMD88 _waitForBannerAdvance).
+function _hideSpotlight() {
   _narrateVisible = false;
   if (_narrateKeyHandler) {
     document.removeEventListener('keydown', _narrateKeyHandler, true);
     _narrateKeyHandler = null;
   }
+  if (_narrateAdvance) {
+    var r = _narrateAdvance; _narrateAdvance = null; r();
+  }
 }
-// Pre-exec hook (§3-q1 hide-on-next-command). Called at the top of each
-// dispatch-loop iteration. Only hides if no -pause is pending — paused banners
-// are dismissed by the operator, not by the next command.
-function _hideBannerIfTransient() {
-  if (_narrateVisible && !_narrateAdvance) _hideBanner();
-}
-// Returns a Promise that resolves on triangle-click OR Enter keypress.
-// Locked §3-q3: Enter advances; other keys (incl. Esc) fall through. The
-// keydown listener attaches in capture phase so it preempts the command bar's
-// Enter handler that resolves _pauseResolve.
-function _waitForBannerAdvance() {
+function _waitForSpotlightAdvance() {
   return new Promise(function(resolve) {
     _narrateAdvance = resolve;
-    var advEl = document.getElementById('phr-narrate-banner-advance');
-    function advance() {
-      if (!_narrateAdvance) return;        // already advanced (race-safe)
-      var r = _narrateAdvance; _narrateAdvance = null; r();
-    }
-    if (advEl) advEl.onclick = advance;
+    _narrateVisible = true;
     _narrateKeyHandler = function(ev) {
-      if (ev.key !== 'Enter') return;       // Esc and others fall through
+      if (ev.key !== 'Enter') return;
       ev.preventDefault();
       ev.stopPropagation();
-      advance();
+      if (!_narrateAdvance) return;
+      var r = _narrateAdvance; _narrateAdvance = null;
+      _narrateVisible = false;
+      if (_narrateKeyHandler) {
+        document.removeEventListener('keydown', _narrateKeyHandler, true);
+        _narrateKeyHandler = null;
+      }
+      r();
     };
     document.addEventListener('keydown', _narrateKeyHandler, true);
   });
 }
 
-// ── Compass-side narrate banner (CMD87b / Brief Aegis Remote Narration) ──────
-// These helpers run on Compass tabs only — gated by !_aegisMode. They mirror
-// the Aegis _showBanner / _hideBanner pattern but with two differences:
-//   1. Triangle click emits 'narrate.advance' (back to Aegis) rather than
-//      resolving a local Promise. Aegis is the orchestrator; the audience
-//      tap is the input event.
-//   2. The DOM lives in compass.html as a position:fixed bottom-anchored
-//      overlay (visible across all Compass tabs, above modals — z-index 2000).
-// §3-q3 (LOCKED): the Compass-local Enter key also advances, mirroring the
-// Aegis-local convention so a single operator running both tabs sees
-// consistent advance semantics.
-// §3-q7 audit: emits 'narrate.cleared' with reason ∈ {'advance','replace','clear'}
-// whenever the banner hides. Gives M2 Mission Control a complete narration
-// trail; not required for protocol correctness.
-// §3-q8 self-targeting: if Aegis is also the operator's session and they
-// `Set NarrateTarget VS` where VS is themself, the narrate.show round-trips
-// and arrives back. Compass renders regardless of whether the same human
-// is on both tabs — the Compass tab IS the audience view by definition.
-function _compassShowBanner(msg, paused, narrateId) {
-  var banner = document.getElementById('phr-compass-narrate-banner');
-  var msgEl  = document.getElementById('phr-compass-narrate-banner-msg');
-  var advEl  = document.getElementById('phr-compass-narrate-banner-advance');
-  if (!banner || !msgEl || !advEl) return;
+// ── Spotlight helpers — Compass side (CMD89) ──────────────────────────────────
+// Renders the dim+hole overlay and the caption card per §2 spec.
+// Lazy-creates the DOM on first use; CSS lives in compass.html.
+//
+// Surface structure:
+//   #phr-spotlight-overlay        — fixed-position container, full viewport
+//     SVG mask defines the dim with a "hole" cut out around the target rect
+//     #phr-spotlight-caption      — caption card (positioned adjacent to hole)
+//       #phr-spotlight-caption-msg
+//       #phr-spotlight-caption-advance  (triangle)
+//
+// §2 hole feathering: implemented via SVG <feGaussianBlur> on the mask, which
+// renders cleanly across Chrome/Firefox/Edge. Radial-gradient mask was
+// considered but produces banding on some GPUs.
+//
+// §2 positioning: target's getBoundingClientRect() drives both the mask cutout
+// and the caption placement (above if midpoint-Y in upper half of viewport,
+// else below). When target fills >75% of viewport or selector matches nothing,
+// falls back to bottom-center caption with no spotlight (full dim if message
+// present + spotlight requested with no-match; pure caption if no spotlight).
 
-  // §3-q4 + §3-q7 replace-immediately: if a banner is already visible with a
-  // different narrate_id, that's a replace. Emit narrate.cleared(reason=replace)
-  // so the M2 audit trail closes the prior narration before the new one opens.
+function _ensureSpotlightDom() {
+  var ov = document.getElementById('phr-spotlight-overlay');
+  if (ov) return ov;
+  ov = document.createElement('div');
+  ov.id = 'phr-spotlight-overlay';
+  ov.innerHTML =
+    '<svg id="phr-spotlight-svg" width="100%" height="100%" preserveAspectRatio="none">' +
+      '<defs>' +
+        '<filter id="phr-spotlight-feather" x="-10%" y="-10%" width="120%" height="120%">' +
+          '<feGaussianBlur stdDeviation="6"/>' +
+        '</filter>' +
+        '<mask id="phr-spotlight-mask">' +
+          '<rect id="phr-spotlight-mask-bg" x="0" y="0" width="100%" height="100%" fill="white"/>' +
+          '<rect id="phr-spotlight-mask-hole" x="0" y="0" width="0" height="0" rx="12" ry="12" fill="black" filter="url(#phr-spotlight-feather)"/>' +
+        '</mask>' +
+      '</defs>' +
+      '<rect id="phr-spotlight-dim" x="0" y="0" width="100%" height="100%" fill="rgba(10,12,20,0.78)" mask="url(#phr-spotlight-mask)"/>' +
+    '</svg>' +
+    '<div id="phr-spotlight-caption">' +
+      '<span id="phr-spotlight-caption-msg"></span>' +
+      '<span id="phr-spotlight-caption-advance" title="Advance (Enter)" role="button" tabindex="0"></span>' +
+    '</div>';
+  document.body.appendChild(ov);
+  return ov;
+}
+
+// Position the caption card relative to the spotlit element's bounding rect.
+// Returns { left, top } in viewport coords. §2 positioning spec.
+function _positionCaption(rect, captionEl) {
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+  var capRect = captionEl.getBoundingClientRect();
+  var capW = capRect.width;
+  var capH = capRect.height;
+  var GAP = 16;
+  var EDGE = 24;
+
+  // Horizontal: center on target, clamp to viewport with EDGE margin.
+  var targetCenterX = rect.left + rect.width / 2;
+  var left = targetCenterX - capW / 2;
+  if (left < EDGE) left = EDGE;
+  if (left + capW > vw - EDGE) left = vw - EDGE - capW;
+
+  // Vertical: target midpoint in upper half → caption below; else above.
+  var targetMidY = rect.top + rect.height / 2;
+  var top;
+  if (targetMidY < vh / 2) {
+    top = rect.bottom + GAP;
+    // Clamp if it would fall off the bottom.
+    if (top + capH > vh - EDGE) top = vh - EDGE - capH;
+  } else {
+    top = rect.top - GAP - capH;
+    if (top < EDGE) top = EDGE;
+  }
+  return { left: Math.round(left), top: Math.round(top) };
+}
+
+function _compassShowSpotlight(msg, paused, narrateId, selector, timeout, captionSuppressed) {
+  var ov = _ensureSpotlightDom();
+  var caption = document.getElementById('phr-spotlight-caption');
+  var msgEl = document.getElementById('phr-spotlight-caption-msg');
+  var advEl = document.getElementById('phr-spotlight-caption-advance');
+  var hole = document.getElementById('phr-spotlight-mask-hole');
+  var svg = document.getElementById('phr-spotlight-svg');
+
+  // §3-q4 + §3-q7 replace-immediately audit.
   if (_compassActiveNarrateId && _compassActiveNarrateId !== narrateId) {
     if (window._cmdEmit) {
       window._cmdEmit('narrate.cleared', {
-        narrate_id: _compassActiveNarrateId,
-        reason:     'replace'
+        narrate_id: _compassActiveNarrateId, reason: 'replace'
       });
     }
   }
+  if (_compassTimeoutId) {
+    clearTimeout(_compassTimeoutId);
+    _compassTimeoutId = null;
+  }
 
-  msgEl.textContent    = msg;
-  advEl.style.display  = paused ? 'flex' : 'none';
-  banner.style.display = 'flex';
+  // Resolve selector → element; if no match, fall back to centered caption.
+  var target = null;
+  if (selector) {
+    try { target = document.querySelector(selector); } catch (e) { target = null; }
+  }
+  var rect = null;
+  if (target) {
+    rect = target.getBoundingClientRect();
+    // §2 fallback: if target fills >75% of viewport, also fall back to centered.
+    var areaPct = (rect.width * rect.height) / (window.innerWidth * window.innerHeight);
+    if (areaPct > 0.75) { target = null; rect = null; }
+  }
+
+  // Caption text.
+  if (captionSuppressed) {
+    caption.style.display = 'none';
+  } else {
+    msgEl.textContent = msg;
+    advEl.style.display = paused ? 'flex' : 'none';
+    caption.style.display = 'flex';
+  }
+
+  // Spotlight rendering: hole only if a valid target rect exists.
+  if (rect) {
+    svg.style.display = 'block';
+    var PAD = 14;
+    hole.setAttribute('x', Math.max(0, rect.left - PAD));
+    hole.setAttribute('y', Math.max(0, rect.top - PAD));
+    hole.setAttribute('width', rect.width + PAD * 2);
+    hole.setAttribute('height', rect.height + PAD * 2);
+  } else {
+    // No target: pure dim only if there's something to show; otherwise hide SVG.
+    if (selector) {
+      // Spotlight requested but no match: dim full screen, caption bottom-center.
+      svg.style.display = 'block';
+      hole.setAttribute('x', 0); hole.setAttribute('y', 0);
+      hole.setAttribute('width', 0); hole.setAttribute('height', 0);
+    } else {
+      // No spotlight requested: caption-only mode, no dim.
+      svg.style.display = 'none';
+    }
+  }
+
+  ov.classList.add('visible');
+  ov.style.display = 'block';
+
+  // Position caption. If we have a target rect, position adjacent. Otherwise
+  // bottom-center (or 64px-from-bottom for no-spotlight transitional caption).
+  if (!captionSuppressed) {
+    // Force layout so getBoundingClientRect on caption is accurate.
+    caption.style.left = '0px';
+    caption.style.top = '0px';
+    caption.style.visibility = 'hidden';
+    caption.offsetHeight; // reflow
+    if (rect) {
+      var pos = _positionCaption(rect, caption);
+      caption.style.left = pos.left + 'px';
+      caption.style.top = pos.top + 'px';
+    } else {
+      // Bottom-center: 64px from bottom for transitional, 32px when full-dim.
+      var capRect2 = caption.getBoundingClientRect();
+      var bottomMargin = selector ? 32 : 64;
+      caption.style.left = Math.round((window.innerWidth - capRect2.width) / 2) + 'px';
+      caption.style.top = Math.round(window.innerHeight - capRect2.height - bottomMargin) + 'px';
+    }
+    caption.style.visibility = 'visible';
+  }
+
   _compassActiveNarrateId = narrateId;
 
-  // Wire triangle click — emits narrate.advance, then hides locally.
-  // Don't wait for Aegis ack; the local hide is the visible feedback.
-  advEl.onclick = function() {
-    _compassAdvanceBanner('advance');
-  };
+  // Wire advance affordance.
+  advEl.onclick = function() { _compassAdvanceSpotlight('advance'); };
 
-  // Local Enter advance (mirrors Aegis-side Enter §3-q3). Capture phase so
-  // it preempts any Compass-side Enter handler.
-  if (paused) {
+  // Local Enter advance.
+  if (paused && !captionSuppressed === false /* always wire for paused */) {
     if (_compassNarrateKeyHandler) {
       document.removeEventListener('keydown', _compassNarrateKeyHandler, true);
     }
@@ -2575,41 +2791,48 @@ function _compassShowBanner(msg, paused, narrateId) {
       if (ev.key !== 'Enter') return;
       ev.preventDefault();
       ev.stopPropagation();
-      _compassAdvanceBanner('advance');
+      _compassAdvanceSpotlight('advance');
     };
     document.addEventListener('keydown', _compassNarrateKeyHandler, true);
   }
+
+  // -timeout auto-advance (Compass-side mirror of Aegis-side timer).
+  if (timeout && timeout > 0) {
+    _compassTimeoutId = setTimeout(function() {
+      _compassTimeoutId = null;
+      _compassAdvanceSpotlight('advance');
+    }, timeout);
+  }
 }
 
-function _compassHideBanner() {
-  var banner = document.getElementById('phr-compass-narrate-banner');
-  if (banner) banner.style.display = 'none';
+function _compassHideSpotlight() {
+  var ov = document.getElementById('phr-spotlight-overlay');
+  if (ov) {
+    ov.classList.remove('visible');
+    // Brief fade-out before display:none so CSS transition can run.
+    setTimeout(function() {
+      if (!ov.classList.contains('visible')) ov.style.display = 'none';
+    }, 200);
+  }
   if (_compassNarrateKeyHandler) {
     document.removeEventListener('keydown', _compassNarrateKeyHandler, true);
     _compassNarrateKeyHandler = null;
   }
+  if (_compassTimeoutId) {
+    clearTimeout(_compassTimeoutId);
+    _compassTimeoutId = null;
+  }
   _compassActiveNarrateId = null;
 }
 
-// Triangle-click / Enter / explicit-clear path. Emits narrate.advance to
-// Aegis (so the awaiting -pause unblocks) and narrate.cleared (audit), then
-// hides locally. reason is propagated into narrate.cleared payload.
-function _compassAdvanceBanner(reason) {
+function _compassAdvanceSpotlight(reason) {
   var nid = _compassActiveNarrateId;
   if (!nid) return;
   if (window._cmdEmit) {
-    // narrate.advance carries narrate_id so Aegis's _waitForEventFiltered
-    // matches the right pending Narrate (Rule 31 payload completeness).
-    window._cmdEmit('narrate.advance', {
-      narrate_id: nid,
-      ts:         Date.now()
-    });
-    window._cmdEmit('narrate.cleared', {
-      narrate_id: nid,
-      reason:     reason || 'advance'
-    });
+    window._cmdEmit('narrate.advance', { narrate_id: nid, ts: Date.now() });
+    window._cmdEmit('narrate.cleared', { narrate_id: nid, reason: reason || 'advance' });
   }
-  _compassHideBanner();
+  _compassHideSpotlight();
 }
 
 // ── Run a list of script lines (factored CMD87) ──────────────────────────────
@@ -2629,15 +2852,10 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
     var line = lines[i];
     if (!line || line.startsWith('#')) continue;
 
-    // CMD87 update: pre-exec _hideBannerIfTransient() hook removed.
-    // Hiding before the next command's transcript line printed caused the
-    // banner to flash and disappear before the operator could read it
-    // (probe pattern: `Narrate "X"` followed by `Pause "Y"` — banner showed,
-    // pre-exec hook fired, banner gone, then Pause prompted with no banner).
-    // Dismissal is now solely via §3-q4 replace-immediately in _showBanner:
-    // the next Narrate replaces the prior banner. To clear without showing
-    // a new banner, use Narrate "".
-    // Paused banners still self-dismiss when the operator advances.
+    // CMD89: pre-exec auto-hide remains absent (CMD87 reasoning preserved).
+    // Dismissal is now via §3-q4 replace-immediately in _compassShowSpotlight,
+    // or by an explicit `Narrate ""` clear. Paused spotlights self-dismiss
+    // when the operator advances (Enter / triangle click / -timeout fire).
 
     // Abort if panel was closed
     if (_scriptAborted) {
@@ -2683,7 +2901,7 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
     // CMD87b: Set NarrateTarget added (Rule 29 — Aegis-local; targeting state
     //   is module-scoped on Aegis only). Brief §3-q1.
     var _lv=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
-             'Narrate','DOFile','Set NarrateTarget',
+             'Narrate','Spotlight','DOFile','Set NarrateTarget',
              'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow','Wait ForModal'];
     if (targetUserId && (_lv.indexOf(parsed.verb)===-1)) {
       // Dispatch via Realtime (non-local commands)
@@ -3483,7 +3701,7 @@ function _runCmd() {
     // CMD87: Narrate, DOFile added to local-verb list (Rule 29 — Aegis-local).
     // CMD87b: Set NarrateTarget added (Rule 29 — Aegis-local). Brief §3-q1.
     var _rl=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
-             'Narrate','DOFile','Set NarrateTarget',
+             'Narrate','Spotlight','DOFile','Set NarrateTarget',
              'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow','Wait ForModal'];
     if (targetUserId && _channel && _rl.indexOf(parsed.verb)===-1) {
       // B-UI-5 / CMD71: resolve $variables against Aegis's _storeVars
@@ -4192,8 +4410,9 @@ async function _init() {
   }, 1000);
 
   // ── CMD87b / Brief Aegis Remote Narration: narrate.show subscriber ─────────
-  // Compass-only. Aegis renders locally via the in-handler _showBanner path
-  // (Narrate's local branch); it never consumes narrate.show as a renderer.
+  // Compass-only. Aegis is operator-facing and renders no overlay (CMD89);
+  // its Narrate local branch only fires Enter-advance flow control. Compass
+  // never receives narrate.show on the Aegis tab.
   // §3-q8 self-targeting: when Aegis and Compass are the same human's two
   // tabs, _handleAppEvent's Aegis-exemption (Rule 15) does NOT fire on the
   // Compass tab — the Compass tab carries its own session/userId distinct
@@ -4209,7 +4428,14 @@ async function _init() {
         if (!payload || !payload.narrate_id || !payload.target) return;
         // Address check: only render if I'm the addressed session.
         if (!_mySession || payload.target !== _mySession.userId) return;
-        _compassShowBanner(payload.message || '', !!payload.paused, payload.narrate_id);
+        _compassShowSpotlight(
+          payload.message || '',
+          !!payload.paused,
+          payload.narrate_id,
+          payload.spotlight || null,
+          payload.timeout || null,
+          !!payload.caption_suppressed
+        );
       });
     } else {
       console.warn('[CMD87b] Compass narrate subscriber: CMDCenter.onAppEvent unavailable');

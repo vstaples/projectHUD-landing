@@ -874,83 +874,96 @@
   .role-tab span.tab-label { display: none; }
 }
 
-/* ── Narrate banner (CMD88b / Brief Aegis Remote Narration) ───────────────────
-   Mirrors aegis.html#phr-narrate-banner styling intent (yellow plaque, magenta
-   text, black inner border, separate bordered triangle cell — see mockup),
-   but positioned as a fixed bottom-center overlay. §3-q4: position:fixed;
-   bottom:24px; left:50%; transform; max-width 960px so the plaque doesn't
-   span an ultra-wide monitor. z-index 2000 — above modals (the prospect
-   drawer in the mockup is below the banner deliberately; the banner narrates
-   the overlay so it must remain on top).
-   §3-q3: triangle click advances; cmd-center.js _compassShowBanner also wires
-   an Enter keydown listener for local advance.
-   Colors are inlined (not :root vars) — Compass's :root has its own palette;
-   keeping the plaque self-contained avoids accidental theme drift. */
-#phr-compass-narrate-banner {
+/* ── Spotlight + caption presentation layer (CMD89) ───────────────────────────
+   Replaces the CMD88 yellow banner. Per §2 spec:
+     - dim overlay rgba(10,12,20,0.78)
+     - hole: rounded rect, 14px padding, 12px corners, feathered edges (SVG)
+     - caption: 16pt white-on-dark (rgba(20,22,32,0.96)) Arial, 14px corners,
+       20px/28px padding, max-width 520px, soft shadow
+     - z-index 9000 (above modals)
+     - 220ms ease-out fade-in, 180ms ease-in fade-out
+   The DOM is lazy-created by cmd-center.js _ensureSpotlightDom on first use,
+   so this CSS is the only static surface.
+
+   #phr-spotlight-overlay   — fixed-position container, full viewport
+     #phr-spotlight-svg     — dim+hole renderer (SVG mask + feGaussianBlur)
+     #phr-spotlight-caption — caption card (positioned by JS via inline left/top)
+       #phr-spotlight-caption-msg
+       #phr-spotlight-caption-advance  (triangle)
+*/
+#phr-spotlight-overlay {
   display: none;
   position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 960px;
-  width: auto;
-  z-index: 2000;
-  background: #F5D033;            /* yellow plaque (matches aegis --yl) */
-  padding: 8px;                   /* outer padding creates the inner-border gap */
-  font-family: monospace;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.45);
-  align-items: stretch;
-  gap: 8px;
+  inset: 0;
+  z-index: 9000;
   pointer-events: auto;
+  opacity: 0;
+  transition: opacity 220ms ease-out;
 }
-#phr-compass-narrate-banner-msg {
+#phr-spotlight-overlay.visible {
+  opacity: 1;
+}
+/* Out-fade: when .visible is removed, transition runs at 180ms ease-in. */
+#phr-spotlight-overlay:not(.visible) {
+  transition: opacity 180ms ease-in;
+}
+#phr-spotlight-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;       /* dim absorbs clicks; only caption advances */
+  display: block;
+}
+#phr-spotlight-caption {
+  position: absolute;
+  display: none;
+  align-items: center;
+  background: rgba(20, 22, 32, 0.96);
+  color: #FFFFFF;
+  font-family: Arial, sans-serif;
+  font-size: 16pt;            /* §2 spec; > 11pt floor */
+  font-weight: 400;
+  line-height: 1.45;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 20px 28px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  max-width: 520px;
+  min-width: 320px;
+  box-sizing: border-box;
+  pointer-events: auto;
+  z-index: 1;                 /* above SVG inside overlay */
+}
+#phr-spotlight-caption-msg {
   flex: 1;
-  background: #F5D033;
-  color: #d92977;                 /* magenta text per mockup */
-  border: 2px solid #000;         /* black inner border around message cell */
-  padding: 14px 22px;
-  font-size: 16pt;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
+  white-space: normal;
+  word-wrap: break-word;
 }
-#phr-compass-narrate-banner-advance {
-  display: none;                  /* shown only when paused (set inline by JS) */
-  width: 72px;
-  background: #F5D033;
-  border: 2px solid #000;         /* black-bordered triangle cell */
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-#phr-compass-narrate-banner-advance:hover { opacity: 0.85; }
-#phr-compass-narrate-banner-advance::before {
-  content: '';
+#phr-spotlight-caption-advance {
+  display: none;              /* JS toggles to flex when paused */
   width: 0; height: 0;
-  border-top: 18px solid transparent;
-  border-bottom: 18px solid transparent;
-  border-left: 28px solid #000;   /* solid black triangle pointing right */
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 14px solid #FFFFFF;
+  cursor: pointer;
+  margin-left: 12px;
+  flex-shrink: 0;
+  transition: opacity 120ms ease;
 }
+#phr-spotlight-caption-advance:hover { opacity: 0.7; }
+#phr-spotlight-caption-advance:focus { outline: 2px solid rgba(255,255,255,0.4); outline-offset: 4px; }
 </style>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
 <body>
 
-<!-- ── Narrate banner (CMD88b / Brief Aegis Remote Narration) ────────────────
-     Hidden by default. Populated and shown by cmd-center.js _compassShowBanner
-     when a 'narrate.show' app_event addressed to this session arrives. Click
-     on the triangle (or Enter, when paused) emits 'narrate.advance' back to
-     Aegis so the awaiting -pause unblocks; banner hides locally on advance.
-     §3-q4: fixed bottom-center overlay; visible across all Compass tabs.
-     §3-q7: emits 'narrate.cleared' on hide for M2 audit. -->
-<div id="phr-compass-narrate-banner" style="display:none">
-  <span id="phr-compass-narrate-banner-msg"></span>
-  <span id="phr-compass-narrate-banner-advance" title="Advance (Enter)"></span>
-</div>
+<!-- ── Spotlight + caption overlay (CMD89) ─────────────────────────────────────
+     The overlay DOM is lazy-created on first use by cmd-center.js
+     (_ensureSpotlightDom), so this block is intentionally just a comment.
+     CSS lives in the stylesheet above; behavior is wired by _compassShowSpotlight
+     when a 'narrate.show' app_event addressed to this session arrives. -->
 
 <!-- ── Hover-reveal sidebar ─────────────────────────────────────────────── -->
 <!-- Trigger zone: invisible 6px strip on left edge -->
