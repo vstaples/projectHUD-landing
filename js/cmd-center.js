@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD84
+// cmd-center.js  ·  v20260425-CMD85
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD84',
+    'cmd-center':  'v20260425-CMD85',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD84 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD85 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -329,6 +329,77 @@ function _connect() {
     _renderSessionList();
   }
 
+  // CMD-PRESENCE-4 (CMD85): receive presence_heartbeat broadcasts from peers
+  // and update the session map. This replaces Phoenix Presence's role of
+  // being the keepalive source of truth — _handlePresenceSync still runs on
+  // initial join and clean leaves, but the every-25s liveness signal now
+  // arrives here via Broadcast.
+  //
+  // The peer's row is overwritten on every heartbeat, refreshing its ts.
+  // The 75s stale-ts threshold (CMD82) in _handlePresenceSync still applies
+  // to entries in _sessions — when a peer goes silent and stops sending
+  // heartbeats, its ts grows stale and the next sync (or a future iteration
+  // of staleness sweeping) will drop it. As a belt-and-braces measure we
+  // also do a per-arrival stale sweep below.
+  function _handlePresenceHeartbeat(payload) {
+    if (!payload || !payload.userId) return;
+    if (_mySession && payload.userId === _mySession.userId) return; // ignore own echoes (broadcast.self=true)
+
+    var who = window._aegisMode ? 'AEGIS' : (_myAlias || _mySession.initials || '?');
+    var peerInitials = payload.initials
+      || (payload.name ? payload.name.split(' ').map(function(n){return n[0]||'';}).join('') : '?');
+
+    // Cancel any pending leave debounce for this user — they're alive.
+    // Mirrors what _handlePresenceJoin does on a fresh Phoenix Presence join.
+    if (_leaveTimers[payload.userId]) {
+      clearTimeout(_leaveTimers[payload.userId]);
+      delete _leaveTimers[payload.userId];
+    }
+
+    var wasNew = !_sessions[payload.userId] || !_sessions[payload.userId].online;
+
+    _sessions[payload.userId] = {
+      name:          payload.name,
+      initials:      peerInitials,
+      alias:         payload.alias || peerInitials,
+      location:      payload.location,
+      online:        true,
+      ts:            payload.ts || Date.now(),
+      aegisObserver: !!payload.aegisObserver,
+    };
+    _aliasMap[payload.alias || peerInitials] = payload.userId;
+    try { localStorage.setItem('phud:cmd:session:' + payload.userId, JSON.stringify(_sessions[payload.userId])); } catch(e) {}
+
+    if (DEBUG_EVENTS) {
+      console.log('[presence-heartbeat] ' + who + ' recv from ' + (payload.alias || peerInitials)
+        + ' · ts=' + payload.ts
+        + (wasNew ? ' · NEW' : ''));
+    }
+
+    // Sweep stale peers from _sessions on every heartbeat arrival. Without
+    // this, a peer that goes silent stays in the map until the next Phoenix
+    // Presence sync rebuild (which is now rare with Approach B). We use the
+    // same 75s threshold as _handlePresenceSync.
+    var _nowSweep = Date.now();
+    var STALE_PRESENCE_MS = 75000;
+    Object.keys(_sessions).forEach(function(uid) {
+      if (_mySession && uid === _mySession.userId) return; // never sweep self
+      var s = _sessions[uid];
+      if (!s) return;
+      if (!s.ts || (_nowSweep - s.ts) > STALE_PRESENCE_MS) {
+        if (DEBUG_EVENTS) console.log((window._aegisMode ? '[Aegis]' : '[cmd-center]')
+          + ' presence heartbeat · dropping stale: '
+          + (s.alias || s.initials || '?') + ' ' + (s.name || '?')
+          + ' · last ts ' + Math.round((_nowSweep - (s.ts||0))/1000) + 's ago');
+        delete _sessions[uid];
+        if (s.alias) delete _aliasMap[s.alias];
+        if (s.initials) delete _aliasMap[s.initials];
+      }
+    });
+
+    _renderSessionList();
+  }
+
   function _handlePresenceJoin(data) {
     var p = data.newPresences && data.newPresences[0];
     if (!p) return;
@@ -540,6 +611,16 @@ function _connect() {
   _channel.on(      'broadcast', { event: 'app_event'       }, _handleAppEvent);
   _channelLegacy.on('broadcast', { event: 'app_event'       }, _handleAppEvent);
 
+  // CMD-PRESENCE-4 (CMD85): Broadcast-based presence liveness.
+  // Phoenix Presence's metadata update path doesn't reliably propagate ts
+  // changes to peers (confirmed CMD83/CMD84). Heartbeats go through the
+  // Broadcast layer instead, which already works for cmd:* events.
+  // Per brief §3 Step 3, registered on _channel only (the modern hud
+  // channel). Sender mirrors this — see _sendPresenceHeartbeat.
+  _channel.on('broadcast', { event: 'presence_heartbeat' }, function(msg) {
+    _handlePresenceHeartbeat(msg && msg.payload);
+  });
+
   // Shared SUBSCRIBED finalizer — runs once, when the SECOND of the two
   // channels reports SUBSCRIBED. This is the both-channels-ready gate
   // from Brief B1.5 §4–5: operator-visible "Connected" banner, LIVE
@@ -577,29 +658,37 @@ function _connect() {
         });
       }, 10000);
     }
-    // Presence heartbeat — explicitly untrack-then-retrack each cycle.
+    // Presence heartbeat — Broadcast-based liveness signal.
     //
-    // Why: Phoenix Presence is designed for join/leave registration,
-    // not heartbeating. Repeated track() calls with substantively
-    // identical metadata (only ts changes) succeed locally with status=ok
-    // but do NOT reliably broadcast a presence_diff to peers. This was
-    // confirmed by CMD83 instrumentation: peers' ts values stayed frozen
-    // at initial-join time even though every track() returned ok.
+    // Phoenix Presence's metadata-update path is unreliable: track() with
+    // only-ts-changed metadata succeeds locally (status=ok) but does NOT
+    // broadcast a presence_diff to peers. CMD83 instrumentation confirmed
+    // peers' ts values stay frozen at initial-join time. CMD84 attempted
+    // an untrack-then-retrack cycle to force a leave/join broadcast; logs
+    // proved the cycle ran every 25s, but peers' ts values still didn't
+    // update. Phoenix Presence is designed for join/leave registration,
+    // not heartbeating, and we've been fighting the design.
     //
-    // untrack() followed by track() forces a leave + join cycle that
-    // peers DO receive. The 30s leave debounce in _handlePresenceLeave
-    // absorbs the brief flicker without flapping the session list.
+    // Approach B (this code, CMD-PRESENCE-4 / CMD85): use Broadcast
+    // instead. Broadcast is the same Realtime mechanism that ferries
+    // cmd:* and app_event traffic — verified working daily. Each session
+    // emits a presence_heartbeat broadcast every 25s; peers consume it
+    // via _handlePresenceHeartbeat, which maintains _sessions. Phoenix
+    // Presence keeps doing initial-join detection via _handlePresenceSync
+    // (it works for that, since the initial sync IS reliable).
     //
-    // 25s heartbeat is shorter than the 75s stale-ts threshold (CMD82)
-    // so peers see fresh ts within 1-2 heartbeats even after a churn.
-    //
-    // CMD-PRESENCE-3 (CMD84): fix for peer-propagation bug identified
-    // in CMD-PRESENCE-2 diagnostic data.
+    // 25s interval keeps peer ts deltas under the 75s stale-ts threshold
+    // by 3x — generous slack for transient lag. The 30s leave debounce
+    // in _handlePresenceLeave is now mostly irrelevant (Phoenix Presence
+    // leave events are rare), but harmless; left in place per brief §2.
     setInterval(function() {
       if (window._cmdCenterFullscreen) return; // pop-out suppresses presence
-      _refreshPresenceOn(_channel,       _channelReady);
-      _refreshPresenceOn(_channelLegacy, _channelLegacyReady);
+      _sendPresenceHeartbeat();
     }, 25000);
+
+    // Send one immediately so peers don't wait 25s for the first liveness
+    // signal beyond the Phoenix Presence initial join.
+    _sendPresenceHeartbeat();
   }
 
   function _trackPresenceOn(ch) {
@@ -633,9 +722,16 @@ function _connect() {
     }
   }
 
-  // CMD-PRESENCE-3: untrack-then-retrack to force presence_diff
-  // broadcast. Used by the 25s heartbeat. See heartbeat block for
-  // rationale.
+  // CMD-PRESENCE-3 (CMD84): untrack-then-retrack to force a presence_diff
+  // broadcast. Used by the 25s heartbeat in CMD84.
+  //
+  // CMD-PRESENCE-4 (CMD85): UNUSED. Approach A (this function and its
+  // _refreshPresenceOn caller) was abandoned after CMD84 verification
+  // failed: log lines confirmed the untrack/retrack cycle ran every 25s,
+  // but peers' ts values still didn't update. Server-side coalescing or
+  // some other Phoenix internal defeated the explicit churn pattern.
+  // See CMD-PRESENCE-4 §1 for full rationale. Kept as dead code per
+  // brief §3 Step 6 — small diff, minor fallback option, no harm.
   function _refreshPresenceOn(ch, ready) {
     if (!ch || !ready) return;
     if (window._cmdCenterFullscreen) return;
@@ -661,6 +757,47 @@ function _connect() {
     } catch(e) {
       console.error('[presence-refresh] ' + who + ' untrack THREW — calling track() anyway', e);
       _trackPresenceOn(ch); // Defense in depth.
+    }
+  }
+
+  // CMD-PRESENCE-4 (CMD85): send periodic liveness signal via Broadcast.
+  // Replaces the Phoenix Presence track()/untrack-retrack heartbeating
+  // attempted in CMD80-CMD84. Payload schema matches what
+  // _handlePresenceHeartbeat expects, which in turn populates _sessions
+  // using the same field shape _handlePresenceSync (Phoenix Presence
+  // path) does — so the renderer (_renderSessionList) consumes both
+  // sources interchangeably.
+  //
+  // Sends on _channel only per brief §3 Step 1 / Step 3 (the modern
+  // hud:{firm_id} channel). Receivers are subscribed there. Note: this
+  // diverges from the file's broader dual-write pattern (_channelSend
+  // hits both _channel and _channelLegacy via _safeSendOn) — see the
+  // CMD85 hand-off note for rationale.
+  function _sendPresenceHeartbeat() {
+    if (window._cmdCenterFullscreen) return;
+    if (!_channel || !_channelReady) return;
+    if (!_mySession) return;
+
+    var who = window._aegisMode ? 'AEGIS' : (_myAlias || _mySession.initials || '?');
+    var payload = {
+      userId:        _mySession.userId,
+      name:          _mySession.name,
+      initials:      _mySession.initials,
+      alias:         _myAlias || _mySession.initials,
+      location:      _currentLocation(),
+      aegisObserver: window._aegisMode ? true : false,
+      ts:            Date.now(),
+    };
+
+    try {
+      _channel.send({
+        type:    'broadcast',
+        event:   'presence_heartbeat',
+        payload: payload,
+      });
+      if (DEBUG_EVENTS) console.log('[presence-heartbeat] ' + who + ' sent · ts=' + payload.ts);
+    } catch(e) {
+      console.error('[presence-heartbeat] ' + who + ' send THREW', e);
     }
   }
 
