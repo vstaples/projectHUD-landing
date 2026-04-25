@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD81
+// cmd-center.js  ·  v20260425-CMD82
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD81',
+    'cmd-center':  'v20260425-CMD82',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD81 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD82 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -276,6 +276,32 @@ function _connect() {
         }
       });
     });
+    // CMD-PRESENCE-1 / CMD82: stale-ts filter. Supabase server-side
+    // presence is unreliable when a client's WebSocket close frame
+    // doesn't reach the server (X-button close, browser crash, network
+    // yank). presenceState() can hold dead entries for many minutes.
+    // The CMD80 heartbeat refreshes ts every 25s on every live session,
+    // so any entry with ts older than 3 missed heartbeats (75s) is dead.
+    // Filter here at rebuild so the next sync can't undo the decision.
+    // Note: ts is the sender's clock, compared against our now — clock
+    // skew between machines is a real concern but in practice tiny
+    // (NTP-synced wall clocks), and 75s of slack absorbs it.
+    var _now = Date.now();
+    var STALE_PRESENCE_MS = 75000;
+    var _live = {};
+    Object.entries(merged).forEach(function(kv) {
+      var p = kv[1];
+      // Always keep self — Aegis is present to itself by definition.
+      if (_mySession && p.userId === _mySession.userId) { _live[kv[0]] = p; return; }
+      if (!p.ts || (_now - p.ts) > STALE_PRESENCE_MS) {
+        if (DEBUG_EVENTS) console.log('[Aegis] presence sync · dropping stale:',
+          (p.alias || p.initials || '?'), p.name || '?',
+          '· last ts ' + Math.round((_now - (p.ts||0))/1000) + 's ago');
+        return;
+      }
+      _live[kv[0]] = p;
+    });
+    merged = _live;
     var execP = Object.values(merged).filter(function(p){return p&&!p.aegisObserver;});
     console.log('[Aegis] presence sync — '+execP.length+' exec session(s): '+execP.map(function(p){return p.name||'?';}).join(', '));
     _sessions = {};
@@ -543,7 +569,7 @@ function _connect() {
     // typical idle-disconnect windows. Calling track() on a healthy
     // connection is idempotent (just refreshes ts). Runs on Aegis too —
     // Aegis tracks itself as aegisObserver:true so other sessions know
-    // there's an observer present. CMD-PRESENCE-1 / CMD81.
+    // there's an observer present. CMD-PRESENCE-1 / CMD80.
     setInterval(function() {
       if (window._cmdCenterFullscreen) return; // pop-out suppresses presence
       if (_channel && _channelReady)             _trackPresenceOn(_channel);
