@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD87
+// cmd-center.js  ·  v20260425-CMD87a
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD87',
+    'cmd-center':  'v20260425-CMD87a',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD87 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD87a ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -2098,7 +2098,12 @@ var COMMANDS = {
       args = args.slice(0, -1);
     }
     var msg = args.join(' ');
-    if (!msg) return 'Narrate: no message';
+    // Empty message + no -pause = explicit clear (alternative to next Narrate).
+    if (!msg && !paused) {
+      _hideBanner();
+      return 'narrate cleared';
+    }
+    if (!msg) return 'Narrate: -pause requires a message';
     _showBanner(msg, paused);
     if (window._cmdEmit) {
       window._cmdEmit('narration.shown', { message: msg, paused: paused, ts: Date.now() });
@@ -2389,9 +2394,15 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
     var line = lines[i];
     if (!line || line.startsWith('#')) continue;
 
-    // CMD87: hide-on-next-command pre-exec hook (§3-q1).
-    // Only hides transient banners — paused banners hold until operator advances.
-    _hideBannerIfTransient();
+    // CMD87 update: pre-exec _hideBannerIfTransient() hook removed.
+    // Hiding before the next command's transcript line printed caused the
+    // banner to flash and disappear before the operator could read it
+    // (probe pattern: `Narrate "X"` followed by `Pause "Y"` — banner showed,
+    // pre-exec hook fired, banner gone, then Pause prompted with no banner).
+    // Dismissal is now solely via §3-q4 replace-immediately in _showBanner:
+    // the next Narrate replaces the prior banner. To clear without showing
+    // a new banner, use Narrate "".
+    // Paused banners still self-dismiss when the operator advances.
 
     // Abort if panel was closed
     if (_scriptAborted) {
