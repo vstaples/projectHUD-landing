@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD83
+// cmd-center.js  ·  v20260425-CMD84
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD83',
+    'cmd-center':  'v20260425-CMD84',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD83 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD84 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -577,17 +577,28 @@ function _connect() {
         });
       }, 10000);
     }
-    // Presence heartbeat — re-call track() periodically to survive silent
-    // WebSocket reconnects. Phoenix auto-reconnects but does not re-call
-    // track(); presence becomes stale on the server. 25s is shorter than
-    // typical idle-disconnect windows. Calling track() on a healthy
-    // connection is idempotent (just refreshes ts). Runs on Aegis too —
-    // Aegis tracks itself as aegisObserver:true so other sessions know
-    // there's an observer present. CMD-PRESENCE-1 / CMD80.
+    // Presence heartbeat — explicitly untrack-then-retrack each cycle.
+    //
+    // Why: Phoenix Presence is designed for join/leave registration,
+    // not heartbeating. Repeated track() calls with substantively
+    // identical metadata (only ts changes) succeed locally with status=ok
+    // but do NOT reliably broadcast a presence_diff to peers. This was
+    // confirmed by CMD83 instrumentation: peers' ts values stayed frozen
+    // at initial-join time even though every track() returned ok.
+    //
+    // untrack() followed by track() forces a leave + join cycle that
+    // peers DO receive. The 30s leave debounce in _handlePresenceLeave
+    // absorbs the brief flicker without flapping the session list.
+    //
+    // 25s heartbeat is shorter than the 75s stale-ts threshold (CMD82)
+    // so peers see fresh ts within 1-2 heartbeats even after a churn.
+    //
+    // CMD-PRESENCE-3 (CMD84): fix for peer-propagation bug identified
+    // in CMD-PRESENCE-2 diagnostic data.
     setInterval(function() {
       if (window._cmdCenterFullscreen) return; // pop-out suppresses presence
-      if (_channel && _channelReady)             _trackPresenceOn(_channel);
-      if (_channelLegacy && _channelLegacyReady) _trackPresenceOn(_channelLegacy);
+      _refreshPresenceOn(_channel,       _channelReady);
+      _refreshPresenceOn(_channelLegacy, _channelLegacyReady);
     }, 25000);
   }
 
@@ -619,6 +630,37 @@ function _connect() {
       }
     } catch(e) {
       console.error('[track] ' + who + ' → THREW · ts=' + startTs, e);
+    }
+  }
+
+  // CMD-PRESENCE-3: untrack-then-retrack to force presence_diff
+  // broadcast. Used by the 25s heartbeat. See heartbeat block for
+  // rationale.
+  function _refreshPresenceOn(ch, ready) {
+    if (!ch || !ready) return;
+    if (window._cmdCenterFullscreen) return;
+    var who = window._aegisMode ? 'AEGIS' : (_myAlias || _mySession.initials || '?');
+    try {
+      var untrackResult = ch.untrack();
+      // Newer @supabase/supabase-js: untrack returns Promise.
+      // Older: returns sync status.
+      if (untrackResult && typeof untrackResult.then === 'function') {
+        untrackResult
+          .then(function(status) {
+            console.log('[presence-refresh] ' + who + ' untrack ok · status=' + status);
+            _trackPresenceOn(ch); // _trackPresenceOn already logs its own outcome
+          })
+          .catch(function(err) {
+            console.error('[presence-refresh] ' + who + ' untrack REJECTED — calling track() anyway', err);
+            _trackPresenceOn(ch); // Try track even if untrack failed; worst case it's a no-op.
+          });
+      } else {
+        console.log('[presence-refresh] ' + who + ' untrack sync · status=' + untrackResult);
+        _trackPresenceOn(ch);
+      }
+    } catch(e) {
+      console.error('[presence-refresh] ' + who + ' untrack THREW — calling track() anyway', e);
+      _trackPresenceOn(ch); // Defense in depth.
     }
   }
 
