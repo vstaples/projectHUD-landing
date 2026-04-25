@@ -22,3 +22,26 @@ Simulate Project In-Progress Across Project Team
              file expense reports.  PM monitors & directs activities, managers monitor KPIs, external clients examine their portal.
 - Scripted Demo:  Aegis uses Mission Control to pop "users" to the forefront; Compass sequences through multitude of activities.
 Demo Time:  15 minutes
+
+
+####################################################
+## PROJECTHUD INTRODUCTORY demonstration
+## Version: v1.0
+## Created: 2026-04-25
+## Updated: 2026-04-25
+####################################################
+
+## Part 1:  Introduce Key ProjectHUD Pages
+
+Set Tab "Dashboard"
+Narrate "ProjectHUD's Dashboard is a primary work surface for Project Managers and Administrators." -pause
+
+Set Tab "Pipeline"
+Narrate "ProjectHUD's Pipeline models business development workflow from Concept to WBS & completed Proposal." -pause
+
+Narrate "Next, let's review how a user will submit an expense report from withn ProjectHUD's Compass work surface." -pause
+
+Narrate "When users submit expense reports, they are automatically routed for required signatures."
+DOFile "triple_session_expense_report
+
+Narrate "Let's pause to answer questions before we move on." -pause
