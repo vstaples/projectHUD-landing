@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD80
+// cmd-center.js  ·  v20260425-CMD81
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD80',
+    'cmd-center':  'v20260425-CMD81',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD80 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD81 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -467,7 +467,18 @@ function _connect() {
     if (d.event_id) { _seenEventIds[d.event_id] = Date.now(); _purgeSeenEventIds(); }
     var eventName = d.event_type || d.event;
     var inner     = d.payload || d;  // unwrap envelope; fall back for legacy emits
-    if (DEBUG_EVENTS) console.log('[cmd-center] recv', eventName, inner);
+    if (DEBUG_EVENTS) {
+      // Prefix log line with sender's alias/initials so operator can tell
+      // which Compass session emitted what. Sender identity comes from the
+      // envelope's source_session (canonical) or `from` (back-compat shim);
+      // we look it up in _sessions which is populated from presence. When
+      // the sender isn't in _sessions yet (pre-sync, or already left), fall
+      // back to '??' so the prefix slot stays consistent.
+      var _src = d.source_session || d.from;
+      var _sess = _src && _sessions[_src];
+      var _tag  = (_sess && (_sess.alias || _sess.initials)) || '??';
+      console.log('[' + _tag + ':cmd-center] recv', eventName, inner);
+    }
     _pushEventBuffer(eventName, inner);
     _resolveEventListeners(eventName, inner);
     _fanoutAppEventListeners(eventName, inner);
@@ -532,7 +543,7 @@ function _connect() {
     // typical idle-disconnect windows. Calling track() on a healthy
     // connection is idempotent (just refreshes ts). Runs on Aegis too —
     // Aegis tracks itself as aegisObserver:true so other sessions know
-    // there's an observer present. CMD-PRESENCE-1 / CMD80.
+    // there's an observer present. CMD-PRESENCE-1 / CMD81.
     setInterval(function() {
       if (window._cmdCenterFullscreen) return; // pop-out suppresses presence
       if (_channel && _channelReady)             _trackPresenceOn(_channel);
