@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260423-CMD74
+// cmd-center.js  ·  v20260425-CMD80
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260423-CMD74',
+    'cmd-center':  'v20260425-CMD80',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260423-CMD74 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD80 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -317,8 +317,8 @@ function _connect() {
     var p = data.leftPresences && data.leftPresences[0];
     if (!p) return;
     var uid = p.userId;
-    // Debounce 8s — Supabase fires leave on every track() update.
-    // If they re-join within 8s it was just a presence update, not a true disconnect.
+    // Debounce 30s — Supabase fires leave on every track() update.
+    // If they re-join within 30s it was just a presence update, not a true disconnect.
     // CMD62: with dual-channel, a single logical "leave" may fire once per
     // channel; the debounce absorbs that exactly as it absorbs track-update churn.
     if (_leaveTimers[uid]) clearTimeout(_leaveTimers[uid]);
@@ -526,6 +526,18 @@ function _connect() {
         });
       }, 10000);
     }
+    // Presence heartbeat — re-call track() periodically to survive silent
+    // WebSocket reconnects. Phoenix auto-reconnects but does not re-call
+    // track(); presence becomes stale on the server. 25s is shorter than
+    // typical idle-disconnect windows. Calling track() on a healthy
+    // connection is idempotent (just refreshes ts). Runs on Aegis too —
+    // Aegis tracks itself as aegisObserver:true so other sessions know
+    // there's an observer present. CMD-PRESENCE-1 / CMD80.
+    setInterval(function() {
+      if (window._cmdCenterFullscreen) return; // pop-out suppresses presence
+      if (_channel && _channelReady)             _trackPresenceOn(_channel);
+      if (_channelLegacy && _channelLegacyReady) _trackPresenceOn(_channelLegacy);
+    }, 25000);
   }
 
   function _trackPresenceOn(ch) {
