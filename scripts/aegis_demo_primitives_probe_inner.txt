@@ -1,0 +1,10 @@
+# Version: 1.0
+# Inner script for DOFile probe — exercises Narrate -pause from nested context.
+# CMD87 / Brief Aegis Demo Primitives.
+
+Narrate "This banner is rendered from inside a DOFile." -pause
+
+# §3-q6 verification: $foo should resolve to "bar" — set in the calling script.
+Log "Inner sees $foo = $foo"
+
+Log "✓ Inner script complete"

@@ -1,0 +1,21 @@
+# Version: 1.0
+# Requires: VS
+# Demo primitives probe — Narrate, Narrate -pause, DOFile.
+# Exercises all three new commands end-to-end.
+# CMD87 / Brief Aegis Demo Primitives.
+
+Log "Probe start"
+
+Narrate "This banner should appear in yellow at the top of Aegis."
+Pause "Confirm the banner is visible without -pause, then press Enter."
+
+Narrate "This banner should have an advance triangle on the right." -pause
+
+Log "Banner advanced. Calling DOFile next."
+
+# Set a variable here; the inner script should see it (§3-q6 shared scope).
+Store foo "bar"
+
+DOFile "aegis_demo_primitives_probe_inner"
+
+Log "✓ Probe complete · returned from DOFile"
