@@ -873,10 +873,84 @@
   .stat-strip-4, .stat-strip-6 { grid-template-columns: repeat(2, 1fr); }
   .role-tab span.tab-label { display: none; }
 }
+
+/* ── Narrate banner (CMD87b / Brief Aegis Remote Narration) ───────────────────
+   Mirrors aegis.html#phr-narrate-banner styling intent (yellow plaque, magenta
+   text, black inner border, separate bordered triangle cell — see mockup),
+   but positioned as a fixed bottom-center overlay. §3-q4: position:fixed;
+   bottom:24px; left:50%; transform; max-width 960px so the plaque doesn't
+   span an ultra-wide monitor. z-index 2000 — above modals (the prospect
+   drawer in the mockup is below the banner deliberately; the banner narrates
+   the overlay so it must remain on top).
+   §3-q3: triangle click advances; cmd-center.js _compassShowBanner also wires
+   an Enter keydown listener for local advance.
+   Colors are inlined (not :root vars) — Compass's :root has its own palette;
+   keeping the plaque self-contained avoids accidental theme drift. */
+#phr-compass-narrate-banner {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 960px;
+  width: auto;
+  z-index: 2000;
+  background: #F5D033;            /* yellow plaque (matches aegis --yl) */
+  padding: 8px;                   /* outer padding creates the inner-border gap */
+  font-family: monospace;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+  align-items: stretch;
+  gap: 8px;
+  pointer-events: auto;
+}
+#phr-compass-narrate-banner-msg {
+  flex: 1;
+  background: #F5D033;
+  color: #d92977;                 /* magenta text per mockup */
+  border: 2px solid #000;         /* black inner border around message cell */
+  padding: 14px 22px;
+  font-size: 16pt;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#phr-compass-narrate-banner-advance {
+  display: none;                  /* shown only when paused (set inline by JS) */
+  width: 72px;
+  background: #F5D033;
+  border: 2px solid #000;         /* black-bordered triangle cell */
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+#phr-compass-narrate-banner-advance:hover { opacity: 0.85; }
+#phr-compass-narrate-banner-advance::before {
+  content: '';
+  width: 0; height: 0;
+  border-top: 18px solid transparent;
+  border-bottom: 18px solid transparent;
+  border-left: 28px solid #000;   /* solid black triangle pointing right */
+}
 </style>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
 <body>
+
+<!-- ── Narrate banner (CMD87b / Brief Aegis Remote Narration) ────────────────
+     Hidden by default. Populated and shown by cmd-center.js _compassShowBanner
+     when a 'narrate.show' app_event addressed to this session arrives. Click
+     on the triangle (or Enter, when paused) emits 'narrate.advance' back to
+     Aegis so the awaiting -pause unblocks; banner hides locally on advance.
+     §3-q4: fixed bottom-center overlay; visible across all Compass tabs.
+     §3-q7: emits 'narrate.cleared' on hide for M2 audit. -->
+<div id="phr-compass-narrate-banner" style="display:none">
+  <span id="phr-compass-narrate-banner-msg"></span>
+  <span id="phr-compass-narrate-banner-advance" title="Advance (Enter)"></span>
+</div>
 
 <!-- ── Hover-reveal sidebar ─────────────────────────────────────────────── -->
 <!-- Trigger zone: invisible 6px strip on left edge -->
@@ -1079,7 +1153,7 @@
 <script src="/js/project-drawer.js"></script>
 <script src="/js/hud-recorder.js"></script>
 <script src="/js/person-picker.js"></script>
-<script src="/js/cmd-center.js?v=v20260425-CMD87"></script>
+<script src="/js/cmd-center.js?v=v20260425-CMD87b"></script>
 
 <script>
 'use strict';

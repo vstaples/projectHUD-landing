@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD87a
+// cmd-center.js  ·  v20260425-CMD87b
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD87a',
+    'cmd-center':  'v20260425-CMD87b',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD87a ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD87b ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -94,6 +94,22 @@ var _narrateAdvance = null; // set by Narrate -pause, resolved on triangle click
 var _narrateKeyHandler = null; // installed-while-banner-visible keydown listener (capture phase)
 var _narrateVisible = false;   // true while banner is showing (any mode)
 var _doFileChain    = [];   // current DOFile call stack — names only, for depth guard + error reporting
+// CMD87b / Brief Aegis Remote Narration: cross-session narrate state
+// _narrateTarget: 'Aegis' = render local (CMD87 behavior); else alias of remote
+// session whose Compass tab will render the banner. Reset to 'Aegis' on each
+// _runScript entry per §7 ("do not persist across script runs").
+var _narrateTarget = 'Aegis';
+// On Aegis: latest narrate_id awaiting remote advance, so a subsequent Narrate
+// can auto-advance the prior remote -pause (§3-q6 cross-session stacking).
+// Holds the resolver fn (truthy) while pending; null otherwise.
+var _narrateRemoteAdvance = null;
+// On Compass: the active narrate_id currently displayed, so the triangle click
+// emits narrate.advance with the correct id, and narrate.cleared (§3-q7) can
+// report on advance/replace/clear.
+var _compassActiveNarrateId = null;
+// On Compass: keydown listener for local Enter-to-advance (mirror of the
+// Aegis _narrateKeyHandler; same Enter advance semantics §3-q3).
+var _compassNarrateKeyHandler = null;
 
 // ── UUID helper (B1/CMD54) ────────────────────────────────────────────────────
 // Used by _cmdEmit to stamp a protocol-compliant event_id on every envelope.
@@ -1288,6 +1304,42 @@ var COMMANDS = {
   },
   'Set View': async function(args){var v=(args[0]||'').toLowerCase().replace(/\.html$/,'');var m={'compass':'/compass.html','cadence':'/cadence.html','dashboard':'/dashboard.html'};var h=m[v];if(!h)return 'Unknown view: '+args[0];window.location.href=h;return 'navigating to '+h;},
 
+  // ── Set NarrateTarget (CMD87b / Brief Aegis Remote Narration) ────────────────
+  // Redirects subsequent `Narrate` calls to render on a target Compass session.
+  //   Set NarrateTarget               — read current value
+  //   Set NarrateTarget Aegis         — clear redirect; render locally (CMD87 default)
+  //   Set NarrateTarget <alias>       — render on that session's Compass tab
+  // §3-q1 (LOCKED): targeting via this dedicated command, NOT via the `VS:`
+  //   prefix. Narrate is a verb that reads naturally as authored; per-line
+  //   prefixes would noise up demo scripts. Selector is set once, persists.
+  // §3-q2: 'Aegis' is the literal default and the symmetric "go local" value.
+  // §3-q9: alias must resolve via _resolveTargetAlias at set time. If the
+  //   target isn't online, the set still succeeds — Narrate's runtime path
+  //   re-resolves and falls back to local with a warning if offline.
+  // §7: not persisted across script runs — _runScript resets to 'Aegis'.
+  // Aegis-local (Rule 29): runs unprefixed; registered in _lv and _rl.
+  'Set NarrateTarget': async function(args) {
+    var alias = args[0];
+    if (!alias) return 'NarrateTarget = ' + _narrateTarget;
+    // §3-q6: if a remote -pause is pending and the target changes, auto-resolve
+    // the prior wait so Aegis doesn't strand the script. The synthetic advance
+    // matches the prior narrate_id; the target's banner remains visible until
+    // its own next narrate.show or until the operator clicks. Acceptable —
+    // the remote target's UX is the audience's anyway, not the script's.
+    if (_narrateRemoteAdvance) {
+      var prev = _narrateRemoteAdvance; _narrateRemoteAdvance = null; prev();
+    }
+    if (alias === 'Aegis') {
+      _narrateTarget = 'Aegis';
+      return 'NarrateTarget cleared (local)';
+    }
+    // Validate alias resolves — fail fast if the script set a wrong name.
+    var uid = _resolveTargetAlias(alias);
+    if (!uid) return 'NarrateTarget: unknown alias ' + alias;
+    _narrateTarget = alias;
+    return 'NarrateTarget = ' + alias;
+  },
+
   // ── Forms ───────────────────────────────────────────────────────────────────
   'Form Open': async function(args) {
     var name = args[0];
@@ -2081,15 +2133,27 @@ var COMMANDS = {
   },
 
   // ── Narrate (CMD87 / Brief Aegis Demo Primitives) ────────────────────────────
-  // Display a yellow banner on the Aegis tab with a message.
-  //   Narrate "<message>"           — banner shown; auto-hides on next command
+  // Display a yellow banner with a message. Renders locally on Aegis by
+  // default (CMD87 behavior); CMD87b adds a remote path that renders on a
+  // target Compass session when Set NarrateTarget redirects.
+  //   Narrate "<message>"           — banner shown; auto-hides on next Narrate
   //   Narrate "<message>" -pause    — banner shown with advance triangle;
-  //                                   blocks until operator clicks ▶ or hits Enter
-  // §3-q3 (LOCKED): Enter advances; triangle click also advances; Esc inert.
-  // §3-q4: replace immediately. _showBanner auto-resolves any prior pending
-  //        -pause so a new banner is always reachable.
-  // §3-q8: emits 'narration.shown' with payload { message, paused, ts }.
+  //                                   blocks until operator clicks ▶ (or hits
+  //                                   Enter on Aegis-local; on remote, the
+  //                                   audience clicks the triangle on Compass)
+  // §3-q3 (LOCKED): Aegis-local — Enter or triangle click advances; Esc inert.
+  //                 Remote — triangle click on the target's Compass advances;
+  //                 no keyboard advance on Aegis (input modality stays where
+  //                 the display is, §3-q3 of CMD87b brief).
+  // §3-q4: replace immediately. _showBanner / _narrateRemoteAdvance both
+  //        auto-resolve any prior pending -pause.
+  // §3-q8 (CMD87): emits 'narration.shown' for the local path (legacy M2 feed).
+  // CMD87b protocol: remote path emits 'narrate.show' (Aegis → target) and
+  //   awaits 'narrate.advance' (target → Aegis). 'narrate.cleared' is emitted
+  //   by the Compass side when the banner hides (§3-q7 audit emit).
   // Aegis-local (Rule 29): runs unprefixed; registered in _lv and _rl.
+  // §3-q9: if remote target isn't online at runtime, fall back to Aegis-local
+  //   for that narration with a warning. Don't halt the script.
   'Narrate': async function(args) {
     // Detect -pause flag (last arg)
     var paused = false;
@@ -2100,20 +2164,85 @@ var COMMANDS = {
     var msg = args.join(' ');
     // Empty message + no -pause = explicit clear (alternative to next Narrate).
     if (!msg && !paused) {
+      // Local clear path unchanged. For remote, no-op (last narrate.show
+      // remains visible on target until the next Narrate replaces it; an
+      // explicit "Narrate ''" while remote-targeted does not propagate a
+      // clear in v1 — out of scope per §7 keep-it-simple).
       _hideBanner();
       return 'narrate cleared';
     }
     if (!msg) return 'Narrate: -pause requires a message';
-    _showBanner(msg, paused);
-    if (window._cmdEmit) {
-      window._cmdEmit('narration.shown', { message: msg, paused: paused, ts: Date.now() });
+
+    // ── Local path ───────────────────────────────────────────────────────────
+    if (_narrateTarget === 'Aegis') {
+      _showBanner(msg, paused);
+      if (window._cmdEmit) {
+        window._cmdEmit('narration.shown', { message: msg, paused: paused, ts: Date.now() });
+      }
+      if (paused) {
+        await _waitForBannerAdvance();
+        _hideBanner();
+        return 'narrate advanced';
+      }
+      return 'narrate: ' + (msg.length > 40 ? msg.slice(0, 40) + '…' : msg);
     }
+
+    // ── Remote path (CMD87b) ─────────────────────────────────────────────────
+    // Re-resolve alias at runtime — the alias may have come online (or gone
+    // offline) since `Set NarrateTarget` ran. §3-q9 fallback on offline.
+    var targetUid = _resolveTargetAlias(_narrateTarget);
+    if (!targetUid) {
+      _appendLine('SYS', 'warn', 'NarrateTarget ' + _narrateTarget +
+        ' not online; falling back to Aegis-local');
+      _showBanner(msg, paused);
+      if (paused) {
+        await _waitForBannerAdvance();
+        _hideBanner();
+        return 'narrate advanced (local fallback)';
+      }
+      return 'narrate (local fallback): ' + (msg.length > 40 ? msg.slice(0, 40) + '…' : msg);
+    }
+
+    // §3-q6 cross-session: auto-advance any pending remote -pause before
+    // showing the new banner — otherwise the new banner replaces on the
+    // target but Aegis is still parked on the old _waitForEventFiltered.
+    if (_narrateRemoteAdvance) {
+      var prev = _narrateRemoteAdvance; _narrateRemoteAdvance = null; prev();
+    }
+
+    // Generate narrate_id (Rule 31 payload completeness — separate from the
+    // envelope event_id _cmdEmit stamps). This is the narration's own id;
+    // it survives re-emit and matches advance to show.
+    var nid = _uuid();
+    window._cmdEmit('narrate.show', {
+      target:     targetUid,
+      narrate_id: nid,
+      message:    msg,
+      paused:     paused
+    });
+
     if (paused) {
-      await _waitForBannerAdvance();
-      _hideBanner();
-      return 'narrate advanced';
+      // §3-q6 cross-target / replace-while-pending. The closure resolves the
+      // local _waitForEventFiltered without round-tripping a fake advance
+      // through Supabase or polluting the M2 audit feed. Direct listener
+      // resolution: matches the predicate (narrate_id === nid) and clears.
+      // The real target's banner remains visible until its own next
+      // narrate.show or until the operator clicks — acceptable per §3-q6.
+      var racePromise = _waitForEventFiltered('narrate.advance', 'narrate_id', nid, 120000);
+      _narrateRemoteAdvance = function() {
+        _resolveEventListeners('narrate.advance', { narrate_id: nid, ts: Date.now(), synthetic: true });
+      };
+      try {
+        await racePromise;
+      } catch (e) {
+        _appendLine('SYS', 'warn', 'Narrate advance timed out (' +
+          nid.slice(0, 8) + '); continuing');
+        // Don't halt — §3-q5 fallback. Operator may have walked away.
+      }
+      _narrateRemoteAdvance = null;
+      return 'narrate sent: ' + _narrateTarget + ' (advanced)';
     }
-    return 'narrate: ' + (msg.length > 40 ? msg.slice(0, 40) + '…' : msg);
+    return 'narrate sent: ' + _narrateTarget;
   },
 
   // ── DOFile (CMD87 / Brief Aegis Demo Primitives) ─────────────────────────────
@@ -2377,6 +2506,100 @@ function _waitForBannerAdvance() {
   });
 }
 
+// ── Compass-side narrate banner (CMD87b / Brief Aegis Remote Narration) ──────
+// These helpers run on Compass tabs only — gated by !_aegisMode. They mirror
+// the Aegis _showBanner / _hideBanner pattern but with two differences:
+//   1. Triangle click emits 'narrate.advance' (back to Aegis) rather than
+//      resolving a local Promise. Aegis is the orchestrator; the audience
+//      tap is the input event.
+//   2. The DOM lives in compass.html as a position:fixed bottom-anchored
+//      overlay (visible across all Compass tabs, above modals — z-index 2000).
+// §3-q3 (LOCKED): the Compass-local Enter key also advances, mirroring the
+// Aegis-local convention so a single operator running both tabs sees
+// consistent advance semantics.
+// §3-q7 audit: emits 'narrate.cleared' with reason ∈ {'advance','replace','clear'}
+// whenever the banner hides. Gives M2 Mission Control a complete narration
+// trail; not required for protocol correctness.
+// §3-q8 self-targeting: if Aegis is also the operator's session and they
+// `Set NarrateTarget VS` where VS is themself, the narrate.show round-trips
+// and arrives back. Compass renders regardless of whether the same human
+// is on both tabs — the Compass tab IS the audience view by definition.
+function _compassShowBanner(msg, paused, narrateId) {
+  var banner = document.getElementById('phr-compass-narrate-banner');
+  var msgEl  = document.getElementById('phr-compass-narrate-banner-msg');
+  var advEl  = document.getElementById('phr-compass-narrate-banner-advance');
+  if (!banner || !msgEl || !advEl) return;
+
+  // §3-q4 + §3-q7 replace-immediately: if a banner is already visible with a
+  // different narrate_id, that's a replace. Emit narrate.cleared(reason=replace)
+  // so the M2 audit trail closes the prior narration before the new one opens.
+  if (_compassActiveNarrateId && _compassActiveNarrateId !== narrateId) {
+    if (window._cmdEmit) {
+      window._cmdEmit('narrate.cleared', {
+        narrate_id: _compassActiveNarrateId,
+        reason:     'replace'
+      });
+    }
+  }
+
+  msgEl.textContent    = msg;
+  advEl.style.display  = paused ? 'flex' : 'none';
+  banner.style.display = 'flex';
+  _compassActiveNarrateId = narrateId;
+
+  // Wire triangle click — emits narrate.advance, then hides locally.
+  // Don't wait for Aegis ack; the local hide is the visible feedback.
+  advEl.onclick = function() {
+    _compassAdvanceBanner('advance');
+  };
+
+  // Local Enter advance (mirrors Aegis-side Enter §3-q3). Capture phase so
+  // it preempts any Compass-side Enter handler.
+  if (paused) {
+    if (_compassNarrateKeyHandler) {
+      document.removeEventListener('keydown', _compassNarrateKeyHandler, true);
+    }
+    _compassNarrateKeyHandler = function(ev) {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      _compassAdvanceBanner('advance');
+    };
+    document.addEventListener('keydown', _compassNarrateKeyHandler, true);
+  }
+}
+
+function _compassHideBanner() {
+  var banner = document.getElementById('phr-compass-narrate-banner');
+  if (banner) banner.style.display = 'none';
+  if (_compassNarrateKeyHandler) {
+    document.removeEventListener('keydown', _compassNarrateKeyHandler, true);
+    _compassNarrateKeyHandler = null;
+  }
+  _compassActiveNarrateId = null;
+}
+
+// Triangle-click / Enter / explicit-clear path. Emits narrate.advance to
+// Aegis (so the awaiting -pause unblocks) and narrate.cleared (audit), then
+// hides locally. reason is propagated into narrate.cleared payload.
+function _compassAdvanceBanner(reason) {
+  var nid = _compassActiveNarrateId;
+  if (!nid) return;
+  if (window._cmdEmit) {
+    // narrate.advance carries narrate_id so Aegis's _waitForEventFiltered
+    // matches the right pending Narrate (Rule 31 payload completeness).
+    window._cmdEmit('narrate.advance', {
+      narrate_id: nid,
+      ts:         Date.now()
+    });
+    window._cmdEmit('narrate.cleared', {
+      narrate_id: nid,
+      reason:     reason || 'advance'
+    });
+  }
+  _compassHideBanner();
+}
+
 // ── Run a list of script lines (factored CMD87) ──────────────────────────────
 // Inner loop body for both _runScript (top-level) and DOFile (inline).
 // Returns 'aborted' if the loop broke out due to abort/error, undefined on
@@ -2445,8 +2668,10 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
     }
 
     // CMD87: Narrate, DOFile added to local-verb list (Rule 29 — Aegis-local).
+    // CMD87b: Set NarrateTarget added (Rule 29 — Aegis-local; targeting state
+    //   is module-scoped on Aegis only). Brief §3-q1.
     var _lv=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
-             'Narrate','DOFile',
+             'Narrate','DOFile','Set NarrateTarget',
              'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow','Wait ForModal'];
     if (targetUserId && (_lv.indexOf(parsed.verb)===-1)) {
       // Dispatch via Realtime (non-local commands)
@@ -2533,6 +2758,9 @@ async function _runScript(scriptText, scriptName) {
 
   _scriptRunning = true;
   _scriptAborted = false;
+  // CMD87b §7: do not persist NarrateTarget across script runs. Reset to local
+  // on entry — script must re-issue `Set NarrateTarget` if it wants remote.
+  _narrateTarget = 'Aegis';
   _appendLine('SYS', 'sys', 'Script: ' + (scriptName||'inline') + ' · ' + lines.filter(function(l){ return !l.startsWith('#'); }).length + ' commands');
   var _scriptVersion = _parseScriptVersion(scriptText);
   if (_scriptVersion) {
@@ -3241,8 +3469,9 @@ function _runCmd() {
   if (parsed && parsed.target) {
     var targetUserId = _resolveTargetAlias(parsed.target);
     // CMD87: Narrate, DOFile added to local-verb list (Rule 29 — Aegis-local).
+    // CMD87b: Set NarrateTarget added (Rule 29 — Aegis-local). Brief §3-q1.
     var _rl=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
-             'Narrate','DOFile',
+             'Narrate','DOFile','Set NarrateTarget',
              'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow','Wait ForModal'];
     if (targetUserId && _channel && _rl.indexOf(parsed.verb)===-1) {
       // B-UI-5 / CMD71: resolve $variables against Aegis's _storeVars
@@ -3918,6 +4147,31 @@ async function _init() {
     _updateStatusEl();
     if (window._cmdConnected) clearInterval(_statusPoll);
   }, 1000);
+
+  // ── CMD87b / Brief Aegis Remote Narration: narrate.show subscriber ─────────
+  // Compass-only. Aegis renders locally via the in-handler _showBanner path
+  // (Narrate's local branch); it never consumes narrate.show as a renderer.
+  // §3-q8 self-targeting: when Aegis and Compass are the same human's two
+  // tabs, _handleAppEvent's Aegis-exemption (Rule 15) does NOT fire on the
+  // Compass tab — the Compass tab carries its own session/userId distinct
+  // from the Aegis pop-out. So narrate.show round-trips and arrives normally.
+  // Per-event target check ensures only the addressed session renders.
+  // Rule 23 / 25 / 31: payload arrives via window.CMDCenter.onAppEvent (the
+  // canonical subscription API). _cmdEmit-stamped event_id dedup is upstream;
+  // our payload extraction relies on narrate_id (Rule 31).
+  if (!window._aegisMode) {
+    if (window.CMDCenter && typeof window.CMDCenter.onAppEvent === 'function') {
+      window.CMDCenter.onAppEvent(function(eventName, payload) {
+        if (eventName !== 'narrate.show') return;
+        if (!payload || !payload.narrate_id || !payload.target) return;
+        // Address check: only render if I'm the addressed session.
+        if (!_mySession || payload.target !== _mySession.userId) return;
+        _compassShowBanner(payload.message || '', !!payload.paused, payload.narrate_id);
+      });
+    } else {
+      console.warn('[CMD87b] Compass narrate subscriber: CMDCenter.onAppEvent unavailable');
+    }
+  }
 
   console.log('[CMD Center] initialized — Ctrl+Shift+` to toggle panel');
 }

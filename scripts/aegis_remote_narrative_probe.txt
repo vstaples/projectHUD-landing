@@ -1,0 +1,54 @@
+# Version: 1.0
+# Requires: VS
+# CMD87b / Brief Aegis Remote Narration — probe
+# Exercises Set NarrateTarget + Narrate to a remote Compass session end-to-end.
+# Run from Aegis with VS connected (Compass tab open in another browser/profile).
+
+Log "Probe start"
+
+# ── Local sanity ────────────────────────────────────────────────────────────
+# Default state is Aegis-local rendering. Confirm CMD87 behavior is unchanged.
+Narrate "This banner shows on Aegis (local default)."
+Pause "Confirm Aegis banner. Press Enter."
+
+# ── Switch to remote ───────────────────────────────────────────────────────
+Set NarrateTarget VS
+
+Narrate "This banner shows on VS's Compass tab — at the bottom."
+Pause "Confirm Compass banner is visible at bottom-center. Press Enter."
+
+# Replace-while-visible: the prior banner should auto-hide on Compass when the
+# new narrate.show arrives. narrate.cleared(reason='replace') fires for the prior.
+Narrate "Replaced banner — second message on Compass."
+Pause "Confirm Compass banner replaced cleanly. Press Enter."
+
+# ── Remote -pause path ─────────────────────────────────────────────────────
+# Aegis blocks awaiting narrate.advance from VS. Audience clicks the triangle
+# (or hits Enter) on the Compass tab to advance.
+Narrate "Now with -pause. Click the triangle on Compass to advance." -pause
+
+Log "Aegis received narrate.advance from Compass."
+
+# ── Cross-target auto-advance (§3-q6) ───────────────────────────────────────
+# Set a -pause on remote, then change target. Aegis's pending wait is
+# auto-resolved by Set NarrateTarget so the script doesn't strand. The
+# remote banner remains on the prior target until its own clear/replace.
+Narrate "Pause on VS that Set NarrateTarget will auto-advance." -pause
+# (operator does NOT click on Compass — instead the next line triggers
+# §3-q6 auto-advance via the target change)
+
+Set NarrateTarget Aegis
+
+Log "Auto-advanced via Set NarrateTarget change."
+
+Narrate "Back on Aegis after auto-advance."
+Pause "Confirm Aegis banner. Press Enter."
+
+# ── Offline-fallback hint (manual sub-test) ─────────────────────────────────
+# If you want to test §3-q9 fallback: close VS's Compass tab, then run:
+#   Set NarrateTarget VS
+#   Narrate "should fall back to Aegis-local"
+# Expected: warning logged ("NarrateTarget VS not online; falling back to
+# Aegis-local") and the banner renders on Aegis instead of halting.
+
+Log "✓ Probe complete"
