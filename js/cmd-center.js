@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD82
+// cmd-center.js  ·  v20260425-CMD83
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD82',
+    'cmd-center':  'v20260425-CMD83',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD82 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD83 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -294,7 +294,7 @@ function _connect() {
       // Always keep self — Aegis is present to itself by definition.
       if (_mySession && p.userId === _mySession.userId) { _live[kv[0]] = p; return; }
       if (!p.ts || (_now - p.ts) > STALE_PRESENCE_MS) {
-        if (DEBUG_EVENTS) console.log('[Aegis] presence sync · dropping stale:',
+        if (DEBUG_EVENTS) console.log((window._aegisMode ? '[Aegis]' : '[cmd-center]') + ' presence sync · dropping stale:',
           (p.alias || p.initials || '?'), p.name || '?',
           '· last ts ' + Math.round((_now - (p.ts||0))/1000) + 's ago');
         return;
@@ -303,7 +303,21 @@ function _connect() {
     });
     merged = _live;
     var execP = Object.values(merged).filter(function(p){return p&&!p.aegisObserver;});
-    console.log('[Aegis] presence sync — '+execP.length+' exec session(s): '+execP.map(function(p){return p.name||'?';}).join(', '));
+    // CMD83 instrumentation: log peer ts deltas to surface propagation drift.
+    // For each peer (excluding self), how stale does their last-known ts look
+    // from this session's perspective? If a peer's delta keeps climbing in
+    // real time, their track() updates aren't reaching us.
+    var nowMs = Date.now();
+    var deltas = execP
+      .filter(function(p) { return p.userId !== _mySession.userId; })
+      .map(function(p) {
+        var deltaMs = nowMs - (p.ts || 0);
+        return (p.alias || p.initials || '?') + '=' + Math.round(deltaMs / 1000) + 's';
+      });
+    if (deltas.length > 0) {
+      console.log('[presence-deltas] ' + (window._aegisMode ? 'AEGIS' : (_myAlias || '?')) + ' sees: ' + deltas.join(', '));
+    }
+    console.log((window._aegisMode ? '[Aegis]' : '[cmd-center]') + ' presence sync — '+execP.length+' exec session(s): '+execP.map(function(p){return p.name||'?';}).join(', '));
     _sessions = {};
     _aliasMap = {};
     Object.values(merged).forEach(function(p) {
@@ -579,17 +593,33 @@ function _connect() {
 
   function _trackPresenceOn(ch) {
     if (window._cmdCenterFullscreen) return; // pop-out suppresses presence
+    var who = window._aegisMode ? 'AEGIS' : (_myAlias || _mySession.initials || '?');
+    var startTs = Date.now();
     try {
-      ch.track({
+      var result = ch.track({
         userId:   _mySession.userId,
         name:     _mySession.name,
         initials: _mySession.initials,
         alias:    _myAlias || _mySession.initials,
         location: _currentLocation(),
-        ts:       Date.now(),
+        ts:       startTs,
         aegisObserver: window._aegisMode ? true : undefined,
       });
-    } catch(e) {}
+      // CMD83 instrumentation: log track() outcome.
+      // Newer @supabase/supabase-js versions return a Promise; older
+      // versions return a sync status string. Handle both shapes.
+      if (result && typeof result.then === 'function') {
+        result.then(function(status) {
+          console.log('[track] ' + who + ' → async ok · status=' + status + ' · ts=' + startTs);
+        }).catch(function(err) {
+          console.error('[track] ' + who + ' → async REJECTED · ts=' + startTs, err);
+        });
+      } else {
+        console.log('[track] ' + who + ' → sync · status=' + result + ' · ts=' + startTs);
+      }
+    } catch(e) {
+      console.error('[track] ' + who + ' → THREW · ts=' + startTs, e);
+    }
   }
 
   _channel.subscribe(function(status) {
