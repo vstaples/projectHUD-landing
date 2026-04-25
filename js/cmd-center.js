@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD85
+// cmd-center.js  ·  v20260425-CMD86
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD85',
+    'cmd-center':  'v20260425-CMD86',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD85 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD86 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -318,8 +318,13 @@ function _connect() {
       console.log('[presence-deltas] ' + (window._aegisMode ? 'AEGIS' : (_myAlias || '?')) + ' sees: ' + deltas.join(', '));
     }
     console.log((window._aegisMode ? '[Aegis]' : '[cmd-center]') + ' presence sync — '+execP.length+' exec session(s): '+execP.map(function(p){return p.name||'?';}).join(', '));
-    _sessions = {};
-    _aliasMap = {};
+    // CMD-PRESENCE-5 (CMD86): non-destructive merge. Do NOT wipe _sessions.
+    // The session map is co-owned with _handlePresenceHeartbeat (CMD85).
+    // Wiping here drops heartbeat-only peers on every Phoenix Presence sync
+    // event (which fires on connectivity changes), causing collateral drops
+    // in Mission Control. The stale-sweep in _handlePresenceHeartbeat handles
+    // eviction using the 75s threshold; this handler only adds/refreshes.
+    // Applies to _aliasMap as well (co-owned with _sessions).
     Object.values(merged).forEach(function(p) {
       if (p.aegisObserver && _mySession && p.userId !== _mySession.userId) return;
       _sessions[p.userId] = {name:p.name,initials:p.initials,alias:p.alias||p.initials,location:p.location,online:true,ts:p.ts,aegisObserver:p.aegisObserver||false};
