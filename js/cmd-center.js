@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD89
+// cmd-center.js  ·  v20260425-CMD89.1
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD89',
+    'cmd-center':  'v20260425-CMD89.1',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD89 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD89.1 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -2217,15 +2217,26 @@ var COMMANDS = {
         var advanceMode = hasTimeout
           ? '(auto-advance ' + timeout + 'ms)'
           : '— press Enter to advance';
-        console.log('[narrate] "' + msg + '" ' + advanceMode);
+        _appendLine('SYS', 'warn', '⏸  ' + msg + ' ' + advanceMode);
+        var _narratePauseStart = Date.now();
         if (hasTimeout) {
           await new Promise(function(r){ setTimeout(r, timeout); });
+          var _nElapsedMs = Date.now() - _narratePauseStart;
+          var _nElapsedStr = _nElapsedMs >= 1000
+            ? (_nElapsedMs / 1000).toFixed(1) + 's'
+            : _nElapsedMs + 'ms';
+          _appendLine('SYS', 'result', '▶ resumed after ' + _nElapsedStr);
           return 'narrate advanced (timeout)';
         }
         await _waitForSpotlightAdvance();
+        var _nElapsedMs2 = Date.now() - _narratePauseStart;
+        var _nElapsedStr2 = _nElapsedMs2 >= 1000
+          ? (_nElapsedMs2 / 1000).toFixed(1) + 's'
+          : _nElapsedMs2 + 'ms';
+        _appendLine('SYS', 'result', '▶ resumed after ' + _nElapsedStr2);
         return 'narrate advanced';
       }
-      console.log('[narrate] "' + msg + '"');
+      _appendLine('SYS', 'info', '· ' + msg);
       return 'narrate: ' + (msg.length > 40 ? msg.slice(0, 40) + '…' : msg);
     }
 
