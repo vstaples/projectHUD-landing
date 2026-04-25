@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD87b
+// cmd-center.js  ·  v20260425-CMD88
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD87b',
+    'cmd-center':  'v20260425-CMD88',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD87b ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD88 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -350,7 +350,11 @@ function _connect() {
       if (p.aegisObserver && _mySession && p.userId !== _mySession.userId) return;
       _sessions[p.userId] = {name:p.name,initials:p.initials,alias:p.alias||p.initials,location:p.location,online:true,ts:p.ts,aegisObserver:p.aegisObserver||false};
       _aliasMap[p.alias||p.initials] = p.userId;
-      try{localStorage.setItem('phud:cmd:session:'+p.userId,JSON.stringify(_sessions[p.userId]));}catch(e){}
+      if (_mySession && _mySession.userId && !String(_mySession.userId).startsWith('anon-')) {
+        try{localStorage.setItem('phud:cmd:session:'+p.userId,JSON.stringify(_sessions[p.userId]));}catch(e){}
+      } else if (DEBUG_EVENTS) {
+        console.log('[cmd-center] persistence skipped: pre-auth state, userId='+(_mySession&&_mySession.userId));
+      }
     });
     _renderSessionList();
   }
@@ -394,7 +398,11 @@ function _connect() {
       aegisObserver: !!payload.aegisObserver,
     };
     _aliasMap[payload.alias || peerInitials] = payload.userId;
-    try { localStorage.setItem('phud:cmd:session:' + payload.userId, JSON.stringify(_sessions[payload.userId])); } catch(e) {}
+    if (_mySession && _mySession.userId && !String(_mySession.userId).startsWith('anon-')) {
+      try { localStorage.setItem('phud:cmd:session:' + payload.userId, JSON.stringify(_sessions[payload.userId])); } catch(e) {}
+    } else if (DEBUG_EVENTS) {
+      console.log('[cmd-center] persistence skipped: pre-auth state, userId='+(_mySession&&_mySession.userId));
+    }
 
     if (DEBUG_EVENTS) {
       console.log('[presence-heartbeat] ' + who + ' recv from ' + (payload.alias || peerInitials)
@@ -442,7 +450,11 @@ function _connect() {
         online: true, ts: Date.now(), lastSeen: Date.now(), aegisObserver: p.aegisObserver || false,
       };
       _aliasMap[p.alias || p.initials] = p.userId;
-      try { localStorage.setItem('phud:cmd:session:' + p.userId, JSON.stringify(_sessions[p.userId])); } catch(e) {}
+      if (_mySession && _mySession.userId && !String(_mySession.userId).startsWith('anon-')) {
+        try { localStorage.setItem('phud:cmd:session:' + p.userId, JSON.stringify(_sessions[p.userId])); } catch(e) {}
+      } else if (DEBUG_EVENTS) {
+        console.log('[cmd-center] persistence skipped: pre-auth state, userId='+(_mySession&&_mySession.userId));
+      }
     }
     _renderSessionList();
     if (isNew && _mySession && p.userId !== _mySession.userId) {
@@ -4061,7 +4073,38 @@ async function _init() {
   });
   _loadScripts();
   _loadServerScripts();
-  try{Object.keys(localStorage).filter(function(k){return k.startsWith('phud:cmd:session:');}).forEach(function(k){var uid=k.replace('phud:cmd:session:','');var s=JSON.parse(localStorage.getItem(k));if(s&&uid&&!_sessions[uid]){s.online=false;_sessions[uid]=s;_aliasMap[s.alias||s.initials]=uid;}});}catch(e){}
+  // CMD88: Init-time prune of zombie session entries in localStorage.
+  // Walks all phud:cmd:session:* keys and deletes entries that match ANY of:
+  //   - key contains ':anon-' (pre-auth writes that escaped earlier guards)
+  //   - entry parses null / missing required fields (name, ts)
+  //   - entry.ts older than 5 min (300000 ms)
+  // Then hydrates _sessions from the surviving entries (offline-tagged).
+  try {
+    var _now = Date.now();
+    var STALE_MS = 300000;
+    var _pruned = 0;
+    Object.keys(localStorage).filter(function(k){return k.startsWith('phud:cmd:session:');}).forEach(function(k){
+      var uid = k.replace('phud:cmd:session:','');
+      var s = null;
+      try { s = JSON.parse(localStorage.getItem(k)); } catch(e) {}
+      var bad = (k.indexOf(':anon-') !== -1)
+             || !s
+             || !s.name
+             || !s.ts
+             || (_now - s.ts > STALE_MS);
+      if (bad) {
+        try { localStorage.removeItem(k); } catch(e) {}
+        _pruned++;
+        return;
+      }
+      if (uid && !_sessions[uid]) {
+        s.online = false;
+        _sessions[uid] = s;
+        _aliasMap[s.alias || s.initials] = uid;
+      }
+    });
+    console.log('[cmd-center] init prune: removed ' + _pruned + ' zombie session entries');
+  } catch(e) {}
   await _loadSupabase();
   if (!window._myResource && _supabase) {
     try {
