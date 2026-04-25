@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD86
+// cmd-center.js  ·  v20260425-CMD87
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD86',
+    'cmd-center':  'v20260425-CMD87',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD86 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD87 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -89,6 +89,11 @@ var _scriptRunning = false; // suppress hook double-logging during script execut
 var _scriptAborted = false; // set when panel closes mid-script
 var _pauseResolve  = null;  // set by Pause command, cleared by Enter in command bar
 var _leaveTimers   = {};    // { userId: timeoutId } — pending leave debounces; read by _renderSessionList
+// CMD87 / Brief Aegis Demo Primitives: Narrate + DOFile state
+var _narrateAdvance = null; // set by Narrate -pause, resolved on triangle click or Enter
+var _narrateKeyHandler = null; // installed-while-banner-visible keydown listener (capture phase)
+var _narrateVisible = false;   // true while banner is showing (any mode)
+var _doFileChain    = [];   // current DOFile call stack — names only, for depth guard + error reporting
 
 // ── UUID helper (B1/CMD54) ────────────────────────────────────────────────────
 // Used by _cmdEmit to stamp a protocol-compliant event_id on every envelope.
@@ -2074,6 +2079,71 @@ var COMMANDS = {
     _appendLine('SYS', 'result', '▶ resumed after ' + _elapsedStr);
     return 'resumed after ' + _elapsedStr;
   },
+
+  // ── Narrate (CMD87 / Brief Aegis Demo Primitives) ────────────────────────────
+  // Display a yellow banner on the Aegis tab with a message.
+  //   Narrate "<message>"           — banner shown; auto-hides on next command
+  //   Narrate "<message>" -pause    — banner shown with advance triangle;
+  //                                   blocks until operator clicks ▶ or hits Enter
+  // §3-q3 (LOCKED): Enter advances; triangle click also advances; Esc inert.
+  // §3-q4: replace immediately. _showBanner auto-resolves any prior pending
+  //        -pause so a new banner is always reachable.
+  // §3-q8: emits 'narration.shown' with payload { message, paused, ts }.
+  // Aegis-local (Rule 29): runs unprefixed; registered in _lv and _rl.
+  'Narrate': async function(args) {
+    // Detect -pause flag (last arg)
+    var paused = false;
+    if (args.length && args[args.length-1] === '-pause') {
+      paused = true;
+      args = args.slice(0, -1);
+    }
+    var msg = args.join(' ');
+    if (!msg) return 'Narrate: no message';
+    _showBanner(msg, paused);
+    if (window._cmdEmit) {
+      window._cmdEmit('narration.shown', { message: msg, paused: paused, ts: Date.now() });
+    }
+    if (paused) {
+      await _waitForBannerAdvance();
+      _hideBanner();
+      return 'narrate advanced';
+    }
+    return 'narrate: ' + (msg.length > 40 ? msg.slice(0, 40) + '…' : msg);
+  },
+
+  // ── DOFile (CMD87 / Brief Aegis Demo Primitives) ─────────────────────────────
+  // Execute another Aegis script inline as if its lines were embedded at the
+  // call site.
+  //   DOFile "<script_name>"
+  // §3-q5 (LOCKED): max recursion depth 4. Overflow error names the call chain.
+  // §3-q6: shared _storeVars namespace — variables propagate between caller
+  //        and callee (matches existing script composition behavior).
+  // §3-q7: error wrapper "in DOFile <name> at line N: <message>" — surfacing
+  //        is implemented inside _runScriptLines via the sourceTag parameter.
+  // Aegis-local (Rule 29): runs unprefixed; registered in _lv and _rl.
+  'DOFile': async function(args) {
+    var scriptName = args[0];
+    if (!scriptName) throw new Error('DOFile: missing script name');
+    if (_doFileChain.length >= 4) {
+      throw new Error('DOFile depth exceeded at depth ' + _doFileChain.length +
+        ': ' + _doFileChain.join(' → ') + ' → ' + scriptName);
+    }
+    var script = _scripts[scriptName];
+    if (!script) throw new Error('DOFile: script not found: ' + scriptName);
+    _doFileChain.push(scriptName);
+    try {
+      var lines = script.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+      var aborted = await _runScriptLines(lines, scriptName, scriptName);
+      if (aborted === 'aborted') {
+        // Inner _runScriptLines already logged the abort with sourceTag context.
+        // Surface as a thrown error so the outer script's halt path triggers.
+        throw new Error('aborted in DOFile ' + scriptName);
+      }
+      return 'DOFile complete: ' + scriptName;
+    } finally {
+      _doFileChain.pop();
+    }
+  },
 };
 
 // ── Parse a command line into [verb, ...args] ─────────────────────────────────
@@ -2239,6 +2309,192 @@ function _parseScriptRequires(scriptText) {
   return [];
 }
 
+// ── Narrate banner helpers (CMD87 / Brief Aegis Demo Primitives) ─────────────
+// Banner DOM lives in aegis.html between the M1 tab bar and the panes.
+// Three states: hidden (display:none), transient (visible, no triangle, hides
+// on next command), paused (visible, triangle showing, awaits Enter or click).
+// Stacking rule (§3-q4): replace immediately. If a -pause is currently
+// awaiting and a new Narrate fires, the pending advance is auto-resolved
+// before the new banner shows — otherwise the new banner would be unreachable.
+function _showBanner(msg, paused) {
+  var banner   = document.getElementById('phr-narrate-banner');
+  var msgEl    = document.getElementById('phr-narrate-banner-msg');
+  var advEl    = document.getElementById('phr-narrate-banner-advance');
+  if (!banner || !msgEl || !advEl) return;
+  // Stacking: auto-advance any pending -pause so the new banner is reachable
+  if (_narrateAdvance) {
+    var prev = _narrateAdvance; _narrateAdvance = null; prev();
+  }
+  msgEl.textContent     = msg;
+  advEl.style.display   = paused ? 'block' : 'none';
+  banner.classList.add('visible');
+  banner.style.display  = 'flex';
+  _narrateVisible       = true;
+}
+function _hideBanner() {
+  var banner = document.getElementById('phr-narrate-banner');
+  if (banner) {
+    banner.classList.remove('visible');
+    banner.style.display = 'none';
+  }
+  _narrateVisible = false;
+  if (_narrateKeyHandler) {
+    document.removeEventListener('keydown', _narrateKeyHandler, true);
+    _narrateKeyHandler = null;
+  }
+}
+// Pre-exec hook (§3-q1 hide-on-next-command). Called at the top of each
+// dispatch-loop iteration. Only hides if no -pause is pending — paused banners
+// are dismissed by the operator, not by the next command.
+function _hideBannerIfTransient() {
+  if (_narrateVisible && !_narrateAdvance) _hideBanner();
+}
+// Returns a Promise that resolves on triangle-click OR Enter keypress.
+// Locked §3-q3: Enter advances; other keys (incl. Esc) fall through. The
+// keydown listener attaches in capture phase so it preempts the command bar's
+// Enter handler that resolves _pauseResolve.
+function _waitForBannerAdvance() {
+  return new Promise(function(resolve) {
+    _narrateAdvance = resolve;
+    var advEl = document.getElementById('phr-narrate-banner-advance');
+    function advance() {
+      if (!_narrateAdvance) return;        // already advanced (race-safe)
+      var r = _narrateAdvance; _narrateAdvance = null; r();
+    }
+    if (advEl) advEl.onclick = advance;
+    _narrateKeyHandler = function(ev) {
+      if (ev.key !== 'Enter') return;       // Esc and others fall through
+      ev.preventDefault();
+      ev.stopPropagation();
+      advance();
+    };
+    document.addEventListener('keydown', _narrateKeyHandler, true);
+  });
+}
+
+// ── Run a list of script lines (factored CMD87) ──────────────────────────────
+// Inner loop body for both _runScript (top-level) and DOFile (inline).
+// Returns 'aborted' if the loop broke out due to abort/error, undefined on
+// normal completion. sourceTag is used in error messages for §3-q7
+// ("in DOFile <name> at line N: <message>").
+async function _runScriptLines(lines, scriptName, sourceTag) {
+  for (var i = 0; i < lines.length; i++) {
+    // Check abort flag — set by Stop button or form closure
+    if (_scriptAborted) {
+      _appendLine('SYS', 'warn', 'Script aborted at line ' + (i+1) +
+        (sourceTag && sourceTag !== scriptName ? ' (in ' + sourceTag + ')' : ''));
+      return 'aborted';
+    }
+
+    var line = lines[i];
+    if (!line || line.startsWith('#')) continue;
+
+    // CMD87: hide-on-next-command pre-exec hook (§3-q1).
+    // Only hides transient banners — paused banners hold until operator advances.
+    _hideBannerIfTransient();
+
+    // Abort if panel was closed
+    if (_scriptAborted) {
+      _scriptAborted = false;
+      _appendLine('SYS', 'warn', 'Script aborted — panel closed');
+      return 'aborted';
+    }
+
+    var parsed = _parseLine(line);
+    if (!parsed) continue;
+
+    // If this is a Form command, verify the overlay is still open.
+    // Give it a short grace period — the overlay may still be animating in
+    // immediately after Form Open returns.
+    // AEGIS-EXEMPT: on Aegis, the form overlay lives on the target session's
+    // DOM (Compass), not on Aegis's. Aegis is dispatching, not executing, so
+    // the local-DOM overlay check is meaningless and would falsely abort.
+    if (!window._aegisMode && parsed.verb && parsed.verb.startsWith('Form ') && parsed.verb !== 'Form Open') {
+      var overlay = document.getElementById('myr-html-form-overlay') ||
+                    document.getElementById('myr-html-form-modal');
+      if (!overlay) {
+        // Grace period: wait up to 1s for overlay to appear
+        for (var gi = 0; gi < 10; gi++) {
+          await new Promise(function(r){ setTimeout(r, 100); });
+          overlay = document.getElementById('myr-html-form-overlay') ||
+                    document.getElementById('myr-html-form-modal');
+          if (overlay) break;
+        }
+      }
+      if (!overlay) {
+        _appendLine('SYS', 'warn', 'Form closed — script aborted at: ' + line);
+        return 'aborted';
+      }
+    }
+
+    // Determine target session via alias map
+    var targetUserId = null;
+    if (parsed.target) {
+      targetUserId = _resolveTargetAlias(parsed.target);
+    }
+
+    // CMD87: Narrate, DOFile added to local-verb list (Rule 29 — Aegis-local).
+    var _lv=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
+             'Narrate','DOFile',
+             'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow','Wait ForModal'];
+    if (targetUserId && (_lv.indexOf(parsed.verb)===-1)) {
+      // Dispatch via Realtime (non-local commands)
+      // B-UI-5 / CMD71: resolve $variables against Aegis's _storeVars
+      // BEFORE transmission. Receiver has no access to sender-captured
+      // vars; the wire must carry resolved literals.
+      var _bareLine = line.replace(/^[A-Z]+:\s*/, '');
+      var _resolvedLine = _resolveVarsInCmd(_bareLine);
+      _appendLine(parsed.target || 'SYS', 'cmd', _resolvedLine);
+      if (_channel) {
+        _channelSend({
+          type: 'broadcast', event: 'cmd',
+          payload: {
+            target: targetUserId,
+            from:   _myAlias || _mySession.initials,
+            cmd:    _resolvedLine,
+            cmdId:  Date.now() + '-' + i,
+          }
+        });
+      }
+      try {
+        var _ackData = await _waitForEvent('result:' + targetUserId, 30000);
+        // Propagate key vars from remote ack into local _storeVars so the
+        // rest of the script (running locally on Aegis) can reference them.
+        // Form Submit acks with 'submitted · instance XXXXXXXX' — extract the id.
+        // The target stored the full UUID in its own _storeVars; we capture
+        // the prefix here, which is sufficient for Log lines. For exact UUID
+        // matching via $instance_id, add 'Store instance_id' to the script.
+        if (_ackData && typeof _ackData.result === 'string') {
+          var _m = _ackData.result.match(/^submitted · instance ([a-f0-9-]+)/i);
+          if (_m) {
+            _storeVars['instance_id'] = _m[1];
+            _appendLine('SYS', 'sys', 'captured $instance_id = ' + _m[1]);
+          }
+        }
+      } catch(e) {
+        _appendLine('SYS', 'warn', 'Timeout waiting for ' + parsed.target);
+      }
+    } else {
+      // Execute locally
+      _appendLine(_myAlias || _mySession.initials, 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
+      try {
+        await _executeCommand(line.replace(/^[A-Z]+:\s*/, ''), _myAlias || _mySession.initials);
+      } catch(e) {
+        // §3-q7: surface both call site and inner line for DOFile errors.
+        var _ctx = (sourceTag && sourceTag !== scriptName)
+          ? 'in DOFile ' + sourceTag + ' at line ' + (i+1) + ': '
+          : '';
+        _appendLine('SYS', 'err', 'Script halted: ' + _ctx + e.message);
+        return 'aborted';
+      }
+    }
+
+    // Small yield between commands
+    await new Promise(function(r){ setTimeout(r, 200); });
+  }
+  return undefined;
+}
+
 // ── Run a multi-line script ───────────────────────────────────────────────────
 async function _runScript(scriptText, scriptName) {
   var lines = scriptText.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
@@ -2282,109 +2538,8 @@ async function _runScript(scriptText, scriptName) {
   }
 
   try {
-    for (var i = 0; i < lines.length; i++) {
-      // Check abort flag — set by Stop button or form closure
-      if (_scriptAborted) {
-        _appendLine('SYS', 'warn', 'Script aborted at line ' + (i+1));
-        break;
-      }
-
-      var line = lines[i];
-      if (!line || line.startsWith('#')) continue;
-
-      // Abort if panel was closed
-      if (_scriptAborted) {
-        _scriptAborted = false;
-        _appendLine('SYS', 'warn', 'Script aborted — panel closed');
-        break;
-      }
-
-      var parsed = _parseLine(line);
-      if (!parsed) continue;
-
-      // If this is a Form command, verify the overlay is still open.
-      // Give it a short grace period — the overlay may still be animating in
-      // immediately after Form Open returns.
-      // AEGIS-EXEMPT: on Aegis, the form overlay lives on the target session's
-      // DOM (Compass), not on Aegis's. Aegis is dispatching, not executing, so
-      // the local-DOM overlay check is meaningless and would falsely abort.
-      if (!window._aegisMode && parsed.verb && parsed.verb.startsWith('Form ') && parsed.verb !== 'Form Open') {
-        var overlay = document.getElementById('myr-html-form-overlay') ||
-                      document.getElementById('myr-html-form-modal');
-        if (!overlay) {
-          // Grace period: wait up to 1s for overlay to appear
-          for (var gi = 0; gi < 10; gi++) {
-            await new Promise(function(r){ setTimeout(r, 100); });
-            overlay = document.getElementById('myr-html-form-overlay') ||
-                      document.getElementById('myr-html-form-modal');
-            if (overlay) break;
-          }
-        }
-        if (!overlay) {
-          _appendLine('SYS', 'warn', 'Form closed — script aborted at: ' + line);
-          break;
-        }
-      }
-
-      // Determine target session via alias map
-      var targetUserId = null;
-      if (parsed.target) {
-        targetUserId = _resolveTargetAlias(parsed.target);
-      }
-
-      var _lv=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
-               'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow','Wait ForModal'];
-      if (targetUserId && (_lv.indexOf(parsed.verb)===-1)) {
-        // Dispatch via Realtime (non-local commands)
-        // B-UI-5 / CMD71: resolve $variables against Aegis's _storeVars
-        // BEFORE transmission. Receiver has no access to sender-captured
-        // vars; the wire must carry resolved literals.
-        var _bareLine = line.replace(/^[A-Z]+:\s*/, '');
-        var _resolvedLine = _resolveVarsInCmd(_bareLine);
-        _appendLine(parsed.target || 'SYS', 'cmd', _resolvedLine);
-        if (_channel) {
-          _channelSend({
-            type: 'broadcast', event: 'cmd',
-            payload: {
-              target: targetUserId,
-              from:   _myAlias || _mySession.initials,
-              cmd:    _resolvedLine,
-              cmdId:  Date.now() + '-' + i,
-            }
-          });
-        }
-        try {
-          var _ackData = await _waitForEvent('result:' + targetUserId, 30000);
-          // Propagate key vars from remote ack into local _storeVars so the
-          // rest of the script (running locally on Aegis) can reference them.
-          // Form Submit acks with 'submitted · instance XXXXXXXX' — extract the id.
-          // The target stored the full UUID in its own _storeVars; we capture
-          // the prefix here, which is sufficient for Log lines. For exact UUID
-          // matching via $instance_id, add 'Store instance_id' to the script.
-          if (_ackData && typeof _ackData.result === 'string') {
-            var _m = _ackData.result.match(/^submitted · instance ([a-f0-9-]+)/i);
-            if (_m) {
-              _storeVars['instance_id'] = _m[1];
-              _appendLine('SYS', 'sys', 'captured $instance_id = ' + _m[1]);
-            }
-          }
-        } catch(e) {
-          _appendLine('SYS', 'warn', 'Timeout waiting for ' + parsed.target);
-        }
-      } else {
-        // Execute locally
-        _appendLine(_myAlias || _mySession.initials, 'cmd', line.replace(/^[A-Z]+:\s*/, ''));
-        try {
-          await _executeCommand(line.replace(/^[A-Z]+:\s*/, ''), _myAlias || _mySession.initials);
-        } catch(e) {
-          _appendLine('SYS', 'err', 'Script halted: ' + e.message);
-          break;
-        }
-      }
-
-      // Small yield between commands
-      await new Promise(function(r){ setTimeout(r, 200); });
-    }
+    var _aborted = await _runScriptLines(lines, scriptName, scriptName || 'inline');
+    if (_aborted === 'aborted') { /* break path already logged inside helper */ }
   } finally {
     _scriptRunning = false;
     _scriptAborted = false;
@@ -3074,7 +3229,9 @@ function _runCmd() {
   var parsed = _parseLine(fullCmd);
   if (parsed && parsed.target) {
     var targetUserId = _resolveTargetAlias(parsed.target);
+    // CMD87: Narrate, DOFile added to local-verb list (Rule 29 — Aegis-local).
     var _rl=['Assert','Log','Wait','Store','Get','DB Poll','DB Get','Run','Pause',
+             'Narrate','DOFile',
              'Wait ForLocation','Wait ForInstance','Wait ForRoute','Wait ForForm','Wait ForQueueRow','Wait ForModal'];
     if (targetUserId && _channel && _rl.indexOf(parsed.verb)===-1) {
       // B-UI-5 / CMD71: resolve $variables against Aegis's _storeVars
