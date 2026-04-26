@@ -15,7 +15,7 @@
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/ui.js"></script>
-<script src="/js/sidebar.js"></script>
+<script src="/js/hud-shell.js"></script>
 <script src="/js/meetings.js"></script>
 <script src="/js/person-picker.js"></script>
 
@@ -843,20 +843,19 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
   <!-- Main (full width — sidebar replaced by Dashboard link in topbar) -->
   <div class="cad-main" style="width:100%">
 
-    <!-- Top bar -->
-    <div class="cad-topbar">
-      <div class="cad-topbar-brand">Cadence</div>
-      <div class="cad-topbar-sub" id="cad-topbar-sub">Certification Command Center</div>
-      <div class="cad-topbar-actions">
+    <!-- Top bar — unified header above renders module name + LIVE/datetime/bell/avatar.
+         This row preserves Cadence-specific actions (back / settings / new flow / new form). -->
+    <div class="cad-topbar cad-topbar-actions-only">
+      <div class="cad-topbar-actions" style="margin-left:auto">
         <a href="/projects.html" class="btn btn-ghost btn-sm" id="topbar-back-btn"
           style="text-decoration:none;display:none">← Dashboard</a>
         <button class="btn btn-ghost btn-sm" id="topbar-settings-btn"
           onclick="_cadOpenLibrarySettings()" style="display:none"
           title="Triggers &amp; form settings">⚙ Settings</button>
         <button class="btn btn-cad btn-sm" id="topbar-new-btn"
-          onclick="_cadNewFlow()" style="font-size:11px;padding:3px 10px">+ New Flow</button>
+          onclick="_cadNewFlow()" style="font-size:12px;padding:4px 10px">+ New Flow</button>
         <button class="btn btn-cad btn-sm" id="topbar-new-form-btn"
-          onclick="_cadNewForm()" style="font-size:11px;padding:3px 10px">+ New Form</button>
+          onclick="_cadNewForm()" style="font-size:12px;padding:4px 10px">+ New Form</button>
       </div>
     </div>
 
@@ -5564,6 +5563,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // Mark initial filter pill active
   var fp = document.getElementById('s9-fp-all');
   if (fp) fp.classList.add('active');
+
+  // Unified shell: slide-in sidebar + unified header (CMD94)
+  if (window.HUDShell) {
+    HUDShell.init({ page: 'cadence', moduleName: 'Cadence' });
+  }
 });
 
 
