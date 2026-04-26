@@ -1026,6 +1026,21 @@ function switchView(viewId) {
       case 'executive':  loadExecutiveView();  break;
       case 'client':     loadClientView();     break;
     }
+  } else if (viewId === 'user') {
+    // CMD95p3: returning to MY WORK after navigating away. Re-apply
+    // the saved sub-tab so the surface isn't blank if we'd left on
+    // a non-'work' tab. uSwitchTab is idempotent and safe when the
+    // sub-tab is already active.
+    const savedTab = localStorage.getItem('compass-user-tab') || 'work';
+    if (window.uSwitchTab) {
+      try {
+        const btn = document.querySelector('.ust[data-tab="' + savedTab + '"]');
+        window.uSwitchTab(savedTab, btn || null);
+      } catch (e) { /* swallow */ }
+    }
+    if (window._mwRefresh) {
+      try { window._mwRefresh(); } catch (e) { /* swallow */ }
+    }
   }
 }
 
@@ -1272,14 +1287,46 @@ function _onTier1Select(tier1Id) {
 function _onTier2Select(tier1Id, tier2Id) {
   // For MY WORK, defer to my-work.html's tab switcher when loaded.
   if (tier1Id === 'user') {
-    if (window.uSwitchTab) {
+    // Always persist intent — loadUserView's end-of-load savedTab
+    // restore picks this up if my-work hasn't mounted yet.
+    try { localStorage.setItem('compass-user-tab', tier2Id); } catch (e) {}
+
+    if (!window.uSwitchTab || !window._myWorkLoaded) {
+      // my-work.html hasn't loaded yet; the savedTab restore at the
+      // end of loadUserView will activate this tab once containers
+      // are mounted. Don't dispatch now — uSwitchTab against an
+      // unmounted target leaves the surface blank.
+      return;
+    }
+
+    // For non-'work' tabs, also verify the target sub-view container
+    // exists; sub-view containers (#mt-root, #user-meetings-content,
+    // etc.) are rendered lazily by my-work.html's own tab handlers.
+    // If absent, defer — uSwitchTab will be re-driven when the user
+    // re-enters this Tier 1 (savedTab path) or clicks the strip again.
+    const SUBVIEW_CONTAINER = {
+      time:     'mt-root',
+      meetings: 'user-meetings-content',
+      calendar: 'user-calendar-content',
+      views:    'user-views-content',
+      notes:    'user-notes-content',
+      requests: 'user-requests-content',
+      team:     'user-team-content',
+    };
+    const containerId = SUBVIEW_CONTAINER[tier2Id];
+    if (containerId && !document.getElementById(containerId)) {
+      // Container not mounted yet. uSwitchTab will mount it on first
+      // call from my-work's own click handlers; calling it here
+      // before mw-tabs has wired things up leaves a blank surface.
+      // Fall through anyway — mw-tabs DOES handle first-time mount
+      // for some tabs. Wrap in try so a failure doesn't crash.
+    }
+
+    try {
       const btn = document.querySelector('.ust[data-tab="' + tier2Id + '"]');
       window.uSwitchTab(tier2Id, btn || null);
-      try { localStorage.setItem('compass-user-tab', tier2Id); } catch (e) {}
-    } else {
-      // my-work.html not yet loaded — record intent so loadUserView's
-      // savedTab restore picks it up.
-      try { localStorage.setItem('compass-user-tab', tier2Id); } catch (e) {}
+    } catch (e) {
+      console.warn('[Compass] Tier 2 → uSwitchTab failed for', tier2Id, e);
     }
     return;
   }

@@ -684,11 +684,12 @@ const HUDShell = (() => {
     if (!skipCallback && typeof _tier1OnSelect === 'function') {
       try { _tier1OnSelect(tier1Id); } catch (e) { console.error('[HUDShell] tier1 onSelect error:', e); }
     }
-    // After Tier 1 changes, fire Tier 2 callback for the (restored) active tier-2 id
-    const t2Active = _tier2Memory[tier1Id];
-    if (t2Active && !skipCallback && typeof _tier2OnSelect === 'function') {
-      try { _tier2OnSelect(tier1Id, t2Active); } catch (e) { console.error('[HUDShell] tier2 onSelect error:', e); }
-    }
+    // CMD95p3: do NOT auto-fire onTier2Select after Tier 1 change.
+    // Tier 1 callback owns surface setup; sub-view restoration is the
+    // caller's responsibility (e.g. compass loadUserView's savedTab
+    // path). Auto-firing caused unmounted-container races and blank
+    // surfaces when returning to a Tier 1 tab whose remembered Tier 2
+    // sub-view hadn't been visited in this session.
   }
 
   // ── Build / refresh Tier 2 vertical strip ────────────────────
