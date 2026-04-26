@@ -52,6 +52,12 @@
 .wl-pct { font-family: var(--font-mono); font-size:11px; min-width: 28px; text-align: right; }
 @media (max-width: 1200px) { .dashboard-grid { grid-template-columns: 1fr; } }
 
+/* CMD97 — Position activity ticker below unified header (48px band).
+   Unified header is position:fixed; top:0; height:48px. Ticker sits
+   directly beneath it. sticky preserves scroll behavior with no
+   gutter/overlap. */
+body.hud-header-rendered #ticker { position: sticky; top: 48px; z-index: 100; }
+
 /* ── ADD PROJECT PANEL ── */
 .add-proj-overlay {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
@@ -116,7 +122,6 @@
         <div class="page-title">DASHBOARD</div>
         <div class="page-subtitle">FIRM-WIDE OPERATIONAL OVERVIEW</div>
       </div>
-      <div class="page-meta" id="page-date"></div>
     </div>
 
     <div id="content">
@@ -191,11 +196,8 @@
 <script src="/js/project-drawer.js"></script>
 <script src="/js/hud-recorder.js"></script>
 <script>
-document.getElementById('page-date').textContent =
-  new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'}).toUpperCase();
-
 Ticker.init('ticker-scroll', Ticker.DEFAULT_EVENTS);
-Sidebar.init('dashboard.html');
+HUDShell.init({ page: 'dashboard', moduleName: 'ProjectHUD' });
 // Set build version from config
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('version-num');
