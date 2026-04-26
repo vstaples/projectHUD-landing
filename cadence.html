@@ -99,6 +99,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 }
 .subnav-item:hover{color:var(--text)}
 .subnav-item.active{color:#7F77DD;border-bottom-color:#7F77DD}
+/* Hidden legacy spans — beats inline display mutations from external cdn-*.js. */
+#tmpl-count,
+#tab-templates,
+#tab-forms,
+#tab-triggers,
+#tab-form-settings { display: none !important; }
 .subnav-badge{
   font-size:12px;padding:1px 5px;border-radius:3px;
   background:rgba(196,125,24,.15);color:var(--cad);

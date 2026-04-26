@@ -1754,6 +1754,23 @@ document.addEventListener('DOMContentLoaded',function(){
 })();
 </script>
 <script src="/js/version.js?v=seed"></script>
+<script src="/js/hud-shell.js"></script>
+<script>
+  (function() {
+    function boot() {
+      if (window.Sidebar) {
+        Sidebar.init('aegis');
+      } else {
+        setTimeout(boot, 25);
+      }
+    }
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      boot();
+    } else {
+      document.addEventListener('DOMContentLoaded', boot);
+    }
+  })();
+</script>
 <script>
   (function() {
     var v = window._PROJECTHUD_VERSION;
