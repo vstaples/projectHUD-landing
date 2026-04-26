@@ -1,7 +1,9 @@
 // ============================================================
-// ProjectHUD — hud-shell.js v1.0 (CMD94)
+// ProjectHUD — hud-shell.js v1.1 (CMD95)
 // Unified shell: slide-in sidebar (absorbed from sidebar.js v3.1)
-//                + unified header bar (logo / ticker / operator-status).
+//                + unified header bar (logo / ticker / operator-status)
+//                + Tier 1 sub-header strip (major-area tabs)
+//                + Tier 2 contextual vertical icon strip (sub-views)
 // ============================================================
 const HUDShell = (() => {
 
@@ -248,6 +250,100 @@ const HUDShell = (() => {
       /* Slide-in trigger sits below the unified header */
       body.hud-header-rendered #hud-sidebar-trigger { top: 48px; }
       body.hud-header-rendered #hud-sidebar-panel { top: 48px; }
+
+      /* ── Tier 1 sub-header (major-area tabs) ─────────────────── */
+      #hud-tier1 {
+        position: fixed; left: 0; right: 0; top: 48px;
+        height: 42px; z-index: 499;
+        display: flex; align-items: stretch;
+        background: rgba(10,16,28,0.95);
+        border-bottom: 1px solid rgba(0,210,255,0.12);
+        padding: 0 14px;
+        font-family: 'Barlow Condensed','Rajdhani',sans-serif;
+      }
+      .hud-tier1-tab {
+        display: flex; align-items: center; gap: 7px;
+        padding: 0 16px; height: 42px;
+        background: none; border: none;
+        border-bottom: 2px solid transparent;
+        color: #7a9bbf;
+        font-family: 'Barlow Condensed','Rajdhani',sans-serif;
+        font-size: 13px; font-weight: 600;
+        letter-spacing: 0.10em; text-transform: uppercase;
+        cursor: pointer; white-space: nowrap;
+        transition: color .12s, background .12s, border-color .12s;
+      }
+      .hud-tier1-tab:hover { color: #e8f4ff; background: rgba(255,255,255,0.03); }
+      .hud-tier1-tab.active { color: #00d2ff; border-bottom-color: #00d2ff; }
+      .hud-tier1-tab .tab-dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: currentColor; opacity: 0.5;
+      }
+      .hud-tier1-tab.active .tab-dot { opacity: 1; }
+
+      /* When Tier 1 renders, push slide-in + content area down further */
+      body.hud-tier1-rendered #hud-sidebar-trigger { top: 90px; }
+      body.hud-tier1-rendered #hud-sidebar-panel { top: 90px; }
+      body.hud-tier1-rendered.hud-header-rendered .hud-shell,
+      body.hud-tier1-rendered.hud-header-rendered #compass-app,
+      body.hud-tier1-rendered.hud-header-rendered #app {
+        height: calc(100vh - 90px) !important;
+        margin-top: 90px;
+      }
+
+      /* ── Tier 2 contextual vertical icon strip ──────────────── */
+      #hud-tier2 {
+        position: fixed; left: 0; top: 90px; bottom: 0;
+        width: 60px; z-index: 498;
+        background: rgba(8,13,24,0.96);
+        border-right: 1px solid rgba(0,210,255,0.12);
+        display: flex; flex-direction: column;
+        align-items: center; padding: 8px 0; gap: 2px;
+        overflow-y: auto; overflow-x: hidden;
+      }
+      .hud-tier2-btn {
+        position: relative; width: 48px; height: 48px;
+        display: flex; align-items: center; justify-content: center;
+        background: none; border: none; border-radius: 5px;
+        color: rgba(160,200,235,0.42); cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+        flex-shrink: 0; padding: 0;
+        border-left: 2px solid transparent;
+        font-family: 'Barlow Condensed','Rajdhani',sans-serif;
+        font-size: 11px; font-weight: 600;
+        letter-spacing: 0.04em;
+      }
+      .hud-tier2-btn:hover { background: rgba(0,210,255,0.08); color: #00d2ff; }
+      .hud-tier2-btn.active {
+        background: rgba(0,210,255,0.10); color: #00d2ff;
+        border-left-color: #00d2ff;
+      }
+      .hud-tier2-btn .tier2-glyph {
+        font-size: 18px; line-height: 1; pointer-events: none;
+      }
+      .hud-tier2-btn::after {
+        content: attr(data-label);
+        position: fixed; left: 68px;
+        background: #0a1525; border: 1px solid rgba(0,210,255,0.28);
+        color: #00d2ff;
+        font-family: 'Barlow Condensed','Rajdhani',sans-serif;
+        font-size: 11px; font-weight: 600;
+        letter-spacing: 0.12em; text-transform: uppercase;
+        white-space: nowrap; padding: 5px 12px;
+        pointer-events: none; opacity: 0;
+        transition: opacity 0.12s;
+        z-index: 9999;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      }
+      .hud-tier2-btn:hover::after { opacity: 1; }
+
+      /* When Tier 2 renders, indent main content from the left */
+      body.hud-tier2-rendered .hud-shell,
+      body.hud-tier2-rendered #compass-app,
+      body.hud-tier2-rendered #app {
+        margin-left: 60px;
+        width: calc(100% - 60px);
+      }
     `;
     document.head.appendChild(s);
   }
@@ -536,7 +632,123 @@ const HUDShell = (() => {
     return inner;
   }
 
-  // ── Unified header: build & wire ─────────────────────────────
+  // ── Tier 1 / Tier 2 state ────────────────────────────────────
+  // _tier1Active: currently active Tier 1 tab id
+  // _tier2Map:    config object { tier1Id: [{ id, label, glyph }] }
+  // _tier2Memory: per-Tier-1 last-selected Tier 2 id (persisted)
+  // _tier1OnSelect / _tier2OnSelect: caller-supplied click handlers
+  let _tier1Active   = null;
+  let _tier2Map      = {};
+  let _tier2Memory   = {};
+  let _tier1OnSelect = null;
+  let _tier2OnSelect = null;
+  const _TIER2_STORAGE_KEY = 'hud-tier2-state';
+
+  function _loadTier2Memory() {
+    try {
+      const raw = localStorage.getItem(_TIER2_STORAGE_KEY);
+      _tier2Memory = raw ? JSON.parse(raw) : {};
+    } catch (e) { _tier2Memory = {}; }
+  }
+  function _saveTier2Memory() {
+    try { localStorage.setItem(_TIER2_STORAGE_KEY, JSON.stringify(_tier2Memory)); }
+    catch (e) {}
+  }
+
+  // ── Build Tier 1 sub-header strip ────────────────────────────
+  function _buildTier1(tabs, initialActive, onSelect) {
+    if (document.getElementById('hud-tier1')) return;
+    const strip = document.createElement('div');
+    strip.id = 'hud-tier1';
+    tabs.forEach(t => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hud-tier1-tab';
+      btn.dataset.tier1Id = t.id;
+      btn.innerHTML = `<span class="tab-dot"></span><span>${t.label}</span>`;
+      btn.addEventListener('click', () => _selectTier1(t.id));
+      strip.appendChild(btn);
+    });
+    document.body.insertBefore(strip, document.body.firstChild.nextSibling);
+    document.body.classList.add('hud-tier1-rendered');
+    _tier1OnSelect = onSelect || null;
+    if (initialActive) _selectTier1(initialActive, /*skipCallback=*/true);
+  }
+
+  function _selectTier1(tier1Id, skipCallback) {
+    _tier1Active = tier1Id;
+    document.querySelectorAll('#hud-tier1 .hud-tier1-tab').forEach(b => {
+      b.classList.toggle('active', b.dataset.tier1Id === tier1Id);
+    });
+    _renderTier2(tier1Id);
+    if (!skipCallback && typeof _tier1OnSelect === 'function') {
+      try { _tier1OnSelect(tier1Id); } catch (e) { console.error('[HUDShell] tier1 onSelect error:', e); }
+    }
+    // After Tier 1 changes, fire Tier 2 callback for the (restored) active tier-2 id
+    const t2Active = _tier2Memory[tier1Id];
+    if (t2Active && !skipCallback && typeof _tier2OnSelect === 'function') {
+      try { _tier2OnSelect(tier1Id, t2Active); } catch (e) { console.error('[HUDShell] tier2 onSelect error:', e); }
+    }
+  }
+
+  // ── Build / refresh Tier 2 vertical strip ────────────────────
+  function _ensureTier2Container() {
+    let strip = document.getElementById('hud-tier2');
+    if (strip) return strip;
+    strip = document.createElement('div');
+    strip.id = 'hud-tier2';
+    document.body.insertBefore(strip, document.body.firstChild.nextSibling);
+    document.body.classList.add('hud-tier2-rendered');
+    return strip;
+  }
+
+  function _renderTier2(tier1Id) {
+    const items = _tier2Map[tier1Id] || [];
+    const strip = _ensureTier2Container();
+    strip.innerHTML = '';
+    if (!items.length) {
+      strip.style.display = 'none';
+      document.body.classList.remove('hud-tier2-rendered');
+      return;
+    }
+    strip.style.display = '';
+    document.body.classList.add('hud-tier2-rendered');
+
+    // Determine active Tier 2 for this Tier 1: memory wins, else first item
+    let activeId = _tier2Memory[tier1Id];
+    if (!activeId || !items.find(i => i.id === activeId)) {
+      activeId = items[0].id;
+      _tier2Memory[tier1Id] = activeId;
+      _saveTier2Memory();
+    }
+
+    items.forEach(it => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hud-tier2-btn' + (it.id === activeId ? ' active' : '');
+      btn.dataset.tier2Id = it.id;
+      btn.dataset.label = it.label;
+      btn.title = it.label;
+      btn.innerHTML = `<span class="tier2-glyph">${it.glyph || '◆'}</span>`;
+      btn.addEventListener('click', () => _selectTier2(it.id));
+      strip.appendChild(btn);
+    });
+  }
+
+  function _selectTier2(tier2Id) {
+    if (!_tier1Active) return;
+    _tier2Memory[_tier1Active] = tier2Id;
+    _saveTier2Memory();
+    document.querySelectorAll('#hud-tier2 .hud-tier2-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.tier2Id === tier2Id);
+    });
+    if (typeof _tier2OnSelect === 'function') {
+      try { _tier2OnSelect(_tier1Active, tier2Id); }
+      catch (e) { console.error('[HUDShell] tier2 onSelect error:', e); }
+    }
+  }
+
+
   function _buildHeader(moduleName) {
     if (document.getElementById('hud-header')) return; // idempotent
     const initials = _userInitialsFallback();
@@ -661,13 +873,20 @@ const HUDShell = (() => {
   }
 
   // ── Public init ──────────────────────────────────────────────
-  // options: { page: string, moduleName?: string, header?: boolean }
-  // - page:        active page key (e.g. 'compass', 'cadence')
-  // - moduleName:  text shown in header left region. If omitted,
-  //                derived from `page`. If empty string, header is
-  //                NOT rendered (used by backward-compat shim so
-  //                CMD93-era surfaces don't sprout headers prematurely).
-  // - header:      explicit override. If false, suppresses header.
+  // options: {
+  //   page:         active page key (e.g. 'compass')
+  //   moduleName:   text shown in header left region. If omitted,
+  //                 derived from `page`. If empty string, header is
+  //                 NOT rendered.
+  //   header:       explicit override. If false, suppresses header.
+  //   tier1:        [{ id, label }] — major-area tabs (CMD95). Optional.
+  //   tier2:        { tier1Id: [{ id, label, glyph }] } — sub-view icons
+  //                 per Tier 1 tab. Optional. Required if tier1 supplied.
+  //   initialTier1: id of initially-active Tier 1 tab.
+  //   onTier1Select(tier1Id): called after Tier 1 selection.
+  //   onTier2Select(tier1Id, tier2Id): called after Tier 2 selection
+  //                 (or after Tier 1 changes and restores its remembered Tier 2).
+  // }
   async function init(options) {
     options = options || {};
     const page = options.page || '';
@@ -706,6 +925,16 @@ const HUDShell = (() => {
       _buildHeader(moduleName);
     }
 
+    // ── Tier 1 / Tier 2 setup (CMD95) ─────────────────────────
+    if (Array.isArray(options.tier1) && options.tier1.length) {
+      _tier2Map      = options.tier2 || {};
+      _tier2OnSelect = typeof options.onTier2Select === 'function' ? options.onTier2Select : null;
+      _loadTier2Memory();
+      const initial = options.initialTier1 || options.tier1[0].id;
+      _buildTier1(options.tier1, initial,
+        typeof options.onTier1Select === 'function' ? options.onTier1Select : null);
+    }
+
     const showToolbar = true;
     try {
       const [users, firms] = await Promise.all([API.getUsers(), API.getFirms()]);
@@ -737,7 +966,13 @@ const HUDShell = (() => {
   }
 
   // ── Public API ───────────────────────────────────────────────
-  const api = { init };
+  const api = {
+    init,
+    selectTier1: _selectTier1,
+    selectTier2: _selectTier2,
+    getActiveTier1: () => _tier1Active,
+    getActiveTier2: () => (_tier1Active ? _tier2Memory[_tier1Active] : null),
+  };
   window.HUDShell = api;
 
   // Backward-compat shim: window.Sidebar.init(page) → HUDShell.init({page})

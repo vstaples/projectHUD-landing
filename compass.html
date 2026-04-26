@@ -45,173 +45,11 @@
 }
 
 /* ── Hover-reveal sidebar — slide-in CSS moved to /css/hud.css (CMD93) ── */
-#hud-notif-btn {
-  position:fixed; top:52px; right:14px; z-index:401;
-  background:rgba(6,10,16,.85);
-  border:1px solid rgba(0,210,255,.2); border-radius:4px;
-  color:rgba(160,200,235,.5); font-size:15px;
-  width:34px; height:34px;
-  display:flex; align-items:center; justify-content:center;
-  cursor:pointer; transition:color .15s,border-color .15s,background .15s; padding:0;
-}
-#hud-notif-btn:hover { color:#00D2FF; border-color:rgba(0,210,255,.45); background:rgba(0,210,255,.08); }
-#hud-notif-btn.has-unread { color:#00D2FF; border-color:rgba(0,210,255,.4); }
-#hud-notif-badge {
-  position:absolute; top:-5px; right:-5px;
-  background:#E24B4A; color:#fff;
-  font-family:var(--font-mono,monospace); font-size:10px; font-weight:700;
-  min-width:16px; height:16px; border-radius:8px;
-  display:flex; align-items:center; justify-content:center;
-  padding:0 3px; pointer-events:none;
-}
 
-/* ── Top nav bar ─────────────────────────────────────────── */
-#compass-nav {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  height: 44px;
-  background: var(--bg1, #0c1628);
-  border-bottom: 1px solid var(--border, rgba(0,210,255,.12));
-  padding: 0 16px;
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.compass-logo-mark {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-right: 20px;
-  text-decoration: none;
-}
-
-.compass-wordmark {
-  font-family: var(--font-hud, 'Rajdhani', sans-serif);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: .12em;
-  color: var(--text0, #eef4ff);
-}
-
-.compass-wordmark span {
-  color: var(--compass-cyan);
-}
-
-.nav-sep {
-  width: 1px;
-  height: 22px;
-  background: var(--border);
-  margin: 0 16px;
-}
-
-/* Role tab buttons */
-.role-tab {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 14px;
-  height: 44px;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text2, #7a9bbf);
-  font-family: var(--font-head, 'Barlow Condensed', sans-serif);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all .12s;
-  white-space: nowrap;
-}
-
-.role-tab:hover {
-  color: var(--text0);
-  background: rgba(255,255,255,.03);
-}
-
-.role-tab.active {
-  color: var(--compass-cyan);
-  border-bottom-color: var(--compass-cyan);
-}
-
-.role-tab .tab-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: .5;
-}
-
-.role-tab.active .tab-dot {
-  opacity: 1;
-}
-
-/* Badge on role tabs */
-.tab-badge {
-  background: var(--compass-red);
-  color: #fff;
-  font-size: 10px;
-  font-family: var(--font-mono);
-  padding: 1px 5px;
-  border-radius: 8px;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-/* Nav right side */
-.nav-spacer { flex: 1; }
-
-.nav-live {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--compass-green);
-  letter-spacing: .1em;
-  margin-right: 12px;
-}
-
-.nav-live-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--compass-green);
-  animation: pulse-live 2s infinite;
-}
-
-@keyframes pulse-live {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: .35; }
-}
-
-.nav-user {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text2);
-}
-
-.nav-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: rgba(0,210,255,.15);
-  border: 1px solid rgba(0,210,255,.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-hud);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--compass-cyan);
-}
+/* ── Compass-specific top-nav CSS removed in CMD95 ──────────────────────
+   Unified header (#hud-header), Tier 1 strip (#hud-tier1), and Tier 2
+   strip (#hud-tier2) are owned by hud-shell.js. The legacy notification
+   bell button is also retired — bell now lives in the unified header. */
 
 /* ── View panels ─────────────────────────────────────────── */
 .compass-view {
@@ -856,7 +694,6 @@
 
 @media (max-width: 720px) {
   .stat-strip-4, .stat-strip-6 { grid-template-columns: repeat(2, 1fr); }
-  .role-tab span.tab-label { display: none; }
 }
 
 /* ── Spotlight + caption presentation layer (CMD89) ───────────────────────────
@@ -952,132 +789,18 @@
 
 <!-- ── Hover-reveal sidebar — markup auto-injected by sidebar.js (CMD93) ── -->
 
-<!-- Notification bell: always-visible fixed button, top-left -->
-<!-- (Bell relocation deferred to CMD93.5 — leave wiring intact) -->
-<button id="hud-notif-btn" title="Notifications" onclick="window.HUDNotif?._openPanel?.(this)">
-  <span id="hud-notif-glyph">◉</span>
-  <span id="hud-notif-badge" style="display:none">0</span>
-</button>
+<!-- Notification bell removed in CMD95 — now lives in unified header -->
 
 <div id="compass-app">
 
-  <!-- ── Top navigation bar ──────────────────────────────── -->
-  <nav id="compass-nav">
-
-    <!-- Logo -->
-    <a class="compass-logo-mark" href="/dashboard.html" title="Back to dashboard">
-      <!-- Compass rose mini icon -->
-      <svg width="22" height="22" viewBox="-30 -30 60 60" style="flex-shrink:0">
-        <circle r="28" fill="none" stroke="#00D2FF" stroke-width="1" opacity=".2"/>
-        <circle r="22" fill="none" stroke="#00D2FF" stroke-width="1" opacity=".38"/>
-        <circle r="15" fill="#0c1628"/>
-        <circle r="15" fill="none" stroke="#00D2FF" stroke-width="1.2"/>
-        <!-- Cardinal ticks -->
-        <line x1="0" y1="-12" x2="0" y2="-15" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/>
-        <line x1="0" y1="12" x2="0" y2="15" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/>
-        <line x1="-12" y1="0" x2="-15" y2="0" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/>
-        <line x1="12" y1="0" x2="15" y2="0" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/>
-        <!-- 45° ticks -->
-        <line x1="8" y1="-8" x2="10" y2="-10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/>
-        <line x1="-8" y1="-8" x2="-10" y2="-10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/>
-        <line x1="8" y1="8" x2="10" y2="10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/>
-        <line x1="-8" y1="8" x2="-10" y2="10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/>
-        <!-- Wind rose: N cyan -->
-        <path d="M0,-13 L2.5,-3 L0,-1.5 L-2.5,-3Z" fill="#00D2FF"/>
-        <!-- Amber north tip -->
-        <path d="M0,-13 L1.5,-9 L0,-8 L-1.5,-9Z" fill="#EF9F27"/>
-        <!-- S dark -->
-        <path d="M0,13 L2,3 L0,1.5 L-2,3Z" fill="#0c1628" stroke="#00D2FF" stroke-width=".5"/>
-        <!-- E/W -->
-        <path d="M13,0 L3,2.5 L1.5,0 L3,-2.5Z" fill="#00D2FF" opacity=".45"/>
-        <path d="M-13,0 L-3,2 L-1.5,0 L-3,-2Z" fill="#0c1628" stroke="#00D2FF" stroke-width=".4"/>
-        <!-- Center -->
-        <circle r="1.8" fill="#00D2FF"/>
-        <circle r=".8" fill="#0c1628"/>
-      </svg>
-      <div class="compass-wordmark">COM<span>PASS</span></div>
-    </a>
-
-    <div class="nav-sep"></div>
-
-    <!-- Role tabs -->
-    <button class="role-tab" id="tab-user"       onclick="switchView('user')"       title="My Work" data-cmd-tab="My Work">
-      <div class="tab-dot"></div>
-      <span class="tab-label">My Work</span>
-    </button>
-    <button class="role-tab" id="tab-pm"         onclick="switchView('pm')"         title="Project Manager" data-cmd-tab="PM View">
-      <div class="tab-dot"></div>
-      <span class="tab-label">PM View</span>
-    </button>
-    <button class="role-tab" id="tab-management" onclick="switchView('management')" title="Management" data-cmd-tab="Management">
-      <div class="tab-dot"></div>
-      <span class="tab-label">Management</span>
-    </button>
-    <button class="role-tab" id="tab-executive"  onclick="switchView('executive')"  title="Executive" data-cmd-tab="Executive">
-      <div class="tab-dot"></div>
-      <span class="tab-label">Executive</span>
-    </button>
-    <button class="role-tab" id="tab-client"     onclick="switchView('client')"     title="Client Portal" data-cmd-tab="Client Portal">
-      <div class="tab-dot"></div>
-      <span class="tab-label">Client Portal</span>
-    </button>
-
-    <div class="nav-sep"></div>
-
-    <!-- Morning Brief trigger -->
-    <button id="nav-brief-btn"
-      onclick="openMorningBrief()"
-      style="font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.08em;
-        text-transform:uppercase;color:var(--text3);background:none;border:none;
-        padding:0 12px;height:44px;cursor:pointer;transition:color .12s;display:flex;align-items:center;gap:6px"
-      onmouseenter="this.style.color='var(--compass-amber)'"
-      onmouseleave="this.style.color='var(--text3)'"
-      title="Open Morning Brief">
-      <span style="font-size:13px">☀</span> Morning Brief
-    </button>
-
-    <!-- Simulator trigger -->
-    <button id="nav-sim-btn"
-      onclick="openDecisionSimulator(null,'Portfolio','Active portfolio — select a project context from PM View')"
-      style="font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.08em;
-        text-transform:uppercase;color:var(--text3);background:none;border:none;
-        padding:0 12px;height:44px;cursor:pointer;transition:color .12s;display:flex;align-items:center;gap:6px"
-      onmouseenter="this.style.color='var(--compass-purple)'"
-      onmouseleave="this.style.color='var(--text3)'"
-      title="Open Decision Simulator">
-      <span style="font-size:13px">◈</span> Simulate
-    </button>
-
-    <div class="nav-sep"></div>
-
-    <!-- Cadence link -->
-    <a href="/cadence.html"
-      style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-        color:var(--text3);text-decoration:none;padding:0 10px;transition:color .12s"
-      onmouseenter="this.style.color='var(--compass-cyan)'"
-      onmouseleave="this.style.color='var(--text3)'"
-      title="Open Cadence workflow canvas">
-      &#9656; Cadence
-    </a>
-
-    <div class="nav-spacer"></div>
-
-    <!-- Live indicator -->
-    <div class="nav-live">
-      <div class="nav-live-dot"></div>
-      LIVE
-    </div>
-
-    <!-- Date -->
-    <div id="compass-date" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-right:14px;letter-spacing:.05em"></div>
-
-    <!-- User -->
-    <div class="nav-user">
-      <div class="nav-avatar" id="compass-user-av">VS</div>
-      <span id="compass-user-name" style="display:none"></span>
-    </div>
-
-  </nav>
+  <!-- ── Top navigation removed in CMD95 ──────────────────────
+       Unified header (logo / ticker / LIVE / datetime / bell /
+       avatar) is rendered by hud-shell.js. The major-area tabs
+       (My Work / PM View / Management / Executive / Client
+       Portal) now live in the Tier 1 sub-header strip, also
+       rendered by hud-shell.js. The Morning Brief / Simulate /
+       Cadence quick-launch buttons are deferred — surface as
+       finding (#1) — pending re-homing decision. -->
 
   <!-- ── View: My Work (Individual Contributor) ──────────── -->
   <div class="compass-view" id="view-user">
@@ -1259,30 +982,25 @@ async function loadBaseData() {
       name: `${r.first_name||''} ${r.last_name||''}`.trim() || r.email || '—',
     }));
 
-    // Update nav avatar
-    if (_myResource?.name) {
-      const initials = _myResource.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-      const avEl = document.getElementById('compass-user-av');
-      if (avEl) avEl.textContent = initials;
-    }
+    // Compass nav avatar removed in CMD95 (lives in unified header now).
   } catch (e) {
     console.error('[Compass] loadBaseData failed:', e);
   }
 }
 
 // ── View switcher ─────────────────────────────────────────
+// Tier 1 click from hud-shell calls into here. Tier 2 visual
+// state is owned by hud-shell; this function only swaps the
+// content panel and lazy-loads view data.
 function switchView(viewId) {
   // Hide all views
   document.querySelectorAll('.compass-view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
 
   // Show target
   const viewEl = document.getElementById('view-' + viewId);
-  const tabEl  = document.getElementById('tab-' + viewId);
   if (!viewEl) return;
 
   viewEl.classList.add('active');
-  if (tabEl) tabEl.classList.add('active');
 
   _currentView = viewId;
   sessionStorage.setItem('compass-view', viewId);
@@ -1488,51 +1206,91 @@ async function loadMyTimeView() {
   }
 }
 
+// ── Tier 1 / Tier 2 configuration (CMD95) ─────────────────
+// Tier 1: major-area tabs that map to compass-view ids.
+// Tier 2: per-Tier-1 sub-view icon strip. For MY WORK, Tier 2
+//   ids correspond to my-work.html .ust[data-tab="..."] entries
+//   and dispatch via window.uSwitchTab(). For other Tier 1 tabs,
+//   a single placeholder Tier 2 entry is provided pending fuller
+//   wiring (surfaced as finding).
+const COMPASS_TIER1 = [
+  { id: 'user',       label: 'My Work' },
+  { id: 'pm',         label: 'PM View' },
+  { id: 'management', label: 'Management' },
+  { id: 'executive',  label: 'Executive' },
+  { id: 'client',     label: 'Client Portal' },
+];
+
+const COMPASS_TIER2 = {
+  user: [
+    { id: 'work',     label: 'My Work',     glyph: '◇' },
+    { id: 'time',     label: 'My Time',     glyph: '⏱' },
+    { id: 'calendar', label: 'My Calendar', glyph: '▦' },
+    { id: 'meetings', label: 'My Meetings', glyph: '◈' },
+    { id: 'views',    label: 'My Views',    glyph: '◉' },
+    { id: 'notes',    label: 'My Notes',    glyph: '✎' },
+    { id: 'requests', label: 'My Requests', glyph: '⬡' },
+    { id: 'team',     label: 'My Team',     glyph: '◑' },
+  ],
+  pm:         [{ id: 'pm-default',         label: 'PM Overview',         glyph: '▥' }],
+  management: [{ id: 'mgmt-default',       label: 'Management Overview', glyph: '◈' }],
+  executive:  [{ id: 'exec-default',       label: 'Executive Overview',  glyph: '◆' }],
+  client:     [{ id: 'client-default',     label: 'Client Portal',       glyph: '⬡' }],
+};
+
+function _onTier1Select(tier1Id) {
+  switchView(tier1Id);
+}
+
+function _onTier2Select(tier1Id, tier2Id) {
+  // For MY WORK, defer to my-work.html's tab switcher when loaded.
+  if (tier1Id === 'user') {
+    if (window.uSwitchTab) {
+      const btn = document.querySelector('.ust[data-tab="' + tier2Id + '"]');
+      window.uSwitchTab(tier2Id, btn || null);
+      try { localStorage.setItem('compass-user-tab', tier2Id); } catch (e) {}
+    } else {
+      // my-work.html not yet loaded — record intent so loadUserView's
+      // savedTab restore picks it up.
+      try { localStorage.setItem('compass-user-tab', tier2Id); } catch (e) {}
+    }
+    return;
+  }
+  // Other Tier 1 tabs: no-op until wider wiring lands. Finding #2.
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   await loadBaseData();
-  // Restore last view or default to PM
+
+  // Restore last view or default to My Work
   const saved = localStorage.getItem('compass-view') || sessionStorage.getItem('compass-view') || 'user';
+
+  // Boot the unified shell (header + Tier 1 + Tier 2)
+  if (window.HUDShell && typeof HUDShell.init === 'function') {
+    await HUDShell.init({
+      page:           'compass',
+      moduleName:     'Compass',
+      tier1:          COMPASS_TIER1,
+      tier2:          COMPASS_TIER2,
+      initialTier1:   saved,
+      onTier1Select:  _onTier1Select,
+      onTier2Select:  _onTier2Select,
+    });
+  }
+
+  // Activate the saved view (HUDShell.init applied initialTier1 visually
+  // and recorded its remembered Tier 2, but did not invoke onTier1Select).
   switchView(saved);
 });
 
 </script>
 
 <script>
-// ── Compass notification bell wiring (CMD93) ─────────────────────────────
-// Slide-in sidebar mechanism extracted to sidebar.js / hud.css. This IIFE
-// retains ONLY the notification bell wiring (badge sync + click handler);
-// bell relocation is CMD93.5's concern. Sidebar.init() now auto-installs
-// trigger/panel/inner and renders directly into the panel.
-(function() {
-  const notifBtn = document.getElementById('hud-notif-btn');
-  const badge    = document.getElementById('hud-notif-badge');
-
-  function _syncNotifBadge() {
-    const count = window.HUDNotif ? window.HUDNotif.getUnread() : 0;
-    if (badge) {
-      badge.textContent = count > 99 ? '99+' : String(count);
-      badge.style.display = count > 0 ? 'flex' : 'none';
-    }
-    if (notifBtn) notifBtn.classList.toggle('has-unread', count > 0);
-  }
-  setInterval(_syncNotifBadge, 2000);
-
-  if (notifBtn) {
-    notifBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (window.HUDNotif) window.HUDNotif._openPanel(notifBtn);
-    });
-  }
-
-  function bootSidebar() {
-    if (typeof Sidebar === 'undefined') return;
-    Sidebar.init('compass').then(_syncNotifBadge);
-  }
-  if (document.readyState === 'complete') {
-    bootSidebar();
-  } else {
-    window.addEventListener('load', bootSidebar);
-  }
-})();
+// ── Compass inline IIFE — fully absorbed in CMD95 ─────────────────────────
+// Pre-CMD95: notification bell wiring + Sidebar.init bootstrap.
+// Bell wiring now lives in hud-shell.js (_bindNotifBtn against the unified
+// header bell). Boot is now performed by the DOMContentLoaded handler above
+// via HUDShell.init({ page, moduleName, tier1, tier2, ... }). Block retained
+// only to document the absorption.
 </script>
 </body>

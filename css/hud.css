@@ -305,3 +305,91 @@ body::before {
 #hud-sidebar-panel #sidebar { height: 100% !important; max-height: 100% !important; }
 #hud-sidebar-panel #ctx-toolbar,
 #hud-sidebar-panel #ctx-toolbar-placeholder { display: none !important; }
+
+/* ── Tier 1 sub-header (CMD95) ─────────────────────────────── */
+#hud-tier1 {
+  position: fixed; left: 0; right: 0; top: 48px;
+  height: 42px; z-index: 499;
+  display: flex; align-items: stretch;
+  background: rgba(10,16,28,0.95);
+  border-bottom: 1px solid rgba(0,210,255,0.12);
+  padding: 0 14px;
+  font-family: 'Barlow Condensed','Rajdhani',sans-serif;
+}
+.hud-tier1-tab {
+  display: flex; align-items: center; gap: 7px;
+  padding: 0 16px; height: 42px;
+  background: none; border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text2);
+  font-family: 'Barlow Condensed','Rajdhani',sans-serif;
+  font-size: 13px; font-weight: 600;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  cursor: pointer; white-space: nowrap;
+  transition: color .12s, background .12s, border-color .12s;
+}
+.hud-tier1-tab:hover { color: var(--text0); background: rgba(255,255,255,0.03); }
+.hud-tier1-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.hud-tier1-tab .tab-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; opacity: 0.5;
+}
+.hud-tier1-tab.active .tab-dot { opacity: 1; }
+
+body.hud-tier1-rendered #hud-sidebar-trigger { top: 90px; }
+body.hud-tier1-rendered #hud-sidebar-panel { top: 90px; }
+body.hud-tier1-rendered.hud-header-rendered .hud-shell,
+body.hud-tier1-rendered.hud-header-rendered #compass-app,
+body.hud-tier1-rendered.hud-header-rendered #app {
+  height: calc(100vh - 90px) !important;
+  margin-top: 90px;
+}
+
+/* ── Tier 2 contextual vertical icon strip (CMD95) ─────────── */
+#hud-tier2 {
+  position: fixed; left: 0; top: 90px; bottom: 0;
+  width: 60px; z-index: 498;
+  background: rgba(8,13,24,0.96);
+  border-right: 1px solid rgba(0,210,255,0.12);
+  display: flex; flex-direction: column;
+  align-items: center; padding: 8px 0; gap: 2px;
+  overflow-y: auto; overflow-x: hidden;
+}
+.hud-tier2-btn {
+  position: relative; width: 48px; height: 48px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; border-radius: 5px;
+  color: rgba(160,200,235,0.42); cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0; padding: 0;
+  border-left: 2px solid transparent;
+  font-family: 'Barlow Condensed','Rajdhani',sans-serif;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+}
+.hud-tier2-btn:hover { background: rgba(0,210,255,0.08); color: var(--cyan); }
+.hud-tier2-btn.active {
+  background: rgba(0,210,255,0.10); color: var(--cyan);
+  border-left-color: var(--cyan);
+}
+.hud-tier2-btn .tier2-glyph { font-size: 18px; line-height: 1; pointer-events: none; }
+.hud-tier2-btn::after {
+  content: attr(data-label);
+  position: fixed; left: 68px;
+  background: var(--bg3); border: 1px solid rgba(0,210,255,0.28);
+  color: var(--cyan);
+  font-family: 'Barlow Condensed','Rajdhani',sans-serif;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  white-space: nowrap; padding: 5px 12px;
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.12s; z-index: 9999;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+}
+.hud-tier2-btn:hover::after { opacity: 1; }
+
+body.hud-tier2-rendered .hud-shell,
+body.hud-tier2-rendered #compass-app,
+body.hud-tier2-rendered #app {
+  margin-left: 60px;
+  width: calc(100% - 60px);
+}
