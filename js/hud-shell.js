@@ -1,5 +1,5 @@
 // ============================================================
-// ProjectHUD — hud-shell.js v1.1 (CMD95)
+// ProjectHUD — hud-shell.js v1.2 (CMD95.5)
 // Unified shell: slide-in sidebar (absorbed from sidebar.js v3.1)
 //                + unified header bar (logo / ticker / operator-status)
 //                + Tier 1 sub-header strip (major-area tabs)
@@ -291,59 +291,57 @@ const HUDShell = (() => {
         margin-top: 90px;
       }
 
-      /* ── Tier 2 contextual vertical icon strip ──────────────── */
+      /* ── Tier 2 contextual vertical strip (CMD95.5: icon+label rows) ── */
       #hud-tier2 {
         position: fixed; left: 0; top: 90px; bottom: 0;
-        width: 60px; z-index: 498;
+        width: 150px; z-index: 498;
         background: rgba(8,13,24,0.96);
         border-right: 1px solid rgba(0,210,255,0.12);
         display: flex; flex-direction: column;
-        align-items: center; padding: 8px 0; gap: 2px;
+        align-items: stretch; padding: 8px 0; gap: 1px;
         overflow-y: auto; overflow-x: hidden;
       }
       .hud-tier2-btn {
-        position: relative; width: 48px; height: 48px;
-        display: flex; align-items: center; justify-content: center;
-        background: none; border: none; border-radius: 5px;
-        color: rgba(160,200,235,0.42); cursor: pointer;
-        transition: background 0.15s, color 0.15s;
-        flex-shrink: 0; padding: 0;
+        position: relative;
+        display: flex; align-items: center; gap: 10px;
+        width: 100%; height: 40px;
+        padding: 0 12px;
+        background: none; border: none; border-radius: 0;
+        color: rgba(160,200,235,0.55); cursor: pointer;
+        transition: background 0.12s, color 0.12s, border-color 0.12s;
+        flex-shrink: 0;
         border-left: 2px solid transparent;
         font-family: 'Barlow Condensed','Rajdhani',sans-serif;
-        font-size: 11px; font-weight: 600;
-        letter-spacing: 0.04em;
+        font-size: 12px; font-weight: 600;
+        letter-spacing: 0.08em; text-transform: uppercase;
+        text-align: left;
       }
-      .hud-tier2-btn:hover { background: rgba(0,210,255,0.08); color: #00d2ff; }
+      .hud-tier2-btn:hover { background: rgba(0,210,255,0.06); color: #e8f4ff; }
       .hud-tier2-btn.active {
         background: rgba(0,210,255,0.10); color: #00d2ff;
         border-left-color: #00d2ff;
       }
       .hud-tier2-btn .tier2-glyph {
-        font-size: 18px; line-height: 1; pointer-events: none;
+        font-size: 18px; line-height: 1; width: 22px;
+        flex-shrink: 0; text-align: center; pointer-events: none;
       }
-      .hud-tier2-btn::after {
-        content: attr(data-label);
-        position: fixed; left: 68px;
-        background: #0a1525; border: 1px solid rgba(0,210,255,0.28);
-        color: #00d2ff;
-        font-family: 'Barlow Condensed','Rajdhani',sans-serif;
-        font-size: 11px; font-weight: 600;
-        letter-spacing: 0.12em; text-transform: uppercase;
-        white-space: nowrap; padding: 5px 12px;
-        pointer-events: none; opacity: 0;
-        transition: opacity 0.12s;
-        z-index: 9999;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      .hud-tier2-btn .tier2-label {
+        flex: 1; min-width: 0;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        pointer-events: none;
       }
-      .hud-tier2-btn:hover::after { opacity: 1; }
 
       /* When Tier 2 renders, indent main content from the left */
       body.hud-tier2-rendered .hud-shell,
       body.hud-tier2-rendered #compass-app,
       body.hud-tier2-rendered #app {
-        margin-left: 60px;
-        width: calc(100% - 60px);
+        margin-left: 150px;
+        width: calc(100% - 150px);
       }
+      /* Slide-in trigger relocates to right edge of Tier 2 strip */
+      body.hud-tier2-rendered #hud-sidebar-trigger { left: 150px; }
+      /* Slide-in panel sits above Tier 2 strip when open */
+      body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
     `;
     document.head.appendChild(s);
   }
@@ -730,7 +728,9 @@ const HUDShell = (() => {
       btn.dataset.tier2Id = it.id;
       btn.dataset.label = it.label;
       btn.title = it.label;
-      btn.innerHTML = `<span class="tier2-glyph">${it.glyph || '◆'}</span>`;
+      btn.innerHTML =
+        `<span class="tier2-glyph">${it.glyph || '◆'}</span>` +
+        `<span class="tier2-label">${it.label}</span>`;
       btn.addEventListener('click', () => _selectTier2(it.id));
       strip.appendChild(btn);
     });
