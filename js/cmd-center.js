@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// cmd-center.js  ·  v20260425-CMD89.1
+// cmd-center.js  ·  v20260425-CMD89.2
 // ProjectHUD Script Runner — multi-client orchestrator
 //
 // Architecture:
@@ -36,7 +36,7 @@ var DEBUG_CHANNEL_SOURCE = false;
 // Version banner — fires on every page load/refresh so you can confirm what's running
 (function() {
   var versions = {
-    'cmd-center':  'v20260425-CMD89.1',
+    'cmd-center':  'v20260425-CMD89.2',
     'mw-core':     typeof window._mwCoreVersion !== 'undefined' ? window._mwCoreVersion : '—',
     'mw-tabs':     typeof window._mwTabsVersion !== 'undefined' ? window._mwTabsVersion : '—',
     'mw-events':   typeof window._mwEventsVersion !== 'undefined' ? window._mwEventsVersion : '—',
@@ -47,7 +47,7 @@ var DEBUG_CHANNEL_SOURCE = false;
   console.log('%cM1 Command · M2 Mission Control · M3 Forge','color:#00c9c9');
   console.groupEnd();
 }
-console.group('%c CMD Center v20260425-CMD89.1 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
+console.group('%c CMD Center v20260425-CMD89.2 ', 'background:#00c9c9;color:#003333;font-weight:700;padding:2px 8px;border-radius:3px');
   console.log('%cHotkey: Ctrl+Shift+` to toggle panel', 'color:#00c9c9');
   Object.entries(versions).forEach(function([mod, ver]) {
     console.log('%c' + mod.padEnd(16) + '%c' + ver,
@@ -2219,22 +2219,40 @@ var COMMANDS = {
           : '— press Enter to advance';
         _appendLine('SYS', 'warn', '⏸  ' + msg + ' ' + advanceMode);
         var _narratePauseStart = Date.now();
-        if (hasTimeout) {
-          await new Promise(function(r){ setTimeout(r, timeout); });
-          var _nElapsedMs = Date.now() - _narratePauseStart;
-          var _nElapsedStr = _nElapsedMs >= 1000
-            ? (_nElapsedMs / 1000).toFixed(1) + 's'
-            : _nElapsedMs + 'ms';
-          _appendLine('SYS', 'result', '▶ resumed after ' + _nElapsedStr);
-          return 'narrate advanced (timeout)';
+        // Command input pill swap — parity with Pause. Captured at entry so
+        // restoration in `finally` is guaranteed even if advance throws.
+        var _np = _panelEl;
+        var _ninput = _np && _np.querySelector('#phr-cmd');
+        var _npill  = _np && _np.querySelector('#phr-target-pill');
+        if (_ninput) {
+          _ninput.placeholder = 'Press Enter to resume ▶';
+          _ninput.style.color = '#EF9F27';
+          if (_npill) { _npill.textContent = '⏸'; _npill.style.color = '#EF9F27'; }
+          _ninput.focus();
         }
-        await _waitForSpotlightAdvance();
-        var _nElapsedMs2 = Date.now() - _narratePauseStart;
-        var _nElapsedStr2 = _nElapsedMs2 >= 1000
-          ? (_nElapsedMs2 / 1000).toFixed(1) + 's'
-          : _nElapsedMs2 + 'ms';
-        _appendLine('SYS', 'result', '▶ resumed after ' + _nElapsedStr2);
-        return 'narrate advanced';
+        try {
+          if (hasTimeout) {
+            await new Promise(function(r){ setTimeout(r, timeout); });
+          } else {
+            await _waitForSpotlightAdvance();
+          }
+        } finally {
+          if (_ninput) {
+            _ninput.placeholder = 'Enter command…';
+            _ninput.style.color = '#fff';
+            if (_npill) {
+              var _nlabel = _cmdTarget === 'ALL' ? 'ALL' : (_sessions[_cmdTarget] ? (_sessions[_cmdTarget].alias || _sessions[_cmdTarget].initials) : 'ALL');
+              _npill.textContent = _nlabel + ' ▾';
+              _npill.style.color = _cmdTarget === 'ALL' ? '#00c9c9' : _sessionColor(_cmdTarget);
+            }
+          }
+        }
+        var _nElapsedMs = Date.now() - _narratePauseStart;
+        var _nElapsedStr = _nElapsedMs >= 1000
+          ? (_nElapsedMs / 1000).toFixed(1) + 's'
+          : _nElapsedMs + 'ms';
+        _appendLine('SYS', 'result', '▶ resumed after ' + _nElapsedStr);
+        return hasTimeout ? 'narrate advanced (timeout)' : 'narrate advanced';
       }
       _appendLine('SYS', 'info', '· ' + msg);
       return 'narrate: ' + (msg.length > 40 ? msg.slice(0, 40) + '…' : msg);
