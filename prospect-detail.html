@@ -9,7 +9,6 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --sidebar-w: 56px;
   --bg:      #0f1117;
   --surface: #181c27;
   --surf2:   #1e2436;
@@ -28,17 +27,14 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
-  display: flex;
   height: 100vh;
   overflow: hidden;
 }
 
-#sidebar-container { width: var(--sidebar-w); flex-shrink: 0; }
-
 .main {
-  flex: 1;
   display: flex;
   flex-direction: column;
+  height: 100vh;
   overflow: hidden;
   min-width: 0;
 }
@@ -708,8 +704,6 @@ body {
 </head>
 <body>
 
-<div id="sidebar-container"></div>
-
 <div class="main">
   <!-- back bar -->
   <div class="backbar">
@@ -1208,7 +1202,7 @@ let allActionItems = [];      // combined prospect + meeting action items
 // ── init ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   if (!PROSPECT_ID) { location.href = '/pipeline.html'; return; }
-  if (window.Sidebar) Sidebar.init('pipeline');
+  if (window.HUDShell) HUDShell.init({ page: 'pipeline', moduleName: 'Pipeline' });
   bindTabs();
   await loadAll();
   // Honour ?tab= param — e.g. returning from meeting-minutes.html
