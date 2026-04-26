@@ -1121,11 +1121,28 @@ async function loadUserView() {
     // Inject HTML content into view-user
     const viewUser = document.getElementById('view-user');
     if (viewUser) {
-      // Replace the inner loading/content divs with my-work content
       const body = doc.body;
-      // Copy non-script children into view-user
+      // CMD95p2: my-work.html's body starts with its own
+      // <div class="compass-view" id="view-user">…</div> wrapper.
+      // Cloning that wrapper into our existing #view-user produced
+      // a NESTED #view-user; getElementById returned the outer one
+      // and inner content was hidden by the .compass-view (no .active)
+      // rule. After Tier 1 navigated away and back, mw-tabs.js's
+      // sibling-show/hide logic against the wrong DOM left the
+      // surface blank. Fix: clear the outer view-user (its initial
+      // #compass-loading / #user-content placeholders are a strict
+      // subset of what my-work.html ships), then unwrap any top-level
+      // #view-user from the fetched doc and copy its children into ours.
+      viewUser.innerHTML = '';
       Array.from(body.children).forEach(el => {
-        if (el.tagName !== 'SCRIPT') viewUser.appendChild(el.cloneNode(true));
+        if (el.tagName === 'SCRIPT') return;
+        if (el.id === 'view-user') {
+          Array.from(el.children).forEach(child => {
+            if (child.tagName !== 'SCRIPT') viewUser.appendChild(child.cloneNode(true));
+          });
+        } else {
+          viewUser.appendChild(el.cloneNode(true));
+        }
       });
     }
     // Execute scripts — src-aware loader handles both inline and external <script src> tags
