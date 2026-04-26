@@ -52,11 +52,36 @@
 .wl-pct { font-family: var(--font-mono); font-size:11px; min-width: 28px; text-align: right; }
 @media (max-width: 1200px) { .dashboard-grid { grid-template-columns: 1fr; } }
 
-/* CMD97 — Position activity ticker below unified header (48px band).
-   Unified header is position:fixed; top:0; height:48px. Ticker sits
-   directly beneath it. sticky preserves scroll behavior with no
-   gutter/overlap. */
-body.hud-header-rendered #ticker { position: sticky; top: 48px; z-index: 100; }
+/* CMD97 — Unified-header retrofit overrides
+   ────────────────────────────────────────────────────────────────
+   1. Activity ticker is moved into the unified header center band
+      (#hud-header-ticker) at boot. The standalone #ticker bar is
+      removed entirely; this rule keeps it hidden if any cached
+      copy survives.
+   2. Inside #hud-header-ticker the ticker scrolls horizontally and
+      fades out before the right status cluster. #ticker-live is
+      removed (the unified header has its own LIVE indicator).
+   3. Brand-pill convention: "Project" cyan + "HUD" light. The
+      hud-shell logo SVG is suppressed in favor of the wordmark.
+   4. Build-version display is shifted right of slide-in trigger. */
+body.hud-header-rendered #ticker { display: none !important; }
+body.hud-header-rendered #hud-header-left .hud-logo { display: none; }
+body.hud-header-rendered #hud-header-left { padding-right: 18px; }
+.hud-module-name .brand-cy { color: #00d2ff; }
+.hud-module-name .brand-lt { color: #e8f4ff; }
+#hud-header-ticker #ticker-scroll-wrap {
+  flex: 1; overflow: hidden; position: relative; height: 100%;
+  display: flex; align-items: center;
+}
+#hud-header-ticker #ticker-scroll {
+  display: flex; align-items: center; white-space: nowrap;
+  will-change: transform;
+}
+#hud-header-ticker::after {
+  content: ''; position: absolute; right: 0; top: 0; bottom: 0;
+  width: 60px; pointer-events: none;
+  background: linear-gradient(to right, transparent, rgba(8,13,24,0.92));
+}
 
 /* ── ADD PROJECT PANEL ── */
 .add-proj-overlay {
@@ -108,9 +133,13 @@ body.hud-header-rendered #ticker { position: sticky; top: 48px; z-index: 100; }
 </head>
 <body>
 
-<div id="ticker">
-  <div id="ticker-live"><div class="dot"></div><span>LIVE</span></div>
-  <div id="ticker-scroll-wrap"><div id="ticker-scroll"></div></div>
+<!-- CMD97: ticker bar removed from body. Ticker scroll content
+     is mounted into #hud-header-ticker (unified header center
+     region) by the boot script below. #ticker-scroll-wrap and
+     #ticker-scroll persist as live DOM (Ticker.init targets
+     'ticker-scroll' by id). -->
+<div id="ticker-scroll-wrap" style="display:none">
+  <div id="ticker-scroll"></div>
 </div>
 
 <div id="app">
@@ -198,6 +227,28 @@ body.hud-header-rendered #ticker { position: sticky; top: 48px; z-index: 100; }
 <script>
 Ticker.init('ticker-scroll', Ticker.DEFAULT_EVENTS);
 HUDShell.init({ page: 'dashboard', moduleName: 'ProjectHUD' });
+
+// CMD97 — post-init dashboard customizations of unified header.
+// (a) Color-split "ProjectHUD" wordmark: "Project" cyan + "HUD" light.
+// (b) Relocate the activity ticker scroll-wrap into the header's
+//     center region (#hud-header-ticker), which hud-shell renders
+//     empty and reserves for surface-specific content.
+// Runs once after hud-shell finishes building the header. Header
+// is built synchronously inside HUDShell.init() before its async
+// data-fetch tail, so a microtask defer is enough.
+Promise.resolve().then(() => {
+  const nameEl = document.querySelector('#hud-header-left .hud-module-name');
+  if (nameEl && nameEl.textContent.trim() === 'ProjectHUD') {
+    nameEl.innerHTML = '<span class="brand-cy">Project</span><span class="brand-lt">HUD</span>';
+  }
+  const headerTicker = document.getElementById('hud-header-ticker');
+  const wrap         = document.getElementById('ticker-scroll-wrap');
+  if (headerTicker && wrap && wrap.parentElement !== headerTicker) {
+    wrap.style.display = '';
+    headerTicker.appendChild(wrap);
+  }
+});
+
 // Set build version from config
 document.addEventListener('DOMContentLoaded', () => {
   const vEl = document.getElementById('version-num');
