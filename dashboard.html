@@ -143,28 +143,28 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
    at kpi-label/sub position — text baselines align across the row. */
 #dash-header-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) repeat(7, 1fr);
-  gap: 6px;
-  margin-bottom: 8px;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
 }
 /* Tighten #content top padding for dashboard so the gap above the
-   first panel matches inter-panel spacing (~8px). hud.css default
-   is 20px which produces ~3× the inter-panel gap. */
+   first panel matches inter-panel spacing. */
 #content { padding-top: 8px !important; }
 #dash-header-row #page-header {
-  /* match .kpi-card chrome */
+  /* match .kpi-card chrome exactly — same padding the .kpi-card
+     compact override below uses (6px 10px). */
   background: var(--bg2, #111827);
   border: 1px solid var(--border, rgba(255,255,255,.08));
   border-top: 2px solid var(--cyan, #00d2ff);
-  padding: 10px 14px !important;
+  padding: 6px 10px !important;
   margin: 0 !important;
-  display: flex; flex-direction: column; justify-content: space-between;
+  display: flex; flex-direction: column; justify-content: flex-start;
   min-height: 0;
 }
 #dash-header-row #page-header > div { margin: 0; padding: 0; }
 #dash-header-row #page-header .page-title {
   font-family: var(--font-hud, 'Rajdhani', 'Inter', sans-serif);
-  font-size: 44px; font-weight: 700; line-height: 1;
+  font-size: 22px; font-weight: 700; line-height: 1.05;
   color: var(--text0, #e8f4ff);
   letter-spacing: .04em;
   margin: 0; padding: 0;
@@ -172,9 +172,9 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
 #dash-header-row #page-header .page-subtitle {
   font-family: var(--font-mono, 'Share Tech Mono', monospace);
   font-size: 11px; font-weight: 400;
-  letter-spacing: .12em;
+  letter-spacing: .06em;
   color: var(--text2, #7a9bbf);
-  margin-top: 14px;
+  margin-top: 1px;
 }
 #dash-header-row .kpi-card {
   padding: 6px 10px !important;
