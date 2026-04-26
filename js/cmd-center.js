@@ -1288,176 +1288,88 @@ window._cmdEmit = function(eventName, data) {
   _fanoutAppEventListeners(eventName, data || {});
 };
 
+// ── Aegis Registry-backed tab activator (CMD91) ─────────────────────────────
+// Shared implementation for `Set Tab` and `Set SubTab` command verbs. Looks
+// up the label via window.AegisRegistry, clicks the clickable ancestor of the
+// registered element, and waits briefly for an activation-class change. On
+// miss, returns a diagnostic listing the labels currently visible on the page.
+async function _aegisActivateTab(level, rawLabel) {
+  var label = (rawLabel == null ? '' : String(rawLabel)).trim();
+  var noun  = (level === 'tab') ? 'tab' : 'subtab';
+  if (!label) return noun + ' not found: (empty label)';
+
+  var reg = window.AegisRegistry;
+  if (!reg) return noun + ' registry unavailable (aegis-registry.js not loaded)';
+
+  var entry = (level === 'tab') ? reg.findTab(label) : reg.findSubTab(label);
+  if (!entry) {
+    var visible = (level === 'tab') ? reg.listTabs() : reg.listSubTabs();
+    var labels = [];
+    for (var i = 0; i < visible.length && labels.length < 20; i++) {
+      if (labels.indexOf(visible[i].label) === -1) labels.push(visible[i].label);
+    }
+    var diag = labels.length ? labels.join(', ') : '(none registered)';
+    return noun + ' not found: ' + label + ' · registered: ' + diag;
+  }
+
+  var ACTIVE_CLASSES = ['active', 'is-active', 'selected', 'is-selected', 'tab-active'];
+  function clickableAncestor(el) {
+    var cur = el;
+    for (var i = 0; cur && i < 5; i++) {
+      var tag = (cur.tagName || '').toLowerCase();
+      if (tag === 'button' || tag === 'a') return cur;
+      if (cur.getAttribute) {
+        var role = cur.getAttribute('role');
+        if (role === 'tab' || role === 'button') return cur;
+        if (cur.hasAttribute('onclick') || cur.hasAttribute('data-tab')) return cur;
+      }
+      if (cur.onclick) return cur;
+      cur = cur.parentElement;
+    }
+    return el;
+  }
+  function hasActiveClass(el) {
+    if (!el || !el.classList) return false;
+    for (var i = 0; i < ACTIVE_CLASSES.length; i++) {
+      if (el.classList.contains(ACTIVE_CLASSES[i])) return true;
+    }
+    if (el.getAttribute && el.getAttribute('aria-selected') === 'true') return true;
+    return false;
+  }
+
+  var target = clickableAncestor(entry.el);
+  try { target.click(); }
+  catch (e) { return noun + ' click failed: ' + label + ' · ' + (e && e.message || e); }
+
+  var deadline = Date.now() + 500;
+  while (Date.now() < deadline) {
+    if (hasActiveClass(target) || hasActiveClass(entry.el)) {
+      return noun + ' activated: ' + label;
+    }
+    await new Promise(function(r){ setTimeout(r, 40); });
+  }
+  return noun + ' clicked: ' + label + ' (no active-class observed)';
+}
+
 // ── Command registry ──────────────────────────────────────────────────────────
 var COMMANDS = {
 
   // ── Navigation ──────────────────────────────────────────────────────────────
+  // `Set Tab` and `Set SubTab` are thin facades over window.AegisRegistry
+  // (CMD91). Pages annotate tab elements with data-cmd-tab / data-cmd-subtab;
+  // the registry indexes them and exposes findTab / findSubTab. The verbs
+  // here just resolve the entry, click its clickable ancestor, and wait
+  // briefly for an activation class change.
   'Set Tab': async function(args) {
-    var tab = args[0];
-    var tabMap = {
-      'MY WORK': 'work', 'MY TIME': 'timesheet', 'MY CALENDAR': 'calendar',
-      'MY MEETINGS': 'meetings', 'MY VIEWS': 'views', 'MY NOTES': 'concerns',
-      'MY REQUESTS': 'requests', 'MY TEAM': 'team'
-    };
-    var key = tab.toUpperCase();
-    var tabId = tabMap[key] || tab.toLowerCase();
-    if (typeof uSwitchTab === 'function') {
-      var btn = document.querySelector('[data-tab="' + tabId + '"]');
-      uSwitchTab(tabId, btn);
-      return 'tab active: ' + tab;
-    }
-    return 'uSwitchTab not available';
+    return _aegisActivateTab('tab', args[0]);
   },
 
-  // ── Set SubTab (CMD90 / Brief CMD90 generic subtab) ─────────────────────────
-  // Generic DOM-driven subtab activator. Finds an element by visible text label
-  // matching common subtab patterns, walks up to its clickable ancestor, clicks,
-  // and optionally confirms activation by class change. Backward-compatible with
-  // the legacy My Requests path via myrSwitchView fallback.
+  // ── Set SubTab (CMD91 — registry-driven) ────────────────────────────────────
+  // Replaces CMD90's heuristic DOM-walking implementation. Looks up the label
+  // via window.AegisRegistry.findSubTab; falls back to a diagnostic listing
+  // currently-registered subtabs when nothing matches.
   'Set SubTab': async function(args) {
-    var label = (args[0] || '').toString().trim();
-    if (!label) return 'subtab not found: (empty label)';
-    var labelLC = label.toLowerCase();
-
-    var ACTIVE_CLASSES = ['active', 'is-active', 'selected', 'is-selected', 'tab-active'];
-    var TAB_CLASS_HINTS = ['subtab', 'tab-button', 'tab-link', 'myr-tab', 'nav-tab'];
-    var TAB_PARENT_HINTS = ['tab-bar', 'tab-list', 'subtab-bar', 'tabs', 'nav-tabs'];
-
-    function visText(el) {
-      return (el.textContent || '').replace(/\s+/g, ' ').trim();
-    }
-    function isVisible(el) {
-      if (!el || !el.getBoundingClientRect) return false;
-      var r = el.getBoundingClientRect();
-      if (r.width === 0 && r.height === 0) return false;
-      var s = window.getComputedStyle ? window.getComputedStyle(el) : null;
-      if (s && (s.display === 'none' || s.visibility === 'hidden')) return false;
-      return true;
-    }
-    function classMatchesAny(el, hints) {
-      var cn = (el.className && el.className.toString) ? el.className.toString().toLowerCase() : '';
-      for (var i = 0; i < hints.length; i++) if (cn.indexOf(hints[i]) !== -1) return true;
-      return false;
-    }
-    function parentMatchesAny(el, hints) {
-      var p = el.parentElement;
-      while (p) {
-        if (classMatchesAny(p, hints)) return true;
-        p = p.parentElement;
-      }
-      return false;
-    }
-    function clickableAncestor(el) {
-      var cur = el;
-      for (var i = 0; cur && i < 5; i++) {
-        var tag = (cur.tagName || '').toLowerCase();
-        if (tag === 'button' || tag === 'a') return cur;
-        if (cur.getAttribute && (cur.getAttribute('role') === 'tab' || cur.getAttribute('role') === 'button')) return cur;
-        if (cur.onclick || (cur.hasAttribute && cur.hasAttribute('onclick'))) return cur;
-        if (cur.getAttribute && cur.getAttribute('data-tab')) return cur;
-        cur = cur.parentElement;
-      }
-      return el;
-    }
-    function hasActiveClass(el) {
-      if (!el || !el.classList) return false;
-      for (var i = 0; i < ACTIVE_CLASSES.length; i++) if (el.classList.contains(ACTIVE_CLASSES[i])) return true;
-      return false;
-    }
-
-    // ── Step 1: collect candidates in priority tiers ─────────────────────────
-    var tier1 = [], tier2 = [], tier3 = [], tier4 = [];
-    var allEls = document.querySelectorAll('[role="tab"], [data-tab], button, a, span, div, li');
-
-    for (var i = 0; i < allEls.length; i++) {
-      var el = allEls[i];
-      var t = visText(el);
-      var tLC = t.toLowerCase();
-      var dataTab = el.getAttribute && el.getAttribute('data-tab');
-      var dataTabLC = dataTab ? dataTab.toLowerCase() : '';
-      var textMatch = tLC === labelLC;
-      var dataTabMatch = dataTabLC === labelLC;
-      if (!textMatch && !dataTabMatch) continue;
-
-      // Skip containers: prefer leaf-ish tabs. If element has a child with the
-      // same matching text, defer to the child (it'll appear later in the loop).
-      if (textMatch && el.children && el.children.length) {
-        var sameTextChild = false;
-        for (var c = 0; c < el.children.length; c++) {
-          if (visText(el.children[c]).toLowerCase() === labelLC) { sameTextChild = true; break; }
-        }
-        if (sameTextChild) continue;
-      }
-
-      var role = el.getAttribute && el.getAttribute('role');
-      if (role === 'tab' && textMatch) { tier1.push(el); continue; }
-      if (classMatchesAny(el, TAB_CLASS_HINTS) && textMatch) { tier2.push(el); continue; }
-      if (dataTabMatch) { tier3.push(el); continue; }
-      if (textMatch && parentMatchesAny(el, TAB_PARENT_HINTS)) { tier4.push(el); continue; }
-    }
-
-    var candidates = tier1.concat(tier2).concat(tier3).concat(tier4);
-
-    // De-duplicate (an element may be added by multiple tiers via ancestor walks).
-    var seen = [], deduped = [];
-    for (var j = 0; j < candidates.length; j++) {
-      if (seen.indexOf(candidates[j]) === -1) { seen.push(candidates[j]); deduped.push(candidates[j]); }
-    }
-    candidates = deduped;
-
-    // Prefer visible candidates.
-    var visibleCandidates = candidates.filter(isVisible);
-    var pool = visibleCandidates.length ? visibleCandidates : candidates;
-
-    // ── Legacy fallback for My Requests (handles cases where labels aren't ──
-    // visible text, or DOM isn't yet matched cleanly) ───────────────────────
-    function legacyMyrFallback() {
-      var up = label.toUpperCase();
-      if (up === 'BROWSE' || up === 'ACTIVE' || up === 'HISTORY') {
-        if (typeof myrSwitchView === 'function') {
-          myrSwitchView(up.toLowerCase());
-          return 'subtab (legacy): ' + up;
-        }
-      }
-      return null;
-    }
-
-    // ── Step 2: not-found handling ───────────────────────────────────────────
-    if (!pool.length) {
-      var legacy = legacyMyrFallback();
-      if (legacy) return legacy;
-      // Build a candidate-labels diagnostic.
-      var seenLabels = {}, labels = [];
-      var labelEls = document.querySelectorAll(
-        '[role="tab"], [data-tab], .subtab, .tab-button, .tab-link, .myr-tab, .nav-tab'
-      );
-      for (var k = 0; k < labelEls.length && labels.length < 20; k++) {
-        if (!isVisible(labelEls[k])) continue;
-        var lt = visText(labelEls[k]);
-        if (lt && !seenLabels[lt]) { seenLabels[lt] = 1; labels.push(lt); }
-      }
-      var diag = labels.length ? labels.join(', ') : '(none visible)';
-      return 'subtab not found: ' + label + ' · candidates: ' + diag;
-    }
-
-    // ── Step 3: click ────────────────────────────────────────────────────────
-    var target = clickableAncestor(pool[0]);
-    var ambiguous = pool.length > 1;
-    try { target.click(); } catch (e) { return 'subtab click failed: ' + label + ' · ' + (e && e.message || e); }
-
-    // ── Step 4: optionally wait for activation ──────────────────────────────
-    var deadline = Date.now() + 500;
-    var confirmed = false;
-    while (Date.now() < deadline) {
-      if (hasActiveClass(target) || hasActiveClass(pool[0])) { confirmed = true; break; }
-      await new Promise(function(r){ setTimeout(r, 40); });
-    }
-
-    if (ambiguous) {
-      return 'subtab ambiguous: ' + label + ' · matches: ' + pool.length + '; clicked first visible';
-    }
-    if (confirmed) return 'subtab activated: ' + label;
-    return 'subtab clicked: ' + label + ' (no active-class observed)';
+    return _aegisActivateTab('subtab', args[0]);
   },
   'Set View': async function(args){var v=(args[0]||'').toLowerCase().replace(/\.html$/,'');var m={'compass':'/compass.html','cadence':'/cadence.html','dashboard':'/dashboard.html'};var h=m[v];if(!h)return 'Unknown view: '+args[0];window.location.href=h;return 'navigating to '+h;},
 
