@@ -65,7 +65,6 @@
       hud-shell logo SVG is suppressed in favor of the wordmark.
    4. Build-version display is shifted right of slide-in trigger. */
 body.hud-header-rendered #ticker { display: none !important; }
-body.hud-header-rendered #hud-header-left .hud-logo { display: none; }
 body.hud-header-rendered #hud-header-left { padding-right: 18px; }
 .hud-module-name .brand-cy { color: #00d2ff; }
 .hud-module-name .brand-lt { color: #e8f4ff; }
@@ -129,6 +128,52 @@ body.hud-header-rendered #hud-header-left { padding-right: 18px; }
 .ap-btn-save:hover { background: rgba(0,210,255,.15); }
 .ap-btn-save:disabled { opacity: .4; cursor: not-allowed; }
 .ap-error { font-family: var(--font-mono); font-size: 10px; color: var(--red); min-height: 16px; }
+
+/* CMD97 — KPI row inline with page header
+   ────────────────────────────────────────────────────────────────
+   #dash-header-row places #page-header + .kpi-row side-by-side.
+   The KPI row owns the bulk of the horizontal space; cards become
+   compact (single-row height matches header height envelope).
+   Typography preserved from pre-existing rules — labels and subs
+   are pre-existing 10px; only new authored text in this block is
+   >= 11px. */
+#dash-header-row {
+  display: flex; align-items: stretch; gap: 16px;
+  padding: 0; margin-bottom: 16px;
+}
+#dash-header-row #page-header {
+  flex: 0 0 auto; min-width: 200px;
+  margin-bottom: 0; padding-bottom: 0;
+}
+#dash-header-row .kpi-row {
+  flex: 1 1 auto; min-width: 0;
+  grid-template-columns: repeat(7, 1fr) !important;
+  gap: 6px !important;
+  align-self: center;
+}
+#dash-header-row .kpi-card {
+  padding: 6px 10px !important;
+  min-height: 0;
+}
+#dash-header-row .kpi-card .kpi-icon {
+  font-size: 18px !important;
+  top: 4px !important; right: 6px !important;
+}
+#dash-header-row .kpi-card .kpi-value {
+  font-size: 22px !important; line-height: 1.05 !important;
+}
+#dash-header-row .kpi-card .kpi-label {
+  font-size: 11px !important; letter-spacing: .05em !important; margin-top: 1px !important;
+}
+#dash-header-row .kpi-card .kpi-sub {
+  font-size: 11px !important; margin-top: 0 !important;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+@media (max-width: 1400px) {
+  #dash-header-row { flex-direction: column; }
+  #dash-header-row #page-header { min-width: 0; }
+  #dash-header-row .kpi-row { align-self: stretch; }
+}
 </style>
 </head>
 <body>
@@ -146,14 +191,14 @@ body.hud-header-rendered #hud-header-left { padding-right: 18px; }
   <nav id="sidebar"></nav>
 
   <div id="main">
-    <div id="page-header">
-      <div>
-        <div class="page-title">DASHBOARD</div>
-        <div class="page-subtitle">FIRM-WIDE OPERATIONAL OVERVIEW</div>
+    <!-- CMD97: page header + KPI row share a single horizontal band. -->
+    <div id="dash-header-row">
+      <div id="page-header">
+        <div>
+          <div class="page-title">DASHBOARD</div>
+          <div class="page-subtitle">FIRM-WIDE OVERVIEW</div>
+        </div>
       </div>
-    </div>
-
-    <div id="content">
       <div class="kpi-row">
         <div class="kpi-card" style="border-top-color:var(--cyan);--kpi-glow:rgba(0,210,255,0.05);"><div class="kpi-icon">◧</div><div class="kpi-value" id="kpi-active" style="color:var(--cyan)">—</div><div class="kpi-label">Active Projects</div><div class="kpi-sub" id="kpi-active-sub">Loading...</div></div>
         <div class="kpi-card" style="border-top-color:var(--purple);--kpi-glow:rgba(155,89,182,0.05);"><div class="kpi-icon">▶</div><div class="kpi-value" id="kpi-actions" style="color:var(--purple)">—</div><div class="kpi-label">Open Action Items</div><div class="kpi-sub" id="kpi-actions-sub">Loading...</div></div>
@@ -163,7 +208,9 @@ body.hud-header-rendered #hud-header-left { padding-right: 18px; }
         <div class="kpi-card" style="border-top-color:#5b8fff;--kpi-glow:rgba(91,143,255,0.05);"><div class="kpi-icon">$</div><div class="kpi-value" id="kpi-budget" style="color:#5b8fff">—</div><div class="kpi-label">Labor Budget</div><div class="kpi-sub" id="kpi-budget-sub">Loading...</div></div>
         <div class="kpi-card" style="border-top-color:var(--amber);--kpi-glow:rgba(255,170,0,0.05);"><div class="kpi-icon">△</div><div class="kpi-value" id="kpi-variance" style="color:var(--amber)">—</div><div class="kpi-label">Schedule Risk</div><div class="kpi-sub" id="kpi-variance-sub">Loading...</div></div>
       </div>
+    </div>
 
+    <div id="content">
       <div class="dashboard-grid">
         <div>
           <div class="panel bracketed">
