@@ -4,6 +4,10 @@
 // ============================================================
 const Sidebar = (() => {
 
+  // Load banner — confirms which sidebar.js the browser is actually running
+  console.log('%c[sidebar.js] ' + (window._PROJECTHUD_VERSION || '(version constant not set)'),
+    'background:#EF9F27;color:#1a1a1a;font-weight:700;padding:2px 8px;border-radius:3px');
+
   // ── SVG icons ───────────────────────────────────────────────
   const ICONS = {
     projects: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="7" width="9" height="13" rx="1.2"/><rect x="13" y="3" width="9" height="17" rx="1.2"/><path d="M5 7V5a2 2 0 012-2h3"/></svg>`,
