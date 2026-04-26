@@ -297,6 +297,6 @@ const Sidebar = (() => {
     document.head.appendChild(s);
   }
 
+  window.Sidebar = { init };
   return { init };
 })();
-window.Sidebar = Sidebar;
