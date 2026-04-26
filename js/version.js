@@ -6,4 +6,4 @@
 // To bump the version: change the literal below. Every loader
 // and every internal banner picks up the change automatically
 // on next deploy.
-window._PROJECTHUD_VERSION = "v20260426-CMD95";
+window._PROJECTHUD_VERSION = "v20260426-CMD95p1";

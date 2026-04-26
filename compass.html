@@ -793,6 +793,16 @@
 
 <div id="compass-app">
 
+  <!-- ── Legacy DOM stub for mw-core.js (CMD95) ─────────────
+       mw-core.js:31 writes textContent into #compass-date at
+       script-evaluation time. Pre-CMD95 the element lived in
+       the old #compass-nav top bar. CMD95 removed that bar but
+       mw-core.js is shared with other paths and out of scope
+       for this brief, so a hidden stub keeps it happy. The
+       unified header in hud-shell.js renders the visible
+       datetime; this element is intentionally not displayed. -->
+  <div id="compass-date" style="display:none" aria-hidden="true"></div>
+
   <!-- ── Top navigation removed in CMD95 ──────────────────────
        Unified header (logo / ticker / LIVE / datetime / bell /
        avatar) is rendered by hud-shell.js. The major-area tabs
