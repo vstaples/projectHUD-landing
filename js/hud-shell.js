@@ -280,7 +280,7 @@ const HUDShell = (() => {
       { href: '/pipeline.html',            icon: '▥', label: 'Pipeline',   section: 'main'  },
       { href: '/resources.html',           icon: '◎', label: 'Resources',  section: 'main'  },
       { href: '/resource-requests.html',   icon: '⬡', label: 'Requests',    section: 'main'  },
-      { href: '/cadence.html',             icon: '⬡', label: 'CadenceHUD',  section: 'main'  },
+      { href: '/cadence.html',             icon: '⬡', label: 'Cadence',     section: 'main'  },
       { href: '/aegis.html',               icon: '⬡', label: 'Aegis',       section: 'admin', target: '_blank' },
       { href: '/audit-log.html',           icon: '▦', label: 'Audit Log',  section: 'admin' },
       { href: '/users.html',               icon: '◑', label: 'User Mgmt',  section: 'admin' },
@@ -679,25 +679,26 @@ const HUDShell = (() => {
 
     _loadCmdCenter();
 
-    // Sidebar host detection:
-    //   - #sidebar               → persistent (dashboard, users)
-    //   - #sidebar-container     → persistent (pipeline, resources, etc.)
-    //   - neither                → install slide-in shell (cadence path)
+    // Slide-in shell is the only sidebar pattern (uniform across all surfaces).
+    // Pre-existing #sidebar / #sidebar-container hosts are collapsed so they
+    // don't reserve gutter space in the layout.
+    const preHost = document.getElementById('sidebar');
+    if (preHost && !preHost.dataset.hudShellShimmed) {
+      preHost.id = 'sidebar-legacy-host';
+      preHost.style.display = 'none';
+      preHost.dataset.hudShellShimmed = '1';
+    }
+    const container = document.getElementById('sidebar-container');
+    if (container && !container.dataset.hudShellShimmed) {
+      container.style.display = 'none';
+      container.dataset.hudShellShimmed = '1';
+    }
+    const inner = _installSlideIn();
     let sidebar = document.getElementById('sidebar');
     if (!sidebar) {
-      const container = document.getElementById('sidebar-container');
-      if (container) {
-        // Persistent host pattern: render directly into #sidebar-container.
-        sidebar = document.createElement('div');
-        sidebar.id = 'sidebar';
-        container.appendChild(sidebar);
-      } else {
-        // No persistent host → slide-in shell.
-        const inner = _installSlideIn();
-        sidebar = document.createElement('div');
-        sidebar.id = 'sidebar';
-        inner.appendChild(sidebar);
-      }
+      sidebar = document.createElement('div');
+      sidebar.id = 'sidebar';
+      inner.appendChild(sidebar);
     }
 
     if (renderHeader) {
