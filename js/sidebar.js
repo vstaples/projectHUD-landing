@@ -280,8 +280,13 @@ const Sidebar = (() => {
   function _loadCmdCenter() {
     if (window._cmdCenterLoaded) return; // already loaded (e.g. compass.html loads it explicitly)
     if (window._aegisMode) return;       // aegis.html has engine embedded inline
+    const v = window._PROJECTHUD_VERSION;
+    if (!v) {
+      console.warn('[Sidebar] window._PROJECTHUD_VERSION not set — js/version.js must load before sidebar.js');
+      return;
+    }
     const s = document.createElement('script');
-    s.src = '/js/cmd-center.js?v=v20260425-CMD91';
+    s.src = '/js/cmd-center.js?v=' + v;
     s.onerror = () => console.warn('[Sidebar] cmd-center.js not found — session will not appear in Aegis');
     document.head.appendChild(s);
   }

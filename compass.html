@@ -1162,12 +1162,23 @@
 <script src="/js/ui.js"></script>
 <script src="/js/ticker.js"></script>
 <script src="/js/notif.js"></script>
+<script src="/js/version.js?v=seed"></script>
 <script src="/js/sidebar.js"></script>
 <script src="/js/project-drawer.js"></script>
 <script src="/js/hud-recorder.js"></script>
 <script src="/js/person-picker.js"></script>
-<script src="/js/aegis-registry.js?v=v20260426-CMD91"></script>
-<script src="/js/cmd-center.js?v=v20260426-CMD91"></script>
+<script>
+  (function() {
+    var v = window._PROJECTHUD_VERSION;
+    function load(src) {
+      var s = document.createElement('script');
+      s.src = src + '?v=' + v;
+      document.head.appendChild(s);
+    }
+    load('/js/aegis-registry.js');
+    load('/js/cmd-center.js');
+  })();
+</script>
 
 <script>
 'use strict';
