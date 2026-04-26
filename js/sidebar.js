@@ -290,12 +290,14 @@ const Sidebar = (() => {
     // gets the operator console + presence engine via the same code path.
     _loadCmdCenter();
 
-    // Auto-install the slide-in shell (trigger + panel + inner) at doc root.
-    // If the page does not already declare a #sidebar host, create one inside
-    // the slide-in panel so the rendered sidebar lives in the hover panel.
-    const inner = _installSlideIn();
+    // Slide-in shell is auto-installed ONLY for pages that don't declare their
+    // own persistent #sidebar host (e.g. compass.html, future hover-reveal
+    // adopters). Dashboard and other persistent-sidebar pages keep their
+    // existing layout — calling _installSlideIn there would overlay a blank
+    // panel on top of the already-rendered sidebar.
     let sidebar = document.getElementById('sidebar');
     if (!sidebar) {
+      const inner = _installSlideIn();
       sidebar = document.createElement('div');
       sidebar.id = 'sidebar';
       inner.appendChild(sidebar);
