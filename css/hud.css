@@ -285,3 +285,21 @@ body::before {
 @media (max-width: 1200px) {
   .kpi-row { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ── Sidebar slide-in (shared across surfaces; injected by sidebar.js) ── */
+#hud-sidebar-trigger {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 6px; z-index: 399; cursor: pointer;
+}
+#hud-sidebar-panel {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 200px;
+  background: var(--bg2, #0c1628);
+  border-right: 1px solid rgba(0,210,255,.15);
+  box-shadow: 4px 0 24px rgba(0,0,0,.6);
+  z-index: 400;
+  transform: translateX(-200px);
+  transition: transform 220ms cubic-bezier(.4,0,.2,1);
+  overflow: hidden; display: flex; flex-direction: column;
+}
+#hud-sidebar-panel.open { transform: translateX(0); }
+#hud-sidebar-inner { flex: 1; overflow-y: auto; overflow-x: hidden; }
+#hud-sidebar-panel #sidebar { height: 100% !important; max-height: 100% !important; }

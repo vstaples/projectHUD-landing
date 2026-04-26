@@ -243,6 +243,46 @@ const Sidebar = (() => {
     `;
   }
 
+  // ── Slide-in shell (auto-installed by init) ──────────────────
+  // Creates #hud-sidebar-trigger / #hud-sidebar-panel / #hud-sidebar-inner
+  // at document root if not already present, wires hover-reveal handlers,
+  // and returns the inner element that sidebar HTML should render into.
+  // CSS lives in /css/hud.css under "Sidebar slide-in".
+  function _installSlideIn() {
+    let trigger = document.getElementById('hud-sidebar-trigger');
+    let panel   = document.getElementById('hud-sidebar-panel');
+    let inner   = document.getElementById('hud-sidebar-inner');
+
+    if (!trigger) {
+      trigger = document.createElement('div');
+      trigger.id = 'hud-sidebar-trigger';
+      document.body.appendChild(trigger);
+    }
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'hud-sidebar-panel';
+      document.body.appendChild(panel);
+    }
+    if (!inner) {
+      inner = document.createElement('div');
+      inner.id = 'hud-sidebar-inner';
+      panel.appendChild(inner);
+    }
+
+    if (!panel.dataset.slideinWired) {
+      let hideTimer = null;
+      const open  = () => { clearTimeout(hideTimer); panel.classList.add('open'); };
+      const close = () => { hideTimer = setTimeout(() => panel.classList.remove('open'), 300); };
+      trigger.addEventListener('mouseenter', open);
+      trigger.addEventListener('mouseleave', close);
+      panel.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+      panel.addEventListener('mouseleave', close);
+      panel.dataset.slideinWired = '1';
+    }
+
+    return inner;
+  }
+
   // ── Public init ───────────────────────────────────────────────
   async function init(activePage = '') {
     // Load cmd-center.js unconditionally — runs even on pages without a #sidebar
@@ -250,8 +290,16 @@ const Sidebar = (() => {
     // gets the operator console + presence engine via the same code path.
     _loadCmdCenter();
 
-    const sidebar = document.getElementById('sidebar');
-    if (!sidebar) return;
+    // Auto-install the slide-in shell (trigger + panel + inner) at doc root.
+    // If the page does not already declare a #sidebar host, create one inside
+    // the slide-in panel so the rendered sidebar lives in the hover panel.
+    const inner = _installSlideIn();
+    let sidebar = document.getElementById('sidebar');
+    if (!sidebar) {
+      sidebar = document.createElement('div');
+      sidebar.id = 'sidebar';
+      inner.appendChild(sidebar);
+    }
     const showToolbar = true;
     try {
       const [users, firms] = await Promise.all([API.getUsers(), API.getFirms()]);

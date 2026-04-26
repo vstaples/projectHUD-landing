@@ -44,22 +44,7 @@
   background: var(--bg0, #060a10);
 }
 
-/* ── Hover-reveal sidebar ─────────────────────────────────── */
-#hud-sidebar-trigger {
-  position:fixed; left:0; top:0; bottom:0; width:6px; z-index:399; cursor:pointer;
-}
-#hud-sidebar-panel {
-  position:fixed; left:0; top:0; bottom:0; width:200px;
-  background:var(--bg1,#0c1628);
-  border-right:1px solid rgba(0,210,255,.15);
-  box-shadow:4px 0 24px rgba(0,0,0,.6);
-  z-index:400;
-  transform:translateX(-200px);
-  transition:transform 220ms cubic-bezier(.4,0,.2,1);
-  overflow:hidden; display:flex; flex-direction:column;
-}
-#hud-sidebar-panel.open { transform:translateX(0); }
-#hud-sidebar-inner { flex:1; overflow-y:auto; overflow-x:hidden; }
+/* ── Hover-reveal sidebar — slide-in CSS moved to /css/hud.css (CMD93) ── */
 #hud-notif-btn {
   position:fixed; top:52px; right:14px; z-index:401;
   background:rgba(6,10,16,.85);
@@ -965,16 +950,10 @@
      CSS lives in the stylesheet above; behavior is wired by _compassShowSpotlight
      when a 'narrate.show' app_event addressed to this session arrives. -->
 
-<!-- ── Hover-reveal sidebar ─────────────────────────────────────────────── -->
-<!-- Trigger zone: invisible 6px strip on left edge -->
-<div id="hud-sidebar-trigger"></div>
-
-<!-- Sidebar panel: slides in from left on hover -->
-<div id="hud-sidebar-panel">
-  <div id="hud-sidebar-inner"></div>
-</div>
+<!-- ── Hover-reveal sidebar — markup auto-injected by sidebar.js (CMD93) ── -->
 
 <!-- Notification bell: always-visible fixed button, top-left -->
+<!-- (Bell relocation deferred to CMD93.5 — leave wiring intact) -->
 <button id="hud-notif-btn" title="Notifications" onclick="window.HUDNotif?._openPanel?.(this)">
   <span id="hud-notif-glyph">◉</span>
   <span id="hud-notif-badge" style="display:none">0</span>
@@ -1519,55 +1498,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 </script>
 
 <script>
-// ── Compass hover-reveal sidebar ──────────────────────────────────────────
+// ── Compass notification bell wiring (CMD93) ─────────────────────────────
+// Slide-in sidebar mechanism extracted to sidebar.js / hud.css. This IIFE
+// retains ONLY the notification bell wiring (badge sync + click handler);
+// bell relocation is CMD93.5's concern. Sidebar.init() now auto-installs
+// trigger/panel/inner and renders directly into the panel.
 (function() {
-  const trigger = document.getElementById('hud-sidebar-trigger');
-  const panel   = document.getElementById('hud-sidebar-panel');
-  const inner   = document.getElementById('hud-sidebar-inner');
   const notifBtn = document.getElementById('hud-notif-btn');
   const badge    = document.getElementById('hud-notif-badge');
-  if (!trigger || !panel) return;
 
-  let hideTimer = null;
-
-  function openPanel() {
-    clearTimeout(hideTimer);
-    panel.classList.add('open');
-  }
-  function closePanel() {
-    hideTimer = setTimeout(() => panel.classList.remove('open'), 300);
-  }
-
-  // Hover trigger zone → open
-  trigger.addEventListener('mouseenter', openPanel);
-  // Keep open while inside panel
-  panel.addEventListener('mouseenter', () => clearTimeout(hideTimer));
-  panel.addEventListener('mouseleave', closePanel);
-  trigger.addEventListener('mouseleave', closePanel);
-
-  // Populate sidebar inner with Sidebar.render output once Sidebar is ready
-  function populateSidebar() {
-    if (typeof Sidebar === 'undefined' || !inner) return;
-    // Sidebar.init() will target #sidebar — we redirect it to our inner div
-    const phantom = document.createElement('div');
-    phantom.id = 'sidebar';
-    phantom.style.display = 'none';
-    document.body.appendChild(phantom);
-
-    // After Sidebar.init populates #sidebar, move its content to our inner div
-    const origInit = Sidebar.init.bind(Sidebar);
-    const wrappedInit = async function(page) {
-      await origInit(page);
-      inner.innerHTML = phantom.innerHTML;
-      phantom.innerHTML = '';
-      // Re-wire HUDNotif badge updates to our visible badge elements
-      _syncNotifBadge();
-    };
-    // Call it once now
-    wrappedInit('compass');
-  }
-
-  // Sync unread count to the fixed bell button badge
   function _syncNotifBadge() {
     const count = window.HUDNotif ? window.HUDNotif.getUnread() : 0;
     if (badge) {
@@ -1576,11 +1515,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (notifBtn) notifBtn.classList.toggle('has-unread', count > 0);
   }
-
-  // Poll badge sync every 2s (HUDNotif polls every 10s, this just keeps the button in sync)
   setInterval(_syncNotifBadge, 2000);
 
-  // Bell button opens notification panel
   if (notifBtn) {
     notifBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1588,11 +1524,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Wait for DOM + scripts to be ready, then populate
+  function bootSidebar() {
+    if (typeof Sidebar === 'undefined') return;
+    Sidebar.init('compass').then(_syncNotifBadge);
+  }
   if (document.readyState === 'complete') {
-    populateSidebar();
+    bootSidebar();
   } else {
-    window.addEventListener('load', populateSidebar);
+    window.addEventListener('load', bootSidebar);
   }
 })();
 </script>
