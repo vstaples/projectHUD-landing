@@ -843,22 +843,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
   <!-- Main (full width — sidebar replaced by Dashboard link in topbar) -->
   <div class="cad-main" style="width:100%">
 
-    <!-- Top bar — unified header above renders module name + LIVE/datetime/bell/avatar.
-         This row preserves Cadence-specific actions (back / settings / new flow / new form). -->
-    <div class="cad-topbar cad-topbar-actions-only">
-      <div class="cad-topbar-actions" style="margin-left:auto">
-        <a href="/projects.html" class="btn btn-ghost btn-sm" id="topbar-back-btn"
-          style="text-decoration:none;display:none">← Dashboard</a>
-        <button class="btn btn-ghost btn-sm" id="topbar-settings-btn"
-          onclick="_cadOpenLibrarySettings()" style="display:none"
-          title="Triggers &amp; form settings">⚙ Settings</button>
-        <button class="btn btn-cad btn-sm" id="topbar-new-btn"
-          onclick="_cadNewFlow()" style="font-size:12px;padding:4px 10px">+ New Flow</button>
-        <button class="btn btn-cad btn-sm" id="topbar-new-form-btn"
-          onclick="_cadNewForm()" style="font-size:12px;padding:4px 10px">+ New Form</button>
-      </div>
-    </div>
-
     <!-- Sub-nav — three-tab restructure (S9.0) -->
     <div class="cad-subnav" id="cad-subnav-main">
 
@@ -916,7 +900,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
 
       <!-- Spacer + Library sub-filter pills (visible only on Library tab) -->
       <div class="s9-subnav-spacer"></div>
-      <div class="s9-lib-filters" id="s9-lib-filters" style="display:flex;align-items:center;gap:6px">
+      <div class="s9-lib-filters" id="s9-lib-filters" style="align-items:center;gap:6px">
         <span style="font-size:11px;color:rgba(255,255,255,.35);font-family:Arial,sans-serif;white-space:nowrap">Filter:</span>
         <button class="s9-filter-pill s9-fp-all active" id="s9-fp-all"
                 onclick="_s9LibFilter('all')">All</button>
@@ -932,6 +916,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:Arial,s
                 onclick="_s9LibFilter('released')">Released</button>
         <button class="s9-filter-pill" id="s9-fp-draft"
                 onclick="_s9LibFilter('draft')">Draft</button>
+        <span style="display:inline-block;width:10px"></span>
+        <button class="btn btn-cad btn-sm" id="topbar-new-btn"
+                onclick="_cadNewFlow()"
+                style="font-size:12px;padding:4px 10px">+ New Flow</button>
+        <button class="btn btn-cad btn-sm" id="topbar-new-form-btn"
+                onclick="_cadNewForm()"
+                style="font-size:12px;padding:4px 10px">+ New Form</button>
       </div>
 
       <!-- Hidden legacy tab IDs kept so cdn-*.js badge writes still work -->

@@ -152,7 +152,15 @@ const HUDShell = (() => {
         backdrop-filter: blur(6px);
         font-family: 'Rajdhani','Inter',sans-serif;
       }
-      body.hud-header-pad { padding-top: 48px; }
+      /* When unified header renders, shift the first/main shell child below it.
+         Targets common root patterns without padding the body itself (which
+         breaks 100vh layouts on surfaces that use overflow:hidden). */
+      body.hud-header-rendered .hud-shell,
+      body.hud-header-rendered #compass-app,
+      body.hud-header-rendered #app {
+        height: calc(100vh - 48px) !important;
+        margin-top: 48px;
+      }
       #hud-header-left {
         display: flex; align-items: center; gap: 10px;
         padding: 0 16px;
@@ -238,8 +246,8 @@ const HUDShell = (() => {
         cursor: default;
       }
       /* Slide-in trigger sits below the unified header */
-      body.hud-header-pad #hud-sidebar-trigger { top: 48px; }
-      body.hud-header-pad #hud-sidebar-panel { top: 48px; }
+      body.hud-header-rendered #hud-sidebar-trigger { top: 48px; }
+      body.hud-header-rendered #hud-sidebar-panel { top: 48px; }
     `;
     document.head.appendChild(s);
   }
@@ -345,8 +353,155 @@ const HUDShell = (() => {
     `;
   }
 
+  // ── Inject slide-in CSS (fallback for surfaces that don't load /css/hud.css) ──
+  function injectSlideInStyles() {
+    if (document.getElementById('hud-slidein-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'hud-slidein-styles';
+    s.textContent = `
+      #hud-sidebar-trigger {
+        position: fixed; left: 0; top: 0; bottom: 0;
+        width: 6px; z-index: 399; cursor: pointer;
+      }
+      #hud-sidebar-panel {
+        position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+        background: #0c1628;
+        border-right: 1px solid rgba(0,210,255,.15);
+        box-shadow: 4px 0 24px rgba(0,0,0,.6);
+        z-index: 400;
+        transform: translateX(-220px);
+        transition: transform 220ms cubic-bezier(.4,0,.2,1);
+        overflow: hidden; display: flex; flex-direction: column;
+      }
+      #hud-sidebar-panel.open { transform: translateX(0); }
+      #hud-sidebar-inner { flex: 1; overflow-y: auto; overflow-x: hidden; }
+      #hud-sidebar-panel #sidebar { height: 100% !important; max-height: 100% !important; }
+      #hud-sidebar-panel #ctx-toolbar,
+      #hud-sidebar-panel #ctx-toolbar-placeholder { display: none !important; }
+
+      /* ── Sidebar internals (scoped fallback for surfaces without /css/hud.css) ── */
+      #hud-sidebar-panel .sidebar-logo {
+        padding: 16px 18px 14px;
+        border-bottom: 1px solid rgba(100,160,220,0.12);
+        display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+      }
+      #hud-sidebar-panel .logo-mark { width: 28px; height: 28px; flex-shrink: 0; }
+      #hud-sidebar-panel .logo-mark svg { width: 100%; height: 100%; }
+      #hud-sidebar-panel .wordmark {
+        font-family: 'Rajdhani', sans-serif; font-size: 18px; font-weight: 700;
+        letter-spacing: 0.08em; color: #e8f4ff; line-height: 1;
+      }
+      #hud-sidebar-panel .wordmark span { color: #00d2ff; }
+      #hud-sidebar-panel .firm {
+        font-family: 'Share Tech Mono', monospace; font-size: 11px;
+        color: #3a5a7a; letter-spacing: 0.18em; margin-top: 3px;
+      }
+      #hud-sidebar-panel #sidebar-nav { padding: 8px 10px; }
+      #hud-sidebar-panel .nav-section-label {
+        font-family: 'Share Tech Mono', monospace; font-size: 11px;
+        color: #3a5a7a; letter-spacing: 0.2em; padding: 10px 8px 4px;
+      }
+      #hud-sidebar-panel .nav-item {
+        display: flex; align-items: center; gap: 9px;
+        padding: 9px 10px; border-left: 2px solid transparent;
+        cursor: pointer;
+        font-family: 'DM Sans','Inter',system-ui,sans-serif;
+        font-size: 13px; font-weight: 500;
+        color: #7a9bbf; letter-spacing: 0.04em;
+        transition: all 0.12s; margin-bottom: 1px;
+        text-decoration: none;
+      }
+      #hud-sidebar-panel .nav-item:hover { color:#e8f4ff; background:rgba(0,210,255,0.04); }
+      #hud-sidebar-panel .nav-item.active {
+        border-left-color:#00d2ff; background:rgba(0,210,255,0.08); color:#00d2ff;
+      }
+      #hud-sidebar-panel .nav-icon { font-size: 13px; width: 16px; text-align: center; flex-shrink: 0; }
+      #hud-sidebar-panel .sidebar-operator {
+        border-top: 1px solid rgba(100,160,220,0.12);
+        padding: 12px 14px; flex-shrink: 0;
+      }
+      #hud-sidebar-panel .op-label {
+        font-family: 'Share Tech Mono', monospace; font-size: 11px;
+        color: #3a5a7a; letter-spacing: 0.2em; margin-bottom: 8px;
+      }
+      #hud-sidebar-panel .op-user {
+        display: flex; align-items: center; gap: 9px;
+        padding: 8px 10px; background: #0c1628;
+        border: 1px solid rgba(100,160,220,0.12); margin-bottom: 8px;
+      }
+      #hud-sidebar-panel .op-avatar {
+        width: 32px; height: 32px; flex-shrink: 0;
+        background: #1a3a5a; border: 1px solid rgba(0,210,255,0.3);
+        display: flex; align-items: center; justify-content: center;
+        font-family: 'Rajdhani', sans-serif; font-size: 13px;
+        font-weight: 700; color: #00d2ff;
+      }
+      #hud-sidebar-panel .op-name {
+        font-family: 'DM Sans','Inter',system-ui,sans-serif;
+        font-size: 13px; font-weight: 600; color: #e8f4ff; line-height: 1.2;
+      }
+      #hud-sidebar-panel .op-role {
+        font-family: 'Share Tech Mono', monospace; font-size: 11px;
+        color: #ffaa00; letter-spacing: 0.12em; margin-top: 1px;
+      }
+      #hud-sidebar-panel .op-tools { display: flex; gap: 6px; margin-bottom: 8px; }
+      #hud-sidebar-panel .op-btn {
+        flex: 1; padding: 6px 0; background: transparent;
+        border: 1px solid rgba(100,160,220,0.12);
+        color: #3a5a7a; cursor: pointer; font-size: 13px;
+        display: flex; align-items: center; justify-content: center;
+        transition: all 0.12s;
+      }
+      #hud-sidebar-panel .op-btn:hover {
+        border-color:#00d2ff; color:#00d2ff; background:rgba(0,210,255,0.08);
+      }
+      #hud-sidebar-panel .op-version {
+        display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+      }
+      #hud-sidebar-panel .op-version span,
+      #hud-sidebar-panel .op-version a {
+        font-family: 'Share Tech Mono', monospace; font-size: 11px;
+        color: #3a5a7a; letter-spacing: 0.08em; text-decoration: none;
+      }
+      #hud-sidebar-panel .op-bottom { display: flex; align-items: center; gap: 6px; }
+      #hud-sidebar-panel .nominal { display: flex; align-items: center; gap: 5px; flex: 1; }
+      #hud-sidebar-panel .nominal-dot {
+        width: 5px; height: 5px; background: #00e5a0;
+        transform: rotate(45deg); flex-shrink: 0;
+      }
+      #hud-sidebar-panel .nominal-text {
+        font-family: 'Share Tech Mono', monospace; font-size: 11px;
+        color: #7a9bbf; letter-spacing: 0.1em;
+      }
+      #hud-sidebar-panel .op-notif {
+        position: relative; background: none;
+        border: 1px solid rgba(100,160,220,0.12);
+        color: #7a9bbf; cursor: pointer; padding: 3px 7px;
+        font-size: 12px; transition: all 0.12s;
+      }
+      #hud-sidebar-panel .op-notif:hover { border-color:#00d2ff; color:#00d2ff; }
+      #hud-sidebar-panel .notif-badge {
+        position: absolute; top: -5px; right: -5px;
+        background: #ff4757; color: #fff;
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 11px; font-weight: 700;
+        width: 15px; height: 15px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+      }
+      #hud-sidebar-panel .op-logout {
+        background: none; border: 1px solid rgba(100,160,220,0.12);
+        color: #3a5a7a; cursor: pointer; padding: 3px 8px;
+        font-family: 'Share Tech Mono', monospace; font-size: 11px;
+        letter-spacing: 0.1em; transition: all 0.12s;
+      }
+      #hud-sidebar-panel .op-logout:hover { border-color:#ff4757; color:#ff4757; }
+    `;
+    document.head.appendChild(s);
+  }
+
   // ── Slide-in shell (preserved from sidebar.js v3.1) ──────────
   function _installSlideIn() {
+    injectSlideInStyles();
     let trigger = document.getElementById('hud-sidebar-trigger');
     let panel   = document.getElementById('hud-sidebar-panel');
     let inner   = document.getElementById('hud-sidebar-inner');
@@ -412,7 +567,7 @@ const HUDShell = (() => {
       </div>
     `;
     document.body.insertBefore(header, document.body.firstChild);
-    document.body.classList.add('hud-header-pad');
+    document.body.classList.add('hud-header-rendered');
 
     _startDatetimeTicker();
     _bindNotifBtn();
@@ -459,6 +614,8 @@ const HUDShell = (() => {
       e.stopPropagation();
       if (window.HUDNotif && typeof window.HUDNotif._openPanel === 'function') {
         window.HUDNotif._openPanel(btn);
+      } else {
+        console.warn('[HUDShell] Bell clicked — window.HUDNotif._openPanel unavailable. cmd-center.js may not be loaded on this surface.');
       }
     });
   }
@@ -522,13 +679,25 @@ const HUDShell = (() => {
 
     _loadCmdCenter();
 
-    // Slide-in shell only if no persistent #sidebar host present
+    // Sidebar host detection:
+    //   - #sidebar               → persistent (dashboard, users)
+    //   - #sidebar-container     → persistent (pipeline, resources, etc.)
+    //   - neither                → install slide-in shell (cadence path)
     let sidebar = document.getElementById('sidebar');
     if (!sidebar) {
-      const inner = _installSlideIn();
-      sidebar = document.createElement('div');
-      sidebar.id = 'sidebar';
-      inner.appendChild(sidebar);
+      const container = document.getElementById('sidebar-container');
+      if (container) {
+        // Persistent host pattern: render directly into #sidebar-container.
+        sidebar = document.createElement('div');
+        sidebar.id = 'sidebar';
+        container.appendChild(sidebar);
+      } else {
+        // No persistent host → slide-in shell.
+        const inner = _installSlideIn();
+        sidebar = document.createElement('div');
+        sidebar.id = 'sidebar';
+        inner.appendChild(sidebar);
+      }
     }
 
     if (renderHeader) {
