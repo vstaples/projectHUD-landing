@@ -9,7 +9,6 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --sidebar-w: 56px;
   --bg:        #0f1117;
   --surface:   #181c27;
   --surface2:  #1e2436;
@@ -36,57 +35,34 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
-  display: flex;
   height: 100vh;
   overflow: hidden;
 }
 
 /* ── layout ───────────────────────────────────────────── */
-#sidebar-container { width: var(--sidebar-w); flex-shrink: 0; }
-
 .main {
-  flex: 1;
   display: flex;
   flex-direction: column;
+  height: 100vh;
   overflow: hidden;
   min-width: 0;
 }
 
-/* ── top bar ──────────────────────────────────────────── */
-.topbar {
+/* ── kanban toolbar (stats + search + new prospect) ───── */
+.kb-toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 20px;
-  height: 52px;
+  gap: 16px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   flex-shrink: 0;
 }
 
-.dash-btn {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 5px 11px; border-radius: 6px;
-  border: 1px solid var(--border2);
-  background: var(--surf2); color: var(--muted);
-  font-size: 11px; font-weight: 500;
-  text-decoration: none; white-space: nowrap;
-  transition: color .15s, background .15s;
-}
-.dash-btn:hover { color: var(--text); background: var(--surf3); }
-
-.topbar-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-}
-.topbar-left {
-  display: flex; align-items: center; gap: 10px; flex: 1;
-}
-
 .topbar-stats {
   display: flex;
   gap: 16px;
+  flex: 1;
 }
 
 .stat-chip {
@@ -525,15 +501,9 @@ body {
 </head>
 <body>
 
-<div id="sidebar-container"></div>
-
 <div class="main">
-  <!-- top bar -->
-  <div class="topbar">
-    <div class="topbar-left">
-      <a href="/index.html" class="dash-btn">← Dashboard</a>
-      <span class="topbar-title">Prospect pipeline</span>
-    </div>
+  <!-- kanban toolbar (stats + search + new prospect) -->
+  <div class="kb-toolbar">
     <div class="topbar-stats" id="pipeline-stats">
       <div class="stat-chip">
         <strong id="stat-total">—</strong> prospects
@@ -708,7 +678,7 @@ let resources    = [];
 
 // ── init ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  if (window.Sidebar) Sidebar.init('pipeline');
+  if (window.HUDShell) HUDShell.init({ page: 'pipeline', moduleName: 'Pipeline' });
   await loadData();
   renderBoard(allProspects);
   bindSearch();
