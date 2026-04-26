@@ -241,6 +241,11 @@ const Sidebar = (() => {
 
   // ── Public init ───────────────────────────────────────────────
   async function init(activePage = '') {
+    // Load cmd-center.js unconditionally — runs even on pages without a #sidebar
+    // element (e.g. pipeline.html uses #sidebar-container) so every entry point
+    // gets the operator console + presence engine via the same code path.
+    _loadCmdCenter();
+
     const sidebar = document.getElementById('sidebar');
     if (!sidebar) return;
     const showToolbar = true;
@@ -272,9 +277,6 @@ const Sidebar = (() => {
         if (ph) ph.replaceWith(buildToolbar(activePage));
       }
     }
-    // Load cmd-center.js on every page so all sessions are visible to Aegis
-    // Guard: skip on aegis.html itself (it embeds the engine directly)
-    _loadCmdCenter();
   }
 
   function _loadCmdCenter() {
