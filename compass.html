@@ -1179,11 +1179,29 @@ async function loadUserView() {
     window._myWorkLoaded = true;
     // Now call the real loadUserView that was just loaded
     if (window._mwLoadUserView) await window._mwLoadUserView();
-    // Restore last active inner tab
+    // CMD95p4: Restore last active inner tab on initial load.
+    // Force 'work' to render first (it's the safe default — its
+    // container #user-content is rendered directly by mw-core).
+    // Then, if a non-work tab was saved, defer restoration until
+    // after a paint so the .ust button DOM is queryable AND the
+    // target sub-view container has had a chance to mount.
+    // Without this, restoring straight to e.g. 'time' on hard
+    // refresh leaves the surface blank because #mt-root hasn't
+    // been built yet.
     const savedTab = localStorage.getItem('compass-user-tab');
     if (savedTab && savedTab !== 'work' && window.uSwitchTab) {
-      const btn = document.querySelector('.ust[data-tab="' + savedTab + '"]');
-      window.uSwitchTab(savedTab, btn || null);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const btn = document.querySelector('.ust[data-tab="' + savedTab + '"]');
+          if (btn) {
+            try { window.uSwitchTab(savedTab, btn); }
+            catch (e) { console.warn('[Compass] deferred savedTab restore failed:', e); }
+          } else {
+            // Button not present — fall back to work (already shown).
+            try { localStorage.setItem('compass-user-tab', 'work'); } catch (e) {}
+          }
+        });
+      });
     }
   } catch(e) {
     console.error('[Compass] Failed to load my-work.html:', e);
