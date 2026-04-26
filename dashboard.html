@@ -134,32 +134,46 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
 .ap-btn-save:disabled { opacity: .4; cursor: not-allowed; }
 .ap-error { font-family: var(--font-mono); font-size: 10px; color: var(--red); min-height: 16px; }
 
-/* CMD97 — KPI row inline with page header
+/* CMD97 — Page header rendered as the first cell in the KPI row.
    ────────────────────────────────────────────────────────────────
-   #dash-header-row places #page-header + .kpi-row side-by-side.
-   The KPI row owns the bulk of the horizontal space; cards become
-   compact (single-row height matches header height envelope).
-   Typography preserved from pre-existing rules — labels and subs
-   are pre-existing 10px; only new authored text in this block is
-   >= 11px. */
+   #dash-header-row is a CSS grid: [ DASHBOARD card ][ 7 KPI cards ].
+   The DASHBOARD cell adopts kpi-card chrome (same background,
+   border, height) so the header reads as the leftmost card. Inside
+   it, .page-title sits at kpi-value position; .page-subtitle sits
+   at kpi-label/sub position — text baselines align across the row. */
 #dash-header-row {
-  display: flex; align-items: flex-start; gap: 16px;
-  padding: 0; margin-bottom: 16px;
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
 }
 #dash-header-row #page-header {
-  flex: 0 0 auto; min-width: 200px;
-  margin: 0 !important; padding: 0 !important;
-  align-self: flex-start;
-  border: 0 !important;
+  /* match .kpi-card chrome */
+  background: var(--bg2, #111827);
+  border: 1px solid var(--border, rgba(255,255,255,.08));
+  border-top: 2px solid var(--cyan, #00d2ff);
+  padding: 6px 12px !important;
+  margin: 0 !important;
+  display: flex; flex-direction: column; justify-content: center;
+  min-height: 0;
 }
 #dash-header-row #page-header > div { margin: 0; padding: 0; }
-#dash-header-row #page-header .page-title { margin-top: 0; padding-top: 0; line-height: 1; }
-#dash-header-row #page-header .page-subtitle { margin-top: 4px; }
+#dash-header-row #page-header .page-title {
+  font-family: var(--font-hud, 'Rajdhani', 'Inter', sans-serif);
+  font-size: 22px; font-weight: 700; line-height: 1.05;
+  color: var(--text0, #e8f4ff);
+  letter-spacing: .04em;
+  margin: 0; padding: 0;
+}
+#dash-header-row #page-header .page-subtitle {
+  font-family: var(--font-mono, 'Share Tech Mono', monospace);
+  font-size: 11px; font-weight: 400;
+  letter-spacing: .08em;
+  color: var(--text2, #7a9bbf);
+  margin-top: 1px;
+}
 #dash-header-row .kpi-row {
-  flex: 1 1 auto; min-width: 0;
-  grid-template-columns: repeat(7, 1fr) !important;
-  gap: 6px !important;
-  align-self: flex-start;
+  display: contents; /* its 7 cards become direct grid items of #dash-header-row */
 }
 #dash-header-row .kpi-card {
   padding: 6px 10px !important;
@@ -180,9 +194,10 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 @media (max-width: 1400px) {
-  #dash-header-row { flex-direction: column; }
-  #dash-header-row #page-header { min-width: 0; }
-  #dash-header-row .kpi-row { align-self: stretch; }
+  #dash-header-row {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  #dash-header-row #page-header { grid-column: 1 / -1; }
 }
 </style>
 </head>
