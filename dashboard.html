@@ -68,6 +68,11 @@ body.hud-header-rendered #ticker { display: none !important; }
 body.hud-header-rendered #hud-header-left { padding-right: 18px; }
 .hud-module-name .brand-cy { color: #00d2ff; }
 .hud-module-name .brand-lt { color: #e8f4ff; }
+/* CMD97 — enlarge ProjectHUD wordmark so its baseline aligns with
+   the logo's bottom edge (logo is 24px tall in hud-shell). */
+body.hud-header-rendered #hud-header-left .hud-module-name {
+  font-size: 22px; line-height: 1;
+}
 #hud-header-ticker #ticker-scroll-wrap {
   flex: 1; overflow: hidden; position: relative; height: 100%;
   display: flex; align-items: center;
@@ -138,18 +143,23 @@ body.hud-header-rendered #hud-header-left { padding-right: 18px; }
    are pre-existing 10px; only new authored text in this block is
    >= 11px. */
 #dash-header-row {
-  display: flex; align-items: stretch; gap: 16px;
+  display: flex; align-items: flex-start; gap: 16px;
   padding: 0; margin-bottom: 16px;
 }
 #dash-header-row #page-header {
   flex: 0 0 auto; min-width: 200px;
-  margin-bottom: 0; padding-bottom: 0;
+  margin: 0 !important; padding: 0 !important;
+  align-self: flex-start;
+  border: 0 !important;
 }
+#dash-header-row #page-header > div { margin: 0; padding: 0; }
+#dash-header-row #page-header .page-title { margin-top: 0; padding-top: 0; line-height: 1; }
+#dash-header-row #page-header .page-subtitle { margin-top: 4px; }
 #dash-header-row .kpi-row {
   flex: 1 1 auto; min-width: 0;
   grid-template-columns: repeat(7, 1fr) !important;
   gap: 6px !important;
-  align-self: center;
+  align-self: flex-start;
 }
 #dash-header-row .kpi-card {
   padding: 6px 10px !important;
