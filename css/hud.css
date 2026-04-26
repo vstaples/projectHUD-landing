@@ -303,3 +303,5 @@ body::before {
 #hud-sidebar-panel.open { transform: translateX(0); }
 #hud-sidebar-inner { flex: 1; overflow-y: auto; overflow-x: hidden; }
 #hud-sidebar-panel #sidebar { height: 100% !important; max-height: 100% !important; }
+#hud-sidebar-panel #ctx-toolbar,
+#hud-sidebar-panel #ctx-toolbar-placeholder { display: none !important; }
