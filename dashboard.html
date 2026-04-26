@@ -151,20 +151,22 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
    first panel matches inter-panel spacing. */
 #content { padding-top: 8px !important; }
 #dash-header-row #page-header {
-  /* match .kpi-card chrome exactly — same padding the .kpi-card
-     compact override below uses (6px 10px). */
+  /* match .kpi-card chrome — same padding as #dash-header-row .kpi-card
+     (6px 10px). Content (title + subtitle) anchored bottom-left to
+     mirror the KPI cards' bottom-left text alignment. */
   background: var(--bg2, #111827);
   border: 1px solid var(--border, rgba(255,255,255,.08));
   border-top: 2px solid var(--cyan, #00d2ff);
   padding: 6px 10px !important;
   margin: 0 !important;
-  display: flex; flex-direction: column; justify-content: flex-start;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  align-items: flex-start;
   min-height: 0;
 }
 #dash-header-row #page-header > div { margin: 0; padding: 0; }
 #dash-header-row #page-header .page-title {
   font-family: var(--font-hud, 'Rajdhani', 'Inter', sans-serif);
-  font-size: 22px; font-weight: 700; line-height: 1.05;
+  font-size: 32px; font-weight: 700; line-height: 1;
   color: var(--text0, #e8f4ff);
   letter-spacing: .04em;
   margin: 0; padding: 0;
@@ -172,9 +174,9 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
 #dash-header-row #page-header .page-subtitle {
   font-family: var(--font-mono, 'Share Tech Mono', monospace);
   font-size: 11px; font-weight: 400;
-  letter-spacing: .06em;
+  letter-spacing: .12em;
   color: var(--text2, #7a9bbf);
-  margin-top: 1px;
+  margin-top: 4px;
 }
 #dash-header-row .kpi-card {
   padding: 6px 10px !important;
