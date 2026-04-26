@@ -299,3 +299,4 @@ const Sidebar = (() => {
 
   return { init };
 })();
+window.Sidebar = Sidebar;
