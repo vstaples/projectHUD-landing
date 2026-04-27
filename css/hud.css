@@ -493,9 +493,10 @@ body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
 .btn-select:hover { background-color: var(--bg3); border-color: var(--border-act); }
 .btn-select option { background: var(--bg2); color: var(--text-primary); }
 
-/* §5.5 — Dashed add-action button modifier (v1.1) */
+/* §5.5 — Dashed add-action button modifier (v1.3) */
 .btn--dashed {
   border-style: dashed;
+  border-width: 2px;
   border-color: var(--border-act);
   width: 100%;
   justify-content: center;
