@@ -500,6 +500,21 @@ body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
   justify-content: center;
 }
 
+/* §5.5 D11.2 — Add-action button affordance (dashed border) */
+.btn--dashed {
+  border-style: dashed;
+  border-color: var(--border-act);
+  width: 100%;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-muted);
+}
+.btn--dashed:hover {
+  background: rgba(255,255,255,.03);
+  color: var(--text-primary);
+  border-color: var(--border-act);
+}
+
 /* Contextual amber tint for buttons inside amber-themed blocks
    (e.g. contingency block) — keeps .btn size/typography. */
 .contingency-block .btn,

@@ -197,9 +197,9 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 .col-role  { width: 110px; }
 .col-level { width: 78px; }
 .col-dur   { width: 48px; }
-.col-days  { width: 48px; }
+.col-days  { width: 56px; }
 .col-ppl   { width: 40px; }
-.col-hrs   { width: 48px; text-align: right !important; }
+.col-hrs   { width: 56px; text-align: right !important; }
 .col-cost  { width: 72px; text-align: right !important; }
 .col-risk  { width: 32px; text-align: center !important; }
 .col-del   { width: 26px; text-align: center !important; }
@@ -210,11 +210,13 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
   padding-right: 8px !important;
   color: var(--text-body);
   font-feature-settings: "tnum";
+  white-space: nowrap;
 }
 .hrs-cell  {
   font-family: var(--font-ui);
   font-size: 12px; color: var(--text-muted); text-align: right;
   font-feature-settings: "tnum";
+  white-space: nowrap;
 }
 .risk-icon { cursor: pointer; font-size: 13px; text-align: center; display: block; color: var(--text-muted); }
 .risk-icon.is-flagged { color: var(--red); }
@@ -271,7 +273,7 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
   color: var(--text-body); font-weight: 500;
 }
 .cp-row--subtotal .cp-subtotal-val {
-  color: var(--text-primary); font-weight: 700;
+  color: var(--text-primary); font-weight: 600; /* §7.1a v1.1 — was 700 */
 }
 
 /* Grand total — doctrine §7.1 */
@@ -351,7 +353,8 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 .mat-row {
   display: flex; justify-content: space-between;
   font-family: var(--font-ui);
-  font-size: 12px; padding: 3px 0; color: var(--text-muted);
+  font-size: 12px; padding: 3px 0;
+  color: var(--text-body); /* doctrine §7.1b — no-scaffold variant */
   font-feature-settings: "tnum";
 }
 .mat-val { font-weight: 600; color: var(--text-body); }
@@ -512,19 +515,7 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 }
 .tasks-empty-link { color: var(--text-accent); cursor: pointer; }
 
-/* ── Add-disc dashed button (visual variant of .btn) ───── */
-.btn--dashed {
-  border-style: dashed;
-  width: 100%;
-  justify-content: center;
-  background: transparent;
-  color: var(--text-muted);
-}
-.btn--dashed:hover {
-  background: rgba(255,255,255,.03);
-  color: var(--text-primary);
-  border-color: var(--border-act);
-}
+/* .btn--dashed lives in /css/hud.css per doctrine §5.5 */
 
 /* ── Task table horizontal-scroll wrapper ──────────────── */
 .task-tbl-wrap { overflow-x: auto; flex: 1; }
@@ -958,7 +949,7 @@ function renderTaskGrid() {
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="6" style="padding-left:14px">${escHtml(disc.name)} Subtotal</td>
+            <td colspan="6" style="padding-left:14px">${escHtml(disc.name)} subtotal</td>
             <td></td>
             <td class="hrs-cell">${totalHrs.toFixed(0)} hrs</td>
             <td class="cost-cell">${fmtCost(totalCost)}</td>
@@ -968,7 +959,7 @@ function renderTaskGrid() {
       </table>
     </div>
     <div class="add-task-row">
-      <button class="btn" onclick="addTask()">+ Add Task to ${escHtml(disc.name)}</button>
+      <button class="btn btn--dashed" onclick="addTask()">+ Add Task to ${escHtml(disc.name)}</button>
     </div>`;
 }
 
