@@ -14,8 +14,10 @@
   --bg0:        #060a10;
   --bg1:        #080d18;
   --bg2:        #0c1628;
-  --bg3:        #0a1525;
+  --bg3:        #1d2a45;
   --bg4:        #0e1e30;
+  /* ── Doctrine v1.4 §3.5.2 — surface elevation role aliases ── */
+  --surface-interactive: var(--bg3);
   --cyan:       #00d2ff;
   --cyan-dim:   rgba(0,210,255,0.08);
   --cyan-glow:  rgba(0,210,255,0.15);
@@ -428,20 +430,24 @@ body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
   padding: 3px 12px;
   border-radius: 6px;
   border: 1px solid var(--border);
-  background: var(--bg2);
+  background: var(--surface-interactive);
   color: var(--text-primary);
   cursor: pointer;
-  transition: background .15s, border-color .15s, color .15s;
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-feature-settings: "tnum";
   text-decoration: none;
   white-space: nowrap;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4),
+              inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .btn:hover {
-  background: var(--bg3);
+  background: rgba(255, 255, 255, 0.04);
   border-color: var(--border-act);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5),
+              inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .btn:focus-visible { outline: 1px solid var(--text-accent); outline-offset: 1px; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
