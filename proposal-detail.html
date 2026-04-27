@@ -976,9 +976,9 @@ function renderTaskGrid() {
 
 function renderTaskRow(t, idx) {
   const hrs  = calcHrs(t.labor_days, t.headcount);
-  const cost = calcCost(t.labor_days, t.headcount, t.hud_role_name || getDefaultRole(), t.level || 'Mid');
+  const cost = calcCost(t.labor_days, t.headcount, getRoleName(t.hud_role_id), t.level || 'Mid');
   const roleOpts = hud_roles.map(r =>
-    `<option value="${r.id}" ${r.name === (t.hud_role_name||getDefaultRole()) ? 'selected' : ''}>${escHtml(r.name)}</option>`
+    `<option value="${r.id}" ${r.id === t.hud_role_id ? 'selected' : ''}>${escHtml(r.name)}</option>`
   ).join('');
 
   return `
@@ -1041,7 +1041,6 @@ function updateTaskRole(id, sel) {
   const t = getTaskById(id);
   if (!t) return;
   t.hud_role_id   = sel.value;
-  t.hud_role_name = sel.options[sel.selectedIndex].text;
   recompute(id);
 }
 
@@ -1049,7 +1048,7 @@ function recompute(id) {
   const t = getTaskById(id);
   if (!t) return;
   t.estimated_hours = calcHrs(t.labor_days, t.headcount);
-  t.total_cost      = calcCost(t.labor_days, t.headcount, t.hud_role_name || getDefaultRole(), t.level || 'Mid');
+  t.total_cost      = calcCost(t.labor_days, t.headcount, getRoleName(t.hud_role_id), t.level || 'Mid');
   renderTaskGrid();
   renderCostPanel();
   updateSummaryStrip();
@@ -1064,7 +1063,6 @@ async function addTask() {
     name:          'New task',
     phase:         'Phase 1',
     hud_role_id:   hud_roles[0]?.id,
-    hud_role_name: hud_roles[0]?.name || getDefaultRole(),
     level:         'Mid',
     duration_days: 1,
     labor_days:    1,
@@ -1073,7 +1071,7 @@ async function addTask() {
     is_risk_flag:  false,
   };
   newTask.estimated_hours = calcHrs(newTask.labor_days, newTask.headcount);
-  newTask.total_cost      = calcCost(newTask.labor_days, newTask.headcount, newTask.hud_role_name, newTask.level);
+  newTask.total_cost      = calcCost(newTask.labor_days, newTask.headcount, getRoleName(newTask.hud_role_id), newTask.level);
 
   try {
     const result = await API.post('wbs_tasks', newTask);
@@ -1114,6 +1112,7 @@ function calcCost(days, ppl, roleName, level) {
   return Math.round((days||0) * (ppl||1) * 8 * rate);
 }
 function getDefaultRole() { return hud_roles[0]?.name || 'Engineer'; }
+function getRoleName(roleId) { return hud_roles.find(r => r.id === roleId)?.name || getDefaultRole(); }
 function getTotalLaborCost() { return wbsTasks.reduce((s,t) => s + (t.total_cost||0), 0); }
 function getTotalMaterialCost() { return materials.reduce((s,m) => s + (m.cost||0), 0); }
 function fmtCost(n) { return '¥' + Math.round(n||0).toLocaleString(); }
@@ -1282,7 +1281,6 @@ async function loadTemplate() {
           name:          tt.name,
           phase:         tt.phase || 'Phase 1',
           hud_role_id:   tt.hud_role_id,
-          hud_role_name: role?.name || getDefaultRole(),
           level:         tt.default_level || 'Mid',
           duration_days: tt.duration_days || 1,
           labor_days:    tt.labor_days || 1,
@@ -1291,7 +1289,7 @@ async function loadTemplate() {
           is_risk_flag:  tt.is_risk_flag || false,
         };
         newTask.estimated_hours = calcHrs(newTask.labor_days, newTask.headcount);
-        newTask.total_cost      = calcCost(newTask.labor_days, newTask.headcount, newTask.hud_role_name, newTask.level);
+        newTask.total_cost      = calcCost(newTask.labor_days, newTask.headcount, getRoleName(newTask.hud_role_id), newTask.level);
         const tResult = await API.post('wbs_tasks', newTask);
         newTask.id = tResult?.[0]?.id;
         wbsTasks.push(newTask);
