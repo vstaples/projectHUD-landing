@@ -27,7 +27,7 @@
   --border-act: rgba(0,210,255,0.25);
   /* ── Doctrine v1.0 §3.2 — semantic text-role tokens ── */
   --text-primary: #e8f4ff;
-  --text-body:    #dceaf6; /* CMD98.2 hotfix — lifted from #c8dff0 for visible separation from --text-muted; v1.2 will ratify */
+  --text-body:    #c8dff0;
   --text-muted:   #a8c5e0;
   --text-faint:   #6890b8;
   --text-accent:  #00d2ff;
@@ -498,21 +498,6 @@ body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
   padding: 3px 6px;
   min-width: 24px;
   justify-content: center;
-}
-
-/* §5.5 D11.2 — Add-action button affordance (dashed border) */
-.btn--dashed {
-  border-style: dashed;
-  border-color: var(--border-act);
-  width: 100%;
-  justify-content: center;
-  background: transparent;
-  color: var(--text-muted);
-}
-.btn--dashed:hover {
-  background: rgba(255,255,255,.03);
-  color: var(--text-primary);
-  border-color: var(--border-act);
 }
 
 /* Contextual amber tint for buttons inside amber-themed blocks
