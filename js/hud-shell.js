@@ -196,8 +196,9 @@ const HUDShell = (() => {
       }
       #hud-status-live {
         display: flex; align-items: center; gap: 6px;
-        font-family: 'Share Tech Mono', monospace;
-        font-size: 11px; color: #00e5a0;
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 11px; font-weight: 600;
+        color: #00e5a0;
         letter-spacing: 0.12em;
       }
       #hud-status-live .live-dot {
@@ -210,9 +211,11 @@ const HUDShell = (() => {
         50% { opacity: 0.35; }
       }
       #hud-status-datetime {
-        font-family: 'Share Tech Mono', monospace;
-        font-size: 11px; color: #7a9bbf;
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 11px; font-weight: 500;
+        color: #a8c5e0;
         letter-spacing: 0.06em; white-space: nowrap;
+        font-feature-settings: "tnum";
       }
       #hud-status-bell {
         position: relative;
@@ -231,19 +234,20 @@ const HUDShell = (() => {
       #hud-status-bell-badge {
         position: absolute; top: -5px; right: -5px;
         background: #E24B4A; color: #fff;
-        font-family: 'Share Tech Mono', monospace;
+        font-family: 'Inter', system-ui, sans-serif;
         font-size: 11px; font-weight: 700;
         min-width: 16px; height: 16px; border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
         padding: 0 3px; pointer-events: none;
+        font-feature-settings: "tnum";
       }
       #hud-status-avatar {
-        width: 30px; height: 30px; border-radius: 50%;
+        width: 32px; height: 32px; border-radius: 50%;
         background: rgba(0,210,255,0.15);
         border: 1px solid rgba(0,210,255,0.3);
         display: flex; align-items: center; justify-content: center;
-        font-family: 'Rajdhani','Inter',sans-serif;
-        font-size: 12px; font-weight: 700;
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 13px; font-weight: 600;
         color: #00d2ff;
         cursor: default;
       }
@@ -781,10 +785,52 @@ const HUDShell = (() => {
     `;
     document.body.insertBefore(header, document.body.firstChild);
     document.body.classList.add('hud-header-rendered');
+    document.body.classList.add('hud-shell-body');
 
     _startDatetimeTicker();
     _bindNotifBtn();
     _refreshAvatarFromAuth();
+  }
+
+  // ── Footer strip with version display (v1.5 §4.9, CMD99) ─────
+  // Fallback styles for surfaces that do not load /css/hud.css.
+  // The canonical rules live in hud.css; these are scoped to the
+  // footer element only and use literal values so they don't depend
+  // on tokens that may be absent on shim-era pages.
+  function injectFooterFallbackStyles() {
+    if (document.getElementById('hud-footer-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'hud-footer-styles';
+    s.textContent = `
+      #hud-footer.hud-footer {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        height: 24px;
+        background: #0d1424;
+        border-top: 1px solid rgba(100,160,220,0.12);
+        display: flex; align-items: center; justify-content: flex-end;
+        padding: 0 14px; z-index: 60;
+      }
+      #hud-footer .hud-footer__version {
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 11px; font-weight: 400;
+        color: #a8c5e0;
+        letter-spacing: 0.04em;
+        font-feature-settings: "tnum";
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
+  function _buildFooter() {
+    if (document.getElementById('hud-footer')) return; // idempotent
+    const v = window._PROJECTHUD_VERSION || '';
+    const footer = document.createElement('footer');
+    footer.id = 'hud-footer';
+    footer.className = 'hud-footer';
+    footer.innerHTML = `<span class="hud-footer__version">${v}</span>`;
+    document.body.appendChild(footer);
+    document.body.classList.add('hud-footer-rendered');
+    document.body.classList.add('hud-shell-body');
   }
 
   // ── Datetime updater (newly written; no prior canonical) ─────
@@ -925,6 +971,12 @@ const HUDShell = (() => {
       injectHeaderStyles();
       _buildHeader(moduleName);
     }
+
+    // Footer strip renders on every surface platform-wide per v1.5 §4.9.
+    // Independent of the header opt-in: even shim-era surfaces that
+    // suppress the unified header still get the version-display footer.
+    injectFooterFallbackStyles();
+    _buildFooter();
 
     // ── Tier 1 / Tier 2 setup (CMD95) ─────────────────────────
     if (Array.isArray(options.tier1) && options.tier1.length) {

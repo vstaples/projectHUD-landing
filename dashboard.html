@@ -6,72 +6,367 @@
 <title>ProjectHUD — Dashboard</title>
 <link rel="stylesheet" href="/css/hud.css">
 <style>
-.dashboard-grid { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
-/* Override kpi-row for 7 cards on one row */
-.kpi-row { grid-template-columns: repeat(7, 1fr) !important; gap: 8px !important; }
-.kpi-card { padding: 10px 12px !important; }
-.kpi-card .kpi-icon { font-size: 24px !important; top: 8px !important; right: 10px !important; }
-.kpi-value { font-size: 26px !important; }
-.kpi-label { font-size: 10px !important; letter-spacing: .06em !important; margin-top: 2px !important; }
-.kpi-sub { font-size: 10px !important; margin-top: 2px !important; }
-.project-card { padding: 14px 16px; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; cursor: pointer; transition: background 0.12s, border-left-color 0.12s; }
-.project-card:last-child { border-bottom: none; }
-.project-card:hover { background: var(--bg4); border-left-color: var(--cyan); }
-.project-card.at-risk { border-left-color: rgba(255,170,0,0.5); }
-.project-card.blocked { border-left-color: rgba(255,71,87,0.5); }
-.project-card.active  { border-left-color: rgba(0,229,160,0.4); }
-.proj-name   { font-family: var(--font-ui); font-size:15.0px; font-weight: 600; color: var(--text0); line-height: 1.2; }
-.proj-client { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.08em; margin-top: 2px; }
-.proj-stats  { display: flex; gap: 16px; font-family: var(--font-mono); font-size:11px; margin-top: 10px; }
-.proj-stat   { display: flex; flex-direction: column; gap: 2px; }
-.proj-stat .stat-label { color: var(--text3); font-size:11px; letter-spacing: 0.1em; }
-.proj-stat .stat-value { color: var(--text1); font-weight: 600; }
-.task-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
-.task-row:last-child { border-bottom: none; }
-.task-row:hover { background: var(--bg4); }
-.task-info { flex: 1; min-width: 0; }
-.task-name { font-family: var(--font-ui); font-size:13.0px; font-weight: 500; color: var(--text0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.task-meta { font-family: var(--font-mono); font-size:11px; color: var(--text2); letter-spacing: 0.06em; margin-top: 2px; }
-.evm-gauge-row { display: flex; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); justify-content: space-around; }
-.evm-values { padding: 10px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.evm-val .ev-label { font-family: var(--font-mono); font-size:11px; color: var(--text3); letter-spacing: 0.1em; }
-.evm-val .ev-num   { font-family: var(--font-hud); font-size:16.0px; font-weight: 700; color: var(--text0); }
-.alert-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
-.alert-row:last-child { border-bottom: none; }
-.alert-info { flex: 1; min-width: 0; }
-.alert-title { font-family: var(--font-ui); font-size:12.5px; color: var(--text0); }
-.alert-meta  { font-family: var(--font-mono); font-size:11px; color: var(--text2); margin-top: 2px; }
-.alert-age   { font-family: var(--font-mono); font-size:11px; color: var(--red); font-weight: 700; flex-shrink: 0; }
-.wl-row { padding: 9px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
-.wl-row:last-child { border-bottom: none; }
-.wl-avatar { width: 26px; height: 26px; flex-shrink: 0; background: #1a3a5a; border: 1px solid rgba(0,210,255,0.25); display: flex; align-items: center; justify-content: center; font-family: var(--font-hud); font-size:11.0px; font-weight: 700; color: var(--cyan); }
-.wl-name { font-family: var(--font-ui); font-size:12.5px; color: var(--text1); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wl-bar-wrap { width: 70px; }
-.wl-bar { height: 3px; background: rgba(255,255,255,0.06); }
-.wl-fill { height: 100%; transition: width 0.6s ease; }
-.wl-pct { font-family: var(--font-mono); font-size:11px; min-width: 28px; text-align: right; }
-@media (max-width: 1200px) { .dashboard-grid { grid-template-columns: 1fr; } }
+/* ============================================================
+   dashboard.html — CMD99 v1.5 doctrine retrofit
+   Inline rules below are dashboard-specific layout glue. All
+   token references use --surface-*, --text-*, --font-ui per
+   v1.5. No new doctrine classes are introduced here.
+   ============================================================ */
 
-/* CMD97 — Unified-header retrofit overrides
-   ────────────────────────────────────────────────────────────────
-   1. Activity ticker is moved into the unified header center band
-      (#hud-header-ticker) at boot. The standalone #ticker bar is
-      removed entirely; this rule keeps it hidden if any cached
-      copy survives.
-   2. Inside #hud-header-ticker the ticker scrolls horizontally and
-      fades out before the right status cluster. #ticker-live is
-      removed (the unified header has its own LIVE indicator).
-   3. Brand-pill convention: "Project" cyan + "HUD" light. The
-      hud-shell logo SVG is suppressed in favor of the wordmark.
-   4. Build-version display is shifted right of slide-in trigger. */
+/* ── Top band: page-identity card + 7-card KPI strip ────────── */
+#dash-header-row {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+@media (max-width: 1400px) {
+  #dash-header-row { grid-template-columns: repeat(4, 1fr); }
+  #dash-page-identity { grid-column: 1 / -1; }
+}
+
+/* §4.3 page-identity block — occupies first KPI slot, no metric */
+#dash-page-identity {
+  position: relative;
+  background: var(--surface-content);
+  border-radius: 6px;
+  padding: 12px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  overflow: hidden;
+  min-height: 78px;
+}
+#dash-page-identity .page-identity__name {
+  font-family: var(--font-ui);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+#dash-page-identity .page-identity__sub {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* Tighten content top padding so first panel sits flush */
+#content { padding-top: 8px !important; padding-bottom: 28px !important; }
+
+/* ── Dashboard grid: left main column / right sidebar column ── */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  align-items: start;
+  padding: 0 14px;
+}
+@media (max-width: 1200px) {
+  .dashboard-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Panel header (v1.5 §4.5) ────────────────────────────────── */
+.panel-frame .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 10px;
+}
+.panel-frame .panel-header__right {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.panel-frame .panel-header__count {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+  letter-spacing: 0.02em;
+}
+.panel-frame .panel-header__count--bad      { color: var(--red); }
+.panel-frame .panel-header__count--caution  { color: var(--amber); }
+.panel-frame .panel-header__count--good     { color: var(--green); }
+.panel-frame .panel-header__count--accent   { color: var(--text-accent); }
+
+/* Text-link affordance for "View All →" / "Details →" — no border, no background */
+.panel-frame a.panel-link,
+.panel-frame button.panel-link {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-accent);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.12s;
+}
+.panel-frame a.panel-link:hover,
+.panel-frame button.panel-link:hover { color: #33daff; }
+
+/* ── Active Projects — project rows ─────────────────────────── */
+.proj-row {
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-left-color 0.12s;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.proj-row:last-child { border-bottom: none; }
+.proj-row:hover { background: var(--surface-content); border-left-color: var(--text-accent); }
+.proj-row.health--at-risk { border-left-color: var(--amber); }
+.proj-row.health--blocked { border-left-color: var(--red); }
+.proj-row.health--active  { border-left-color: var(--green); }
+
+.proj-row__r1 {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+}
+.proj-row__title-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.proj-row__title {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.proj-row__sub {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* AT RISK / BLOCKED / ACTIVE row badge — right-anchored, vertical-center per §4.7 */
+.row-badge {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+}
+.row-badge--bad     { color: var(--red);   border-color: var(--red);   background: rgba(255,71,87,0.12); }
+.row-badge--caution { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.12); }
+.row-badge--good    { color: var(--green); border-color: var(--green); background: rgba(0,229,160,0.10); }
+.row-badge--info    { color: var(--text-accent); border-color: var(--text-accent); background: rgba(0,210,255,0.10); }
+.row-badge--neutral { color: var(--text-muted); border-color: var(--border); background: transparent; }
+
+/* Project metric strip (CPI / SPI / TASKS / OVERDUE etc.) */
+.proj-metrics {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  font-family: var(--font-ui);
+  font-feature-settings: "tnum";
+}
+.proj-metric {
+  display: flex; flex-direction: column; gap: 1px;
+}
+.proj-metric__label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.proj-metric__value {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-body);
+  font-feature-settings: "tnum";
+}
+.proj-metric__value--bad     { color: var(--red); }
+.proj-metric__value--caution { color: var(--amber); }
+.proj-metric__value--good    { color: var(--green); }
+.proj-metric__value--accent  { color: var(--text-accent); }
+
+/* P25/P50/P80 phase pills — .btn-shape with state-color treatment per §3.3.3 */
+.phase-pills {
+  display: inline-flex; align-items: center; gap: 0;
+}
+.phase-pill {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  font-feature-settings: "tnum";
+  padding: 3px 10px;
+  border: 1px solid;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.phase-pill:first-child { border-radius: 4px 0 0 4px; }
+.phase-pill:last-child  { border-radius: 0 4px 4px 0; border-left: 0; }
+.phase-pill:not(:first-child):not(:last-child) { border-left: 0; }
+.phase-pill--good    { color: var(--green); border-color: var(--green); background: rgba(0,229,160,0.10); }
+.phase-pill--info    { color: var(--text-accent); border-color: var(--text-accent); background: rgba(0,210,255,0.10); }
+.phase-pill--caution { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.10); }
+.phase-pill--bad     { color: var(--red);   border-color: var(--red);   background: rgba(255,71,87,0.10); }
+
+/* Diagnosis line (kept short, --text-muted) */
+.proj-diagnosis {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── EVM Summary panel (gauges only, v1.5) ──────────────────── */
+.evm-gauge-row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-around;
+  padding: 6px 0 4px;
+}
+.evm-gauge {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.evm-gauge__label {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* ── Alerts / Tasks Up Next / Action Items / Workload — generic row ── */
+.list-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.list-row:last-child { border-bottom: none; }
+.list-row__info { flex: 1; min-width: 0; }
+.list-row__title {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.list-row__sub {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.list-row__right {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  align-self: center;
+}
+.list-row__count {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+  white-space: nowrap;
+  align-self: center;
+}
+.list-row__count--bad     { color: var(--red); }
+.list-row__count--caution { color: var(--amber); }
+.list-row__count--good    { color: var(--green); }
+.list-row__count--accent  { color: var(--text-accent); }
+.list-row__count--muted   { color: var(--text-muted); }
+
+.list-row__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.list-row__dot--bad     { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+.list-row__dot--caution { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.list-row__dot--good    { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.list-row__dot--accent  { background: var(--text-accent); }
+.list-row__dot--neutral { background: var(--text-faint); }
+
+.alert-glyph {
+  font-size: 14px; line-height: 1;
+  color: var(--red);
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* ── Team Workload row (avatar + name + bar + count) ────────── */
+.wl-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.wl-row:last-child { border-bottom: none; }
+.wl-row__name {
+  flex: 1; min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-body);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wl-row__bar-wrap { width: 70px; flex-shrink: 0; align-self: center; }
+.wl-row__bar {
+  height: 4px;
+  background: var(--bg3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.wl-row__fill { height: 100%; transition: width 0.6s ease; border-radius: 2px; }
+.wl-row__fill--bad     { background: var(--red); }
+.wl-row__fill--caution { background: var(--amber); }
+.wl-row__fill--good    { background: var(--green); }
+.wl-row__count {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+  min-width: 28px;
+  text-align: right;
+  align-self: center;
+}
+.wl-row__count--bad     { color: var(--red); }
+.wl-row__count--caution { color: var(--amber); }
+.wl-row__count--good    { color: var(--green); }
+
+.wl-unit-context {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+
+/* ── CMD97 — Unified-header overrides preserved ─────────────── */
 body.hud-header-rendered #ticker { display: none !important; }
 body.hud-header-rendered #hud-header-left { padding-right: 18px; }
-.hud-module-name .brand-cy { color: #00d2ff; }
-.hud-module-name .brand-lt { color: #e8f4ff; }
-/* CMD97 — enlarge ProjectHUD wordmark so its baseline aligns with
-   the logo's bottom edge (logo is 24px tall in hud-shell). */
+.hud-module-name .brand-cy { color: var(--text-accent); }
+.hud-module-name .brand-lt { color: var(--text-primary); }
 body.hud-header-rendered #hud-header-left .hud-module-name {
+  font-family: var(--font-display);
   font-size: 22px; line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 #hud-header-ticker #ticker-scroll-wrap {
   flex: 1; overflow: hidden; position: relative; height: 100%;
@@ -87,130 +382,81 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
   background: linear-gradient(to right, transparent, rgba(8,13,24,0.92));
 }
 
-/* ── ADD PROJECT PANEL ── */
+/* ── ADD PROJECT modal — preserved chrome, retypeset to Inter ── */
 .add-proj-overlay {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
   z-index: 1000; backdrop-filter: blur(2px);
 }
 .add-proj-overlay.open { display: flex; align-items: center; justify-content: center; }
 .add-proj-panel {
-  background: var(--bg1); border: 1px solid rgba(0,210,255,0.2);
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-act);
   width: 580px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
   position: relative;
+  border-radius: 6px;
   box-shadow: 0 0 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,210,255,0.08);
 }
 .ap-header {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: flex-start; justify-content: space-between;
   padding: 18px 24px; border-bottom: 1px solid var(--border);
 }
-.ap-title { font-family: var(--font-hud); font-size: 18px; font-weight: 700; color: var(--text0); letter-spacing: .04em; }
-.ap-close { background: none; border: none; color: var(--text3); font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1; transition: color .15s; }
-.ap-close:hover { color: var(--text0); }
+.ap-title {
+  font-family: var(--font-ui);
+  font-size: 16px; font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+}
+.ap-subtitle {
+  font-family: var(--font-ui);
+  font-size: 11px; font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
 .ap-body { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
 .ap-field { display: flex; flex-direction: column; gap: 6px; }
 .ap-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.ap-label { font-family: var(--font-mono); font-size: 10px; color: var(--text3); letter-spacing: .12em; }
+.ap-label {
+  font-family: var(--font-ui);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
 .ap-label span { color: var(--red); margin-left: 2px; }
 .ap-input, .ap-select, .ap-textarea {
-  background: var(--bg2); border: 1px solid var(--border); color: var(--text1);
-  font-family: var(--font-ui); font-size: 13px; padding: 9px 12px; outline: none;
+  background: var(--surface-content);
+  border: 1px solid var(--border);
+  color: var(--text-body);
+  font-family: var(--font-ui);
+  font-size: 13px; padding: 9px 12px; outline: none;
+  border-radius: 4px;
   transition: border-color .15s; width: 100%;
 }
-.ap-input:focus, .ap-select:focus, .ap-textarea:focus { border-color: rgba(0,210,255,.45); }
+.ap-input:focus, .ap-select:focus, .ap-textarea:focus { border-color: var(--border-act); }
 .ap-textarea { resize: vertical; min-height: 72px; }
 .ap-select { cursor: pointer; }
 .ap-section-label {
-  font-family: var(--font-mono); font-size: 9px; color: var(--text3); letter-spacing: .15em;
-  border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: -4px;
+  font-family: var(--font-ui);
+  font-size: 11px; font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px; margin-bottom: -4px;
 }
 .ap-footer {
   display: flex; align-items: center; justify-content: flex-end; gap: 10px;
   padding: 16px 24px; border-top: 1px solid var(--border);
 }
-.ap-btn-cancel { background: none; border: 1px solid var(--border); color: var(--text3); font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; padding: 8px 20px; cursor: pointer; transition: all .15s; }
-.ap-btn-cancel:hover { border-color: var(--text2); color: var(--text1); }
-.ap-btn-save { background: rgba(0,210,255,.08); border: 1px solid rgba(0,210,255,.45); color: var(--cyan); font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; padding: 8px 24px; cursor: pointer; transition: all .15s; }
-.ap-btn-save:hover { background: rgba(0,210,255,.15); }
-.ap-btn-save:disabled { opacity: .4; cursor: not-allowed; }
-.ap-error { font-family: var(--font-mono); font-size: 10px; color: var(--red); min-height: 16px; }
-
-/* CMD97 — Page header rendered as the first cell in the KPI row.
-   ────────────────────────────────────────────────────────────────
-   #dash-header-row is a CSS grid: [ DASHBOARD card ][ 7 KPI cards ].
-   The DASHBOARD cell adopts kpi-card chrome (same background,
-   border, height) so the header reads as the leftmost card. Inside
-   it, .page-title sits at kpi-value position; .page-subtitle sits
-   at kpi-label/sub position — text baselines align across the row. */
-#dash-header-row {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 8px;
-  margin-bottom: 16px;
-}
-/* Tighten #content top padding for dashboard so the gap above the
-   first panel matches inter-panel spacing. */
-#content { padding-top: 8px !important; }
-#dash-header-row #page-header {
-  /* match .kpi-card chrome — same padding as #dash-header-row .kpi-card
-     (6px 10px). Content (title + subtitle) anchored bottom-left to
-     mirror the KPI cards' bottom-left text alignment. */
-  background: var(--bg2, #111827);
-  border: 1px solid var(--border, rgba(255,255,255,.08));
-  border-top: 2px solid var(--cyan, #00d2ff);
-  padding: 6px 10px !important;
-  margin: 0 !important;
-  display: flex; flex-direction: column; justify-content: flex-end;
-  align-items: flex-start;
-  min-height: 0;
-}
-#dash-header-row #page-header > div { margin: 0; padding: 0; }
-#dash-header-row #page-header .page-title {
-  font-family: var(--font-hud, 'Rajdhani', 'Inter', sans-serif);
-  font-size: 32px; font-weight: 700; line-height: 1;
-  color: var(--text0, #e8f4ff);
-  letter-spacing: .04em;
-  margin: 0; padding: 0;
-}
-#dash-header-row #page-header .page-subtitle {
-  font-family: var(--font-mono, 'Share Tech Mono', monospace);
-  font-size: 11px; font-weight: 400;
-  letter-spacing: .12em;
-  color: var(--text2, #7a9bbf);
-  margin-top: 4px;
-}
-#dash-header-row .kpi-card {
-  padding: 6px 10px !important;
-  min-height: 0;
-}
-#dash-header-row .kpi-card .kpi-icon {
-  font-size: 18px !important;
-  top: 4px !important; right: 6px !important;
-}
-#dash-header-row .kpi-card .kpi-value {
-  font-size: 22px !important; line-height: 1.05 !important;
-}
-#dash-header-row .kpi-card .kpi-label {
-  font-size: 11px !important; letter-spacing: .05em !important; margin-top: 1px !important;
-}
-#dash-header-row .kpi-card .kpi-sub {
-  font-size: 11px !important; margin-top: 0 !important;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-@media (max-width: 1400px) {
-  #dash-header-row {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  #dash-header-row #page-header { grid-column: 1 / -1; }
+.ap-error {
+  font-family: var(--font-ui);
+  font-size: 11px; color: var(--red); min-height: 16px;
 }
 </style>
 </head>
 <body>
 
-<!-- CMD97: ticker bar removed from body. Ticker scroll content
-     is mounted into #hud-header-ticker (unified header center
-     region) by the boot script below. #ticker-scroll-wrap and
-     #ticker-scroll persist as live DOM (Ticker.init targets
-     'ticker-scroll' by id). -->
+<!-- Activity ticker scroll-wrap is mounted into #hud-header-ticker by boot below. -->
 <div id="ticker-scroll-wrap" style="display:none">
   <div id="ticker-scroll"></div>
 </div>
@@ -218,73 +464,149 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
 <div id="app">
   <nav id="sidebar"></nav>
 
-    <div id="content">
-      <!-- CMD97: page header + KPI row share a single horizontal band, inside #content for left-edge alignment with panels below. -->
-      <div id="dash-header-row">
-        <div id="page-header">
-          <div>
-            <div class="page-title">DASHBOARD</div>
-            <div class="page-subtitle">FIRM-WIDE OVERVIEW</div>
-          </div>
-        </div>
-        <div class="kpi-card" style="border-top-color:var(--cyan);--kpi-glow:rgba(0,210,255,0.05);"><div class="kpi-icon">◧</div><div class="kpi-value" id="kpi-active" style="color:var(--cyan)">—</div><div class="kpi-label">Active Projects</div><div class="kpi-sub" id="kpi-active-sub">Loading...</div></div>
-        <div class="kpi-card" style="border-top-color:var(--purple);--kpi-glow:rgba(155,89,182,0.05);"><div class="kpi-icon">▶</div><div class="kpi-value" id="kpi-actions" style="color:var(--purple)">—</div><div class="kpi-label">Open Action Items</div><div class="kpi-sub" id="kpi-actions-sub">Loading...</div></div>
-        <div class="kpi-card" style="border-top-color:var(--red);--kpi-glow:rgba(255,71,87,0.05);"><div class="kpi-icon">⚑</div><div class="kpi-value" id="kpi-alerts" style="color:var(--red)">—</div><div class="kpi-label">At-Risk Tasks</div><div class="kpi-sub" id="kpi-alerts-sub">Loading...</div></div>
-        <div class="kpi-card" style="border-top-color:var(--green);--kpi-glow:rgba(0,229,160,0.05);"><div class="kpi-icon">✓</div><div class="kpi-value" id="kpi-complete" style="color:var(--green)">—</div><div class="kpi-label">Tasks Complete</div><div class="kpi-sub" id="kpi-complete-sub">Loading...</div></div>
-        <div class="kpi-card" style="border-top-color:var(--amber);--kpi-glow:rgba(255,170,0,0.05);"><div class="kpi-icon">◎</div><div class="kpi-value" id="kpi-risks" style="color:var(--amber)">—</div><div class="kpi-label">Open Risks</div><div class="kpi-sub" id="kpi-risks-sub">Loading...</div></div>
-        <div class="kpi-card" style="border-top-color:#5b8fff;--kpi-glow:rgba(91,143,255,0.05);"><div class="kpi-icon">$</div><div class="kpi-value" id="kpi-budget" style="color:#5b8fff">—</div><div class="kpi-label">Labor Budget</div><div class="kpi-sub" id="kpi-budget-sub">Loading...</div></div>
-        <div class="kpi-card" style="border-top-color:var(--amber);--kpi-glow:rgba(255,170,0,0.05);"><div class="kpi-icon">△</div><div class="kpi-value" id="kpi-variance" style="color:var(--amber)">—</div><div class="kpi-label">Schedule Risk</div><div class="kpi-sub" id="kpi-variance-sub">Loading...</div></div>
+  <div id="content">
+    <!-- Top band: page-identity card + 7-card KPI strip -->
+    <div id="dash-header-row">
+      <div id="dash-page-identity">
+        <div class="page-identity__name">DASHBOARD</div>
+        <div class="page-identity__sub">FIRM-WIDE OVERVIEW</div>
       </div>
 
-      <div class="dashboard-grid">
-        <div>
-          <div class="panel bracketed">
-            <div class="bracket-bl"></div><div class="bracket-br"></div>
-            <div class="panel-header">
-              <div class="panel-title">ACTIVE PROJECTS</div>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <span class="panel-count" id="proj-count">—</span>
-                <button class="panel-action" onclick="ProjectDrawer.openAdd()" style="color:var(--green);border-color:rgba(0,229,160,.35);background:rgba(0,229,160,.06);">+ ADD PROJECT</button>
-                <button class="panel-action" onclick="window.location.href='/projects.html'">VIEW ALL →</button>
-              </div>
+      <div class="kpi-card-v15" id="kpi-card-active">
+        <div class="kpi-card__bar kpi-card__bar--informational"></div>
+        <span class="kpi-card__glyph">◧</span>
+        <div class="kpi-card__label">Active Projects</div>
+        <div class="kpi-card__value kpi-card__value--accent" id="kpi-active">—</div>
+        <div class="kpi-card__sub" id="kpi-active-sub">Loading…</div>
+      </div>
+
+      <div class="kpi-card-v15" id="kpi-card-actions">
+        <div class="kpi-card__bar kpi-card__bar--informational" id="kpi-actions-bar"></div>
+        <span class="kpi-card__glyph">▶</span>
+        <div class="kpi-card__label">Open Action Items</div>
+        <div class="kpi-card__value kpi-card__value--accent" id="kpi-actions">—</div>
+        <div class="kpi-card__sub" id="kpi-actions-sub">Loading…</div>
+      </div>
+
+      <div class="kpi-card-v15" id="kpi-card-alerts">
+        <div class="kpi-card__bar kpi-card__bar--state-bad" id="kpi-alerts-bar"></div>
+        <span class="kpi-card__glyph">⚑</span>
+        <div class="kpi-card__label">At-Risk Tasks</div>
+        <div class="kpi-card__value kpi-card__value--state-bad" id="kpi-alerts">—</div>
+        <div class="kpi-card__sub" id="kpi-alerts-sub">Loading…</div>
+      </div>
+
+      <div class="kpi-card-v15" id="kpi-card-complete">
+        <div class="kpi-card__bar kpi-card__bar--informational"></div>
+        <span class="kpi-card__glyph">✓</span>
+        <div class="kpi-card__label">Tasks Complete</div>
+        <div class="kpi-card__value kpi-card__value--accent" id="kpi-complete">—</div>
+        <div class="kpi-card__sub" id="kpi-complete-sub">Loading…</div>
+      </div>
+
+      <div class="kpi-card-v15" id="kpi-card-risks">
+        <div class="kpi-card__bar kpi-card__bar--state-good" id="kpi-risks-bar"></div>
+        <span class="kpi-card__glyph">◎</span>
+        <div class="kpi-card__label">Open Risks</div>
+        <div class="kpi-card__value kpi-card__value--state-good" id="kpi-risks">—</div>
+        <div class="kpi-card__sub" id="kpi-risks-sub">Loading…</div>
+      </div>
+
+      <div class="kpi-card-v15" id="kpi-card-budget">
+        <div class="kpi-card__bar kpi-card__bar--informational"></div>
+        <span class="kpi-card__glyph">$</span>
+        <div class="kpi-card__label">Labor Budget</div>
+        <div class="kpi-card__value kpi-card__value--accent" id="kpi-budget">—</div>
+        <div class="kpi-card__sub" id="kpi-budget-sub">Loading…</div>
+      </div>
+
+      <div class="kpi-card-v15" id="kpi-card-variance">
+        <div class="kpi-card__bar kpi-card__bar--state-good" id="kpi-variance-bar"></div>
+        <span class="kpi-card__glyph">△</span>
+        <div class="kpi-card__label">Schedule Risk</div>
+        <div class="kpi-card__value kpi-card__value--state-good" id="kpi-variance">—</div>
+        <div class="kpi-card__sub" id="kpi-variance-sub">Loading…</div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <div>
+        <!-- ACTIVE PROJECTS -->
+        <div class="panel-frame" style="margin-bottom:16px">
+          <div class="panel-frame__corner-bl"></div><div class="panel-frame__corner-br"></div>
+          <div class="panel-header">
+            <span class="section-label-with-bar">ACTIVE PROJECTS
+              <span class="panel-header__count panel-header__count--accent" id="proj-count">—</span>
+            </span>
+            <div class="panel-header__right">
+              <button class="btn btn-primary" type="button" onclick="openAddProject()">+ Add Project</button>
+              <a class="panel-link" href="/projects.html">View All →</a>
             </div>
-            <div id="projects-list"></div>
           </div>
-          <div class="panel">
-            <div class="panel-header"><div class="panel-title">TASKS UP NEXT</div><button class="panel-action">VIEW ALL →</button></div>
-            <div id="tasks-list"></div>
-          </div>
+          <div id="projects-list"></div>
         </div>
-        <div>
-          <div class="panel bracketed">
-            <div class="bracket-bl"></div><div class="bracket-br"></div>
-            <div class="panel-header"><div class="panel-title">EVM SUMMARY</div><button class="panel-action">DETAILS →</button></div>
-            <div class="evm-gauge-row" id="evm-gauges"></div>
-            <div class="evm-values" id="evm-values"></div>
+
+        <!-- TASKS UP NEXT -->
+        <div class="panel-frame">
+          <div class="panel-frame__corner-bl"></div><div class="panel-frame__corner-br"></div>
+          <div class="panel-header">
+            <span class="section-label-with-bar">TASKS UP NEXT</span>
+            <div class="panel-header__right">
+              <a class="panel-link" href="/projects.html">View All →</a>
+            </div>
           </div>
-          <div class="panel">
-            <div class="panel-header"><div class="panel-title">ALERTS — OVERDUE</div><span class="panel-count" id="alerts-count" style="background:rgba(255,71,87,0.1);color:var(--red);border-color:rgba(255,71,87,0.25);">—</span></div>
-            <div id="alerts-list"></div>
+          <div id="tasks-list"></div>
+        </div>
+      </div>
+
+      <div>
+        <!-- EVM SUMMARY -->
+        <div class="panel-frame" style="margin-bottom:16px">
+          <div class="panel-frame__corner-bl"></div><div class="panel-frame__corner-br"></div>
+          <div class="panel-header">
+            <span class="section-label-with-bar">EVM SUMMARY</span>
+            <div class="panel-header__right">
+              <a class="panel-link" href="/projects.html">Details →</a>
+            </div>
           </div>
-          <div class="panel">
-            <div class="panel-header"><div class="panel-title">KEY ACTION ITEMS</div><button class="panel-action">VIEW ALL →</button></div>
-            <div id="actions-list"></div>
+          <div class="evm-gauge-row" id="evm-gauges"></div>
+        </div>
+
+        <!-- ALERTS — OVERDUE -->
+        <div class="panel-frame" style="margin-bottom:16px">
+          <div class="panel-frame__corner-bl"></div><div class="panel-frame__corner-br"></div>
+          <div class="panel-header">
+            <span class="section-label-with-bar">ALERTS — OVERDUE
+              <span class="panel-header__count panel-header__count--bad" id="alerts-count">—</span>
+            </span>
           </div>
-          <div class="panel">
-            <div class="panel-header"><div class="panel-title">TEAM WORKLOAD</div></div>
-            <div id="workload-list"></div>
+          <div id="alerts-list"></div>
+        </div>
+
+        <!-- KEY ACTION ITEMS -->
+        <div class="panel-frame" style="margin-bottom:16px">
+          <div class="panel-frame__corner-bl"></div><div class="panel-frame__corner-br"></div>
+          <div class="panel-header">
+            <span class="section-label-with-bar">KEY ACTION ITEMS</span>
+            <div class="panel-header__right">
+              <a class="panel-link" href="/action-items.html">View All →</a>
+            </div>
           </div>
+          <div id="actions-list"></div>
+        </div>
+
+        <!-- TEAM WORKLOAD -->
+        <div class="panel-frame">
+          <div class="panel-frame__corner-bl"></div><div class="panel-frame__corner-br"></div>
+          <div class="panel-header">
+            <span class="section-label-with-bar">TEAM WORKLOAD</span>
+          </div>
+          <div class="wl-unit-context">Open tasks per assignee</div>
+          <div id="workload-list"></div>
         </div>
       </div>
     </div>
   </div>
-</div>
-
-<!-- Build version -->
-<div id="build-version" style="position:fixed;bottom:8px;left:60px;
-  font-family:var(--font-mono,monospace);font-size:9px;letter-spacing:.08em;
-  color:rgba(255,255,255,.2);z-index:10;pointer-events:none;user-select:none">
-  ProjectHUD v<span id="version-num">—</span>
 </div>
 
 <script src="/js/config.js"></script>
@@ -300,14 +622,7 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
 Ticker.init('ticker-scroll', Ticker.DEFAULT_EVENTS);
 HUDShell.init({ page: 'dashboard', moduleName: 'ProjectHUD' });
 
-// CMD97 — post-init dashboard customizations of unified header.
-// (a) Color-split "ProjectHUD" wordmark: "Project" cyan + "HUD" light.
-// (b) Relocate the activity ticker scroll-wrap into the header's
-//     center region (#hud-header-ticker), which hud-shell renders
-//     empty and reserves for surface-specific content.
-// Runs once after hud-shell finishes building the header. Header
-// is built synchronously inside HUDShell.init() before its async
-// data-fetch tail, so a microtask defer is enough.
+// Post-init dashboard customizations of unified header.
 Promise.resolve().then(() => {
   const nameEl = document.querySelector('#hud-header-left .hud-module-name');
   if (nameEl && nameEl.textContent.trim() === 'ProjectHUD') {
@@ -321,11 +636,63 @@ Promise.resolve().then(() => {
   }
 });
 
-// Set build version from config
-document.addEventListener('DOMContentLoaded', () => {
-  const vEl = document.getElementById('version-num');
-  if (vEl && typeof PHUD !== 'undefined') vEl.textContent = PHUD.VERSION || '1.0.0';
-});
+// ── Doctrine-conformant gauge renderer (CMD99 §3.3.5) ─────────
+// Local replacement for UI.gauge that:
+//   (a) computes arc length proportional to value/max (the
+//       proportionality fix mandated by the brief),
+//   (b) renders typography in Inter per §2.1, ≥11px per IR38,
+//       state-color tokens at full saturation per §3.7.
+function renderGauge(value, max, colorVar, label, displayText) {
+  const pct  = Math.min(1, Math.max(0, (value || 0) / (max || 1)));
+  const r    = 28;
+  const cx   = 36;
+  const cy   = 36;
+  const circ = 2 * Math.PI * r;
+  const dash = pct * circ;
+  const gap  = circ - dash;
+  return `<div class="evm-gauge">
+    <svg width="76" height="76" viewBox="0 0 72 72" aria-hidden="true">
+      <circle cx="${cx}" cy="${cy}" r="${r}"
+        fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="5"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}"
+        fill="none" stroke="${colorVar}" stroke-width="5"
+        stroke-linecap="round"
+        stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
+        transform="rotate(-90 ${cx} ${cy})"/>
+      <text x="${cx}" y="${cy + 5}" text-anchor="middle"
+        font-family="Inter, system-ui, sans-serif" font-size="13"
+        font-weight="700" fill="${colorVar}"
+        style="font-feature-settings: 'tnum'">${displayText}</text>
+    </svg>
+    <div class="evm-gauge__label">${label}</div>
+  </div>`;
+}
+
+// CPI/SPI threshold mapping per §3.3.4 (red < 0.95, amber 0.95–1.05, green > 1.05)
+function evmIndexColor(v) {
+  if (v == null || isNaN(v)) return 'var(--text-muted)';
+  if (v < 0.95) return 'var(--red)';
+  if (v <= 1.05) return 'var(--amber)';
+  return 'var(--green)';
+}
+
+// Empty-state helper (v1.5 §4.6)
+function emptyState(label, sub, glyphMod) {
+  const g = glyphMod || 'good';
+  const glyph = g === 'good' ? '✓' : g === 'bad' ? '⚠' : '·';
+  return `<div class="empty-state">
+    <div class="empty-state__glyph empty-state__glyph--${g}">${glyph}</div>
+    <div class="empty-state__label">${label}</div>
+    <div class="empty-state__sub">${sub}</div>
+  </div>`;
+}
+
+// Avatar (v1.5 §5.8) — initials fallback; photo support reserved for
+// when resources.photo_url surfaces in API responses
+function renderInitialsAvatar(name) {
+  const initials = (name || '?').split(' ').map(w => w[0]).join('').toUpperCase().substring(0,2);
+  return `<span class="avatar avatar--md" aria-label="${name||''}">${initials}</span>`;
+}
 
 async function loadDashboard() {
   try {
@@ -337,7 +704,6 @@ async function loadDashboard() {
 
     const activeProjects  = projects.filter(p => p.status === 'active');
 
-    // ── EVM + TEAC forecast per project ───────────────────────────────────────
     function calcProjectEVM(proj, projTasks, projEntries) {
       const today      = new Date().toLocaleDateString('en-CA');
       const bac        = parseFloat(proj.budget_baseline_hours || 0);
@@ -348,7 +714,6 @@ async function loadDashboard() {
       const evPct      = totalEffort > 0 ? earnedEffort / totalEffort : 0;
       const ev         = bac > 0 ? evPct * bac : earnedEffort;
 
-      // Planned value
       const startDate  = proj.start_date;
       const targetDate = proj.target_date;
       const daysTotal  = (startDate && targetDate)
@@ -361,10 +726,8 @@ async function loadDashboard() {
       const cpi  = actualHrs > 0 ? ev / actualHrs  : null;
       const spi  = pv > 0        ? ev / pv          : null;
       const eac  = (cpi && cpi > 0 && bac > 0) ? bac / cpi : null;
-      const cv   = eac ? eac - bac : null;  // cost variance (positive = overrun)
+      const cv   = eac ? eac - bac : null;
 
-      // TEAC — Time Estimate at Completion (EVM-based schedule forecast)
-      // Uses Earned Schedule concept: TEAC = Planned Duration / SPI
       let teac = null, teacDate = null, slipDays = null;
       if (spi && spi > 0 && daysTotal > 0 && startDate) {
         const teacDays = Math.round(daysTotal / spi);
@@ -376,10 +739,6 @@ async function loadDashboard() {
         }
       }
 
-      // Three-scenario confidence bands
-      // P25 (optimistic): SPI recovers to 1.0 for remaining work
-      // P50 (most likely): current SPI continues
-      // P80 (pessimistic): SPI degrades by 15%
       let p25Date = null, p50Date = null, p80Date = null;
       if (spi && daysTotal > 0 && startDate) {
         const daysRemaining = daysTotal - daysElapsed;
@@ -392,40 +751,35 @@ async function loadDashboard() {
         p80Date = new Date(ms(p80Days)).toLocaleDateString('en-CA');
       }
 
-      // TCPI — To Complete Performance Index
-      // What efficiency must the team sustain to hit the BAC target?
       const workRemaining = bac - ev;
       const fundsRemaining = bac - actualHrs;
       const tcpi = (fundsRemaining > 0) ? workRemaining / fundsRemaining : null;
 
-      // Expense actuals
       const expBudget  = parseFloat(proj.expense_budget_baseline || 0);
       const billableHrs= (projEntries||[]).filter(e => e.is_billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
-      // Estimate accrued labor cost: billable hours × assumed $150/hr blended rate
-      // TODO: tie to actual_rate from resources when available
       const accrLaborCost = billableHrs * 150;
 
-      // Why at risk — plain-English diagnosis
       const overdueTasks = projTasks.filter(t =>
         t.due_date && t.due_date < today && t.status !== 'complete').length;
       const blockedTasks = projTasks.filter(t => t.status === 'blocked').length;
       let diagnosis = '';
       if (blockedTasks > 0 && spi && spi < 1)
-        diagnosis = `${blockedTasks} blocked task${blockedTasks!==1?'s':''} + schedule running at ${(spi*100).toFixed(0)}% efficiency`;
+        diagnosis = `${blockedTasks} blocked · SPI ${(spi).toFixed(2)}`;
       else if (overdueTasks > 0 && spi && spi < 1)
-        diagnosis = `${overdueTasks} overdue task${overdueTasks!==1?'s':''} driving SPI = ${spi?.toFixed(2)||'—'} — resourcing issue`;
+        diagnosis = `${overdueTasks} overdue · SPI ${spi.toFixed(2)}`;
       else if (cpi && cpi < 0.95)
-        diagnosis = `Cost overrun: CPI = ${cpi.toFixed(2)} — consuming ${((1/cpi-1)*100).toFixed(0)}% more effort than planned`;
+        diagnosis = `Cost overrun · CPI ${cpi.toFixed(2)}`;
       else if (spi && spi < 0.95)
-        diagnosis = `Schedule slipping: SPI = ${spi.toFixed(2)} — ${Math.round((1-spi)*100)}% behind planned progress`;
+        diagnosis = `Schedule slipping · SPI ${spi.toFixed(2)}`;
       else
-        diagnosis = 'On track — no significant variance detected';
+        diagnosis = 'On track';
 
       return { evPct, ev, pv, bac, actualHrs, cpi, spi, eac, cv, tcpi,
                teacDate, slipDays, p25Date, p50Date, p80Date,
                expBudget, accrLaborCost, diagnosis,
                overdueTasks, blockedTasks };
     }
+
     const completeTasks   = tasks.filter(t => t.status === 'complete');
     const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
     const atRiskTasks     = tasks.filter(t =>
@@ -435,54 +789,85 @@ async function loadDashboard() {
     const clientFirms = Object.fromEntries(firms.map(f => [f.id, f.name]));
     const projMap     = Object.fromEntries(projects.map(p => [p.id, p.name]));
 
-    // KPI cards
-    document.getElementById('kpi-active').textContent    = activeProjects.length;
+    // ── KPI strip with state-driven top-bar coloring per §3.3.2 ──
+    function setBar(elId, klass) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.className = 'kpi-card__bar ' + klass;
+    }
+
+    document.getElementById('kpi-active').textContent = activeProjects.length;
     const planningCount = projects.filter(p => p.status === 'planning').length;
     document.getElementById('kpi-active-sub').textContent =
       planningCount > 0
         ? `${projects.length} total · ${planningCount} in planning`
         : `${projects.length} total projects`;
-    document.getElementById('kpi-actions').textContent   = 0;
-    document.getElementById('kpi-actions-sub').textContent = '0 overdue · view →';
-    document.getElementById('kpi-alerts').textContent    = atRiskTasks.length;
-    document.getElementById('kpi-alerts-sub').innerHTML  =
-      `<span style="color:var(--red)">${tasks.filter(t=>t.status==='blocked').length} blocked</span> · ${tasks.filter(t=>t.status==='overdue').length} overdue`;
-    document.getElementById('kpi-complete').textContent  = completeTasks.length;
-    document.getElementById('kpi-complete-sub').textContent = `of ${tasks.length} total tasks`;
-    document.getElementById('kpi-risks').textContent     = 0;
-    document.getElementById('kpi-risks-sub').textContent = 'no critical risks';
 
-    // Active projects
+    const openActionsCount = 0;
+    document.getElementById('kpi-actions').textContent = openActionsCount;
+    document.getElementById('kpi-actions-sub').textContent = '0 overdue';
+    setBar('kpi-actions-bar',
+      openActionsCount > 0 ? 'kpi-card__bar--state-caution' : 'kpi-card__bar--informational');
+
+    document.getElementById('kpi-alerts').textContent = atRiskTasks.length;
+    const blockedCt = tasks.filter(t=>t.status==='blocked').length;
+    const overdueCt = tasks.filter(t=>t.status==='overdue').length;
+    document.getElementById('kpi-alerts-sub').textContent =
+      `${blockedCt} blocked · ${overdueCt} overdue`;
+    setBar('kpi-alerts-bar',
+      atRiskTasks.length > 0 ? 'kpi-card__bar--state-bad' : 'kpi-card__bar--state-good');
+    const alertsValEl = document.getElementById('kpi-alerts');
+    alertsValEl.className = 'kpi-card__value ' +
+      (atRiskTasks.length > 0 ? 'kpi-card__value--state-bad' : 'kpi-card__value--state-good');
+
+    document.getElementById('kpi-complete').textContent = completeTasks.length;
+    document.getElementById('kpi-complete-sub').textContent = `of ${tasks.length} total tasks`;
+
+    const openRisksCount = 0;
+    document.getElementById('kpi-risks').textContent = openRisksCount;
+    document.getElementById('kpi-risks-sub').textContent =
+      openRisksCount > 0 ? `${openRisksCount} open` : 'no critical risks';
+    setBar('kpi-risks-bar',
+      openRisksCount > 0 ? 'kpi-card__bar--state-bad' : 'kpi-card__bar--state-good');
+    const risksValEl = document.getElementById('kpi-risks');
+    risksValEl.className = 'kpi-card__value ' +
+      (openRisksCount > 0 ? 'kpi-card__value--state-bad' : 'kpi-card__value--state-good');
+
     document.getElementById('proj-count').textContent = activeProjects.length;
     const projList = document.getElementById('projects-list');
+
+    // EVM aggregations (needed even if zero projects, for KPI cards)
+    const projEVMs = {};
+    activeProjects.forEach(proj => {
+      const pt = tasks.filter(t => t.project_id === proj.id);
+      const pe = (timeEntries||[]).filter(e => e.project_id === proj.id);
+      projEVMs[proj.id] = calcProjectEVM(proj, pt, pe);
+    });
+
+    const totalBACHrs   = activeProjects.reduce((s,p) => s + parseFloat(p.budget_baseline_hours||0), 0);
+    const totalActualHrs= activeProjects.reduce((s,p) => s + (projEVMs[p.id]?.actualHrs||0), 0);
+    const budgetPct     = totalBACHrs > 0 ? Math.round((totalActualHrs / totalBACHrs) * 100) : 0;
+    document.getElementById('kpi-budget').textContent    = totalBACHrs.toFixed(0) + 'h';
+    document.getElementById('kpi-budget-sub').textContent= `${totalActualHrs.toFixed(0)}h used · ${budgetPct}% consumed`;
+
+    const slips     = activeProjects.map(p => projEVMs[p.id]?.slipDays||0).filter(s => s > 0);
+    const maxSlip   = slips.length > 0 ? Math.max(...slips) : 0;
+    const atRiskCount2 = activeProjects.filter(p => (projEVMs[p.id]?.slipDays||0) > 0).length;
+    const varEl     = document.getElementById('kpi-variance');
+    varEl.textContent = maxSlip > 0 ? '+' + maxSlip + 'd' : '0d';
+    let varianceState;
+    if (maxSlip > 14)      varianceState = 'state-bad';
+    else if (maxSlip > 0)  varianceState = 'state-caution';
+    else                   varianceState = 'state-good';
+    varEl.className = 'kpi-card__value kpi-card__value--' + varianceState;
+    setBar('kpi-variance-bar', 'kpi-card__bar--' + varianceState);
+    document.getElementById('kpi-variance-sub').textContent =
+      atRiskCount2 > 0 ? `${atRiskCount2} project${atRiskCount2!==1?'s':''} forecasting slip` : 'All on schedule';
+
+    // ── Active Projects rows ──
     if (activeProjects.length === 0) {
-      projList.innerHTML = UI.allClear('NO ACTIVE PROJECTS','Create a project to begin tracking');
+      projList.innerHTML = emptyState('NO ACTIVE PROJECTS', 'Create a project to begin tracking', 'neutral');
     } else {
-      // Compute EVM for all projects upfront for KPI aggregation
-      const projEVMs = {};
-      activeProjects.forEach(proj => {
-        const pt = tasks.filter(t => t.project_id === proj.id);
-        const pe = (timeEntries||[]).filter(e => e.project_id === proj.id);
-        projEVMs[proj.id] = calcProjectEVM(proj, pt, pe);
-      });
-
-      // Budget KPI — total labor budget vs accrued hours
-      const totalBACHrs   = activeProjects.reduce((s,p) => s + parseFloat(p.budget_baseline_hours||0), 0);
-      const totalActualHrs= activeProjects.reduce((s,p) => s + (projEVMs[p.id]?.actualHrs||0), 0);
-      const budgetPct     = totalBACHrs > 0 ? Math.round((totalActualHrs / totalBACHrs) * 100) : 0;
-      document.getElementById('kpi-budget').textContent    = totalBACHrs.toFixed(0) + 'h';
-      document.getElementById('kpi-budget-sub').textContent= `${totalActualHrs.toFixed(0)}h used · ${budgetPct}% consumed`;
-
-      // Schedule risk KPI — worst slip across all projects
-      const slips     = activeProjects.map(p => projEVMs[p.id]?.slipDays||0).filter(s => s > 0);
-      const maxSlip   = slips.length > 0 ? Math.max(...slips) : 0;
-      const atRiskCount2 = activeProjects.filter(p => (projEVMs[p.id]?.slipDays||0) > 0).length;
-      const varEl     = document.getElementById('kpi-variance');
-      varEl.textContent = maxSlip > 0 ? '+' + maxSlip + 'd' : '0d';
-      varEl.style.color = maxSlip > 14 ? 'var(--red)' : maxSlip > 0 ? 'var(--amber)' : 'var(--green)';
-      document.getElementById('kpi-variance-sub').textContent =
-        atRiskCount2 > 0 ? `${atRiskCount2} project${atRiskCount2!==1?'s':''} forecasting slip` : 'All on schedule';
-
       projList.innerHTML = activeProjects.map(proj => {
         const pt      = tasks.filter(t => t.project_id === proj.id);
         const done    = pt.filter(t => t.status === 'complete').length;
@@ -490,208 +875,168 @@ async function loadDashboard() {
         const pctDone = UI.pct(done, pt.length);
         const health  = evm.blockedTasks > 0 ? 'blocked' : evm.overdueTasks > 0 ? 'at-risk' : 'active';
         const hLabel  = evm.blockedTasks > 0 ? 'BLOCKED' : evm.overdueTasks > 0 ? 'AT RISK' : 'ACTIVE';
+        const hBadge  = health === 'blocked' ? 'bad' : health === 'at-risk' ? 'caution' : 'good';
         const client  = proj.client_id ? clientFirms[proj.client_id] || '—' : 'Internal';
-        const fill    = pctDone === 100 ? 'var(--green)' : evm.overdueTasks > 0 ? 'var(--amber)' : 'var(--cyan)';
         const cpi     = evm.cpi  ? evm.cpi.toFixed(2)  : '—';
         const spi     = evm.spi  ? evm.spi.toFixed(2)  : '—';
         const tcpi    = evm.tcpi ? evm.tcpi.toFixed(2) : '—';
         const dLeft   = proj.target_date ? UI.daysUntil(proj.target_date) : null;
 
-        // PM initials — pm_resource_id matches resources.id
         const _pmRes = proj.pm_resource_id
           ? (resources||[]).find(r => r.id === proj.pm_resource_id) : null;
-        const pmName = _pmRes
-          ? ((_pmRes.first_name||'')[0] + (_pmRes.last_name||'')[0]).toUpperCase()
-          : '';
-        // Budget % calculations
-        const laborBudget  = parseFloat(proj.budget_baseline_hours || 0);
-        const laborUsed    = evm.actualHrs || 0;
-        const laborPct     = laborBudget > 0 ? Math.round((laborUsed / laborBudget) * 100) : 0;
-        const expBudget    = parseFloat(proj.expense_budget_baseline || 0);
-        const expUsed      = evm.accrLaborCost || 0;
-        const expPct       = expBudget > 0 ? Math.round((expUsed / expBudget) * 100) : 0;
+        const pmName = _pmRes ? `${_pmRes.first_name||''} ${_pmRes.last_name||''}`.trim() : '';
 
+        const cpiState = evm.cpi == null ? '' :
+          (evm.cpi < 0.95 ? 'bad' : evm.cpi <= 1.05 ? 'caution' : 'good');
+        const spiState = evm.spi == null ? '' :
+          (evm.spi < 0.95 ? 'bad' : evm.spi <= 1.05 ? 'caution' : 'good');
 
+        // P25/P50/P80 phase pills per §3.3.3
+        const phasePills = evm.p25Date ? `
+          <div class="phase-pills">
+            <span class="phase-pill phase-pill--good">P25 ${UI.fmtDateShort(evm.p25Date)}</span>
+            <span class="phase-pill phase-pill--info">P50 ${UI.fmtDateShort(evm.p50Date)}</span>
+            <span class="phase-pill phase-pill--${evm.slipDays>14?'bad':evm.slipDays>0?'caution':'good'}">P80 ${UI.fmtDateShort(evm.p80Date)}</span>
+          </div>` : '';
 
-        return `<div class="project-card ${health} fade-in"
-            onclick="window.location.href='/project-detail.html?id=${proj.id}'" style="cursor:pointer;">
-
-          <!-- ROW 1: Name · Edit · AT RISK -->
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:2px;">
-            <div style="display:flex;align-items:center;gap:8px">
-              <div class="proj-name">${proj.name}</div>
-              <button onclick="event.stopPropagation();openEditProject('${proj.id}')"
-                style="font-family:var(--font-mono);font-size:9px;padding:1px 6px;
-                  border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);
-                  color:var(--text3);cursor:pointer;border-radius:3px;flex-shrink:0">✎ EDIT</button>
+        return `<div class="proj-row health--${health}"
+            onclick="window.location.href='/project-detail.html?id=${proj.id}'">
+          <div class="proj-row__r1">
+            <div class="proj-row__title-wrap">
+              <div class="proj-row__title">${proj.name}</div>
+              <button class="btn" type="button" style="padding:1px 8px;font-size:11px"
+                onclick="event.stopPropagation();openEditProject('${proj.id}')">Edit</button>
             </div>
-            <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
-                padding:2px 8px;border:1px solid;flex-shrink:0;${
-              health==='blocked' ? 'color:var(--red);border-color:rgba(255,71,87,.4);background:rgba(255,71,87,.08);' :
-              health==='at-risk' ? 'color:var(--amber);border-color:rgba(255,170,0,.4);background:rgba(255,170,0,.06);' :
-              'color:var(--green);border-color:rgba(0,229,160,.4);background:rgba(0,229,160,.08);'
-            }">${hLabel}</span>
+            <span class="row-badge row-badge--${hBadge}">${hLabel}</span>
           </div>
-
-          <!-- ROW 2: 3-column grid — col widths identical to Row 4 for vertical alignment -->
-          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,200px);
-              align-items:center;gap:8px;margin-bottom:7px;">
-            <div class="proj-client">${client}${proj.phase?' · '+proj.phase:''}</div>
-            <div style="display:flex;align-items:center;gap:16px;font-family:var(--font-mono);
-                font-size:11px;justify-content:center;">
-              ${laborBudget > 0 ? `<span>
-                <span style="color:var(--text3);letter-spacing:.07em">LABOR </span>
-                <span style="color:var(--text1)">${laborBudget.toFixed(0)}h</span>
-                <span style="color:var(--text3)"> · </span>
-                <span style="color:${laborPct>80?'var(--amber)':'var(--cyan)'}">${laborUsed.toFixed(0)}h used (${laborPct}%)</span>
-              </span>` : ''}
-              ${expBudget > 0 ? `<span>
-                <span style="color:var(--text3);letter-spacing:.07em">EXPENSE </span>
-                <span style="color:var(--text1)">$${(expBudget/1000).toFixed(0)}K</span>
-                <span style="color:var(--text3)"> · </span>
-                <span style="color:${expPct>80?'var(--amber)':'var(--cyan)'}">\$${(expUsed/1000).toFixed(1)}K used (${expPct}%)</span>
-              </span>` : ''}
+          <div class="proj-row__sub">${client}${proj.phase?' · '+proj.phase:''}${pmName?' · PM: '+pmName:''}</div>
+          <div class="proj-metrics">
+            <div class="proj-metric">
+              <span class="proj-metric__label">% Complete</span>
+              <span class="proj-metric__value proj-metric__value--accent">${pctDone}%</span>
             </div>
-            <div style="text-align:right">
-              ${dLeft!==null?`<span style="font-family:var(--font-mono);font-size:10px;
-                color:${dLeft<30?'var(--amber)':'var(--text3)'};">${dLeft}d REMAINING</span>`:''}
+            <div class="proj-metric">
+              <span class="proj-metric__label">CPI</span>
+              <span class="proj-metric__value ${cpiState?'proj-metric__value--'+cpiState:''}">${cpi}</span>
             </div>
+            <div class="proj-metric">
+              <span class="proj-metric__label">SPI</span>
+              <span class="proj-metric__value ${spiState?'proj-metric__value--'+spiState:''}">${spi}</span>
+            </div>
+            <div class="proj-metric">
+              <span class="proj-metric__label">Tasks</span>
+              <span class="proj-metric__value">${done}/${pt.length}</span>
+            </div>
+            ${evm.overdueTasks>0?`<div class="proj-metric">
+              <span class="proj-metric__label">Overdue</span>
+              <span class="proj-metric__value proj-metric__value--bad">${evm.overdueTasks}</span>
+            </div>`:''}
+            ${dLeft!==null?`<div class="proj-metric">
+              <span class="proj-metric__label">Days Left</span>
+              <span class="proj-metric__value ${dLeft<30?'proj-metric__value--caution':''}">${dLeft}d</span>
+            </div>`:''}
           </div>
+          ${UI.progressBar(pctDone, health==='active'?'var(--green)':health==='at-risk'?'var(--amber)':'var(--red)')}
+          ${phasePills}
+          <div class="proj-diagnosis">${evm.diagnosis}</div>
+        </div>`;
+      }).join('');
+    }
 
-          <!-- ROW 3: Progress bar full width -->
-          ${UI.progressBar(pctDone,fill)}
-
-          <!-- ROW 4: identical 3-column grid — P25/P50/P80 center column aligns with LABOR/EXPENSE above -->
-          <div style="display:grid;grid-template-columns:var(--col-left,220px) 1fr var(--col-right,340px);
-              align-items:center;gap:8px;margin-top:6px;">
-
-            <!-- LEFT: EVM metrics — grid col, same width as client text above -->
-            <div class="proj-stats" style="margin-top:0;flex-wrap:wrap;">
-              <div class="proj-stat"><span class="stat-label">% COMPLETE</span>
-                <span class="stat-value" style="color:var(--cyan)">${pctDone}%</span></div>
-              <div class="proj-stat"><span class="stat-label">CPI</span>
-                <span class="stat-value" style="color:${UI.indexColor(evm.cpi)}">${cpi}</span></div>
-              <div class="proj-stat"><span class="stat-label">SPI</span>
-                <span class="stat-value" style="color:${UI.indexColor(evm.spi)}">${spi}</span></div>
-              <div class="proj-stat"><span class="stat-label">TASKS</span>
-                <span class="stat-value">${done}/${pt.length}</span></div>
-              ${evm.overdueTasks>0?`<div class="proj-stat"><span class="stat-label">OVERDUE</span>
-                <span class="stat-value" style="color:var(--red)">${evm.overdueTasks}</span></div>`:''}
-            </div>
-
-            <!-- CENTER: grid center column — same column as LABOR/EXPENSE above, auto-aligned -->
-            <div style="display:flex;justify-content:center;align-items:center;">
-              ${evm.p25Date ? `
-              <div style="display:flex;align-items:center;gap:0;font-family:var(--font-mono);
-                  font-size:11px;letter-spacing:.05em;white-space:nowrap;">
-                <span style="color:var(--green);padding:2px 8px;background:rgba(0,229,160,.08);
-                    border:1px solid rgba(0,229,160,.2);border-radius:3px 0 0 3px">
-                  P25 ${UI.fmtDateShort(evm.p25Date)}</span>
-                <span style="color:var(--cyan);padding:2px 8px;background:rgba(0,210,255,.08);
-                    border-top:1px solid rgba(0,210,255,.2);border-bottom:1px solid rgba(0,210,255,.2)">
-                  ▼ P50 ${UI.fmtDateShort(evm.p50Date)}</span>
-                <span style="color:${evm.slipDays>14?'var(--red)':'var(--amber)'};padding:2px 8px;
-                    background:rgba(255,170,0,.06);border:1px solid rgba(255,170,0,.2);
-                    border-radius:0 3px 3px 0">
-                  P80 ${UI.fmtDateShort(evm.p80Date)}</span>
-              </div>` : ''}
-            </div>
-
-            <!-- RIGHT: grid right column — aligns with days-remaining column above -->
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0;">
-              <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);
-                  font-size:11px;white-space:nowrap;">
-                ${proj.target_date?`<span>
-                  <span style="color:var(--text3);letter-spacing:.08em">TARGET </span>
-                  <span style="color:var(--text1)">${UI.fmtDateShort(proj.target_date)}</span>
-                </span>`:''}
-                ${evm.p50Date?`<span>
-                  <span style="color:var(--text3);letter-spacing:.08em">FORECAST </span>
-                  <span style="color:${!evm.slipDays||evm.slipDays<=0?'var(--green)':evm.slipDays<=14?'var(--amber)':'var(--red)'}">
-                    ${UI.fmtDateShort(evm.p50Date)}</span>
-                  <span style="color:${!evm.slipDays||evm.slipDays<=0?'var(--green)':'var(--amber)'}">
-                    ${!evm.slipDays||evm.slipDays<=0?' ✓ On track':' +'+evm.slipDays+'d'}</span>
-                </span>`:''}
-                ${pmName?`<span style="color:var(--text3)">PM: <span style="color:var(--text1)">${pmName}</span></span>`:''}
-              </div>
-              <div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);
-                  font-size:11px;color:var(--text3);white-space:nowrap;">
-                ${evm.tcpi?`<span>TCPI <span style="color:${UI.indexColor(evm.tcpi)};font-weight:700">${tcpi}</span></span>`:''}
-                ${evm.eac&&proj.budget_baseline_hours?`<span>EAC <span style="color:${evm.cv>0?'var(--red)':'var(--green)'}">
-                  ${evm.eac.toFixed(0)}h${evm.cv>0?' +'+evm.cv.toFixed(0)+'h':''}</span></span>`:''}
-                <span style="font-style:italic;overflow:hidden;text-overflow:ellipsis;max-width:260px;display:inline-block;vertical-align:bottom">
-                  ${evm.diagnosis}</span>
-              </div>
-            </div>
-
+    // ── Tasks Up Next ──
+    const upNext = tasks.filter(t=>t.status!=='complete'&&t.due_date)
+      .sort((a,b)=>new Date(a.due_date)-new Date(b.due_date)).slice(0,6);
+    const tList = document.getElementById('tasks-list');
+    if (upNext.length === 0) {
+      tList.innerHTML = emptyState('ALL CLEAR', 'No upcoming tasks', 'good');
+    } else {
+      tList.innerHTML = upNext.map(t => {
+        const days = UI.daysUntil(t.due_date);
+        const overdue = days != null && days < 0;
+        const dotMod = overdue ? 'bad' :
+                       t.status === 'blocked' ? 'bad' :
+                       t.status === 'in_progress' ? 'accent' :
+                       days != null && days <= 1 ? 'caution' : 'neutral';
+        const asgn = users.find(u=>u.id===t.assigned_to);
+        const statusLabel = t.status === 'in_progress' ? 'IN PROGRESS' :
+                            t.status === 'blocked'     ? 'BLOCKED' :
+                            t.status === 'overdue'     ? 'OVERDUE' :
+                            'NOT STARTED';
+        const statusBadgeMod = t.status === 'in_progress' ? 'info' :
+                               t.status === 'blocked' || t.status === 'overdue' ? 'bad' :
+                               'neutral';
+        const overdueDays = overdue ? Math.abs(days) : 0;
+        return `<div class="list-row">
+          <span class="list-row__dot list-row__dot--${dotMod}"></span>
+          <div class="list-row__info">
+            <div class="list-row__title">${t.name}</div>
+            <div class="list-row__sub">${projMap[t.project_id]||'—'}${t.phase?' · '+t.phase:''}${asgn?' · '+asgn.name:''}</div>
+          </div>
+          <div class="list-row__right">
+            <span class="row-badge row-badge--${statusBadgeMod}">${statusLabel}</span>
+            ${overdueDays>0?`<span class="list-row__count list-row__count--bad">${overdueDays}d OVERDUE</span>`:''}
           </div>
         </div>`;
       }).join('');
     }
 
-    // Tasks up next
-    const upNext = tasks.filter(t=>t.status!=='complete'&&t.due_date)
-      .sort((a,b)=>new Date(a.due_date)-new Date(b.due_date)).slice(0,6);
-    const tList = document.getElementById('tasks-list');
-    tList.innerHTML = upNext.length === 0 ? UI.allClear('ALL CLEAR','No upcoming tasks') :
-      upNext.map(t => {
-        const due = UI.dueDateLabel(t.due_date);
-        const asgn = users.find(u=>u.id===t.assigned_to);
-        return `<div class="task-row">
-          ${UI.taskDot(t.status)}
-          <div class="task-info">
-            <div class="task-name">${t.name}</div>
-            <div class="task-meta">${projMap[t.project_id]||'—'}${t.phase?' · '+t.phase:''}${asgn?' · '+asgn.name:''}</div>
-          </div>
-          ${UI.badge(t.status)}
-          <span style="font-family:var(--font-mono);font-size:11px;color:${due.color};min-width:60px;text-align:right;flex-shrink:0;">${due.text}</span>
-        </div>`;
-      }).join('');
-
-    // EVM gauges
-    const p = UI.pct(completeTasks.length, tasks.length);
+    // ── EVM Summary gauges (proportional arcs per §3.3.5) ──
+    const workPct = UI.pct(completeTasks.length, tasks.length);
     const cpiV = 0.97, spiV = 0.94;
+    const cpiColor = evmIndexColor(cpiV);
+    const spiColor = evmIndexColor(spiV);
     document.getElementById('evm-gauges').innerHTML =
-      UI.gauge(p,    100, 'var(--cyan)',           'WORK %', p+'%') +
-      UI.gauge(cpiV, 2,   UI.indexColor(cpiV),     'CPI',    cpiV.toFixed(2)) +
-      UI.gauge(spiV, 2,   UI.indexColor(spiV),     'SPI',    spiV.toFixed(2));
-    document.getElementById('evm-values').innerHTML = `
-      <div class="evm-val"><span class="ev-label">TOTAL TASKS</span><span class="ev-num" style="color:var(--cyan)">${tasks.length}</span></div>
-      <div class="evm-val"><span class="ev-label">COMPLETE</span><span class="ev-num" style="color:var(--green)">${completeTasks.length}</span></div>
-      <div class="evm-val"><span class="ev-label">IN PROGRESS</span><span class="ev-num" style="color:var(--cyan)">${inProgressTasks.length}</span></div>
-      <div class="evm-val"><span class="ev-label">AT RISK</span><span class="ev-num" style="color:var(--red)">${atRiskTasks.length}</span></div>`;
+      renderGauge(workPct, 100, 'var(--text-accent)', 'WORK %', workPct + '%') +
+      renderGauge(cpiV,    2,   cpiColor,             'CPI',    cpiV.toFixed(2)) +
+      renderGauge(spiV,    2,   spiColor,             'SPI',    spiV.toFixed(2));
 
-    // Alerts
+    // ── Alerts ──
     const overdue = tasks.filter(t=>t.status!=='complete'&&t.due_date&&new Date(t.due_date)<new Date()).slice(0,4);
     document.getElementById('alerts-count').textContent = overdue.length;
-    document.getElementById('alerts-list').innerHTML = overdue.length === 0
-      ? UI.allClear('ALL CLEAR','No overdue tasks')
-      : overdue.map(t=>`<div class="alert-row">
-          <span style="color:var(--red);margin-top:1px;flex-shrink:0;">⚑</span>
-          <div class="alert-info"><div class="alert-title">${t.name}</div><div class="alert-meta">${projMap[t.project_id]||'—'}${t.phase?' · '+t.phase:''}</div></div>
-          <span class="alert-age">${Math.abs(UI.daysUntil(t.due_date))}d</span>
-        </div>`).join('');
+    if (overdue.length === 0) {
+      document.getElementById('alerts-list').innerHTML = emptyState('ALL CLEAR', 'No overdue tasks', 'good');
+    } else {
+      document.getElementById('alerts-list').innerHTML = overdue.map(t => {
+        const days = Math.abs(UI.daysUntil(t.due_date));
+        return `<div class="list-row">
+          <span class="alert-glyph">⚑</span>
+          <div class="list-row__info">
+            <div class="list-row__title">${t.name}</div>
+            <div class="list-row__sub">${projMap[t.project_id]||'—'}${t.phase?' · '+t.phase:''}</div>
+          </div>
+          <span class="list-row__count list-row__count--bad">${days}d</span>
+        </div>`;
+      }).join('');
+    }
 
-    // Action items
-    document.getElementById('actions-list').innerHTML = UI.allClear('ALL CLEAR','No open action items');
+    // ── Key Action Items (empty-state primary path) ──
+    document.getElementById('actions-list').innerHTML =
+      emptyState('ALL CLEAR', 'No open action items', 'good');
 
-    // Team workload
+    // ── Team Workload ──
     const wl = users.filter(u=>!u.project_id).map(u=>({
       user:u, count:tasks.filter(t=>t.assigned_to===u.id&&t.status!=='complete').length
     })).filter(w=>w.count>0).sort((a,b)=>b.count-a.count);
     const maxL = Math.max(...wl.map(w=>w.count),1);
-    document.getElementById('workload-list').innerHTML = wl.length === 0
-      ? UI.allClear('ALL CLEAR')
-      : wl.map(w=>{
-          const p = UI.pct(w.count, maxL*1.2);
-          const c = p>80?'var(--red)':p>55?'var(--amber)':'var(--cyan)';
-          return `<div class="wl-row">
-            <div class="wl-avatar">${UI.initials(w.user.name)}</div>
-            <div class="wl-name">${w.user.name}</div>
-            <div class="wl-bar-wrap"><div class="wl-bar"><div class="wl-fill" style="width:${p}%;background:${c}"></div></div></div>
-            <div class="wl-pct" style="color:${c}">${w.count}</div>
-          </div>`;
-        }).join('');
+    const wlEl = document.getElementById('workload-list');
+    if (wl.length === 0) {
+      wlEl.innerHTML = emptyState('ALL CLEAR', 'No active workload', 'good');
+    } else {
+      wlEl.innerHTML = wl.map(w => {
+        const pct = UI.pct(w.count, maxL*1.2);
+        const stateMod = pct > 80 ? 'bad' : pct > 55 ? 'caution' : 'good';
+        return `<div class="wl-row">
+          ${renderInitialsAvatar(w.user.name)}
+          <div class="wl-row__name">${w.user.name}</div>
+          <div class="wl-row__bar-wrap">
+            <div class="wl-row__bar">
+              <div class="wl-row__fill wl-row__fill--${stateMod}" style="width:${pct}%"></div>
+            </div>
+          </div>
+          <div class="wl-row__count wl-row__count--${stateMod}">${w.count}</div>
+        </div>`;
+      }).join('');
+    }
 
   } catch(err) { console.error('Dashboard load error:', err); }
 }
@@ -700,7 +1045,6 @@ loadDashboard();
 
 // ── ADD PROJECT ────────────────────────────────────────────────────
 let _apFirms = [], _apInternalFirmId = null;
-
 let _apResources = [];
 
 async function loadDrawerData() {
@@ -709,7 +1053,6 @@ async function loadDrawerData() {
     _apInternalFirmId = _apFirms.find(f => f.is_internal)?.id || null;
   }
   if (!_apResources.length) {
-    // Load only PM/Program Manager roles
     const pmRoles = await API.get(
       'hud_roles?is_active=eq.true&select=id&or=(abbreviation.eq.PM,abbreviation.eq.PGM,name.ilike.*Project Manager*,name.ilike.*Program Manager*)'
     ).catch(() => []);
@@ -719,14 +1062,12 @@ async function loadDrawerData() {
         `resources?is_active=eq.true&hud_role_id=in.(${pmRoleIds.join(',')})&order=last_name&select=id,first_name,last_name,title,hud_role_id`
       ).catch(() => []);
     }
-    // Fallback: if no PM roles found, load all resources
     if (!_apResources.length) {
       _apResources = await API.get(
         'resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,title'
       ).catch(() => []);
     }
   }
-  // Client dropdown
   const sel = document.getElementById('ap-client');
   sel.innerHTML = '<option value="">— Select client —</option>' +
     _apFirms
@@ -734,7 +1075,6 @@ async function loadDrawerData() {
       .sort((a,b) => a.name.localeCompare(b.name))
       .map(f => `<option value="${f.id}">${f.name}</option>`)
       .join('');
-  // PM dropdown
   const pmSel = document.getElementById('ap-pm');
   pmSel.innerHTML = '<option value="">— Select PM —</option>' +
     _apResources
@@ -747,20 +1087,17 @@ async function openAddProject() {
   overlay.classList.add('open');
   await loadDrawerData();
 
-  // Set mode: ADD
   document.getElementById('ap-title').textContent    = 'ADD PROJECT';
   document.getElementById('ap-subtitle').textContent = 'Set project title, client & budget';
   document.getElementById('ap-edit-id').value        = '';
   document.getElementById('ap-save-btn').textContent = 'CREATE PROJECT →';
 
-  // Default start date to today
   const today = new Date();
   const yr = today.getFullYear();
   const mo = String(today.getMonth()+1).padStart(2,'0');
   const dy = String(today.getDate()).padStart(2,'0');
   document.getElementById('ap-start').value = `${yr}-${mo}-${dy}`;
 
-  // Clear fields
   document.getElementById('ap-name').value      = '';
   document.getElementById('ap-desc').value      = '';
   document.getElementById('ap-phase').value     = '';
@@ -780,7 +1117,6 @@ async function openEditProject(projId) {
   overlay.classList.add('open');
   await loadDrawerData();
 
-  // Set mode: EDIT
   document.getElementById('ap-title').textContent    = 'EDIT PROJECT';
   document.getElementById('ap-subtitle').textContent = 'Update project title, client & budget';
   document.getElementById('ap-edit-id').value        = projId;
@@ -788,7 +1124,6 @@ async function openEditProject(projId) {
   document.getElementById('ap-error').textContent    = '';
   document.getElementById('ap-save-btn').disabled    = false;
 
-  // Load project data
   try {
     const rows = await API.get(`projects?id=eq.${projId}&select=*`);
     const proj = rows?.[0];
@@ -804,7 +1139,6 @@ async function openEditProject(projId) {
     document.getElementById('ap-expense').value   = proj.expense_budget_baseline || '';
     document.getElementById('ap-status').value    = proj.status || 'active';
     document.getElementById('ap-pm').value        = proj.pm_resource_id || '';
-    // Set client after dropdown is populated
     setTimeout(() => {
       document.getElementById('ap-client').value = proj.client_id || '';
     }, 50);
@@ -817,7 +1151,6 @@ function closeAddProject() {
   document.getElementById('add-proj-overlay').classList.remove('open');
 }
 
-// Close on Escape
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeAddProject();
 });
@@ -881,15 +1214,16 @@ async function saveNewProject() {
 }
 </script>
 
-<!-- ── ADD PROJECT PANEL ───────────────────────────────────────── -->
+<!-- ── ADD PROJECT MODAL ───────────────────────────────────────── -->
 <div class="add-proj-overlay" id="add-proj-overlay" onclick="if(event.target===this)closeAddProject()">
   <div class="add-proj-panel">
     <div class="ap-header">
       <input type="hidden" id="ap-edit-id" />
-      <div class="ap-title" id="ap-title">ADD PROJECT</div>
-      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);
-          margin-top:2px" id="ap-subtitle">Set project title, client &amp; budget</div>
-      <button class="ap-close" onclick="closeAddProject()">✕</button>
+      <div>
+        <div class="ap-title" id="ap-title">ADD PROJECT</div>
+        <div class="ap-subtitle" id="ap-subtitle">Set project title, client &amp; budget</div>
+      </div>
+      <button class="btn btn--icon-only" type="button" onclick="closeAddProject()" aria-label="Close">✕</button>
     </div>
     <div class="ap-body">
 
@@ -971,8 +1305,8 @@ async function saveNewProject() {
       <div class="ap-error" id="ap-error"></div>
     </div>
     <div class="ap-footer">
-      <button class="ap-btn-cancel" onclick="closeAddProject()">CANCEL</button>
-      <button class="ap-btn-save" id="ap-save-btn" onclick="saveNewProject()">CREATE PROJECT →</button>
+      <button class="btn" type="button" onclick="closeAddProject()">CANCEL</button>
+      <button class="btn btn-primary" type="button" id="ap-save-btn" onclick="saveNewProject()">CREATE PROJECT →</button>
     </div>
   </div>
 </div>

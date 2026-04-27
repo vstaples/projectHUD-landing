@@ -4,6 +4,11 @@
    ============================================================ */
 
 /* ── GOOGLE FONTS ───────────────────────────────────────────── */
+/* CMD99 / v1.5 §2: Inter is the sole UI face. Rajdhani retained for
+   the platform wordmark only (§2.2). Other faces remain referenced
+   from non-retrofitted surface stylesheets via legacy token aliases
+   (--font-mono, --font-hud, --font-body) and continue to import here
+   until those surfaces retrofit. */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&family=Barlow:wght@400;500&family=Barlow+Condensed:wght@300;400;500;600;700&family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ── RESET ──────────────────────────────────────────────────── */
@@ -11,15 +16,22 @@
 
 /* ── DESIGN TOKENS ──────────────────────────────────────────── */
 :root {
-  --bg0:        #060a10;
-  --bg1:        #080d18;
-  --bg2:        #0c1628;
-  --bg3:        #1d2a45;
-  --bg4:        #0e1e30;
-  /* ── Doctrine v1.4 §3.5.2 — surface elevation role aliases ── */
-  --surface-interactive: var(--bg3);
+  /* ── Doctrine v1.4 §3.5.1 — six-tier elevation ladder (CMD99) ── */
+  --bg0:        #060a10;   /* tier 0 — page background */
+  --bg1:        #0d1424;   /* tier 1 — primary panel surface */
+  --bg2:        #141d33;   /* tier 2 — content/row within panel */
+  --bg3:        #1d2a45;   /* tier 3 — interactive at rest */
+  --bg4:        #2a3a5c;   /* tier 4 — interactive hover/active */
+  --bg5:        #344770;   /* tier 5 — overlay/modal/popover */
+  /* ── Doctrine v1.4 §3.5.1 — surface role aliases (CMD99 completes suite) ── */
+  --surface-page:               var(--bg0);
+  --surface-panel:              var(--bg1);
+  --surface-content:            var(--bg2);
+  --surface-interactive:        var(--bg3);
+  --surface-interactive-hover:  var(--bg4);
+  --surface-overlay:            var(--bg5);
   --cyan:       #00d2ff;
-  --cyan-dim:   rgba(0,210,255,0.08);
+  --cyan-dim:   rgba(0,210,255,0.4);
   --cyan-glow:  rgba(0,210,255,0.15);
   --green:      #00e5a0;
   --amber:      #ffaa00;
@@ -48,6 +60,9 @@
   --font-data:  'JetBrains Mono', monospace;
   --sidebar-w:  220px;
   --ticker-h:   32px;
+  /* ── v1.5 §4.9 — page-frame chrome dimensions ── */
+  --header-h:   48px;
+  --footer-h:   24px;
 }
 
 /* ── BASE ───────────────────────────────────────────────────── */
@@ -444,7 +459,7 @@ body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
               inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .btn:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-interactive-hover);
   border-color: var(--border-act);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5),
               inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -529,4 +544,262 @@ body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
   background: rgba(212,144,31,.18);
   border-color: rgba(212,144,31,.6);
   color: var(--amber);
+}
+/* ============================================================
+   ProjectHUD Style Doctrine v1.5 — shared classes (CMD99)
+   Authorized additions per brief §3.1. No new classes beyond
+   those enumerated in the brief.
+   ============================================================ */
+
+/* ── §4.4 KPI card canonical (v1.5) ─────────────────────────── */
+.kpi-card-v15 {
+  position: relative;
+  background: var(--surface-content);
+  border-radius: 6px;
+  padding: 12px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+.kpi-card__bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+.kpi-card__bar--state-good      { background: var(--green); }
+.kpi-card__bar--state-caution   { background: var(--amber); }
+.kpi-card__bar--state-bad       { background: var(--red); }
+.kpi-card__bar--informational   { background: var(--text-accent); }
+.kpi-card__bar--domain-purple   { background: #8a4fef; }
+.kpi-card__label {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.kpi-card__value {
+  font-family: var(--font-ui);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+  font-feature-settings: "tnum";
+}
+.kpi-card__value--state-good      { color: var(--green); }
+.kpi-card__value--state-caution   { color: var(--amber); }
+.kpi-card__value--state-bad       { color: var(--red); }
+.kpi-card__value--accent          { color: var(--text-accent); }
+.kpi-card__sub {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  font-feature-settings: "tnum";
+}
+.kpi-card__glyph {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-faint);
+}
+.kpi-strip {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.kpi-strip > .kpi-card-v15 {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── §4.5 Panel frame canonical (v1.5) ──────────────────────── */
+.panel-frame {
+  position: relative;
+  background: var(--surface-panel);
+  border-radius: 6px;
+  padding: 14px 16px;
+}
+/* Aqua corner brackets — implementation: pseudo-elements (TL, TR)
+   plus explicit corner-element divs (BL, BR). Pseudo-elements alone
+   cannot deliver four corners on a single element; explicit divs
+   alone create extra DOM noise per panel. The hybrid matches the
+   pre-existing .bracketed pattern in this stylesheet so dashboard
+   markup composes cleanly. */
+.panel-frame::before,
+.panel-frame::after,
+.panel-frame__corner-bl,
+.panel-frame__corner-br {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
+.panel-frame::before {
+  top: -1px; left: -1px;
+  border-top: 1px solid var(--cyan-dim);
+  border-left: 1px solid var(--cyan-dim);
+}
+.panel-frame::after {
+  top: -1px; right: -1px;
+  border-top: 1px solid var(--cyan-dim);
+  border-right: 1px solid var(--cyan-dim);
+}
+.panel-frame__corner-bl {
+  bottom: -1px; left: -1px;
+  border-bottom: 1px solid var(--cyan-dim);
+  border-left: 1px solid var(--cyan-dim);
+}
+.panel-frame__corner-br {
+  bottom: -1px; right: -1px;
+  border-bottom: 1px solid var(--cyan-dim);
+  border-right: 1px solid var(--cyan-dim);
+}
+.section-label-with-bar {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  padding-left: 12px;
+}
+.section-label-with-bar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--text-accent);
+  border-radius: 1px;
+}
+
+/* ── §4.6 Empty-state pattern (v1.5) ────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px;
+  text-align: center;
+  gap: 6px;
+}
+.empty-state__glyph {
+  font-size: 32px;
+  line-height: 1;
+}
+.empty-state__glyph--good     { color: var(--green); }
+.empty-state__glyph--neutral  { color: var(--text-muted); }
+.empty-state__glyph--bad      { color: var(--red); }
+.empty-state__label {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+}
+.empty-state__sub {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* ── §5.8 Avatar canonical (v1.5) ───────────────────────────── */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg3);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.avatar--sm    { width: 24px; height: 24px; font-size: 11px; }
+.avatar--md    { width: 28px; height: 28px; font-size: 12px; }
+.avatar--lg    { width: 32px; height: 32px; font-size: 13px; }
+.avatar--round { border-radius: 50%; }
+.avatar__photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── §4.9 Page-frame lines (v1.5) ───────────────────────────── */
+body.hud-shell-body {
+  position: relative;
+}
+body.hud-shell-body::before {
+  content: "";
+  position: fixed;
+  top: var(--header-h, 48px);
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border);
+  z-index: 50;
+  pointer-events: none;
+}
+body.hud-shell-body::after {
+  content: "";
+  position: fixed;
+  top: var(--header-h, 48px);
+  right: 0;
+  bottom: var(--footer-h, 24px);
+  width: 1px;
+  background: var(--border);
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* ── §4.9 Footer strip with version display (v1.5) ──────────── */
+.hud-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--footer-h, 24px);
+  background: var(--surface-panel);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 14px;
+  z-index: 60;
+}
+.hud-footer__version {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  font-feature-settings: "tnum";
+  letter-spacing: 0.04em;
+}
+
+/* Reserve bottom space platform-wide so fixed footer doesn't
+   overlap content on surfaces using overflow:hidden 100vh layouts. */
+body.hud-footer-rendered #content,
+body.hud-footer-rendered .hud-shell {
+  padding-bottom: var(--footer-h, 24px);
 }
