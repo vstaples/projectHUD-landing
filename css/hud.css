@@ -493,10 +493,19 @@ body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
 .btn-select:hover { background-color: var(--bg3); border-color: var(--border-act); }
 .btn-select option { background: var(--bg2); color: var(--text-primary); }
 
-/* §5.2 — Icon-only button modifier (modal close, etc.) */
+/* §5.5 — Dashed add-action button modifier (v1.1) */
+.btn--dashed {
+  border-style: dashed;
+  border-color: var(--border-act);
+  width: 100%;
+  justify-content: center;
+}
+
+/* §5.6 — Icon-only button modifier (v1.2) */
 .btn--icon-only {
-  padding: 3px 6px;
-  min-width: 24px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   justify-content: center;
 }
 

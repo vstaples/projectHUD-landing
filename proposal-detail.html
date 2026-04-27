@@ -273,7 +273,7 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
   color: var(--text-body); font-weight: 500;
 }
 .cp-row--subtotal .cp-subtotal-val {
-  color: var(--text-primary); font-weight: 700;
+  color: var(--text-primary); font-weight: 600; /* §7.1a v1.1 — was 700 */
 }
 
 /* Grand total — doctrine §7.1 */
@@ -353,7 +353,8 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 .mat-row {
   display: flex; justify-content: space-between;
   font-family: var(--font-ui);
-  font-size: 12px; padding: 3px 0; color: var(--text-muted);
+  font-size: 12px; padding: 3px 0;
+  color: var(--text-body); /* §7.1b — was var(--text-muted) */
   font-feature-settings: "tnum";
 }
 .mat-val { font-weight: 600; color: var(--text-body); }
@@ -514,19 +515,7 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 }
 .tasks-empty-link { color: var(--text-accent); cursor: pointer; }
 
-/* ── Add-disc dashed button (visual variant of .btn) ───── */
-.btn--dashed {
-  border-style: dashed;
-  width: 100%;
-  justify-content: center;
-  background: transparent;
-  color: var(--text-muted);
-}
-.btn--dashed:hover {
-  background: rgba(255,255,255,.03);
-  color: var(--text-primary);
-  border-color: var(--border-act);
-}
+/* ── §5.5 .btn--dashed lives in /css/hud.css per doctrine ── */
 
 /* ── Task table horizontal-scroll wrapper ──────────────── */
 .task-tbl-wrap { overflow-x: auto; flex: 1; }
@@ -613,7 +602,7 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
             <div id="mat-list"></div>
             <div class="mat-add">
               <input type="text" id="mat-name-input" placeholder="Item · ¥cost" />
-              <button class="btn" onclick="addMaterial()">+ Add</button>
+              <button class="btn btn--dashed" onclick="addMaterial()">+ Add</button>
             </div>
           </div>
 
@@ -931,7 +920,7 @@ function renderTaskGrid() {
         ${escHtml(disc.name)}
         ${risks ? `<span class="risk-flag">${risks} risk${risks>1?'s':''}</span>` : ''}
       </div>
-      <button class="btn" onclick="addTask()">+ Add Task</button>
+      <button class="btn btn--dashed" onclick="addTask()">+ Add Task</button>
     </div>
     <div class="task-tbl-wrap">
       <table class="task-tbl">
@@ -960,7 +949,7 @@ function renderTaskGrid() {
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="6" style="padding-left:14px">${escHtml(disc.name)} Subtotal</td>
+            <td colspan="6" style="padding-left:14px">${escHtml(disc.name)} subtotal</td>
             <td></td>
             <td class="hrs-cell">${totalHrs.toFixed(0)} hrs</td>
             <td class="cost-cell">${fmtCost(totalCost)}</td>
@@ -970,7 +959,7 @@ function renderTaskGrid() {
       </table>
     </div>
     <div class="add-task-row">
-      <button class="btn" onclick="addTask()">+ Add Task to ${escHtml(disc.name)}</button>
+      <button class="btn btn--dashed" onclick="addTask()">+ Add Task to ${escHtml(disc.name)}</button>
     </div>`;
 }
 
