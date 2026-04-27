@@ -5,31 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Proposal — ProjectHUD</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/css/hud.css">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ============================================================
+   proposal-detail.html — surface-local LAYOUT-ONLY rules.
+   All visual atoms (font, color, size, weight, padding, case)
+   live in /css/hud.css per ProjectHUD Style Doctrine v1.0.
+   This block contains only layout, positioning, and structural
+   styling specific to the WBS estimator surface.
+   ============================================================ */
 
-:root {
-  --bg:      #0f1117;
-  --surface: #181c27;
-  --surf2:   #1e2436;
-  --surf3:   #232a3e;
-  --border:  rgba(255,255,255,.08);
-  --border2: rgba(255,255,255,.14);
-  --text:    #e8eaf0;
-  --muted:   #7a8099;
-  --accent:  #4f8ef7;
-  --green:   #2a9d40;
-  --amber:   #d4901f;
-  --red:     #c0404a;
-}
-
-body {
-  font-family: 'Inter', system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  height: 100vh;
-  overflow: hidden;
-}
+body { height: 100vh; overflow: hidden; }
 
 .main {
   display: flex; flex-direction: column;
@@ -37,20 +23,21 @@ body {
   overflow: hidden; min-width: 0;
 }
 
-/* back bar */
+/* ── Back bar ──────────────────────────────────────────── */
 .backbar {
   display: flex; align-items: center; gap: 10px;
   padding: 0 20px; height: 40px;
   border-bottom: 1px solid var(--border);
-  background: var(--surface); flex-shrink: 0;
-  font-size: 12px; color: var(--muted);
+  background: var(--bg1); flex-shrink: 0;
+  font-family: var(--font-ui);
+  font-size: 12px; color: var(--text-muted);
 }
-.backbar a { color: var(--muted); text-decoration: none; }
-.backbar a:hover { color: var(--text); }
+.backbar a { color: var(--text-muted); text-decoration: none; }
+.backbar a:hover { color: var(--text-primary); }
 
-/* proposal header */
+/* ── Proposal header ───────────────────────────────────── */
 .prop-header {
-  background: var(--surface);
+  background: var(--bg1);
   border-bottom: 1px solid var(--border);
   padding: 14px 20px 0;
   flex-shrink: 0;
@@ -60,101 +47,81 @@ body {
   justify-content: space-between; gap: 12px;
   margin-bottom: 10px;
 }
-.prop-title { font-size: 16px; font-weight: 700; }
-.prop-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.prop-title {
+  font-family: var(--font-ui);
+  font-size: 16px; font-weight: 700;
+  color: var(--text-primary);
+}
+.prop-sub {
+  font-family: var(--font-ui);
+  font-size: 12px; color: var(--text-muted); margin-top: 2px;
+}
 .ph-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
-.btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 12px; border-radius: 6px;
-  font-size: 12px; font-weight: 500; cursor: pointer;
-  border: 1px solid var(--border2);
-  background: var(--surf2); color: var(--text);
-  transition: background .15s;
-}
-.btn:hover { background: var(--surf3); }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn-primary:hover { opacity: .88; }
-.btn-teal { background: #1a6b5a; border-color: #2a9d7a; color: #7af0c0; }
-.btn-teal:hover { background: #2a9d7a; color: #fff; }
-
-/* tabs */
+/* ── Tabs ──────────────────────────────────────────────── */
 .prop-tabs { display: flex; gap: 2px; }
 .tab {
+  font-family: var(--font-ui);
   padding: 8px 14px; font-size: 12px; font-weight: 500;
-  color: var(--muted); cursor: pointer;
+  color: var(--text-muted); cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: color .15s, border-color .15s; white-space: nowrap;
 }
-.tab:hover { color: var(--text); }
-.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab:hover { color: var(--text-primary); }
+.tab.active { color: var(--text-accent); border-bottom-color: var(--text-accent); }
 
-/* panels */
+/* ── Panels container ──────────────────────────────────── */
 .panels { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 .panel  { display: none; flex: 1; overflow: hidden; }
 .panel.active { display: flex; flex-direction: column; }
 
-/* ── WBS TAB ──────────────────────────────────────────── */
+/* ── WBS layout ────────────────────────────────────────── */
 .wbs-layout {
   flex: 1; display: grid;
   grid-template-columns: 180px 1fr 220px;
   gap: 0; overflow: hidden;
 }
 
-/* discipline sidebar */
+/* ── Discipline sidebar ────────────────────────────────── */
 .disc-sidebar {
   border-right: 1px solid var(--border);
   overflow-y: auto; padding: 12px 10px;
-  background: var(--surf2);
+  background: var(--bg2);
 }
 
 .template-bar {
   display: flex; gap: 6px; margin-bottom: 10px;
 }
-.template-bar select {
-  flex: 1; padding: 5px 8px; border-radius: 5px;
-  border: 1px solid var(--border2); background: var(--surf2);
-  color: var(--muted); font-size: 11px; outline: none;
-}
-.template-bar button {
-  padding: 5px 9px; border-radius: 5px;
-  border: 1px solid var(--border2); background: transparent;
-  color: var(--muted); font-size: 11px; cursor: pointer;
-}
+.template-bar .btn-select { flex: 1; }
 
 .disc-tab {
   padding: 9px 10px; border-radius: 7px;
   border: 1px solid var(--border);
-  background: var(--surface); cursor: pointer;
-  margin-bottom: 6px; transition: border-color .15s;
+  background: var(--bg1); cursor: pointer;
+  margin-bottom: 6px; transition: border-color .15s, background .15s;
 }
-.disc-tab:hover  { border-color: var(--border2); }
-.disc-tab.active { border-color: var(--accent); background: rgba(79,142,247,.08); }
+.disc-tab:hover  { border-color: var(--border-act); }
+.disc-tab.active { border-color: var(--text-accent); background: var(--cyan-dim); }
 .dt-name {
-  font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 3px;
+  font-family: var(--font-ui);
+  font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px;
 }
-.disc-tab.active .dt-name { color: var(--accent); }
+.disc-tab.active .dt-name { color: var(--text-accent); }
 .dt-meta {
   display: flex; justify-content: space-between;
-  font-size: 10px; color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 11px; color: var(--text-muted);
+  font-feature-settings: "tnum";
 }
-.dt-cost { font-weight: 600; color: var(--muted); }
-.disc-tab.active .dt-cost { color: var(--accent); }
+.dt-cost { font-weight: 600; color: var(--text-muted); }
+.disc-tab.active .dt-cost { color: var(--text-accent); }
 .dt-bar  {
   height: 2px; border-radius: 1px;
   background: var(--border); margin-top: 5px; overflow: hidden;
 }
 .dt-fill { height: 2px; border-radius: 1px; }
 
-.disc-add-btn {
-  width: 100%; padding: 7px; border-radius: 6px;
-  border: 1px dashed var(--border2); background: transparent;
-  color: var(--muted); font-size: 11px; cursor: pointer;
-  text-align: center; transition: all .15s;
-}
-.disc-add-btn:hover { background: rgba(255,255,255,.03); color: var(--text); }
-
-/* task grid */
+/* ── Task grid area ────────────────────────────────────── */
 .task-area {
   flex: 1; overflow: auto; display: flex; flex-direction: column;
 }
@@ -163,53 +130,67 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
-  background: var(--surf2); flex-shrink: 0;
+  background: var(--bg2); flex-shrink: 0;
 }
 .tp-title {
   display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-ui);
   font-size: 13px; font-weight: 600;
+  color: var(--text-primary);
 }
 .disc-dot { width: 10px; height: 10px; border-radius: 2px; }
 .risk-flag {
-  font-size: 10px; padding: 2px 7px; border-radius: 5px;
-  background: rgba(192,64,74,.15); color: #f07a7a;
+  font-family: var(--font-ui);
+  font-size: 11px; font-weight: 600;
+  padding: 2px 7px; border-radius: 5px;
+  background: rgba(255,71,87,.12); color: var(--red);
+  letter-spacing: 0.02em;
 }
 
+/* ── Task table ────────────────────────────────────────── */
 table.task-tbl { width: 100%; border-collapse: collapse; }
 .task-tbl th {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .05em; color: var(--muted);
-  padding: 6px 8px; border-bottom: 1px solid var(--border2);
-  background: var(--surf2); text-align: left; white-space: nowrap;
+  font-family: var(--font-ui);
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text-muted);
+  padding: 6px 8px; border-bottom: 1px solid var(--border-act);
+  background: var(--bg2); text-align: left; white-space: nowrap;
 }
 .task-tbl td {
   padding: 4px 5px; border-bottom: 1px solid var(--border);
   vertical-align: middle;
+  font-family: var(--font-ui);
+  color: var(--text-body);
 }
 .task-tbl tr:hover td { background: rgba(255,255,255,.02); }
-.task-tbl tr.risk-row td { background: rgba(192,64,74,.04); }
+.task-tbl tr.risk-row td { background: rgba(255,71,87,.05); }
 .task-tbl tfoot td {
-  background: var(--surf2); font-weight: 600;
-  font-size: 11px; color: var(--muted); padding: 7px 8px;
-  border-top: 1px solid var(--border2);
+  background: var(--bg2);
+  font-family: var(--font-ui);
+  font-weight: 600; font-size: 12px;
+  color: var(--text-body); padding: 7px 8px;
+  border-top: 1px solid var(--border-act);
 }
+.task-tbl tfoot .cost-cell { color: var(--text-accent); font-weight: 700; }
 
 .task-tbl input[type=text],
 .task-tbl input[type=number],
 .task-tbl select {
   width: 100%; padding: 4px 6px;
   border: 1px solid transparent; border-radius: 4px;
-  background: transparent; color: var(--text);
-  font-size: 11px; font-family: inherit; outline: none;
+  background: transparent; color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px; outline: none;
+  font-feature-settings: "tnum";
   transition: border-color .15s, background .15s;
 }
 .task-tbl input:focus,
 .task-tbl select:focus {
-  border-color: var(--accent);
-  background: var(--surf2);
+  border-color: var(--text-accent);
+  background: var(--bg2);
 }
 .task-tbl input[type=number] { text-align: right; }
-.task-tbl select option { background: #1e2436; }
+.task-tbl select option { background: var(--bg2); color: var(--text-primary); }
 
 .col-task  { min-width: 130px; }
 .col-phase { width: 88px; }
@@ -223,108 +204,168 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 .col-risk  { width: 32px; text-align: center !important; }
 .col-del   { width: 26px; text-align: center !important; }
 
-.cost-cell { font-size: 11px; font-weight: 600; text-align: right; padding-right: 8px !important; }
-.hrs-cell  { font-size: 11px; color: var(--muted); text-align: right; }
-.risk-icon { cursor: pointer; font-size: 13px; text-align: center; display: block; }
-.del-btn   { font-size: 14px; color: var(--muted); cursor: pointer; text-align: center; display: block; }
+.cost-cell {
+  font-family: var(--font-ui);
+  font-size: 12px; font-weight: 600; text-align: right;
+  padding-right: 8px !important;
+  color: var(--text-body);
+  font-feature-settings: "tnum";
+}
+.hrs-cell  {
+  font-family: var(--font-ui);
+  font-size: 12px; color: var(--text-muted); text-align: right;
+  font-feature-settings: "tnum";
+}
+.risk-icon { cursor: pointer; font-size: 13px; text-align: center; display: block; color: var(--text-muted); }
+.risk-icon.is-flagged { color: var(--red); }
+.del-btn {
+  font-size: 14px; color: var(--text-muted); cursor: pointer;
+  text-align: center; display: block;
+}
 .del-btn:hover { color: var(--red); }
 
 .add-task-row {
   padding: 8px 14px; border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
-.add-task-btn {
-  font-size: 11px; color: var(--accent); cursor: pointer;
-  background: none; border: none; padding: 0;
-}
+/* .add-task-btn now uses .btn (doctrine §5.3) */
 
-/* cost panel */
+/* ── Cost panel ────────────────────────────────────────── */
 .cost-panel {
   border-left: 1px solid var(--border);
   overflow-y: auto; padding: 14px;
-  background: var(--surf2);
+  background: var(--bg2);
 }
-.cp-title {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--muted);
-  margin-bottom: 10px; padding-bottom: 6px;
-  border-bottom: 1px solid var(--border);
-}
+/* .cp-title now uses .section-label class on markup */
+.cp-section-spacer { padding-bottom: 6px; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
+
 .cp-row {
   display: flex; justify-content: space-between;
   align-items: center; padding: 5px 0;
-  border-bottom: 1px solid var(--border); font-size: 11px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-feature-settings: "tnum";
 }
 .cp-row:last-of-type { border-bottom: none; }
-.cp-name { color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.cp-name {
+  display: flex; align-items: center; gap: 5px;
+  color: var(--text-muted); font-weight: 400;
+}
 .cp-dot  { width: 7px; height: 7px; border-radius: 50%; }
-.cp-val  { font-weight: 600; color: var(--text); }
+.cp-val  { color: var(--text-body); font-weight: 600; }
 .cp-bar-wrap { height: 2px; background: var(--border); border-radius: 1px; margin: 2px 0 5px; overflow: hidden; }
 .cp-bar { height: 2px; border-radius: 1px; }
 
-.cp-div { border: none; border-top: 1px solid var(--border2); margin: 8px 0; }
-.cp-total { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px; }
+.cp-div { border: none; border-top: 1px solid var(--border-act); margin: 8px 0; }
+
+/* Subtotal row — doctrine §7.1 */
+.cp-row--subtotal {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  display: flex; justify-content: space-between;
+  margin-bottom: 4px;
+  font-feature-settings: "tnum";
+}
+.cp-row--subtotal .cp-subtotal-lbl {
+  color: var(--text-body); font-weight: 500;
+}
+.cp-row--subtotal .cp-subtotal-val {
+  color: var(--text-primary); font-weight: 700;
+}
+
+/* Grand total — doctrine §7.1 */
 .cp-grand {
   display: flex; justify-content: space-between;
   margin-top: 6px; padding-top: 6px;
-  border-top: 1px solid var(--border2);
+  border-top: 1px solid var(--border-act);
+  font-feature-settings: "tnum";
 }
-.cp-grand-label { font-size: 13px; font-weight: 600; }
-.cp-grand-val   { font-size: 15px; font-weight: 700; color: var(--accent); }
+.cp-grand-label {
+  font-family: var(--font-ui);
+  font-size: 13px; font-weight: 600;
+  color: var(--text-primary);
+}
+.cp-grand-val {
+  font-family: var(--font-ui);
+  font-size: 15px; font-weight: 700;
+  color: var(--text-accent);
+}
 
-/* range band */
+/* ── Range band ────────────────────────────────────────── */
 .range-section {
   margin-top: 10px; padding: 10px;
   background: rgba(255,255,255,.03);
   border-radius: 7px;
 }
-.range-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px; }
+/* .range-lbl uses .section-label */
 .range-bar-wrap { position: relative; height: 7px; border-radius: 4px; background: var(--border); margin: 5px 0 3px; }
-.range-base  { position: absolute; left: 0; top: 0; height: 7px; border-radius: 4px 0 0 4px; background: var(--accent); }
+.range-base  { position: absolute; left: 0; top: 0; height: 7px; border-radius: 4px 0 0 4px; background: var(--text-accent); }
 .range-cont  { position: absolute; height: 7px; background: var(--amber); opacity: .7; }
 .range-worst { position: absolute; height: 7px; border-radius: 0 4px 4px 0; background: var(--red); opacity: .5; }
-.range-labels { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); }
+.range-labels {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-ui);
+  font-size: 11px; color: var(--text-muted);
+}
 .range-vals  { display: flex; justify-content: space-between; margin-top: 6px; }
 .rv { text-align: center; }
-.rv-val { font-size: 11px; font-weight: 600; }
-.rv-lbl { font-size: 9px; color: var(--muted); }
+.rv-val {
+  font-family: var(--font-ui);
+  font-size: 12px; font-weight: 600;
+  color: var(--text-body);
+  font-feature-settings: "tnum";
+}
+.rv-val--accent { color: var(--text-accent); }
+.rv-val--amber  { color: var(--amber); }
+.rv-val--red    { color: var(--red); }
+.rv-lbl {
+  font-family: var(--font-ui);
+  font-size: 11px; color: var(--text-muted);
+}
 
+/* ── Contingency block (amber-themed) ──────────────────── */
 .contingency-block {
   margin-top: 8px; padding: 9px 10px;
   border: 1px solid rgba(212,144,31,.3);
   border-radius: 7px; background: rgba(212,144,31,.06);
 }
-.cb-top { display: flex; justify-content: space-between; margin-bottom: 3px; }
-.cb-lbl { font-size: 11px; font-weight: 600; color: var(--amber); }
-.cb-val { font-size: 13px; font-weight: 700; color: var(--amber); }
-.cb-sub { font-size: 10px; color: rgba(212,144,31,.7); margin-bottom: 6px; }
-.cb-btn {
-  width: 100%; padding: 5px; border-radius: 5px;
-  border: 1px solid rgba(212,144,31,.4); background: transparent;
-  color: var(--amber); font-size: 11px; cursor: pointer;
+.cb-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
+.cb-lbl {
+  font-family: var(--font-ui);
+  font-size: 12px; font-weight: 600; color: var(--amber);
 }
-.cb-btn:hover { background: rgba(212,144,31,.1); }
+.cb-val {
+  font-family: var(--font-ui);
+  font-size: 13px; font-weight: 700; color: var(--amber);
+  font-feature-settings: "tnum";
+}
+.cb-sub {
+  font-family: var(--font-ui);
+  font-size: 11px; color: rgba(212,144,31,.75); margin-bottom: 6px;
+}
+.contingency-block .btn { width: 100%; justify-content: center; }
 
-/* materials */
+/* ── Materials ─────────────────────────────────────────── */
 .mat-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .mat-row {
   display: flex; justify-content: space-between;
-  font-size: 11px; padding: 3px 0; color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 12px; padding: 3px 0; color: var(--text-muted);
+  font-feature-settings: "tnum";
 }
-.mat-val { font-weight: 600; color: var(--text); }
+.mat-val { font-weight: 600; color: var(--text-body); }
 .mat-add { display: flex; gap: 5px; margin-top: 7px; }
 .mat-add input {
   flex: 1; padding: 4px 7px; border-radius: 5px;
-  border: 1px solid var(--border2); background: var(--surf2);
-  color: var(--text); font-size: 11px; outline: none;
+  border: 1px solid var(--border); background: var(--bg2);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px; outline: none;
 }
-.mat-add button {
-  padding: 4px 8px; border-radius: 5px;
-  border: 1px solid var(--border2); background: transparent;
-  color: var(--muted); font-size: 10px; cursor: pointer;
-}
+.mat-add input::placeholder { color: var(--text-muted); }
 
-/* save-as-template modal */
+/* ── Save-as-template modal ────────────────────────────── */
 .modal-bg {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.6); z-index: 200;
@@ -332,20 +373,18 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 }
 .modal-bg.open { display: flex; }
 .modal {
-  background: var(--surface); border: 1px solid var(--border2);
+  background: var(--bg1); border: 1px solid var(--border-act);
   border-radius: 12px; width: 460px; overflow: hidden;
 }
 .modal-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 18px; border-bottom: 1px solid var(--border);
-  background: var(--surf2);
+  background: var(--bg2);
 }
-.modal-title { font-size: 14px; font-weight: 600; }
-.modal-close {
-  width: 26px; height: 26px; border-radius: 6px;
-  border: 1px solid var(--border2); background: transparent;
-  color: var(--muted); cursor: pointer; font-size: 14px;
-  display: flex; align-items: center; justify-content: center;
+.modal-title {
+  font-family: var(--font-ui);
+  font-size: 14px; font-weight: 600;
+  color: var(--text-primary);
 }
 .modal-body { padding: 18px; }
 .modal-foot {
@@ -354,59 +393,147 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 }
 .m-field { margin-bottom: 12px; }
 .m-field label {
-  display: block; font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .06em;
-  color: var(--muted); margin-bottom: 4px;
+  display: block; margin-bottom: 4px;
 }
 .m-field input, .m-field select, .m-field textarea {
   width: 100%; padding: 7px 10px; border-radius: 6px;
-  border: 1px solid var(--border2); background: var(--surf2);
-  color: var(--text); font-size: 12px; font-family: inherit; outline: none;
+  border: 1px solid var(--border); background: var(--bg2);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px; outline: none;
+}
+.m-field input:focus, .m-field select:focus, .m-field textarea:focus {
+  border-color: var(--text-accent);
 }
 .m-field textarea { resize: vertical; min-height: 60px; line-height: 1.5; }
 .disc-checklist { border: 1px solid var(--border); border-radius: 7px; overflow: hidden; margin-bottom: 12px; }
 .dcl-row {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 12px; border-bottom: 1px solid var(--border);
+  font-family: var(--font-ui);
   font-size: 12px;
+  color: var(--text-body);
 }
 .dcl-row:last-child { border-bottom: none; }
 .dcl-row input { width: 14px; height: 14px; cursor: pointer; }
+.dcl-tasks-tag {
+  font-family: var(--font-ui);
+  font-size: 11px; color: var(--text-muted);
+  font-feature-settings: "tnum";
+}
 .strip-costs {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 12px; border: 1px solid var(--border);
-  border-radius: 7px; font-size: 12px; margin-bottom: 12px;
+  border-radius: 7px;
+  font-family: var(--font-ui);
+  font-size: 12px; margin-bottom: 12px;
+  color: var(--text-body);
 }
 .strip-costs input { width: 14px; height: 14px; cursor: pointer; }
+.strip-costs-title { font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.strip-costs-sub   { font-size: 11px; color: var(--text-muted); }
+
 .success-state { text-align: center; padding: 28px 20px; }
 .ss-icon  { font-size: 32px; margin-bottom: 10px; }
-.ss-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
-.ss-sub   { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+.ss-title {
+  font-family: var(--font-ui);
+  font-size: 15px; font-weight: 600;
+  color: var(--text-primary); margin-bottom: 6px;
+}
+.ss-sub {
+  font-family: var(--font-ui);
+  font-size: 12px; color: var(--text-muted);
+  line-height: 1.6; margin-bottom: 14px;
+}
 
-/* summary strip */
+/* ── Summary strip ─────────────────────────────────────── */
 .summary-strip {
   display: flex; gap: 8px; padding: 10px 14px;
   border-bottom: 1px solid var(--border);
-  background: var(--surf2); flex-shrink: 0;
+  background: var(--bg2); flex-shrink: 0;
 }
 .sum-card {
-  background: var(--surface); border-radius: 7px;
+  background: var(--bg1); border-radius: 7px;
   padding: 8px 12px; flex: 1;
 }
-.sum-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 3px; }
-.sum-val { font-size: 17px; font-weight: 700; }
-.sum-sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
+/* .sum-lbl uses .section-label */
+.sum-val {
+  font-family: var(--font-ui);
+  font-size: 17px; font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 3px;
+  font-feature-settings: "tnum";
+}
+.sum-val--accent { color: var(--text-accent); }
+.sum-sub {
+  font-family: var(--font-ui);
+  font-size: 11px; color: var(--text-muted); margin-top: 1px;
+}
 
+/* ── Empty / placeholder panels ────────────────────────── */
+.empty-panel {
+  padding: 32px 20px; text-align: center;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+.empty-panel-icon { font-size: 32px; margin-bottom: 12px; }
+.empty-panel-title {
+  font-family: var(--font-ui);
+  font-size: 15px; font-weight: 600;
+  color: var(--text-primary); margin-bottom: 8px;
+}
+.empty-panel-body { margin-bottom: 20px; }
+
+/* ── Loading state ─────────────────────────────────────── */
 .loading-state {
   display: flex; align-items: center; justify-content: center;
-  height: 200px; color: var(--muted); font-size: 13px; gap: 8px;
+  height: 200px; color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 13px; gap: 8px;
 }
 .spinner {
   width: 16px; height: 16px;
-  border: 2px solid var(--border2); border-top-color: var(--accent);
+  border: 2px solid var(--border); border-top-color: var(--text-accent);
   border-radius: 50%; animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Discipline picker dot in modal ────────────────────── */
+.dcl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dcl-label-flex { flex: 1; cursor: pointer; }
+
+/* ── Empty-tasks helper link ───────────────────────────── */
+.tasks-empty-cell {
+  padding: 16px; text-align: center;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+.tasks-empty-link { color: var(--text-accent); cursor: pointer; }
+
+/* ── Add-disc dashed button (visual variant of .btn) ───── */
+.btn--dashed {
+  border-style: dashed;
+  width: 100%;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-muted);
+}
+.btn--dashed:hover {
+  background: rgba(255,255,255,.03);
+  color: var(--text-primary);
+  border-color: var(--border-act);
+}
+
+/* ── Task table horizontal-scroll wrapper ──────────────── */
+.task-tbl-wrap { overflow-x: auto; flex: 1; }
+.task-tbl-wrap > table.task-tbl { min-width: 700px; }
+
+/* ── Task-area no-disciplines empty state ──────────────── */
+.no-disc-empty {
+  height: auto; padding: 40px;
+}
 </style>
 </head>
 <body>
@@ -427,13 +554,13 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
         <div class="prop-sub"  id="prop-sub"></div>
       </div>
       <div class="ph-actions">
-        <button class="btn" onclick="openTemplateModal()">Save as template</button>
-        <button class="btn btn-teal" onclick="convertToProject()">Convert to project ↗</button>
+        <button class="btn" onclick="openTemplateModal()">Save as Template</button>
+        <button class="btn btn-positive" onclick="convertToProject()">Convert to Project ↗</button>
         <button class="btn btn-primary" onclick="exportPDF()">Export PDF</button>
       </div>
     </div>
     <div class="prop-tabs">
-      <div class="tab active" data-tab="wbs">WBS estimator</div>
+      <div class="tab active" data-tab="wbs">WBS Estimator</div>
     </div>
   </div>
 
@@ -444,24 +571,24 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
     <div class="panel active" id="panel-wbs">
       <!-- summary strip -->
       <div class="summary-strip" id="wbs-summary">
-        <div class="sum-card"><div class="sum-lbl">Duration</div><div class="sum-val" id="s-dur">—</div><div class="sum-sub">calendar days</div></div>
-        <div class="sum-card"><div class="sum-lbl">Labor days</div><div class="sum-val" id="s-ldays">—</div><div class="sum-sub">all disciplines</div></div>
-        <div class="sum-card"><div class="sum-lbl">Hours</div><div class="sum-val" id="s-hrs">—</div><div class="sum-sub">estimated</div></div>
-        <div class="sum-card"><div class="sum-lbl">Labor cost</div><div class="sum-val" id="s-labor">—</div><div class="sum-sub">at role rates</div></div>
-        <div class="sum-card"><div class="sum-lbl">Total</div><div class="sum-val" id="s-total" style="color:var(--accent)">—</div><div class="sum-sub">labor + materials</div></div>
+        <div class="sum-card"><div class="section-label">Duration</div><div class="sum-val" id="s-dur">—</div><div class="sum-sub">Calendar Days</div></div>
+        <div class="sum-card"><div class="section-label">Labor Days</div><div class="sum-val" id="s-ldays">—</div><div class="sum-sub">All Disciplines</div></div>
+        <div class="sum-card"><div class="section-label">Hours</div><div class="sum-val" id="s-hrs">—</div><div class="sum-sub">Estimated</div></div>
+        <div class="sum-card"><div class="section-label">Labor Cost</div><div class="sum-val" id="s-labor">—</div><div class="sum-sub">At Role Rates</div></div>
+        <div class="sum-card"><div class="section-label">Total</div><div class="sum-val sum-val--accent" id="s-total">—</div><div class="sum-sub">Labor + Materials</div></div>
       </div>
 
       <div class="wbs-layout">
         <!-- discipline sidebar -->
         <div class="disc-sidebar">
           <div class="template-bar">
-            <select id="tpl-select">
-              <option value="">Load template…</option>
+            <select id="tpl-select" class="btn-select">
+              <option value="">Load Template…</option>
             </select>
-            <button onclick="loadTemplate()">Apply</button>
+            <button class="btn" onclick="loadTemplate()">Apply</button>
           </div>
           <div id="disc-tabs-list"></div>
-          <button class="disc-add-btn" onclick="addDiscipline()">+ Add discipline</button>
+          <button class="btn btn--dashed" onclick="addDiscipline()">+ Add Discipline</button>
         </div>
 
         <!-- task grid -->
@@ -471,56 +598,56 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 
         <!-- cost panel -->
         <div class="cost-panel">
-          <div class="cp-title">Live cost summary</div>
+          <div class="section-label cp-section-spacer">Live Cost Summary</div>
           <div id="cp-disc-rows"></div>
           <hr class="cp-div" />
-          <div class="cp-total" id="cp-labor-row">
-            <span style="color:var(--muted)">Labor subtotal</span>
-            <span id="cp-labor" style="font-weight:600">¥0</span>
+          <div class="cp-row--subtotal" id="cp-labor-row">
+            <span class="cp-subtotal-lbl">Labor Subtotal</span>
+            <span class="cp-subtotal-val" id="cp-labor">¥0</span>
           </div>
 
           <div class="mat-section">
-            <div class="cp-title" style="margin-bottom:8px">Materials</div>
+            <div class="section-label cp-section-spacer">Materials</div>
             <div id="mat-list"></div>
             <div class="mat-add">
               <input type="text" id="mat-name-input" placeholder="Item · ¥cost" />
-              <button onclick="addMaterial()">+ Add</button>
+              <button class="btn" onclick="addMaterial()">+ Add</button>
             </div>
           </div>
 
           <hr class="cp-div" />
-          <div class="cp-total">
-            <span style="color:var(--muted)">Materials</span>
-            <span id="cp-mats" style="font-weight:600">¥0</span>
+          <div class="cp-row--subtotal">
+            <span class="cp-subtotal-lbl">Materials Subtotal</span>
+            <span class="cp-subtotal-val" id="cp-mats">¥0</span>
           </div>
 
           <div class="cp-grand">
-            <span class="cp-grand-label">Base estimate</span>
+            <span class="cp-grand-label">Base Estimate</span>
             <span class="cp-grand-val" id="cp-total">¥0</span>
           </div>
 
-          <div class="range-section" id="range-section" style="display:none">
-            <div class="range-lbl">Risk-adjusted range</div>
+          <div class="range-section" id="range-section" hidden>
+            <div class="section-label">Risk-Adjusted Range</div>
             <div class="range-bar-wrap">
               <div class="range-base" id="rb-base"></div>
               <div class="range-cont" id="rb-cont"></div>
               <div class="range-worst" id="rb-worst"></div>
             </div>
-            <div class="range-labels"><span>Base</span><span>+ contingency</span><span>Worst</span></div>
+            <div class="range-labels"><span>Base</span><span>+ Contingency</span><span>Worst</span></div>
             <div class="range-vals">
-              <div class="rv"><div class="rv-val" style="color:var(--accent)" id="rv-base">—</div><div class="rv-lbl">Base</div></div>
-              <div class="rv"><div class="rv-val" style="color:var(--amber)" id="rv-cont">—</div><div class="rv-lbl">+ contingency</div></div>
-              <div class="rv"><div class="rv-val" style="color:var(--red)"   id="rv-worst">—</div><div class="rv-lbl">Worst case</div></div>
+              <div class="rv"><div class="rv-val rv-val--accent" id="rv-base">—</div><div class="rv-lbl">Base</div></div>
+              <div class="rv"><div class="rv-val rv-val--amber"  id="rv-cont">—</div><div class="rv-lbl">+ Contingency</div></div>
+              <div class="rv"><div class="rv-val rv-val--red"    id="rv-worst">—</div><div class="rv-lbl">Worst Case</div></div>
             </div>
           </div>
 
-          <div class="contingency-block" id="cont-block" style="display:none">
+          <div class="contingency-block" id="cont-block" hidden>
             <div class="cb-top">
-              <span class="cb-lbl">Recommended contingency</span>
+              <span class="cb-lbl">Recommended Contingency</span>
               <span class="cb-val" id="cb-val">¥0</span>
             </div>
             <div class="cb-sub" id="cb-sub">Based on risk register</div>
-            <button class="cb-btn" onclick="addContingency()">Add to estimate</button>
+            <button class="btn" onclick="addContingency()">Add to Estimate</button>
           </div>
         </div>
       </div>
@@ -528,24 +655,24 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 
     <!-- RISKS (link to risks page) -->
     <div class="panel" id="panel-risks">
-      <div style="padding:32px 20px;text-align:center;color:var(--muted);font-size:13px">
-        <div style="font-size:32px;margin-bottom:12px">⚑</div>
-        <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px">Risk &amp; assumption register</div>
-        <div style="margin-bottom:20px">Document risks and assumptions linked to this WBS.<br>PMI P×I scoring and EMV calculations applied automatically.</div>
+      <div class="empty-panel">
+        <div class="empty-panel-icon">⚑</div>
+        <div class="empty-panel-title">Risk &amp; Assumption Register</div>
+        <div class="empty-panel-body">Document risks and assumptions linked to this WBS.<br>PMI P×I scoring and EMV calculations applied automatically.</div>
         <div id="risk-summary-here"></div>
         <button class="btn btn-primary" onclick="location.href='/risk-register.html?proposal_id='+PROPOSAL_ID">
-          Open risk register →
+          Open Risk Register →
         </button>
       </div>
     </div>
 
     <!-- SOW -->
     <div class="panel" id="panel-sow">
-      <div style="padding:32px 20px;text-align:center;color:var(--muted);font-size:13px">
-        <div style="font-size:32px;margin-bottom:12px">📄</div>
-        <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px">Statement of Work</div>
-        <div style="margin-bottom:20px">Build the formal SOW document from this WBS.<br>All sections auto-populated from the estimator and risk register.</div>
-        <button class="btn btn-primary" id="sow-btn" onclick="openSOW()">Open SOW builder →</button>
+      <div class="empty-panel">
+        <div class="empty-panel-icon">📄</div>
+        <div class="empty-panel-title">Statement of Work</div>
+        <div class="empty-panel-body">Build the formal SOW document from this WBS.<br>All sections auto-populated from the estimator and risk register.</div>
+        <button class="btn btn-primary" id="sow-btn" onclick="openSOW()">Open SOW Builder →</button>
       </div>
     </div>
 
@@ -556,16 +683,16 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 <div class="modal-bg" id="tpl-modal" onclick="closeTplModal(event)">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-head">
-      <span class="modal-title">Save as template</span>
-      <button class="modal-close" onclick="document.getElementById('tpl-modal').classList.remove('open')">✕</button>
+      <span class="modal-title">Save as Template</span>
+      <button class="btn btn--icon-only" onclick="document.getElementById('tpl-modal').classList.remove('open')" aria-label="Close">✕</button>
     </div>
     <div class="modal-body" id="tpl-modal-body">
       <div class="m-field">
-        <label>Template name *</label>
+        <label class="section-label">Template Name *</label>
         <input type="text" id="tpl-name" placeholder="e.g. Medical Device R&D — Endoscopic" />
       </div>
       <div class="m-field">
-        <label>Industry tag</label>
+        <label class="section-label">Industry Tag</label>
         <select id="tpl-industry">
           <option>Medical device</option>
           <option>Industrial automation</option>
@@ -576,20 +703,20 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
         </select>
       </div>
       <div class="m-field">
-        <label>Description</label>
+        <label class="section-label">Description</label>
         <textarea id="tpl-desc" placeholder="What kind of project is this template suited for?"></textarea>
       </div>
-      <div class="m-field"><label>Include disciplines</label></div>
+      <div class="m-field"><label class="section-label">Include Disciplines</label></div>
       <div class="disc-checklist" id="tpl-disc-checks"></div>
       <div class="strip-costs">
         <input type="checkbox" id="strip-costs" checked />
         <div>
-          <div style="font-weight:600;color:var(--text);margin-bottom:2px">Strip cost figures from template</div>
-          <div style="font-size:11px;color:var(--muted)">Saves structure, roles, levels — removes ¥ values so each project starts fresh</div>
+          <div class="strip-costs-title">Strip Cost Figures From Template</div>
+          <div class="strip-costs-sub">Saves structure, roles, levels — removes ¥ values so each project starts fresh</div>
         </div>
       </div>
       <div class="m-field">
-        <label>Visibility</label>
+        <label class="section-label">Visibility</label>
         <select id="tpl-visibility">
           <option value="firm">Firm-wide — available to all PMs</option>
           <option value="private">Private — only visible to me</option>
@@ -598,7 +725,7 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
     </div>
     <div class="modal-foot" id="tpl-modal-foot">
       <button class="btn" onclick="document.getElementById('tpl-modal').classList.remove('open')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveTemplate()">Save template</button>
+      <button class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
     </div>
   </div>
 </div>
@@ -783,8 +910,8 @@ function switchDisc(idx) {
 function renderTaskGrid() {
   const area = document.getElementById('task-area');
   if (disciplines.length === 0) {
-    area.innerHTML = `<div class="loading-state" style="height:auto;padding:40px">
-      <span style="color:var(--muted)">No disciplines yet. Add one to start building your WBS.</span>
+    area.innerHTML = `<div class="loading-state no-disc-empty">
+      <span>No disciplines yet. Add one to start building your WBS.</span>
     </div>`;
     return;
   }
@@ -802,10 +929,10 @@ function renderTaskGrid() {
         ${escHtml(disc.name)}
         ${risks ? `<span class="risk-flag">${risks} risk${risks>1?'s':''}</span>` : ''}
       </div>
-      <button class="btn" onclick="addTask()">+ Add task</button>
+      <button class="btn" onclick="addTask()">+ Add Task</button>
     </div>
-    <div style="overflow-x:auto;flex:1">
-      <table class="task-tbl" style="min-width:700px">
+    <div class="task-tbl-wrap">
+      <table class="task-tbl">
         <thead>
           <tr>
             <th class="col-task">Task</th>
@@ -824,24 +951,24 @@ function renderTaskGrid() {
         <tbody id="task-tbody">
           ${tasks.map((t, i) => renderTaskRow(t, i)).join('')}
           ${tasks.length === 0
-            ? `<tr><td colspan="11" style="padding:16px;text-align:center;color:var(--muted);font-size:12px">
+            ? `<tr><td colspan="11" class="tasks-empty-cell">
                 No tasks yet.
-                <span style="color:var(--accent);cursor:pointer" onclick="addTask()"> Add the first one →</span>
+                <span class="tasks-empty-link" onclick="addTask()"> Add the first one →</span>
                </td></tr>` : ''}
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="6" style="padding-left:14px">${escHtml(disc.name)} subtotal</td>
+            <td colspan="6" style="padding-left:14px">${escHtml(disc.name)} Subtotal</td>
             <td></td>
             <td class="hrs-cell">${totalHrs.toFixed(0)} hrs</td>
-            <td class="cost-cell" style="color:var(--accent)">${fmtCost(totalCost)}</td>
+            <td class="cost-cell">${fmtCost(totalCost)}</td>
             <td colspan="2"></td>
           </tr>
         </tfoot>
       </table>
     </div>
     <div class="add-task-row">
-      <button class="add-task-btn" onclick="addTask()">+ Add task to ${escHtml(disc.name)}</button>
+      <button class="btn" onclick="addTask()">+ Add Task to ${escHtml(disc.name)}</button>
     </div>`;
 }
 
@@ -890,8 +1017,7 @@ function renderTaskRow(t, idx) {
       <td class="hrs-cell">${hrs.toFixed(0)}</td>
       <td class="cost-cell">${fmtCost(cost)}</td>
       <td class="col-risk">
-        <span class="risk-icon" onclick="toggleRisk('${t.id}',this)"
-          style="color:${t.is_risk_flag ? '#f07a7a' : 'var(--muted)'}">
+        <span class="risk-icon ${t.is_risk_flag ? 'is-flagged' : ''}" onclick="toggleRisk('${t.id}',this)">
           ${t.is_risk_flag ? '⚑' : '⚐'}
         </span>
       </td>
@@ -1203,9 +1329,9 @@ function openTemplateModal() {
   checks.innerHTML = disciplines.map(d => `
     <div class="dcl-row">
       <input type="checkbox" checked id="tplc-${d.id}" />
-      <div style="width:8px;height:8px;border-radius:50%;background:${d.color}"></div>
-      <label for="tplc-${d.id}" style="flex:1;cursor:pointer">${escHtml(d.name)}</label>
-      <span style="font-size:10px;color:var(--muted)">${wbsTasks.filter(t=>t.discipline_id===d.id).length} tasks</span>
+      <div class="dcl-dot" style="background:${d.color}"></div>
+      <label for="tplc-${d.id}" class="dcl-label-flex">${escHtml(d.name)}</label>
+      <span class="dcl-tasks-tag">${wbsTasks.filter(t=>t.discipline_id===d.id).length} tasks</span>
     </div>`).join('');
   document.getElementById('tpl-name').value = (proposal?.title || 'WBS Template').replace(/— Proposal.*/,'').trim();
   document.getElementById('tpl-modal').classList.add('open');
@@ -1268,7 +1394,7 @@ async function saveTemplate() {
     body.innerHTML = `
       <div class="success-state">
         <div class="ss-icon">✓</div>
-        <div class="ss-title">Template saved</div>
+        <div class="ss-title">Template Saved</div>
         <div class="ss-sub">"${escHtml(name)}" is now available in the template picker.<br>
           Industry: ${escHtml(industry)} · ${escHtml(capitalize(visibility))}</div>
       </div>`;
