@@ -452,6 +452,55 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
   font-family: var(--font-ui);
   font-size: 11px; color: var(--red); min-height: 16px;
 }
+
+/* ── CMD99.1 §3.B.3 — KPI primary value surface-override ────── */
+/* Doctrine §4.4 sanctions 28-36px "varies by surface density".
+   Dashboard's 7-card strip is dense; 32px overpowers. Reduce to 26px. */
+#dash-header-row .kpi-card__value {
+  font-size: 26px;
+}
+
+/* ── CMD99.1 §3.B.1 — Phase-pill row above progress bar ─────── */
+/* Phase pills + status sit centered above the progress bar. AT RISK
+   badge is right-anchored on this same row per §3.B.2 / doctrine §4.7. */
+.proj-row__phase-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+}
+.proj-row__phase-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+}
+.proj-row__phase-status {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.proj-row__phase-status--good    { color: var(--green); }
+.proj-row__phase-status--caution { color: var(--amber); }
+.proj-row__phase-status--bad     { color: var(--red); }
+
+/* ── CMD99.1 §3.B.4 — OVERDUE inline with sub-text ──────────── */
+.list-row__sub-overdue {
+  color: var(--red);
+  font-weight: 600;
+}
+
+/* ── CMD99.1 §3.C.1 — PM avatar inline on Active Projects ───── */
+.proj-row__pm {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 </style>
 </head>
 <body>
@@ -514,7 +563,7 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
 
       <div class="kpi-card-v15" id="kpi-card-budget">
         <div class="kpi-card__bar kpi-card__bar--informational"></div>
-        <span class="kpi-card__glyph">$</span>
+        <span class="kpi-card__glyph">⏱</span>
         <div class="kpi-card__label">Labor Budget</div>
         <div class="kpi-card__value kpi-card__value--accent" id="kpi-budget">—</div>
         <div class="kpi-card__sub" id="kpi-budget-sub">Loading…</div>
@@ -636,12 +685,23 @@ Promise.resolve().then(() => {
   }
 });
 
-// ── Doctrine-conformant gauge renderer (CMD99 §3.3.5) ─────────
+// ── Doctrine-conformant gauge renderer (CMD99 §3.3.5; CMD99.1 §3.A.1) ─
 // Local replacement for UI.gauge that:
 //   (a) computes arc length proportional to value/max (the
 //       proportionality fix mandated by the brief),
 //   (b) renders typography in Inter per §2.1, ≥11px per IR38,
 //       state-color tokens at full saturation per §3.7.
+//
+// CMD99.1 fix: CSS custom properties (`var(--red)` etc.) do NOT
+// resolve when written as direct SVG presentation-attribute values
+// (e.g. stroke="var(--red)"). They resolve only in CSS context —
+// the `style` attribute or a stylesheet. The CMD99 implementation
+// passed colorVar as a stroke="…" attribute, so all three gauges
+// fell back to the SVG initial stroke color. The math was correct;
+// the rendered colors and visual proportions did not match because
+// rounded-cap rendering on an unstyled stroke renders unpredictably
+// across the three arc lengths. Fix: emit the stroke color via
+// inline `style="stroke: var(--…)"` instead.
 function renderGauge(value, max, colorVar, label, displayText) {
   const pct  = Math.min(1, Math.max(0, (value || 0) / (max || 1)));
   const r    = 28;
@@ -655,14 +715,15 @@ function renderGauge(value, max, colorVar, label, displayText) {
       <circle cx="${cx}" cy="${cy}" r="${r}"
         fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="5"/>
       <circle cx="${cx}" cy="${cy}" r="${r}"
-        fill="none" stroke="${colorVar}" stroke-width="5"
+        fill="none" stroke-width="5"
         stroke-linecap="round"
         stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
-        transform="rotate(-90 ${cx} ${cy})"/>
+        transform="rotate(-90 ${cx} ${cy})"
+        style="stroke: ${colorVar}"/>
       <text x="${cx}" y="${cy + 5}" text-anchor="middle"
         font-family="Inter, system-ui, sans-serif" font-size="13"
-        font-weight="700" fill="${colorVar}"
-        style="font-feature-settings: 'tnum'">${displayText}</text>
+        font-weight="700"
+        style="fill: ${colorVar}; font-feature-settings: 'tnum'">${displayText}</text>
     </svg>
     <div class="evm-gauge__label">${label}</div>
   </div>`;
@@ -687,12 +748,29 @@ function emptyState(label, sub, glyphMod) {
   </div>`;
 }
 
-// Avatar (v1.5 §5.8) — initials fallback; photo support reserved for
-// when resources.photo_url surfaces in API responses
-function renderInitialsAvatar(name) {
-  const initials = (name || '?').split(' ').map(w => w[0]).join('').toUpperCase().substring(0,2);
-  return `<span class="avatar avatar--md" aria-label="${name||''}">${initials}</span>`;
+// Avatar (v1.5 §5.8) — initials fallback; photo support active
+// when resource record carries a photo_url. Size argument follows
+// doctrine: 'sm' (24×24, dense lists), 'md' (28×28, default).
+function renderAvatar(nameOrResource, size) {
+  const sizeMod = size === 'sm' ? 'avatar--sm' : 'avatar--md';
+  let name = '', photoUrl = null;
+  if (nameOrResource && typeof nameOrResource === 'object') {
+    name = `${nameOrResource.first_name||''} ${nameOrResource.last_name||''}`.trim()
+         || nameOrResource.name || '';
+    photoUrl = nameOrResource.photo_url || null;
+  } else {
+    name = nameOrResource || '';
+  }
+  if (photoUrl) {
+    return `<span class="avatar ${sizeMod}" aria-label="${name}">`
+         + `<img class="avatar__photo" src="${photoUrl}" alt="${name}"></span>`;
+  }
+  const initials = (name || '?').split(' ').filter(Boolean)
+    .map(w => w[0]).join('').toUpperCase().substring(0,2);
+  return `<span class="avatar ${sizeMod}" aria-label="${name||''}">${initials}</span>`;
 }
+// Back-compat shim — older call sites still use renderInitialsAvatar(name)
+function renderInitialsAvatar(name) { return renderAvatar(name, 'md'); }
 
 async function loadDashboard() {
   try {
@@ -891,6 +969,11 @@ async function loadDashboard() {
         const spiState = evm.spi == null ? '' :
           (evm.spi < 0.95 ? 'bad' : evm.spi <= 1.05 ? 'caution' : 'good');
 
+        // Phase status mod for the inline status label (CMD99.1 §3.B.1)
+        const statusMod = health === 'blocked' ? 'bad'
+                        : health === 'at-risk' ? 'caution'
+                        : 'good';
+
         // P25/P50/P80 phase pills per §3.3.3
         const phasePills = evm.p25Date ? `
           <div class="phase-pills">
@@ -898,6 +981,11 @@ async function loadDashboard() {
             <span class="phase-pill phase-pill--info">P50 ${UI.fmtDateShort(evm.p50Date)}</span>
             <span class="phase-pill phase-pill--${evm.slipDays>14?'bad':evm.slipDays>0?'caution':'good'}">P80 ${UI.fmtDateShort(evm.p80Date)}</span>
           </div>` : '';
+
+        // PM cluster (§3.C.1) — inline avatar between "PM:" label and PM name
+        const pmCluster = pmName
+          ? `<span class="proj-row__pm">PM: ${renderAvatar(_pmRes, 'sm')} ${pmName}</span>`
+          : '';
 
         return `<div class="proj-row health--${health}"
             onclick="window.location.href='/project-detail.html?id=${proj.id}'">
@@ -907,9 +995,8 @@ async function loadDashboard() {
               <button class="btn" type="button" style="padding:1px 8px;font-size:11px"
                 onclick="event.stopPropagation();openEditProject('${proj.id}')">Edit</button>
             </div>
-            <span class="row-badge row-badge--${hBadge}">${hLabel}</span>
           </div>
-          <div class="proj-row__sub">${client}${proj.phase?' · '+proj.phase:''}${pmName?' · PM: '+pmName:''}</div>
+          <div class="proj-row__sub">${client}${proj.phase?' · '+proj.phase:''}${pmCluster?' · '+pmCluster:''}</div>
           <div class="proj-metrics">
             <div class="proj-metric">
               <span class="proj-metric__label">% Complete</span>
@@ -936,9 +1023,14 @@ async function loadDashboard() {
               <span class="proj-metric__value ${dLeft<30?'proj-metric__value--caution':''}">${dLeft}d</span>
             </div>`:''}
           </div>
+          <div class="proj-row__phase-row">
+            <div class="proj-row__phase-cluster">
+              ${phasePills}
+              <span class="proj-row__phase-status proj-row__phase-status--${statusMod}">${evm.diagnosis}</span>
+            </div>
+            <span class="row-badge row-badge--${hBadge}">${hLabel}</span>
+          </div>
           ${UI.progressBar(pctDone, health==='active'?'var(--green)':health==='at-risk'?'var(--amber)':'var(--red)')}
-          ${phasePills}
-          <div class="proj-diagnosis">${evm.diagnosis}</div>
         </div>`;
       }).join('');
     }
@@ -966,15 +1058,20 @@ async function loadDashboard() {
                                t.status === 'blocked' || t.status === 'overdue' ? 'bad' :
                                'neutral';
         const overdueDays = overdue ? Math.abs(days) : 0;
+        const subParts = [
+          projMap[t.project_id]||'—',
+          t.phase||null,
+          asgn?asgn.name:null,
+          overdueDays>0?`<span class="list-row__sub-overdue">${overdueDays}d Overdue</span>`:null
+        ].filter(Boolean).join(' · ');
         return `<div class="list-row">
           <span class="list-row__dot list-row__dot--${dotMod}"></span>
           <div class="list-row__info">
             <div class="list-row__title">${t.name}</div>
-            <div class="list-row__sub">${projMap[t.project_id]||'—'}${t.phase?' · '+t.phase:''}${asgn?' · '+asgn.name:''}</div>
+            <div class="list-row__sub">${subParts}</div>
           </div>
           <div class="list-row__right">
             <span class="row-badge row-badge--${statusBadgeMod}">${statusLabel}</span>
-            ${overdueDays>0?`<span class="list-row__count list-row__count--bad">${overdueDays}d OVERDUE</span>`:''}
           </div>
         </div>`;
       }).join('');

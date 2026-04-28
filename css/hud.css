@@ -489,6 +489,7 @@ body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
   background: #33daff;
   border-color: #33daff;
   color: #fff;
+  filter: brightness(1.15);
 }
 
 /* §5.3 — Dropdown styled as button (Load Template selector) */
