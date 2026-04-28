@@ -456,18 +456,13 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 /* ── Summary strip ─────────────────────────────────────── */
 /* Surface-local .summary-strip / .sum-card / .sum-val / .sum-sub
    rules retired in CMD98.7 — strip now uses canonical .kpi-strip
-   and .kpi-card class set from /css/hud.css per Doctrine §4.4.
+   and .kpi-card-v15 class set from /css/hud.css per Doctrine §4.4.
    Surface-local positioning preserved below via the strip's
    existing ID, no new class introduced. */
 #wbs-summary.kpi-strip {
   border-bottom: 1px solid var(--border);
   background: var(--bg0);
   flex-shrink: 0;
-}
-#wbs-summary > .kpi-card {
-  flex: 1;
-  min-width: 0;
-  background: var(--bg1);
 }
 #wbs-summary .kpi-card__value {
   font-size: 26px;
@@ -562,37 +557,37 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
     <div class="panel active" id="panel-wbs">
       <!-- summary strip -->
       <div class="kpi-strip" id="wbs-summary">
-        <div class="kpi-card">
+        <div class="kpi-card-v15">
           <div class="kpi-card__bar kpi-card__bar--informational-dim"></div>
           <div class="kpi-card__label section-label">Duration</div>
           <div class="kpi-card__value" id="s-dur">—</div>
           <div class="kpi-card__sub">Calendar Days</div>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card-v15">
           <div class="kpi-card__bar kpi-card__bar--informational-dim"></div>
           <div class="kpi-card__label section-label">Labor Days</div>
           <div class="kpi-card__value" id="s-ldays">—</div>
           <div class="kpi-card__sub">All Disciplines</div>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card-v15">
           <div class="kpi-card__bar kpi-card__bar--informational-dim"></div>
           <div class="kpi-card__label section-label">Hours</div>
           <div class="kpi-card__value" id="s-hrs">—</div>
           <div class="kpi-card__sub">Estimated</div>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card-v15">
           <div class="kpi-card__bar kpi-card__bar--informational-dim"></div>
           <div class="kpi-card__label section-label">Labor Cost</div>
           <div class="kpi-card__value" id="s-labor">—</div>
           <div class="kpi-card__sub">At Role Rates</div>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card-v15">
           <div class="kpi-card__bar kpi-card__bar--informational-dim"></div>
           <div class="kpi-card__label section-label">Materials</div>
           <div class="kpi-card__value" id="s-materials">¥0</div>
           <div class="kpi-card__sub" id="s-materials-sub">0 items</div>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card-v15">
           <div class="kpi-card__bar kpi-card__bar--informational-focal"></div>
           <div class="kpi-card__label section-label">Total</div>
           <div class="kpi-card__value kpi-card__value--accent" id="s-total">—</div>
