@@ -460,22 +460,19 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
   font-size: 26px;
 }
 
-/* ── CMD99.1 §3.B.1 — Phase-pill row above progress bar ─────── */
-/* Phase pills + status sit centered above the progress bar. AT RISK
-   badge is right-anchored on this same row per §3.B.2 / doctrine §4.7. */
-.proj-row__phase-row {
-  display: flex;
+/* ── CMD99.1 §3.B.1 / §3.B.2 — Metrics row hosts phase cluster + AT RISK ─ */
+/* Phase pills + status + AT RISK badge ride on the metrics row,
+   right-anchored after the metric items. The metrics row becomes
+   the single horizontal spine; progress bar sits below it. */
+.proj-metrics {
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 2px;
 }
-.proj-row__phase-cluster {
+.proj-metrics__right {
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex: 1;
-  justify-content: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 .proj-row__phase-status {
   font-family: var(--font-ui);
@@ -1022,13 +1019,11 @@ async function loadDashboard() {
               <span class="proj-metric__label">Days Left</span>
               <span class="proj-metric__value ${dLeft<30?'proj-metric__value--caution':''}">${dLeft}d</span>
             </div>`:''}
-          </div>
-          <div class="proj-row__phase-row">
-            <div class="proj-row__phase-cluster">
+            <div class="proj-metrics__right">
               ${phasePills}
               <span class="proj-row__phase-status proj-row__phase-status--${statusMod}">${evm.diagnosis}</span>
+              <span class="row-badge row-badge--${hBadge}">${hLabel}</span>
             </div>
-            <span class="row-badge row-badge--${hBadge}">${hLabel}</span>
           </div>
           ${UI.progressBar(pctDone, health==='active'?'var(--green)':health==='at-risk'?'var(--amber)':'var(--red)')}
         </div>`;
@@ -1078,14 +1073,19 @@ async function loadDashboard() {
     }
 
     // ── EVM Summary gauges (proportional arcs per §3.3.5) ──
+    // CPI/SPI scale: value is treated directly as a 0-1 fraction
+    // (0.97 → 97% arc-closed). Per operator override of brief §3.A.1
+    // (the brief's max=2 prescription was incorrect — operator
+    // confirmed CMD99.2 review that 0.97 must read as 97% closed,
+    // not 48.5%). Caps at 1.0 via the clamp inside renderGauge.
     const workPct = UI.pct(completeTasks.length, tasks.length);
     const cpiV = 0.97, spiV = 0.94;
     const cpiColor = evmIndexColor(cpiV);
     const spiColor = evmIndexColor(spiV);
     document.getElementById('evm-gauges').innerHTML =
       renderGauge(workPct, 100, 'var(--text-accent)', 'WORK %', workPct + '%') +
-      renderGauge(cpiV,    2,   cpiColor,             'CPI',    cpiV.toFixed(2)) +
-      renderGauge(spiV,    2,   spiColor,             'SPI',    spiV.toFixed(2));
+      renderGauge(cpiV,    1,   cpiColor,             'CPI',    cpiV.toFixed(2)) +
+      renderGauge(spiV,    1,   spiColor,             'SPI',    spiV.toFixed(2));
 
     // ── Alerts ──
     const overdue = tasks.filter(t=>t.status!=='complete'&&t.due_date&&new Date(t.due_date)<new Date()).slice(0,4);

@@ -481,15 +481,14 @@ body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
 
 /* §5.2 — Primary CTA variant */
 .btn-primary {
-  background: var(--text-accent);
-  border-color: var(--text-accent);
+  background: #0a4a5e;
+  border-color: #0a4a5e;
   color: #fff;
 }
 .btn-primary:hover {
-  background: #33daff;
-  border-color: #33daff;
+  background: #062f3c;
+  border-color: #062f3c;
   color: #fff;
-  filter: brightness(1.15);
 }
 
 /* §5.3 — Dropdown styled as button (Load Template selector) */
