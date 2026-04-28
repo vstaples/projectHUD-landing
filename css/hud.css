@@ -804,3 +804,54 @@ body.hud-footer-rendered #content,
 body.hud-footer-rendered .hud-shell {
   padding-bottom: var(--footer-h, 24px);
 }
+/* ============================================================
+   §6.2 / §3.5.2 — Compass panel-tier classes (CMD-A, v1.7)
+   ============================================================
+   Migrated from inline-styled JS-rendered DOM in mw-*.js.
+   All panel-tier surfaces resolve to var(--surface-panel) per
+   §3.5.2. The cyan-wash advisory tint (rgba(0,210,255,0.03))
+   is rejected per §3.5.7.
+*/
+
+/* §3.5.2 — Recommended Sequence panel
+   Source: mw-sequence.js renderRecSeq outer container.
+   Cyan left-border preserved as system-generated identity
+   marker per §3.5.7's enumerated existing signals. */
+.cmp-panel-recseq {
+  background: var(--surface-panel);
+  border: 1px solid rgba(0, 210, 255, 0.15);
+  border-left: 3px solid var(--cyan, #00D2FF);
+}
+
+/* §3.5.2 — Since-last-login delta strip (#mw-delta-strip)
+   Source: mw-core.js line 776. Singleton ID; non-background
+   chrome (display, padding, border-bottom, gap, etc.) stays
+   inline because it includes the data-driven display:none /
+   display:flex toggle. */
+#mw-delta-strip {
+  background: var(--surface-panel);
+}
+
+/* §3.5.2 — Chain of Custody panel (#mw-coc)
+   Source: mw-core.js line 1219. Singleton ID. Sticky inner
+   header (line 1223) was hardcoded to #060a10; migrated to
+   var(--surface-content) via .cmp-panel-coc__header so the
+   header sits one tier deeper than the panel per §3.5.3. */
+#mw-coc {
+  background: var(--surface-panel);
+}
+.cmp-panel-coc__header {
+  background: var(--surface-content);
+}
+
+/* §6.2 — Diagram timeline canvas chrome (Work Queue diagram view)
+   Source: mw-core.js lines 1074, 1076. The diagram canvas
+   (#mw-diag-tl-wrap) renders at --bg0 to give the dot-grid
+   spatial-context backdrop; its corner cell and timeline
+   header are sub-regions of that canvas, not panel-tier
+   surfaces. Doctrine-conformant in substance (--bg0 matches
+   the canvas tier) but §6.2-violation in form. Migrated to
+   class-based reference, preserving visual. */
+.cmp-diag-tl-canvas-chrome {
+  background: var(--surface-page);
+}

@@ -773,7 +773,7 @@ window._mwLoadUserView = async function() {
     </div>
 
     <!-- Since-last-login delta strip -->
-    <div id="mw-delta-strip" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 14px 7px;border-bottom:1px solid rgba(0,210,255,.07);background:rgba(0,210,255,.03)">
+    <div id="mw-delta-strip" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 14px 7px;border-bottom:1px solid rgba(0,210,255,.07)">
       <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:rgba(255,255,255,.25);text-transform:uppercase;white-space:nowrap">Since last login</span>
       <div id="mw-delta-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
@@ -1071,9 +1071,9 @@ window._mwLoadUserView = async function() {
                  [stub col — v-scroll only][card canvas — both] -->
             <div id="mw-diag-tl-wrap" style="height:480px;display:grid;grid-template-columns:150px 1fr;grid-template-rows:36px 1fr;background:var(--bg0);background-image:radial-gradient(rgba(0,210,255,.05) 1px,transparent 1px);background-size:24px 24px">
               <!-- Top-left: fixed corner -->
-              <div style="background:#060a10;border-right:1px solid rgba(0,210,255,.08);border-bottom:1px solid rgba(0,210,255,.1);z-index:10"></div>
+              <div class="cmp-diag-tl-canvas-chrome" style="border-right:1px solid rgba(0,210,255,.08);border-bottom:1px solid rgba(0,210,255,.1);z-index:10"></div>
               <!-- Top-right: timeline header — h-scroll synced, no v-scroll -->
-              <div id="mw-diag-tl-header" style="overflow:hidden;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1);z-index:10"></div>
+              <div id="mw-diag-tl-header" class="cmp-diag-tl-canvas-chrome" style="overflow:hidden;border-bottom:1px solid rgba(0,210,255,.1);z-index:10"></div>
               <!-- Bottom-left: stub column — v-scroll synced, no h-scroll -->
               <div id="mw-diag-stub-col" style="overflow:hidden;background:var(--bg0);border-right:1px solid rgba(0,210,255,.08);z-index:9"></div>
               <!-- Bottom-right: card canvas — master scroll source -->
@@ -1216,11 +1216,11 @@ window._mwLoadUserView = async function() {
       </div>
 
       <!-- CoC Panel — fills remaining space -->
-      <div id="mw-coc" style="display:none;flex-direction:column;width:300px;flex-shrink:0;background:#060c18;border-left:1px solid rgba(0,210,255,.15);position:relative">
+      <div id="mw-coc" style="display:none;flex-direction:column;width:300px;flex-shrink:0;border-left:1px solid rgba(0,210,255,.15);position:relative">
         <!-- Drag handle on left edge -->
         <div id="mw-coc-drag" style="position:absolute;left:0;top:0;width:5px;height:100%;cursor:col-resize;z-index:10;background:transparent"></div>
         <div style="display:flex;flex-direction:column;height:100%;overflow-y:auto">
-        <div style="position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.1)">
+        <div class="cmp-panel-coc__header" style="position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;border-bottom:1px solid rgba(0,210,255,.1)">
           <div>
             <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">Chain of Custody</div>
             <div id="mw-coc-count" style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-top:1px"></div>
