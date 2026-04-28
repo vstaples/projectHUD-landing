@@ -588,7 +588,7 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
         <div class="kpi-card-v15">
           <div class="kpi-card__bar kpi-card__bar--informational-dim"></div>
           <div class="kpi-card__label section-label">Materials</div>
-          <div class="kpi-card__value" id="s-materials">¥0</div>
+          <div class="kpi-card__value" id="s-materials">$0</div>
           <div class="kpi-card__sub" id="s-materials-sub">0 items</div>
         </div>
         <div class="kpi-card-v15">
@@ -624,14 +624,14 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
           <hr class="cp-div" />
           <div class="cp-row--subtotal" id="cp-labor-row">
             <span class="cp-subtotal-lbl">Labor Subtotal</span>
-            <span class="cp-subtotal-val" id="cp-labor">¥0</span>
+            <span class="cp-subtotal-val" id="cp-labor">$0</span>
           </div>
 
           <div class="mat-section">
             <div class="section-label cp-section-spacer">Materials</div>
             <div id="mat-list"></div>
             <div class="mat-add">
-              <input type="text" id="mat-name-input" placeholder="Item · ¥cost" />
+              <input type="text" id="mat-name-input" placeholder="Item · $cost" />
               <button class="btn btn--dashed" onclick="addMaterial()">+ Add</button>
             </div>
           </div>
@@ -639,12 +639,12 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
           <hr class="cp-div" />
           <div class="cp-row--subtotal">
             <span class="cp-subtotal-lbl">Materials Subtotal</span>
-            <span class="cp-subtotal-val" id="cp-mats">¥0</span>
+            <span class="cp-subtotal-val" id="cp-mats">$0</span>
           </div>
 
           <div class="cp-grand">
             <span class="cp-grand-label">Base Estimate</span>
-            <span class="cp-grand-val" id="cp-total">¥0</span>
+            <span class="cp-grand-val" id="cp-total">$0</span>
           </div>
 
           <div class="range-section" id="range-section" hidden>
@@ -665,7 +665,7 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
           <div class="contingency-block" id="cont-block" hidden>
             <div class="cb-top">
               <span class="cb-lbl">Recommended Contingency</span>
-              <span class="cb-val" id="cb-val">¥0</span>
+              <span class="cb-val" id="cb-val">$0</span>
             </div>
             <div class="cb-sub" id="cb-sub">Based on risk register</div>
             <button class="btn" onclick="addContingency()">Add to Estimate</button>
@@ -733,7 +733,7 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
         <input type="checkbox" id="strip-costs" checked />
         <div>
           <div class="strip-costs-title">Strip Cost Figures From Template</div>
-          <div class="strip-costs-sub">Saves structure, roles, levels — removes ¥ values so each project starts fresh</div>
+          <div class="strip-costs-sub">Saves structure, roles, levels — removes $ values so each project starts fresh</div>
         </div>
       </div>
       <div class="m-field">
@@ -1134,7 +1134,7 @@ function getDefaultRole() { return hud_roles[0]?.name || 'Engineer'; }
 function getRoleName(roleId) { return hud_roles.find(r => r.id === roleId)?.name || getDefaultRole(); }
 function getTotalLaborCost() { return wbsTasks.reduce((s,t) => s + (t.total_cost||0), 0); }
 function getTotalMaterialCost() { return materials.reduce((s,m) => s + (m.cost||0), 0); }
-function fmtCost(n) { return '¥' + Math.round(n||0).toLocaleString(); }
+function fmtCost(n) { return '$' + Math.round(n||0).toLocaleString(); }
 
 // ── cost panel ─────────────────────────────────────────
 function renderCostPanel() {
@@ -1176,8 +1176,8 @@ async function addMaterial() {
   const inp = document.getElementById('mat-name-input');
   const raw = inp.value.trim();
   if (!raw) return;
-  // parse "Item name · ¥cost" or "Item name 12000"
-  const match = raw.match(/^(.+?)[·\s]+[¥$]?([\d,]+)\s*$/);
+  // parse "Item name · $cost" or "Item name 12000"
+  const match = raw.match(/^(.+?)[·\s]+[$]?([\d,]+)\s*$/);
   const name  = match ? match[1].trim() : raw;
   const cost  = match ? +match[2].replace(/,/g,'') : 0;
 
