@@ -572,7 +572,8 @@ body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
 .kpi-card__bar--state-good      { background: var(--green); }
 .kpi-card__bar--state-caution   { background: var(--amber); }
 .kpi-card__bar--state-bad       { background: var(--red); }
-.kpi-card__bar--informational   { background: var(--text-accent); }
+.kpi-card__bar--informational-focal { background: var(--text-accent); }
+.kpi-card__bar--informational-dim   { background: var(--text-faint); }
 .kpi-card__bar--domain-purple   { background: #8a4fef; }
 .kpi-card__label {
   font-family: var(--font-ui);

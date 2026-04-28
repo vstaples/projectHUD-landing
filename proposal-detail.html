@@ -454,27 +454,15 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
 }
 
 /* ── Summary strip ─────────────────────────────────────── */
-.summary-strip {
-  display: flex; gap: 8px; padding: 10px 14px;
+/* Surface-local .summary-strip / .sum-card / .sum-val / .sum-sub
+   rules retired in CMD98.7 — strip now uses canonical .kpi-strip
+   and .kpi-card class set from /css/hud.css per Doctrine §4.4.
+   Surface-local positioning preserved below via the strip's
+   existing ID, no new class introduced. */
+#wbs-summary.kpi-strip {
   border-bottom: 1px solid var(--border);
-  background: var(--bg2); flex-shrink: 0;
-}
-.sum-card {
-  background: var(--bg1); border-radius: 7px;
-  padding: 8px 12px; flex: 1;
-}
-/* .sum-lbl uses .section-label */
-.sum-val {
-  font-family: var(--font-ui);
-  font-size: 17px; font-weight: 700;
-  color: var(--text-primary);
-  margin-top: 3px;
-  font-feature-settings: "tnum";
-}
-.sum-val--accent { color: var(--text-accent); }
-.sum-sub {
-  font-family: var(--font-ui);
-  font-size: 11px; color: var(--text-muted); margin-top: 1px;
+  background: var(--bg2);
+  flex-shrink: 0;
 }
 
 /* ── Empty / placeholder panels ────────────────────────── */
@@ -565,12 +553,43 @@ table.task-tbl { width: 100%; border-collapse: collapse; }
     <!-- WBS -->
     <div class="panel active" id="panel-wbs">
       <!-- summary strip -->
-      <div class="summary-strip" id="wbs-summary">
-        <div class="sum-card"><div class="section-label">Duration</div><div class="sum-val" id="s-dur">—</div><div class="sum-sub">Calendar Days</div></div>
-        <div class="sum-card"><div class="section-label">Labor Days</div><div class="sum-val" id="s-ldays">—</div><div class="sum-sub">All Disciplines</div></div>
-        <div class="sum-card"><div class="section-label">Hours</div><div class="sum-val" id="s-hrs">—</div><div class="sum-sub">Estimated</div></div>
-        <div class="sum-card"><div class="section-label">Labor Cost</div><div class="sum-val" id="s-labor">—</div><div class="sum-sub">At Role Rates</div></div>
-        <div class="sum-card"><div class="section-label">Total</div><div class="sum-val sum-val--accent" id="s-total">—</div><div class="sum-sub">Labor + Materials</div></div>
+      <div class="kpi-strip" id="wbs-summary">
+        <div class="kpi-card">
+          <div class="kpi-card__bar kpi-card__bar--informational-dim"></div>
+          <div class="kpi-card__label section-label">Duration</div>
+          <div class="kpi-card__value" id="s-dur">—</div>
+          <div class="kpi-card__sub">Calendar Days</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__bar kpi-card__bar--informational-dim"></div>
+          <div class="kpi-card__label section-label">Labor Days</div>
+          <div class="kpi-card__value" id="s-ldays">—</div>
+          <div class="kpi-card__sub">All Disciplines</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__bar kpi-card__bar--informational-dim"></div>
+          <div class="kpi-card__label section-label">Hours</div>
+          <div class="kpi-card__value" id="s-hrs">—</div>
+          <div class="kpi-card__sub">Estimated</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__bar kpi-card__bar--informational-dim"></div>
+          <div class="kpi-card__label section-label">Labor Cost</div>
+          <div class="kpi-card__value" id="s-labor">—</div>
+          <div class="kpi-card__sub">At Role Rates</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__bar kpi-card__bar--informational-dim"></div>
+          <div class="kpi-card__label section-label">Materials</div>
+          <div class="kpi-card__value" id="s-materials">¥0</div>
+          <div class="kpi-card__sub" id="s-materials-sub">0 items</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__bar kpi-card__bar--informational-focal"></div>
+          <div class="kpi-card__label section-label">Total</div>
+          <div class="kpi-card__value kpi-card__value--accent" id="s-total">—</div>
+          <div class="kpi-card__sub">Labor + Materials</div>
+        </div>
       </div>
 
       <div class="wbs-layout">
@@ -1174,19 +1193,24 @@ function updateSummaryStrip() {
         wbsTasks.filter(t=>t.discipline_id===d.id).reduce((s,t)=>s+(t.duration_days||0),0)
       ), 0) : 0;
   const labor      = getTotalLaborCost();
-  const grand      = labor + getTotalMaterialCost();
+  const totalMat   = getTotalMaterialCost();
+  const matCount   = materials.length;
+  const grand      = labor + totalMat;
 
-  document.getElementById('s-dur').textContent   = totalDur.toFixed(0);
-  document.getElementById('s-ldays').textContent = totalDays.toFixed(0);
-  document.getElementById('s-hrs').textContent   = totalHrs.toFixed(0);
-  document.getElementById('s-labor').textContent = fmtCost(labor);
-  document.getElementById('s-total').textContent = fmtCost(grand);
+  document.getElementById('s-dur').textContent       = totalDur.toFixed(0);
+  document.getElementById('s-ldays').textContent     = totalDays.toFixed(0);
+  document.getElementById('s-hrs').textContent       = totalHrs.toFixed(0);
+  document.getElementById('s-labor').textContent     = fmtCost(labor);
+  document.getElementById('s-materials').textContent = fmtCost(totalMat);
+  document.getElementById('s-materials-sub').textContent =
+    matCount === 1 ? '1 item' : matCount + ' items';
+  document.getElementById('s-total').textContent     = fmtCost(grand);
 
   // save totals to proposal
   if (PROPOSAL_ID) {
     API.patch(`proposals?id=eq.${PROPOSAL_ID}`, {
       total_labor_cost:    labor,
-      total_material_cost: getTotalMaterialCost(),
+      total_material_cost: totalMat,
       total_cost:          grand,
     }).catch(()=>{});
   }

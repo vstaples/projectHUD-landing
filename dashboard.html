@@ -523,7 +523,7 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
       </div>
 
       <div class="kpi-card-v15" id="kpi-card-active">
-        <div class="kpi-card__bar kpi-card__bar--informational"></div>
+        <div class="kpi-card__bar kpi-card__bar--informational-focal"></div>
         <span class="kpi-card__glyph">◧</span>
         <div class="kpi-card__label">Active Projects</div>
         <div class="kpi-card__value kpi-card__value--accent" id="kpi-active">—</div>
@@ -531,7 +531,7 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
       </div>
 
       <div class="kpi-card-v15" id="kpi-card-actions">
-        <div class="kpi-card__bar kpi-card__bar--informational" id="kpi-actions-bar"></div>
+        <div class="kpi-card__bar kpi-card__bar--informational-focal" id="kpi-actions-bar"></div>
         <span class="kpi-card__glyph">▶</span>
         <div class="kpi-card__label">Open Action Items</div>
         <div class="kpi-card__value kpi-card__value--accent" id="kpi-actions">—</div>
@@ -547,7 +547,7 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
       </div>
 
       <div class="kpi-card-v15" id="kpi-card-complete">
-        <div class="kpi-card__bar kpi-card__bar--informational"></div>
+        <div class="kpi-card__bar kpi-card__bar--informational-focal"></div>
         <span class="kpi-card__glyph">✓</span>
         <div class="kpi-card__label">Tasks Complete</div>
         <div class="kpi-card__value kpi-card__value--accent" id="kpi-complete">—</div>
@@ -563,7 +563,7 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
       </div>
 
       <div class="kpi-card-v15" id="kpi-card-budget">
-        <div class="kpi-card__bar kpi-card__bar--informational"></div>
+        <div class="kpi-card__bar kpi-card__bar--informational-focal"></div>
         <span class="kpi-card__glyph">⏱</span>
         <div class="kpi-card__label">Labor Budget</div>
         <div class="kpi-card__value kpi-card__value--accent" id="kpi-budget">—</div>
@@ -886,7 +886,7 @@ async function loadDashboard() {
     document.getElementById('kpi-actions').textContent = openActionsCount;
     document.getElementById('kpi-actions-sub').textContent = '0 overdue';
     setBar('kpi-actions-bar',
-      openActionsCount > 0 ? 'kpi-card__bar--state-caution' : 'kpi-card__bar--informational');
+      openActionsCount > 0 ? 'kpi-card__bar--state-caution' : 'kpi-card__bar--informational-focal');
 
     document.getElementById('kpi-alerts').textContent = atRiskTasks.length;
     const blockedCt = tasks.filter(t=>t.status==='blocked').length;
