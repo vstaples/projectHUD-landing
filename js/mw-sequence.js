@@ -296,7 +296,7 @@ function renderRecSeq(items) {
 
   el.style.display = 'block';
   el.innerHTML = `
-    <div style="background:rgba(0,210,255,.03);border:1px solid rgba(0,210,255,.15);border-left:3px solid #00D2FF" onmouseenter="showRecSeqTooltip(event)" onmouseleave="if(!this.contains(event.relatedTarget))hideRecSeqTooltip()">
+    <div style="background:var(--bg1);border:1px solid rgba(0,210,255,.15);border-left:3px solid #00D2FF" onmouseenter="showRecSeqTooltip(event)" onmouseleave="if(!this.contains(event.relatedTarget))hideRecSeqTooltip()">
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(0,210,255,.1)">
         <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#00D2FF;cursor:help" id="mw-recseq-hdr">Recommended sequence for today</div>
         <div style="font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">System-generated · ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
