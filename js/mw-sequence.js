@@ -283,7 +283,7 @@ function renderRecSeq(items) {
 
     return `<div style="display:grid;grid-template-columns:24px 1fr 280px 200px;gap:0;padding:6px 12px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;align-items:start"
       data-wi-id="${w.id}" data-wi-type="${w.type}" data-action="diag-open-task"
-      onmouseenter="this.style.background='rgba(0,210,255,.03)'" onmouseleave="this.style.background=''">
+      onmouseenter="this.style.background='var(--surface-content)'" onmouseleave="this.style.background=''">
       <div style="font-size:15px;font-weight:700;color:${rankColor};padding-top:1px">${i+1}</div>
       <div style="min-width:0;padding-right:8px">
         <div style="font-size:12px;font-weight:600;color:#F0F6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
