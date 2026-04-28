@@ -71,8 +71,9 @@
   .dashboard-grid { grid-template-columns: 1fr; }
 }
 
-/* ── Active Projects panel: darker pane to match Compass ─────── */
-#active-projects-panel.panel-frame {
+/* ── Dashboard pane fill: unified darker tone ────────────────── */
+.panel-frame,
+.kpi-card-v15 {
   background: #040f23cf;
 }
 
@@ -587,7 +588,7 @@ body.hud-header-rendered #hud-header-left .hud-module-name {
     <div class="dashboard-grid">
       <div>
         <!-- ACTIVE PROJECTS -->
-        <div class="panel-frame" id="active-projects-panel" style="margin-bottom:16px">
+        <div class="panel-frame" style="margin-bottom:16px">
           <div class="panel-frame__corner-bl"></div><div class="panel-frame__corner-br"></div>
           <div class="panel-header">
             <span class="section-label-with-bar">ACTIVE PROJECTS
