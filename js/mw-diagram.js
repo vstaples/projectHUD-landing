@@ -87,7 +87,7 @@ function buildWorkDiagram() {
     col.style.cssText = `width:${CW}px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3px 0`;
     const dayNum  = dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
     const dayName = dt.toLocaleDateString('en-US', { weekday:'short' });
-    col.innerHTML = `<div style="font-family:var(--font-mono,monospace);font-size:11px;font-weight:${isToday?'700':'400'};color:${isToday?'#00D2FF':'rgba(255,255,255,.3)'}">${dayNum}</div><div style="font-family:var(--font-mono,monospace);font-size:11px;color:${isToday?'#00D2FF':'rgba(255,255,255,.2)'}">${dayName}</div>`;
+    col.innerHTML = `<div style="font-family:var(--font-mono,monospace);font-size:11px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--text-accent)':'var(--text-faint)'}">${dayNum}</div><div style="font-family:var(--font-mono,monospace);font-size:11px;color:${isToday?'var(--text-accent)':'var(--text-faint)'}">${dayName}</div>`;
     tlRow.appendChild(col);
   });
   tlHdr.appendChild(tlRow);
@@ -189,7 +189,7 @@ function buildWorkDiagram() {
     // Stub: project header
     const ps = document.createElement('div');
     ps.style.cssText = `height:${PROJ_HDR_H}px;display:flex;align-items:center;gap:7px;padding:0 10px;cursor:pointer;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.04);box-sizing:border-box`;
-    ps.innerHTML = `<div style="width:3px;height:14px;background:${projColor};border-radius:1px;flex-shrink:0"></div><div style="font-family:var(--font-mono,monospace);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:${projColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj.name)}</div><div id="diag-tog-${proj.id}" style="font-family:var(--font-mono,monospace);font-size:11px;color:rgba(255,255,255,.3)">${collapsed?'▸':'▾'}</div>`;
+    ps.innerHTML = `<div style="width:3px;height:14px;background:${projColor};border-radius:1px;flex-shrink:0"></div><div style="font-family:var(--font-mono,monospace);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:${projColor};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj.name)}</div><div id="diag-tog-${proj.id}" style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text-faint)">${collapsed?'▸':'▾'}</div>`;
     ps.dataset.action = 'diag-toggle-proj';
     ps.dataset.projId = proj.id;
     stubCol.appendChild(ps);
@@ -232,7 +232,7 @@ function buildWorkDiagram() {
       // Stub: lane label
       const ls = document.createElement('div');
       ls.style.cssText = `height:${lh}px;background:rgba(255,255,255,.01);border-bottom:1px solid rgba(255,255,255,.03);display:flex;align-items:flex-start;padding:6px 10px;box-sizing:border-box`;
-      ls.innerHTML = `<span style="font-family:var(--font-mono,monospace);font-size:11px;color:rgba(255,255,255,.2);letter-spacing:.06em;text-transform:uppercase">${lane.label}</span>`;
+      ls.innerHTML = `<span style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase">${lane.label}</span>`;
       stubCol.appendChild(ls);
 
       // Canvas: lane row
@@ -263,7 +263,7 @@ function buildWorkDiagram() {
         const nd=document.createElement('div');
         nd.style.cssText=`position:absolute;left:${x}px;top:${pos.y}px;width:${CARD_W}px;cursor:pointer;z-index:3`;
         nd.dataset.wiId=node.id; nd.dataset.action='diag-open-task';
-        nd.innerHTML=`<div class="diag-nd-inner" style="border:1px solid ${nc}44;border-left:3px solid ${nc};background:rgba(10,12,28,.9);border-radius:3px;padding:5px 7px;height:${CARD_H}px;box-sizing:border-box;overflow:hidden"><div style="font-family:var(--font-mono,monospace);font-size:11px;color:${nc};letter-spacing:.05em;text-transform:uppercase;opacity:.7;margin-bottom:2px">${node.type}</div><div style="font-family:var(--font-mono,monospace);font-size:11px;font-weight:700;color:#F0F6FF;line-height:1.3;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${CARD_W-14}px" title="${esc(node.title)}">${esc(node.title)}</div><div style="font-family:var(--font-mono,monospace);font-size:11px;color:rgba(255,255,255,.35);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(node.project)}</div>${pct>0?`<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${pct}%;background:${nc};border-radius:1px"></div></div>`:''}<div style="font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;border:1px solid ${nc}55;color:${nc};display:inline-block;letter-spacing:.04em">${sl}</div></div>`;
+        nd.innerHTML=`<div class="diag-nd-inner" style="border:1px solid ${nc}44;border-left:3px solid ${nc};background:rgba(10,12,28,.9);border-radius:3px;padding:5px 7px;height:${CARD_H}px;box-sizing:border-box;overflow:hidden"><div style="font-family:var(--font-mono,monospace);font-size:11px;color:${nc};letter-spacing:.05em;text-transform:uppercase;opacity:.7;margin-bottom:2px">${node.type}</div><div style="font-family:var(--font-mono,monospace);font-size:11px;font-weight:700;color:#F0F6FF;line-height:1.3;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${CARD_W-14}px" title="${esc(node.title)}">${esc(node.title)}</div><div style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text-muted);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(node.project)}</div>${pct>0?`<div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${pct}%;background:${nc};border-radius:1px"></div></div>`:''}<div style="font-family:var(--font-mono,monospace);font-size:11px;padding:1px 5px;border:1px solid ${nc}55;color:${nc};display:inline-block;letter-spacing:.04em">${sl}</div></div>`;
         cv.appendChild(nd);
       });
 
