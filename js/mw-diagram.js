@@ -151,7 +151,8 @@ function buildWorkDiagram() {
 
   // Render capacity bar row in tlHdr (second row)
   const capRow = document.createElement('div');
-  capRow.style.cssText = `display:flex;width:${totalCW}px;background:#060a10;border-bottom:1px solid rgba(0,210,255,.08)`;
+  capRow.className = 'cmp-diag-tl-canvas-chrome';
+  capRow.style.cssText = `display:flex;width:${totalCW}px;border-bottom:1px solid rgba(0,210,255,.08)`;
   DATES.forEach(d => {
     const isToday = d === today;
     const alloc   = allocMap[d] || 0;
@@ -429,7 +430,7 @@ window.toggleUserCoC = function() {
       }).join('');
 
   drawer.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(0,210,255,.12);flex-shrink:0;background:#060a10">
+    <div class="cmp-panel-coc__header" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(0,210,255,.12);flex-shrink:0">
       <div>
         <div style="font-family:var(--font-mono,monospace);font-size:13px;font-weight:700;color:#F0F6FF;letter-spacing:.05em">Chain of Custody</div>
         <div style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--text3);margin-top:1px">${evts.length} events</div>
