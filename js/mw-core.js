@@ -778,8 +778,9 @@ window._mwLoadUserView = async function() {
       <div id="mw-delta-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
 
-    <!-- Suite tabs -->
-    <div id="user-suite-tabs" style="display:flex;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:12px;background:var(--bg0,#060a10);position:sticky;top:0;z-index:10">
+    <!-- Suite tabs (hidden — Tier 2 sidebar strip in hud-shell replaces this navigation;
+         buttons retained for uSwitchTab btn-arg lookup at compass.html:1354) -->
+    <div id="user-suite-tabs" style="display:none;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:12px;background:var(--bg0,#060a10);position:sticky;top:0;z-index:10">
       <button class="ust on" data-tab="work"      onclick="uSwitchTab('work',this)">My Work</button>
       <button class="ust"    data-tab="timesheet"  onclick="uSwitchTab('timesheet',this)">My Time</button>
       <button class="ust"    data-tab="calendar"   onclick="uSwitchTab('calendar',this)">My Calendar</button>
