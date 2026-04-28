@@ -26,11 +26,14 @@
   --text2: #90B8D8;   /* tertiary text — medium blue (was #7a9bbf, bumped up) */
   --text3: #6A94B8;   /* metadata / labels — readable mid-blue (was #3a5a7a, major bump) */
   --muted: #5A84A8;   /* muted elements — still visible */
+}
 
-  /* ── Pane fill harmonization with dashboard.html ──────────────
-     Override Layer 1 surface tokens compass-wide so all panel,
-     card, sub-section, and row-hover surfaces render at the
-     unified darker tone. Page background (--bg0) untouched. */
+/* ── Pane fill harmonization with dashboard.html ──────────────
+   Override Layer 1 surface tokens compass-wide so all panel,
+   card, sub-section, and row-hover surfaces render at the
+   unified darker tone. Page background (--bg0) untouched.
+   Scoped to #compass-app to outrank hud.css :root rule. */
+#compass-app {
   --bg1: #040f23cf;
   --bg2: #040f23cf;
 }
