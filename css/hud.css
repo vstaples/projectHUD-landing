@@ -234,7 +234,7 @@ body::before {
 .kpi-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text2); letter-spacing: 0.06em; }
 
 /* ── PANELS ─────────────────────────────────────────────────── */
-.panel { background: var(--bg2); border: 1px solid var(--border); margin-bottom: 14px; }
+.panel { background: var(--surface-panel); border: 1px solid var(--border); margin-bottom: 14px; }
 .panel-header {
   padding: 10px 14px; border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;

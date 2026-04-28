@@ -74,10 +74,6 @@ body { height: 100vh; overflow: hidden; }
 .panels { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 .panel  { display: none; flex: 1; overflow: hidden; }
 .panel.active { display: flex; flex-direction: column; }
-/* CMD98.7 — restore dashboard-style elevation contrast under the
-   summary strip: panel reads --bg1 (matches dashboard panel-frame),
-   cards stay canonical --bg2, so cards visually pop. */
-#panel-wbs { background: var(--bg1); }
 
 /* ── WBS layout ────────────────────────────────────────── */
 .wbs-layout {

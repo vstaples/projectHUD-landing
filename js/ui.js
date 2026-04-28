@@ -574,11 +574,12 @@ window.UI = {
           transform="rotate(-90 ${cx} ${cy})"/>
         <!-- Center value -->
         <text x="${cx}" y="${cy + 5}" text-anchor="middle"
-          font-family="var(--font-mono,monospace)" font-size="13"
+          font-family="var(--font-ui)" font-size="13"
           font-weight="700" fill="${color}">${escHtml(String(display))}</text>
       </svg>
-      <div style="font-family:var(--font-mono,monospace);font-size:9px;
-        letter-spacing:.12em;color:var(--text3,#7a8099)">${escHtml(label)}</div>
+      <div style="font-family:var(--font-ui);font-size:11px;font-weight:700;
+        letter-spacing:.08em;text-transform:uppercase;
+        color:var(--text3,#7a8099)">${escHtml(label)}</div>
     </div>`;
   },
 };
