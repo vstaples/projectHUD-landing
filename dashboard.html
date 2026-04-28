@@ -18,7 +18,7 @@
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   gap: 10px;
-  padding: 12px 14px;
+  padding: 12px 14px 0;
   margin-bottom: 16px;
 }
 @media (max-width: 1400px) {
@@ -110,7 +110,11 @@
   transition: color 0.12s;
 }
 .panel-frame a.panel-link:hover,
-.panel-frame button.panel-link:hover { color: #33daff; }
+.panel-frame button.panel-link:hover {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 /* ── Active Projects — project rows ─────────────────────────── */
 .proj-row {
