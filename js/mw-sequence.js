@@ -298,7 +298,7 @@ function renderRecSeq(items) {
   el.innerHTML = `
     <div class="cmp-panel-recseq" onmouseenter="showRecSeqTooltip(event)" onmouseleave="if(!this.contains(event.relatedTarget))hideRecSeqTooltip()">
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(0,210,255,.1)">
-        <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#00D2FF;cursor:help" id="mw-recseq-hdr">Recommended sequence for today</div>
+        <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#00D2FF;cursor:help" id="mw-recseq-hdr" title="Hold Ctrl while hovering this panel to see scoring factors">Recommended sequence for today <span style="font-size:11px;font-weight:400;letter-spacing:0;text-transform:none;color:rgba(0,210,255,.5);margin-left:4px">⌃ for details</span></div>
         <div style="font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">System-generated · ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
         <button onclick="document.getElementById('mw-rec-seq').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:14px;padding:0 0 0 6px;line-height:1" title="Dismiss">×</button>
       </div>
