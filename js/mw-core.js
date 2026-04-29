@@ -782,12 +782,13 @@ window._mwLoadUserView = async function() {
          buttons retained for uSwitchTab btn-arg lookup at compass.html:1354) -->
     <div id="user-suite-tabs" style="display:none;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:12px;background:var(--bg0,#060a10);position:sticky;top:0;z-index:10">
       <button class="ust on" data-tab="work"      onclick="uSwitchTab('work',this)">My Work</button>
-      <button class="ust"    data-tab="timesheet"  onclick="uSwitchTab('timesheet',this)">My Time</button>
-      <button class="ust"    data-tab="calendar"   onclick="uSwitchTab('calendar',this)">My Calendar</button>
-      <button class="ust"    data-tab="meetings"   onclick="uSwitchTab('meetings',this)">My Meetings <span id="ust-meetings-badge" class="ust-badge" style="display:none"></span></button>
-      <button class="ust"    data-tab="views"      onclick="uSwitchTab('views',this)">My Views</button>
-      <button class="ust"    data-tab="concerns"   onclick="uSwitchTab('concerns',this)">My Notes <span id="ust-concerns-badge" class="ust-badge ust-badge-red" style="display:none"></span></button>
-      <button class="ust"    data-tab="requests"   onclick="uSwitchTab('requests',this)">My Requests <span id="ust-requests-badge" class="ust-badge" style="display:none"></span></button>
+      <button class="ust"    data-tab="time"      onclick="uSwitchTab('time',this)">My Time</button>
+      <button class="ust"    data-tab="calendar"  onclick="uSwitchTab('calendar',this)">My Calendar</button>
+      <button class="ust"    data-tab="meetings"  onclick="uSwitchTab('meetings',this)">My Meetings <span id="ust-meetings-badge" class="ust-badge" style="display:none"></span></button>
+      <button class="ust"    data-tab="views"     onclick="uSwitchTab('views',this)">My Views</button>
+      <button class="ust"    data-tab="notes"     onclick="uSwitchTab('notes',this)">My Notes <span id="ust-concerns-badge" class="ust-badge ust-badge-red" style="display:none"></span></button>
+      <button class="ust"    data-tab="requests"  onclick="uSwitchTab('requests',this)">My Requests <span id="ust-requests-badge" class="ust-badge" style="display:none"></span></button>
+      <button class="ust"    data-tab="team"      onclick="uSwitchTab('team',this)">My Team</button>
     </div>
     <style>
       .ust{font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:7px 14px;cursor:pointer;color:rgba(255,255,255,.35);background:none;border:none;border-bottom:2px solid transparent;transition:.12s;display:flex;align-items:center;gap:5px}
@@ -797,7 +798,7 @@ window._mwLoadUserView = async function() {
       .ust-badge-red{background:rgba(226,75,74,.15);color:#E24B4A}
       .ust-badge-amber{background:rgba(239,159,39,.12);color:#EF9F27}
       .ust-badge-green{background:rgba(29,158,117,.12);color:#1D9E75}
-      .utc{display:none}.utc.on{display:block}#utc-concerns.on{display:block}
+      .utc{display:none}.utc.on{display:block}#utc-notes.on{display:block}
       .myr-subnav{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:6px 14px;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,.35);cursor:pointer;transition:.12s;display:flex;align-items:center;gap:5px}
       .myr-subnav.on{color:#00D2FF;border-bottom-color:#00D2FF}
       .myr-subnav:hover:not(.on){color:rgba(255,255,255,.7)}
@@ -1238,8 +1239,8 @@ window._mwLoadUserView = async function() {
 
     </div><!-- end utc-work -->
 
-    <!-- Tab: TIMESHEET — my-time.html injected here on first activation -->
-    <div class="utc" id="utc-timesheet">
+    <!-- Tab: TIME — my-time.html injected here on first activation -->
+    <div class="utc" id="utc-time">
       <div id="mt-root"></div>
     </div>
 
@@ -1253,10 +1254,13 @@ window._mwLoadUserView = async function() {
       <div id="views-root"></div>
     </div>
 
-    <!-- Tab: CONCERNS -->
-    <div class="utc" id="utc-concerns">
+    <!-- Tab: NOTES -->
+    <div class="utc" id="utc-notes">
       <div id="notes-root"></div>
     </div>
+
+    <!-- Tab: TEAM -->
+    <div class="utc" id="utc-team"></div>
 
     <!-- Tab: MY CALENDAR — my-calendar.html injected here on first activation -->
     <div class="utc" id="utc-calendar">

@@ -182,6 +182,14 @@ responsibilities. Show your reasoning when it matters. Be terse
 when it doesn't. Trust the operator to push back when something
 is wrong.
 
+## Additionally - 2026-04-29
+
+Please read the following files before commencing work:
+1. Iron Rules 36-40 Ratifications
+2. Work Mode A - Classification Doctrine
+3. Work Mode B - Batch Brief Template
+4. Work Mode C - Operator Direct Protocol
+5. Style Doctrine v1.7
 ---
 
 *End of ProjectHUD Architecture system prompt.*

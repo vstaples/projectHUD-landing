@@ -132,16 +132,16 @@ var _myrExpandedIds = _myrExpandedIds || new Set();
 var _myrCocOpenIds  = _myrCocOpenIds  || new Set();
 window.uSwitchTab = function(tab, btn) {
   // Flush any pending notes save before leaving the tab
-  if (_uActiveTab === 'concerns' && tab !== 'concerns' && window._notesSaveNow) {
+  if (_uActiveTab === 'notes' && tab !== 'notes' && window._notesSaveNow) {
     window._notesSaveNow();
   }
   // Stop polls when leaving MY NOTES
-  if (_uActiveTab === 'concerns' && tab !== 'concerns' && window._notesStopInboxPoll) {
+  if (_uActiveTab === 'notes' && tab !== 'notes' && window._notesStopInboxPoll) {
     window._notesStopInboxPoll();
     if (window._notesStopPingSystem) window._notesStopPingSystem();
   }
   // Restart polls when entering MY NOTES
-  if (tab === 'concerns' && window._notesStartInboxPoll) {
+  if (tab === 'notes' && window._notesStartInboxPoll) {
     window._notesStartInboxPoll();
     if (window._notesStartPingSystem) window._notesStartPingSystem();
   }
@@ -165,8 +165,8 @@ window.uSwitchTab = function(tab, btn) {
     window._mwWorkStale = false;
     window._mwLoadUserView && window._mwLoadUserView();
   }
-  if (tab === 'concerns' && !window._notesLoaded) loadMyNotesView();
-  else if (tab === 'concerns' && window._notesRefresh) window._notesRefresh();
+  if (tab === 'notes' && !window._notesLoaded) loadMyNotesView();
+  else if (tab === 'notes' && window._notesRefresh) window._notesRefresh();
   if (tab === 'views' && !window._myViewsLoaded) loadMyViewsView();
   else if (tab === 'views' && window._viewsRefresh) window._viewsRefresh();
   if (tab === 'calendar' && !window._calLoaded) loadMyCalView();
@@ -177,7 +177,8 @@ window.uSwitchTab = function(tab, btn) {
     window._requestsLoaded = false;
     loadUserRequests();
   }
-  if (tab === 'timesheet' && !window._myTimeLoaded) loadMyTimeView();
+  if (tab === 'time' && !window._myTimeLoaded) loadMyTimeView();
+  if (tab === 'team' && window._mwTeamLoad) window._mwTeamLoad();
 };
 
 // ── Calendar popup ────────────────────────────────────────
@@ -3172,7 +3173,7 @@ window.populateDeltaStrip = function() {
   const unreads = concerns.filter(c => c.status==='unread'||c.status==='not_yet_read');
   if (unreads.length) {
     deltas.push({ label: unreads.length + ' unread concern' + (unreads.length>1?'s':''), color:'red',
-      navigate: () => uSwitchTab('concerns', document.querySelector('.ust[data-tab=concerns]')) });
+      navigate: () => uSwitchTab('notes', document.querySelector('.ust[data-tab=notes]')) });
   }
   const reqs = window._myRequests || [];
   const recentApproved = reqs.filter(r => r.status==='completed' && r._newSinceLogin);

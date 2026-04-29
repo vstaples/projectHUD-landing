@@ -1,0 +1,270 @@
+=== Journal Entry 2026-04-28 ===
+2026-04-28-cmd99_2-cleanup-and-compass-section-6_2-amendment.txt
+
+[Two-act day. Morning: CMD99.2 cross-surface infrastructure cleanup
+shipped — the `.panel` global rule correction, UI.gauge typography
+fix, and retirement of dashboard's local gauge renderer. Doctrine
+v1.6.1 ratified the corrections in advance of the work-cycle.
+Evening: visual-parity exercise on Compass surfaced four pre-existing
+§6.2 violations on JS-rendered panel-tier surfaces, leading to
+Doctrine v1.7 ratification (operator standing in as acting-architect)
+and CMD-A brief authorship. Compass cleanup is queued; CMD-A is the
+doctrine-application kickoff for the broader Compass retrofit.
+
+Daily summary by thread:
+
+(1) CMD99.2 ratified and shipped. Three concerns bundled per §11
+exception language on grounds of intrinsic coupling: (a) UI.gauge
+typography correction in /js/ui.js per v1.6.1 §5.9 — Inter font,
+IR38 11px floor compliance — and retirement of dashboard's local
+renderGauge() introduced in CMD99 in favor of the corrected
+canonical; (b) `.panel { background: var(--bg2) }` correction in
+/css/hud.css to var(--surface-panel) per v1.6.1 §3.5.6, and
+retirement of proposal-detail's surface-local
+`#panel-wbs { background: var(--bg1) }` override introduced in
+CMD98.7; (c) ratification work in surfaces that had local
+workarounds for these defects. Closes the gauge-divergence and
+panel-elevation defects that surfaced during the dashboard / proposal-
+detail retrofit arc. Cross-surface scope; the third bundle exception
+on record (after CMD98.3 and CMD99).
+
+(2) Doctrine v1.6.1 (point-release preceding CMD99.2). §4.4 amended
+twice — primary KPI value spec changed from "28-36px (varies by
+surface density)" to "26px canonical" reflecting CMD99.1 visual
+review; KPI strip elevation context made explicit (strips on
+--surface-page, cards on --surface-content, two-tier-skip pattern).
+§3.5 amended for the .panel global rule clarification (.panel must
+use var(--surface-panel) = --bg1, not --bg2). §5.x added — the
+shared UI.gauge component in ui.js is the canonical gauge
+implementation; surfaces do not implement local gauge replacements.
+The §5.x rule directly addresses the CMD99 architecture incident
+where the agent wrote a local gauge renderer rather than halting and
+requesting ui.js access.
+
+(3) Compass visual-parity exercise — afternoon thread. Started as
+"dial in the window pane color of the dashboard panels to more closely
+mirror Compass (darker)." Operator picked #040f23cf via Chrome DevTools
+color picker as the target panel-fill value. Initial scope dashboard-
+only; dashboard.html got a single CSS override (.panel-frame,
+.kpi-card-v15 { background: #040f23cf }) and visual parity with Compass
+achieved on dashboard side. Operator then asked the doctrine question:
+what needs to be amended to honor this change firm-wide? Doctrine
+review surfaced the change as a doctrine violation — collapses the
+two-tier separation between .panel-frame (--surface-panel = --bg1)
+and .kpi-card-v15 (--surface-content = --bg2), bypasses the Layer 2
+semantic alias system, re-introduces the surface-local override
+pattern that v1.6.1 just retired. Three paths offered: (A) revert,
+(B) retune Layer 1 token values per §3.5.5 forward-only retune
+language, (C) ratify the deviation as a sanctioned exception. Operator
+chose alternative path: align Compass to dashboard's aesthetic
+first, then revisit the doctrine question with both surfaces matching.
+
+(4) Compass alignment attempt revealed unexpected state. Aggressive
+override applied to compass.html — `#compass-app { --bg1: #040f23cf;
+--bg2: #040f23cf }` at higher specificity than hud.css's :root. Console
+diagnostics confirmed the override propagated to every consuming
+surface in compass.html. Visual review showed no change. Sequence of
+diagnostic snippets walked through specificity, deployment cache,
+DOM-level computed values, and finally an inline-painted sentinel
+that confirmed the renderer was responsive. Conclusion: Compass had
+already been rendering at the target color before the override; the
+override was a no-op cosmetically. The original premise — "Compass is
+darker than dashboard, align dashboard to it" — was correct. Dashboard
+was the outlier; dashboard.html's #040f23cf override brought it into
+alignment with Compass. The Compass override remained in place to
+guarantee the parity didn't drift.
+
+(5) But one Compass panel remained visually distinct — Recommended
+Sequence. Console diagnostics on its outer container showed
+background:rgba(0,210,255,.03), not a token reference. Walked the
+DOM up to find the rendering origin: not in compass.html or hud.css,
+but in mw-sequence.js line 299, an inline style:"" attribute on the
+panel container's <div>. The architectural smell crystallized at this
+point — panel chrome was being rendered from a behavior file with
+hardcoded inline styles, unreachable to any token override at any
+specificity. The pattern is exactly what doctrine §6.2 (introduced
+v1.2) already forbids; the rule had been correct since v1.2 but had
+never been audited against Compass's JS-rendered surfaces.
+
+(6) Audit pass surfaced three more pre-existing §6.2 violations.
+Console snippet (`querySelectorAll('#compass-app *').filter(...)`)
+returned 464 inline-styled background elements; classification by
+panel-tier vs row-level vs overlay yielded four panel-tier offenders:
+mw-sequence.js Recommended Sequence panel container (cyan-wash advisory
+tint), `#mw-delta-strip` "Since last login" notification bar (same
+cyan-wash tint), `#mw-coc` Chain of Custody container (hardcoded
+rgb(6,12,24) near-bg0), `#mw-diag-tl-header` diagnostic timeline
+header (hardcoded rgb(6,10,16) bg0). Plus 460-odd row-level
+inline-styled elements (badges, status pills, action buttons, hover
+states) that are doctrine-conformant under §6.2's data-driven
+exception. The architectural smell was systemic, not isolated.
+
+(7) Doctrine v1.7 ratified. Operator stood in as acting-architect
+because the architect role is unstaffed (this is itself a documented
+operating mode now — see lesson 22 below). Three amendments: §6.2
+gained an explicit violations register (4-row table naming the
+offenders, owner files, original inline values, dispositions);
+§3.5.7 added explicitly rejecting the rgba(0,210,255,.03) cyan-wash
+advisory tint as an unsanctioned parallel-track surface tier (rejected
+on three grounds: bypasses elevation system, illusory at 3% opacity,
+compounds via copy-paste); §12 sequencing entry 11a (CMD-A) inserted
+as the doctrine-application kickoff for the broader Compass retrofit.
+v1.7 introduced no new tokens, no new modifier classes, no new tiers.
+The advisory-tint rejection was operator-decided after explicit
+disposition options offered (kill / formalize / defer); operator
+chose kill, with a v1.8+ revisit clause if pattern recurrence after
+deploy reveals advisory surfaces feel undifferentiated.
+
+(8) CMD-A brief drafted. Pure doctrine-application scope: migrate
+every Compass-rendered panel-tier surface (the four named offenders
+plus any audit-discovered additional offenders) from inline-styled
+JS DOM to class-based token-driven CSS in /css/hud.css. No functional
+changes, no layout changes, no new infrastructure. Brief structured
+in the standard format (scope, context files, doctrine sections
+inherited, per-surface specification, DoD with code/console/audit/
+behavioral evidence, out-of-scope, pre-flight checklist, post-
+completion next steps). Each named offender has its migration spec;
+audit-discovered offenders follow the same pattern. Halt-and-report
+triggers explicit per §0.1 — agent does not invent new tokens, modifier
+classes, or tiers if the audit surfaces a panel that doesn't fit
+--surface-panel cleanly. Brief was reviewed by operator and signed off.
+Narrative introduction (3-paragraph agent intro) drafted and signed
+off separately. Brief ready for agent issuance; coding agent currently
+underway as of journal-entry time.
+
+(9) Side observation: Recommended Sequence's `mw-sequence.js` was the
+unblocking patch — operator/architect agreed to a single inline
+var(--bg1) substitution to unblock visual review while CMD-A's full
+class-based migration remained queued. The patch is doctrine-conformant
+in substance (consumes the right token) but the architectural problem
+(panel chrome in a behavior file) remains. CMD-A's §2 explicitly notes
+this and relocates the chrome to a class definition.
+
+Architect operating-practice lessons logged this session
+(continuing the catalog from the prior journal entries):
+
+(22) Operator-as-acting-architect single-session ratification is a
+sanctioned bridge mode when the architect role is unstaffed. The
+authority chain in §0.1 names operator (product) + architect (code) as
+the ratification dyad. When only the operator is present, the operator
+may stand in as acting-architect for a single session, ratify the
+doctrine amendment, and proceed. The status line on the doctrine
+records the substitution explicitly ("ratified by operator and
+acting-architect (operator standing in for architect role per
+2026-04-28 session)"). Distinguishes from the v1.1 incident where the
+coding agent inadvertently played the architect role — that was a
+bridge-corruption failure (lesson 18). Operator-as-acting-architect is
+a bridge-shortening mode under operator control. Limit: the operator
+should not stand in as acting-architect for changes the operator
+cannot evaluate technically (e.g., pure code-correctness amendments
+about thread-safety, schema, performance). The v1.7 amendments were
+all visual / structural / discipline — operator could evaluate them
+fully.
+
+(23) Console diagnostic snippets are the primary instrument for
+surfacing §6.2 violations on JS-rendered surfaces. The Compass audit
+relied on a single querySelectorAll filter snippet to inventory all
+inline-styled background elements; classification by inspection was
+straightforward once the inventory was in hand. Future doctrine
+applications on JS-rendered surfaces (Cadence, Aegis, /scripts/*)
+should use the same instrument. The snippet is preserved in CMD-A's
+§1; future briefs that touch JS-rendered surfaces should reference it
+or copy it. Distinguishes a class of doctrine-application work that
+cannot be discovered by reading source files alone — only the
+rendered DOM contains the truth.
+
+(24) Layer 1 token override at a high-specificity wrapper
+(`#compass-app { --bg1: #040f23cf; --bg2: #040f23cf }`) is currently
+unaddressed in doctrine. The pattern preserves the Layer 2 semantic
+alias system (--surface-* aliases continue to point at --bg1/--bg2),
+preserves the elevation ladder structure, but allows a surface to
+locally retune the absolute color values that the ladder resolves to.
+It is structurally different from collapsing tier separation
+(dashboard's two-class override that flattened panel + KPI to a
+single fill — that was a doctrine violation and the original v1.7
+question). It is also structurally different from §3.5.6's surface-
+local panel-background overrides that v1.6.1 retired (those targeted
+panel-class backgrounds directly, not the underlying tokens). The
+ProjectHUD doctrine has no language about whether token-value local
+retunes are sanctioned, forbidden, or sanctioned-with-conditions.
+Should be addressed in v1.8 or as a v1.7.1 point-release. Three
+candidate dispositions: (a) sanction explicitly with a "scoped
+retune" pattern that records the surface and the operator-ratified
+values; (b) forbid explicitly — token values are global and
+amendments to them require doctrine ratification, not surface-local
+overrides; (c) defer with a watchful-waiting clause until the pattern
+recurs or causes a regression. Logged for next architect review.
+
+(25) Visual-parity exercises across surfaces benefit from running
+console diagnostics on both surfaces in parallel before committing to
+a direction. The Compass-vs-dashboard parity work consumed several
+diagnostic round-trips before reaching the conclusion that Compass
+was already at the target — a single side-by-side console diagnostic
+("compute background of canonical panel on each surface") at the start
+would have surfaced this in one pass. Future visual-parity work
+should default to "diagnose both surfaces, compare, then decide
+direction" rather than "edit one surface and review."
+
+End of day state:
+
+Style Doctrine v1.7 ratified. CMD99.2 shipped (UI.gauge corrected,
+.panel global rule corrected, dashboard local gauge renderer
+retired, surface-local overrides retired). Dashboard at full v1.5
+canonical (post-CMD99.1 visual review corrections, post-CMD99.2
+infrastructure cleanup). Proposal-detail at v1.3 + partial v1.4
+(CMD98.6 / CMD98.7 still queued for full v1.5 conformance). Compass
+fronted at #040f23cf via #compass-app token override (operator-
+ratified value, sanctioning question deferred per lesson 24).
+mw-sequence.js Recommended Sequence panel patched to var(--bg1)
+inline (unblock; full class migration queued under CMD-A). CMD-A
+brief signed off and underway. /css/hud.css holds full v1.4 ladder
++ v1.5 helper classes + v1.6.1 .panel correction. hud-shell.js
+renders footer strip platform-wide. Iron Rules through IR38 still
+binding. v1.7 §6.2 violations register holds 4 named Compass
+offenders (Recommended Sequence panel, #mw-delta-strip, #mw-coc,
+#mw-diag-tl-header) awaiting CMD-A migration. Two new candidate
+discipline rules from CMD99.1 (verification tiers, missing-input
+rule) still pending two-application threshold for IR# graduation.
+
+Open queue (in priority order):
+
+- CMD-A — Compass §6.2 violation cleanup (currently underway, agent
+  issued)
+- CMD98.7 — proposal-detail KPI container upgrade to v1.5 §4.4
+  canonical (next priority for proposal-detail surface; was queued
+  earlier, sequencing position unchanged)
+- CMD98.6 — proposal-detail full v1.4 elevation retrofit (lower
+  priority; deferred earlier)
+- v1.7.1 or v1.8 — token-value local retune disposition (lesson 24;
+  architect review needed)
+- Cross-surface §6.2 audit — Dashboard, Cadence, Pipeline, Aegis
+  inventory pass to populate the violations register firm-wide
+  (deferred to post-CMD-A; CMD-A is Compass-only by design)
+- Two-Add-Task-buttons UX consolidation (small; can fold into next
+  proposal-detail brief)
+- CMD-Compass — full v1.7 doctrine application across Compass views
+  (My Work, PM View, Management, Executive, Client Portal); proceeds
+  on CMD-A's token-driven foundation
+- Cadence / Pipeline / project-detail / User Management / Aegis full
+  surface retrofits (sequential, post-Compass)
+- Doctrine ergonomics pass (architect work; future, when doctrine
+  size warrants — v1.7 added ~125 lines, total now over 1,750)
+- Hover-highlight discipline reassessment (deferred until dogfooding
+  produces concrete examples)
+- Differentiated accent colors (--accent-brand / --accent-action /
+  --accent-focal) — deferred per §10
+- Non-text color token role aliases (backgrounds, borders, state
+  colors get same Layer-1 + Layer-2 treatment) — deferred per §10
+- Advisory-tier formalization revisit (per v1.7 §3.5.7's v1.8+
+  clause; only if operator review post-CMD-A reveals advisory
+  surfaces feel undifferentiated)
+- Export PDF implementation (deferred; needs frontend-vs-backend
+  product-architecture decision)
+
+End-of-May alpha demo deadline remains the critical path for shipped
+functionality. The doctrine work continues to be foundational
+infrastructure — every subsequent product feature ships against the
+doctrine, so the convergence cost paid here is amortized across all
+forward work. v1.7's §6.2 violations register is a pattern that
+should recur as later surfaces are audited; the register grows, the
+rule itself doesn't change.]

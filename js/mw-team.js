@@ -509,52 +509,10 @@ function _e(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Self-install ──────────────────────────────────────────────────────────────
-// MC1: Uses mw:viewready event fired by mw-core.js instead of setTimeout polling.
-// Guaranteed to run at exactly the right moment — after the tab strip is in the DOM.
-// Falls back to DOMContentLoaded + a single 500ms retry for resilience.
-(function _install() {
-  function doInstall(tabBar) {
-    // 1. Inject MY TEAM tab button if not already present
-    tabBar = tabBar || document.getElementById('user-suite-tabs');
-    if (tabBar && !document.querySelector('[data-tab="team"]')) {
-      var btn = document.createElement('button');
-      btn.className   = 'ust';
-      btn.dataset.tab = 'team';
-      btn.textContent = 'My Team';
-      btn.onclick = function() { uSwitchTab('team', btn); };
-      tabBar.appendChild(btn);
-      console.log('[mw-team] MT6 — 30s cache + _mwTeamInvalidate');
-    }
-    // 2. Inject MY TEAM panel if not already present
-    var sibling = document.getElementById('utc-work');
-    if (sibling && !document.getElementById('utc-team')) {
-      var panel = document.createElement('div');
-      panel.id        = 'utc-team';
-      panel.className = 'utc';
-      sibling.parentElement.appendChild(panel);
-    }
-    // 3. Patch uSwitchTab to load team data on tab click
-    if (typeof uSwitchTab === 'function' && !uSwitchTab._mtPatched) {
-      var _orig = uSwitchTab;
-      uSwitchTab = function(tab, btn) {
-        _orig(tab, btn);
-        if (tab === 'team') window._mwTeamLoad && window._mwTeamLoad();
-      };
-      uSwitchTab._mtPatched = true;
-    }
-  }
-
-  // Primary: listen for mw:viewready (fired by mw-core.js MC1+)
-  window.addEventListener('mw:viewready', function(e) {
-    doInstall(e.detail && e.detail.tabBar);
-  }, { once: true });
-
-  // Fallback: if mw:viewready never fires (e.g. older mw-core.js without MC1),
-  // silently install after a longer delay. Guard prevents double-inject.
-  setTimeout(function() {
-    doInstall(null); // doInstall no-ops if tab already present
-  }, 4000);
-})();
+// ── Self-install retired (CMD100) ─────────────────────────────────────────────
+// Tab strip + utc-team panel are now declared canonically in mw-core.js;
+// dispatch is wired in mw-tabs.js's uSwitchTab. This module exports
+// _mwTeamLoad / _mwTeamInvalidate as a pure module called by the canonical
+// dispatch. No DOM injection, no monkey-patch, no setTimeout fallback.
 
 })();

@@ -287,6 +287,14 @@ When the operator signals end-of-day or end-of-thread:
 - Don't ask "anything else?" — let the operator say what they
   need.
 
+## Additionally - 2026-04-29
+
+Please read the following files before commencing work:
+1. Iron Rules 36-40 Ratifications
+2. Work Mode A - Classification Doctrine
+3. Work Mode B - Batch Brief Template
+4. Work Mode C - Operator Direct Protocol
+5. Style Doctrine v1.7
 ---
 
 *End of Architect Onboarding Protocol. This document is the
