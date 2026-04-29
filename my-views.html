@@ -776,7 +776,7 @@ function _notesWireLeft() {
       }
       if (note?.is_inbox && note?.entity_type === 'view_removed') {
         const overlay = document.createElement('div');
-        overlay.className = 'notes-invite-dialog-overlay';
+        overlay.className = 'views-invite-dialog-overlay';
         overlay.innerHTML =
           '<div class="views-invite-dialog">' +
             '<div class="nid-header"><div class="nid-from">View Access</div>' +
@@ -803,7 +803,7 @@ function _notesWireLeft() {
             note.title?.includes('declined your invitation')) {
           // Show simple acknowledgment dialog
           const overlay = document.createElement('div');
-          overlay.className = 'notes-invite-dialog-overlay';
+          overlay.className = 'views-invite-dialog-overlay';
           overlay.innerHTML =
             '<div class="views-invite-dialog">' +
               '<div class="nid-header">' +
