@@ -538,7 +538,7 @@ window._viewsLoadView = async function() {
   }
   if (window._notesSplitterInit) window._notesSplitterInit();
   _notesDndInit();
-  if (window._notesStartInboxPoll) window._notesStartInboxPoll();
+  _notesStartInboxPoll();
   // Re-render widget tiles after DOM settles
   setTimeout(function() {
     if (window._viewsPostWire) window._viewsPostWire();
@@ -3396,7 +3396,9 @@ window._notesSwitchToSharedView = async function(ownerUserIdOrViewId, viewNameOr
     if (!ownerView) return;
 
     // Fetch notes referenced by this view's tiles so they resolve for the participant
-    const tileNoteIds = (ownerView.tiles || []).map(function(t) { return t.noteId; }).filter(Boolean);
+    const tileNoteIds = (ownerView.tiles || [])
+      .map(function(t) { return t.noteId; })
+      .filter(function(id) { return id && !id.startsWith('ph-') && !id.startsWith('wt-'); });
     if (tileNoteIds.length) {
       try {
         const sharedNotes = await API.get(
