@@ -473,6 +473,7 @@ let _lastTyped         = {}; // noteId → timestamp of last keystroke
 let _userId    = null;
 let _userName  = 'Vaughn Staples';
 let _notes     = [];      // all notes for this user
+window._notes  = _notes;  // exposed for share-dialog.js (Brief 2.5)
 let _messages  = {};      // noteId → [messages]
 let _workspace = {        // in-memory workspace; persisted per-view to compass_views
   activeView: 'Default',
