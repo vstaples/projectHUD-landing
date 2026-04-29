@@ -342,8 +342,11 @@ const HUDShell = (() => {
         margin-left: 150px;
         width: calc(100% - 150px);
       }
-      /* Slide-in trigger relocates to right edge of Tier 2 strip */
-      body.hud-tier2-rendered #hud-sidebar-trigger { left: 170px; }
+      /* Slide-in trigger stays at app-window left edge regardless of Tier 2;
+         CMD100 — relocating to left:170px placed the trigger on the RIGHT
+         edge of the persistent Tier 2 strip, causing the panel to slide in
+         when the cursor crossed the toolbar boundary instead of the window edge. */
+      body.hud-tier2-rendered #hud-sidebar-trigger { left: 0; }
       /* Slide-in panel sits above Tier 2 strip when open */
       body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
     `;
