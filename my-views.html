@@ -742,7 +742,8 @@ function _notesRenderInbox() {
   el.innerHTML = inbox.length === 0
     ? '<div style="padding:8px 14px;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3)">Empty inbox</div>'
     : inbox.map(function(n) {
-        return '<div class="views-item" onclick="_viewsOpenNote(\'' + n.id + '\')">'+
+        var vid = (n.entity_meta && n.entity_meta.viewId) ? n.entity_meta.viewId : '';
+        return '<div class="views-item" data-noteid="' + _esc(n.id) + '" data-viewid="' + _esc(vid) + '">'+
           '<div class="views-item-body"><div class="views-item-title">' + _esc(n.title||'Untitled') + '</div>'+
           '<div class="views-item-meta">' + _notesRelTime(n.updated_at) + '</div></div></div>';
       }).join('');
