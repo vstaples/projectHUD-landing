@@ -5370,11 +5370,26 @@ async function _notesViewHeartbeat(ownerUserId, viewName) {
   const viewId = await _resolveViewId(ownerUserId, viewName);
   if (!viewId) return; // No compass_views row → no participant rows to heartbeat
 
-  // 1. Patch own last_seen_at
+  // Brief 2 fix: pre-check participant-row existence. PATCHing zero rows can
+  // 500 under view_participants RLS, and is meaningless work in any case.
+  // Also guards the cross-surface conflation case: if MY NOTES is asking
+  // about a "Default" that's actually MY VIEWS' compass_views row (same
+  // name, different surface), no participant row exists for self → skip.
+  let participantRow = null;
+  try {
+    const rows = await API.get(
+      'view_participants?view_id=eq.' + viewId +
+      '&user_id=eq.' + userId +
+      '&select=id&limit=1'
+    ).catch(function() { return []; });
+    participantRow = (rows && rows[0]) || null;
+  } catch(e) { participantRow = null; }
+  if (!participantRow) return;
+
+  // 1. Patch own last_seen_at by participant row id (idempotent, single-row)
   try {
     await API.patch(
-      'view_participants?view_id=eq.' + viewId +
-      '&user_id=eq.' + userId,
+      'view_participants?id=eq.' + participantRow.id,
       { last_seen_at: new Date().toISOString() }
     );
   } catch(e) {}
@@ -5383,17 +5398,14 @@ async function _notesViewHeartbeat(ownerUserId, viewName) {
   await _notesLoadViewParticipants(ownerUserId, viewName);
   _notesRenderViewPresenceStrip(ownerUserId, viewName);
 
-  // 3. View-config sync for participants (not the owner)
-  // If we are NOT the owner, check if the owner's workspace state has changed
-  // and re-render our view accordingly
+  // 3. View-config sync for participants (not the owner): re-read owner's
+  //    dashboard from compass_views (post-Brief-2 source of truth).
   if (userId !== ownerUserId) {
     try {
-      const wsRows = await API.get(
-        'notes_workspace?user_id=eq.' + ownerUserId + '&limit=1'
-      ).catch(() => []);
-      const ownerState = wsRows?.[0]?.state;
-      if (!ownerState) return;
-      const ownerView = (ownerState.views || {})[viewName];
+      const cvRows = await API.get(
+        'compass_views?id=eq.' + viewId + '&select=state&limit=1'
+      ).catch(function() { return []; });
+      const ownerView = cvRows && cvRows[0] && cvRows[0].state;
       if (!ownerView) return;
 
       // Compare a lightweight hash (JSON string) to avoid unnecessary re-renders
