@@ -440,7 +440,7 @@
           title="Clone this view — copy layout and widgets to a new named view"
           style="color:rgba(0,210,255,.7);border-color:rgba(0,210,255,.2)">⧉ Clone</button>
         <button class="views-grid-btn" id="views-share-view-btn"
-          onclick="window._notesShowShareViewDialog && window._notesShowShareViewDialog()"
+          onclick="window._viewsShowShareDialog && window._viewsShowShareDialog()"
           title="Share this view with others"
           style="color:rgba(0,210,255,.7);border-color:rgba(0,210,255,.2)">⊕ Share</button>
         <button class="views-grid-btn" onclick="_notesSaveAsTemplate()" title="Save current view as a reusable template"
@@ -3316,6 +3316,16 @@ let _syncPollInterval = null;
 window._viewsSaveNow         = _viewsSaveNow; // MY VIEWS save — does NOT overwrite window._notesSaveNow
 window._viewsSaveWorkspace   = _viewsSaveWorkspace; // expose to Blocks 2+3 (widget system)
 window._viewsCv              = _cv; // MY VIEWS: do NOT overwrite window._notesCv
+// Brief 2: MY VIEWS Share button wrapper — passes the active dashboard's
+// compass_views.id explicitly so the shared dialog (defined in my-notes.html)
+// targets MY VIEWS data, not MY NOTES' active view name.
+window._viewsShowShareDialog = function() {
+  if (!window._notesShowShareViewDialog) return;
+  return window._notesShowShareViewDialog({
+    viewId:   _activeViewId(),
+    viewName: _workspace.activeView,
+  });
+};
 // MY VIEWS: poll functions scoped — do NOT overwrite MY NOTES poll functions
 window._viewsStartInboxPoll  = _notesStartInboxPoll;
 window._viewsStopInboxPoll   = _notesStopInboxPoll;

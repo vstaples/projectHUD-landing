@@ -5479,9 +5479,23 @@ window._notesGetViewParticipants = function(ownerUserId, viewName) {
 };
 
 // ── STEP 5: Share View dialog ─────────────────────────────────────────────
-window._notesShowShareViewDialog = async function() {
-  const userId   = window._notesResource && window._notesResource.user_id;
-  const viewName = window._workspace && window._workspace.activeView;
+window._notesShowShareViewDialog = async function(opts) {
+  const userId = window._notesResource && window._notesResource.user_id;
+  // Brief 2: caller may pass {viewId, viewName} explicitly (MY VIEWS Share
+  // button does this — MY VIEWS dashboards live in compass_views and have
+  // their UUID available via _activeViewId). When called with no args (MY
+  // NOTES Share button), fall back to MY NOTES' active view name; view_id
+  // is then resolved via compass_views lookup, which returns null for MY
+  // NOTES dashboards (Brief 2 §7.5 — note-level dashboard sharing is not
+  // yet representable post-fork).
+  let viewName, providedViewId;
+  if (opts && (opts.viewName || opts.viewId)) {
+    viewName       = opts.viewName || (window._workspace && window._workspace.activeView);
+    providedViewId = opts.viewId   || null;
+  } else {
+    viewName       = window._workspace && window._workspace.activeView;
+    providedViewId = null;
+  }
   if (!userId || !viewName) return;
 
   const myParts = await _notesLoadViewParticipants(userId, viewName);
@@ -5646,12 +5660,17 @@ window._notesShowShareViewDialog = async function() {
           const _vpColor = _vpColors[(_existingVp.length) % _vpColors.length];
 
           // MY VIEWS persistence fork (Brief 2): VP rows require view_id (FK to
-          // compass_views.id). Resolve from the dashboard. Skip + warn if the
-          // dashboard has no compass_views row (Brief 2 §7.5 — MY NOTES
-          // dashboards do not currently have rows).
-          const viewIdRes = await _resolveViewId(userId, viewName);
+          // compass_views.id). Prefer the caller-provided view_id (MY VIEWS
+          // surface). Fall back to compass_views lookup; null means MY NOTES
+          // dashboard with no compass_views row (§7.5).
+          let viewIdRes = providedViewId;
+          if (!viewIdRes) {
+            viewIdRes = await _resolveViewId(userId, viewName);
+          }
           if (!viewIdRes) {
             console.warn('[Compass] Share view "' + viewName + '": no compass_views row — invite skipped (see Brief 2 §7.5).');
+            // Surface the failure visibly to the operator instead of silent re-render.
+            try { compassToast('Sharing for this dashboard is not yet supported (Brief 2 §7.5).', 4000); } catch(e) {}
             await _notesLoadViewParticipants(userId, viewName);
             await renderDialog();
             return;
