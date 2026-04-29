@@ -709,29 +709,37 @@ async function _notesLoadWorkspace() {
 async function _notesRestoreSharedViews() {
   if (!_userId) return;
   try {
+    // MY VIEWS persistence fork: view_participants now references view_id (FK
+    // to compass_views.id). MY NOTES dashboards have no compass_views row, so
+    // this restore path will only return rows for shared MY VIEWS dashboards.
+    // Note-level sharing (notes_workspace dashboards) is not yet representable
+    // in view_participants — see Brief 2 §7.5.
     const parts = await API.get(
       'view_participants?user_id=eq.' + _userId +
       '&accepted_at=not.is.null' +
-      '&select=workspace_owner_user_id,view_name,view_role,tile_edit_overrides' +
+      '&select=id,view_id,view_role,tile_edit_overrides' +
       '&limit=50'
     ).catch(function() { return []; });
     if (!parts || !parts.length) return;
 
     for (var i = 0; i < parts.length; i++) {
       var p = parts[i];
-      if (p.workspace_owner_user_id === _userId) continue; // skip own views
-      var ownerUserId = p.workspace_owner_user_id;
-      var viewName    = p.view_name;
-      var sharedKey   = '__shared__' + ownerUserId + '__' + viewName;
-      // Always refresh layout from owner's current workspace (don't skip if already present)
+      var viewId = p.view_id;
+      if (!viewId) continue;
       try {
-        var wsRows = await API.get(
-          'notes_workspace?user_id=eq.' + ownerUserId + '&limit=1'
+        // Read owner dashboard from compass_views
+        var rows = await API.get(
+          'compass_views?id=eq.' + viewId +
+          '&select=id,owner_user_id,view_name,state&limit=1'
         ).catch(function() { return []; });
-        var ownerState = wsRows && wsRows[0] && wsRows[0].state;
-        if (!ownerState) continue;
-        var ownerView = (ownerState.views || {})[viewName];
-        if (!ownerView) continue;
+        var row = rows && rows[0];
+        if (!row) continue;
+        if (row.owner_user_id === _userId) continue; // skip own dashboards
+        var ownerUserId = row.owner_user_id;
+        var viewName    = row.view_name;
+        var ownerView   = row.state || {};
+        var sharedKey   = '__shared__' + ownerUserId + '__' + viewName;
+
         // Fetch referenced notes into local _notes array
         var tileNoteIds = (ownerView.tiles || []).map(function(t) { return t.noteId; }).filter(Boolean);
         if (tileNoteIds.length) {
@@ -746,23 +754,22 @@ async function _notesRestoreSharedViews() {
           _isSharedView:   true,
           _sharedOwner:    ownerUserId,
           _sharedViewName: viewName,
+          _sharedViewId:   viewId,
         });
         // If the user's last active view was this shared view, restore it as active
         if (_workspace.activeView === sharedKey) {
           // Already set — nothing to do
         } else if (_workspace.sharedViews && _workspace.sharedViews[ownerUserId + '::' + viewName]) {
-          // User had this shared view active — restore it
           const svMeta = _workspace.sharedViews[ownerUserId + '::' + viewName];
           if (svMeta && svMeta.wasActive) {
             _workspace.activeView = sharedKey;
           }
         }
       } catch(e) {
-        console.warn('[Compass] Could not restore shared view:', viewName, e);
+        console.warn('[Compass] Could not restore shared view (view_id=' + viewId + '):', e);
       }
     }
-    // If activeView points to a sharedKey that now exists, keep it; 
-    // if it points to a stale key, fall back to Default
+    // Stale-key fallback
     if (_workspace.activeView && _workspace.activeView.startsWith('__shared__')) {
       if (!_workspace.views[_workspace.activeView]) {
         _workspace.activeView = Object.keys(_workspace.views).find(function(k) { return !k.startsWith('__shared__'); }) || 'Default';
@@ -2772,32 +2779,44 @@ async function _notesLaunchTemplateNow(templateName, paramVals, requestedViewNam
   _notesSaveWorkspace(true);
   _notesRenderGrid(); _notesRenderLeft(); _notesRenderViewSwitcher();
 
-  // STEP 5: insert owner row then invite each person via view_participants + inbox
+  // MY VIEWS persistence fork (Brief 2): VP rows now require view_id (FK to
+  // compass_views.id). MY NOTES dashboards have no compass_views row, so this
+  // path resolves view_id and silently skips if not found (Brief 2 §7.5
+  // coupling). Notifications go to notes table per §2.6.
   const myName   = (window._notesResource && window._notesResource.name) || 'Someone';
   const myUserId = _userId;
-  const myResId  = (window._notesResource && window._notesResource.id) || null;
+  if (!myUserId) return;
 
-  if (myUserId) {
-    try {
-      await API.post('view_participants', {
-        firm_id: FIRM_ID, workspace_owner_user_id: myUserId, view_name: viewName,
-        user_id: myUserId, resource_id: myResId, view_role: 'owner',
-        tile_edit_overrides: [], invited_at: new Date().toISOString(),
-        accepted_at: new Date().toISOString(), last_seen_at: new Date().toISOString(),
-      });
-    } catch(e) { console.warn('[Compass] Template launch owner row failed:', e); }
+  const viewId = await _resolveViewId(myUserId, viewName);
+  if (!viewId) {
+    console.warn('[Compass] Template launch: no compass_views row for "' + viewName + '" — view_participants skipped (see Brief 2 §7.5).');
+    return;
   }
+
+  try {
+    await API.post('view_participants', {
+      firm_id: FIRM_ID, view_id: viewId,
+      user_id: myUserId, view_role: 'owner',
+      tile_edit_overrides: {}, color: '#00D2FF',
+      invited_at: new Date().toISOString(),
+      accepted_at: new Date().toISOString(), last_seen_at: new Date().toISOString(),
+    });
+  } catch(e) { console.warn('[Compass] Template launch owner row failed:', e); }
 
   for (var i = 0; i < invitees.length; i++) {
     var inv = invitees[i];
     if (!inv.user_id) continue;
+    let participantRowId = null;
     try {
-      await API.post('view_participants', {
-        firm_id: FIRM_ID, workspace_owner_user_id: myUserId, view_name: viewName,
-        user_id: inv.user_id, resource_id: inv.resource_id || null, view_role: 'viewer',
-        tile_edit_overrides: [], invited_at: new Date().toISOString(),
+      const created = await API.post('view_participants', {
+        firm_id: FIRM_ID, view_id: viewId,
+        user_id: inv.user_id, view_role: 'viewer',
+        tile_edit_overrides: {}, color: inv.color || '#00D2FF',
+        invited_at: new Date().toISOString(),
         accepted_at: null, last_seen_at: null,
-      });
+      }, { Prefer: 'return=representation' });
+      const newPart = Array.isArray(created) ? created[0] : created;
+      if (newPart && newPart.id) participantRowId = newPart.id;
     } catch(e) { console.warn('[Compass] Template launch participant row failed:', e); }
     try {
       await API.post('notes', {
@@ -2805,8 +2824,8 @@ async function _notesLaunchTemplateNow(templateName, paramVals, requestedViewNam
         title:   myName + ' invited you to view: ' + viewName,
         content: myName + ' shared the view "' + viewName + '" with you (from template "' + templateName + '"). Accept in your inbox to access it.',
         hierarchy_path: 'Inbox', is_inbox: true,
-        entity_id: null, entity_type: 'view_invite',
-        entity_meta: { ownerUserId: myUserId, viewName: viewName },
+        entity_id: participantRowId, entity_type: 'view_invite',
+        entity_meta: { viewId: viewId, viewName: viewName },
         created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       });
     } catch(e) { console.warn('[Compass] Template launch view invite notification failed:', e); }
@@ -3345,21 +3364,27 @@ function _notesNewView() {
     _notesRenderGrid();
     _notesRenderLeft();
     _notesRenderViewSwitcher();
-    // ── STEP 5: insert owner row in view_participants ─────────────────────
+    // MY VIEWS persistence fork (Brief 2): VP rows now require view_id.
+    // MY NOTES dashboards have no compass_views row — skip VP write with warn
+    // (see Brief 2 §7.5).
     (async function() {
       if (!_userId) return;
+      const viewId = await _resolveViewId(_userId, trimmed);
+      if (!viewId) {
+        console.warn('[Compass] New view "' + trimmed + '": no compass_views row — view_participants skipped (see Brief 2 §7.5).');
+        return;
+      }
       try {
         await API.post('view_participants', {
-          firm_id:                 FIRM_ID,
-          workspace_owner_user_id: _userId,
-          view_name:               trimmed,
-          user_id:                 _userId,
-          resource_id:             window._notesResource?.id || null,
-          view_role:               'owner',
-          tile_edit_overrides:     [],
-          invited_at:              new Date().toISOString(),
-          accepted_at:             new Date().toISOString(),
-          last_seen_at:            new Date().toISOString(),
+          firm_id:             FIRM_ID,
+          view_id:             viewId,
+          user_id:             _userId,
+          view_role:           'owner',
+          tile_edit_overrides: {},
+          color:               '#00D2FF',
+          invited_at:          new Date().toISOString(),
+          accepted_at:         new Date().toISOString(),
+          last_seen_at:        new Date().toISOString(),
         });
       } catch(e) {
         console.warn('[Compass] view_participants owner row insert failed:', e);
@@ -3545,14 +3570,10 @@ function _notesRenameView(newName) {
   _notesSaveWorkspace(true);
   _notesRenderViewSwitcher();
   _notesRenderLibrary(); // keep WORKFLOWS left panel in sync with rename
-  // STEP 5: keep view_participants in sync so participant heartbeats stay aligned
-  if (_userId) {
-    API.patch(
-      'view_participants?workspace_owner_user_id=eq.' + _userId +
-      '&view_name=eq.' + encodeURIComponent(oldName),
-      { view_name: newName }
-    ).catch(function(e) { console.warn('[Compass] Rename view_participants failed:', e); });
-  }
+  // MY VIEWS persistence fork (Brief 2): view_participants no longer carries
+  // view_name (Brief 1 dropped that column). Renames update the dashboard
+  // (notes_workspace.state.views key) but no participant-side PATCH is needed —
+  // view_id FK handles the linkage.
 }
 
 function _notesClearWorkspace() {
@@ -3611,23 +3632,10 @@ async function _notesFirstLaunchSeed() {
       }
     };
     await _notesSaveNow();
-    // ── STEP 5: seed owner row for Default view ───────────────────────────
-    try {
-      await API.post('view_participants', {
-        firm_id:                 FIRM_ID,
-        workspace_owner_user_id: _userId,
-        view_name:               'Default',
-        user_id:                 _userId,
-        resource_id:             window._notesResource?.id || null,
-        view_role:               'owner',
-        tile_edit_overrides:     [],
-        invited_at:              new Date().toISOString(),
-        accepted_at:             new Date().toISOString(),
-        last_seen_at:            new Date().toISOString(),
-      });
-    } catch(e) {
-      console.warn('[Compass] Default view owner row insert failed:', e);
-    }
+    // MY VIEWS persistence fork (Brief 2): MY NOTES Default dashboard has no
+    // compass_views row, so the view_participants owner-row seed is skipped.
+    // See Brief 2 §7.5 — note-level dashboard sharing pending architect
+    // adjudication.
   } catch(e) { console.error('[Compass] First launch seed error:', e); }
 }
 
@@ -5241,28 +5249,57 @@ function _vpViewKey(ownerUserId, viewName) {
   return ownerUserId + '::' + viewName;
 }
 
-// Load view_participants rows for a given owner+viewName
-async function _notesLoadViewParticipants(ownerUserId, viewName) {
-  const key = _vpViewKey(ownerUserId, viewName);
+// MY VIEWS persistence fork (Brief 2): resolve compass_views.id by
+// (owner_user_id, view_name). MY NOTES dashboards live in notes_workspace and
+// have no compass_views row → returns null → callers skip view_participants
+// writes (those writes would fail Brief 1's NOT NULL FK constraint anyway).
+const _viewIdLookupCache = {};
+async function _resolveViewId(ownerUserId, viewName) {
+  if (!ownerUserId || !viewName) return null;
+  const key = ownerUserId + '::' + viewName;
+  if (Object.prototype.hasOwnProperty.call(_viewIdLookupCache, key)) {
+    return _viewIdLookupCache[key];
+  }
   try {
     const rows = await API.get(
-      'view_participants?workspace_owner_user_id=eq.' + ownerUserId +
+      'compass_views?owner_user_id=eq.' + ownerUserId +
       '&view_name=eq.' + encodeURIComponent(viewName) +
-      '&select=id,user_id,resource_id,view_role,tile_edit_overrides,color,invited_at,accepted_at,last_seen_at' +
+      '&select=id&limit=1'
+    ).catch(function() { return []; });
+    const id = (rows && rows[0] && rows[0].id) || null;
+    _viewIdLookupCache[key] = id;
+    return id;
+  } catch(e) {
+    _viewIdLookupCache[key] = null;
+    return null;
+  }
+}
+
+// Load view_participants rows for a given owner+viewName (post-Brief-1 schema)
+async function _notesLoadViewParticipants(ownerUserId, viewName) {
+  const key = _vpViewKey(ownerUserId, viewName);
+  const viewId = await _resolveViewId(ownerUserId, viewName);
+  if (!viewId) {
+    // No compass_views row for this dashboard — MY NOTES dashboards do not
+    // currently have a row (see Brief 2 §7.5). Cache empty and return.
+    _viewParticipants[key] = [];
+    return _viewParticipants[key];
+  }
+  try {
+    const rows = await API.get(
+      'view_participants?view_id=eq.' + viewId +
+      '&select=id,view_id,user_id,view_role,tile_edit_overrides,color,invited_at,accepted_at,last_seen_at' +
       '&order=invited_at.asc'
     ).catch(() => []);
     const resources = _inviteResources || await _notesLoadInviteResources();
     _viewParticipants[key] = (Array.isArray(rows) ? rows : []).map(function(p) {
-      const res = resources.find(function(r) {
-        return r.id === p.resource_id || r.user_id === p.user_id;
-      });
+      const res = resources.find(function(r) { return r.user_id === p.user_id; });
       const name = res
         ? ((res.first_name || '') + ' ' + (res.last_name || '')).trim() || res.email || 'User'
         : 'User';
       return Object.assign({}, p, {
         name:     name,
         initials: name.split(' ').map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase(),
-        // Use DB color if set, otherwise assign from palette by position
         color:    p.color || PARTICIPANT_COLORS[
           (Array.isArray(rows) ? rows : []).indexOf(p) % PARTICIPANT_COLORS.length
         ],
@@ -5325,17 +5362,18 @@ function _notesRenderViewPresenceStrip(ownerUserId, viewName) {
   });
 }
 
-// View heartbeat — patches own last_seen_at in view_participants, re-renders strip,
-// and syncs the view config if the owner has made structural changes
+// View heartbeat — patches own last_seen_at in view_participants, re-renders strip
 async function _notesViewHeartbeat(ownerUserId, viewName) {
   const userId = window._notesResource?.user_id;
   if (!userId) return;
 
+  const viewId = await _resolveViewId(ownerUserId, viewName);
+  if (!viewId) return; // No compass_views row → no participant rows to heartbeat
+
   // 1. Patch own last_seen_at
   try {
     await API.patch(
-      'view_participants?workspace_owner_user_id=eq.' + ownerUserId +
-      '&view_name=eq.' + encodeURIComponent(viewName) +
+      'view_participants?view_id=eq.' + viewId +
       '&user_id=eq.' + userId,
       { last_seen_at: new Date().toISOString() }
     );
@@ -5594,20 +5632,40 @@ window._notesShowShareViewDialog = async function() {
           const _vpColors = ['#E25B6B','#EF9F27','#1D9E75','#8B5CF6','#E879A0','#00B4D8'];
           const _existingVp = _viewParticipants[_vpViewKey(userId, viewName)] || [];
           const _vpColor = _vpColors[(_existingVp.length) % _vpColors.length];
-          await API.post('view_participants', {
-            firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
-            workspace_owner_user_id: userId, view_name: viewName,
-            user_id: res.user_id, resource_id: res.id||null,
-            view_role: 'viewer', tile_edit_overrides: [], color: _vpColor,
-            invited_at: new Date().toISOString(), accepted_at: null, last_seen_at: null,
-          });
+
+          // MY VIEWS persistence fork (Brief 2): VP rows require view_id (FK to
+          // compass_views.id). Resolve from the dashboard. Skip + warn if the
+          // dashboard has no compass_views row (Brief 2 §7.5 — MY NOTES
+          // dashboards do not currently have rows).
+          const viewIdRes = await _resolveViewId(userId, viewName);
+          if (!viewIdRes) {
+            console.warn('[Compass] Share view "' + viewName + '": no compass_views row — invite skipped (see Brief 2 §7.5).');
+            await _notesLoadViewParticipants(userId, viewName);
+            await renderDialog();
+            return;
+          }
+
+          let participantRowId = null;
+          try {
+            const created = await API.post('view_participants', {
+              firm_id: 'aaaaaaaa-0001-0001-0001-000000000001',
+              view_id: viewIdRes,
+              user_id: res.user_id,
+              view_role: 'viewer', tile_edit_overrides: {}, color: _vpColor,
+              invited_at: new Date().toISOString(), accepted_at: null, last_seen_at: null,
+            }, { Prefer: 'return=representation' });
+            const newPart = Array.isArray(created) ? created[0] : created;
+            if (newPart && newPart.id) participantRowId = newPart.id;
+          } catch(eIns) { console.warn('[Compass] Add view participant insert failed:', eIns); }
+
           const myName = (window._notesResource && window._notesResource.name) || 'Someone';
           await API.post('notes', {
             firm_id: 'aaaaaaaa-0001-0001-0001-000000000001', owner_user_id: res.user_id,
             title: myName + ' invited you to view: ' + viewName,
             content: myName + ' has shared the view "' + viewName + '" with you. Accept in your inbox to access it.',
-            hierarchy_path: 'Inbox', is_inbox: true, entity_id: null, entity_type: 'view_invite',
-            entity_meta: { ownerUserId: userId, viewName: viewName },
+            hierarchy_path: 'Inbox', is_inbox: true,
+            entity_id: participantRowId, entity_type: 'view_invite',
+            entity_meta: { viewId: viewIdRes, viewName: viewName },
             created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
           }).catch(function(){});
         } catch(e) { console.warn('[Compass] Add view participant error:', e); }
@@ -5626,7 +5684,7 @@ window._notesShowShareViewDialog = async function() {
         overlay.querySelectorAll('.nvsd-slot-chk[data-pid="' + p.id + '"]:checked:not(:disabled)').forEach(function(chk) {
           checkedSlots.push(chk.dataset.slot);
         });
-        const overrides = checkedSlots.length ? [{ user_id: p.user_id, slot_keys: checkedSlots }] : [];
+        const overrides = checkedSlots.length ? [{ user_id: p.user_id, slot_keys: checkedSlots }] : {};
         try {
           await API.patch('view_participants?id=eq.' + p.id, { view_role: p.view_role, tile_edit_overrides: overrides });
         } catch(e) { console.warn('[Compass] Save view participant error:', e); }
@@ -5651,20 +5709,33 @@ window._notesShowShareViewDialog = async function() {
   await renderDialog();
 };
 
-// ── STEP 5: View invite inbox dialog — accept / decline ───────────────────
+// ── View invite inbox dialog — accept / decline (Brief 2: view_id-aware) ──
 async function _notesShowViewInviteDialog(inviteNote) {
   const titleMatch  = (inviteNote.title || '').match(/^(.+?) invited you to view: (.+)$/);
   const inviterName = titleMatch ? titleMatch[1] : 'Someone';
   const viewName    = titleMatch ? titleMatch[2] : 'a view';
-  let ownerUserId   = null;
+  // Brief 2 §2.6: invites now carry viewId in entity_meta; legacy invites
+  // carry ownerUserId. entity_id (when present) is the view_participants row id.
+  let ownerUserId = null;
+  let viewId      = null;
+  const participantRowId = inviteNote.entity_id || null;
   try {
-    // entity_meta may arrive as object (jsonb) or string depending on API layer — handle both
     const meta = inviteNote.entity_meta
       ? (typeof inviteNote.entity_meta === 'string' ? JSON.parse(inviteNote.entity_meta) : inviteNote.entity_meta)
       : null;
-    ownerUserId = meta && meta.ownerUserId;
+    if (meta) {
+      viewId      = meta.viewId      || null;
+      ownerUserId = meta.ownerUserId || null;
+    }
   } catch(e) {}
-  if (!ownerUserId) return;
+  // Resolve ownerUserId from view_id if needed
+  if (viewId && !ownerUserId) {
+    try {
+      const rows = await API.get('compass_views?id=eq.' + viewId + '&select=owner_user_id&limit=1').catch(function(){return [];});
+      if (rows && rows[0]) ownerUserId = rows[0].owner_user_id;
+    } catch(e) {}
+  }
+  if (!ownerUserId && !viewId) return;
 
   const overlay = document.createElement('div');
   overlay.className = 'notes-invite-dialog-overlay';
@@ -5688,38 +5759,50 @@ async function _notesShowViewInviteDialog(inviteNote) {
   document.body.appendChild(overlay);
   overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
 
+  // Helper: DELETE the participant row using best-available identifier.
+  async function _deleteParticipantRow(selfUserId) {
+    if (participantRowId) {
+      try { await API.del('view_participants?id=eq.' + participantRowId); return; } catch(e) {}
+    }
+    if (viewId && selfUserId) {
+      try { await API.del('view_participants?view_id=eq.' + viewId + '&user_id=eq.' + selfUserId); return; } catch(e) {}
+    }
+    // Legacy invites with no view_id and no participant id — best-effort no-op.
+  }
+
+  // Helper: PATCH accepted_at on the participant row.
+  async function _markAcceptedAt(selfUserId) {
+    if (participantRowId) {
+      try { await API.patch('view_participants?id=eq.' + participantRowId, { accepted_at: new Date().toISOString() }); return; } catch(e) {}
+    }
+    if (viewId && selfUserId) {
+      try { await API.patch('view_participants?view_id=eq.' + viewId + '&user_id=eq.' + selfUserId, { accepted_at: new Date().toISOString() }); return; } catch(e) {}
+    }
+  }
+
   overlay.querySelector('#nvid-decline').onclick = async function() {
     overlay.remove();
     const selfUserId = window._notesResource && window._notesResource.user_id;
-    // Remove from local array immediately before DB delete
     if (typeof _notes !== 'undefined') {
       const didx = _notes.findIndex(function(n) { return n.id === inviteNote.id; });
       if (didx >= 0) _notes.splice(didx, 1);
     }
     API.del('notes?id=eq.' + inviteNote.id).catch(function(){});
-    if (selfUserId && ownerUserId) {
-      try {
-        await API.del(
-          'view_participants?workspace_owner_user_id=eq.' + ownerUserId +
-          '&view_name=eq.' + encodeURIComponent(viewName) +
-          '&user_id=eq.' + selfUserId
-        );
-      } catch(e) {}
+    if (selfUserId && (ownerUserId || viewId)) {
+      await _deleteParticipantRow(selfUserId);
       const myName = (window._notesResource && window._notesResource.name) || 'Someone';
-      try {
-        await API.post('notes', {
-          firm_id: 'aaaaaaaa-0001-0001-0001-000000000001', owner_user_id: ownerUserId,
-          title: myName + ' declined your view invitation: ' + viewName,
-          content: myName + ' has declined your invitation to the view "' + viewName + '".',
-          hierarchy_path: 'Inbox', is_inbox: true, entity_id: null, entity_type: null,
-          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-        });
-      } catch(e) {}
+      if (ownerUserId) {
+        try {
+          await API.post('notes', {
+            firm_id: 'aaaaaaaa-0001-0001-0001-000000000001', owner_user_id: ownerUserId,
+            title: myName + ' declined your view invitation: ' + viewName,
+            content: myName + ' has declined your invitation to the view "' + viewName + '".',
+            hierarchy_path: 'Inbox', is_inbox: true, entity_id: null, entity_type: null,
+            created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          });
+        } catch(e) {}
+      }
     }
-    // Refresh inbox
-    const notesArr = typeof _notes !== 'undefined' ? _notes : [];
-    const idx = notesArr.findIndex(function(n){ return n.id === inviteNote.id; });
-    if (idx >= 0) notesArr.splice(idx, 1);
     if (typeof _notesRenderLeft === 'function') _notesRenderLeft();
     else if (window._notesRenderLeft) window._notesRenderLeft();
   };
@@ -5727,31 +5810,24 @@ async function _notesShowViewInviteDialog(inviteNote) {
   overlay.querySelector('#nvid-accept').onclick = async function() {
     overlay.remove();
     const selfUserId = window._notesResource && window._notesResource.user_id;
-    if (!selfUserId || !ownerUserId) return;
+    if (!selfUserId) return;
 
     // 1. Mark view_participants row as accepted
-    try {
-      await API.patch(
-        'view_participants?workspace_owner_user_id=eq.' + ownerUserId +
-        '&view_name=eq.' + encodeURIComponent(viewName) +
-        '&user_id=eq.' + selfUserId,
-        { accepted_at: new Date().toISOString() }
-      );
-    } catch(e) { console.warn('[Compass] Accept view invite patch error:', e); }
+    await _markAcceptedAt(selfUserId);
 
-    // 2. Update local workspace sharedViews — update in-memory only, save via existing workspace save
-    const wsKey = _vpViewKey(ownerUserId, viewName);
+    // 2. Update local workspace sharedViews
+    const wsKey = _vpViewKey(ownerUserId || 'unknown', viewName);
     if (window._workspace) {
       if (!window._workspace.sharedViews) window._workspace.sharedViews = {};
-      window._workspace.sharedViews[wsKey] = { ownerUserId: ownerUserId, viewName: viewName, acceptedAt: new Date().toISOString() };
+      window._workspace.sharedViews[wsKey] = { ownerUserId: ownerUserId, viewName: viewName, viewId: viewId, acceptedAt: new Date().toISOString() };
     }
-    // Persist — use upsert-safe pattern: read current state, merge, write back
+    // Persist — read-modify-write own MY NOTES workspace state (own user — not forbidden)
     try {
       const wsRows = await API.get('notes_workspace?user_id=eq.' + selfUserId + '&limit=1').catch(function(){ return []; });
       const existing = wsRows && wsRows[0];
       const state = (existing && existing.state) ? existing.state : (window._workspace ? JSON.parse(JSON.stringify(window._workspace)) : {});
       if (!state.sharedViews) state.sharedViews = {};
-      state.sharedViews[wsKey] = { ownerUserId: ownerUserId, viewName: viewName, acceptedAt: new Date().toISOString() };
+      state.sharedViews[wsKey] = { ownerUserId: ownerUserId, viewName: viewName, viewId: viewId, acceptedAt: new Date().toISOString() };
       if (existing) {
         await API.patch('notes_workspace?user_id=eq.' + selfUserId, { state: state, updated_at: new Date().toISOString() });
       } else {
@@ -5759,19 +5835,21 @@ async function _notesShowViewInviteDialog(inviteNote) {
       }
     } catch(e) { console.warn('[Compass] Accept view invite workspace write error:', e); }
 
-    // 3. Remove from local array first, then fire async DB delete
+    // 3. Remove invite note from inbox
     if (typeof _notes !== 'undefined') {
       const idx = _notes.findIndex(function(n) { return n.id === inviteNote.id; });
       if (idx >= 0) _notes.splice(idx, 1);
     }
-    // Advance lastChecked so inbox poller never re-fetches this deleted note
     try { window._inboxLastChecked = new Date().toISOString(); } catch(e) {}
     API.del('notes?id=eq.' + inviteNote.id).catch(function(e) { console.warn('[Compass] Inbox delete error:', e); });
 
-    // 4. Re-render inbox (note already gone from array) then switch to shared view
+    // 4. Re-render and switch to shared view. New invites pass viewId; legacy use (owner, name).
     if (typeof _notesRenderLeft === 'function') _notesRenderLeft();
     else if (window._notesRenderLeft) window._notesRenderLeft();
-    if (window._notesSwitchToSharedView) window._notesSwitchToSharedView(ownerUserId, viewName);
+    if (window._notesSwitchToSharedView) {
+      if (viewId) window._notesSwitchToSharedView(viewId);
+      else if (ownerUserId) window._notesSwitchToSharedView(ownerUserId, viewName);
+    }
   };
 }
 window._notesShowViewInviteDialog = _notesShowViewInviteDialog;
