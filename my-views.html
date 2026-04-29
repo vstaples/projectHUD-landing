@@ -158,8 +158,8 @@
 #views-tray:empty{display:none}
 .views-tray-chip{font-family:var(--font-mono,monospace);font-size:10px;padding:3px 10px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.15);color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0}
 /* ── Invitation dialog ── */
-.views-invite-dialog-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
-.views-invite-dialog{background:#0d1e35;border:1px solid rgba(0,210,255,.3);box-shadow:0 16px 60px rgba(0,0,0,.8);width:420px;max-width:95vw;padding:0}
+.views-invite-dialog-overlay,.invite-dialog-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.views-invite-dialog,.invite-dialog{background:#0d1e35;border:1px solid rgba(0,210,255,.3);box-shadow:0 16px 60px rgba(0,0,0,.8);width:420px;max-width:95vw;padding:0}
 .nid-header{padding:20px 24px 16px;border-bottom:1px solid rgba(0,210,255,.1)}
 .nid-from{font-family:var(--font-mono,monospace);font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
 .nid-title{font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--text0,#F0F6FF);margin-bottom:4px}
@@ -846,8 +846,8 @@ function _notesWireLeft() {
 }
 
 function _notesToggleSection(which) {
-  const listId = which === 'inbox' ? 'notes-inbox-list' : which === 'library' ? 'notes-library-list' : 'notes-tree-scroll';
-  const chevId = 'notes-chev-' + which;
+  const listId = which === 'inbox' ? 'views-inbox-list' : which === 'library' ? 'views-library-list' : 'views-tree-scroll';
+  const chevId = 'views-chev-' + which;
   const el     = document.getElementById(listId);
   const chev   = document.getElementById(chevId);
   if (!el) return;
@@ -2812,7 +2812,7 @@ function _notesDndInit() {
     }
     // Clear all drop indicators
     shell.querySelectorAll('.views-drop-before,.views-drop-after').forEach(el => {
-      el.classList.remove('notes-drop-before','notes-drop-after');
+      el.classList.remove('views-drop-before','views-drop-after');
     });
     _dropInsert = null;
 
@@ -2826,7 +2826,7 @@ function _notesDndInit() {
       const rect = target.getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
       const pos  = e.clientY < midY ? 'before' : 'after';
-      target.classList.add(pos === 'before' ? 'notes-drop-before' : 'notes-drop-after');
+      target.classList.add(pos === 'before' ? 'views-drop-before' : 'views-drop-after');
       _dropInsert = { noteId: target.dataset.noteid, position: pos };
     }
   });
@@ -2842,7 +2842,7 @@ function _notesDndInit() {
     const srcItem = document.querySelector('#views-left .views-item[data-viewid="' + _dragNoteId + '"]');
     if (srcItem) srcItem.style.opacity = '';
     shell.querySelectorAll('.views-drop-before,.views-drop-after').forEach(el => {
-      el.classList.remove('notes-drop-before','notes-drop-after');
+      el.classList.remove('views-drop-before','views-drop-after');
     });
 
     const savedDragId  = _dragNoteId;
@@ -3218,7 +3218,7 @@ async function _notesDeleteInboxNote(noteId) {
     // Show confirmation dialog
     const confirmed = await new Promise(resolve => {
       const overlay = document.createElement('div');
-      overlay.className = 'notes-invite-dialog-overlay';
+      overlay.className = 'views-invite-dialog-overlay';
       const noteName = note.title || 'this shared note';
       overlay.innerHTML =
         '<div class="views-invite-dialog">' +

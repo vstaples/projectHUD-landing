@@ -734,9 +734,9 @@ async function _notesShowViewInviteDialog(inviteNote) {
   if (!ownerUserId && !viewId) return;
 
   const overlay = document.createElement('div');
-  overlay.className = 'notes-invite-dialog-overlay';
+  overlay.className = 'invite-dialog-overlay';
   overlay.innerHTML =
-    '<div class="notes-invite-dialog">' +
+    '<div class="invite-dialog">' +
       '<div class="nid-header">' +
         '<div class="nid-from">View Invitation</div>' +
         '<div class="nid-title">' + _esc(inviterName) + ' invited you to a view</div>' +
