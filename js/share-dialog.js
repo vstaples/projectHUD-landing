@@ -237,6 +237,39 @@ async function _resolveViewId(ownerUserId, viewName) {
   }
 }
 
+// Load view_participants rows for a given (view_id) — bypasses name-based
+// resolution. Used by the share dialog where the caller knows the target.
+async function _loadParticipantsByViewId(cacheKey, viewId) {
+  const api = _api();
+  if (!viewId || !api) { _viewParticipants[cacheKey] = []; return _viewParticipants[cacheKey]; }
+  try {
+    const rows = await api.get(
+      'view_participants?view_id=eq.' + viewId +
+      '&select=id,view_id,user_id,view_role,tile_edit_overrides,color,invited_at,accepted_at,last_seen_at' +
+      '&order=invited_at.asc'
+    ).catch(function() { return []; });
+    const resources = await _resolveResources();
+    const palette = (window.PARTICIPANT_COLORS && window.PARTICIPANT_COLORS.length)
+      ? window.PARTICIPANT_COLORS : PARTICIPANT_COLORS;
+    _viewParticipants[cacheKey] = (Array.isArray(rows) ? rows : []).map(function(p) {
+      const res = resources.find(function(r) { return r.user_id === p.user_id; });
+      const name = res
+        ? ((res.first_name || '') + ' ' + (res.last_name || '')).trim() || res.email || res.name || 'User'
+        : 'User';
+      return Object.assign({}, p, {
+        name:     name,
+        initials: name.split(' ').map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase(),
+        color:    p.color || palette[
+          (Array.isArray(rows) ? rows : []).indexOf(p) % palette.length
+        ],
+      });
+    });
+  } catch(e) {
+    _viewParticipants[cacheKey] = [];
+  }
+  return _viewParticipants[cacheKey];
+}
+
 // ── Load view_participants for a given owner+viewName (post-Brief-1 schema) ─
 async function _notesLoadViewParticipants(ownerUserId, viewName) {
   const key = _vpViewKey(ownerUserId, viewName);
@@ -445,9 +478,22 @@ window._notesShowShareViewDialog = async function(opts) {
   const api = _api();
   if (!api) return;
 
-  const myParts = await _notesLoadViewParticipants(userId, viewName);
-  const myRow   = myParts.find(function(p) { return p.user_id === userId; });
-  if (myRow && myRow.view_role === 'viewer') return;
+  // Brief 2.5 fix: dialog uses ONLY the caller-provided view_id for its
+  // participant query. No name-based resolution — name collisions across
+  // surfaces (MY VIEWS "Default" vs MY NOTES "Default") would otherwise
+  // surface the wrong dashboard's participants. When providedViewId is
+  // null (MY NOTES surface), the participant list is empty and the Add
+  // path surfaces the §7.5 toast.
+  const dialogViewId = providedViewId;
+  const dialogKey    = '__dialog__::' + (dialogViewId || ('noview::' + viewName));
+
+  if (dialogViewId) {
+    const myParts = await _loadParticipantsByViewId(dialogKey, dialogViewId);
+    const myRow   = myParts.find(function(p) { return p.user_id === userId; });
+    if (myRow && myRow.view_role === 'viewer') return;
+  } else {
+    _viewParticipants[dialogKey] = [];
+  }
 
   const cvFn  = window._notesCv || window._viewsCv;
   const cv    = typeof cvFn === 'function' ? cvFn() : null;
@@ -467,8 +513,12 @@ window._notesShowShareViewDialog = async function(opts) {
   });
 
   async function renderDialog() {
-    await _notesLoadViewParticipants(userId, viewName);
-    const existing = _viewParticipants[_vpViewKey(userId, viewName)] || [];
+    if (dialogViewId) {
+      await _loadParticipantsByViewId(dialogKey, dialogViewId);
+    } else {
+      _viewParticipants[dialogKey] = [];
+    }
+    const existing = _viewParticipants[dialogKey] || [];
     const others   = existing.filter(function(p) { return p.user_id !== userId; });
 
     function peopleRowHtml(p) {
@@ -541,7 +591,7 @@ window._notesShowShareViewDialog = async function(opts) {
       '</div>';
 
     overlay.querySelector('#nvsd-cancel').onclick = function() {
-      delete _viewParticipants[_vpViewKey(userId, viewName)];
+      delete _viewParticipants[dialogKey];
       overlay.remove();
     };
     overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
@@ -549,8 +599,7 @@ window._notesShowShareViewDialog = async function(opts) {
     overlay.querySelectorAll('.nvsd-role-sel').forEach(function(sel) {
       sel.onchange = function() {
         const pid  = sel.dataset.pid;
-        const vkey = _vpViewKey(userId, viewName);
-        const part = (_viewParticipants[vkey]||[]).find(function(p){ return p.id===pid; });
+        const part = (_viewParticipants[dialogKey]||[]).find(function(p){ return p.id===pid; });
         if (part) part.view_role = sel.value;
         overlay.querySelector('#nvsd-matrix').innerHTML = matrixHtml();
       };
@@ -561,9 +610,8 @@ window._notesShowShareViewDialog = async function(opts) {
         btn.disabled = true;
         btn.style.opacity = '0.3';
         const pid  = btn.dataset.pid;
-        const vkey = _vpViewKey(userId, viewName);
-        const part = (_viewParticipants[vkey]||[]).find(function(p){ return p.id===pid; });
-        _viewParticipants[vkey] = (_viewParticipants[vkey]||[]).filter(function(p){ return p.id !== pid; });
+        const part = (_viewParticipants[dialogKey]||[]).find(function(p){ return p.id===pid; });
+        _viewParticipants[dialogKey] = (_viewParticipants[dialogKey]||[]).filter(function(p){ return p.id !== pid; });
         try { await api.del('view_participants?id=eq.' + pid); }
         catch(e) { console.warn('[Compass] Remove view participant delete error:', e); }
         if (part && part.user_id) {
@@ -576,40 +624,31 @@ window._notesShowShareViewDialog = async function(opts) {
             created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
           }).catch(function(){});
         }
-        await _notesLoadViewParticipants(userId, viewName);
         renderDialog();
       };
     });
 
     overlay.querySelector('#nvsd-add-btn').onclick = function(e) {
+      // No compass_views row → no view_id → §7.5 toast and exit before opening picker.
+      if (!dialogViewId) {
+        console.warn('[Compass] Share view "' + viewName + '": no compass_views row — invite skipped (see Brief 2 §7.5).');
+        _toast('Sharing for this dashboard is not yet supported (Brief 2 §7.5).', 4000);
+        return;
+      }
       window._notesShowResourcePicker(e.currentTarget, async function(res) {
         if (!res.user_id) return;
-        const vkey = _vpViewKey(userId, viewName);
-        await _notesLoadViewParticipants(userId, viewName);
-        const existing2 = _viewParticipants[vkey] || [];
+        if (dialogViewId) await _loadParticipantsByViewId(dialogKey, dialogViewId);
+        const existing2 = _viewParticipants[dialogKey] || [];
         if (existing2.some(function(p){ return p.user_id===res.user_id; })) return;
         try {
           const _vpColors = ['#E25B6B','#EF9F27','#1D9E75','#8B5CF6','#E879A0','#00B4D8'];
-          const _existingVp = _viewParticipants[_vpViewKey(userId, viewName)] || [];
-          const _vpColor = _vpColors[(_existingVp.length) % _vpColors.length];
-
-          let viewIdRes = providedViewId;
-          if (!viewIdRes) {
-            viewIdRes = await _resolveViewId(userId, viewName);
-          }
-          if (!viewIdRes) {
-            console.warn('[Compass] Share view "' + viewName + '": no compass_views row — invite skipped (see Brief 2 §7.5).');
-            _toast('Sharing for this dashboard is not yet supported (Brief 2 §7.5).', 4000);
-            await _notesLoadViewParticipants(userId, viewName);
-            await renderDialog();
-            return;
-          }
+          const _vpColor = _vpColors[(existing2.length) % _vpColors.length];
 
           let participantRowId = null;
           try {
             const created = await api.post('view_participants', {
               firm_id: _firmId(),
-              view_id: viewIdRes,
+              view_id: dialogViewId,
               user_id: res.user_id,
               view_role: 'viewer', tile_edit_overrides: {}, color: _vpColor,
               invited_at: new Date().toISOString(), accepted_at: null, last_seen_at: null,
@@ -625,18 +664,16 @@ window._notesShowShareViewDialog = async function(opts) {
             content: myName + ' has shared the view "' + viewName + '" with you. Accept in your inbox to access it.',
             hierarchy_path: 'Inbox', is_inbox: true,
             entity_id: participantRowId, entity_type: 'view_invite',
-            entity_meta: { viewId: viewIdRes, viewName: viewName },
+            entity_meta: { viewId: dialogViewId, viewName: viewName },
             created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
           }).catch(function(){});
         } catch(e) { console.warn('[Compass] Add view participant error:', e); }
-        await _notesLoadViewParticipants(userId, viewName);
         await renderDialog();
       });
     };
 
     overlay.querySelector('#nvsd-save').onclick = async function() {
-      const vkey  = _vpViewKey(userId, viewName);
-      const parts2 = _viewParticipants[vkey] || [];
+      const parts2 = _viewParticipants[dialogKey] || [];
       for (var i = 0; i < parts2.length; i++) {
         var p = parts2[i];
         if (p.user_id === userId) continue;
@@ -650,7 +687,7 @@ window._notesShowShareViewDialog = async function(opts) {
         } catch(e) { console.warn('[Compass] Save view participant error:', e); }
       }
       overlay.remove();
-      await _notesLoadViewParticipants(userId, viewName);
+      if (dialogViewId) await _loadParticipantsByViewId(dialogKey, dialogViewId);
     };
   }
 
