@@ -343,7 +343,7 @@ const HUDShell = (() => {
         width: calc(100% - 150px);
       }
       /* Slide-in trigger relocates to right edge of Tier 2 strip */
-      body.hud-tier2-rendered #hud-sidebar-trigger { left: 150px; }
+      body.hud-tier2-rendered #hud-sidebar-trigger { left: 170px; }
       /* Slide-in panel sits above Tier 2 strip when open */
       body.hud-tier2-rendered #hud-sidebar-panel { z-index: 600; }
     `;
