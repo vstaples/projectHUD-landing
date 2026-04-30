@@ -465,8 +465,8 @@
 (function() {
 'use strict';
 
-const _MV_VERSION = 'v20260430-CMD100.17';
-console.log('[my-views] ' + _MV_VERSION + ' — _viewsRefresh now reconciles shared-dashboard membership against view_participants');
+const _MV_VERSION = 'v20260430-CMD100.18';
+console.log('[my-views] ' + _MV_VERSION + ' — reconcile pass now also runs on first-load (not just tab revisit)');
 
 // ── State ─────────────────────────────────────────────────────────────────
 const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
@@ -525,6 +525,10 @@ window._viewsLoadView = async function() {
 
   await _notesFetchAll();
   await _notesLoadWorkspace();
+  // Reconcile shared dashboards against the participant table — drops any
+  // __shared__ entries the user no longer has access to (matches the same
+  // pass run by _viewsRefresh on tab revisit).
+  await _notesReconcileSharedViews();
   // MY VIEWS: skip _notesFetchSharedViewNotes, _notesCleanWidgetNotes, _notesFirstLaunchSeed
   // — these operate on MY NOTES data and must not run in the views module.
   _notesRenderLeft();
