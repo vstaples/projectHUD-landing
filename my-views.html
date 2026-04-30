@@ -465,8 +465,8 @@
 (function() {
 'use strict';
 
-const _MV_VERSION = 'v20260430-CMD100.19';
-console.log('[my-views] ' + _MV_VERSION + ' — inbox renderer filters by owner_user_id (suppresses foreign notes pulled in by shared-view loader)');
+const _MV_VERSION = 'v20260430-CMD100.20';
+console.log('[my-views] ' + _MV_VERSION + ' — DIAGNOSTIC build: verbose tracing in _notesSwitchToSharedView');
 
 // ── State ─────────────────────────────────────────────────────────────────
 const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
@@ -3535,7 +3535,8 @@ window._viewsRenderGrid    = _notesRenderGrid; // scoped — do NOT overwrite MY
 // Resolves the dashboard from compass_views by view_id (preferred) or by
 // (owner_user_id, view_name) for legacy invites.
 window._notesSwitchToSharedView = async function(ownerUserIdOrViewId, viewNameOrNull) {
-  if (!ownerUserIdOrViewId) return;
+  console.log('[switchToShared] entry', { arg1: ownerUserIdOrViewId, arg2: viewNameOrNull, _userId: _userId });
+  if (!ownerUserIdOrViewId) { console.log('[switchToShared] early return: no arg'); return; }
   try {
     let ownerView = null;
     let ownerUserId = null;
@@ -3546,11 +3547,14 @@ window._notesSwitchToSharedView = async function(ownerUserIdOrViewId, viewNameOr
     // Path 2: legacy two-arg call with (ownerUserId, viewName).
     // Distinguish by whether second arg is present + first arg looks like a UUID.
     const looksLikeUUID = /^[0-9a-f-]{36}$/i.test(String(ownerUserIdOrViewId));
+    console.log('[switchToShared] looksLikeUUID:', looksLikeUUID);
     if (looksLikeUUID && !viewNameOrNull) {
       viewId = ownerUserIdOrViewId;
+      console.log('[switchToShared] fetching compass_views for viewId:', viewId);
       const rows = await API.get(
         'compass_views?id=eq.' + viewId + '&select=id,owner_user_id,view_name,state&limit=1'
-      ).catch(function() { return []; });
+      ).catch(function(e) { console.log('[switchToShared] fetch caught error:', e); return []; });
+      console.log('[switchToShared] fetch result:', rows);
       if (rows && rows[0]) {
         ownerView   = rows[0].state || {};
         ownerUserId = rows[0].owner_user_id;
@@ -3568,7 +3572,8 @@ window._notesSwitchToSharedView = async function(ownerUserIdOrViewId, viewNameOr
         viewId    = rows[0].id;
       }
     }
-    if (!ownerView) return;
+    console.log('[switchToShared] resolved:', { ownerView: !!ownerView, ownerUserId, viewName, viewId });
+    if (!ownerView) { console.log('[switchToShared] early return: no ownerView'); return; }
 
     // Fetch notes referenced by this view's tiles so they resolve for the participant
     const tileNoteIds = (ownerView.tiles || [])
