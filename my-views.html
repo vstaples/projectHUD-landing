@@ -568,7 +568,9 @@ async function _notesFetchAll() {
       'notes?owner_user_id=eq.' + _userId + '&firm_id=eq.' + FIRM_ID +
       '&order=updated_at.desc&limit=200'
     ).catch(() => []);
-    _notes = Array.isArray(notes) ? notes : [];
+    // Mutate in place to preserve window._notes reference identity (used by share-dialog.js).
+    _notes.length = 0;
+    if (Array.isArray(notes)) Array.prototype.push.apply(_notes, notes);
   } catch(e) { console.error('[Compass] Notes fetch error:', e); }
 }
 
