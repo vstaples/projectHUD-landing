@@ -665,7 +665,85 @@ async function _notesLoadWorkspace() {
     });
     if (migrated) _viewsSaveWorkspace(true);
   } catch(e) { console.error('[Compass] Views workspace load error:', e); }
+  await _notesRestoreSharedViews();
   _notesCleanTiles();
+}
+
+
+async function _notesRestoreSharedViews() {
+  if (!_userId) return;
+  try {
+    // MY VIEWS persistence fork: view_participants now references view_id (FK
+    // to compass_views.id). MY NOTES dashboards have no compass_views row, so
+    // this restore path will only return rows for shared MY VIEWS dashboards.
+    // Note-level sharing (notes_workspace dashboards) is not yet representable
+    // in view_participants — see Brief 2 §7.5.
+    const parts = await API.get(
+      'view_participants?user_id=eq.' + _userId +
+      '&accepted_at=not.is.null' +
+      '&select=id,view_id,view_role,tile_edit_overrides' +
+      '&limit=50'
+    ).catch(function() { return []; });
+    if (!parts || !parts.length) return;
+
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      var viewId = p.view_id;
+      if (!viewId) continue;
+      try {
+        // Read owner dashboard from compass_views
+        var rows = await API.get(
+          'compass_views?id=eq.' + viewId +
+          '&select=id,owner_user_id,view_name,state&limit=1'
+        ).catch(function() { return []; });
+        var row = rows && rows[0];
+        if (!row) continue;
+        if (row.owner_user_id === _userId) continue; // skip own dashboards
+        var ownerUserId = row.owner_user_id;
+        var viewName    = row.view_name;
+        var ownerView   = row.state || {};
+        var sharedKey   = '__shared__' + ownerUserId + '__' + viewName;
+
+        // Fetch referenced notes into local _notes array
+        var tileNoteIds = (ownerView.tiles || [])
+          .map(function(t) { return t.noteId; })
+          .filter(function(id) { return id && !id.startsWith('ph-') && !id.startsWith('wt-'); });
+        if (tileNoteIds.length) {
+          var sharedNotes = await API.get(
+            'notes?id=in.(' + tileNoteIds.join(',') + ')&limit=50'
+          ).catch(function() { return []; });
+          (sharedNotes || []).forEach(function(n) {
+            if (!_notes.find(function(x) { return x.id === n.id; })) _notes.push(n);
+          });
+        }
+        _workspace.views[sharedKey] = Object.assign({}, ownerView, {
+          _isSharedView:   true,
+          _sharedOwner:    ownerUserId,
+          _sharedViewName: viewName,
+          _sharedViewId:   viewId,
+        });
+        // If the user's last active view was this shared view, restore it as active
+        if (_workspace.activeView === sharedKey) {
+          // Already set — nothing to do
+        } else if (_workspace.sharedViews && _workspace.sharedViews[ownerUserId + '::' + viewName]) {
+          const svMeta = _workspace.sharedViews[ownerUserId + '::' + viewName];
+          if (svMeta && svMeta.wasActive) {
+            _workspace.activeView = sharedKey;
+          }
+        }
+      } catch(e) {
+        console.warn('[Compass] Could not restore shared view (view_id=' + viewId + '):', e);
+      }
+    }
+    // Stale-key fallback
+    if (_workspace.activeView && _workspace.activeView.startsWith('__shared__')) {
+      if (!_workspace.views[_workspace.activeView]) {
+        _workspace.activeView = Object.keys(_workspace.views).find(function(k) { return !k.startsWith('__shared__'); }) || 'Default';
+      }
+    }
+  } catch(e) {
+    console.warn('[Compass] _notesRestoreSharedViews error:', e);
+  }
 }
 
 
