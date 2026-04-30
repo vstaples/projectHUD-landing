@@ -433,7 +433,7 @@
       <!-- CENTER: associated user name -->
       <div id="views-header-user"></div>
       <!-- RIGHT: action buttons -->
-      <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+      <div id="views-action-buttons" style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
         <button class="views-grid-btn" onclick="_notesNewView()" title="New view">+ View</button>
         <button class="views-grid-btn" onclick="window._viewsDiag && window._viewsDiag()" title="Diagnostics" style="color:#EF9F27;border-color:rgba(239,159,39,.3)">&#9873; Diag</button>
         <button class="views-grid-btn" id="views-clone-btn" onclick="window._notesCloneView && window._notesCloneView()"
@@ -465,8 +465,8 @@
 (function() {
 'use strict';
 
-const _MV_VERSION = 'v20260430-CMD100.22';
-console.log('[my-views] ' + _MV_VERSION + ' — participant pill strip suppressed on read-only shared view side');
+const _MV_VERSION = 'v20260430-CMD100.23';
+console.log('[my-views] ' + _MV_VERSION + ' — owner-only action buttons (+View, Diag, Clone, Share, Save Template, Clear) hidden on shared dashboards');
 
 // ── State ─────────────────────────────────────────────────────────────────
 const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
@@ -2290,6 +2290,12 @@ function _notesRenderViewSwitcher() {
     sharedBar.style.display = 'none';
   }
   if (editBtn) editBtn.style.display = (tpl && !cv._isSharedView) ? '' : 'none';
+
+  // Hide owner-only action buttons (+View, Diag, Clone, Share, Save Template,
+  // Clear) when viewing a shared dashboard. Read-only viewers should not be
+  // able to share, clone, clear, or otherwise mutate someone else's view.
+  const actionsBar = document.getElementById('views-action-buttons');
+  if (actionsBar) actionsBar.style.display = cv._isSharedView ? 'none' : 'flex';
 
   // MY VIEWS persistence fork: pill-badges for accepted view_participants on active dashboard.
   _viewsRenderParticipantBadges();
