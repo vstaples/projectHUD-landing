@@ -411,7 +411,7 @@
           style="background:#0a1628;border:1px solid rgba(0,210,255,.2);color:var(--text0,#F0F6FF);
             font-family:var(--font-mono);font-size:13px;padding:2px 6px;cursor:pointer;outline:none;
             font-weight:600;-webkit-appearance:auto;max-width:300px;width:auto"
-          onchange="_notesSwitchView(this.value)">
+          onchange="window._viewsSwitchView && window._viewsSwitchView(this.value)">
         </select>
         <button id="views-lock-btn"
           onclick="window._notesToggleViewLock && window._notesToggleViewLock()"
@@ -465,8 +465,8 @@
 (function() {
 'use strict';
 
-const _MV_VERSION = 'v20260430-CMD100.15';
-console.log('[my-views] ' + _MV_VERSION + ' — view_removed handler drops revoked dashboard and switches active view');
+const _MV_VERSION = 'v20260430-CMD100.16';
+console.log('[my-views] ' + _MV_VERSION + ' — dashboard switcher onchange routed to window._viewsSwitchView');
 
 // ── State ─────────────────────────────────────────────────────────────────
 const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
