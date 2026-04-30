@@ -40,8 +40,8 @@
 (function() {
 'use strict';
 
-const _SD_VERSION = 'v20260430-CMD100.15';
-console.log('[share-dialog] ' + _SD_VERSION + ' — view_removed payload now carries revoked compass_views.id in entity_id');
+const _SD_VERSION = 'v20260430-CMD100.20';
+console.log('[share-dialog] ' + _SD_VERSION + ' — Save button relabelled to "Save Permissions" (only persists role + tile-edit matrix; add/remove already auto-save)');
 
 // ── Constants ─────────────────────────────────────────────────────────────
 const PARTICIPANT_COLORS = ['#E25B6B','#EF9F27','#1D9E75','#8B5CF6','#E879A0','#00B4D8'];
@@ -589,7 +589,7 @@ window._notesShowShareViewDialog = async function(opts) {
         '</div>' +
         '<div class="ntd-actions">' +
           '<button class="ntd-btn ntd-btn-cancel" id="nvsd-cancel">Close</button>' +
-          '<button class="ntd-btn ntd-btn-save" id="nvsd-save">Save Changes</button>' +
+          '<button class="ntd-btn ntd-btn-save" id="nvsd-save">Save Permissions</button>' +
         '</div>' +
       '</div>';
 

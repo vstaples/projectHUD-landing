@@ -34,6 +34,7 @@ var DEBUG_EVENTS = true;
 var DEBUG_CHANNEL_SOURCE = false;
 
 // Version banner — fires on every page load/refresh so you can confirm what's running
+// CMD100.21: _safeSendOn now routes via httpSend() when channel not joined, silencing the Realtime fallback deprecation warning.
 (function() {
   var V = (typeof window._PROJECTHUD_VERSION === 'string' && window._PROJECTHUD_VERSION) || '—';
   var versions = {
@@ -229,7 +230,19 @@ function _channelSend(payload) {
 
 function _safeSendOn(ch, payload) {
   if (!ch) return;
-  try { ch.send(payload); } catch(e) {}
+  try {
+    // CMD100.21: Supabase deprecation warning — when the channel is not yet
+    // joined, send() falls back to REST internally and warns. Pick the
+    // explicit method based on connection state to silence the warning.
+    if (ch.state === 'joined') {
+      ch.send(payload);
+    } else if (typeof ch.httpSend === 'function') {
+      ch.httpSend(payload);
+    } else {
+      // Older SDKs without httpSend — fall through to send() and accept the warning.
+      ch.send(payload);
+    }
+  } catch(e) {}
 }
 
 function _connect() {

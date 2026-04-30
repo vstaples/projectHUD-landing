@@ -465,8 +465,8 @@
 (function() {
 'use strict';
 
-const _MV_VERSION = 'v20260430-CMD100.20';
-console.log('[my-views] ' + _MV_VERSION + ' — DIAGNOSTIC build: verbose tracing in _notesSwitchToSharedView');
+const _MV_VERSION = 'v20260430-CMD100.21';
+console.log('[my-views] ' + _MV_VERSION + ' — left-panel dashboards list now includes shared dashboards, grouped under their owner');
 
 // ── State ─────────────────────────────────────────────────────────────────
 const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
@@ -1688,7 +1688,29 @@ function _notesRenderLibrary() {
 
   Object.keys(views).forEach(function(vKey) {
     const v = views[vKey];
-    if (v._isSharedView) return;
+    if (v._isSharedView) {
+      // Shared dashboards: group under the owner's name. Owner identity comes
+      // from _sharedOwner (a user_id); resolve via window._inviteResources.
+      const ownerUserId = v._sharedOwner || '';
+      let ownerName = 'Shared owner';
+      let ownerRid  = '';
+      if (window._inviteResources && window._inviteResources.length) {
+        const res = window._inviteResources.find(function(r){ return r.user_id === ownerUserId; });
+        if (res) { ownerName = res.name || ownerName; ownerRid = res.id || ''; }
+      }
+      const initials = ownerName.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+      let colorIdx = 0;
+      if (window._inviteResources && window._inviteResources.length && ownerRid) {
+        const idx = window._inviteResources.findIndex(function(r){ return r.id === ownerRid; });
+        colorIdx = idx >= 0 ? idx : 0;
+      }
+      const color = (window.PARTICIPANT_COLORS && window.PARTICIPANT_COLORS.length)
+        ? window.PARTICIPANT_COLORS[colorIdx % window.PARTICIPANT_COLORS.length] : '#00D2FF';
+      // Display label is the dashboard's friendly name, not the synthetic __shared__ key.
+      const label = v._sharedViewName || vKey;
+      otherViews.push({ vKey, label, personName: ownerName, personRid: ownerRid, initials, color, isActive: vKey === _workspace.activeView });
+      return;
+    }
     if (v.forResourceName) {
       const personName = v.forResourceName;
       const personRid  = v.forResourceId || '';
