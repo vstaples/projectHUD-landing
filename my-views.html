@@ -465,8 +465,8 @@
 (function() {
 'use strict';
 
-const _MV_VERSION = 'v20260430-CMD100.18';
-console.log('[my-views] ' + _MV_VERSION + ' — reconcile pass now also runs on first-load (not just tab revisit)');
+const _MV_VERSION = 'v20260430-CMD100.19';
+console.log('[my-views] ' + _MV_VERSION + ' — inbox renderer filters by owner_user_id (suppresses foreign notes pulled in by shared-view loader)');
 
 // ── State ─────────────────────────────────────────────────────────────────
 const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
@@ -872,7 +872,10 @@ function _notesRenderLeft() {
 }
 
 function _notesRenderInbox() {
-  const inbox = _notes.filter(n => n.is_inbox);
+  // Filter by owner: shared-view loaders may pull foreign-owned notes into
+  // _notes when those notes back tile entries on a shared dashboard. The
+  // inbox panel should only show notes that belong to the current user.
+  const inbox = _notes.filter(n => n.is_inbox && n.owner_user_id === _userId);
   const el    = document.getElementById('views-inbox-list');
   const badge = document.getElementById('views-inbox-count');
   if (!el) return;
