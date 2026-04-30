@@ -40,6 +40,9 @@
 (function() {
 'use strict';
 
+const _SD_VERSION = 'v20260430-CMD100.15';
+console.log('[share-dialog] ' + _SD_VERSION + ' — view_removed payload now carries revoked compass_views.id in entity_id');
+
 // ── Constants ─────────────────────────────────────────────────────────────
 const PARTICIPANT_COLORS = ['#E25B6B','#EF9F27','#1D9E75','#8B5CF6','#E879A0','#00B4D8'];
 const FIRM_ID_FALLBACK = 'aaaaaaaa-0001-0001-0001-000000000001';
@@ -620,7 +623,7 @@ window._notesShowShareViewDialog = async function(opts) {
             firm_id: _firmId(), owner_user_id: part.user_id,
             title: myName + ' removed you from view: ' + viewName,
             content: myName + ' has removed your access to the shared view "' + viewName + '".',
-            hierarchy_path: 'Inbox', is_inbox: true, entity_id: null, entity_type: 'view_removed',
+            hierarchy_path: 'Inbox', is_inbox: true, entity_id: dialogViewId, entity_type: 'view_removed',
             created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
           }).catch(function(){});
         }

@@ -465,8 +465,8 @@
 (function() {
 'use strict';
 
-const _MV_VERSION = 'v20260430-CMD100.14';
-console.log('[my-views] ' + _MV_VERSION + ' — inbox array reference identity preserved across refresh');
+const _MV_VERSION = 'v20260430-CMD100.15';
+console.log('[my-views] ' + _MV_VERSION + ' — view_removed handler drops revoked dashboard and switches active view');
 
 // ── State ─────────────────────────────────────────────────────────────────
 const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
@@ -872,6 +872,40 @@ function _notesWireLeft() {
           overlay.remove();
           API.del('notes?id=eq.' + note.id).catch(()=>{});
           _notes = _notes.filter(n => n.id !== note.id);
+          // Drop the revoked shared dashboard from the workspace, if present.
+          // share-dialog.js carries the revoked compass_views.id in note.entity_id.
+          const revokedViewId = note.entity_id || null;
+          if (revokedViewId) {
+            const revokedKey = Object.keys(_workspace.views || {}).find(function(k) {
+              const v = _workspace.views[k];
+              return v && v._isSharedView && v._sharedViewId === revokedViewId;
+            });
+            if (revokedKey) {
+              const wasActive = (_workspace.activeView === revokedKey);
+              const revokedEntry = _workspace.views[revokedKey];
+              // Remove from workspace.views
+              delete _workspace.views[revokedKey];
+              // Clean wasActive flag on the corresponding sharedViews meta
+              if (_workspace.sharedViews && revokedEntry) {
+                const svMetaKey = revokedEntry._sharedOwner + '::' + revokedEntry._sharedViewName;
+                if (_workspace.sharedViews[svMetaKey]) delete _workspace.sharedViews[svMetaKey];
+              }
+              if (wasActive) {
+                // Pick the next remaining shared dashboard, fall back to 'Default'
+                const nextSharedKey = Object.keys(_workspace.views).find(function(k) {
+                  return _workspace.views[k] && _workspace.views[k]._isSharedView;
+                });
+                const nextView = nextSharedKey || 'Default';
+                // Bypass the activeView-equality guard in _notesSwitchView by
+                // clearing activeView first; otherwise the switch is a no-op
+                // when the revoked key was itself the active view.
+                _workspace.activeView = '__pending__';
+                _notesSwitchView(nextView);
+              } else {
+                _viewsSaveWorkspace(true);
+              }
+            }
+          }
           _notesRenderLeft();
         };
         overlay.querySelector('#nid-vr-ack').onclick = dismiss;
