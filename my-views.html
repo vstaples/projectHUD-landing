@@ -465,8 +465,8 @@
 (function() {
 'use strict';
 
-const _MV_VERSION = 'v20260430-CMD100.21';
-console.log('[my-views] ' + _MV_VERSION + ' — left-panel dashboards list now includes shared dashboards, grouped under their owner');
+const _MV_VERSION = 'v20260430-CMD100.22';
+console.log('[my-views] ' + _MV_VERSION + ' — participant pill strip suppressed on read-only shared view side');
 
 // ── State ─────────────────────────────────────────────────────────────────
 const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
@@ -2199,10 +2199,16 @@ async function _viewsRenderParticipantBadges() {
   const bar = document.getElementById('views-participants-bar');
   if (!bar) return;
   const cv = _cv();
+  // Suppress the participant strip on the read-only side. The "Shared view ·
+  // Read-only" label is sufficient context for the participant; only the
+  // owner needs to see who has access (they manage it via the Share dialog).
+  if (cv && cv._isSharedView) {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+    return;
+  }
   // Resolve which view_id the badges should render for.
-  const viewId = cv && cv._isSharedView
-    ? (cv._sharedViewId || null)
-    : _activeViewId();
+  const viewId = _activeViewId();
   if (!viewId) {
     bar.style.display = 'none';
     bar.innerHTML = '';
