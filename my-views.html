@@ -465,8 +465,8 @@
 (function() {
 'use strict';
 
-const _MV_VERSION = 'v20260430-CMD100.16';
-console.log('[my-views] ' + _MV_VERSION + ' — dashboard switcher onchange routed to window._viewsSwitchView');
+const _MV_VERSION = 'v20260430-CMD100.17';
+console.log('[my-views] ' + _MV_VERSION + ' — _viewsRefresh now reconciles shared-dashboard membership against view_participants');
 
 // ── State ─────────────────────────────────────────────────────────────────
 const FIRM_ID  = 'aaaaaaaa-0001-0001-0001-000000000001';
@@ -550,9 +550,60 @@ window._viewsLoadView = async function() {
 
 window._viewsRefresh = async function() {
   await _notesFetchAll();
+  await _notesReconcileSharedViews();
   _notesRenderLeft();
   _notesRenderGrid();
+  _notesRenderViewSwitcher();
 };
+
+// Tab-revisit reconciliation: ensure local __shared__ entries match the current
+// view_participants table. Drops entries the user no longer has access to;
+// (re-)adds entries from the participant table. If the active view is dropped,
+// falls back to the next remaining shared dashboard or 'Default'.
+async function _notesReconcileSharedViews() {
+  if (!_userId) return;
+  let allowedIds = new Set();
+  try {
+    const parts = await API.get(
+      'view_participants?user_id=eq.' + _userId +
+      '&accepted_at=not.is.null' +
+      '&select=view_id' +
+      '&limit=50'
+    ).catch(function() { return []; });
+    (parts || []).forEach(function(p) { if (p.view_id) allowedIds.add(p.view_id); });
+  } catch(e) {
+    console.warn('[Compass] Reconcile shared views: participant fetch failed:', e);
+    return;
+  }
+  // Drop __shared__ entries no longer authorized
+  let activeWasDropped = false;
+  Object.keys(_workspace.views || {}).forEach(function(k) {
+    if (!k.startsWith('__shared__')) return;
+    const v = _workspace.views[k];
+    if (!v || !v._sharedViewId || !allowedIds.has(v._sharedViewId)) {
+      if (_workspace.activeView === k) activeWasDropped = true;
+      const svMetaKey = v && v._sharedOwner && v._sharedViewName
+        ? v._sharedOwner + '::' + v._sharedViewName : null;
+      delete _workspace.views[k];
+      if (svMetaKey && _workspace.sharedViews && _workspace.sharedViews[svMetaKey]) {
+        delete _workspace.sharedViews[svMetaKey];
+      }
+    }
+  });
+  // (Re-)add any allowed shared views not yet present
+  await _notesRestoreSharedViews();
+  // If the active view was dropped, switch to next remaining shared or Default
+  if (activeWasDropped) {
+    const nextSharedKey = Object.keys(_workspace.views).find(function(k) {
+      return _workspace.views[k] && _workspace.views[k]._isSharedView;
+    });
+    const nextView = nextSharedKey || 'Default';
+    _workspace.activeView = '__pending__';
+    _notesSwitchView(nextView);
+  } else {
+    _viewsSaveWorkspace(true);
+  }
+}
 
 // ── One-time cleanup: remove note records that back widget tiles ───────────
 // Runs silently on startup. Any note whose ID appears in a workspace tile with
