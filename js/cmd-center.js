@@ -88,6 +88,7 @@ var _execQueue   = [];     // pending async commands
 var _eventListeners = {};  // { eventName: [resolvers] }
 var _storeVars   = {};     // script variable storage { name: value }
 var _recordArmed = {};     // CMD100.50: per-session recorder arm map { userId: bool } — ephemeral
+var _pageReadyTs = {};     // CMD100.63: per-session ts of latest page_ready broadcast — used by script-runner nav settle
 var _scriptRunning = false; // suppress hook double-logging during script execution
 var _scriptAborted = false; // set when panel closes mid-script
 var _pauseResolve  = null;  // set by Pause command, cleared by Enter in command bar
@@ -646,10 +647,10 @@ function _connect() {
   // ── CMD100.50 — Recorder pipe ──────────────────────────────
   // Per-session arm map declared at module scope above; this handler
   // just consumes it.
-  // CMD100.63 — per-session timestamp of latest page_ready broadcast.
-  // Aegis script-runner uses this as a "destination has bootstrapped"
-  // signal after navigation commands.
-  var _pageReadyTs = {};   // { userId: ts }
+  // CMD100.63 — _pageReadyTs declared at module scope above so the
+  // script-runner (also at module scope) can read it. This handler
+  // just consumes it.
+  // var _pageReadyTs (declared at module scope)
 
   function _handlePageReady(payload) {
     var d = payload.payload;
