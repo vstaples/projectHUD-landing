@@ -646,6 +646,17 @@ function _connect() {
   // ── CMD100.50 — Recorder pipe ──────────────────────────────
   // Per-session arm map declared at module scope above; this handler
   // just consumes it.
+  // CMD100.63 — per-session timestamp of latest page_ready broadcast.
+  // Aegis script-runner uses this as a "destination has bootstrapped"
+  // signal after navigation commands.
+  var _pageReadyTs = {};   // { userId: ts }
+
+  function _handlePageReady(payload) {
+    var d = payload.payload;
+    if (!d || !d.userId) return;
+    _pageReadyTs[d.userId] = d.ts || Date.now();
+    console.log('[recv-page_ready]', { userId: d.userId.slice(0,8), location: d.location, ts: _pageReadyTs[d.userId] });
+  }
 
   function _handleRecorderEvent(payload) {
     var d = payload.payload;
@@ -709,6 +720,10 @@ function _connect() {
   // CMD100.50: Recorder events from any module's hud-shell click handler.
   _channel.on(      'broadcast', { event: 'recorder_event'  }, _handleRecorderEvent);
   _channelLegacy.on('broadcast', { event: 'recorder_event'  }, _handleRecorderEvent);
+  // CMD100.63: page_ready signal — destination page broadcasts after
+  // bootstrapping channels, so the dispatcher can confirm post-nav settle.
+  _channel.on(      'broadcast', { event: 'page_ready'      }, _handlePageReady);
+  _channelLegacy.on('broadcast', { event: 'page_ready'      }, _handlePageReady);
 
   // CMD-PRESENCE-4 (CMD85): Broadcast-based presence liveness.
   // Phoenix Presence's metadata update path doesn't reliably propagate ts
@@ -741,6 +756,23 @@ function _connect() {
     _updateStatusEl();
     _renderSessionList();
     _startLiveClock();
+
+    // CMD100.63 — emit page_ready so any Aegis-side script-runner
+    // waiting for this session's post-nav settle can proceed. Sent only
+    // from non-Aegis pages; Aegis itself doesn't drive scripts via nav.
+    if (!window._aegisMode) {
+      _channelSend({
+        type: 'broadcast', event: 'page_ready',
+        payload: {
+          userId:   _mySession.userId,
+          name:     _mySession.name,
+          initials: _mySession.initials,
+          location: _currentLocation(),
+          ts:       Date.now()
+        }
+      });
+      if (DEBUG_EVENTS) console.log('[cmd-center] page_ready emitted', _currentLocation());
+    }
     // Location heartbeat — send on both channels via _channelSend.
     // Only from main window (not pop-out), and never from Aegis.
     if (!window._cmdCenterFullscreen && !window._aegisMode) {
@@ -3249,17 +3281,38 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
         }
       }
 
-      // CMD100.62 — post-nav settle. Empirically, 1500ms is sufficient
-      // for any module page to bootstrap cmd-center, AegisRegistry, and
-      // the channel subscription. The earlier heartbeat-freshness watch
-      // produced false-warning timeouts because heartbeat cadence (~5s)
-      // doesn't align with the watch deadline. Dropping it.
+      // CMD100.63 — post-nav settle. Wait for a `page_ready` broadcast
+      // from the target session that is NEWER than the pre-dispatch
+      // timestamp. That's the only reliable signal that the new page's
+      // cmd-center has subscribed and is ready to receive cmds.
       if (_isNavCmd) {
         var _settleStart = Date.now();
-        var _SETTLE_MS = 1500;
-        console.log('[script-nav] settling', { ms: _SETTLE_MS });
-        await new Promise(function(r){ setTimeout(r, _SETTLE_MS); });
-        console.log('[script-nav] settled', { elapsedMs: Date.now() - _settleStart });
+        var _preReadyTs  = _pageReadyTs[targetUserId] || 0;
+        var _navDeadline = _settleStart + 8000;
+        var _polls = 0;
+        console.log('[script-nav] awaiting page_ready', { preReadyTs: _preReadyTs, deadlineMs: 8000 });
+        while (Date.now() < _navDeadline) {
+          _polls++;
+          var _readyTs = _pageReadyTs[targetUserId] || 0;
+          if (_readyTs > _preReadyTs) {
+            console.log('[script-nav] settled via page_ready', {
+              polls: _polls,
+              elapsedMs: Date.now() - _settleStart,
+              readyTs: _readyTs
+            });
+            // Tiny settle margin — page_ready fires the moment channels
+            // subscribe; give 200ms for the cmd subscription to propagate
+            // server-side before the next dispatch.
+            await new Promise(function(r){ setTimeout(r, 200); });
+            break;
+          }
+          await new Promise(function(r){ setTimeout(r, 100); });
+        }
+        var _finalTs = _pageReadyTs[targetUserId] || 0;
+        if (_finalTs <= _preReadyTs) {
+          console.warn('[script-nav] page_ready timeout', { preReadyTs: _preReadyTs, currentTs: _finalTs });
+          _appendLine('SYS', 'warn', 'Nav settle timeout for ' + parsed.target + ' (page_ready not received)');
+        }
       }
     } else {
       // Execute locally
