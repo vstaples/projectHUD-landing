@@ -1,6 +1,6 @@
-// VERSION: 20260422-CMD74
-window._mwCoreVersion = 'v20260422-CMD74';
-console.log('%c[mw-core] v20260422-CMD74 — B-UI-6: poll no longer re-renders work tab (reactive handler owns it)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260430-CMD100.30
+window._mwCoreVersion = 'v20260430-CMD100.30';
+console.log('%c[mw-core] v20260430-CMD100.30 — Request type filter pill + bulk delete extended to Action rows','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -609,14 +609,17 @@ window._mwLoadUserView = async function() {
     function workListRows() {
       const cutoff30d = new Date(Date.now()+30*86400000).toLocaleDateString('en-CA');
       const filtered = workItems.filter(w => {
-        if (_wfType !== 'all' && w.type !== _wfType) return false;
+        // CMD100.30: virtual 'request' type — _isWrRow rows have w.type='action'
+        // physically but should be classified as 'request' for filter purposes.
+        const effectiveType = w._isWrRow ? 'request' : w.type;
+        if (_wfType !== 'all' && effectiveType !== _wfType) return false;
         if (_wfStatus !== 'all') {
           if (w.type!=='action' && w.status !== _wfStatus) return false;
         }
         if (_wfProject && w.projectId !== _wfProject) return false;
       const isRequestItem = w._isWrRow ||
         (w.title||'').startsWith('Review request:') || (w.title||'').startsWith('Approve request:');
-      if (isRequestItem) return true; // always show — blocking items regardless of due date or type filter
+      if (isRequestItem && _wfType === 'all') return true; // sticky only when no type filter narrows
         if (_wfDateRange==='today') return !w.due||w.due===today||w.overdue;
         if (_wfDateRange==='week')  return !w.due||w.due<=weekDays[6]||w.overdue;
         if (_wfDateRange==='30d')   return !w.due||w.due<=cutoff30d||w.overdue;
@@ -691,9 +694,15 @@ window._mwLoadUserView = async function() {
         const _titleStyle  = _instCancelled ? 'text-decoration:line-through;color:rgba(255,255,255,.4);' : '';
         return `<div class="cmp-row wi-row" data-wi-id="${w.id}" data-wi-type="${w.type}"
           data-wi-status="${w.status}" data-wi-projectid="${w.projectId||''}"
-          style="display:grid;grid-template-columns:14px 80px 1fr 140px 56px 78px;
+          style="display:grid;grid-template-columns:34px 80px 1fr 140px 56px 78px;
             gap:0;align-items:center;padding:0 8px 0 4px;min-height:38px;${_negBorder}${_cancelStyle}">
-          <div style="display:flex;align-items:center;justify-content:center">
+          <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+            ${w._isWrRow
+              ? `<input type="checkbox" class="wi-bulk-cb" data-wi-id="${w.id}" data-wi-table="workflow_requests" title="Select for bulk delete" style="width:13px;height:13px;cursor:pointer;accent-color:#EF9F27;margin:0">`
+              : (w.type === 'action'
+                ? `<input type="checkbox" class="wi-bulk-cb" data-wi-id="${w.id}" data-wi-table="workflow_action_items" title="Select for bulk delete" style="width:13px;height:13px;cursor:pointer;accent-color:#EF9F27;margin:0">`
+                : `<span style="display:inline-block;width:13px"></span>`)
+            }
             <div class="wi-complete-circle" data-wi-id="${w.id}" data-wi-type="${w.type}"
               data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId||''}"
               data-wi-status="${w.status}" title="Click to mark complete"
@@ -1011,6 +1020,7 @@ window._mwLoadUserView = async function() {
         <div class="cmp-panel" id="mw-worklist-panel" style="margin-bottom:14px">
           <div class="panel-hdr" style="flex-wrap:wrap;gap:6px;padding-bottom:8px">
             <div class="panel-title" style="color:var(--compass-cyan);font-size:13px">My Work Queue</div>
+            <button id="wq-bulk-delete-btn" style="display:none;font-family:var(--font-mono);font-size:11px;padding:3px 10px;background:rgba(226,75,74,.12);border:1px solid var(--compass-red);color:var(--compass-red);cursor:pointer;letter-spacing:.05em;font-weight:700;transition:all .12s" onmouseenter="this.style.background='rgba(226,75,74,.22)'" onmouseleave="this.style.background='rgba(226,75,74,.12)'">Delete Selected (<span id="wq-bulk-count">0</span>)</button>
             <button onclick="(function(){const el=document.getElementById('mw-rec-seq');if(!el)return;if(el.style.display==='none'){if(window._recSeqItems)renderRecSeq(window._recSeqItems);else buildRecommendedSequence(_wiItems);el.style.display='block';}else{el.style.display='none';}})()" title="Recommended sequence" style="font-family:var(--font-mono);font-size:11px;padding:2px 8px;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.2);color:rgba(0,210,255,.6);cursor:pointer;letter-spacing:.05em;transition:all .12s" onmouseenter="this.style.background='rgba(0,210,255,.12)'" onmouseleave="this.style.background='rgba(0,210,255,.06)'">⚡ Seq</button>
             <div style="display:flex;align-items:center;gap:0;border:1px solid rgba(255,255,255,.12);border-radius:12px;overflow:hidden;margin:0 auto">
               <button data-action="diagram-list" style="font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 12px;background:${_diagramMode?'none':'rgba(239,159,39,.2)'};color:${_diagramMode?'rgba(255,255,255,.3)':'#EF9F27'};border:none;cursor:pointer;transition:all .12s">LIST</button>
@@ -1033,7 +1043,7 @@ window._mwLoadUserView = async function() {
             border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--bg2)">
             <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em">TYPE</span>
             <div style="display:flex;gap:3px">
-              ${['all','task','action'].map(t=>{const labels={all:'All',task:'Tasks',action:'Actions'},active=_wfType===t;return `<button class="wf-type-btn" data-type="${t}" style="font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 8px;background:${active?'rgba(139,92,246,.25)':'none'};color:${active?'#8B5CF6':'var(--text2)'};border:1px solid ${active?'#8B5CF6':'var(--border)'};cursor:pointer">${labels[t]}</button>`;}).join('')}
+              ${['all','task','action','request'].map(t=>{const labels={all:'All',task:'Tasks',action:'Actions',request:'Requests'},active=_wfType===t;return `<button class="wf-type-btn" data-type="${t}" style="font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 8px;background:${active?'rgba(139,92,246,.25)':'none'};color:${active?'#8B5CF6':'var(--text2)'};border:1px solid ${active?'#8B5CF6':'var(--border)'};cursor:pointer">${labels[t]}</button>`;}).join('')}
             </div>
             <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-left:4px">STATUS</span>
             <div style="display:flex;gap:3px">
@@ -1050,7 +1060,7 @@ window._mwLoadUserView = async function() {
               ${[...new Set(workItems.filter(w=>w.projectId).map(w=>w.projectId))].map(pid=>{const p=_projects.find(p=>p.id===pid);return p?`<option value="${p.id}" ${_wfProject===p.id?'selected':''}}>${esc(p.name)}</option>`:'';}).join('')}
             </select>
           </div>
-          <div style="display:grid;grid-template-columns:14px 80px 1fr 140px 56px 78px;
+          <div style="display:grid;grid-template-columns:34px 80px 1fr 140px 56px 78px;
             gap:0;padding:5px 8px 5px 4px;border-bottom:1px solid var(--border);
             font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text3);
             letter-spacing:.08em;text-transform:uppercase">
@@ -1292,6 +1302,76 @@ window._mwLoadUserView = async function() {
 
     if (loading) loading.style.display = 'none';
     content.style.display = 'block';
+
+    // ── CMD100.29: Bulk delete for Request rows in My Work Queue ──
+    // Per-row checkboxes (visible only on _isWrRow rows, rendered inline).
+    // Delete Selected button appears in panel header when any row is checked.
+    // Delete is per-row only — does not cascade to parent workflow_instances
+    // or affect requests addressed to other recipients.
+    (function wireWqBulkDelete() {
+      const panel = document.getElementById('mw-worklist-panel');
+      if (!panel || panel.dataset.bulkWired) return;
+      panel.dataset.bulkWired = '1';
+      const btn = panel.querySelector('#wq-bulk-delete-btn');
+      const countEl = panel.querySelector('#wq-bulk-count');
+      function syncBtn() {
+        const checked = panel.querySelectorAll('.wi-bulk-cb:checked');
+        if (countEl) countEl.textContent = checked.length;
+        if (btn) btn.style.display = checked.length > 0 ? 'inline-block' : 'none';
+      }
+      panel.addEventListener('change', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('wi-bulk-cb')) {
+          syncBtn();
+        }
+      });
+      if (btn) {
+        btn.addEventListener('click', async function() {
+          const checked = Array.from(panel.querySelectorAll('.wi-bulk-cb:checked'));
+          if (!checked.length) return;
+          // Group selected ids by source table.
+          const byTable = {};
+          checked.forEach(cb => {
+            const tbl = cb.dataset.wiTable;
+            const id = cb.dataset.wiId;
+            if (!tbl || !id) return;
+            (byTable[tbl] = byTable[tbl] || []).push(id);
+          });
+          const total = Object.values(byTable).reduce((s, a) => s + a.length, 0);
+          if (!total) return;
+          const ok = window.confirm('Delete ' + total + ' selected row' + (total === 1 ? '' : 's') + ' from your work queue? This cannot be undone.');
+          if (!ok) return;
+          btn.disabled = true;
+          btn.style.opacity = '.5';
+          try {
+            // One DELETE per table — PostgREST in.() syntax.
+            for (const tbl of Object.keys(byTable)) {
+              const ids = byTable[tbl];
+              await API.del(tbl + '?id=in.(' + ids.join(',') + ')');
+            }
+            // Drop the deleted rows from the in-memory list.
+            const allDeleted = new Set([].concat(...Object.values(byTable)));
+            if (Array.isArray(window._wiItems)) {
+              window._wiItems = window._wiItems.filter(w => !allDeleted.has(w.id));
+            }
+            if (typeof window._renderWorkList === 'function') {
+              window._renderWorkList();
+            } else {
+              allDeleted.forEach(function(id) {
+                const row = panel.querySelector('.wi-row[data-wi-id="' + id + '"]');
+                if (row) row.remove();
+              });
+            }
+            syncBtn();
+          } catch (err) {
+            console.error('[wq-bulk-delete] failed:', err);
+            window.alert('Delete failed. See console for details.');
+          } finally {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+          }
+        });
+      }
+    })();
 
     // ── Delta strip — since last login ───────────────────
     setTimeout(() => { if (window.populateDeltaStrip) populateDeltaStrip(); }, 200);
