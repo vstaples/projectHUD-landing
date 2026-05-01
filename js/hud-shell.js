@@ -1,6 +1,7 @@
 // ============================================================
 // ProjectHUD — hud-shell.js v1.2 (CMD95.5)
 // CMD100.25: Tier 2 strip shifted +6px (left:6→width:144) to clear the slide-in edge trigger.
+// CMD100.26: Display brightness/contrast tuning popover added to header strip (sun icon).
 // Unified shell: slide-in sidebar (absorbed from sidebar.js v3.1)
 //                + unified header bar (logo / ticker / operator-status)
 //                + Tier 1 sub-header strip (major-area tabs)
@@ -49,6 +50,7 @@ const HUDShell = (() => {
     compass:      `<svg viewBox="-14 -14 28 28" fill="none"><circle r="12" stroke="currentColor" stroke-width="2"/><line x1="0" y1="-7" x2="0" y2="-12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="0" y1="7" x2="0" y2="12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="-7" y1="0" x2="-12" y2="0" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="7" y1="0" x2="12" y2="0" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M0,-10 L2.5,-2 L0,-1 L-2.5,-2Z" fill="currentColor"/><path d="M0,-10 L1.4,-6.5 L0,-5.8 L-1.4,-6.5Z" fill="#EF9F27"/><path d="M0,10 L2,2 L0,1 L-2,2Z" fill="currentColor" opacity=".5"/><circle r="1.8" fill="currentColor"/></svg>`,
     aegis:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L3 6.5V12c0 5 3.5 9.2 9 10 5.5-.8 9-5 9-10V6.5L12 2z"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
     bell:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>`,
+    display:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="7.05" y2="7.05"/><line x1="16.95" y1="16.95" x2="19.07" y2="19.07"/><line x1="4.93" y1="19.07" x2="7.05" y2="16.95"/><line x1="16.95" y1="7.05" x2="19.07" y2="4.93"/></svg>`,
   };
 
   const TOOLBAR_ITEMS = [
@@ -232,6 +234,46 @@ const HUDShell = (() => {
       #hud-status-bell svg { width: 16px; height: 16px; }
       #hud-status-bell:hover { color:#00d2ff; border-color:rgba(0,210,255,.45); background:rgba(0,210,255,.08); }
       #hud-status-bell.has-unread { color:#00d2ff; border-color:rgba(0,210,255,.4); }
+      #hud-display-btn {
+        position: relative;
+        background: rgba(6,10,16,0.6);
+        border: 1px solid rgba(0,210,255,0.20);
+        border-radius: 4px;
+        color: rgba(160,200,235,0.6);
+        width: 32px; height: 32px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; padding: 0;
+        transition: color .15s, border-color .15s, background .15s;
+      }
+      #hud-display-btn svg { width: 16px; height: 16px; }
+      #hud-display-btn:hover, #hud-display-btn.active { color:#EF9F27; border-color:rgba(239,159,39,.45); background:rgba(239,159,39,.08); }
+      #hud-display-popover {
+        position: fixed; top: 50px; right: 12px;
+        width: 240px;
+        background: #0c1628;
+        border: 1px solid rgba(0,210,255,0.25);
+        border-radius: 6px;
+        box-shadow: 0 6px 24px rgba(0,0,0,.6);
+        padding: 14px;
+        z-index: 700;
+        font-family: 'Inter', system-ui, sans-serif;
+        display: none;
+      }
+      #hud-display-popover.open { display: block; }
+      #hud-display-popover .row { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+      #hud-display-popover .row label { font-size:11px; color:rgba(160,200,235,0.85); letter-spacing:.04em; text-transform:uppercase; }
+      #hud-display-popover .row .val { font-size:11px; color:#EF9F27; font-feature-settings:"tnum"; min-width:36px; text-align:right; }
+      #hud-display-popover input[type=range] { width:100%; margin: 0 0 12px; accent-color:#EF9F27; }
+      #hud-display-popover .actions { display:flex; gap:6px; margin-top:4px; }
+      #hud-display-popover button.dp-btn {
+        flex:1; background: rgba(6,10,16,0.6);
+        border: 1px solid rgba(0,210,255,0.25);
+        color: rgba(160,200,235,0.85);
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 11px; padding:6px 0; border-radius:3px; cursor:pointer;
+        transition: color .12s, border-color .12s, background .12s;
+      }
+      #hud-display-popover button.dp-btn:hover { color:#00d2ff; border-color:rgba(0,210,255,.5); background:rgba(0,210,255,.08); }
       #hud-status-bell-badge {
         position: absolute; top: -5px; right: -5px;
         background: #E24B4A; color: #fff;
@@ -784,6 +826,9 @@ const HUDShell = (() => {
           ${ICONS.bell}
           <span id="hud-status-bell-badge" style="display:none">0</span>
         </button>
+        <button id="hud-display-btn" title="Display brightness & contrast" type="button">
+          ${ICONS.display}
+        </button>
         <div id="hud-status-avatar" title="Operator">${initials}</div>
       </div>
     `;
@@ -794,7 +839,102 @@ const HUDShell = (() => {
     _startDatetimeTicker();
     _bindNotifBtn();
     _refreshAvatarFromAuth();
+    _bindDisplayTuningBtn();
   }
+
+  // ── Display brightness/contrast tuning (CMD100.26) ───────────
+  // A floating popover with brightness + contrast sliders. Settings
+  // persist per-user in localStorage and are applied via a CSS filter
+  // on the documentElement, so every panel adapts uniformly.
+  const _DISPLAY_KEY = 'hud-display-tuning';
+  const _DISPLAY_DEFAULTS = { brightness: 100, contrast: 100 };
+  function _loadDisplayTuning() {
+    try {
+      const raw = localStorage.getItem(_DISPLAY_KEY);
+      if (!raw) return Object.assign({}, _DISPLAY_DEFAULTS);
+      const parsed = JSON.parse(raw);
+      return {
+        brightness: Math.max(50, Math.min(150, +parsed.brightness || 100)),
+        contrast:   Math.max(50, Math.min(200, +parsed.contrast   || 100))
+      };
+    } catch(e) { return Object.assign({}, _DISPLAY_DEFAULTS); }
+  }
+  function _saveDisplayTuning(t) {
+    try { localStorage.setItem(_DISPLAY_KEY, JSON.stringify(t)); } catch(e) {}
+  }
+  function _applyDisplayTuning(t) {
+    const el = document.documentElement;
+    if (t.brightness === 100 && t.contrast === 100) {
+      el.style.filter = '';
+    } else {
+      el.style.filter = `brightness(${t.brightness}%) contrast(${t.contrast}%)`;
+    }
+  }
+  function _bindDisplayTuningBtn() {
+    const btn = document.getElementById('hud-display-btn');
+    if (!btn || btn.dataset.wired) return;
+    btn.dataset.wired = '1';
+
+    let popover = document.getElementById('hud-display-popover');
+    if (!popover) {
+      popover = document.createElement('div');
+      popover.id = 'hud-display-popover';
+      popover.innerHTML = `
+        <div class="row"><label>Brightness</label><span class="val" id="dp-bri-val">100%</span></div>
+        <input type="range" id="dp-bri" min="50" max="150" step="1" value="100">
+        <div class="row"><label>Contrast</label><span class="val" id="dp-con-val">100%</span></div>
+        <input type="range" id="dp-con" min="50" max="200" step="1" value="100">
+        <div class="actions">
+          <button class="dp-btn" id="dp-reset">Reset</button>
+          <button class="dp-btn" id="dp-close">Close</button>
+        </div>
+      `;
+      document.body.appendChild(popover);
+    }
+
+    const tuning = _loadDisplayTuning();
+    const briEl = popover.querySelector('#dp-bri');
+    const conEl = popover.querySelector('#dp-con');
+    const briVal = popover.querySelector('#dp-bri-val');
+    const conVal = popover.querySelector('#dp-con-val');
+    briEl.value = tuning.brightness;
+    conEl.value = tuning.contrast;
+    briVal.textContent = tuning.brightness + '%';
+    conVal.textContent = tuning.contrast + '%';
+
+    const onInput = () => {
+      const t = { brightness: +briEl.value, contrast: +conEl.value };
+      briVal.textContent = t.brightness + '%';
+      conVal.textContent = t.contrast + '%';
+      _applyDisplayTuning(t);
+      _saveDisplayTuning(t);
+    };
+    briEl.addEventListener('input', onInput);
+    conEl.addEventListener('input', onInput);
+
+    popover.querySelector('#dp-reset').addEventListener('click', () => {
+      briEl.value = 100; conEl.value = 100;
+      onInput();
+    });
+    popover.querySelector('#dp-close').addEventListener('click', () => {
+      popover.classList.remove('open'); btn.classList.remove('active');
+    });
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = popover.classList.toggle('open');
+      btn.classList.toggle('active', isOpen);
+    });
+    document.addEventListener('click', (e) => {
+      if (!popover.classList.contains('open')) return;
+      if (popover.contains(e.target) || btn.contains(e.target)) return;
+      popover.classList.remove('open');
+      btn.classList.remove('active');
+    });
+  }
+  // Apply persisted tuning ASAP, before the header has rendered, so the
+  // first paint reflects the user's preference.
+  try { _applyDisplayTuning(_loadDisplayTuning()); } catch(e) {}
 
   // ── Footer strip with version display (v1.5 §4.9, CMD99) ─────
   // Fallback styles for surfaces that do not load /css/hud.css.
