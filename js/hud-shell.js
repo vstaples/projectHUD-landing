@@ -2,6 +2,7 @@
 // ProjectHUD — hud-shell.js v1.2 (CMD95.5)
 // CMD100.25: Tier 2 strip shifted +6px (left:6→width:144) to clear the slide-in edge trigger.
 // CMD100.26: Display brightness/contrast tuning popover added to header strip (sun icon).
+// CMD100.31: Display popover extended — saturation slider + Compass panel color picker (HEX) + panel transparency.
 // Unified shell: slide-in sidebar (absorbed from sidebar.js v3.1)
 //                + unified header bar (logo / ticker / operator-status)
 //                + Tier 1 sub-header strip (major-area tabs)
@@ -249,7 +250,7 @@ const HUDShell = (() => {
       #hud-display-btn:hover, #hud-display-btn.active { color:#EF9F27; border-color:rgba(239,159,39,.45); background:rgba(239,159,39,.08); }
       #hud-display-popover {
         position: fixed; top: 50px; right: 12px;
-        width: 240px;
+        width: 260px;
         background: #0c1628;
         border: 1px solid rgba(0,210,255,0.25);
         border-radius: 6px;
@@ -258,8 +259,10 @@ const HUDShell = (() => {
         z-index: 700;
         font-family: 'Inter', system-ui, sans-serif;
         display: none;
+        max-height: calc(100vh - 70px); overflow-y: auto;
       }
       #hud-display-popover.open { display: block; }
+      #hud-display-popover .dp-section-label { font-size:10px; color:rgba(0,210,255,.55); letter-spacing:.12em; text-transform:uppercase; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid rgba(0,210,255,.12); }
       #hud-display-popover .row { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
       #hud-display-popover .row label { font-size:11px; color:rgba(160,200,235,0.85); letter-spacing:.04em; text-transform:uppercase; }
       #hud-display-popover .row .val { font-size:11px; color:#EF9F27; font-feature-settings:"tnum"; min-width:36px; text-align:right; }
@@ -842,20 +845,34 @@ const HUDShell = (() => {
     _bindDisplayTuningBtn();
   }
 
-  // ── Display brightness/contrast tuning (CMD100.26) ───────────
-  // A floating popover with brightness + contrast sliders. Settings
-  // persist per-user in localStorage and are applied via a CSS filter
-  // on the documentElement, so every panel adapts uniformly.
+  // ── Display tuning (CMD100.26 → CMD100.31) ─────────────────────
+  // Floating popover with brightness/contrast/saturation sliders, plus
+  // panel background color picker and panel alpha slider. Settings persist
+  // per-user in localStorage. Filter values apply to documentElement;
+  // panel overrides go through a dedicated injected stylesheet.
   const _DISPLAY_KEY = 'hud-display-tuning';
-  const _DISPLAY_DEFAULTS = { brightness: 100, contrast: 100 };
+  const _DISPLAY_DEFAULTS = {
+    brightness: 100,
+    contrast:   100,
+    saturation: 100,
+    panelColor: '',     // empty string = no override (use original CSS)
+    panelAlpha: 100     // % opacity applied to panel background
+  };
+  function _hexToRgb(hex) {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+    return m ? { r: parseInt(m[1],16), g: parseInt(m[2],16), b: parseInt(m[3],16) } : null;
+  }
   function _loadDisplayTuning() {
     try {
       const raw = localStorage.getItem(_DISPLAY_KEY);
       if (!raw) return Object.assign({}, _DISPLAY_DEFAULTS);
       const parsed = JSON.parse(raw);
       return {
-        brightness: Math.max(50, Math.min(150, +parsed.brightness || 100)),
-        contrast:   Math.max(50, Math.min(200, +parsed.contrast   || 100))
+        brightness: Math.max(50,  Math.min(150, +parsed.brightness || 100)),
+        contrast:   Math.max(50,  Math.min(200, +parsed.contrast   || 100)),
+        saturation: Math.max(0,   Math.min(200, parsed.saturation == null ? 100 : +parsed.saturation)),
+        panelColor: typeof parsed.panelColor === 'string' ? parsed.panelColor : '',
+        panelAlpha: Math.max(0,   Math.min(100, parsed.panelAlpha == null ? 100 : +parsed.panelAlpha))
       };
     } catch(e) { return Object.assign({}, _DISPLAY_DEFAULTS); }
   }
@@ -863,12 +880,28 @@ const HUDShell = (() => {
     try { localStorage.setItem(_DISPLAY_KEY, JSON.stringify(t)); } catch(e) {}
   }
   function _applyDisplayTuning(t) {
+    // Filter chain on documentElement
     const el = document.documentElement;
-    if (t.brightness === 100 && t.contrast === 100) {
-      el.style.filter = '';
-    } else {
-      el.style.filter = `brightness(${t.brightness}%) contrast(${t.contrast}%)`;
+    const parts = [];
+    if (t.brightness !== 100) parts.push(`brightness(${t.brightness}%)`);
+    if (t.contrast   !== 100) parts.push(`contrast(${t.contrast}%)`);
+    if (t.saturation !== 100) parts.push(`saturate(${t.saturation}%)`);
+    el.style.filter = parts.length ? parts.join(' ') : '';
+
+    // Panel overrides via injected stylesheet (only .cmp-panel)
+    let style = document.getElementById('hud-panel-tuning-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'hud-panel-tuning-style';
+      document.head.appendChild(style);
     }
+    if (!t.panelColor && t.panelAlpha === 100) {
+      style.textContent = '';
+      return;
+    }
+    const rgb = _hexToRgb(t.panelColor) || { r: 12, g: 22, b: 40 }; // fallback to current default panel bg
+    const a = (t.panelAlpha / 100).toFixed(2);
+    style.textContent = `.cmp-panel { background: rgba(${rgb.r},${rgb.g},${rgb.b},${a}) !important; }`;
   }
   function _bindDisplayTuningBtn() {
     const btn = document.getElementById('hud-display-btn');
@@ -880,12 +913,23 @@ const HUDShell = (() => {
       popover = document.createElement('div');
       popover.id = 'hud-display-popover';
       popover.innerHTML = `
+        <div class="dp-section-label">Display</div>
         <div class="row"><label>Brightness</label><span class="val" id="dp-bri-val">100%</span></div>
         <input type="range" id="dp-bri" min="50" max="150" step="1" value="100">
         <div class="row"><label>Contrast</label><span class="val" id="dp-con-val">100%</span></div>
         <input type="range" id="dp-con" min="50" max="200" step="1" value="100">
+        <div class="row"><label>Saturation</label><span class="val" id="dp-sat-val">100%</span></div>
+        <input type="range" id="dp-sat" min="0" max="200" step="1" value="100">
+        <div class="dp-section-label" style="margin-top:6px">Panel (Compass main card)</div>
+        <div class="row"><label>Color</label><span class="val" id="dp-pnc-val" style="font-family:'JetBrains Mono',ui-monospace,monospace">—</span></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <input type="color" id="dp-pnc" value="#0c1628" style="width:36px;height:28px;border:1px solid rgba(0,210,255,.25);background:transparent;cursor:pointer;padding:0">
+          <button class="dp-btn" id="dp-pnc-clear" style="flex:0 0 auto;padding:5px 8px">Clear</button>
+        </div>
+        <div class="row"><label>Transparency</label><span class="val" id="dp-pna-val">100%</span></div>
+        <input type="range" id="dp-pna" min="0" max="100" step="1" value="100">
         <div class="actions">
-          <button class="dp-btn" id="dp-reset">Reset</button>
+          <button class="dp-btn" id="dp-reset">Reset all</button>
           <button class="dp-btn" id="dp-close">Close</button>
         </div>
       `;
@@ -895,25 +939,54 @@ const HUDShell = (() => {
     const tuning = _loadDisplayTuning();
     const briEl = popover.querySelector('#dp-bri');
     const conEl = popover.querySelector('#dp-con');
+    const satEl = popover.querySelector('#dp-sat');
+    const pncEl = popover.querySelector('#dp-pnc');
+    const pnaEl = popover.querySelector('#dp-pna');
     const briVal = popover.querySelector('#dp-bri-val');
     const conVal = popover.querySelector('#dp-con-val');
-    briEl.value = tuning.brightness;
-    conEl.value = tuning.contrast;
-    briVal.textContent = tuning.brightness + '%';
-    conVal.textContent = tuning.contrast + '%';
+    const satVal = popover.querySelector('#dp-sat-val');
+    const pncVal = popover.querySelector('#dp-pnc-val');
+    const pnaVal = popover.querySelector('#dp-pna-val');
+
+    briEl.value = tuning.brightness; briVal.textContent = tuning.brightness + '%';
+    conEl.value = tuning.contrast;   conVal.textContent = tuning.contrast + '%';
+    satEl.value = tuning.saturation; satVal.textContent = tuning.saturation + '%';
+    if (tuning.panelColor) { pncEl.value = tuning.panelColor; pncVal.textContent = tuning.panelColor.toUpperCase(); }
+    else { pncVal.textContent = '—'; }
+    pnaEl.value = tuning.panelAlpha; pnaVal.textContent = tuning.panelAlpha + '%';
 
     const onInput = () => {
-      const t = { brightness: +briEl.value, contrast: +conEl.value };
+      const t = {
+        brightness: +briEl.value,
+        contrast:   +conEl.value,
+        saturation: +satEl.value,
+        panelColor: (pncVal.textContent === '—') ? '' : pncEl.value,
+        panelAlpha: +pnaEl.value
+      };
       briVal.textContent = t.brightness + '%';
       conVal.textContent = t.contrast + '%';
+      satVal.textContent = t.saturation + '%';
+      pnaVal.textContent = t.panelAlpha + '%';
       _applyDisplayTuning(t);
       _saveDisplayTuning(t);
     };
     briEl.addEventListener('input', onInput);
     conEl.addEventListener('input', onInput);
+    satEl.addEventListener('input', onInput);
+    pnaEl.addEventListener('input', onInput);
+    pncEl.addEventListener('input', () => {
+      pncVal.textContent = pncEl.value.toUpperCase();
+      onInput();
+    });
+    popover.querySelector('#dp-pnc-clear').addEventListener('click', () => {
+      pncVal.textContent = '—';
+      onInput();
+    });
 
     popover.querySelector('#dp-reset').addEventListener('click', () => {
-      briEl.value = 100; conEl.value = 100;
+      briEl.value = 100; conEl.value = 100; satEl.value = 100;
+      pnaEl.value = 100; pncEl.value = '#0c1628';
+      pncVal.textContent = '—';
       onInput();
     });
     popover.querySelector('#dp-close').addEventListener('click', () => {
