@@ -723,6 +723,7 @@ body {
         </div>
       </div>
       <div class="ph-actions">
+        <button class="btn btn-back" onclick="closeProspect()" title="Back to Pipeline" style="margin-right:6px">← Back</button>
         <button class="btn" onclick="openMeetingDrawer()">+ Schedule meeting</button>
         <button class="btn" onclick="openActionItemDrawer()">+ Action item</button>
         <button class="btn btn-primary" onclick="openLogDrawer()">Log activity</button>
@@ -2178,6 +2179,13 @@ function switchTab(name) {
 }
 
 // ── drawers ────────────────────────────────────────────
+// CMD100.65: Back-to-Pipeline navigator. Recorder picks up the click
+// on .btn-back and emits `Close Prospect`; replaying that command
+// dispatches here.
+function closeProspect() {
+  window.location.href = '/pipeline.html';
+}
+
 function openLogDrawer() {
   const today = new Date().toLocaleDateString('en-CA');
   document.getElementById('log-date').value     = today;

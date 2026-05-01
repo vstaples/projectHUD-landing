@@ -1597,6 +1597,19 @@ var COMMANDS = {
     return 'opened prospect "' + args[0] + '"';
   },
 
+  // ── Close Prospect (CMD100.65) ─────────────────────────────────────────────
+  // Pipeline-specific: ascend back to the pipeline kanban view from a
+  // prospect detail page. Counterpart to Open Prospect.
+  'Close Prospect': async function() {
+    console.log('[cmd:Close Prospect]', { currentLoc: window.location.pathname, aegisMode: !!window._aegisMode });
+    if (typeof window.closeProspect === 'function') {
+      window.closeProspect();
+    } else {
+      window.location.href = '/pipeline.html';
+    }
+    return 'closed prospect (returned to pipeline)';
+  },
+
   // ── Set NarrateTarget (CMD87b / Brief Aegis Remote Narration) ────────────────
   // Redirects subsequent `Narrate` calls to render on a target Compass session.
   //   Set NarrateTarget               — read current value
@@ -3221,7 +3234,7 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
       // (Register / Set Page / Set View / Open Prospect) tear down the
       // target's WebSocket; the ack may not arrive before the page
       // reloads.
-      var _NAV_VERBS = ['Register','Set Page','Set View','Open Prospect'];
+      var _NAV_VERBS = ['Register','Set Page','Set View','Open Prospect','Close Prospect'];
       var _isNavCmd = _NAV_VERBS.indexOf(parsed.verb) !== -1;
       var _preNavLastSeen = _sessions[targetUserId]
         ? (_sessions[targetUserId].lastSeen || 0)

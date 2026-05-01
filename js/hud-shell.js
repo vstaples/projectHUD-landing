@@ -1500,6 +1500,10 @@ const HUDShell = (() => {
       if (el.classList && el.classList.contains('add-card-btn')) {
         return `Form Open "Add Prospect"`;
       }
+      // CMD100.65: Back-to-Pipeline button on prospect detail page.
+      if (el.classList && el.classList.contains('btn-back')) {
+        return `Close Prospect`;
+      }
 
       // 2. Container-based: walk ancestors, look for nav/tab signals
       let p = el.parentElement;

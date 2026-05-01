@@ -1,0 +1,10 @@
+VS: Register Dashboard
+VS: Set Page "Pipeline"
+VS: Open Prospect "Endoscopic Platform Development"
+VS: Set Tab "Stakeholders"
+VS: Set Tab "Findings"
+VS: Set Tab "Meetings"
+VS: Set Tab "Proposals"
+VS: Set Tab "Action items"
+VS: Set Tab "Activity log"
+VS: Set Tab "Overview"
