@@ -4,6 +4,8 @@
 // CMD100.26: Display brightness/contrast tuning popover added to header strip (sun icon).
 // CMD100.31: Display popover extended — saturation slider + Compass panel color picker (HEX) + panel transparency.
 // CMD100.37: Shell uses min-height instead of fixed height so page scrolls naturally past the viewport.
+// CMD100.40: Sidebar nav reordered — Dashboard top + divider; main and admin sections alphabetized.
+// CMD100.41: Header avatar populated from sidebar's resolved currentUser (no more "—").
 // Unified shell: slide-in sidebar (absorbed from sidebar.js v3.1)
 //                + unified header bar (logo / ticker / operator-status)
 //                + Tier 1 sub-header strip (major-area tabs)
@@ -103,6 +105,7 @@ const HUDShell = (() => {
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
       #sidebar-nav .nav-section-label { font-size:11px; padding:8px 12px 4px; }
+      #sidebar-nav .nav-divider { height:1px; background:rgba(0,210,255,.18); margin:6px 12px 8px; }
       .sidebar-operator {
         flex-shrink: 0 !important;
         overflow-y: auto !important; overflow-x: hidden !important;
@@ -425,13 +428,13 @@ const HUDShell = (() => {
   function renderSidebar(activePage, firmName, currentUser, notifCount, showToolbar) {
     const currentPath = window.location.pathname;
     const NAV_ITEMS = [
+      { href: '/dashboard.html',           icon: '◈', label: 'Dashboard',  section: 'top'   },
+      { href: '/cadence.html',             icon: '⬡', label: 'Cadence',    section: 'main'  },
       { href: '/compass.html',             icon: '◈', label: 'Compass',    section: 'main'  },
-      { href: '/dashboard.html',           icon: '◈', label: 'Dashboard',  section: 'main'  },
       { href: '/pipeline.html',            icon: '▥', label: 'Pipeline',   section: 'main'  },
+      { href: '/resource-requests.html',   icon: '⬡', label: 'Requests',   section: 'main'  },
       { href: '/resources.html',           icon: '◎', label: 'Resources',  section: 'main'  },
-      { href: '/resource-requests.html',   icon: '⬡', label: 'Requests',    section: 'main'  },
-      { href: '/cadence.html',             icon: '⬡', label: 'Cadence',     section: 'main'  },
-      { href: '/aegis.html',               icon: '⬡', label: 'Aegis',       section: 'admin', target: '_blank' },
+      { href: '/aegis.html',               icon: '⬡', label: 'Aegis',      section: 'admin', target: '_blank' },
       { href: '/audit-log.html',           icon: '▦', label: 'Audit Log',  section: 'admin' },
       { href: '/users.html',               icon: '◑', label: 'User Mgmt',  section: 'admin' },
     ];
@@ -441,6 +444,7 @@ const HUDShell = (() => {
         <span class="nav-icon">${item.icon}</span>${item.label}
       </a>`;
     };
+    const topItems   = NAV_ITEMS.filter(n=>n.section==='top').map(navItem).join('');
     const mainItems  = NAV_ITEMS.filter(n=>n.section==='main').map(navItem).join('');
     const adminItems = NAV_ITEMS.filter(n=>n.section==='admin').map(navItem).join('');
     const initStr = (window.UI && UI.initials)
@@ -465,6 +469,8 @@ const HUDShell = (() => {
       </div>
       <div id="sidebar-body">
         <div id="sidebar-nav">
+          ${topItems}
+          <div class="nav-divider"></div>
           ${mainItems}
           <div class="nav-section-label">Admin</div>
           ${adminItems}
@@ -1223,6 +1229,18 @@ const HUDShell = (() => {
       }
       injectSidebarStyles();
       sidebar.innerHTML = renderSidebar(page, internalFirm?.name||'', currentUser, notifCount, showToolbar);
+      // CMD100.41: push the resolved currentUser into the header avatar so it
+      // shows initials instead of the "—" fallback. The slide-in panel and
+      // the header avatar are populated by separate paths; this links them.
+      if (currentUser && currentUser.name) {
+        const av = document.getElementById('hud-status-avatar');
+        if (av) {
+          av.textContent = currentUser.name.split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,2);
+          av.title = currentUser.name;
+        }
+        // Also expose globally so any later _refreshAvatarFromAuth pass succeeds.
+        window.CURRENT_USER = currentUser;
+      }
       if (showToolbar) {
         const ph = document.getElementById('ctx-toolbar-placeholder');
         if (ph) ph.replaceWith(buildToolbar(page));
