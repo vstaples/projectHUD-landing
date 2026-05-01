@@ -1,6 +1,6 @@
-// VERSION: 20260430-CMD100.33
-window._mwCoreVersion = 'v20260430-CMD100.33';
-console.log('%c[mw-core] v20260430-CMD100.33 — fixed-position checkbox/circle/type columns; consistent badge padding','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260430-CMD100.34
+window._mwCoreVersion = 'v20260430-CMD100.34';
+console.log('%c[mw-core] v20260430-CMD100.34 — empty checkbox spacer given explicit width to preserve grid slot','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -701,7 +701,7 @@ window._mwLoadUserView = async function() {
               ? `<input type="checkbox" class="wi-bulk-cb" data-wi-id="${w.id}" data-wi-table="workflow_requests" title="Select for bulk delete" style="width:13px;height:13px;cursor:pointer;accent-color:#EF9F27;margin:0">`
               : (w.type === 'action'
                 ? `<input type="checkbox" class="wi-bulk-cb" data-wi-id="${w.id}" data-wi-table="workflow_action_items" title="Select for bulk delete" style="width:13px;height:13px;cursor:pointer;accent-color:#EF9F27;margin:0">`
-                : `<span></span>`)
+                : `<span style="display:block;width:14px;height:14px"></span>`)
             }
             <div class="wi-complete-circle" data-wi-id="${w.id}" data-wi-type="${w.type}"
               data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId||''}"
