@@ -1306,6 +1306,12 @@ const HUDShell = (() => {
 
     const showToolbar = true;
     try {
+      // CMD100.57: guard window.API — Aegis doesn't load api.js. Without
+      // this, init throws ReferenceError on every Aegis page load.
+      if (!window.API || !API.getUsers || !API.getFirms) {
+        // Defer toolbar initialization on pages without API; recorder still installs.
+        return;
+      }
       const [users, firms] = await Promise.all([API.getUsers(), API.getFirms()]);
       const userId      = await Auth.getCurrentUserId();
       const currentUser = users?.find(u => u.id === userId);
