@@ -229,10 +229,18 @@ body {
   font-weight: 600;
   color: var(--text);
   line-height: 1.3;
+  /* CMD100.71: reserve exactly 2 lines so card heights align;
+     ellipsize anything that would wrap to a 3rd line. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: calc(13px * 1.3 * 2);
 }
 
 .p-card-co {
-  font-size: 11px;
+  font-size: 12px;       /* CMD100.71: bumped one size */
   color: var(--muted);
   margin-bottom: 8px;
 }
@@ -266,7 +274,7 @@ body {
 .tag-other{ background: #2a2a2a; color: #a0a0a0; }
 
 .p-card-val {
-  font-size: 13px;       /* CMD100.70: bumped two sizes */
+  font-size: 17px;       /* CMD100.72: 13 → 17, the most important element per card */
   color: var(--muted);
 }
 .p-card-val span { color: var(--text); font-weight: 600; }
@@ -754,7 +762,7 @@ function renderCard(p) {
   const fu    = p.next_follow_up_date;
   let fuClass = '', fuText = '—';
   if (fu) {
-    fuText = new Date(fu + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    fuText = new Date(fu + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
     if (fu < today)       fuClass = 'overdue';
     else if (fu === today) fuClass = 'today';
   }
@@ -788,7 +796,7 @@ function renderCard(p) {
       <div class="p-card-foot">
         <div class="assigned-chip">
           <div class="av-xs">${initials}</div>
-          ${escHtml((p.assigned_to_name || '').split(' ')[0] || '—')}
+          ${escHtml(p.assigned_to_name || '—')}
         </div>
         <div class="followup-chip ${fuClass}">${fuText}</div>
       </div>
