@@ -3249,49 +3249,17 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
         }
       }
 
-      // CMD100.60 — post-nav settle. Two-phase wait: minimum delay so
-      // the new page actually starts unloading the old, then heartbeat
-      // freshness confirmation.
+      // CMD100.62 — post-nav settle. Empirically, 1500ms is sufficient
+      // for any module page to bootstrap cmd-center, AegisRegistry, and
+      // the channel subscription. The earlier heartbeat-freshness watch
+      // produced false-warning timeouts because heartbeat cadence (~5s)
+      // doesn't align with the watch deadline. Dropping it.
       if (_isNavCmd) {
         var _settleStart = Date.now();
-        var _MIN_SETTLE_MS = 1500;
-        // Phase 1 — minimum delay
-        console.log('[script-nav] phase1 minimum settle delay', { ms: _MIN_SETTLE_MS });
-        await new Promise(function(r){ setTimeout(r, _MIN_SETTLE_MS); });
-
-        // Phase 2 — heartbeat freshness
-        var _navDeadline = Date.now() + 8000;
-        var _polls = 0;
-        console.log('[script-nav] phase2 heartbeat watch', {
-          preNavLastSeen: _preNavLastSeen,
-          deadlineMsFromNow: 8000
-        });
-        while (Date.now() < _navDeadline) {
-          _polls++;
-          var _now = _sessions[targetUserId] && _sessions[targetUserId].lastSeen;
-          var _online = _sessions[targetUserId] && _sessions[targetUserId].online;
-          var _loc = _sessions[targetUserId] && _sessions[targetUserId].location;
-          if (_now && _now > _preNavLastSeen + 250 && _online) {
-            console.log('[script-nav] settled', {
-              polls: _polls,
-              elapsedMs: Date.now() - _settleStart,
-              newLastSeen: _now,
-              newLocation: _loc
-            });
-            break;
-          }
-          await new Promise(function(r){ setTimeout(r, 100); });
-        }
-        var _settled = _sessions[targetUserId] && _sessions[targetUserId].lastSeen;
-        if (!_settled || _settled <= _preNavLastSeen + 250) {
-          console.warn('[script-nav] settle timeout', {
-            preNavLastSeen: _preNavLastSeen,
-            currentLastSeen: _settled,
-            online: _sessions[targetUserId] && _sessions[targetUserId].online,
-            location: _sessions[targetUserId] && _sessions[targetUserId].location
-          });
-          _appendLine('SYS', 'warn', 'Nav settle timeout for ' + parsed.target + ' (page may not have reloaded)');
-        }
+        var _SETTLE_MS = 1500;
+        console.log('[script-nav] settling', { ms: _SETTLE_MS });
+        await new Promise(function(r){ setTimeout(r, _SETTLE_MS); });
+        console.log('[script-nav] settled', { elapsedMs: Date.now() - _settleStart });
       }
     } else {
       // Execute locally
