@@ -1377,6 +1377,12 @@ const HUDShell = (() => {
     const ACTIONABLE_ROLES = new Set(['button', 'tab']);
     const ACTIONABLE_INPUT_TYPES = new Set(['button', 'submit']);
 
+    // Class signatures that mark an element as recordable even if it's
+    // a non-semantic tag like <div onclick>. Covers existing module
+    // markup (resources.html, cadence.html, pipeline.html etc. use
+    // <div class="tab"> instead of <button>).
+    const ACTIONABLE_CLASS_RX = /\b(tab|tab-btn|tab-strip-item|nav-item|menu-item|btn|button|chip)\b/i;
+
     function isActionable(el) {
       if (!el || el.nodeType !== 1) return false;
       if (el.hasAttribute && el.hasAttribute('data-aegis-cmd')) return true;
@@ -1386,6 +1392,9 @@ const HUDShell = (() => {
       if (tag === 'INPUT' && ACTIONABLE_INPUT_TYPES.has((el.type||'').toLowerCase())) return true;
       const role = el.getAttribute && el.getAttribute('role');
       if (role && ACTIONABLE_ROLES.has(role)) return true;
+      // Non-semantic tag with a tab/nav class signature → recordable.
+      const cls = (el.className && typeof el.className === 'string') ? el.className : '';
+      if (cls && ACTIONABLE_CLASS_RX.test(cls)) return true;
       return false;
     }
 
@@ -1403,7 +1412,7 @@ const HUDShell = (() => {
     function extractLabel(el) {
       const al = el.getAttribute && el.getAttribute('aria-label');
       if (al && al.trim()) return _cleanLabel(al);
-      const txt = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      const txt = _textWithoutBadges(el);
       if (txt) return _cleanLabel(txt);
       const t = el.getAttribute && el.getAttribute('title');
       if (t && t.trim()) return _cleanLabel(t);
@@ -1412,12 +1421,41 @@ const HUDShell = (() => {
       return '';
     }
 
+    // Walk children and concatenate text nodes only, skipping descendant
+    // elements that look like badges/counts (numeric-only text, or class
+    // contains badge|count|pill|chip|notif). Keeps the label clean even
+    // when a tab includes a child counter element.
+    function _textWithoutBadges(el) {
+      const BADGE_RX = /\b(badge|count|pill|chip|notif|tag-count|num)\b/i;
+      let out = '';
+      const walk = (node) => {
+        for (const child of node.childNodes) {
+          if (child.nodeType === 3) { // text node
+            out += child.nodeValue;
+          } else if (child.nodeType === 1) {
+            const cls = (child.className && typeof child.className === 'string') ? child.className : '';
+            const t = (child.textContent || '').trim();
+            // Skip if the element is a badge by class…
+            if (BADGE_RX.test(cls)) continue;
+            // …or if its text content is purely numeric (likely a count).
+            if (/^\d+$/.test(t)) continue;
+            walk(child);
+          }
+        }
+      };
+      walk(el);
+      return out.replace(/\s+/g, ' ').trim();
+    }
+
     // Strip leading non-alphanumeric characters (icon glyphs, bullets, arrows)
-    // and collapse whitespace. Keeps internal punctuation intact.
+    // and collapse whitespace. Also strips a trailing standalone number that
+    // commonly appears as a counter/badge text-node sibling. Keeps internal
+    // punctuation intact.
     function _cleanLabel(s) {
       if (!s) return '';
       return String(s)
         .replace(/^[^\p{L}\p{N}]+/u, '')
+        .replace(/\s+\d+\s*$/u, '')   // trailing standalone number (e.g. "Active 32")
         .replace(/\s+/g, ' ')
         .trim();
     }
@@ -1430,16 +1468,17 @@ const HUDShell = (() => {
       // 2. Container-based: walk ancestors, look for nav/tab signals
       let p = el.parentElement;
       let depth = 0;
-      const TAB_RX  = /\b(tab|tabs|tier2|sub-?nav)\b/i;
-      const NAV_RX  = /\b(nav|sidebar|menu|hud-sidebar|tier1)\b/i;
-      const SUBTAB_RX = /\b(sub-?tab|subtab|sub-?nav)\b/i;
+      const TAB_RX     = /\b(tab|tabs|tier2|tier-2)\b/i;
+      const NAV_RX     = /\b(nav|sidebar|menu|hud-sidebar|tier1|tier-1)\b/i;
+      const SUBTAB_RX  = /\b(sub-?tab|sub-?tabs|sub-?nav|tier3|tier-3|browse-bar|view-tabs|inner-tabs)\b/i;
       let inNav = false, inTab = false, inSubtab = false, inForm = false, inDialog = false;
+      let tabDepth = 0; // count nested tab containers — 2+ implies a SubTab strip
       while (p && depth < 12) {
         const tag = p.tagName;
         const cls = (p.className && typeof p.className === 'string') ? p.className : '';
         const role = p.getAttribute && p.getAttribute('role');
         if (tag === 'NAV' || NAV_RX.test(cls)) inNav = true;
-        if (TAB_RX.test(cls) || role === 'tablist') inTab = true;
+        if (TAB_RX.test(cls) || role === 'tablist') { inTab = true; tabDepth++; }
         if (SUBTAB_RX.test(cls)) inSubtab = true;
         if (tag === 'FORM') inForm = true;
         if (role === 'dialog' || /\b(modal|dialog|popover)\b/i.test(cls)) inDialog = true;
@@ -1452,7 +1491,7 @@ const HUDShell = (() => {
       const role = el.getAttribute && el.getAttribute('role');
 
       if (inNav && !inTab) return `Set Page "${label}"`;
-      if (inSubtab) return `Set SubTab "${label}"`;
+      if (inSubtab || tabDepth >= 2) return `Set SubTab "${label}"`;
       if (inTab || role === 'tab') return `Set Tab "${label}"`;
       if (inDialog || inForm) return `Click "${label}"`;
       if (tag === 'A') return `Set Page "${label}"`;
