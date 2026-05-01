@@ -3165,6 +3165,19 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
       var _bareLine = line.replace(/^[A-Z]+:\s*/, '');
       var _resolvedLine = _resolveVarsInCmd(_bareLine);
       _appendLine(parsed.target || 'SYS', 'cmd', _resolvedLine);
+
+      // CMD100.59 — pre-nav heartbeat capture. Navigation commands
+      // (Register / Set Page / Set View / Open Prospect) tear down the
+      // target's WebSocket; the ack may not arrive before the page
+      // reloads. Capture the session's pre-nav lastSeen so we can wait
+      // for a fresher heartbeat post-execution as proof the new page
+      // has reconnected.
+      var _NAV_VERBS = ['Register','Set Page','Set View','Open Prospect'];
+      var _isNavCmd = _NAV_VERBS.indexOf(parsed.verb) !== -1;
+      var _preNavLastSeen = _isNavCmd && _sessions[targetUserId]
+        ? (_sessions[targetUserId].lastSeen || 0)
+        : 0;
+
       if (_channel) {
         _channelSend({
           type: 'broadcast', event: 'cmd',
@@ -3177,13 +3190,13 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
         });
       }
       try {
-        var _ackData = await _waitForEvent('result:' + targetUserId, 30000);
+        // Nav commands use a short timeout — the page tears down quickly
+        // and an ack may never arrive. We don't actually rely on the ack;
+        // we wait for a fresh heartbeat below.
+        var _waitTimeout = _isNavCmd ? 1500 : 30000;
+        var _ackData = await _waitForEvent('result:' + targetUserId, _waitTimeout);
         // Propagate key vars from remote ack into local _storeVars so the
         // rest of the script (running locally on Aegis) can reference them.
-        // Form Submit acks with 'submitted · instance XXXXXXXX' — extract the id.
-        // The target stored the full UUID in its own _storeVars; we capture
-        // the prefix here, which is sufficient for Log lines. For exact UUID
-        // matching via $instance_id, add 'Store instance_id' to the script.
         if (_ackData && typeof _ackData.result === 'string') {
           var _m = _ackData.result.match(/^submitted · instance ([a-f0-9-]+)/i);
           if (_m) {
@@ -3192,7 +3205,28 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
           }
         }
       } catch(e) {
-        _appendLine('SYS', 'warn', 'Timeout waiting for ' + parsed.target);
+        // For non-nav commands a timeout is a real warning. For nav
+        // commands a missing ack is expected — the page is reloading.
+        if (!_isNavCmd) {
+          _appendLine('SYS', 'warn', 'Timeout waiting for ' + parsed.target);
+        }
+      }
+
+      // CMD100.59 — post-nav heartbeat wait. Block until the target
+      // session emits a heartbeat newer than the pre-nav timestamp,
+      // signaling that the new page has loaded and reconnected. Cap
+      // at 10s so a truly broken nav surfaces as a script-level error.
+      if (_isNavCmd && _preNavLastSeen > 0) {
+        var _navDeadline = Date.now() + 10000;
+        while (Date.now() < _navDeadline) {
+          var _now = _sessions[targetUserId] && _sessions[targetUserId].lastSeen;
+          if (_now && _now > _preNavLastSeen + 250) break; // 250ms guard against clock skew
+          await new Promise(function(r){ setTimeout(r, 100); });
+        }
+        var _settled = _sessions[targetUserId] && _sessions[targetUserId].lastSeen;
+        if (!_settled || _settled <= _preNavLastSeen + 250) {
+          _appendLine('SYS', 'warn', 'Nav settle timeout for ' + parsed.target + ' (page may not have reloaded)');
+        }
       }
     } else {
       // Execute locally
