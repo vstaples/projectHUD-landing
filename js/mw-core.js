@@ -1,6 +1,6 @@
-// VERSION: 20260430-CMD100.30
-window._mwCoreVersion = 'v20260430-CMD100.30';
-console.log('%c[mw-core] v20260430-CMD100.30 — Request type filter pill + bulk delete extended to Action rows','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260430-CMD100.33
+window._mwCoreVersion = 'v20260430-CMD100.33';
+console.log('%c[mw-core] v20260430-CMD100.33 — fixed-position checkbox/circle/type columns; consistent badge padding','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -696,12 +696,12 @@ window._mwLoadUserView = async function() {
           data-wi-status="${w.status}" data-wi-projectid="${w.projectId||''}"
           style="display:grid;grid-template-columns:34px 80px 1fr 140px 56px 78px;
             gap:0;align-items:center;padding:0 8px 0 4px;min-height:38px;${_negBorder}${_cancelStyle}">
-          <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+          <div style="display:grid;grid-template-columns:14px 14px;gap:6px;align-items:center;justify-items:center;padding-left:2px">
             ${w._isWrRow
               ? `<input type="checkbox" class="wi-bulk-cb" data-wi-id="${w.id}" data-wi-table="workflow_requests" title="Select for bulk delete" style="width:13px;height:13px;cursor:pointer;accent-color:#EF9F27;margin:0">`
               : (w.type === 'action'
                 ? `<input type="checkbox" class="wi-bulk-cb" data-wi-id="${w.id}" data-wi-table="workflow_action_items" title="Select for bulk delete" style="width:13px;height:13px;cursor:pointer;accent-color:#EF9F27;margin:0">`
-                : `<span style="display:inline-block;width:13px"></span>`)
+                : `<span></span>`)
             }
             <div class="wi-complete-circle" data-wi-id="${w.id}" data-wi-type="${w.type}"
               data-wi-title="${esc(w.title)}" data-wi-projectid="${w.projectId||''}"
@@ -711,7 +711,7 @@ window._mwLoadUserView = async function() {
               onmouseenter="this.style.borderColor='var(--compass-green)';this.style.boxShadow='0 0 0 2px rgba(29,158,117,.25)'"
               onmouseleave="this.style.borderColor='var(--text3)';this.style.boxShadow='none'"></div>
           </div>
-          <div style="padding:0 6px 0 2px;display:flex;align-items:center">${badge}</div>
+          <div style="padding:0 6px 0 8px;display:flex;align-items:center">${badge}</div>
           <div style="padding:8px 8px 8px 4px;min-width:0">
             <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text0);
               white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${_titleStyle}">${esc(w.title)}${_instCancelled?' <span style="font-size:10px;color:#E24B4A;font-family:var(--font-mono)">WITHDRAWN</span>':''}</div>
@@ -1064,7 +1064,7 @@ window._mwLoadUserView = async function() {
             gap:0;padding:5px 8px 5px 4px;border-bottom:1px solid var(--border);
             font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text3);
             letter-spacing:.08em;text-transform:uppercase">
-            <div></div><div style="padding-left:2px">TYPE</div>
+            <div></div><div style="padding-left:8px">TYPE</div>
             <div style="padding-left:4px">TASK / ACTION</div>
             <div style="padding:0 8px">PROGRESS</div>
             <div style="text-align:center">DUE</div>
@@ -1324,6 +1324,13 @@ window._mwLoadUserView = async function() {
           syncBtn();
         }
       });
+      // Stop checkbox click from bubbling to the row click handler that
+      // would otherwise raise the resolve/review popup.
+      panel.addEventListener('click', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('wi-bulk-cb')) {
+          e.stopPropagation();
+        }
+      }, true);
       if (btn) {
         btn.addEventListener('click', async function() {
           const checked = Array.from(panel.querySelectorAll('.wi-bulk-cb:checked'));
