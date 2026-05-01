@@ -227,7 +227,7 @@ const HUDShell = (() => {
       }
       #hud-header-left .hud-logo svg { width:100%; height:100%; display:block; }
       #hud-header-left .hud-module-name {
-        font-size: 16px; font-weight: 700;
+        font-size: 20px; font-weight: 700;
         letter-spacing: 0.08em; text-transform: uppercase;
         color: #e8f4ff;
         font-family: 'Inter', system-ui, sans-serif;
