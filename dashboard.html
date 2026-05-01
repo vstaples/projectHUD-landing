@@ -370,14 +370,8 @@
 /* ── CMD97 — Unified-header overrides preserved ─────────────── */
 body.hud-header-rendered #ticker { display: none !important; }
 body.hud-header-rendered #hud-header-left { padding-right: 18px; }
-.hud-module-name .brand-cy { color: var(--text-accent); }
-.hud-module-name .brand-lt { color: var(--text-primary); }
-body.hud-header-rendered #hud-header-left .hud-module-name {
-  font-family: var(--font-display);
-  font-size: 22px; line-height: 1;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
+/* CMD100.46: wordmark sizing/coloring is now owned by hud-shell.js for
+   consistency across all modules. Dashboard-specific overrides removed. */
 #hud-header-ticker #ticker-scroll-wrap {
   flex: 1; overflow: hidden; position: relative; height: 100%;
   display: flex; align-items: center;
@@ -679,11 +673,8 @@ Ticker.init('ticker-scroll', Ticker.DEFAULT_EVENTS);
 HUDShell.init({ page: 'dashboard', moduleName: 'ProjectHUD' });
 
 // Post-init dashboard customizations of unified header.
+// CMD100.46: wordmark rewrite removed — hud-shell now owns the split coloring.
 Promise.resolve().then(() => {
-  const nameEl = document.querySelector('#hud-header-left .hud-module-name');
-  if (nameEl && nameEl.textContent.trim() === 'ProjectHUD') {
-    nameEl.innerHTML = '<span class="brand-cy">Project</span><span class="brand-lt">HUD</span>';
-  }
   const headerTicker = document.getElementById('hud-header-ticker');
   const wrap         = document.getElementById('ticker-scroll-wrap');
   if (headerTicker && wrap && wrap.parentElement !== headerTicker) {

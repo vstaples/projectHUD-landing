@@ -7,6 +7,7 @@
 // CMD100.40: Sidebar nav reordered — Dashboard top + divider; main and admin sections alphabetized.
 // CMD100.41: Header avatar populated from sidebar's resolved currentUser (no more "—").
 // CMD100.42: Per-module icons + split-color wordmarks; shared scrolling ticker; standardized header across all modules.
+// CMD100.46: ProjectHUD icon framed like other modules; wordmark split-coloring centralized; dashboard custom overrides removed.
 // Unified shell: slide-in sidebar (absorbed from sidebar.js v3.1)
 //                + unified header bar (logo / ticker / operator-status)
 //                + Tier 1 sub-header strip (major-area tabs)
@@ -52,20 +53,24 @@ const HUDShell = (() => {
     'Aegis': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#4d9fff" stroke-width="1.5" opacity="0.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><polygon points="45,18 58,62 45,54 32,62" fill="#0e1e38" stroke="#2a4a70" stroke-width="1"/><line x1="45" y1="18" x2="45" y2="54" stroke="#4d9fff" stroke-width="1.5" opacity="0.5"/><line x1="32" y1="62" x2="58" y2="62" stroke="#4d9fff" stroke-width="2" opacity="0.6"/><path d="M 72 20 A 36 36 0 0 1 81 45 A 36 36 0 0 1 45 81" fill="none" stroke="#00c9c9" stroke-width="4" stroke-linecap="round"/><circle cx="72" cy="20" r="4" fill="#00c9c9"/></svg>`,
     'Requests': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#4d9fff" stroke-width="1.5" opacity="0.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><path d="M 22 26 Q 22 22 26 22 L 56 22 Q 60 22 60 26 L 60 42 Q 60 46 56 46 L 38 46 L 30 54 L 30 46 L 26 46 Q 22 46 22 42 Z" fill="#0e1e38" stroke="#2a4a70" stroke-width="1.2" stroke-linejoin="round"/><path d="M 30 50 Q 30 46 34 46 L 64 46 Q 68 46 68 50 L 68 64 Q 68 68 64 68 L 56 68 L 50 74 L 50 68 L 34 68 Q 30 68 30 64 Z" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.2" stroke-linejoin="round"/><line x1="36" y1="32" x2="50" y2="32" stroke="#4d9fff" stroke-width="0.8" opacity="0.5"/><line x1="36" y1="36" x2="46" y2="36" stroke="#4d9fff" stroke-width="0.8" opacity="0.5"/><line x1="38" y1="56" x2="58" y2="56" stroke="#00c9c9" stroke-width="0.8" opacity="0.7"/><line x1="38" y1="60" x2="56" y2="60" stroke="#00c9c9" stroke-width="0.8" opacity="0.7"/><line x1="22" y1="26" x2="60" y2="26" stroke="#00c9c9" stroke-width="2.5" stroke-linecap="round"/><circle cx="60" cy="26" r="4" fill="#00c9c9"/></svg>`,
     'Resources': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#4d9fff" stroke-width="1.5" opacity="0.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><circle cx="29" cy="36" r="6" fill="#0e1e38" stroke="#2a4a70" stroke-width="1.2"/><path d="M 19 56 Q 19 48 29 48 Q 39 48 39 56 L 39 60 L 19 60 Z" fill="#0e1e38" stroke="#2a4a70" stroke-width="1.2"/><circle cx="61" cy="36" r="6" fill="#0e1e38" stroke="#2a4a70" stroke-width="1.2"/><path d="M 51 56 Q 51 48 61 48 Q 71 48 71 56 L 71 60 L 51 60 Z" fill="#0e1e38" stroke="#2a4a70" stroke-width="1.2"/><circle cx="45" cy="30" r="7" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.5"/><path d="M 33 56 Q 33 44 45 44 Q 57 44 57 56 L 57 64 L 33 64 Z" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.5"/><circle cx="68" cy="22" r="4" fill="#00c9c9"/></svg>`,
-    'User Mgmt': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#4d9fff" stroke-width="1.5" opacity="0.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><polygon points="45,14 70,28 70,56 45,70 20,56 20,28" fill="#0e1e38" stroke="#00c9c9" stroke-width="1.5" stroke-linejoin="round"/><polygon points="45,20 64,30 64,52 45,62 26,52 26,30" fill="none" stroke="#4d9fff" stroke-width="0.6" opacity="0.4" stroke-linejoin="round"/><polygon points="45,26 58,33 58,49 45,56 32,49 32,33" fill="none" stroke="#4d9fff" stroke-width="0.6" opacity="0.4" stroke-linejoin="round"/><circle cx="45" cy="36" r="6.5" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.5"/><path d="M 33 56 Q 33 46 45 46 Q 57 46 57 56 L 57 58 L 33 58 Z" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.5" stroke-linejoin="round"/><line x1="42" y1="34" x2="44" y2="36" stroke="#00c9c9" stroke-width="1" opacity="0.7"/><line x1="48" y1="34" x2="46" y2="36" stroke="#00c9c9" stroke-width="1" opacity="0.7"/><path d="M 41 40 Q 45 42 49 40" fill="none" stroke="#00c9c9" stroke-width="1" stroke-linecap="round"/><circle cx="20" cy="28" r="2.5" fill="#4d9fff" opacity="0.65"/><circle cx="70" cy="28" r="3.5" fill="#00c9c9"/><circle cx="20" cy="56" r="2.5" fill="#4d9fff" opacity="0.65"/><circle cx="70" cy="56" r="2.5" fill="#4d9fff" opacity="0.65"/></svg>`
+    'User Mgmt': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#4d9fff" stroke-width="1.5" opacity="0.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><polygon points="45,14 70,28 70,56 45,70 20,56 20,28" fill="#0e1e38" stroke="#00c9c9" stroke-width="1.5" stroke-linejoin="round"/><polygon points="45,20 64,30 64,52 45,62 26,52 26,30" fill="none" stroke="#4d9fff" stroke-width="0.6" opacity="0.4" stroke-linejoin="round"/><polygon points="45,26 58,33 58,49 45,56 32,49 32,33" fill="none" stroke="#4d9fff" stroke-width="0.6" opacity="0.4" stroke-linejoin="round"/><circle cx="45" cy="36" r="6.5" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.5"/><path d="M 33 56 Q 33 46 45 46 Q 57 46 57 56 L 57 58 L 33 58 Z" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.5" stroke-linejoin="round"/><line x1="42" y1="34" x2="44" y2="36" stroke="#00c9c9" stroke-width="1" opacity="0.7"/><line x1="48" y1="34" x2="46" y2="36" stroke="#00c9c9" stroke-width="1" opacity="0.7"/><path d="M 41 40 Q 45 42 49 40" fill="none" stroke="#00c9c9" stroke-width="1" stroke-linecap="round"/><circle cx="20" cy="28" r="2.5" fill="#4d9fff" opacity="0.65"/><circle cx="70" cy="28" r="3.5" fill="#00c9c9"/><circle cx="20" cy="56" r="2.5" fill="#4d9fff" opacity="0.65"/><circle cx="70" cy="56" r="2.5" fill="#4d9fff" opacity="0.65"/></svg>`,
+    'ProjectHUD': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#4d9fff" stroke-width="1.5" opacity="0.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><polygon points="45,18 72,68 18,68" fill="none" stroke="#00d2ff" stroke-width="2"/><polygon points="45,30 64,62 26,62" fill="rgba(0,210,255,0.10)"/><circle cx="45" cy="46" r="5" fill="#00d2ff"/><line x1="45" y1="40" x2="45" y2="34" stroke="#00d2ff" stroke-width="2"/></svg>`
   };
 
   // ── Module wordmark split-color rules ───────────────────────
   // Each entry: [white prefix, aqua suffix]. The aqua portion uses #00D2FF.
+  // Each entry: [text-A, text-B, aqua-position] where aqua-position is
+  // 'first' or 'last'. Default = 'last' (white prefix, aqua suffix).
   const WORDMARK_SPLITS = {
-    'Compass':   ['Com',  'pass'],
-    'Cadence':   ['Cad',  'ence'],
-    'Pipeline':  ['Pipe', 'line'],
-    'Aegis':     ['Ae',   'gis'],
-    'Requests':  ['Re',   'quests'],
-    'Resources': ['Res',  'ources'],
-    'User Mgmt': ['User ','Mgmt'],
-    'Dashboard': ['Dash', 'board']
+    'Compass':    ['Com',     'pass',  'last'],
+    'Cadence':    ['Cad',     'ence',  'last'],
+    'Pipeline':   ['Pipe',    'line',  'last'],
+    'Aegis':      ['Ae',      'gis',   'last'],
+    'Requests':   ['Re',      'quests','last'],
+    'Resources':  ['Res',     'ources','last'],
+    'User Mgmt':  ['User ',   'Mgmt',  'last'],
+    'Dashboard':  ['Dash',    'board', 'last'],
+    'ProjectHUD': ['Project', 'HUD',   'first']  // matches sidebar wordmark
   };
 
   // ── Header ticker content (shared across all modules) ───────
@@ -895,7 +900,9 @@ const HUDShell = (() => {
       </svg>`;
     const split = WORDMARK_SPLITS[modKey];
     const wordmarkHTML = split
-      ? `${split[0]}<span class="wm-aqua">${split[1]}</span>`
+      ? (split[2] === 'first'
+          ? `<span class="wm-aqua">${split[0]}</span>${split[1]}`
+          : `${split[0]}<span class="wm-aqua">${split[1]}</span>`)
       : (modKey || '');
 
     // Build ticker: items repeated twice for seamless animation loop.
