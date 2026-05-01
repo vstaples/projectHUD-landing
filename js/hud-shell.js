@@ -1542,19 +1542,27 @@ const HUDShell = (() => {
     function emit(command) {
       if (!command) return;
       const ch = window._cmdCenterChannelSend;
-      if (typeof ch === 'function') {
-        ch({
-          type: 'broadcast',
-          event: 'recorder_event',
-          payload: {
-            event_id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
-            user_id: (window.CURRENT_USER && window.CURRENT_USER.user_id) || null,
-            alias:   (window.CURRENT_USER && (window.CURRENT_USER.alias || window.CURRENT_USER.initials)) || '??',
-            command: command,
-            ts: Date.now()
-          }
-        });
-      }
+      if (typeof ch !== 'function') return;
+      // CMD100.66: prefer cmd-center's resolved session (window._aegisSelf)
+      // over CURRENT_USER. CURRENT_USER population goes through hud-shell's
+      // API path which can fail silently on pages with different api/auth
+      // wiring. _aegisSelf is set by cmd-center's _resolveSession after a
+      // successful identity resolve and is consistently populated.
+      const self = window._aegisSelf || window.CURRENT_USER || {};
+      const userId = self.user_id || self.id || null;
+      const alias  = self.alias || self.initials
+                     || (self.name ? self.name.split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,3) : '??');
+      ch({
+        type: 'broadcast',
+        event: 'recorder_event',
+        payload: {
+          event_id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+          user_id: userId,
+          alias:   alias,
+          command: command,
+          ts: Date.now()
+        }
+      });
     }
 
     document.addEventListener('click', function(ev) {

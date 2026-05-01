@@ -169,6 +169,15 @@ function _resolveSession() {
   if (!_myAlias && !_mySession.userId.startsWith('anon-')) {
     _myAlias = localStorage.getItem('phud:cmd:alias:' + _mySession.userId) || _mySession.initials;
   }
+  // CMD100.66: expose resolved session as a global so hud-shell's recorder
+  // has a reliable identity source even on pages where CURRENT_USER fails
+  // to populate (api.js path differences, RLS-blocked user table, etc.).
+  window._aegisSelf = {
+    user_id:  _mySession.userId,
+    alias:    _myAlias || _mySession.initials,
+    initials: _mySession.initials,
+    name:     _mySession.name
+  };
 }
 
 // ── Location tracking ─────────────────────────────────────────────────────────
