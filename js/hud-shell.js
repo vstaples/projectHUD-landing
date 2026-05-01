@@ -1308,8 +1308,14 @@ const HUDShell = (() => {
     try {
       // CMD100.57: guard window.API — Aegis doesn't load api.js. Without
       // this, init throws ReferenceError on every Aegis page load.
+      // Render the sidebar with empty user/firm context and continue.
       if (!window.API || !API.getUsers || !API.getFirms) {
-        // Defer toolbar initialization on pages without API; recorder still installs.
+        injectSidebarStyles();
+        sidebar.innerHTML = renderSidebar(page, '', null, 0, showToolbar);
+        if (showToolbar) {
+          const ph = document.getElementById('ctx-toolbar-placeholder');
+          if (ph) ph.replaceWith(buildToolbar(page));
+        }
         return;
       }
       const [users, firms] = await Promise.all([API.getUsers(), API.getFirms()]);
