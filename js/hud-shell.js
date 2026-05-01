@@ -6,6 +6,7 @@
 // CMD100.37: Shell uses min-height instead of fixed height so page scrolls naturally past the viewport.
 // CMD100.40: Sidebar nav reordered — Dashboard top + divider; main and admin sections alphabetized.
 // CMD100.41: Header avatar populated from sidebar's resolved currentUser (no more "—").
+// CMD100.42: Per-module icons + split-color wordmarks; shared scrolling ticker; standardized header across all modules.
 // Unified shell: slide-in sidebar (absorbed from sidebar.js v3.1)
 //                + unified header bar (logo / ticker / operator-status)
 //                + Tier 1 sub-header strip (major-area tabs)
@@ -24,9 +25,11 @@ const HUDShell = (() => {
     'dashboard':  'Dashboard',
     'aegis':      'Aegis',
     'resources':  'Resources',
-    'users':      'User Management',
-    'users.html': 'User Management',
-    'dashboard.html': 'Dashboard',
+    'requests':         'Requests',
+    'resource-requests':'Requests',
+    'users':            'User Mgmt',
+    'users.html':       'User Mgmt',
+    'dashboard.html':   'Dashboard',
   };
 
   function _deriveModuleName(page) {
@@ -37,6 +40,45 @@ const HUDShell = (() => {
     if (PAGE_TO_MODULE[stripped]) return PAGE_TO_MODULE[stripped];
     return stripped.charAt(0).toUpperCase() + stripped.slice(1);
   }
+
+  // ── Module wordmark icons (header) — CMD100.42 ──────────────
+  // Each module (except Dashboard, which keeps the universal ProjectHUD
+  // triangle) has a 90×90 SVG glyph that renders to the left of the
+  // module name in the header.
+  const MODULE_ICONS = {
+    'Compass': `<svg viewBox="-30 -30 60 60" xmlns="http://www.w3.org/2000/svg"><circle r="28" fill="none" stroke="#00D2FF" stroke-width="1" opacity=".2"/><circle r="22" fill="none" stroke="#00D2FF" stroke-width="1" opacity=".38"/><circle r="15" fill="#0c1628"/><circle r="15" fill="none" stroke="#00D2FF" stroke-width="1.2"/><line x1="0" y1="-12" x2="0" y2="-15" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/><line x1="0" y1="12" x2="0" y2="15" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/><line x1="-12" y1="0" x2="-15" y2="0" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/><line x1="12" y1="0" x2="15" y2="0" stroke="#00D2FF" stroke-width="1.8" opacity=".9"/><line x1="8" y1="-8" x2="10" y2="-10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/><line x1="-8" y1="-8" x2="-10" y2="-10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/><line x1="8" y1="8" x2="10" y2="10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/><line x1="-8" y1="8" x2="-10" y2="10" stroke="#00D2FF" stroke-width="1.2" opacity=".6"/><path d="M0,-13 L2.5,-3 L0,-1.5 L-2.5,-3Z" fill="#00D2FF"/><path d="M0,-10 L1.4,-6.5 L0,-5.8 L-1.4,-6.5Z" fill="#EF9F27"/><path d="M0,10 L2,2 L0,1 L-2,2Z" fill="#00D2FF" opacity=".5"/><circle r="1.8" fill="#00D2FF"/></svg>`,
+    'Cadence': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#1a3050" stroke-width="1.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><polygon points="45,20 64,32 64,58 45,70 26,58 26,32" fill="#0e1e38" stroke="#2a4a70" stroke-width="1.2"/><circle cx="45" cy="20" r="2.5" fill="#2a4a70"/><circle cx="64" cy="32" r="2.5" fill="#2a4a70"/><circle cx="64" cy="58" r="2.5" fill="#2a4a70"/><circle cx="45" cy="70" r="2.5" fill="#2a4a70"/><circle cx="26" cy="58" r="2.5" fill="#2a4a70"/><circle cx="26" cy="32" r="2.5" fill="#2a4a70"/><path d="M 45 20 L 64 32 L 64 58" fill="none" stroke="#00c9c9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="64" cy="58" r="4" fill="#00c9c9"/><circle cx="45" cy="45" r="3" fill="#4d9fff"/><circle cx="45" cy="45" r="6" fill="none" stroke="#4d9fff" stroke-width="0.8" opacity="0.5"/></svg>`,
+    'Pipeline': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#1a3050" stroke-width="1.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><path d="M 22 22 L 68 22 L 56 44 L 56 64 L 34 64 L 34 44 Z" fill="none" stroke="#2a4a70" stroke-width="1.2" stroke-linejoin="round"/><path d="M 22 22 L 68 22 L 60 36 L 30 36 Z" fill="#0e1e38" stroke="#4d9fff" stroke-width="1" stroke-linejoin="round" opacity="0.85"/><path d="M 30 36 L 60 36 L 56 50 L 34 50 Z" fill="#0e1e38" stroke="#4d9fff" stroke-width="1" stroke-linejoin="round" opacity="0.65"/><path d="M 34 50 L 56 50 L 56 64 L 34 64 Z" fill="#0e1e38" stroke="#00c9c9" stroke-width="1.5" stroke-linejoin="round"/><circle cx="45" cy="64" r="3" fill="#00c9c9"/><line x1="22" y1="22" x2="68" y2="22" stroke="#00c9c9" stroke-width="2.5" stroke-linecap="round"/><circle cx="68" cy="22" r="4" fill="#00c9c9"/></svg>`,
+    'Aegis': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#1a3050" stroke-width="1.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><polygon points="45,18 58,62 45,54 32,62" fill="#0e1e38" stroke="#2a4a70" stroke-width="1"/><line x1="45" y1="18" x2="45" y2="54" stroke="#4d9fff" stroke-width="1.5" opacity="0.5"/><line x1="32" y1="62" x2="58" y2="62" stroke="#4d9fff" stroke-width="2" opacity="0.6"/><path d="M 72 20 A 36 36 0 0 1 81 45 A 36 36 0 0 1 45 81" fill="none" stroke="#00c9c9" stroke-width="4" stroke-linecap="round"/><circle cx="72" cy="20" r="4" fill="#00c9c9"/></svg>`,
+    'Requests': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#1a3050" stroke-width="1.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><path d="M 22 26 Q 22 22 26 22 L 56 22 Q 60 22 60 26 L 60 42 Q 60 46 56 46 L 38 46 L 30 54 L 30 46 L 26 46 Q 22 46 22 42 Z" fill="#0e1e38" stroke="#2a4a70" stroke-width="1.2" stroke-linejoin="round"/><path d="M 30 50 Q 30 46 34 46 L 64 46 Q 68 46 68 50 L 68 64 Q 68 68 64 68 L 56 68 L 50 74 L 50 68 L 34 68 Q 30 68 30 64 Z" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.2" stroke-linejoin="round"/><line x1="36" y1="32" x2="50" y2="32" stroke="#4d9fff" stroke-width="0.8" opacity="0.5"/><line x1="36" y1="36" x2="46" y2="36" stroke="#4d9fff" stroke-width="0.8" opacity="0.5"/><line x1="38" y1="56" x2="58" y2="56" stroke="#00c9c9" stroke-width="0.8" opacity="0.7"/><line x1="38" y1="60" x2="56" y2="60" stroke="#00c9c9" stroke-width="0.8" opacity="0.7"/><line x1="22" y1="26" x2="60" y2="26" stroke="#00c9c9" stroke-width="2.5" stroke-linecap="round"/><circle cx="60" cy="26" r="4" fill="#00c9c9"/></svg>`,
+    'Resources': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#1a3050" stroke-width="1.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><circle cx="29" cy="36" r="6" fill="#0e1e38" stroke="#2a4a70" stroke-width="1.2"/><path d="M 19 56 Q 19 48 29 48 Q 39 48 39 56 L 39 60 L 19 60 Z" fill="#0e1e38" stroke="#2a4a70" stroke-width="1.2"/><circle cx="61" cy="36" r="6" fill="#0e1e38" stroke="#2a4a70" stroke-width="1.2"/><path d="M 51 56 Q 51 48 61 48 Q 71 48 71 56 L 71 60 L 51 60 Z" fill="#0e1e38" stroke="#2a4a70" stroke-width="1.2"/><circle cx="45" cy="30" r="7" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.5"/><path d="M 33 56 Q 33 44 45 44 Q 57 44 57 56 L 57 64 L 33 64 Z" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.5"/><circle cx="68" cy="22" r="4" fill="#00c9c9"/></svg>`,
+    'User Mgmt': `<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"><circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#1a3050" stroke-width="1.5"/><circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/><polygon points="45,14 70,28 70,56 45,70 20,56 20,28" fill="#0e1e38" stroke="#00c9c9" stroke-width="1.5" stroke-linejoin="round"/><polygon points="45,20 64,30 64,52 45,62 26,52 26,30" fill="none" stroke="#4d9fff" stroke-width="0.6" opacity="0.4" stroke-linejoin="round"/><polygon points="45,26 58,33 58,49 45,56 32,49 32,33" fill="none" stroke="#4d9fff" stroke-width="0.6" opacity="0.4" stroke-linejoin="round"/><circle cx="45" cy="36" r="6.5" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.5"/><path d="M 33 56 Q 33 46 45 46 Q 57 46 57 56 L 57 58 L 33 58 Z" fill="#0e1e38" stroke="#4d9fff" stroke-width="1.5" stroke-linejoin="round"/><line x1="42" y1="34" x2="44" y2="36" stroke="#00c9c9" stroke-width="1" opacity="0.7"/><line x1="48" y1="34" x2="46" y2="36" stroke="#00c9c9" stroke-width="1" opacity="0.7"/><path d="M 41 40 Q 45 42 49 40" fill="none" stroke="#00c9c9" stroke-width="1" stroke-linecap="round"/><circle cx="20" cy="28" r="2.5" fill="#4d9fff" opacity="0.65"/><circle cx="70" cy="28" r="3.5" fill="#00c9c9"/><circle cx="20" cy="56" r="2.5" fill="#4d9fff" opacity="0.65"/><circle cx="70" cy="56" r="2.5" fill="#4d9fff" opacity="0.65"/></svg>`
+  };
+
+  // ── Module wordmark split-color rules ───────────────────────
+  // Each entry: [white prefix, aqua suffix]. The aqua portion uses #00D2FF.
+  const WORDMARK_SPLITS = {
+    'Compass':   ['Com',  'pass'],
+    'Cadence':   ['Cad',  'ence'],
+    'Pipeline':  ['Pipe', 'line'],
+    'Aegis':     ['Ae',   'gis'],
+    'Requests':  ['Re',   'quests'],
+    'Resources': ['Res',  'ources'],
+    'User Mgmt': ['User ','Mgmt'],
+    'Dashboard': ['Dash', 'board']
+  };
+
+  // ── Header ticker content (shared across all modules) ───────
+  // Currently static; future: feed from a live event stream.
+  const TICKER_ITEMS = [
+    {dot:'#1D9E75', who:'VS', verb:'approved',         tail:"Expense Report \u00b7 step 2 \u00b7 2m ago"},
+    {dot:'#00c9c9', who:'Cadence', verb:'cert issued', tail:"Expense Report v1.2 \u00b7 6/6 paths \u00b7 22m ago"},
+    {dot:'#EF9F27', who:'AK', verb:'pending approval', tail:"NovaBio QMS \u00b7 step 3 \u00b7 34m ago"},
+    {dot:'#E24B4A', who:'instance blocked', verb:'Finance unassigned', tail:"Design Review \u00b7 1h ago"},
+    {dot:'#1D9E75', who:'DN', verb:'completed',        tail:"Flexscope \u00b7 PCB fabrication \u00b7 1h ago"},
+    {dot:'#00c9c9', who:'Cadence', verb:'suite run',   tail:"359 runs \u00b7 87% pass rate \u00b7 2h ago"},
+    {dot:'#EF9F27', who:'RC', verb:'updated quote',    tail:"Endoscopic Platform \u00b7 In Progress \u00b7 2h ago"}
+  ];
 
   // ── SVG icons (sidebar) ─────────────────────────────────────
   const ICONS = {
@@ -180,7 +222,7 @@ const HUDShell = (() => {
         flex-shrink: 0;
       }
       #hud-header-left .hud-logo {
-        width: 24px; height: 24px; flex-shrink: 0;
+        width: 32px; height: 32px; flex-shrink: 0;
         color: #00d2ff;
       }
       #hud-header-left .hud-logo svg { width:100%; height:100%; display:block; }
@@ -188,15 +230,41 @@ const HUDShell = (() => {
         font-size: 16px; font-weight: 700;
         letter-spacing: 0.08em; text-transform: uppercase;
         color: #e8f4ff;
+        font-family: 'Inter', system-ui, sans-serif;
+        white-space: nowrap;
       }
+      #hud-header-left .hud-module-name .wm-aqua { color: #00D2FF; }
       #hud-header-ticker {
         flex: 1 1 auto; min-width: 0;
         display: flex; align-items: center;
-        padding: 0 14px;
+        padding: 0;
         border-right: 1px solid rgba(0,210,255,0.10);
         background: rgba(0,210,255,0.02);
         overflow: hidden;
+        position: relative;
       }
+      #hud-header-ticker .hud-ticker-track {
+        display: flex; align-items: center; white-space: nowrap;
+        animation: hud-ticker-slide 60s linear infinite;
+        padding-left: 100%;
+      }
+      #hud-header-ticker:hover .hud-ticker-track { animation-play-state: paused; }
+      @keyframes hud-ticker-slide {
+        from { transform: translateX(0); }
+        to   { transform: translateX(-50%); }
+      }
+      #hud-header-ticker .ti {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 11px; color: #a8c5e0;
+        margin-right: 28px;
+      }
+      #hud-header-ticker .ti .td {
+        width: 6px; height: 6px; border-radius: 50%;
+        flex-shrink: 0;
+      }
+      #hud-header-ticker .ti .tw { color: #e8f4ff; font-weight: 600; }
+      #hud-header-ticker .ti .ta { color: #00D2FF; }
       #hud-header-ticker:empty::before {
         content: ''; display: block; width: 100%; height: 1px;
       }
@@ -816,24 +884,38 @@ const HUDShell = (() => {
     if (document.getElementById('hud-header')) return; // idempotent
     const initials = _userInitialsFallback();
 
+    // Resolve module-specific icon and wordmark split.
+    const modKey = moduleName || '';
+    const moduleIcon = MODULE_ICONS[modKey] || `
+      <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="20,4 36,36 4,36" fill="none" stroke="currentColor" stroke-width="2"/>
+        <polygon points="20,10 31,32 9,32" fill="rgba(0,210,255,0.10)"/>
+        <circle cx="20" cy="20" r="4" fill="currentColor"/>
+        <line x1="20" y1="14" x2="20" y2="10" stroke="currentColor" stroke-width="1.5"/>
+      </svg>`;
+    const split = WORDMARK_SPLITS[modKey];
+    const wordmarkHTML = split
+      ? `${split[0]}<span class="wm-aqua">${split[1]}</span>`
+      : (modKey || '');
+
+    // Build ticker: items repeated twice for seamless animation loop.
+    const tiHTML = TICKER_ITEMS.map(t =>
+      `<span class="ti"><span class="td" style="background:${t.dot}"></span><span class="tw">${t.who}</span> <span class="ta">${t.verb}</span> ${t.tail}</span>`
+    ).join('');
+
     const header = document.createElement('div');
     header.id = 'hud-header';
     header.innerHTML = `
       <div id="hud-header-left">
-        <div class="hud-logo">
-          <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-            <polygon points="20,4 36,36 4,36" fill="none" stroke="currentColor" stroke-width="2"/>
-            <polygon points="20,10 31,32 9,32" fill="rgba(0,210,255,0.10)"/>
-            <circle cx="20" cy="20" r="4" fill="currentColor"/>
-            <line x1="20" y1="14" x2="20" y2="10" stroke="currentColor" stroke-width="1.5"/>
-          </svg>
-        </div>
-        <div class="hud-module-name">${moduleName || ''}</div>
+        <div class="hud-logo">${moduleIcon}</div>
+        <div class="hud-module-name">${wordmarkHTML}</div>
       </div>
-      <div id="hud-header-ticker"></div>
+      <div id="hud-header-ticker">
+        <div class="hud-ticker-track">${tiHTML}${tiHTML}</div>
+      </div>
       <div id="hud-header-status">
         <div id="hud-status-live"><span class="live-dot"></span>LIVE</div>
-        <div id="hud-status-datetime">—</div>
+        <div id="hud-status-datetime">\u2014</div>
         <button id="hud-status-bell" title="Notifications" type="button">
           ${ICONS.bell}
           <span id="hud-status-bell-badge" style="display:none">0</span>

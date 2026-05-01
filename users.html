@@ -3194,7 +3194,7 @@ async function removeAvatar(resourceId) {
   renderResources();
 }
   // Init sidebar
-  Sidebar.init('users.html');
+  if (window.HUDShell) HUDShell.init({ page: 'users', moduleName: 'User Mgmt' });
 
 // ── ORG CHART ─────────────────────────────────────────────────────────────────
 var _ocPending = {};

@@ -403,7 +403,7 @@ let _timeFilters = { resource: '', project: '', from: '', to: '' };
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  if (window.Sidebar) Sidebar.init('resources');
+  if (window.HUDShell) HUDShell.init({ page: 'resources', moduleName: 'Resources' });
   await loadAll();
 });
 

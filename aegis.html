@@ -507,45 +507,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 <!-- ════════════════════════════════ APP ════════════════════════════════ -->
 <div class="app">
 
-<!-- TOPBAR -->
-<div class="topbar">
-  <div class="logo">
-    <svg viewBox="0 0 90 90" aria-hidden="true">
-      <circle cx="45" cy="45" r="42" fill="#080e1c" stroke="#1a3050" stroke-width="1.5"/>
-      <circle cx="45" cy="45" r="32" fill="none" stroke="#1a3050" stroke-width="0.8" opacity="0.5"/>
-      <polygon points="45,18 58,62 45,54 32,62" fill="#0e1e38" stroke="#2a4a70" stroke-width="1"/>
-      <line x1="45" y1="18" x2="45" y2="54" stroke="#4d9fff" stroke-width="1.5" opacity="0.5"/>
-      <line x1="32" y1="62" x2="58" y2="62" stroke="#4d9fff" stroke-width="2" opacity="0.6"/>
-      <path d="M 72 20 A 36 36 0 0 1 81 45 A 36 36 0 0 1 45 81" fill="none" stroke="#00c9c9" stroke-width="4" stroke-linecap="round"/>
-      <circle cx="72" cy="20" r="4" fill="#00c9c9"/>
-    </svg>
-    <span class="wm"><span class="wm-ae">AE</span><span class="wm-gis">GIS</span></span>
-    <span class="wm-sub"><span>Command</span><span>System</span></span>
-  </div>
-  <div class="ticker">
-    <div class="ticker-track">
-      <span class="ti"><span class="td" style="background:var(--gr)"></span><span class="tw">VS</span> <span class="ta">approved</span> Expense Report · step 2 · 2m ago</span>
-      <span class="ti"><span class="td" style="background:var(--aq)"></span><span class="tw">Cadence</span> <span class="ta">cert issued</span> Expense Report v1.2 · 6/6 paths · 22m ago</span>
-      <span class="ti"><span class="td" style="background:var(--am)"></span><span class="tw">AK</span> <span class="ta">pending approval</span> NovaBio QMS · step 3 · 34m ago</span>
-      <span class="ti"><span class="td" style="background:var(--rd)"></span><span class="tw">instance blocked</span> <span class="ta">Finance unassigned</span> Design Review · 1h ago</span>
-      <span class="ti"><span class="td" style="background:var(--gr)"></span><span class="tw">DN</span> <span class="ta">completed</span> Flexscope · PCB fabrication · 1h ago</span>
-      <span class="ti"><span class="td" style="background:var(--aq)"></span><span class="tw">Cadence</span> <span class="ta">suite run</span> 359 runs · 87% pass rate · 2h ago</span>
-      <span class="ti"><span class="td" style="background:var(--am)"></span><span class="tw">RC</span> <span class="ta">updated quote</span> Endoscopic Platform · In Progress · 2h ago</span>
-      <span class="ti"><span class="td" style="background:var(--gr)"></span><span class="tw">VS</span> <span class="ta">approved</span> Expense Report · step 2 · 2m ago</span>
-      <span class="ti"><span class="td" style="background:var(--aq)"></span><span class="tw">Cadence</span> <span class="ta">cert issued</span> Expense Report v1.2 · 6/6 paths · 22m ago</span>
-      <span class="ti"><span class="td" style="background:var(--am)"></span><span class="tw">AK</span> <span class="ta">pending approval</span> NovaBio QMS · step 3 · 34m ago</span>
-      <span class="ti"><span class="td" style="background:var(--rd)"></span><span class="tw">instance blocked</span> <span class="ta">Finance unassigned</span> Design Review · 1h ago</span>
-      <span class="ti"><span class="td" style="background:var(--gr)"></span><span class="tw">DN</span> <span class="ta">completed</span> Flexscope · PCB fabrication · 1h ago</span>
-      <span class="ti"><span class="td" style="background:var(--aq)"></span><span class="tw">Cadence</span> <span class="ta">suite run</span> 359 runs · 87% pass rate · 2h ago</span>
-      <span class="ti"><span class="td" style="background:var(--am)"></span><span class="tw">RC</span> <span class="ta">updated quote</span> Endoscopic Platform · In Progress · 2h ago</span>
-    </div>
-  </div>
-  <div class="tbar-r">
-    <div class="live-dot"></div><span class="live-lbl">LIVE · Apr 16, 2026</span>
-    <span class="tbar-time" id="clk">01:52:03</span>
-    <div class="av">VS</div>
-  </div>
-</div>
+<!-- TOPBAR removed — hud-shell.js builds the standard ProjectHUD header -->
 
 <div class="shell">
 <!-- LEFT NAV -->
@@ -1758,8 +1720,8 @@ document.addEventListener('DOMContentLoaded',function(){
 <script>
   (function() {
     function boot() {
-      if (window.Sidebar) {
-        Sidebar.init('aegis');
+      if (window.HUDShell) {
+        HUDShell.init({ page: 'aegis', moduleName: 'Aegis' });
       } else {
         setTimeout(boot, 25);
       }
