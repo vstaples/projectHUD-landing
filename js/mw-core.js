@@ -1,6 +1,6 @@
-// VERSION: 20260430-CMD100.38
-window._mwCoreVersion = 'v20260430-CMD100.38';
-console.log('%c[mw-core] v20260430-CMD100.38 — empty checkbox slot uses invisible disabled input for pixel-perfect alignment','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260430-CMD100.39
+window._mwCoreVersion = 'v20260430-CMD100.39';
+console.log('%c[mw-core] v20260430-CMD100.39 — every row reserves 3px border-left so negotiation indicator does not shift task rows','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -695,7 +695,7 @@ window._mwLoadUserView = async function() {
         return `<div class="cmp-row wi-row" data-wi-id="${w.id}" data-wi-type="${w.type}"
           data-wi-status="${w.status}" data-wi-projectid="${w.projectId||''}"
           style="display:grid;grid-template-columns:34px 80px 1fr 140px 56px 78px;
-            gap:0;align-items:center;padding:0 8px 0 4px;min-height:38px;${_negBorder}${_cancelStyle}">
+            gap:0;align-items:center;padding:0 8px 0 4px;min-height:38px;border-left:3px solid transparent;${_negBorder}${_cancelStyle}">
           <div style="display:grid;grid-template-columns:14px 14px;gap:6px;align-items:center;justify-items:center;padding-left:2px">
             ${w._isWrRow
               ? `<input type="checkbox" class="wi-bulk-cb" data-wi-id="${w.id}" data-wi-table="workflow_requests" title="Select for bulk delete" style="width:13px;height:13px;cursor:pointer;accent-color:#EF9F27;margin:0">`
@@ -1061,7 +1061,7 @@ window._mwLoadUserView = async function() {
             </select>
           </div>
           <div style="display:grid;grid-template-columns:34px 80px 1fr 140px 56px 78px;
-            gap:0;padding:5px 8px 5px 4px;border-bottom:1px solid var(--border);
+            gap:0;padding:5px 8px 5px 4px;border-left:3px solid transparent;border-bottom:1px solid var(--border);
             font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text3);
             letter-spacing:.08em;text-transform:uppercase">
             <div></div><div style="padding-left:8px">TYPE</div>
