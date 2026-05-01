@@ -1,6 +1,6 @@
-// VERSION: 20260430-CMD100.34
-window._mwCoreVersion = 'v20260430-CMD100.34';
-console.log('%c[mw-core] v20260430-CMD100.34 — empty checkbox spacer given explicit width to preserve grid slot','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260430-CMD100.36
+window._mwCoreVersion = 'v20260430-CMD100.36';
+console.log('%c[mw-core] v20260430-CMD100.36 — work queue rows now scroll internally (max-height 380px)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1075,7 +1075,7 @@ window._mwLoadUserView = async function() {
                 onmouseleave="clearTimeout(window._wqLegendTimer)">?</span>
             </div>
           </div>
-          <div id="work-list-rows" style="${_diagramMode?'display:none':''}">${workListRows()}</div>
+          <div id="work-list-rows" style="${_diagramMode?'display:none':'max-height:380px;overflow-y:auto'}">${workListRows()}</div>
           <!-- Diagram view -->
           <div id="mw-diagram-wrap" style="${_diagramMode?'':'display:none'}">
             <!-- 4-cell diagram grid:
@@ -1345,7 +1345,10 @@ window._mwLoadUserView = async function() {
           });
           const total = Object.values(byTable).reduce((s, a) => s + a.length, 0);
           if (!total) return;
-          const ok = window.confirm('Delete ' + total + ' selected row' + (total === 1 ? '' : 's') + ' from your work queue? This cannot be undone.');
+          const ok = await _wqConfirm(
+            'Delete from work queue',
+            'Delete ' + total + ' selected row' + (total === 1 ? '' : 's') + ' from your work queue? This cannot be undone.'
+          );
           if (!ok) return;
           btn.disabled = true;
           btn.style.opacity = '.5';
@@ -1371,7 +1374,7 @@ window._mwLoadUserView = async function() {
             syncBtn();
           } catch (err) {
             console.error('[wq-bulk-delete] failed:', err);
-            window.alert('Delete failed. See console for details.');
+            await _wqAlert('Delete failed', 'The delete operation failed. See console for details.');
           } finally {
             btn.disabled = false;
             btn.style.opacity = '1';
@@ -1379,6 +1382,114 @@ window._mwLoadUserView = async function() {
         });
       }
     })();
+
+    // ── Styled modal helpers (CMD100.35) ─────────────────────────
+    // _wqConfirm(title, message) → Promise<boolean>
+    // _wqAlert(title, message)   → Promise<void>
+    function _wqEnsureModalStyles() {
+      if (document.getElementById('wq-modal-styles')) return;
+      const s = document.createElement('style');
+      s.id = 'wq-modal-styles';
+      s.textContent = `
+        .wq-modal-overlay {
+          position: fixed; inset: 0; background: rgba(0,0,0,.6);
+          z-index: 9000; display: flex; align-items: center; justify-content: center;
+          backdrop-filter: blur(2px);
+          opacity: 0; transition: opacity .12s ease-out;
+        }
+        .wq-modal-overlay.open { opacity: 1; }
+        .wq-modal {
+          background: #0c1628;
+          border: 1px solid rgba(0,210,255,.25);
+          border-radius: 6px;
+          box-shadow: 0 8px 32px rgba(0,0,0,.7);
+          width: 420px; max-width: calc(100vw - 32px);
+          font-family: 'Inter', system-ui, sans-serif;
+          color: var(--text0, #F0F6FF);
+          transform: translateY(-8px); transition: transform .12s ease-out;
+        }
+        .wq-modal-overlay.open .wq-modal { transform: translateY(0); }
+        .wq-modal-hdr {
+          padding: 14px 18px; border-bottom: 1px solid rgba(0,210,255,.12);
+          font-family: var(--font-mono,'JetBrains Mono',monospace);
+          font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+          color: rgba(0,210,255,.75);
+        }
+        .wq-modal-body { padding: 18px; font-size: 13px; line-height: 1.5; color: var(--text1,#D8E4F0); }
+        .wq-modal-footer {
+          padding: 12px 18px; display: flex; justify-content: flex-end; gap: 8px;
+          border-top: 1px solid rgba(0,210,255,.08);
+        }
+        .wq-modal-btn {
+          font-family: var(--font-mono,'JetBrains Mono',monospace);
+          font-size: 11px; font-weight: 600; letter-spacing: .06em;
+          padding: 7px 14px; border-radius: 3px; cursor: pointer;
+          background: rgba(6,10,16,.6); border: 1px solid rgba(160,200,235,.25);
+          color: rgba(160,200,235,.85); transition: all .12s;
+        }
+        .wq-modal-btn:hover { color:#00d2ff; border-color:rgba(0,210,255,.5); background:rgba(0,210,255,.08); }
+        .wq-modal-btn.danger { color:#fff; border-color:#E24B4A; background:rgba(226,75,74,.18); }
+        .wq-modal-btn.danger:hover { background:rgba(226,75,74,.32); border-color:#E24B4A; color:#fff; }
+        .wq-modal-btn:focus { outline: 2px solid rgba(0,210,255,.5); outline-offset: 1px; }
+      `;
+      document.head.appendChild(s);
+    }
+    function _wqShowModal(opts) {
+      _wqEnsureModalStyles();
+      return new Promise(function(resolve) {
+        const ov = document.createElement('div');
+        ov.className = 'wq-modal-overlay';
+        const buttons = (opts.buttons || []).map(function(b, i) {
+          return '<button class="wq-modal-btn ' + (b.kind === 'danger' ? 'danger' : '') + '" data-idx="' + i + '">' + b.label + '</button>';
+        }).join('');
+        ov.innerHTML =
+          '<div class="wq-modal" role="dialog" aria-modal="true">' +
+            '<div class="wq-modal-hdr">' + (opts.title || 'Confirm') + '</div>' +
+            '<div class="wq-modal-body">' + (opts.message || '') + '</div>' +
+            '<div class="wq-modal-footer">' + buttons + '</div>' +
+          '</div>';
+        document.body.appendChild(ov);
+        // Animate in next frame
+        requestAnimationFrame(function() { ov.classList.add('open'); });
+        function close(value) {
+          document.removeEventListener('keydown', onKey, true);
+          ov.classList.remove('open');
+          setTimeout(function() { ov.remove(); resolve(value); }, 120);
+        }
+        ov.querySelectorAll('.wq-modal-btn').forEach(function(b) {
+          b.addEventListener('click', function() { close(opts.buttons[+b.dataset.idx].value); });
+        });
+        ov.addEventListener('click', function(e) {
+          if (e.target === ov) close(opts.cancelValue);
+        });
+        function onKey(e) {
+          if (e.key === 'Escape') { e.preventDefault(); close(opts.cancelValue); }
+        }
+        document.addEventListener('keydown', onKey, true);
+        // Default focus
+        const defaultBtn = ov.querySelector('.wq-modal-btn[data-idx="' + (opts.defaultIdx || 0) + '"]');
+        if (defaultBtn) setTimeout(function() { defaultBtn.focus(); }, 0);
+      });
+    }
+    function _wqConfirm(title, message) {
+      return _wqShowModal({
+        title: title, message: message,
+        buttons: [
+          { label: 'Cancel', value: false, kind: 'neutral' },
+          { label: 'Delete', value: true,  kind: 'danger' }
+        ],
+        defaultIdx: 0,    // Cancel focused
+        cancelValue: false
+      });
+    }
+    function _wqAlert(title, message) {
+      return _wqShowModal({
+        title: title, message: message,
+        buttons: [{ label: 'OK', value: true, kind: 'neutral' }],
+        defaultIdx: 0,
+        cancelValue: true
+      });
+    }
 
     // ── Delta strip — since last login ───────────────────
     setTimeout(() => { if (window.populateDeltaStrip) populateDeltaStrip(); }, 200);
