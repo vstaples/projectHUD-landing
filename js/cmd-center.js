@@ -641,8 +641,11 @@ function _connect() {
     if (d.event_id) { _seenEventIds[d.event_id] = Date.now(); _purgeSeenEventIds(); }
     if (!_recordArmed[d.user_id]) return;
     var alias = d.alias || (_sessions[d.user_id] && (_sessions[d.user_id].alias || _sessions[d.user_id].initials)) || '??';
-    // _appendLine prepends "<who>: " for cmd-type lines from non-self sources.
-    _appendLine(alias, 'cmd', d.command);
+    // CMD100.57: recorder lines must always carry the session alias prefix
+    // regardless of whether the armed session is the operator's own. This
+    // ensures recorded transcripts are directly replayable as scripts.
+    // Pass 'SYS' as `who` so _appendLine's self-prefix-skip path doesn't fire.
+    _appendLine('SYS', 'cmd', alias + ': ' + d.command);
   }
 
   function _handleAppEvent(payload) {
@@ -1332,26 +1335,79 @@ window._cmdEmit = function(eventName, data) {
 // up the label via window.AegisRegistry, clicks the clickable ancestor of the
 // registered element, and waits briefly for an activation-class change. On
 // miss, returns a diagnostic listing the labels currently visible on the page.
+// CMD100.57 — DOM-fallback for Set Tab / Set SubTab when the AegisRegistry
+// has no entry for the supplied label. Walks elements with tab-like classes
+// (matches the recorder's actionable-class signature) and finds one whose
+// visible text equals the label (case-insensitive, badge-stripped).
+function _findTabInDOM(label, level) {
+  var TAB_SELECTORS = [
+    '[role="tab"]',
+    '.tab', '.tab-btn', '.tab-strip-item',
+    '.subnav-item', '.sub-nav-item',
+    '.nav-item', '.menu-item'
+  ];
+  var BADGE_RX = /\b(badge|count|pill|chip|notif|tag-count|num)\b/i;
+  function cleanText(el) {
+    var out = '';
+    var nodes = el.childNodes;
+    for (var i = 0; i < nodes.length; i++) {
+      var c = nodes[i];
+      if (c.nodeType === 3) { out += c.nodeValue; continue; }
+      if (c.nodeType !== 1) continue;
+      var cls = (c.className && typeof c.className === 'string') ? c.className : '';
+      if (BADGE_RX.test(cls)) continue;
+      var t = (c.textContent || '').trim();
+      if (/^\d+$/.test(t)) continue;
+      out += c.textContent || '';
+    }
+    return out.replace(/\s+/g, ' ').trim();
+  }
+  var want = label.replace(/\s+/g, ' ').trim().toLowerCase();
+  for (var s = 0; s < TAB_SELECTORS.length; s++) {
+    var els = document.querySelectorAll(TAB_SELECTORS[s]);
+    for (var i = 0; i < els.length; i++) {
+      var txt = cleanText(els[i]).toLowerCase();
+      if (txt === want) return els[i];
+    }
+  }
+  return null;
+}
+
 async function _aegisActivateTab(level, rawLabel) {
   var label = (rawLabel == null ? '' : String(rawLabel)).trim();
   var noun  = (level === 'tab') ? 'tab' : 'subtab';
   if (!label) return noun + ' not found: (empty label)';
 
+  // CMD100.57: DOM-first fallback. Recorded transcripts emit `Set Tab` /
+  // `Set SubTab` for any element that classified as one — including pages
+  // whose tabs the AegisRegistry hasn't been told about. Try the registry
+  // first; if no match, walk the DOM for any element whose visible text
+  // matches the label and which has an actionable shape.
   var reg = window.AegisRegistry;
-  if (!reg) return noun + ' registry unavailable (aegis-registry.js not loaded)';
-
-  var entry = (level === 'tab') ? reg.findTab(label) : reg.findSubTab(label);
-  if (!entry) {
-    var visible = (level === 'tab') ? reg.listTabs() : reg.listSubTabs();
-    var labels = [];
-    for (var i = 0; i < visible.length && labels.length < 20; i++) {
-      if (labels.indexOf(visible[i].label) === -1) labels.push(visible[i].label);
-    }
-    var diag = labels.length ? labels.join(', ') : '(none registered)';
-    return noun + ' not found: ' + label + ' · registered: ' + diag;
+  var entry = null;
+  if (reg) {
+    entry = (level === 'tab') ? reg.findTab(label) : reg.findSubTab(label);
   }
 
-  var ACTIVE_CLASSES = ['active', 'is-active', 'selected', 'is-selected', 'tab-active'];
+  if (!entry) {
+    var domHit = _findTabInDOM(label, level);
+    if (domHit) {
+      entry = { el: domHit };
+    } else {
+      var diag = '(none registered)';
+      if (reg) {
+        var visible = (level === 'tab') ? reg.listTabs() : reg.listSubTabs();
+        var labels = [];
+        for (var i = 0; i < visible.length && labels.length < 20; i++) {
+          if (labels.indexOf(visible[i].label) === -1) labels.push(visible[i].label);
+        }
+        if (labels.length) diag = labels.join(', ');
+      }
+      return noun + ' not found: ' + label + ' · registered: ' + diag;
+    }
+  }
+
+  var ACTIVE_CLASSES = ['active', 'is-active', 'selected', 'is-selected', 'tab-active', 'on'];
   function clickableAncestor(el) {
     var cur = el;
     for (var i = 0; cur && i < 5; i++) {
@@ -1411,6 +1467,84 @@ var COMMANDS = {
     return _aegisActivateTab('subtab', args[0]);
   },
   'Set View': async function(args){var v=(args[0]||'').toLowerCase().replace(/\.html$/,'');var m={'compass':'/compass.html','cadence':'/cadence.html','dashboard':'/dashboard.html'};var h=m[v];if(!h)return 'Unknown view: '+args[0];window.location.href=h;return 'navigating to '+h;},
+
+  // ── Register <Module> (CMD100.57) ──────────────────────────────────────────
+  // Canonical script-start primitive. Auto-routes the executing session to
+  // the named module's main page. Must be the first runnable command in any
+  // demo script. Rationale: every recorded transcript needs a deterministic
+  // entry point; without one, a script that begins with `Set Tab "..."` fails
+  // because no module is loaded yet.
+  //
+  // Default target is "Dashboard" if no argument supplied. Module names are
+  // matched case-insensitively against the same map Set Page uses.
+  'Register': async function(args) {
+    var name = (args[0] || 'Dashboard').toString();
+    var key = name.toLowerCase();
+    var pageMap = {
+      'dashboard':  '/dashboard.html',
+      'compass':    '/compass.html',
+      'cadence':    '/cadence.html',
+      'pipeline':   '/pipeline.html',
+      'aegis':      '/aegis.html',
+      'requests':   '/resource-requests.html',
+      'resources':  '/resources.html',
+      'user mgmt':  '/users.html',
+      'users':      '/users.html'
+    };
+    var href = pageMap[key];
+    if (!href) return 'Register: unknown module "' + name + '"';
+    window.location.href = href;
+    return 'registered to ' + name + ' (' + href + ')';
+  },
+
+  // ── Set Page <Module> (CMD100.57) ──────────────────────────────────────────
+  // Human-label alias for `Set View`. The recorder emits Set Page (matches
+  // user mental model — "I navigated to Cadence", not "/cadence.html").
+  // Same module-name matching as Register; also accepts URL-style
+  // identifiers for back-compat.
+  'Set Page': async function(args) {
+    var name = (args[0] || '').toString();
+    var key = name.toLowerCase().replace(/\.html$/, '');
+    var pageMap = {
+      'dashboard':  '/dashboard.html',
+      'compass':    '/compass.html',
+      'cadence':    '/cadence.html',
+      'pipeline':   '/pipeline.html',
+      'aegis':      '/aegis.html',
+      'requests':   '/resource-requests.html',
+      'resources':  '/resources.html',
+      'user mgmt':  '/users.html',
+      'users':      '/users.html',
+      'resource-requests': '/resource-requests.html'
+    };
+    var href = pageMap[key];
+    if (!href) return 'Set Page: unknown module "' + name + '"';
+    window.location.href = href;
+    return 'navigating to ' + name + ' (' + href + ')';
+  },
+
+  // ── Open Prospect <name> (CMD100.57) ───────────────────────────────────────
+  // Pipeline-specific: descend into the prospect detail view by name match.
+  // Requires the Pipeline page to be loaded first (use Register Pipeline or
+  // Set Page Pipeline). Walks the rendered .p-card elements, matches the
+  // .p-card-name text against the supplied argument (case-insensitive,
+  // whitespace-collapsed), and clicks the matching card.
+  'Open Prospect': async function(args) {
+    var target = (args[0] || '').toString().trim().toLowerCase();
+    if (!target) return 'Open Prospect: missing prospect name';
+    var cards = document.querySelectorAll('.p-card');
+    if (!cards.length) return 'Open Prospect: no .p-card elements on this page (is Pipeline loaded?)';
+    var match = null;
+    cards.forEach(function(c) {
+      var nameEl = c.querySelector('.p-card-name');
+      if (!nameEl) return;
+      var name = (nameEl.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (name === target) match = c;
+    });
+    if (!match) return 'Open Prospect: no card with name "' + args[0] + '"';
+    match.click();
+    return 'opened prospect "' + args[0] + '"';
+  },
 
   // ── Set NarrateTarget (CMD87b / Brief Aegis Remote Narration) ────────────────
   // Redirects subsequent `Narrate` calls to render on a target Compass session.
