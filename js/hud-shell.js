@@ -1,5 +1,6 @@
 // ============================================================
 // ProjectHUD — hud-shell.js v1.2 (CMD95.5)
+// CMD100.25: Tier 2 strip shifted +6px (left:6→width:144) to clear the slide-in edge trigger.
 // Unified shell: slide-in sidebar (absorbed from sidebar.js v3.1)
 //                + unified header bar (logo / ticker / operator-status)
 //                + Tier 1 sub-header strip (major-area tabs)
@@ -297,8 +298,8 @@ const HUDShell = (() => {
 
       /* ── Tier 2 contextual vertical strip (CMD95.5: icon+label rows) ── */
       #hud-tier2 {
-        position: fixed; left: 0; top: 90px; bottom: 0;
-        width: 150px; z-index: 498;
+        position: fixed; left: 6px; top: 90px; bottom: 0;
+        width: 144px; z-index: 498;
         background: rgba(8,13,24,0.96);
         border-right: 1px solid rgba(0,210,255,0.12);
         display: flex; flex-direction: column;
