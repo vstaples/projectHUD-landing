@@ -87,6 +87,7 @@ var _cmdTarget   = 'ALL';  // current command target userId or 'ALL'
 var _execQueue   = [];     // pending async commands
 var _eventListeners = {};  // { eventName: [resolvers] }
 var _storeVars   = {};     // script variable storage { name: value }
+var _recordArmed = {};     // CMD100.50: per-session recorder arm map { userId: bool } — ephemeral
 var _scriptRunning = false; // suppress hook double-logging during script execution
 var _scriptAborted = false; // set when panel closes mid-script
 var _pauseResolve  = null;  // set by Pause command, cleared by Enter in command bar
@@ -629,9 +630,8 @@ function _connect() {
   // target-match (cmd) / from-match (result), both of which handle the
   // twin-tab case correctly without the _aegisMode guard.
   // ── CMD100.50 — Recorder pipe ──────────────────────────────
-  // Per-session arm map. Keys are session userIds; truthy → armed.
-  // Ephemeral: cleared on Aegis reload (no localStorage persistence).
-  var _recordArmed = {};
+  // Per-session arm map declared at module scope above; this handler
+  // just consumes it.
 
   function _handleRecorderEvent(payload) {
     var d = payload.payload;
@@ -3873,7 +3873,7 @@ function _renderSessionList() {
         ? '<div style="width:6px;height:6px;border-radius:50%;background:#EF9F27;flex-shrink:0"></div>'
         : '<div style="width:6px;height:6px;border-radius:50%;background:rgba(0,201,201,0.35);flex-shrink:0"></div>';
     // CMD100.50: per-session record button. Idle = hollow circle, armed = filled red.
-    var armed = !!(typeof _recordArmed !== 'undefined' && _recordArmed[uid]);
+    var armed = !!_recordArmed[uid];
     var recBtn = '<div class="phr-rec-btn" data-rec-uid="' + uid + '" title="' + (armed?'Stop recording':'Record this session') + '" '
       + 'style="width:14px;height:14px;border-radius:50%;border:1.5px solid ' + (armed?'#E24B4A':'rgba(226,75,74,0.55)') + ';background:' + (armed?'#E24B4A':'transparent') + ';flex-shrink:0;cursor:pointer;margin-right:4px"></div>';
     html += '<div data-uid="' + uid + '" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:pointer;background:' + bg + ';border-left:' + border + '">'
