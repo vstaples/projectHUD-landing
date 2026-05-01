@@ -1409,8 +1409,7 @@ const HUDShell = (() => {
           // children (chips, avatars, badges). Per the Pipeline A2 spec,
           // clicking anywhere inside a prospect card emits Open Prospect,
           // not the chip's own command.
-          const cls = (el.className && typeof el.className === 'string') ? el.className : '';
-          if (/\bp-card\b/.test(cls)) return el;
+          if (el.classList && el.classList.contains('p-card')) return el;
         }
         el = el.parentElement;
         hops++;
@@ -1478,13 +1477,15 @@ const HUDShell = (() => {
 
       // 1a. Pipeline-specific rules (CMD100.55).
       // Prospect card: descend into prospect detail.
-      if (/\bp-card\b/.test(cls)) {
+      // Use classList for strict token match (not /\bp-card\b/, which
+      // matches inner descendants like p-card-name as well).
+      if (el.classList && el.classList.contains('p-card')) {
         const nameEl = el.querySelector && el.querySelector('.p-card-name');
         const name = nameEl ? _cleanLabel(nameEl.textContent || '') : '';
         return name ? `Open Prospect "${name}"` : null;
       }
       // Per-column add button: opens the New Prospect drawer.
-      if (/\badd-card-btn\b/.test(cls)) {
+      if (el.classList && el.classList.contains('add-card-btn')) {
         return `Form Open "Add Prospect"`;
       }
 
