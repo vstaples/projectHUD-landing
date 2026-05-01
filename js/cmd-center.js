@@ -636,6 +636,9 @@ function _connect() {
   function _handleRecorderEvent(payload) {
     var d = payload.payload;
     if (!d || !d.user_id || !d.command) return;
+    // CMD100.50: dedup across dual-channel receipts (channel + legacy).
+    if (d.event_id && _seenEventIds[d.event_id]) return;
+    if (d.event_id) { _seenEventIds[d.event_id] = Date.now(); _purgeSeenEventIds(); }
     if (!_recordArmed[d.user_id]) return;
     var alias = d.alias || (_sessions[d.user_id] && (_sessions[d.user_id].alias || _sessions[d.user_id].initials)) || '??';
     // _appendLine prepends "<who>: " for cmd-type lines from non-self sources.

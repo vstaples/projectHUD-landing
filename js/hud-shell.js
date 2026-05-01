@@ -1402,14 +1402,24 @@ const HUDShell = (() => {
 
     function extractLabel(el) {
       const al = el.getAttribute && el.getAttribute('aria-label');
-      if (al && al.trim()) return al.trim();
+      if (al && al.trim()) return _cleanLabel(al);
       const txt = (el.textContent || '').replace(/\s+/g, ' ').trim();
-      if (txt) return txt;
+      if (txt) return _cleanLabel(txt);
       const t = el.getAttribute && el.getAttribute('title');
-      if (t && t.trim()) return t.trim();
+      if (t && t.trim()) return _cleanLabel(t);
       const v = el.value;
-      if (v && String(v).trim()) return String(v).trim();
+      if (v && String(v).trim()) return _cleanLabel(String(v));
       return '';
+    }
+
+    // Strip leading non-alphanumeric characters (icon glyphs, bullets, arrows)
+    // and collapse whitespace. Keeps internal punctuation intact.
+    function _cleanLabel(s) {
+      if (!s) return '';
+      return String(s)
+        .replace(/^[^\p{L}\p{N}]+/u, '')
+        .replace(/\s+/g, ' ')
+        .trim();
     }
 
     function classify(el, label) {
@@ -1458,6 +1468,7 @@ const HUDShell = (() => {
           type: 'broadcast',
           event: 'recorder_event',
           payload: {
+            event_id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
             user_id: (window.CURRENT_USER && window.CURRENT_USER.user_id) || null,
             alias:   (window.CURRENT_USER && (window.CURRENT_USER.alias || window.CURRENT_USER.initials)) || '??',
             command: command,
