@@ -222,7 +222,7 @@ const HUDShell = (() => {
         flex-shrink: 0;
       }
       #hud-header-left .hud-logo {
-        width: 32px; height: 32px; flex-shrink: 0;
+        width: 40px; height: 40px; flex-shrink: 0;
         color: #00d2ff;
       }
       #hud-header-left .hud-logo svg { width:100%; height:100%; display:block; }
