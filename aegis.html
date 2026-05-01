@@ -1722,6 +1722,20 @@ document.addEventListener('DOMContentLoaded',function(){
     function boot() {
       if (window.HUDShell) {
         HUDShell.init({ page: 'aegis', moduleName: 'Aegis' });
+        // CMD100.48: force default cmd module visible after all aegis-registry
+        // / cmd-center scripts have settled. This restores the historical
+        // "Command is the landing tab" behavior in case any post-init script
+        // strips the static `on` classes from #mod-cmd / #lni-cmd.
+        setTimeout(function() {
+          if (typeof window.switchMod === 'function') {
+            window.switchMod('cmd');
+          } else {
+            var m = document.getElementById('mod-cmd');
+            var l = document.getElementById('lni-cmd');
+            if (m) m.classList.add('on');
+            if (l) l.classList.add('on');
+          }
+        }, 200);
       } else {
         setTimeout(boot, 25);
       }
