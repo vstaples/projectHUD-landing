@@ -1381,7 +1381,7 @@ const HUDShell = (() => {
     // a non-semantic tag like <div onclick>. Covers existing module
     // markup (resources.html, cadence.html, pipeline.html etc. use
     // <div class="tab"> instead of <button>).
-    const ACTIONABLE_CLASS_RX = /\b(tab|tab-btn|tab-strip-item|nav-item|subnav-item|sub-?nav|menu-item|btn|button|chip)\b/i;
+    const ACTIONABLE_CLASS_RX = /\b(tab|tab-btn|tab-strip-item|nav-item|subnav-item|sub-?nav|menu-item|btn|button|chip|p-card|add-card-btn)\b/i;
 
     function isActionable(el) {
       if (!el || el.nodeType !== 1) return false;
@@ -1401,12 +1401,21 @@ const HUDShell = (() => {
     function findActionable(target) {
       let el = target;
       let hops = 0;
+      let firstHit = null;
       while (el && hops < 8) {
-        if (isActionable(el)) return el;
+        if (isActionable(el)) {
+          if (!firstHit) firstHit = el;
+          // CMD100.55: prefer an outer card ancestor over inner clickable
+          // children (chips, avatars, badges). Per the Pipeline A2 spec,
+          // clicking anywhere inside a prospect card emits Open Prospect,
+          // not the chip's own command.
+          const cls = (el.className && typeof el.className === 'string') ? el.className : '';
+          if (/\bp-card\b/.test(cls)) return el;
+        }
         el = el.parentElement;
         hops++;
       }
-      return null;
+      return firstHit;
     }
 
     function extractLabel(el) {
@@ -1464,6 +1473,20 @@ const HUDShell = (() => {
       // 1. Override
       const override = el.getAttribute && el.getAttribute('data-aegis-cmd');
       if (override) return override;
+
+      const cls = (el.className && typeof el.className === 'string') ? el.className : '';
+
+      // 1a. Pipeline-specific rules (CMD100.55).
+      // Prospect card: descend into prospect detail.
+      if (/\bp-card\b/.test(cls)) {
+        const nameEl = el.querySelector && el.querySelector('.p-card-name');
+        const name = nameEl ? _cleanLabel(nameEl.textContent || '') : '';
+        return name ? `Open Prospect "${name}"` : null;
+      }
+      // Per-column add button: opens the New Prospect drawer.
+      if (/\badd-card-btn\b/.test(cls)) {
+        return `Form Open "Add Prospect"`;
+      }
 
       // 2. Container-based: walk ancestors, look for nav/tab signals
       let p = el.parentElement;
