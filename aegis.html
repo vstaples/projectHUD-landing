@@ -1142,7 +1142,10 @@ VS: Click &quot;Approve&quot;"
 
 <script>
 // ── Clock ──
-function tick(){const n=new Date();document.getElementById('clk').textContent=n.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+// CMD100.48: #clk lived inside the removed legacy topbar. The standard
+// hud-shell header now provides the clock, so this is a no-op when #clk
+// isn't found.
+function tick(){const el=document.getElementById('clk');if(!el)return;el.textContent=new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'})}
 tick();setInterval(tick,1000);
 
 // ── Module switching ──
