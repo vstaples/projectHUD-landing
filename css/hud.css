@@ -66,7 +66,9 @@
 }
 
 /* ── BASE ───────────────────────────────────────────────────── */
-html, body { height: 100%; overflow: hidden; }
+/* CMD100.37: page-level scroll. Removed fixed height + overflow:hidden so
+   content taller than the viewport extends the page and scrolls naturally. */
+html, body { min-height: 100%; }
 body {
   background: var(--bg0);
   color: var(--text1);
@@ -368,7 +370,7 @@ body.hud-tier1-rendered #hud-sidebar-panel { top: 90px; }
 body.hud-tier1-rendered.hud-header-rendered .hud-shell,
 body.hud-tier1-rendered.hud-header-rendered #compass-app,
 body.hud-tier1-rendered.hud-header-rendered #app {
-  height: calc(100vh - 90px) !important;
+  min-height: calc(100vh - 90px) !important;
   margin-top: 90px;
 }
 
