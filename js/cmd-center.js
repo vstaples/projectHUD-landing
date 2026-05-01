@@ -512,15 +512,29 @@ function _connect() {
   function _handleCmd(payload) {
     var d = payload.payload;
     if (!d) return;
-    if (d.target !== _mySession.userId && d.target !== 'ALL') return;
+    var isMine = (d.target === _mySession.userId);
+    var isAll  = (d.target === 'ALL');
+    console.log('[recv-cmd]', {
+      target: d.target,
+      mine: isMine,
+      all: isAll,
+      myUid: _mySession && _mySession.userId,
+      aegisMode: !!window._aegisMode,
+      cmd: d.cmd,
+      cmdId: d.cmdId,
+      from: d.from
+    });
+    if (!isMine && !isAll) return;
     if (window._aegisMode) return; // Aegis dispatches but never executes
-    // CMD62: cmdId dedup — with broadcast.self=true on both channels,
-    // every cmd arrives twice on a CMD62↔CMD62 pair. Drop the duplicate.
-    if (d.cmdId && _seenCmdIds[d.cmdId]) return;
+    if (d.cmdId && _seenCmdIds[d.cmdId]) {
+      console.log('[recv-cmd] dedup drop', d.cmdId);
+      return;
+    }
     if (d.cmdId) { _seenCmdIds[d.cmdId] = Date.now(); _purgeSeenCmdIds(); }
     _appendLine(d.from || 'SYS', 'cmd', d.cmd);
+    console.log('[recv-cmd] executing', d.cmd);
     _executeCommand(d.cmd, d.from).then(function(result) {
-      // Always ack so the dispatcher doesn't time out. Undefined → true (completed).
+      console.log('[recv-cmd] completed', { cmd: d.cmd, result: result });
       _channelSend({
         type: 'broadcast', event: 'result',
         payload: {
@@ -530,7 +544,7 @@ function _connect() {
         }
       });
     }).catch(function(err) {
-      // Execution threw — still ack, but carry the error so the dispatcher can see it.
+      console.warn('[recv-cmd] threw', { cmd: d.cmd, err: err && err.message });
       _appendLine('SYS', 'err', 'Cmd failed: ' + (err && err.message ? err.message : err));
       _channelSend({
         type: 'broadcast', event: 'result',
@@ -1492,6 +1506,7 @@ var COMMANDS = {
       'users':      '/users.html'
     };
     var href = pageMap[key];
+    console.log('[cmd:Register]', { args: args, name: name, key: key, href: href, currentLoc: window.location.pathname, aegisMode: !!window._aegisMode });
     if (!href) return 'Register: unknown module "' + name + '"';
     window.location.href = href;
     return 'registered to ' + name + ' (' + href + ')';
@@ -1518,6 +1533,7 @@ var COMMANDS = {
       'resource-requests': '/resource-requests.html'
     };
     var href = pageMap[key];
+    console.log('[cmd:Set Page]', { args: args, name: name, key: key, href: href, currentLoc: window.location.pathname, aegisMode: !!window._aegisMode });
     if (!href) return 'Set Page: unknown module "' + name + '"';
     window.location.href = href;
     return 'navigating to ' + name + ' (' + href + ')';
@@ -1533,6 +1549,7 @@ var COMMANDS = {
     var target = (args[0] || '').toString().trim().toLowerCase();
     if (!target) return 'Open Prospect: missing prospect name';
     var cards = document.querySelectorAll('.p-card');
+    console.log('[cmd:Open Prospect]', { args: args, target: target, cardCount: cards.length, currentLoc: window.location.pathname, aegisMode: !!window._aegisMode });
     if (!cards.length) return 'Open Prospect: no .p-card elements on this page (is Pipeline loaded?)';
     var match = null;
     cards.forEach(function(c) {
@@ -1542,6 +1559,7 @@ var COMMANDS = {
       if (name === target) match = c;
     });
     if (!match) return 'Open Prospect: no card with name "' + args[0] + '"';
+    console.log('[cmd:Open Prospect] clicking matched card', match);
     match.click();
     return 'opened prospect "' + args[0] + '"';
   },
@@ -3169,34 +3187,54 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
       // CMD100.59 — pre-nav heartbeat capture. Navigation commands
       // (Register / Set Page / Set View / Open Prospect) tear down the
       // target's WebSocket; the ack may not arrive before the page
-      // reloads. Capture the session's pre-nav lastSeen so we can wait
-      // for a fresher heartbeat post-execution as proof the new page
-      // has reconnected.
+      // reloads.
       var _NAV_VERBS = ['Register','Set Page','Set View','Open Prospect'];
       var _isNavCmd = _NAV_VERBS.indexOf(parsed.verb) !== -1;
-      var _preNavLastSeen = _isNavCmd && _sessions[targetUserId]
+      var _preNavLastSeen = _sessions[targetUserId]
         ? (_sessions[targetUserId].lastSeen || 0)
         : 0;
 
+      console.log('[script-nav]', {
+        line: i+1,
+        verb: parsed.verb,
+        isNav: _isNavCmd,
+        target: parsed.target,
+        targetUserId: targetUserId,
+        preNavLastSeen: _preNavLastSeen,
+        sessionsKnown: Object.keys(_sessions),
+        targetSessionEntry: _sessions[targetUserId] ? {
+          online: _sessions[targetUserId].online,
+          lastSeen: _sessions[targetUserId].lastSeen,
+          location: _sessions[targetUserId].location,
+          initials: _sessions[targetUserId].initials,
+          alias: _sessions[targetUserId].alias
+        } : null,
+        channelOpen: !!_channel
+      });
+
       if (_channel) {
+        var _cmdId = Date.now() + '-' + i;
+        console.log('[script-nav] dispatching cmd', { cmdId: _cmdId, target: targetUserId, cmd: _resolvedLine });
         _channelSend({
           type: 'broadcast', event: 'cmd',
           payload: {
             target: targetUserId,
             from:   _myAlias || _mySession.initials,
             cmd:    _resolvedLine,
-            cmdId:  Date.now() + '-' + i,
+            cmdId:  _cmdId,
           }
         });
+      } else {
+        console.warn('[script-nav] no channel — cmd not dispatched', _resolvedLine);
       }
+
       try {
         // Nav commands use a short timeout — the page tears down quickly
-        // and an ack may never arrive. We don't actually rely on the ack;
-        // we wait for a fresh heartbeat below.
+        // and an ack may never arrive.
         var _waitTimeout = _isNavCmd ? 1500 : 30000;
+        console.log('[script-nav] awaiting ack', { eventName: 'result:' + targetUserId, timeoutMs: _waitTimeout });
         var _ackData = await _waitForEvent('result:' + targetUserId, _waitTimeout);
-        // Propagate key vars from remote ack into local _storeVars so the
-        // rest of the script (running locally on Aegis) can reference them.
+        console.log('[script-nav] ack received', _ackData);
         if (_ackData && typeof _ackData.result === 'string') {
           var _m = _ackData.result.match(/^submitted · instance ([a-f0-9-]+)/i);
           if (_m) {
@@ -3205,26 +3243,53 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
           }
         }
       } catch(e) {
-        // For non-nav commands a timeout is a real warning. For nav
-        // commands a missing ack is expected — the page is reloading.
+        console.log('[script-nav] ack timed out', { isNav: _isNavCmd, message: e && e.message });
         if (!_isNavCmd) {
           _appendLine('SYS', 'warn', 'Timeout waiting for ' + parsed.target);
         }
       }
 
-      // CMD100.59 — post-nav heartbeat wait. Block until the target
-      // session emits a heartbeat newer than the pre-nav timestamp,
-      // signaling that the new page has loaded and reconnected. Cap
-      // at 10s so a truly broken nav surfaces as a script-level error.
-      if (_isNavCmd && _preNavLastSeen > 0) {
-        var _navDeadline = Date.now() + 10000;
+      // CMD100.60 — post-nav settle. Two-phase wait: minimum delay so
+      // the new page actually starts unloading the old, then heartbeat
+      // freshness confirmation.
+      if (_isNavCmd) {
+        var _settleStart = Date.now();
+        var _MIN_SETTLE_MS = 1500;
+        // Phase 1 — minimum delay
+        console.log('[script-nav] phase1 minimum settle delay', { ms: _MIN_SETTLE_MS });
+        await new Promise(function(r){ setTimeout(r, _MIN_SETTLE_MS); });
+
+        // Phase 2 — heartbeat freshness
+        var _navDeadline = Date.now() + 8000;
+        var _polls = 0;
+        console.log('[script-nav] phase2 heartbeat watch', {
+          preNavLastSeen: _preNavLastSeen,
+          deadlineMsFromNow: 8000
+        });
         while (Date.now() < _navDeadline) {
+          _polls++;
           var _now = _sessions[targetUserId] && _sessions[targetUserId].lastSeen;
-          if (_now && _now > _preNavLastSeen + 250) break; // 250ms guard against clock skew
+          var _online = _sessions[targetUserId] && _sessions[targetUserId].online;
+          var _loc = _sessions[targetUserId] && _sessions[targetUserId].location;
+          if (_now && _now > _preNavLastSeen + 250 && _online) {
+            console.log('[script-nav] settled', {
+              polls: _polls,
+              elapsedMs: Date.now() - _settleStart,
+              newLastSeen: _now,
+              newLocation: _loc
+            });
+            break;
+          }
           await new Promise(function(r){ setTimeout(r, 100); });
         }
         var _settled = _sessions[targetUserId] && _sessions[targetUserId].lastSeen;
         if (!_settled || _settled <= _preNavLastSeen + 250) {
+          console.warn('[script-nav] settle timeout', {
+            preNavLastSeen: _preNavLastSeen,
+            currentLastSeen: _settled,
+            online: _sessions[targetUserId] && _sessions[targetUserId].online,
+            location: _sessions[targetUserId] && _sessions[targetUserId].location
+          });
           _appendLine('SYS', 'warn', 'Nav settle timeout for ' + parsed.target + ' (page may not have reloaded)');
         }
       }
