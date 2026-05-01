@@ -8,6 +8,7 @@
 // CMD100.41: Header avatar populated from sidebar's resolved currentUser (no more "—").
 // CMD100.42: Per-module icons + split-color wordmarks; shared scrolling ticker; standardized header across all modules.
 // CMD100.46: ProjectHUD icon framed like other modules; wordmark split-coloring centralized; dashboard custom overrides removed.
+// CMD100.50: Recorder — global click-recorder in hud-shell broadcasts inferred Aegis-canonical command lines via `recorder_event`. Aegis renders armed sessions' lines into the transcript pane. Per-session record button added to Sessions panel.
 // Unified shell: slide-in sidebar (absorbed from sidebar.js v3.1)
 //                + unified header bar (logo / ticker / operator-status)
 //                + Tier 1 sub-header strip (major-area tabs)
@@ -1328,7 +1329,14 @@ const HUDShell = (() => {
           av.title = currentUser.name;
         }
         // Also expose globally so any later _refreshAvatarFromAuth pass succeeds.
-        window.CURRENT_USER = currentUser;
+        // CMD100.50: normalize for recorder pipe — must include `user_id` and an
+        // `alias` (initials fallback) so emitted recorder_event payloads carry
+        // identifying info Aegis can match against its _sessions table.
+        window.CURRENT_USER = Object.assign({}, currentUser, {
+          user_id: currentUser.user_id || currentUser.id || userId || null,
+          alias:   currentUser.alias   || currentUser.initials
+                   || (currentUser.name||'').split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,3)
+        });
       }
       if (showToolbar) {
         const ph = document.getElementById('ctx-toolbar-placeholder');
@@ -1346,8 +1354,147 @@ const HUDShell = (() => {
   }
 
   // ── Public API ───────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────
+  // RECORDER — CMD100.50
+  // Inference-first global click handler. Walks up from event.target,
+  // classifies the element, extracts a label, and broadcasts a
+  // 'recorder_event' payload via the existing Compass channel.
+  // Aegis subscribes and renders armed sessions' commands into the
+  // transcript pane.
+  //
+  // No data-aegis-* tagging required by default. Override available
+  // via data-aegis-cmd="<verbatim command>" if inference is wrong.
+  //
+  // Skipped tags: only fires for strict actionables — button, a[href],
+  // [role=button|tab], input[type=button|submit]. Generic <div onclick>
+  // is intentionally ignored to avoid noise.
+  // ────────────────────────────────────────────────────────────────
+  function _recorderInit() {
+    if (window.__hudRecorderInstalled) return;
+    window.__hudRecorderInstalled = true;
+
+    const ACTIONABLE_TAGS = new Set(['BUTTON', 'A']);
+    const ACTIONABLE_ROLES = new Set(['button', 'tab']);
+    const ACTIONABLE_INPUT_TYPES = new Set(['button', 'submit']);
+
+    function isActionable(el) {
+      if (!el || el.nodeType !== 1) return false;
+      if (el.hasAttribute && el.hasAttribute('data-aegis-cmd')) return true;
+      const tag = el.tagName;
+      if (tag === 'BUTTON') return true;
+      if (tag === 'A' && el.hasAttribute('href')) return true;
+      if (tag === 'INPUT' && ACTIONABLE_INPUT_TYPES.has((el.type||'').toLowerCase())) return true;
+      const role = el.getAttribute && el.getAttribute('role');
+      if (role && ACTIONABLE_ROLES.has(role)) return true;
+      return false;
+    }
+
+    function findActionable(target) {
+      let el = target;
+      let hops = 0;
+      while (el && hops < 8) {
+        if (isActionable(el)) return el;
+        el = el.parentElement;
+        hops++;
+      }
+      return null;
+    }
+
+    function extractLabel(el) {
+      const al = el.getAttribute && el.getAttribute('aria-label');
+      if (al && al.trim()) return al.trim();
+      const txt = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (txt) return txt;
+      const t = el.getAttribute && el.getAttribute('title');
+      if (t && t.trim()) return t.trim();
+      const v = el.value;
+      if (v && String(v).trim()) return String(v).trim();
+      return '';
+    }
+
+    function classify(el, label) {
+      // 1. Override
+      const override = el.getAttribute && el.getAttribute('data-aegis-cmd');
+      if (override) return override;
+
+      // 2. Container-based: walk ancestors, look for nav/tab signals
+      let p = el.parentElement;
+      let depth = 0;
+      const TAB_RX  = /\b(tab|tabs|tier2|sub-?nav)\b/i;
+      const NAV_RX  = /\b(nav|sidebar|menu|hud-sidebar|tier1)\b/i;
+      const SUBTAB_RX = /\b(sub-?tab|subtab|sub-?nav)\b/i;
+      let inNav = false, inTab = false, inSubtab = false, inForm = false, inDialog = false;
+      while (p && depth < 12) {
+        const tag = p.tagName;
+        const cls = (p.className && typeof p.className === 'string') ? p.className : '';
+        const role = p.getAttribute && p.getAttribute('role');
+        if (tag === 'NAV' || NAV_RX.test(cls)) inNav = true;
+        if (TAB_RX.test(cls) || role === 'tablist') inTab = true;
+        if (SUBTAB_RX.test(cls)) inSubtab = true;
+        if (tag === 'FORM') inForm = true;
+        if (role === 'dialog' || /\b(modal|dialog|popover)\b/i.test(cls)) inDialog = true;
+        p = p.parentElement;
+        depth++;
+      }
+
+      // 3. Tag-based fallbacks
+      const tag = el.tagName;
+      const role = el.getAttribute && el.getAttribute('role');
+
+      if (inNav && !inTab) return `Set Page "${label}"`;
+      if (inSubtab) return `Set SubTab "${label}"`;
+      if (inTab || role === 'tab') return `Set Tab "${label}"`;
+      if (inDialog || inForm) return `Click "${label}"`;
+      if (tag === 'A') return `Set Page "${label}"`;
+      // Top-level standalone button → bare command
+      return label;
+    }
+
+    function emit(command) {
+      if (!command) return;
+      const ch = window._cmdCenterChannelSend;
+      if (typeof ch === 'function') {
+        ch({
+          type: 'broadcast',
+          event: 'recorder_event',
+          payload: {
+            user_id: (window.CURRENT_USER && window.CURRENT_USER.user_id) || null,
+            alias:   (window.CURRENT_USER && (window.CURRENT_USER.alias || window.CURRENT_USER.initials)) || '??',
+            command: command,
+            ts: Date.now()
+          }
+        });
+      }
+    }
+
+    document.addEventListener('click', function(ev) {
+      try {
+        const el = findActionable(ev.target);
+        if (!el) return;
+        const label = extractLabel(el);
+        if (!label) return;
+        const cmd = classify(el, label);
+        if (!cmd) return;
+        emit(cmd);
+      } catch(e) {
+        // Recorder must never break the page.
+      }
+    }, true);
+  }
+
+  // Install recorder once HUDShell has booted.
+  // Wrapped in try/catch so a recorder failure never blocks shell init.
+  function _installRecorderAfterInit() {
+    try { _recorderInit(); } catch(e) {}
+  }
+
   const api = {
-    init,
+    init: function(opts) {
+      const result = init(opts);
+      // Install recorder once init completes (idempotent).
+      _installRecorderAfterInit();
+      return result;
+    },
     selectTier1: _selectTier1,
     selectTier2: _selectTier2,
     getActiveTier1: () => _tier1Active,

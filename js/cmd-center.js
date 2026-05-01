@@ -228,6 +228,11 @@ function _channelSend(payload) {
   _safeSendOn(_channelLegacy, payload);
 }
 
+// CMD100.50: Recorder bridge. Expose _channelSend so hud-shell.js's
+// global click-recorder can broadcast `recorder_event` payloads on the
+// shared Compass channel without needing internal access.
+window._cmdCenterChannelSend = _channelSend;
+
 function _safeSendOn(ch, payload) {
   if (!ch) return;
   try {
@@ -623,6 +628,20 @@ function _connect() {
   // intentionally unchanged — they key on cmdId dedup (Rule 25) plus
   // target-match (cmd) / from-match (result), both of which handle the
   // twin-tab case correctly without the _aegisMode guard.
+  // ── CMD100.50 — Recorder pipe ──────────────────────────────
+  // Per-session arm map. Keys are session userIds; truthy → armed.
+  // Ephemeral: cleared on Aegis reload (no localStorage persistence).
+  var _recordArmed = {};
+
+  function _handleRecorderEvent(payload) {
+    var d = payload.payload;
+    if (!d || !d.user_id || !d.command) return;
+    if (!_recordArmed[d.user_id]) return;
+    var alias = d.alias || (_sessions[d.user_id] && (_sessions[d.user_id].alias || _sessions[d.user_id].initials)) || '??';
+    // _appendLine prepends "<who>: " for cmd-type lines from non-self sources.
+    _appendLine(alias, 'cmd', d.command);
+  }
+
   function _handleAppEvent(payload) {
     var d = payload.payload;
     if (!d) return;
@@ -667,6 +686,9 @@ function _connect() {
   _channelLegacy.on('broadcast', { event: 'result'          }, _handleResult);
   _channel.on(      'broadcast', { event: 'app_event'       }, _handleAppEvent);
   _channelLegacy.on('broadcast', { event: 'app_event'       }, _handleAppEvent);
+  // CMD100.50: Recorder events from any module's hud-shell click handler.
+  _channel.on(      'broadcast', { event: 'recorder_event'  }, _handleRecorderEvent);
+  _channelLegacy.on('broadcast', { event: 'recorder_event'  }, _handleRecorderEvent);
 
   // CMD-PRESENCE-4 (CMD85): Broadcast-based presence liveness.
   // Phoenix Presence's metadata update path doesn't reliably propagate ts
@@ -3850,6 +3872,10 @@ function _renderSessionList() {
       : (_leaveTimers&&_leaveTimers[uid])
         ? '<div style="width:6px;height:6px;border-radius:50%;background:#EF9F27;flex-shrink:0"></div>'
         : '<div style="width:6px;height:6px;border-radius:50%;background:rgba(0,201,201,0.35);flex-shrink:0"></div>';
+    // CMD100.50: per-session record button. Idle = hollow circle, armed = filled red.
+    var armed = !!(typeof _recordArmed !== 'undefined' && _recordArmed[uid]);
+    var recBtn = '<div class="phr-rec-btn" data-rec-uid="' + uid + '" title="' + (armed?'Stop recording':'Record this session') + '" '
+      + 'style="width:14px;height:14px;border-radius:50%;border:1.5px solid ' + (armed?'#E24B4A':'rgba(226,75,74,0.55)') + ';background:' + (armed?'#E24B4A':'transparent') + ';flex-shrink:0;cursor:pointer;margin-right:4px"></div>';
     html += '<div data-uid="' + uid + '" style="display:flex;align-items:center;gap:7px;padding:5px 10px;cursor:pointer;background:' + bg + ';border-left:' + border + '">'
       + '<div style="width:22px;height:22px;border-radius:50%;background:' + color + '22;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:' + color + ';flex-shrink:0">' + s.initials + '</div>'
       + '<div style="flex:1;min-width:0">'
@@ -3859,6 +3885,7 @@ function _renderSessionList() {
       + '</div>'
       + '<div style="font-size:9px;color:#EF9F27;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">' + (s.location||'—') + '</div>'
       + '</div>'
+      + recBtn
       + onlineIndicator
       + '</div>';
   });
@@ -3883,6 +3910,23 @@ function _renderSessionList() {
         pill.style.borderColor = 'rgba(0,201,201,0.45)';
       }
     };
+  });
+
+  // CMD100.50: wire record-button toggles. Stop propagation so the
+  // click doesn't bubble to the row-select handler above.
+  container.querySelectorAll('.phr-rec-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(ev) {
+      ev.stopPropagation();
+      var uid = btn.dataset.recUid;
+      if (!uid) return;
+      _recordArmed[uid] = !_recordArmed[uid];
+      var sess = _sessions[uid];
+      var alias = (sess && (sess.alias || sess.initials)) || uid.slice(0, 4);
+      _appendLine('SYS', 'sys', _recordArmed[uid]
+        ? 'Recording armed for ' + alias
+        : 'Recording stopped for ' + alias);
+      _renderSessionList();
+    });
   });
 }
 
