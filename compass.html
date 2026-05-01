@@ -62,10 +62,11 @@
    bell button is also retired — bell now lives in the unified header. */
 
 /* ── View panels ─────────────────────────────────────────── */
+/* CMD100.37: page-level scroll. compass-view no longer has its own scroll
+   container; content flows past viewport and the page scrolls naturally. */
 .compass-view {
   display: none;
   flex: 1;
-  overflow-y: auto;
 }
 
 .compass-view.active {

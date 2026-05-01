@@ -3,6 +3,7 @@
 // CMD100.25: Tier 2 strip shifted +6px (left:6→width:144) to clear the slide-in edge trigger.
 // CMD100.26: Display brightness/contrast tuning popover added to header strip (sun icon).
 // CMD100.31: Display popover extended — saturation slider + Compass panel color picker (HEX) + panel transparency.
+// CMD100.37: Shell uses min-height instead of fixed height so page scrolls naturally past the viewport.
 // Unified shell: slide-in sidebar (absorbed from sidebar.js v3.1)
 //                + unified header bar (logo / ticker / operator-status)
 //                + Tier 1 sub-header strip (major-area tabs)
@@ -160,11 +161,13 @@ const HUDShell = (() => {
       }
       /* When unified header renders, shift the first/main shell child below it.
          Targets common root patterns without padding the body itself (which
-         breaks 100vh layouts on surfaces that use overflow:hidden). */
+         breaks 100vh layouts on surfaces that use overflow:hidden).
+         CMD100.37: min-height instead of fixed height so content longer than
+         the viewport extends the shell and the page scrolls naturally. */
       body.hud-header-rendered .hud-shell,
       body.hud-header-rendered #compass-app,
       body.hud-header-rendered #app {
-        height: calc(100vh - 48px) !important;
+        min-height: calc(100vh - 48px) !important;
         margin-top: 48px;
       }
       #hud-header-left {

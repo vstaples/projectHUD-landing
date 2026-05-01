@@ -1,6 +1,6 @@
-// VERSION: 20260430-CMD100.36
-window._mwCoreVersion = 'v20260430-CMD100.36';
-console.log('%c[mw-core] v20260430-CMD100.36 — work queue rows now scroll internally (max-height 380px)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: 20260430-CMD100.37
+window._mwCoreVersion = 'v20260430-CMD100.37';
+console.log('%c[mw-core] v20260430-CMD100.37 — page-level scroll restored; work queue list cap removed','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
@@ -1075,7 +1075,7 @@ window._mwLoadUserView = async function() {
                 onmouseleave="clearTimeout(window._wqLegendTimer)">?</span>
             </div>
           </div>
-          <div id="work-list-rows" style="${_diagramMode?'display:none':'max-height:380px;overflow-y:auto'}">${workListRows()}</div>
+          <div id="work-list-rows" style="${_diagramMode?'display:none':''}">${workListRows()}</div>
           <!-- Diagram view -->
           <div id="mw-diagram-wrap" style="${_diagramMode?'':'display:none'}">
             <!-- 4-cell diagram grid:
