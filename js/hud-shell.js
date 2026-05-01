@@ -1381,7 +1381,7 @@ const HUDShell = (() => {
     // a non-semantic tag like <div onclick>. Covers existing module
     // markup (resources.html, cadence.html, pipeline.html etc. use
     // <div class="tab"> instead of <button>).
-    const ACTIONABLE_CLASS_RX = /\b(tab|tab-btn|tab-strip-item|nav-item|menu-item|btn|button|chip)\b/i;
+    const ACTIONABLE_CLASS_RX = /\b(tab|tab-btn|tab-strip-item|nav-item|subnav-item|sub-?nav|menu-item|btn|button|chip)\b/i;
 
     function isActionable(el) {
       if (!el || el.nodeType !== 1) return false;
