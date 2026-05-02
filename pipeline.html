@@ -698,7 +698,7 @@ async function loadData() {
   try {
     const [pros, comps, ress] = await Promise.all([
       API.get('v_pipeline_summary?order=created_at.desc&limit=200'),
-      API.get('companies?order=name&select=id,name,industry'),
+      API.get('companies?order=name&select=id,name,industry,firm_id'),
       API.get('resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,avatar_url'),
     ]);
     allProspects = pros || [];
@@ -891,7 +891,22 @@ function populateFormSelects() {
       return;
     }
     try {
-      const result = await API.post('companies', { name: name.trim() });
+      // CMD100.74: companies requires firm_id (NOT NULL, no default).
+      // Use the operator's firm_id from the existing companies cache.
+      // Every row in `companies` is firm-scoped via RLS so any cached
+      // company's firm_id is the right one.
+      const firmId = companies[0]?.firm_id
+                  || (window.CURRENT_USER && window.CURRENT_USER.firm_id)
+                  || null;
+      if (!firmId) {
+        _showFormError('Could not add company', 'No firm context available — try refreshing.');
+        cSel.value = '';
+        return;
+      }
+      const result = await API.post('companies', {
+        name: name.trim(),
+        firm_id: firmId
+      });
       const newCo = result?.[0];
       if (!newCo) throw new Error('No company returned from insert');
       // Add to local cache.
