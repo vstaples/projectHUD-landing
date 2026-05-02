@@ -19,6 +19,12 @@
   --muted:     #7a8099;
   --accent:    #4f8ef7;
 
+  /* CMD101.5j — unified palette overrides. hud.css ships --red:#ff4757
+     and --amber:#ffaa00; the pipeline page uses brighter red and the
+     KPI yellow as canonical "warning" / "danger" tones. */
+  --red:    #E60000;
+  --amber:  #f0c47a;
+
   /* CMD101: kanban-stage swatches kept as pre-existing local tokens.
      The brief's stage-color tokens (--stage-prospect..--stage-approved)
      are added to hud.css §3 and are referenced by the dashboard widgets,
@@ -163,8 +169,8 @@ body {
   background: var(--text-accent, #00d2ff);
 }
 .pl-kpi__bar--good    { background: var(--green, #00e5a0); }
-.pl-kpi__bar--caution { background: var(--amber, #ffaa00); }
-.pl-kpi__bar--bad     { background: var(--red,   #ff4757); }
+.pl-kpi__bar--caution { background: var(--amber, #f0c47a); }
+.pl-kpi__bar--bad     { background: var(--red,   #E60000); }
 .pl-kpi__label {
   font-size: 11px;
   font-weight: 700;
@@ -180,8 +186,8 @@ body {
   font-feature-settings: "tnum";
 }
 .pl-kpi__value--good    { color: var(--green, #00e5a0); }
-.pl-kpi__value--caution { color: var(--amber, #ffaa00); }
-.pl-kpi__value--bad     { color: var(--red,   #ff4757); }
+.pl-kpi__value--caution { color: var(--amber, #f0c47a); }
+.pl-kpi__value--bad     { color: var(--red,   #E60000); }
 .pl-kpi__value--accent  { color: var(--text-accent, #00d2ff); }
 .pl-kpi__sub {
   font-size: 11px;
@@ -215,7 +221,7 @@ body {
   color: var(--text);
   font-feature-settings: "tnum";
 }
-.pl-panel__count--bad { color: var(--red, #ff4757); }
+.pl-panel__count--bad { color: var(--red, #E60000); }
 
 /* Funnel velocity — six tiles + five conversion %s */
 .pl-funnel {
@@ -240,7 +246,7 @@ body {
 .pl-funnel__stage[data-stage="prospect"]   { border-top-color: var(--stage-prospect,   #00e5a0); }
 .pl-funnel__stage[data-stage="qualifying"] { border-top-color: var(--stage-qualifying, #5dcaa5); }
 .pl-funnel__stage[data-stage="discovery"]  { border-top-color: var(--stage-discovery,  #00d2ff); }
-.pl-funnel__stage[data-stage="proposal"]   { border-top-color: var(--stage-proposal,   #ffaa00); }
+.pl-funnel__stage[data-stage="proposal"]   { border-top-color: var(--stage-proposal,   #f0c47a); }
 .pl-funnel__stage[data-stage="review"]     { border-top-color: var(--stage-review,     #9b59b6); }
 .pl-funnel__stage[data-stage="approved"]   { border-top-color: var(--stage-approved,   #00e5a0); }
 .pl-funnel__name {
@@ -262,7 +268,7 @@ body {
 .pl-funnel__stage[data-stage="qualifying"] .pl-funnel__val,
 .pl-funnel__stage[data-stage="discovery"]  .pl-funnel__val { color: var(--text); }
 .pl-funnel__stage[data-stage="proposal"]   .pl-funnel__val,
-.pl-funnel__stage[data-stage="review"]     .pl-funnel__val { color: var(--amber, #ffaa00); }
+.pl-funnel__stage[data-stage="review"]     .pl-funnel__val { color: var(--amber, #f0c47a); }
 .pl-funnel__stage[data-stage="approved"]   .pl-funnel__val { color: var(--green, #00e5a0); }
 .pl-funnel__meta {
   font-size: 11px;
@@ -287,8 +293,9 @@ body {
   left: 0;
   right: 0;
   top: 50%;
-  height: 1px;
-  background: var(--border2);
+  height: 2px;
+  background: var(--muted);
+  opacity: .55;
   z-index: 0;
 }
 .pl-funnel__conv > span {
@@ -298,8 +305,8 @@ body {
   padding: 1px 6px;
 }
 .pl-funnel__conv--good    { color: var(--green, #00e5a0); }
-.pl-funnel__conv--caution { color: var(--amber, #ffaa00); }
-.pl-funnel__conv--bad     { color: var(--red,   #ff4757); }
+.pl-funnel__conv--caution { color: var(--amber, #f0c47a); }
+.pl-funnel__conv--bad     { color: var(--red,   #E60000); }
 
 /* Active deals list */
 .pl-deals { display: flex; flex-direction: column; }
@@ -322,8 +329,8 @@ body {
   background: var(--green, #00e5a0);
 }
 .pl-deal__bar--ok  { background: var(--green, #00e5a0); }
-.pl-deal__bar--cau { background: var(--amber, #ffaa00); }
-.pl-deal__bar--bad { background: var(--red,   #ff4757); }
+.pl-deal__bar--cau { background: var(--amber, #f0c47a); }
+.pl-deal__bar--bad { background: var(--red,   #E60000); }
 .pl-deal__main { min-width: 0; }
 .pl-deal__title {
   font-size: 13px;
@@ -352,7 +359,7 @@ body {
 .pl-deal__stage[data-stage="prospect"]   { color: var(--stage-prospect,   #00e5a0); border-color: var(--stage-prospect,   #00e5a0); background: rgba(0,229,160,.08); }
 .pl-deal__stage[data-stage="qualifying"] { color: var(--stage-qualifying, #5dcaa5); border-color: var(--stage-qualifying, #5dcaa5); background: rgba(93,202,165,.08); }
 .pl-deal__stage[data-stage="discovery"]  { color: var(--stage-discovery,  #00d2ff); border-color: var(--stage-discovery,  #00d2ff); background: rgba(0,210,255,.08); }
-.pl-deal__stage[data-stage="proposal"]   { color: var(--stage-proposal,   #ffaa00); border-color: var(--stage-proposal,   #ffaa00); background: rgba(255,170,0,.08); }
+.pl-deal__stage[data-stage="proposal"]   { color: var(--stage-proposal,   #f0c47a); border-color: var(--stage-proposal,   #f0c47a); background: rgba(240,196,122,.10); }
 .pl-deal__stage[data-stage="review"]     { color: var(--stage-review,     #9b59b6); border-color: var(--stage-review,     #9b59b6); background: rgba(155,89,182,.10); }
 .pl-deal__stage[data-stage="approved"]   { color: var(--stage-approved,   #00e5a0); border-color: var(--stage-approved,   #00e5a0); background: rgba(0,229,160,.08); }
 .pl-deal__status {
@@ -362,8 +369,8 @@ body {
   white-space: nowrap;
 }
 .pl-deal__status--ok  { color: var(--green, #00e5a0); }
-.pl-deal__status--cau { color: var(--amber, #ffaa00); }
-.pl-deal__status--bad { color: var(--red,   #ff4757); }
+.pl-deal__status--cau { color: var(--amber, #f0c47a); }
+.pl-deal__status--bad { color: var(--red,   #E60000); }
 .pl-deal__date {
   font-size: 11px;
   color: var(--muted);
@@ -466,15 +473,12 @@ body {
 }
 .pl-tip__row {
   display: grid;
-  grid-template-columns: max-content 1fr auto;
+  grid-template-columns: 1fr max-content auto;
   align-items: baseline;
-  gap: 8px;
+  gap: 10px;
   padding: 2px 0;
   font-size: 12px;
   font-feature-settings: "tnum";
-}
-.pl-tip__row > .pl-tip__badge {
-  justify-self: start;
 }
 .pl-tip__row > .pl-tip__label {
   color: var(--text);
@@ -482,6 +486,9 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.pl-tip__row > .pl-tip__badge {
+  justify-self: start;
 }
 .pl-tip__row > .pl-tip__val {
   color: var(--text-accent, #00d2ff);
@@ -549,8 +556,8 @@ body {
 .pl-ring__fill  { stroke: var(--text-accent, #00d2ff); stroke-width: 8; fill: none;
                   stroke-linecap: round; transition: stroke-dasharray .6s ease; }
 .pl-ring__fill--good    { stroke: var(--green, #00e5a0); }
-.pl-ring__fill--caution { stroke: var(--amber, #ffaa00); }
-.pl-ring__fill--bad     { stroke: var(--red,   #ff4757); }
+.pl-ring__fill--caution { stroke: var(--amber, #f0c47a); }
+.pl-ring__fill--bad     { stroke: var(--red,   #E60000); }
 .pl-ring__txt {
   font-size: 14px;
   font-weight: 700;
@@ -606,8 +613,8 @@ body {
   flex-shrink: 0;
   white-space: nowrap;
 }
-.pl-rail-row__right--bad     { color: var(--red,   #ff4757); }
-.pl-rail-row__right--caution { color: var(--amber, #ffaa00); }
+.pl-rail-row__right--bad     { color: var(--red,   #E60000); }
+.pl-rail-row__right--caution { color: var(--amber, #f0c47a); }
 .pl-rail-row__right--accent  { color: var(--text-accent, #00d2ff); }
 .pl-rail-empty {
   padding: 14px 4px;
@@ -851,7 +858,7 @@ body {
   flex-shrink: 0;
   line-height: 1;
 }
-.pri-chip--high   { background: rgba(240,122,122,.15); color: #f07a7a; border: 1px solid rgba(240,122,122,.35); }
+.pri-chip--high   { background: rgba(230,0,0,.15); color: #E60000; border: 1px solid rgba(230,0,0,.45); }
 .pri-chip--medium { background: rgba(240,196,122,.15); color: #f0c47a; border: 1px solid rgba(240,196,122,.35); }
 .pri-chip--low    { background: rgba(122,240,160,.15); color: #7af0a0; border: 1px solid rgba(122,240,160,.35); }
 
@@ -956,9 +963,9 @@ body {
 .p-card-date-val .p-card-date-text { color: #f0c47a; }       /* date always amber */
 .p-card-date-val.recent .p-card-age { color: #7af0a0; }
 .p-card-date-val.aging  .p-card-age { color: #f0c47a; }
-.p-card-date-val.stale  .p-card-age { color: #ff3b3b; }      /* bright red */
+.p-card-date-val.stale  .p-card-age { color: #E60000; }      /* bright red */
 /* Follow-up urgency tones */
-.p-card-date-val.overdue { color: #ff3b3b; }                  /* bright red */
+.p-card-date-val.overdue { color: #E60000; }                  /* bright red */
 .p-card-date-val.today   { color: #f0c47a; }
 
 /* action items badge */
@@ -966,9 +973,9 @@ body {
   font-size: 9px;
   padding: 2px 6px;
   border-radius: 8px;
-  background: rgba(240,180,100,.15);
-  color: #f0b464;
-  border: 1px solid rgba(240,180,100,.25);
+  background: rgba(240,196,122,.15);
+  color: #f0c47a;
+  border: 1px solid rgba(240,196,122,.35);
   white-space: nowrap;
   line-height: 1.2;
 }
@@ -1236,7 +1243,7 @@ body {
             <strong id="stat-value">—</strong> total est. value
           </div>
           <div class="stat-chip" id="stat-overdue-wrap" style="display:none">
-            <strong id="stat-overdue" style="color:#f07a7a">—</strong> follow-ups overdue
+            <strong id="stat-overdue" style="color:#E60000">—</strong> follow-ups overdue
           </div>
         </div>
         <div class="toolbar">
@@ -1320,7 +1327,7 @@ body {
     </div>
     <div class="drawer-body">
       <div class="field">
-        <label>Company <span style="color:#f07a7a">*</span></label>
+        <label>Company <span style="color:#E60000">*</span></label>
         <div style="display:flex;gap:6px;align-items:stretch">
           <select id="f-company" style="flex:1">
             <option value="">— Select or add company —</option>
@@ -1330,7 +1337,7 @@ body {
         </div>
       </div>
       <div class="field">
-        <label>Initiative / project title <span style="color:#f07a7a">*</span></label>
+        <label>Initiative / project title <span style="color:#E60000">*</span></label>
         <input id="f-title" type="text" placeholder="e.g. Endoscopic Platform Development" />
       </div>
 
@@ -1397,7 +1404,7 @@ body {
 
       <div class="sec-label">Our team</div>
       <div class="field">
-        <label>Assigned to <span style="color:#f07a7a">*</span></label>
+        <label>Assigned to <span style="color:#E60000">*</span></label>
         <input type="hidden" id="f-assigned" value="" />
         <button type="button" id="f-assigned-trigger" onclick="openAssigneePicker(event)"
           style="width:100%;padding:8px 10px;background:var(--bg2,#0a1424);border:1px solid var(--border1,#1d2c44);border-radius:4px;color:var(--text0,#e8eaf0);text-align:left;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;min-height:36px">
@@ -1408,7 +1415,7 @@ body {
       <div class="sec-label">First follow-up</div>
       <div class="field-row">
         <div class="field">
-          <label>Follow-up date <span style="color:#f07a7a">*</span></label>
+          <label>Follow-up date <span style="color:#E60000">*</span></label>
           <input id="f-followup" type="date" />
         </div>
         <div class="field">
@@ -1566,9 +1573,9 @@ async function loadData() {
   } catch (e) {
     console.error(e);
     document.getElementById('board-wrap').innerHTML =
-      `<div class="board-loading" style="color:#f07a7a">Failed to load pipeline. Check console.</div>`;
+      `<div class="board-loading" style="color:#E60000">Failed to load pipeline. Check console.</div>`;
     document.getElementById('deals-list').innerHTML =
-      `<div class="pl-deals-empty" style="color:#f07a7a">Failed to load. Check console.</div>`;
+      `<div class="pl-deals-empty" style="color:#E60000">Failed to load. Check console.</div>`;
   }
 }
 
@@ -2206,7 +2213,7 @@ function _stagePill(stage) {
   if      (stage === 'prospect')   color = '#5dcaa5';
   else if (stage === 'qualifying') color = '#5dcaa5';
   else if (stage === 'discovery')  color = '#00d2ff';
-  else if (stage === 'proposal')   color = '#ffaa00';
+  else if (stage === 'proposal')   color = '#f0c47a';
   else if (stage === 'review')     color = '#9b59b6';
   else if (stage === 'approved')   color = '#00e5a0';
   return '<span class="pl-tip__stage-pill" style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' + escHtml(label) + '</span>';
@@ -2220,8 +2227,8 @@ var _TIP_RENDERERS = {
     open.sort(function(a,b){ return (b.est_value || 0) - (a.est_value || 0); });
     var rows = open.map(function(p) {
       return '<div class="pl-tip__row">'
-           +   '<span class="pl-tip__badge">' + _stagePill(p.stage) + '</span>'
            +   '<span class="pl-tip__label">' + escHtml(p.title || '(untitled)') + '</span>'
+           +   '<span class="pl-tip__badge">' + _stagePill(p.stage) + '</span>'
            +   '<span class="pl-tip__val">' + (p.est_value ? _fmt$(p.est_value) : '—') + '</span>'
            + '</div>';
     }).join('');
@@ -2253,8 +2260,8 @@ var _TIP_RENDERERS = {
       var prob = STAGE_PROB[s.key] || 0;
       var contrib = b.sum * prob;
       rows += '<div class="pl-tip__row">'
-            +   '<span class="pl-tip__badge">' + _stagePill(s.key) + '</span>'
             +   '<span class="pl-tip__label">' + _fmt$(b.sum) + ' × ' + Math.round(prob * 100) + '%</span>'
+            +   '<span class="pl-tip__badge">' + _stagePill(s.key) + '</span>'
             +   '<span class="pl-tip__val">' + _fmt$(contrib) + '</span>'
             + '</div>';
     });
@@ -2325,9 +2332,9 @@ var _TIP_RENDERERS = {
     var rows = stuckSorted.map(function(p){
       var over = Math.round(_daysInStage(p) - (STUCK_THRESHOLD_DAYS[p.stage] || 0));
       return '<div class="pl-tip__row">'
-           +   '<span class="pl-tip__badge">' + _stagePill(p.stage) + '</span>'
            +   '<span class="pl-tip__label">' + escHtml(p.title || '(untitled)') + '</span>'
-           +   '<span class="pl-tip__val" style="color:#ff4757">+' + over + 'd</span>'
+           +   '<span class="pl-tip__badge">' + _stagePill(p.stage) + '</span>'
+           +   '<span class="pl-tip__val" style="color:#E60000">+' + over + 'd</span>'
            + '</div>';
     }).join('');
     if (!rows) rows = '<div class="pl-tip__note">No stuck deals.</div>';
@@ -2340,7 +2347,7 @@ var _TIP_RENDERERS = {
          + rows
          + '<div class="pl-tip__row pl-tip__row--total pl-tip__row--nobadge">'
          +   '<span class="pl-tip__label">At risk</span>'
-         +   '<span class="pl-tip__val" style="color:#ff4757">' + _fmt$(_kpiSnapshot.stuckAtRisk) + '</span>'
+         +   '<span class="pl-tip__val" style="color:#E60000">' + _fmt$(_kpiSnapshot.stuckAtRisk) + '</span>'
          + '</div>'
          + '<div class="pl-tip__note">Stuck = days since updated_at &gt; per-stage threshold. Thresholds: ' + thresholds.replace(/ · $/, '') + '.</div>';
   },
