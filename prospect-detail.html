@@ -645,6 +645,9 @@ body.prospect-inactive .prospect-header {
 /* CMD101.5s — Edit Brief drawer needs the same below-header positioning */
 #brief-overlay { inset: 48px 0 0 0; }
 #brief-overlay .drawer { height: calc(100vh - 48px); }
+/* CMD101.5z — Finding drawer below header */
+#finding-overlay { inset: 48px 0 0 0; }
+#finding-overlay .drawer { height: calc(100vh - 48px); }
 /* CMD101.5t — Edit Stakeholder drawer below header */
 #sh-edit-overlay { inset: 48px 0 0 0; }
 #sh-edit-overlay .drawer { height: calc(100vh - 48px); }
@@ -1816,6 +1819,10 @@ function renderFindings() {
     const comments = _findingComments[f.id] || [];
     const author   = resources.find(r => r.id === f.created_by);
     const authorName = author ? author.first_name + ' ' + author.last_name : 'Team';
+    // CMD101.5z: snippet for the Aegis recorder verb. First 40 chars of
+    // content, single-line, escaped for the data-aegis-cmd attribute. Used
+    // as the unique identifier in `Form Open "Edit Finding" "<snippet>"`.
+    const snippet = (f.content || '').replace(/\s+/g, ' ').trim().slice(0, 40);
     return `
       <div class="finding-card" id="finding-${f.id}">
         <div class="finding-card-head">
@@ -1834,7 +1841,9 @@ function renderFindings() {
             </div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
-            <button class="finding-btn" onclick="openEditFinding('${f.id}')">✎ Edit</button>
+            <button class="finding-btn"
+              data-aegis-cmd='Form Open "Edit Finding" "${escHtml(snippet)}"'
+              onclick="openEditFinding('${f.id}')">✎ Edit</button>
           </div>
         </div>
         <div class="finding-actions">
@@ -1874,7 +1883,7 @@ function renderFindings() {
 
   panel.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-      <button class="btn btn-primary" onclick="openAddFinding()">+ Add finding</button>
+      <button class="btn btn-primary" data-aegis-cmd='Form Open "Add Finding"' onclick="openAddFinding()">+ Add finding</button>
     </div>
     ${findings.length === 0
       ? '<div style="padding:32px 0;text-align:center;color:var(--muted);font-size:12px">No findings recorded yet.</div>'
@@ -3240,6 +3249,31 @@ window._pageFormRegistry['Edit Stakeholder'] = function(targetName) {
 // CMD101.5u — Add Stakeholder takes no args; opens drawer in add mode.
 window._pageFormRegistry['Add Stakeholder'] = function() {
   openAddStakeholder();
+};
+// CMD101.5z — Add Finding takes no args.
+window._pageFormRegistry['Add Finding'] = function() {
+  openAddFinding();
+};
+// CMD101.5z — Edit Finding takes one arg: snippet matching the start of a
+// finding's content (case-insensitive). The cards display the first ~40
+// chars; the verb's snippet should match the start of any finding's content.
+// Substring-prefix match — script can be slightly shorter than the rendered
+// snippet without breaking, but ambiguous prefixes will pick the first hit.
+window._pageFormRegistry['Edit Finding'] = function(snippet) {
+  if (!snippet) {
+    alert('Form Open "Edit Finding" requires a content-snippet argument.');
+    return;
+  }
+  var want = String(snippet).toLowerCase().trim();
+  var match = (findings || []).find(function(f){
+    var c = (f.content || '').toLowerCase().trim();
+    return c.indexOf(want) === 0;   // prefix match
+  });
+  if (!match) {
+    console.warn('[Edit Finding] no match for snippet "' + snippet + '"');
+    return;
+  }
+  openEditFinding(match.id);
 };
 
 async function saveBrief() {
