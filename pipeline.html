@@ -240,26 +240,35 @@ body {
 .pl-funnel__stage[data-stage="review"]     { border-top-color: var(--stage-review,     #9b59b6); }
 .pl-funnel__stage[data-stage="approved"]   { border-top-color: var(--stage-approved,   #00e5a0); }
 .pl-funnel__name {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--text);
+  letter-spacing: .08em;
+  color: var(--muted);
 }
 .pl-funnel__val {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text);
   font-feature-settings: "tnum";
   line-height: 1.1;
 }
+/* Stage-tinted values: white for early stages, amber for mid, green for closed */
+.pl-funnel__stage[data-stage="prospect"]   .pl-funnel__val,
+.pl-funnel__stage[data-stage="qualifying"] .pl-funnel__val,
+.pl-funnel__stage[data-stage="discovery"]  .pl-funnel__val { color: var(--text); }
+.pl-funnel__stage[data-stage="proposal"]   .pl-funnel__val,
+.pl-funnel__stage[data-stage="review"]     .pl-funnel__val { color: var(--amber, #ffaa00); }
+.pl-funnel__stage[data-stage="approved"]   .pl-funnel__val { color: var(--green, #00e5a0); }
 .pl-funnel__meta {
   font-size: 11px;
   color: var(--muted);
   font-feature-settings: "tnum";
 }
+/* Conversion connector — horizontal track + centered % */
 .pl-funnel__conv {
-  flex: 0 0 36px;
+  flex: 0 0 56px;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -267,6 +276,22 @@ body {
   font-weight: 700;
   font-feature-settings: "tnum";
   color: var(--muted);
+}
+.pl-funnel__conv::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--border2);
+  z-index: 0;
+}
+.pl-funnel__conv > span {
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
+  padding: 1px 6px;
 }
 .pl-funnel__conv--good    { color: var(--green, #00e5a0); }
 .pl-funnel__conv--caution { color: var(--amber, #ffaa00); }
@@ -447,6 +472,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding: 0 20px 20px;
 }
 
 /* ── kanban toolbar (stats + search + new prospect) ───── */
@@ -454,9 +480,8 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 10px 20px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
   flex-shrink: 0;
 }
 
@@ -539,7 +564,7 @@ body {
 /* ── kanban board ─────────────────────────────────────── */
 .board-wrap {
   overflow-x: auto;
-  padding: 16px;
+  padding: 16px 0 0;
   display: flex;
   gap: 12px;
   align-items: flex-start;
@@ -1519,7 +1544,7 @@ function renderFunnel(prospects) {
             : pct >= 0.30 ? 'pl-funnel__conv--caution'
             : 'pl-funnel__conv--bad';
       }
-      html += '<div class="pl-funnel__conv ' + cls + '">' + (isFinite(pct) ? _fmtPct(pct, 0) : '—') + '</div>';
+      html += '<div class="pl-funnel__conv ' + cls + '"><span>' + (isFinite(pct) ? _fmtPct(pct, 0) : '—') + '</span></div>';
     }
   });
   row.innerHTML = html;
