@@ -556,10 +556,20 @@ body {
 }
 .pl-tip__row--total > .pl-tip__label { color: var(--text); font-weight: 700; }
 .pl-tip__row--total > .pl-tip__val   { color: var(--text); }
+/* CMD101.5n: forecast row has 4 columns — title | badge | math | contribution */
+.pl-tip__row--fcst {
+  grid-template-columns: 1fr max-content max-content auto;
+}
+.pl-tip__row--fcst > .pl-tip__math {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  font-feature-settings: "tnum";
+}
 /* When a row has no badge column (most non-list rows), span the badge slot */
 .pl-tip__row--nobadge { grid-template-columns: 1fr auto; }
 /* Auto-fallback: any row without a .pl-tip__badge child uses the 2-col template */
-.pl-tip__row:not(:has(.pl-tip__badge)) { grid-template-columns: 1fr auto; }
+.pl-tip__row:not(:has(.pl-tip__badge)):not(.pl-tip__row--fcst) { grid-template-columns: 1fr auto; }
 .pl-tip__formula {
   font-family: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
   font-size: 11px;
@@ -1751,7 +1761,7 @@ function renderDashboard(prospects) {
 
   document.getElementById('kpi-forecast-val').textContent = _fmt$(weightedFcst);
   document.getElementById('kpi-forecast-sub').textContent = isFinite(fcstPctOfBench)
-    ? (_fmtPct(fcstPctOfBench, 0) + ' vs trailing 12mo')
+    ? (_fmtPct(fcstPctOfBench, 0) + ' coverage of last 12mo')
     : 'No baseline yet';
 
   var winEl    = document.getElementById('kpi-winrate-val');
@@ -2015,9 +2025,14 @@ function renderForecastRings(weighted, trailing, winRate, prospects) {
          + '</div>';
   }
 
+  // CMD101.5n: dial fill is capped at 100% (can't exceed full circle), but
+  // the center text shows the raw uncapped % so executives see real coverage
+  // even when forecast outpaces last year's closed-won.
+  var fcstUncapped = trailing > 0 ? (weighted / trailing) : NaN;
+
   var html = '';
   html += makeRing('Forecast', pctFcst,
-    isFinite(pctFcst) ? (Math.round(pctFcst * 100) + '%') : '—',
+    isFinite(fcstUncapped) ? (Math.round(fcstUncapped * 100) + '%') : '—',
     ringTone(pctFcst), 'ring-forecast');
   html += makeRing('Win Rate', pctWin,
     isFinite(pctWin) ? (Math.round(pctWin * 100) + '%') : '—',
@@ -2263,36 +2278,30 @@ var _TIP_RENDERERS = {
   'kpi-forecast': function() {
     if (!_kpiSnapshot) return _tipNoSnapshot();
     var open = (_kpiSnapshot.prospects || []).filter(function(p){ return p.stage !== 'approved'; });
-    var byStage = {};
-    STAGES.forEach(function(s){ byStage[s.key] = { sum: 0, count: 0 }; });
-    open.forEach(function(p){
-      if (!byStage[p.stage]) return;
-      byStage[p.stage].sum   += (p.est_value || 0);
-      byStage[p.stage].count += 1;
+    // Sort by stage (latest first) then by est_value desc — biggest contributors near top.
+    open.sort(function(a, b) {
+      var sb = (STAGE_INDEX[b.stage] || 0) - (STAGE_INDEX[a.stage] || 0);
+      if (sb !== 0) return sb;
+      return (b.est_value || 0) - (a.est_value || 0);
     });
-    var rows = '';
-    STAGES.forEach(function(s) {
-      if (s.key === 'approved') return;
-      var b = byStage[s.key];
-      var prob = STAGE_PROB[s.key] || 0;
-      var contrib = b.sum * prob;
-      rows += '<div class="pl-tip__row">'
-            +   '<span class="pl-tip__label">' + _fmt$(b.sum) + ' × ' + Math.round(prob * 100) + '%</span>'
-            +   '<span class="pl-tip__badge">' + _stagePill(s.key) + '</span>'
-            +   '<span class="pl-tip__val">' + _fmt$(contrib) + '</span>'
-            + '</div>';
-    });
-    var benchPct = isFinite(_kpiSnapshot.weightedFcst / _kpiSnapshot.trailing12mo)
-      ? Math.round((_kpiSnapshot.weightedFcst / _kpiSnapshot.trailing12mo) * 100) + '%'
-      : '—';
+    var rows = open.map(function(p) {
+      var prob = STAGE_PROB[p.stage] || 0;
+      var contrib = (p.est_value || 0) * prob;
+      return '<div class="pl-tip__row pl-tip__row--fcst">'
+           +   '<span class="pl-tip__label">' + escHtml(p.title || '(untitled)') + '</span>'
+           +   '<span class="pl-tip__badge">' + _stagePill(p.stage) + '</span>'
+           +   '<span class="pl-tip__math">' + _fmt$(p.est_value || 0) + ' × ' + Math.round(prob * 100) + '%</span>'
+           +   '<span class="pl-tip__val">' + _fmt$(contrib) + '</span>'
+           + '</div>';
+    }).join('');
+    if (!rows) rows = '<div class="pl-tip__note">No open deals.</div>';
     return '<div class="pl-tip__title">Weighted Forecast</div>'
-         + '<div class="pl-tip__formula">Σ (stage value × stage probability)</div>'
+         + '<div class="pl-tip__formula">Σ (deal value × stage probability)</div>'
          + rows
          + '<div class="pl-tip__row pl-tip__row--total pl-tip__row--nobadge">'
          +   '<span class="pl-tip__label">Total</span>'
          +   '<span class="pl-tip__val">' + _fmt$(_kpiSnapshot.weightedFcst) + '</span>'
-         + '</div>'
-         + '<div class="pl-tip__note">Benchmark: ' + benchPct + ' of trailing-12mo closed-won (' + _fmt$(_kpiSnapshot.trailing12mo) + ').</div>';
+         + '</div>';
   },
 
   // ── KPI #3: Win Rate — basis ──
@@ -2389,27 +2398,33 @@ var _TIP_RENDERERS = {
          + '<div class="pl-tip__note">"Advanced" approximated as any update — true stage-history will replace this proxy in v2.</div>';
   },
 
-  // ── Ring 1: Forecast (weighted forecast vs trailing-12mo closed-won) ──
+  // ── Ring 1: Forecast (pipeline coverage vs last 12mo revenue) ──
   'ring-forecast': function() {
     if (!_kpiSnapshot) return _tipNoSnapshot();
-    var pct = isFinite(_kpiSnapshot.ringFcstUncapped)
-      ? Math.round(_kpiSnapshot.ringFcstUncapped * 100) + '%'
-      : '—';
-    return '<div class="pl-tip__title">Forecast Dial</div>'
-         + '<div class="pl-tip__formula">weighted forecast ÷ trailing-12mo closed-won</div>'
+    var ratio = _kpiSnapshot.ringFcstUncapped;
+    var pct   = isFinite(ratio) ? Math.round(ratio * 100) + '%' : '—';
+    var health = '';
+    if (isFinite(ratio)) {
+      if (ratio < 0.5)      health = 'Pipeline is thin — revenue cliff risk if nothing is added.';
+      else if (ratio < 1.0) health = 'Pipeline below last year — at-risk of underperforming.';
+      else if (ratio < 2.0) health = 'On track — pipeline can roughly match last year if deals convert.';
+      else                  health = 'Robust pipeline — execution capacity, not lead-gen, is the constraint.';
+    }
+    return '<div class="pl-tip__title">Pipeline Coverage</div>'
          + '<div class="pl-tip__row">'
-         +   '<span class="pl-tip__label">Weighted forecast</span>'
+         +   '<span class="pl-tip__label">Weighted forecast (now)</span>'
          +   '<span class="pl-tip__val">' + _fmt$(_kpiSnapshot.weightedFcst) + '</span>'
          + '</div>'
          + '<div class="pl-tip__row">'
-         +   '<span class="pl-tip__label">Trailing 12mo won</span>'
+         +   '<span class="pl-tip__label">Last 12mo closed-won</span>'
          +   '<span class="pl-tip__val">' + _fmt$(_kpiSnapshot.trailing12mo) + '</span>'
          + '</div>'
          + '<div class="pl-tip__row pl-tip__row--total">'
          +   '<span class="pl-tip__label">Coverage</span>'
          +   '<span class="pl-tip__val">' + pct + '</span>'
          + '</div>'
-         + '<div class="pl-tip__note">Dial fills to 100% max; raw value can exceed 1.0 when forecast outpaces last year.</div>';
+         + (health ? '<div class="pl-tip__note">' + health + '</div>' : '')
+         + '<div class="pl-tip__note">Coverage = probability-adjusted pipeline ÷ last 12 months of closed-won. Tells you whether what\u2019s in flight today can sustain last year\u2019s revenue. Dial fill caps at 100% visually; the number is the truth.</div>';
   },
 
   // ── Ring 2: Win Rate (mirror of KPI #3) ──
