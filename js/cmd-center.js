@@ -1951,11 +1951,14 @@ var COMMANDS = {
     // open functions on window._pageFormRegistry so script-side `Form Open
     // "<name>"` can dispatch directly without hunting the DOM.
     //   window._pageFormRegistry["Edit Brief"] = function(){ openBriefEditor(); };
+    // CMD101.5t: additional args (Form Open "Edit Stakeholder" "Claire Voss")
+    // are forwarded to the registered fn as positional arguments.
     var pageReg = window._pageFormRegistry || {};
     var lcWant = String(name || '').toLowerCase();
     var hit = Object.keys(pageReg).find(function(k){ return k.toLowerCase() === lcWant; });
     if (hit && typeof pageReg[hit] === 'function') {
-      pageReg[hit]();
+      var extraArgs = args.slice(1);   // drop form-name, pass the rest
+      pageReg[hit].apply(null, extraArgs);
       // Brief settle so the drawer's elements are in the DOM before the
       // next Form Insert lands.
       await new Promise(function(r){ setTimeout(r, 80); });

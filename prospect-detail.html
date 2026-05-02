@@ -645,6 +645,9 @@ body.prospect-inactive .prospect-header {
 /* CMD101.5s — Edit Brief drawer needs the same below-header positioning */
 #brief-overlay { inset: 48px 0 0 0; }
 #brief-overlay .drawer { height: calc(100vh - 48px); }
+/* CMD101.5t — Edit Stakeholder drawer below header */
+#sh-edit-overlay { inset: 48px 0 0 0; }
+#sh-edit-overlay .drawer { height: calc(100vh - 48px); }
 #edit-overlay .pill-group { display: flex; flex-wrap: wrap; gap: 6px; }
 #edit-overlay .pill {
   padding: 4px 10px;
@@ -1882,6 +1885,7 @@ function renderStakeholders() {
             data-sh-role="${link.stakeholder_role||''}"
             data-sh-influence="${link.influence_score||5}"
             data-sh-notes="${escHtml(link.notes||'')}"
+            data-aegis-cmd='Form Open "Edit Stakeholder" "${escHtml(c.first_name + ' ' + c.last_name)}"'
             onclick="openEditStakeholderFromBtn(this)">
             ✎
           </button>
@@ -3029,6 +3033,33 @@ function openBriefEditor() {
 window._pageFormRegistry = window._pageFormRegistry || {};
 window._pageFormRegistry['Edit Brief']    = function(){ openBriefEditor(); };
 window._pageFormRegistry['Edit Prospect'] = function(){ if (typeof editProspect === 'function') editProspect(); };
+// CMD101.5t — Edit Stakeholder takes one arg: stakeholder name. Resolves to
+// the cached link row by matching first_name + last_name (case-insensitive).
+window._pageFormRegistry['Edit Stakeholder'] = function(targetName) {
+  if (!targetName) {
+    alert('Form Open "Edit Stakeholder" requires a name argument.');
+    return;
+  }
+  var want = String(targetName).toLowerCase().trim();
+  var match = (stakeholders || []).find(function(link){
+    var c = link.contacts;
+    if (!c) return false;
+    var full = ((c.first_name||'') + ' ' + (c.last_name||'')).toLowerCase().trim();
+    return full === want;
+  });
+  if (!match) {
+    console.warn('[Edit Stakeholder] no match for "' + targetName + '"');
+    return;
+  }
+  var c = match.contacts;
+  openEditStakeholder(
+    match.id,
+    (c.first_name || '') + ' ' + (c.last_name || ''),
+    match.stakeholder_role || '',
+    match.influence_score || 5,
+    match.notes || ''
+  );
+};
 
 async function saveBrief() {
   const desc      = document.getElementById('brief-desc').value.trim();
