@@ -642,6 +642,9 @@ body.prospect-inactive .prospect-header {
 /* CMD101.5e — Edit Prospect drawer (port of pipeline.html drawer) */
 #edit-overlay { inset: 48px 0 0 0; }
 #edit-overlay .drawer { height: calc(100vh - 48px); }
+/* CMD101.5s — Edit Brief drawer needs the same below-header positioning */
+#brief-overlay { inset: 48px 0 0 0; }
+#brief-overlay .drawer { height: calc(100vh - 48px); }
 #edit-overlay .pill-group { display: flex; flex-wrap: wrap; gap: 6px; }
 #edit-overlay .pill {
   padding: 4px 10px;
@@ -1656,6 +1659,7 @@ function renderOverview() {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <div class="card-title" style="margin-bottom:0">Initial brief</div>
           <button class="btn" style="font-size:10px;padding:3px 8px;height:auto"
+            data-aegis-cmd='Form Open "Edit Brief"'
             onclick="openBriefEditor()">✎ Edit</button>
         </div>
         <div id="ov-brief-text" style="font-size:13px;color:var(--muted);line-height:1.7">
@@ -1674,7 +1678,9 @@ function renderOverview() {
             letter-spacing:.07em;color:var(--text);margin-bottom:6px">Next steps</div>
           <div style="font-size:13px;color:var(--muted);font-style:italic">
             No next steps recorded.
-            <span style="color:var(--accent);cursor:pointer" onclick="openBriefEditor()">Add one →</span>
+            <span style="color:var(--accent);cursor:pointer"
+              data-aegis-cmd='Form Open "Edit Brief"'
+              onclick="openBriefEditor()">Add one →</span>
           </div>
         </div>`}
       </div>
@@ -3016,6 +3022,13 @@ function openBriefEditor() {
   document.getElementById('brief-next-steps').value = prospect?.next_steps     || '';
   document.getElementById('brief-overlay').classList.add('open');
 }
+
+// CMD101.5s: register opener fns on the page-form registry so script-side
+// `Form Open "<name>"` can dispatch directly. Names match the human label
+// the operator types in scripts; lookup is case-insensitive in cmd-center.
+window._pageFormRegistry = window._pageFormRegistry || {};
+window._pageFormRegistry['Edit Brief']    = function(){ openBriefEditor(); };
+window._pageFormRegistry['Edit Prospect'] = function(){ if (typeof editProspect === 'function') editProspect(); };
 
 async function saveBrief() {
   const desc      = document.getElementById('brief-desc').value.trim();

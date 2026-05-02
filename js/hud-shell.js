@@ -1638,6 +1638,52 @@ const HUDShell = (() => {
       }
     }, true);
 
+    // CMD101.5s: textarea / text-input blur capture → `Form Insert "<label>" "<value>"`.
+    // Fires only for fields inside an open .overlay (drawer) so we don't spam
+    // the recorder with general page edits. Walks up to the .field wrapper to
+    // resolve the label, matching _findFormFieldByLabel's lookup contract.
+    document.addEventListener('blur', function(ev) {
+      try {
+        var el = ev.target;
+        if (!el || (el.tagName !== 'TEXTAREA' && el.tagName !== 'INPUT')) return;
+        if (el.tagName === 'INPUT' && !/^(text|email|tel|url|number|search)?$/i.test(el.type || 'text')) return;
+        // Only inside an open drawer/overlay.
+        var inDrawer = el.closest('.overlay.open, [role="dialog"][open]');
+        if (!inDrawer) return;
+        // Skip if the element opted out.
+        if (el.dataset && el.dataset.aegisIgnore === 'true') return;
+        // Walk to .field wrapper for label resolution.
+        var fieldWrap = el.closest('.field');
+        if (!fieldWrap) return;
+        var lbl = fieldWrap.querySelector('label');
+        var labelText = '';
+        if (lbl) {
+          // Mirror _findFormFieldByLabel's text extraction (drop * markers).
+          for (var i = 0; i < lbl.childNodes.length; i++) {
+            var n = lbl.childNodes[i];
+            if (n.nodeType === 3) labelText += n.nodeValue;
+            else if (n.nodeType === 1 && (n.textContent || '').trim() !== '*') labelText += n.textContent;
+          }
+          labelText = labelText.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+        }
+        if (!labelText) return;   // unlabeled field — skip rather than guess
+        // Skip empty values.
+        var val = (el.value || '').trim();
+        if (!val) return;
+        // Skip if value matches the prior emitted value (don't double-emit on
+        // tab-out + click-back-out cycles).
+        var sig = labelText + '\u0000' + val;
+        if (el._aegisLastEmit === sig) return;
+        el._aegisLastEmit = sig;
+        // Quote escapes for the script literal.
+        var escVal   = val.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        var escLabel = labelText.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        emit('Form Insert "' + escLabel + '" "' + escVal + '"');
+      } catch(e) {
+        // Recorder must never break the page.
+      }
+    }, true);
+
     // ─────────────────────────────────────────────────────────────────
     // CMD100.73 — Form-input recorder
     // Captures text/textarea/number/date input values on blur and select

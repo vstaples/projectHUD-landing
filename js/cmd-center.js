@@ -1947,6 +1947,21 @@ var COMMANDS = {
   'Form Open': async function(args) {
     var name = args[0];
 
+    // CMD101.5s: page-level form registry. Pages register their drawer
+    // open functions on window._pageFormRegistry so script-side `Form Open
+    // "<name>"` can dispatch directly without hunting the DOM.
+    //   window._pageFormRegistry["Edit Brief"] = function(){ openBriefEditor(); };
+    var pageReg = window._pageFormRegistry || {};
+    var lcWant = String(name || '').toLowerCase();
+    var hit = Object.keys(pageReg).find(function(k){ return k.toLowerCase() === lcWant; });
+    if (hit && typeof pageReg[hit] === 'function') {
+      pageReg[hit]();
+      // Brief settle so the drawer's elements are in the DOM before the
+      // next Form Insert lands.
+      await new Promise(function(r){ setTimeout(r, 80); });
+      return 'form opened (page registry): ' + hit;
+    }
+
     // _myrFormDefs may not be populated yet if mw-core.js is still loading.
     // Poll for up to 5s before giving up.
     var defs = window._myrFormDefs || [];
@@ -2182,6 +2197,15 @@ var COMMANDS = {
     document.querySelectorAll('[style*="backdrop-filter"]').forEach(function(el) {
       if (el.style.zIndex >= 9000) el.remove();
     });
+    // CMD101.5s: inline drawer fallback — click the open drawer's ✕ button.
+    // Covers prospect-detail edit drawers and pipeline.html add/edit drawer.
+    var openOverlay = document.querySelector('.overlay.open');
+    if (openOverlay) {
+      var closeBtn = openOverlay.querySelector('.drawer-close');
+      if (closeBtn) { closeBtn.click(); return 'form closed (inline)'; }
+      openOverlay.classList.remove('open');
+      return 'form closed (inline class)';
+    }
     return 'form closed';
   },
 
