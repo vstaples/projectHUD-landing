@@ -1,0 +1,11 @@
+VS: Remove Stakeholder "Peter Pan"
+Pause Wait for Remove Stakeholder
+VS: Form Open "Add Stakeholder"
+VS: Form Insert "Name" "Peter Pan"
+VS: Form Insert "Title" "Regulatory Affairs"
+VS: Form Insert "Email" "ppg@orthomotion.com"
+VS: Form Insert "Cell Phone" "207-939-8040"
+VS: Form Select "Role" "Technical authority"
+VS: Form Slide "Influence" "7"
+VS: Form Insert "Notes" "Owns FDA submission process internally."
+VS: Form Save

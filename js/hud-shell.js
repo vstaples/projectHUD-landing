@@ -1133,12 +1133,6 @@ const HUDShell = (() => {
         letter-spacing: 0.04em;
         font-feature-settings: "tnum";
       }
-      /* CMD101.5y: reserve the footer's height at the bottom of any page that
-         renders it so fixed-bottom content (Aegis command-entry input,
-         drawer feet, etc.) doesn't get occluded. The body class is set by
-         _buildFooter() — page-local CSS that depends on viewport-aligned
-         elements should subtract this same 24px. */
-      body.hud-footer-rendered { padding-bottom: 24px; }
     `;
     document.head.appendChild(s);
   }
