@@ -465,17 +465,19 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .pl-tip__row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: max-content 1fr auto;
   align-items: baseline;
-  gap: 14px;
+  gap: 8px;
   padding: 2px 0;
   font-size: 12px;
   font-feature-settings: "tnum";
 }
+.pl-tip__row > .pl-tip__badge {
+  justify-self: start;
+}
 .pl-tip__row > .pl-tip__label {
   color: var(--text);
-  flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -485,6 +487,7 @@ body {
   color: var(--text-accent, #00d2ff);
   font-weight: 600;
   white-space: nowrap;
+  justify-self: end;
 }
 .pl-tip__row--total {
   margin-top: 6px;
@@ -494,6 +497,10 @@ body {
 }
 .pl-tip__row--total > .pl-tip__label { color: var(--text); font-weight: 700; }
 .pl-tip__row--total > .pl-tip__val   { color: var(--text); }
+/* When a row has no badge column (most non-list rows), span the badge slot */
+.pl-tip__row--nobadge { grid-template-columns: 1fr auto; }
+/* Auto-fallback: any row without a .pl-tip__badge child uses the 2-col template */
+.pl-tip__row:not(:has(.pl-tip__badge)) { grid-template-columns: 1fr auto; }
 .pl-tip__formula {
   font-family: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
   font-size: 11px;
@@ -802,12 +809,20 @@ body {
   gap: 6px;
   margin-bottom: 6px;
 }
+.p-card-top__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
 
 .p-card-name {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
   line-height: 1.3;
+  flex: 1;
+  min-width: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -822,13 +837,23 @@ body {
   margin-bottom: 8px;
 }
 
-.pri-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+.pri-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .04em;
   flex-shrink: 0;
-  margin-top: 3px;
+  line-height: 1;
 }
+.pri-chip--high   { background: rgba(240,122,122,.15); color: #f07a7a; border: 1px solid rgba(240,122,122,.35); }
+.pri-chip--medium { background: rgba(240,196,122,.15); color: #f0c47a; border: 1px solid rgba(240,196,122,.35); }
+.pri-chip--low    { background: rgba(122,240,160,.15); color: #7af0a0; border: 1px solid rgba(122,240,160,.35); }
 
 .p-card-meta {
   display: flex;
@@ -898,15 +923,14 @@ body {
 
 /* action items badge */
 .ai-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
   font-size: 9px;
-  padding: 1px 5px;
+  padding: 2px 6px;
   border-radius: 8px;
   background: rgba(240,180,100,.15);
   color: #f0b464;
   border: 1px solid rgba(240,180,100,.25);
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 /* empty state */
@@ -1718,24 +1742,11 @@ function renderDashboard(prospects) {
 
   // Active deals list rendered by renderAll() based on inactive toggle state.
 
-  // Right rail
-  renderForecastRings(weightedFcst, trailing12moTotal, winRate, prospects);
-  renderStuckPanel(stuckList);
-  renderTouchToday(prospects);
-
-  // Funnel total label.
-  var ft = document.getElementById('funnel-total');
-  if (ft) ft.textContent = prospects.length + ' deals · ' + _fmt$(prospects.reduce(function(s,p){return s+(p.est_value||0);},0));
-
-  // Deals count is set inside renderActiveDeals (driven by inactive-toggle state).
-
-  // Stuck count.
-  var sc = document.getElementById('stuck-count');
-  sc.textContent = stuckList.length;
-  sc.className = 'pl-panel__count' + (stuckList.length > 0 ? ' pl-panel__count--bad' : '');
-
-  // CMD101.5f: stash everything tooltip renderers need so they can paint
-  // a fresh snapshot on each hover without recomputing.
+  // CMD101.5f: build the live KPI snapshot BEFORE rendering rings, so that
+  // renderForecastRings can append velocity fields (velN30/velN60/velRatio,
+  // ringFcstPct, ringWinPct) onto the same object. Previously the rings ran
+  // first and wrote to a stale (or null) snapshot that was then overwritten
+  // by this assignment, leaving the velocity tooltip with `undefined` values.
   _kpiSnapshot = {
     pipelineVal:      pipelineVal,
     weightedFcst:     weightedFcst,
@@ -1752,6 +1763,22 @@ function renderDashboard(prospects) {
     weekVal:          weekVal,
     prospects:        prospects.slice(),    // for Pipeline Value detail list
   };
+
+  // Right rail
+  renderForecastRings(weightedFcst, trailing12moTotal, winRate, prospects);
+  renderStuckPanel(stuckList);
+  renderTouchToday(prospects);
+
+  // Funnel total label.
+  var ft = document.getElementById('funnel-total');
+  if (ft) ft.textContent = prospects.length + ' deals · ' + _fmt$(prospects.reduce(function(s,p){return s+(p.est_value||0);},0));
+
+  // Deals count is set inside renderActiveDeals (driven by inactive-toggle state).
+
+  // Stuck count.
+  var sc = document.getElementById('stuck-count');
+  sc.textContent = stuckList.length;
+  sc.className = 'pl-panel__count' + (stuckList.length > 0 ? ' pl-panel__count--bad' : '');
 }
 
 function renderFunnel(prospects) {
@@ -2153,14 +2180,15 @@ var _TIP_RENDERERS = {
     open.sort(function(a,b){ return (b.est_value || 0) - (a.est_value || 0); });
     var rows = open.map(function(p) {
       return '<div class="pl-tip__row">'
-           +   '<span class="pl-tip__label">' + _stagePill(p.stage) + escHtml(p.title || '(untitled)') + '</span>'
+           +   '<span class="pl-tip__badge">' + _stagePill(p.stage) + '</span>'
+           +   '<span class="pl-tip__label">' + escHtml(p.title || '(untitled)') + '</span>'
            +   '<span class="pl-tip__val">' + (p.est_value ? _fmt$(p.est_value) : '—') + '</span>'
            + '</div>';
     }).join('');
     if (!rows) rows = '<div class="pl-tip__note">No open deals.</div>';
     return '<div class="pl-tip__title">Pipeline Value · ' + open.length + ' open deals</div>'
          + rows
-         + '<div class="pl-tip__row pl-tip__row--total">'
+         + '<div class="pl-tip__row pl-tip__row--total pl-tip__row--nobadge">'
          +   '<span class="pl-tip__label">Total</span>'
          +   '<span class="pl-tip__val">' + _fmt$(_kpiSnapshot.pipelineVal) + '</span>'
          + '</div>'
@@ -2185,7 +2213,8 @@ var _TIP_RENDERERS = {
       var prob = STAGE_PROB[s.key] || 0;
       var contrib = b.sum * prob;
       rows += '<div class="pl-tip__row">'
-            +   '<span class="pl-tip__label">' + _stagePill(s.key) + _fmt$(b.sum) + ' × ' + Math.round(prob * 100) + '%</span>'
+            +   '<span class="pl-tip__badge">' + _stagePill(s.key) + '</span>'
+            +   '<span class="pl-tip__label">' + _fmt$(b.sum) + ' × ' + Math.round(prob * 100) + '%</span>'
             +   '<span class="pl-tip__val">' + _fmt$(contrib) + '</span>'
             + '</div>';
     });
@@ -2195,7 +2224,7 @@ var _TIP_RENDERERS = {
     return '<div class="pl-tip__title">Weighted Forecast</div>'
          + '<div class="pl-tip__formula">Σ (stage value × stage probability)</div>'
          + rows
-         + '<div class="pl-tip__row pl-tip__row--total">'
+         + '<div class="pl-tip__row pl-tip__row--total pl-tip__row--nobadge">'
          +   '<span class="pl-tip__label">Total</span>'
          +   '<span class="pl-tip__val">' + _fmt$(_kpiSnapshot.weightedFcst) + '</span>'
          + '</div>'
@@ -2256,7 +2285,8 @@ var _TIP_RENDERERS = {
     var rows = stuckSorted.map(function(p){
       var over = Math.round(_daysInStage(p) - (STUCK_THRESHOLD_DAYS[p.stage] || 0));
       return '<div class="pl-tip__row">'
-           +   '<span class="pl-tip__label">' + _stagePill(p.stage) + escHtml(p.title || '(untitled)') + '</span>'
+           +   '<span class="pl-tip__badge">' + _stagePill(p.stage) + '</span>'
+           +   '<span class="pl-tip__label">' + escHtml(p.title || '(untitled)') + '</span>'
            +   '<span class="pl-tip__val" style="color:#ff4757">+' + over + 'd</span>'
            + '</div>';
     }).join('');
@@ -2268,7 +2298,7 @@ var _TIP_RENDERERS = {
     });
     return '<div class="pl-tip__title">Stuck Deals · ' + stuck.length + '</div>'
          + rows
-         + '<div class="pl-tip__row pl-tip__row--total">'
+         + '<div class="pl-tip__row pl-tip__row--total pl-tip__row--nobadge">'
          +   '<span class="pl-tip__label">At risk</span>'
          +   '<span class="pl-tip__val" style="color:#ff4757">' + _fmt$(_kpiSnapshot.stuckAtRisk) + '</span>'
          + '</div>'
@@ -2391,8 +2421,12 @@ function renderCard(p) {
     .map(w => w[0]).join('').toUpperCase().slice(0, 2)) || '—';
 
   const tagClass = INDUSTRY_TAGS[p.company_industry] || 'tag-other';
-  const priColor = p.priority === 'high' ? '#f07a7a'
-                 : p.priority === 'medium' ? '#f0c47a' : '#7af0a0';
+
+  // CMD101.5g: replace bare priority dot with a labeled chip — clearer
+  // semantic, no redundant info-conveyance via 7px circle.
+  const priChip = p.priority
+    ? `<span class="pri-chip pri-chip--${p.priority}" title="${p.priority} priority">${p.priority[0].toUpperCase()}</span>`
+    : '';
 
   const aiCount = p.open_action_items > 0
     ? `<div class="ai-badge">${p.open_action_items} action${p.open_action_items > 1 ? 's' : ''}</div>`
@@ -2402,10 +2436,12 @@ function renderCard(p) {
 
   return `
     <div class="p-card" draggable="true" data-id="${p.id}" data-stage="${p.stage}" onclick="openProspect('${p.id}')">
-      ${aiCount}
       <div class="p-card-top">
         <div class="p-card-name">${escHtml(p.title)}</div>
-        <div class="pri-dot" style="background:${priColor}" title="${p.priority} priority"></div>
+        <div class="p-card-top__right">
+          ${aiCount}
+          ${priChip}
+        </div>
       </div>
       <div class="p-card-co">${escHtml(p.company_name || '—')}</div>
       <div class="p-card-meta">
