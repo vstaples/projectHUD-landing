@@ -2239,9 +2239,21 @@ var COMMANDS = {
 
   'Form Save': async function(args) {
     var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
-    if (!iframe) return 'No form overlay open';
-    iframe.contentWindow.postMessage({ source: 'cmd-center', cmd: 'Form Save' }, '*');
-    return 'draft saved';
+    if (iframe) {
+      iframe.contentWindow.postMessage({ source: 'cmd-center', cmd: 'Form Save' }, '*');
+      return 'draft saved';
+    }
+    // CMD101.5x: inline drawer fallback — same shape as Form Submit's
+    // fallback. Find the primary action button inside an open overlay/dialog
+    // and click it. Save flows that close the drawer and reload data trip
+    // their own loadAll() / refresh paths; we just need to deliver the click.
+    var btn = document.querySelector('.overlay.open .btn-primary, [role="dialog"][open] .btn-primary, .drawer .btn-primary');
+    if (!btn) return 'No form overlay open';
+    btn.click();
+    // Brief settle so any subsequent script step (or a final dedup-drop log
+    // line) doesn't race the save's own DOM mutations.
+    await new Promise(function(r){ setTimeout(r, 120); });
+    return 'saved (clicked primary action)';
   },
 
   'Form Close': async function(args) {
