@@ -1925,6 +1925,21 @@ var COMMANDS = {
       }
       return 'Form Select: no pill "' + value + '" in "' + field + '"';
     }
+    // CMD100.82: hidden-input + trigger pattern (Pipeline assignee picker).
+    // If the field resolves to a hidden input AND the page exposes a
+    // setAssignee() helper, look up the resource by name in window.pipelineResources.
+    var hidden = _findFormFieldByLabel(field, ['INPUT']);
+    if (hidden && (hidden.type || '').toLowerCase() === 'hidden' && typeof window.setAssignee === 'function') {
+      var roster = window.pipelineResources || [];
+      var match = roster.find(function(r){
+        var nm = ((r.first_name||'') + ' ' + (r.last_name||'')).trim().toLowerCase();
+        return nm === String(value).toLowerCase();
+      });
+      if (!match) return 'Form Select: no person "' + value + '" in "' + field + '"';
+      var fullName = ((match.first_name||'') + ' ' + (match.last_name||'')).trim();
+      window.setAssignee(match.id, fullName);
+      return 'selected person "' + field + '" = "' + fullName + '"';
+    }
     return 'Form Select: field not found "' + field + '"';
   },
 

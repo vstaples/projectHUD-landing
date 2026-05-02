@@ -643,9 +643,14 @@ body {
       <div class="sec-label">Our team</div>
       <div class="field">
         <label>Assigned to <span style="color:#f07a7a">*</span></label>
-        <select id="f-assigned">
-          <option value="">— Select —</option>
-        </select>
+        <!-- CMD100.82: PersonPicker-backed assignee picker.
+             Hidden input carries the resource_id; trigger button shows
+             avatar + name + title for the chosen resource. -->
+        <input type="hidden" id="f-assigned" value="" />
+        <button type="button" id="f-assigned-trigger" onclick="openAssigneePicker(event)"
+          style="width:100%;padding:8px 10px;background:var(--bg2,#0a1424);border:1px solid var(--border1,#1d2c44);border-radius:4px;color:var(--text0,#e8eaf0);text-align:left;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;min-height:36px">
+          <span id="f-assigned-display" style="color:var(--muted)">— Select —</span>
+        </button>
       </div>
 
       <div class="sec-label">First follow-up</div>
@@ -678,6 +683,7 @@ body {
 <script src="/js/api.js"></script>
 <script src="/js/version.js?v=seed"></script>
 <script src="/js/hud-shell.js"></script>
+<script src="/js/person-picker.js"></script>
 <script>
 // ── config ─────────────────────────────────────────────
 const STAGES = [
@@ -1004,7 +1010,14 @@ async function openDrawerForEdit(id) {
   document.getElementById('f-budget-high').value   = row.budget_range_high || '';
   document.getElementById('f-urgency').value       = row.timeline_urgency || '';
   document.getElementById('f-priority').value      = row.priority || '';
-  document.getElementById('f-assigned').value      = row.assigned_to || '';
+  // CMD100.82: PersonPicker-backed assignee — use setAssignee helper.
+  if (row.assigned_to) {
+    var rsrc = (resources || []).find(r => r.id === row.assigned_to);
+    var rname = rsrc ? ((rsrc.first_name||'') + ' ' + (rsrc.last_name||'')).trim() : '(unknown)';
+    setAssignee(row.assigned_to, rname);
+  } else {
+    setAssignee('', '');
+  }
   document.getElementById('f-followup').value      = row.next_follow_up_date || '';
   document.getElementById('f-followup-type').value = row.next_follow_up_type || 'phone_call';
 
@@ -1055,14 +1068,9 @@ function populateFormSelects() {
   addOpt.textContent = '+ Add new company…';
   cSel.appendChild(addOpt);
 
-  // resources
-  const rSel = document.getElementById('f-assigned');
-  resources.forEach(r => {
-    const opt = document.createElement('option');
-    opt.value = r.id;
-    opt.textContent = r.first_name + ' ' + r.last_name;
-    rSel.appendChild(opt);
-  });
+  // CMD100.82: resources are no longer poured into a <select> — the
+  // Assigned-to field is now backed by PersonPicker which reads
+  // _assigneeListForPicker() on demand.
 
   // CMD100.74: company sentinel handler — when user picks "+ Add new
   // company…", prompt for a name and POST to companies, then re-select
@@ -1108,6 +1116,69 @@ function populateFormSelects() {
       cSel.value = '';
     }
   });
+}
+
+// CMD100.82: PersonPicker integration for the Assigned-to field.
+// resources cache is in module scope; PersonPicker accepts an array of
+// { id, user_id, name, department, is_external, title } objects.
+function _assigneeListForPicker() {
+  return (resources || []).map(function(r) {
+    return {
+      id:          r.id,
+      user_id:     r.user_id,
+      name:        ((r.first_name || '') + ' ' + (r.last_name || '')).trim(),
+      department:  r.department  || null,
+      is_external: r.is_external || false,
+      title:       r.title       || null,
+    };
+  });
+}
+
+function openAssigneePicker(ev) {
+  if (ev) ev.stopPropagation();
+  if (!window.PersonPicker) {
+    _showFormError('Picker unavailable', 'PersonPicker module not loaded.');
+    return;
+  }
+  var trigger = document.getElementById('f-assigned-trigger');
+  var current = document.getElementById('f-assigned').value;
+  PersonPicker.show(trigger, function(pick) {
+    setAssignee(pick.id, pick.name);
+    // CMD100.82: emit recorder line directly. The hidden input is not a
+    // real focusable element so the click recorder's blur/change paths
+    // never see it. Routing through the recorder channel keeps the
+    // transcript verb identical to the original <select> behavior.
+    try {
+      if (typeof window._cmdCenterChannelSend === 'function' && pick.name) {
+        var self = window._aegisSelf || window.CURRENT_USER || {};
+        window._cmdCenterChannelSend({
+          type: 'broadcast',
+          event: 'recorder_event',
+          payload: {
+            event_id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+            user_id: self.user_id || self.id || null,
+            alias:   self.alias || self.initials || '??',
+            command: 'Form Select "Assigned to" "' + pick.name.replace(/"/g, '\\"') + '"',
+            ts: Date.now()
+          }
+        });
+      }
+    } catch(e) {}
+  }, { resources: _assigneeListForPicker(), selected: current });
+}
+
+// Set the assignee state. Updates the hidden input AND the trigger face.
+function setAssignee(id, name) {
+  document.getElementById('f-assigned').value = id || '';
+  var disp = document.getElementById('f-assigned-display');
+  if (!disp) return;
+  if (!id) {
+    disp.textContent = '— Select —';
+    disp.style.color = 'var(--muted)';
+    return;
+  }
+  disp.textContent = name || '(unknown)';
+  disp.style.color = 'var(--text0,#e8eaf0)';
 }
 
 // CMD100.79: rename the currently-selected company. Updates the row in
@@ -1280,7 +1351,7 @@ function clearForm() {
     document.getElementById(id).value = '';
   });
   document.getElementById('f-company').value  = '';
-  document.getElementById('f-assigned').value = '';
+  setAssignee('', '');                                    // CMD100.82: reset PersonPicker face
   document.getElementById('f-priority').value = '';   // CMD100.74: default is "— Select —"
   document.getElementById('f-urgency').value  = '';   // CMD100.74: default is "— Select —"
   document.querySelectorAll('.pill.active').forEach(p => p.classList.remove('active'));
@@ -1293,6 +1364,11 @@ function escHtml(str) {
 // CMD100.80: expose helpers for cmd-center's Move Prospect command.
 window.renderBoard = renderBoard;
 window.updateStats = updateStats;
+// CMD100.82: expose for Form Select replay against PersonPicker-backed fields.
+window.setAssignee = setAssignee;
+Object.defineProperty(window, 'pipelineResources', {
+  get: function(){ return resources; }
+});
 </script>
 </body>
 </html>
