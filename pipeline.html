@@ -150,6 +150,18 @@ body {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  /* CMD101.5r: width tracks the Forecast Summary panel column above.
+     KPI strip lives inside a 20px gutter on each side and is a 6-col
+     grid with 10px gaps. One column = (viewport − 40px gutter − 50px
+     of inter-column gaps) / 6. Using vw resolves against the page,
+     not the flex parent — earlier flex-relative calc gave the wrong
+     basis. */
+  width: calc((100vw - 40px - 5 * 10px) / 6);
+  min-width: 220px;   /* don't collapse on narrow viewports */
+}
+.pipeline-toolbar .search-box {
+  flex: 1;
+  width: auto;
 }
 
 /* ── CMD101.5: shell scroll area hosts both permanent widgets and tab body ── */
@@ -556,9 +568,11 @@ body {
 }
 .pl-tip__row--total > .pl-tip__label { color: var(--text); font-weight: 700; }
 .pl-tip__row--total > .pl-tip__val   { color: var(--text); }
-/* CMD101.5n: forecast row has 4 columns — title | badge | math | contribution */
+/* CMD101.5n/p: forecast row has 4 columns — title | badge | math | contribution.
+   Badge + math tracks use a min-content sizing trick so every row's badges and
+   math expressions land in the same column position, right-justified. */
 .pl-tip__row--fcst {
-  grid-template-columns: 1fr max-content max-content auto;
+  grid-template-columns: 1fr 90px 110px auto;
   gap: 16px;
 }
 .pl-tip__row--fcst > .pl-tip__badge {
