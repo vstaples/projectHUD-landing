@@ -965,6 +965,9 @@ async function saveProspect() {
   const payload = {
     title,
     company_id,
+    // CMD100.77: prospects.firm_id is NOT NULL. Source from the selected
+    // company's row in the local cache (every company is firm-scoped).
+    firm_id:             companies.find(c => c.id === company_id)?.firm_id || null,
     stage:               _drawerStage,
     priority:            document.getElementById('f-priority').value || null,
     industry_tag:        getActivePill('industry-pills'),
