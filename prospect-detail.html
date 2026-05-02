@@ -788,7 +788,7 @@ body.prospect-inactive .prospect-header {
       </div>
       <div class="ph-actions">
         <button class="btn btn-back" onclick="closeProspect()" title="Back to Pipeline" style="margin-right:6px">← Back</button>
-        <button class="btn btn-edit" onclick="editProspect()" title="Edit prospect">✎ Edit</button>
+        <button class="btn btn-edit" data-aegis-cmd='Form Open "Edit Prospect"' onclick="editProspect()" title="Edit prospect">✎ Edit</button>
         <button class="btn" onclick="openMeetingDrawer()">+ Schedule meeting</button>
         <button class="btn" onclick="openActionItemDrawer()">+ Action item</button>
         <button class="btn btn-primary" onclick="openLogDrawer()">Log activity</button>
@@ -1687,7 +1687,7 @@ function renderOverview() {
       <div class="card">
         <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
           <span>Key signals</span>
-          <button class="btn btn-edit" onclick="editProspect()" title="Edit prospect"
+          <button class="btn btn-edit" data-aegis-cmd='Form Open "Edit Prospect"' onclick="editProspect()" title="Edit prospect"
             style="font-size:11px;padding:3px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:4px;cursor:pointer">✎ Edit</button>
         </div>
         ${renderSignal('Budget', p.budget_range_low || p.budget_range_high
