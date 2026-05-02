@@ -429,6 +429,101 @@ body {
   white-space: nowrap;
 }
 
+/* ── CMD101.5f: KPI / dial hover-tooltip system ───────── */
+.pl-kpi[data-tip-id],
+.pl-ring[data-tip-id] { cursor: help; }
+
+#pl-tooltip {
+  position: fixed;
+  z-index: 9500;
+  min-width: 220px;
+  max-width: 360px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #0b1626;
+  border: 1px solid var(--border2, rgba(255,255,255,.14));
+  box-shadow: 0 8px 24px rgba(0,0,0,.55);
+  font-size: 12px;
+  color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+#pl-tooltip.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.pl-tip__title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.pl-tip__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  padding: 2px 0;
+  font-size: 12px;
+  font-feature-settings: "tnum";
+}
+.pl-tip__row > .pl-tip__label {
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pl-tip__row > .pl-tip__val {
+  color: var(--text-accent, #00d2ff);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pl-tip__row--total {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  font-weight: 700;
+}
+.pl-tip__row--total > .pl-tip__label { color: var(--text); font-weight: 700; }
+.pl-tip__row--total > .pl-tip__val   { color: var(--text); }
+.pl-tip__formula {
+  font-family: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 4px 0 6px;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+.pl-tip__note {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin-top: 6px;
+}
+.pl-tip__stage-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
 /* Right rail — rings + lists */
 .pl-rings {
   display: flex;
@@ -1001,37 +1096,37 @@ body {
 
       <!-- KPI strip -->
       <div class="pl-kpi-strip" id="pl-kpi-strip">
-        <div class="pl-kpi" id="kpi-pipeline">
+        <div class="pl-kpi" id="kpi-pipeline" data-tip-id="kpi-pipeline">
           <div class="pl-kpi__bar"></div>
           <div class="pl-kpi__label">Pipeline Value</div>
           <div class="pl-kpi__value pl-kpi__value--accent" id="kpi-pipeline-val">—</div>
           <div class="pl-kpi__sub" id="kpi-pipeline-sub">Loading…</div>
         </div>
-        <div class="pl-kpi" id="kpi-forecast">
+        <div class="pl-kpi" id="kpi-forecast" data-tip-id="kpi-forecast">
           <div class="pl-kpi__bar"></div>
           <div class="pl-kpi__label">Weighted Forecast</div>
           <div class="pl-kpi__value pl-kpi__value--accent" id="kpi-forecast-val">—</div>
           <div class="pl-kpi__sub" id="kpi-forecast-sub">Loading…</div>
         </div>
-        <div class="pl-kpi" id="kpi-winrate">
+        <div class="pl-kpi" id="kpi-winrate" data-tip-id="kpi-winrate">
           <div class="pl-kpi__bar pl-kpi__bar--good"></div>
           <div class="pl-kpi__label">Win Rate</div>
           <div class="pl-kpi__value pl-kpi__value--good" id="kpi-winrate-val">—</div>
           <div class="pl-kpi__sub" id="kpi-winrate-sub">Last 90d</div>
         </div>
-        <div class="pl-kpi" id="kpi-cycle">
+        <div class="pl-kpi" id="kpi-cycle" data-tip-id="kpi-cycle">
           <div class="pl-kpi__bar pl-kpi__bar--good"></div>
           <div class="pl-kpi__label">Avg Cycle</div>
           <div class="pl-kpi__value pl-kpi__value--good" id="kpi-cycle-val">—</div>
           <div class="pl-kpi__sub" id="kpi-cycle-sub">Last 10 won</div>
         </div>
-        <div class="pl-kpi" id="kpi-stuck">
+        <div class="pl-kpi" id="kpi-stuck" data-tip-id="kpi-stuck">
           <div class="pl-kpi__bar pl-kpi__bar--good"></div>
           <div class="pl-kpi__label">Stuck Deals</div>
           <div class="pl-kpi__value pl-kpi__value--good" id="kpi-stuck-val">—</div>
           <div class="pl-kpi__sub" id="kpi-stuck-sub">$0 at risk</div>
         </div>
-        <div class="pl-kpi" id="kpi-week">
+        <div class="pl-kpi" id="kpi-week" data-tip-id="kpi-week">
           <div class="pl-kpi__bar pl-kpi__bar--good"></div>
           <div class="pl-kpi__label">This Week</div>
           <div class="pl-kpi__value pl-kpi__value--good" id="kpi-week-val">—</div>
@@ -1147,6 +1242,9 @@ body {
   </div>
 
 </div>
+
+<!-- CMD101.5f: floating KPI/dial hover tooltip -->
+<div id="pl-tooltip" role="tooltip" aria-hidden="true"></div>
 
 <!-- new/edit prospect drawer -->
 <div class="overlay" id="drawer-overlay" onclick="handleOverlayClick(event)">
@@ -1333,6 +1431,10 @@ let _closedWon12mo = [];   // CMD101: trailing-12mo approved deals (for forecast
 let _inactiveProspects = [];
 let _inactiveLoaded    = false;
 let _showInactive      = false;
+
+// CMD101.5f: latest KPI/dial snapshot, refreshed every renderDashboard().
+// Tooltips read from this on hover so they stay in sync after data refresh.
+let _kpiSnapshot = null;
 
 // Cross-script lookup mirror (Edit/Move/Delete/Toggle Prospect commands).
 window.allProspects = [];
@@ -1631,6 +1733,25 @@ function renderDashboard(prospects) {
   var sc = document.getElementById('stuck-count');
   sc.textContent = stuckList.length;
   sc.className = 'pl-panel__count' + (stuckList.length > 0 ? ' pl-panel__count--bad' : '');
+
+  // CMD101.5f: stash everything tooltip renderers need so they can paint
+  // a fresh snapshot on each hover without recomputing.
+  _kpiSnapshot = {
+    pipelineVal:      pipelineVal,
+    weightedFcst:     weightedFcst,
+    trailing12mo:     trailing12moTotal,
+    won90:            won90,
+    changed90:        changed90,
+    winRate:          winRate,
+    avgCycle:         avgCycle,
+    avgCycleSampleN:  approvedSorted.length,
+    stuckList:        stuckList.slice(),
+    stuckAtRisk:      stuckAtRisk,
+    weekAdvanced:     weekAdvanced,
+    weekWon:          weekWon,
+    weekVal:          weekVal,
+    prospects:        prospects.slice(),    // for Pipeline Value detail list
+  };
 }
 
 function renderFunnel(prospects) {
@@ -1771,6 +1892,16 @@ function renderForecastRings(weighted, trailing, winRate, prospects) {
   var velRatio = n60 > 0 ? (n30 / n60) : (n30 > 0 ? 2.0 : NaN);
   var pctVel = isFinite(velRatio) ? Math.min(velRatio, 2.0) / 2.0 : NaN;
 
+  // CMD101.5f: stash dial inputs for ring tooltips.
+  if (_kpiSnapshot) {
+    _kpiSnapshot.ringFcstPct = pctFcst;
+    _kpiSnapshot.ringFcstUncapped = trailing > 0 ? (weighted / trailing) : NaN;
+    _kpiSnapshot.ringWinPct  = pctWin;
+    _kpiSnapshot.velRatio    = velRatio;
+    _kpiSnapshot.velN30      = n30;
+    _kpiSnapshot.velN60      = n60;
+  }
+
   function ringTone(p) {
     if (!isFinite(p)) return '';
     if (p >= 0.66) return 'pl-ring__fill--good';
@@ -1778,10 +1909,10 @@ function renderForecastRings(weighted, trailing, winRate, prospects) {
     return 'pl-ring__fill--bad';
   }
 
-  function makeRing(label, fillPct, displayTxt, tone) {
+  function makeRing(label, fillPct, displayTxt, tone, tipId) {
     var r = 26, c = 2 * Math.PI * r;
     var dash = isFinite(fillPct) ? (fillPct * c) : 0;
-    return '<div class="pl-ring">'
+    return '<div class="pl-ring" data-tip-id="' + tipId + '">'
          +   '<svg class="pl-ring__svg" viewBox="0 0 64 64">'
          +     '<circle class="pl-ring__bg" cx="32" cy="32" r="' + r + '"></circle>'
          +     '<circle class="pl-ring__fill ' + tone + '" cx="32" cy="32" r="' + r + '"'
@@ -1796,13 +1927,13 @@ function renderForecastRings(weighted, trailing, winRate, prospects) {
   var html = '';
   html += makeRing('Forecast', pctFcst,
     isFinite(pctFcst) ? (Math.round(pctFcst * 100) + '%') : '—',
-    ringTone(pctFcst));
+    ringTone(pctFcst), 'ring-forecast');
   html += makeRing('Win Rate', pctWin,
     isFinite(pctWin) ? (Math.round(pctWin * 100) + '%') : '—',
-    ringTone(pctWin));
+    ringTone(pctWin), 'ring-winrate');
   html += makeRing('Velocity', pctVel,
     isFinite(velRatio) ? (velRatio.toFixed(2) + 'x') : '—',
-    ringTone(pctVel));
+    ringTone(pctVel), 'ring-velocity');
 
   var row = document.getElementById('rings-row');
   if (row) row.innerHTML = html;
@@ -1928,6 +2059,291 @@ function updateInactiveToggleUI() {
     }
   }
 }
+
+// ── CMD101.5f: KPI / dial hover tooltips ───────────────
+// Single floating element, positioned per hovered card on mouseenter.
+// Renderers read fresh from _kpiSnapshot so values stay in sync after
+// any loadData() refresh.
+var _tipTarget = null;
+
+function _tipEl() { return document.getElementById('pl-tooltip'); }
+
+function _tipPosition(target) {
+  var el = _tipEl();
+  if (!el) return;
+  var r = target.getBoundingClientRect();
+  var tw = el.offsetWidth;
+  var th = el.offsetHeight;
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+  // Default: below the target, left-aligned with target.
+  var top  = r.bottom + 8;
+  var left = r.left;
+  if (left + tw > vw - 12) left = vw - tw - 12;   // right-clamp
+  if (left < 12) left = 12;                       // left-clamp
+  if (top + th > vh - 12) {
+    // No room below — flip above.
+    top = r.top - th - 8;
+    if (top < 12) top = 12;
+  }
+  el.style.left = Math.round(left) + 'px';
+  el.style.top  = Math.round(top)  + 'px';
+}
+
+function _tipShow(target) {
+  var tipId = target.getAttribute('data-tip-id');
+  if (!tipId) return;
+  var renderer = _TIP_RENDERERS[tipId];
+  if (!renderer) return;
+  var el = _tipEl();
+  if (!el) return;
+  el.innerHTML = renderer();
+  _tipTarget = target;
+  el.classList.add('is-visible');
+  el.setAttribute('aria-hidden', 'false');
+  _tipPosition(target);
+}
+
+function _tipHide() {
+  var el = _tipEl();
+  if (!el) return;
+  el.classList.remove('is-visible');
+  el.setAttribute('aria-hidden', 'true');
+  _tipTarget = null;
+}
+
+document.addEventListener('mouseover', function(ev) {
+  var t = ev.target.closest && ev.target.closest('[data-tip-id]');
+  if (!t || t === _tipTarget) return;
+  _tipShow(t);
+});
+document.addEventListener('mouseout', function(ev) {
+  if (!_tipTarget) return;
+  // Hide if leaving the target and not entering a child of it.
+  var related = ev.relatedTarget;
+  if (related && _tipTarget.contains(related)) return;
+  if (related && related.closest && related.closest('[data-tip-id]') === _tipTarget) return;
+  _tipHide();
+});
+window.addEventListener('scroll', _tipHide, true);
+
+// ── Tooltip content renderers ──────────────────────────
+function _tipNoSnapshot() {
+  return '<div class="pl-tip__title">Loading…</div>'
+       + '<div class="pl-tip__note">Hover again after data finishes loading.</div>';
+}
+
+function _stagePill(stage) {
+  var label = (STAGES.find(function(s){ return s.key === stage; }) || {}).label || stage;
+  var color = '#7a8099';
+  if      (stage === 'prospect')   color = '#5dcaa5';
+  else if (stage === 'qualifying') color = '#5dcaa5';
+  else if (stage === 'discovery')  color = '#00d2ff';
+  else if (stage === 'proposal')   color = '#ffaa00';
+  else if (stage === 'review')     color = '#9b59b6';
+  else if (stage === 'approved')   color = '#00e5a0';
+  return '<span class="pl-tip__stage-pill" style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' + escHtml(label) + '</span>';
+}
+
+var _TIP_RENDERERS = {
+  // ── KPI #1: Pipeline Value — itemized list of open deals ──
+  'kpi-pipeline': function() {
+    if (!_kpiSnapshot) return _tipNoSnapshot();
+    var open = (_kpiSnapshot.prospects || []).filter(function(p){ return p.stage !== 'approved'; });
+    open.sort(function(a,b){ return (b.est_value || 0) - (a.est_value || 0); });
+    var rows = open.map(function(p) {
+      return '<div class="pl-tip__row">'
+           +   '<span class="pl-tip__label">' + _stagePill(p.stage) + escHtml(p.title || '(untitled)') + '</span>'
+           +   '<span class="pl-tip__val">' + (p.est_value ? _fmt$(p.est_value) : '—') + '</span>'
+           + '</div>';
+    }).join('');
+    if (!rows) rows = '<div class="pl-tip__note">No open deals.</div>';
+    return '<div class="pl-tip__title">Pipeline Value · ' + open.length + ' open deals</div>'
+         + rows
+         + '<div class="pl-tip__row pl-tip__row--total">'
+         +   '<span class="pl-tip__label">Total</span>'
+         +   '<span class="pl-tip__val">' + _fmt$(_kpiSnapshot.pipelineVal) + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__note">Σ est_value where stage ≠ approved. Excludes inactive deals.</div>';
+  },
+
+  // ── KPI #2: Weighted Forecast — formula breakdown by stage ──
+  'kpi-forecast': function() {
+    if (!_kpiSnapshot) return _tipNoSnapshot();
+    var open = (_kpiSnapshot.prospects || []).filter(function(p){ return p.stage !== 'approved'; });
+    var byStage = {};
+    STAGES.forEach(function(s){ byStage[s.key] = { sum: 0, count: 0 }; });
+    open.forEach(function(p){
+      if (!byStage[p.stage]) return;
+      byStage[p.stage].sum   += (p.est_value || 0);
+      byStage[p.stage].count += 1;
+    });
+    var rows = '';
+    STAGES.forEach(function(s) {
+      if (s.key === 'approved') return;
+      var b = byStage[s.key];
+      var prob = STAGE_PROB[s.key] || 0;
+      var contrib = b.sum * prob;
+      rows += '<div class="pl-tip__row">'
+            +   '<span class="pl-tip__label">' + _stagePill(s.key) + _fmt$(b.sum) + ' × ' + Math.round(prob * 100) + '%</span>'
+            +   '<span class="pl-tip__val">' + _fmt$(contrib) + '</span>'
+            + '</div>';
+    });
+    var benchPct = isFinite(_kpiSnapshot.weightedFcst / _kpiSnapshot.trailing12mo)
+      ? Math.round((_kpiSnapshot.weightedFcst / _kpiSnapshot.trailing12mo) * 100) + '%'
+      : '—';
+    return '<div class="pl-tip__title">Weighted Forecast</div>'
+         + '<div class="pl-tip__formula">Σ (stage value × stage probability)</div>'
+         + rows
+         + '<div class="pl-tip__row pl-tip__row--total">'
+         +   '<span class="pl-tip__label">Total</span>'
+         +   '<span class="pl-tip__val">' + _fmt$(_kpiSnapshot.weightedFcst) + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__note">Benchmark: ' + benchPct + ' of trailing-12mo closed-won (' + _fmt$(_kpiSnapshot.trailing12mo) + ').</div>';
+  },
+
+  // ── KPI #3: Win Rate — basis ──
+  'kpi-winrate': function() {
+    if (!_kpiSnapshot) return _tipNoSnapshot();
+    var rate = isFinite(_kpiSnapshot.winRate) ? Math.round(_kpiSnapshot.winRate * 100) + '%' : '—';
+    return '<div class="pl-tip__title">Win Rate · last 90 days</div>'
+         + '<div class="pl-tip__formula">won ÷ total stage moves</div>'
+         + '<div class="pl-tip__row">'
+         +   '<span class="pl-tip__label">Approved (won)</span>'
+         +   '<span class="pl-tip__val">' + _kpiSnapshot.won90 + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__row">'
+         +   '<span class="pl-tip__label">Total stage moves</span>'
+         +   '<span class="pl-tip__val">' + _kpiSnapshot.changed90 + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__row pl-tip__row--total">'
+         +   '<span class="pl-tip__label">Win rate</span>'
+         +   '<span class="pl-tip__val">' + rate + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__note">v1 approximation — there is no Lost stage yet, so the denominator counts all updates in the period (proxy for activity), not just won/lost outcomes. Threshold: ≥30% green, &lt;30% amber.</div>';
+  },
+
+  // ── KPI #4: Avg Cycle ──
+  'kpi-cycle': function() {
+    if (!_kpiSnapshot) return _tipNoSnapshot();
+    var avg = isFinite(_kpiSnapshot.avgCycle) ? _kpiSnapshot.avgCycle.toFixed(1) + 'd' : '—';
+    return '<div class="pl-tip__title">Avg Cycle</div>'
+         + '<div class="pl-tip__formula">mean(updated_at − created_at)</div>'
+         + '<div class="pl-tip__row">'
+         +   '<span class="pl-tip__label">Sample size</span>'
+         +   '<span class="pl-tip__val">' + _kpiSnapshot.avgCycleSampleN + ' deals</span>'
+         + '</div>'
+         + '<div class="pl-tip__row">'
+         +   '<span class="pl-tip__label">Baseline</span>'
+         +   '<span class="pl-tip__val">' + AVG_CYCLE_BASELINE_DAYS + 'd</span>'
+         + '</div>'
+         + '<div class="pl-tip__row pl-tip__row--total">'
+         +   '<span class="pl-tip__label">Avg cycle</span>'
+         +   '<span class="pl-tip__val">' + avg + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__note">Last ' + _kpiSnapshot.avgCycleSampleN + ' Approved deals, sorted by updated_at desc. Green if ≤ baseline, amber otherwise.</div>';
+  },
+
+  // ── KPI #5: Stuck Deals ──
+  'kpi-stuck': function() {
+    if (!_kpiSnapshot) return _tipNoSnapshot();
+    var stuck = _kpiSnapshot.stuckList || [];
+    var stuckSorted = stuck.slice().sort(function(a,b){
+      var ad = (Date.now() - new Date(a.updated_at)) / 86400000 - (STUCK_THRESHOLD_DAYS[a.stage] || 0);
+      var bd = (Date.now() - new Date(b.updated_at)) / 86400000 - (STUCK_THRESHOLD_DAYS[b.stage] || 0);
+      return bd - ad;
+    });
+    var rows = stuckSorted.map(function(p){
+      var over = Math.round(_daysInStage(p) - (STUCK_THRESHOLD_DAYS[p.stage] || 0));
+      return '<div class="pl-tip__row">'
+           +   '<span class="pl-tip__label">' + _stagePill(p.stage) + escHtml(p.title || '(untitled)') + '</span>'
+           +   '<span class="pl-tip__val" style="color:#ff4757">+' + over + 'd</span>'
+           + '</div>';
+    }).join('');
+    if (!rows) rows = '<div class="pl-tip__note">No stuck deals.</div>';
+    var thresholds = '';
+    Object.keys(STUCK_THRESHOLD_DAYS).forEach(function(k){
+      if (k === 'approved') return;
+      thresholds += _stagePill(k) + STUCK_THRESHOLD_DAYS[k] + 'd · ';
+    });
+    return '<div class="pl-tip__title">Stuck Deals · ' + stuck.length + '</div>'
+         + rows
+         + '<div class="pl-tip__row pl-tip__row--total">'
+         +   '<span class="pl-tip__label">At risk</span>'
+         +   '<span class="pl-tip__val" style="color:#ff4757">' + _fmt$(_kpiSnapshot.stuckAtRisk) + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__note">Stuck = days since updated_at &gt; per-stage threshold. Thresholds: ' + thresholds.replace(/ · $/, '') + '.</div>';
+  },
+
+  // ── KPI #6: This Week ──
+  'kpi-week': function() {
+    if (!_kpiSnapshot) return _tipNoSnapshot();
+    return '<div class="pl-tip__title">This Week · last 7 days</div>'
+         + '<div class="pl-tip__formula">Σ est_value where updated_at ≥ now − 7d</div>'
+         + '<div class="pl-tip__row">'
+         +   '<span class="pl-tip__label">Deals advanced</span>'
+         +   '<span class="pl-tip__val">' + _kpiSnapshot.weekAdvanced + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__row">'
+         +   '<span class="pl-tip__label">Deals won</span>'
+         +   '<span class="pl-tip__val">' + _kpiSnapshot.weekWon + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__row pl-tip__row--total">'
+         +   '<span class="pl-tip__label">Value moved</span>'
+         +   '<span class="pl-tip__val">+' + _fmt$(_kpiSnapshot.weekVal) + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__note">"Advanced" approximated as any update — true stage-history will replace this proxy in v2.</div>';
+  },
+
+  // ── Ring 1: Forecast (weighted forecast vs trailing-12mo closed-won) ──
+  'ring-forecast': function() {
+    if (!_kpiSnapshot) return _tipNoSnapshot();
+    var pct = isFinite(_kpiSnapshot.ringFcstUncapped)
+      ? Math.round(_kpiSnapshot.ringFcstUncapped * 100) + '%'
+      : '—';
+    return '<div class="pl-tip__title">Forecast Dial</div>'
+         + '<div class="pl-tip__formula">weighted forecast ÷ trailing-12mo closed-won</div>'
+         + '<div class="pl-tip__row">'
+         +   '<span class="pl-tip__label">Weighted forecast</span>'
+         +   '<span class="pl-tip__val">' + _fmt$(_kpiSnapshot.weightedFcst) + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__row">'
+         +   '<span class="pl-tip__label">Trailing 12mo won</span>'
+         +   '<span class="pl-tip__val">' + _fmt$(_kpiSnapshot.trailing12mo) + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__row pl-tip__row--total">'
+         +   '<span class="pl-tip__label">Coverage</span>'
+         +   '<span class="pl-tip__val">' + pct + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__note">Dial fills to 100% max; raw value can exceed 1.0 when forecast outpaces last year.</div>';
+  },
+
+  // ── Ring 2: Win Rate (mirror of KPI #3) ──
+  'ring-winrate': function() {
+    return _TIP_RENDERERS['kpi-winrate']();
+  },
+
+  // ── Ring 3: Velocity ──
+  'ring-velocity': function() {
+    if (!_kpiSnapshot) return _tipNoSnapshot();
+    var ratio = isFinite(_kpiSnapshot.velRatio) ? _kpiSnapshot.velRatio.toFixed(2) + 'x' : '—';
+    return '<div class="pl-tip__title">Velocity Dial</div>'
+         + '<div class="pl-tip__formula">deals advanced last 30d ÷ prior 30d</div>'
+         + '<div class="pl-tip__row">'
+         +   '<span class="pl-tip__label">Last 30d</span>'
+         +   '<span class="pl-tip__val">' + _kpiSnapshot.velN30 + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__row">'
+         +   '<span class="pl-tip__label">Prior 30d (30–60d ago)</span>'
+         +   '<span class="pl-tip__val">' + _kpiSnapshot.velN60 + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__row pl-tip__row--total">'
+         +   '<span class="pl-tip__label">Ratio</span>'
+         +   '<span class="pl-tip__val">' + ratio + '</span>'
+         + '</div>'
+         + '<div class="pl-tip__note">1.0× = steady. Dial fills proportionally to a 2.0× ceiling. "Advanced" approximated as any updated_at change.</div>';
+  }
+};
 
 // ── board render ───────────────────────────────────────
 function renderBoard(prospects) {
