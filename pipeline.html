@@ -724,7 +724,7 @@ async function loadData() {
     const [pros, comps, ress] = await Promise.all([
       API.get('v_pipeline_summary?order=created_at.desc&limit=200'),
       API.get('companies?order=name&select=id,name,industry,firm_id'),
-      API.get('resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,avatar_url'),
+      API.get('resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,avatar_url,department,title,is_external,user_id'),
     ]);
     allProspects = pros || [];
     window.allProspects = allProspects;   // CMD100.78: keep mirror in sync
