@@ -386,6 +386,49 @@ body {
   font-size: 13px;
 }
 
+/* CMD101.5c — inactive prospect surfacing */
+.pl-inactive-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.pl-inactive-toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
+}
+.pl-inactive-toggle__count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  font-feature-settings: "tnum";
+}
+.pl-deal--inactive {
+  opacity: 0.62;
+}
+.pl-deal--inactive .pl-deal__bar { background: var(--muted) !important; }
+.pl-badge-inactive {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+  background: rgba(122,128,153,0.10);
+  white-space: nowrap;
+}
+
 /* Right rail — rings + lists */
 .pl-rings {
   display: flex;
@@ -1066,7 +1109,14 @@ body {
         <section class="pl-panel active-deals">
           <div class="pl-panel__head">
             <span>Active Deals</span>
-            <span class="pl-panel__count" id="deals-count">—</span>
+            <div style="display:flex;align-items:center;gap:14px;margin-left:auto">
+              <label class="pl-inactive-toggle" id="pl-inactive-toggle-wrap">
+                <input type="checkbox" id="pl-show-inactive" onchange="onToggleShowInactive(event)" />
+                <span>Show inactive</span>
+                <span class="pl-inactive-toggle__count" id="pl-inactive-count"></span>
+              </label>
+              <span class="pl-panel__count" id="deals-count">—</span>
+            </div>
           </div>
           <div class="pl-deals" id="deals-list">
             <div class="pl-deals-empty">Loading…</div>
@@ -1277,6 +1327,13 @@ let companies    = [];
 let resources    = [];
 let _closedWon12mo = [];   // CMD101: trailing-12mo approved deals (for forecast benchmark)
 
+// CMD101.5c: inactive-prospect cache. Populated on demand when the
+// "Show inactive" filter is toggled on in the List view. Stays empty
+// until the operator opts in. Board view never reads from this cache.
+let _inactiveProspects = [];
+let _inactiveLoaded    = false;
+let _showInactive      = false;
+
 // Cross-script lookup mirror (Edit/Move/Delete/Toggle Prospect commands).
 window.allProspects = [];
 
@@ -1315,6 +1372,15 @@ async function loadData() {
     companies      = comps || [];
     resources      = ress || [];
     _closedWon12mo = won || [];
+
+    // CMD101.5c: invalidate inactive cache on each load. If the operator
+    // had it on, refetch immediately so the toggle state is preserved.
+    _inactiveProspects = [];
+    _inactiveLoaded    = false;
+    if (_showInactive) {
+      await loadInactiveProspects();
+    }
+
     populateFormSelects();
   } catch (e) {
     console.error(e);
@@ -1325,11 +1391,38 @@ async function loadData() {
   }
 }
 
+// CMD101.5c: separate fetch for inactive prospects (List view, opt-in only).
+// Pulls from v_pipeline_summary so List rows have the same joined fields
+// (company_name, industry, assignee, est_value) as active rows. Filters
+// client-side to is_active=false since the view does not propagate the
+// column server-side.
+async function loadInactiveProspects() {
+  try {
+    var rows = await API.get('v_pipeline_summary?order=updated_at.desc&limit=500');
+    _inactiveProspects = (rows || []).filter(function(p){ return p.is_active === false; });
+    _inactiveLoaded = true;
+  } catch (e) {
+    console.error('[CMD101.5c] inactive fetch failed:', e);
+    _inactiveProspects = [];
+    _inactiveLoaded = false;
+  }
+}
+
 // CMD101: render both views from cache. Cheap — both sections always exist; only one is visible.
+// CMD101.5c: dashboard math (KPIs, funnel, stuck, touch) ALWAYS runs against
+// active prospects only — inactive deals do not contribute to forecast,
+// pipeline value, or stuck alerts. Only the List-view Active Deals list
+// expands to include inactive when the toggle is on.
 function renderAll() {
   renderDashboard(allProspects);
   renderBoard(allProspects);
   updateStats(allProspects);
+  // Active Deals list reads its own source based on the toggle.
+  var listSource = (_showInactive && _inactiveLoaded)
+    ? allProspects.concat(_inactiveProspects)
+    : allProspects;
+  renderActiveDeals(listSource);
+  updateInactiveToggleUI();
 }
 
 // ── stats strip (Board toolbar) ────────────────────────
@@ -1498,8 +1591,7 @@ function renderDashboard(prospects) {
   // Funnel velocity
   renderFunnel(prospects);
 
-  // Active deals list
-  renderActiveDeals(prospects);
+  // Active deals list rendered by renderAll() based on inactive toggle state.
 
   // Right rail
   renderForecastRings(weightedFcst, trailing12moTotal, winRate, prospects);
@@ -1510,8 +1602,7 @@ function renderDashboard(prospects) {
   var ft = document.getElementById('funnel-total');
   if (ft) ft.textContent = prospects.length + ' deals · ' + _fmt$(prospects.reduce(function(s,p){return s+(p.est_value||0);},0));
 
-  // Deals count.
-  document.getElementById('deals-count').textContent = prospects.length;
+  // Deals count is set inside renderActiveDeals (driven by inactive-toggle state).
 
   // Stuck count.
   var sc = document.getElementById('stuck-count');
@@ -1560,12 +1651,32 @@ function renderFunnel(prospects) {
 function renderActiveDeals(prospects) {
   var listEl = document.getElementById('deals-list');
   if (!listEl) return;
+
+  var activeCount   = 0;
+  var inactiveCount = 0;
+  prospects.forEach(function(p){
+    if (p.is_active === false) inactiveCount++;
+    else activeCount++;
+  });
+
+  // Deals-count: shows active when inactive hidden, "active + inactive" split when shown.
+  var countEl = document.getElementById('deals-count');
+  if (countEl) {
+    countEl.textContent = inactiveCount > 0
+      ? (activeCount + ' + ' + inactiveCount + ' inactive')
+      : activeCount;
+  }
+
   if (!prospects.length) {
     listEl.innerHTML = '<div class="pl-deals-empty">No active prospects.</div>';
     return;
   }
 
+  // CMD101.5c: inactive rows always sort last; within each bucket sort by stage then value desc.
   var sorted = prospects.slice().sort(function(a,b) {
+    var ai = (a.is_active === false) ? 1 : 0;
+    var bi = (b.is_active === false) ? 1 : 0;
+    if (ai !== bi) return ai - bi;
     var sa = STAGE_INDEX[a.stage] || 0, sb = STAGE_INDEX[b.stage] || 0;
     if (sa !== sb) return sa - sb;
     return (b.est_value || 0) - (a.est_value || 0);
@@ -1573,14 +1684,16 @@ function renderActiveDeals(prospects) {
 
   var todayIso = new Date().toLocaleDateString('en-CA');
   var html = sorted.map(function(p) {
-    var stuck = _isStuck(p);
+    var inactive = (p.is_active === false);
+    var stuck = !inactive && _isStuck(p);
     var fu = p.next_follow_up_date;
-    var overdue = fu && fu < todayIso;
+    var overdue = !inactive && fu && fu < todayIso;
 
     var statusClass, statusLabel, barClass;
-    if (stuck) { statusClass = 'pl-deal__status--bad'; statusLabel = 'Stuck'; barClass = 'pl-deal__bar--bad'; }
-    else if (overdue) { statusClass = 'pl-deal__status--cau'; statusLabel = 'Followup Nd'; barClass = 'pl-deal__bar--cau'; }
-    else { statusClass = 'pl-deal__status--ok'; statusLabel = 'On Track'; barClass = 'pl-deal__bar--ok'; }
+    if (inactive)     { statusClass = '';                       statusLabel = '';            barClass = ''; }
+    else if (stuck)   { statusClass = 'pl-deal__status--bad';   statusLabel = 'Stuck';       barClass = 'pl-deal__bar--bad'; }
+    else if (overdue) { statusClass = 'pl-deal__status--cau';   statusLabel = 'Followup Nd'; barClass = 'pl-deal__bar--cau'; }
+    else              { statusClass = 'pl-deal__status--ok';    statusLabel = 'On Track';    barClass = 'pl-deal__bar--ok'; }
 
     var assignedInits = ((p.assigned_to_name || '').split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2)) || '—';
     var dateStr = fu
@@ -1594,14 +1707,22 @@ function renderActiveDeals(prospects) {
 
     var stageLabel = (STAGES.find(function(s){return s.key === p.stage;}) || {}).label || p.stage;
 
-    return '<div class="pl-deal" data-id="' + p.id + '" onclick="openProspect(\'' + p.id + '\')">'
+    var titleCell = '<div class="pl-deal__title">' + escHtml(p.title || '(untitled)');
+    if (inactive) titleCell += ' <span class="pl-badge-inactive">Inactive</span>';
+    titleCell += '</div>';
+
+    var statusCell = inactive
+      ? '<span class="pl-badge-inactive">Inactive</span>'
+      : '<span class="pl-deal__status ' + statusClass + '">' + statusLabel + '</span>';
+
+    return '<div class="pl-deal' + (inactive ? ' pl-deal--inactive' : '') + '" data-id="' + p.id + '" onclick="openProspect(\'' + p.id + '\')">'
          +   '<div class="pl-deal__bar ' + barClass + '"></div>'
          +   '<div class="pl-deal__main">'
-         +     '<div class="pl-deal__title">' + escHtml(p.title || '(untitled)') + '</div>'
+         +     titleCell
          +     '<div class="pl-deal__meta">' + meta + '</div>'
          +   '</div>'
          +   '<span class="pl-deal__stage" data-stage="' + p.stage + '">' + escHtml(stageLabel) + '</span>'
-         +   '<span class="pl-deal__status ' + statusClass + '">' + statusLabel + '</span>'
+         +   statusCell
          +   '<span class="pl-deal__date">' + dateStr + '</span>'
          +   '<span class="pl-deal__val">' + (p.est_value ? _fmt$(p.est_value) : '—') + '</span>'
          + '</div>';
@@ -1757,6 +1878,33 @@ function switchView(name) {
   if (vb) { if (key === 'board') vb.removeAttribute('hidden'); else vb.setAttribute('hidden',''); }
 }
 window.switchView = switchView;
+
+// ── CMD101.5c: Show-inactive toggle ────────────────────
+async function onToggleShowInactive(ev) {
+  var checked = !!(ev && ev.target && ev.target.checked);
+  _showInactive = checked;
+  if (checked && !_inactiveLoaded) {
+    // Show pending state on the deals list while we fetch.
+    var dl = document.getElementById('deals-list');
+    if (dl) dl.innerHTML = '<div class="pl-deals-empty">Loading inactive…</div>';
+    await loadInactiveProspects();
+  }
+  renderAll();
+}
+window.onToggleShowInactive = onToggleShowInactive;
+
+function updateInactiveToggleUI() {
+  var cb  = document.getElementById('pl-show-inactive');
+  var cnt = document.getElementById('pl-inactive-count');
+  if (cb)  cb.checked = !!_showInactive;
+  if (cnt) {
+    if (_showInactive && _inactiveLoaded) {
+      cnt.textContent = '(' + _inactiveProspects.length + ')';
+    } else {
+      cnt.textContent = '';
+    }
+  }
+}
 
 // ── board render ───────────────────────────────────────
 function renderBoard(prospects) {
