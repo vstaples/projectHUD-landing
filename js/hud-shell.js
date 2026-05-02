@@ -1487,6 +1487,30 @@ const HUDShell = (() => {
 
       const cls = (el.className && typeof el.className === 'string') ? el.className : '';
 
+      // CMD101: pipeline view-switch tab. Strict classList match (not regex)
+      // so we don't over-match other "tab"-classed elements. Returns
+      // `Switch View "<label>"` so the recorder verb is distinct from
+      // generic `Set Tab`.
+      if (el.classList && el.classList.contains('hud-tab') && el.hasAttribute('data-view')) {
+        return label ? `Switch View "${label}"` : null;
+      }
+
+      // CMD101: Mark Inactive / Mark Active button inside the prospect edit
+      // drawer. Resolves the prospect title from the drawer's title-input
+      // (#f-title) for self-describing replay. The button itself only renders
+      // in edit mode and the drawer carries `.prospect-edit-drawer` then.
+      if (el.classList && el.classList.contains('btn-toggle-active')) {
+        var titleInput = document.getElementById('f-title');
+        var pname = titleInput ? _cleanLabel(titleInput.value || '') : '';
+        if (!pname) {
+          // Fallback: dataset on the toggle button (set when drawer is opened
+          // for edit) — protects against captures that fire before the title
+          // input is reachable for any reason.
+          pname = (el.dataset && el.dataset.title) ? _cleanLabel(el.dataset.title) : '';
+        }
+        return pname ? `Toggle Active "${pname}"` : `Toggle Active`;
+      }
+
       // 1a. Pipeline-specific rules (CMD100.55).
       // Prospect card: descend into prospect detail.
       // Use classList for strict token match (not /\bp-card\b/, which

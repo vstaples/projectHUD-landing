@@ -1753,6 +1753,156 @@ var COMMANDS = {
     }
   },
 
+  // ── Switch View (CMD101) ───────────────────────────────────────────────────
+  // Pipeline-specific: toggle between Dashboard and Board sub-views inside
+  // pipeline.html. Pure DOM swap (hidden attribute) — no route change, no
+  // re-fetch. Re-broadcasts page_ready after the swap settles so any
+  // Aegis-side script-runner waiting on settle can proceed.
+  //   Switch View "Dashboard" | Switch View "Board"
+  'Switch View': async function(args) {
+    var name = (args[0] || '').toString().trim();
+    var key  = name.toLowerCase();
+    if (key !== 'dashboard' && key !== 'board') {
+      return 'Switch View: unknown view "' + args[0] + '" (expected Dashboard|Board)';
+    }
+    if (typeof window.switchView !== 'function') {
+      return 'Switch View: pipeline.html not loaded (window.switchView missing)';
+    }
+    window.switchView(key);
+    // Re-broadcast page_ready so script-runner settle paths advance.
+    try {
+      if (_mySession && !window._aegisMode) {
+        _channelSend({
+          type: 'broadcast', event: 'page_ready',
+          payload: {
+            userId:   _mySession.userId,
+            name:     _mySession.name,
+            initials: _mySession.initials,
+            location: _currentLocation(),
+            ts:       Date.now()
+          }
+        });
+      }
+    } catch(e) {}
+    return 'switched to ' + key;
+  },
+
+  // ── Delete Prospect (CMD101) ───────────────────────────────────────────────
+  // Script-only verb (no capture rule). Resolves by exact title match against
+  // the in-page prospect cache (window.allProspects). Multi-match deletes all;
+  // no-match logs a warning and continues without halting the script.
+  //   Delete Prospect "<title>"
+  'Delete Prospect': async function(args) {
+    var title = (args[0] || '').toString();
+    console.log('[cmd:Delete Prospect]', { title: title, currentLoc: window.location.pathname });
+    if (!title) return 'Delete Prospect: missing prospect title';
+    var ap = window.allProspects || [];
+    var matches = ap.filter(function(p){ return (p.title || '') === title; });
+    if (!matches.length) {
+      console.warn('[recorder] Delete Prospect: no match for "' + title + '"');
+      return 'Delete Prospect: no match for "' + title + '"';
+    }
+    var failed = [];
+    for (var i = 0; i < matches.length; i++) {
+      var p = matches[i];
+      try {
+        if (typeof window.API?.deleteProspect === 'function') {
+          await window.API.deleteProspect(p.id);
+        } else if (typeof window.API?.del === 'function') {
+          await window.API.del('prospects?id=eq.' + encodeURIComponent(p.id));
+        } else {
+          failed.push(p.id + ' (no DELETE method on API)');
+        }
+      } catch (err) {
+        failed.push(p.id + ': ' + (err.message || String(err)));
+      }
+    }
+    // Refresh + page_ready broadcast.
+    try {
+      if (typeof window.loadData === 'function')   await window.loadData();
+      if (typeof window.renderAll === 'function')  window.renderAll();
+    } catch(e) { console.warn('[cmd:Delete Prospect] refresh failed:', e); }
+    try {
+      if (_mySession && !window._aegisMode) {
+        _channelSend({
+          type: 'broadcast', event: 'page_ready',
+          payload: {
+            userId:   _mySession.userId,
+            name:     _mySession.name,
+            initials: _mySession.initials,
+            location: _currentLocation(),
+            ts:       Date.now()
+          }
+        });
+      }
+    } catch(e) {}
+    if (failed.length) return 'Delete Prospect partial: ' + failed.join('; ');
+    return 'deleted ' + matches.length + ' prospect' + (matches.length > 1 ? 's' : '') + ' titled "' + title + '"';
+  },
+
+  // ── Toggle Active (CMD101) ─────────────────────────────────────────────────
+  // Pipeline-specific: flip a prospect's is_active boolean. Resolution mirrors
+  // Delete Prospect — exact title match against window.allProspects. Refresh
+  // and re-broadcast page_ready after the PATCH settles.
+  //   Toggle Active "<title>"
+  'Toggle Active': async function(args) {
+    var title = (args[0] || '').toString();
+    console.log('[cmd:Toggle Active]', { title: title, currentLoc: window.location.pathname });
+    if (!title) return 'Toggle Active: missing prospect title';
+    var ap = window.allProspects || [];
+    var matches = ap.filter(function(p){ return (p.title || '') === title; });
+    if (!matches.length) {
+      // Active list filters out inactive rows; for the Mark Active flip we
+      // need to find the row directly. Try a one-off lookup by title.
+      try {
+        if (typeof window.API?.get === 'function') {
+          var rows = await window.API.get('prospects?select=id,is_active,title&title=eq.' + encodeURIComponent(title));
+          if (rows && rows.length) matches = rows;
+        }
+      } catch(e) { /* fall through */ }
+    }
+    if (!matches.length) {
+      console.warn('[recorder] Toggle Active: no match for "' + title + '"');
+      return 'Toggle Active: no match for "' + title + '"';
+    }
+    var failed = [];
+    for (var i = 0; i < matches.length; i++) {
+      var p = matches[i];
+      var next = (p.is_active === false);   // flip
+      try {
+        if (typeof window.API?.setProspectActive === 'function') {
+          await window.API.setProspectActive(p.id, next);
+        } else if (typeof window.API?.patch === 'function') {
+          await window.API.patch('prospects?id=eq.' + encodeURIComponent(p.id), { is_active: next });
+        } else {
+          failed.push(p.id + ' (no PATCH method on API)');
+        }
+      } catch (err) {
+        failed.push(p.id + ': ' + (err.message || String(err)));
+      }
+    }
+    try {
+      if (typeof window.loadData === 'function')   await window.loadData();
+      if (typeof window.renderAll === 'function')  window.renderAll();
+    } catch(e) { console.warn('[cmd:Toggle Active] refresh failed:', e); }
+    try {
+      if (_mySession && !window._aegisMode) {
+        _channelSend({
+          type: 'broadcast', event: 'page_ready',
+          payload: {
+            userId:   _mySession.userId,
+            name:     _mySession.name,
+            initials: _mySession.initials,
+            location: _currentLocation(),
+            ts:       Date.now()
+          }
+        });
+      }
+    } catch(e) {}
+    if (failed.length) return 'Toggle Active partial: ' + failed.join('; ');
+    return 'toggled active for "' + title + '"';
+  },
+
   // ── Set NarrateTarget (CMD87b / Brief Aegis Remote Narration) ────────────────
   // Redirects subsequent `Narrate` calls to render on a target Compass session.
   //   Set NarrateTarget               — read current value

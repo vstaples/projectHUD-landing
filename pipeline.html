@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Pipeline — ProjectHUD</title>
+<link rel="stylesheet" href="/css/hud.css">
 <style>
 /* ── reset & base ─────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -18,13 +19,17 @@
   --muted:     #7a8099;
   --accent:    #4f8ef7;
 
-  --stage-prospect:   #3d4560;
-  --stage-qualifying: #2d5a8e;
-  --stage-discovery:  #1a6b5a;
-  --stage-proposal:   #6b4f1a;
-  --stage-review:     #6b2d5a;
-  --stage-approved:   #1a6b2d;
-  --stage-declined:   #6b1a1a;
+  /* CMD101: kanban-stage swatches kept as pre-existing local tokens.
+     The brief's stage-color tokens (--stage-prospect..--stage-approved)
+     are added to hud.css §3 and are referenced by the dashboard widgets,
+     not by the kanban columns. The names below are local & legacy. */
+  --kb-stage-prospect:   #3d4560;
+  --kb-stage-qualifying: #2d5a8e;
+  --kb-stage-discovery:  #1a6b5a;
+  --kb-stage-proposal:   #6b4f1a;
+  --kb-stage-review:     #6b2d5a;
+  --kb-stage-approved:   #1a6b2d;
+  --kb-stage-declined:   #6b1a1a;
 
   --pri-low:    #3d5a3d;
   --pri-med:    #6b5a1a;
@@ -40,12 +45,367 @@ body {
 }
 
 /* ── layout ───────────────────────────────────────────── */
-.main {
+.hud-shell {
   display: flex;
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
   min-width: 0;
+}
+
+/* ── CMD101: tab strip wrapper above views ────────────── */
+.pipeline-tabs-wrap {
+  padding: 12px 20px 0;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* ── CMD101: dashboard view ───────────────────────────── */
+.view-dashboard {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 20px 20px;
+  background: var(--bg);
+}
+
+.view-dashboard[hidden] { display: none !important; }
+.view-board[hidden]     { display: none !important; }
+
+/* KPI strip — six cards, dense */
+.pl-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+@media (max-width: 1280px) {
+  .pl-kpi-strip { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 720px) {
+  .pl-kpi-strip { grid-template-columns: repeat(2, 1fr); }
+}
+
+.pl-kpi {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+  min-height: 78px;
+}
+.pl-kpi__bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--text-accent, #00d2ff);
+}
+.pl-kpi__bar--good    { background: var(--green, #00e5a0); }
+.pl-kpi__bar--caution { background: var(--amber, #ffaa00); }
+.pl-kpi__bar--bad     { background: var(--red,   #ff4757); }
+.pl-kpi__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+.pl-kpi__value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  font-feature-settings: "tnum";
+}
+.pl-kpi__value--good    { color: var(--green, #00e5a0); }
+.pl-kpi__value--caution { color: var(--amber, #ffaa00); }
+.pl-kpi__value--bad     { color: var(--red,   #ff4757); }
+.pl-kpi__value--accent  { color: var(--text-accent, #00d2ff); }
+.pl-kpi__sub {
+  font-size: 11px;
+  color: var(--muted);
+  font-feature-settings: "tnum";
+}
+
+/* Dashboard grid — main column + 320px right rail */
+.pl-dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1200px) {
+  .pl-dash-grid { grid-template-columns: 1fr; }
+}
+
+/* Generic dashboard panel */
+.pl-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.pl-panel:last-child { margin-bottom: 0; }
+.pl-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+.pl-panel__count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  font-feature-settings: "tnum";
+}
+.pl-panel__count--bad { color: var(--red, #ff4757); }
+
+/* Funnel velocity — six tiles + five conversion %s */
+.pl-funnel {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.pl-funnel__stage {
+  flex: 1 1 0;
+  min-width: 110px;
+  padding: 10px 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 3px solid var(--stage-prospect, var(--green, #00e5a0));
+}
+.pl-funnel__stage[data-stage="prospect"]   { border-top-color: var(--stage-prospect,   #00e5a0); }
+.pl-funnel__stage[data-stage="qualifying"] { border-top-color: var(--stage-qualifying, #5dcaa5); }
+.pl-funnel__stage[data-stage="discovery"]  { border-top-color: var(--stage-discovery,  #00d2ff); }
+.pl-funnel__stage[data-stage="proposal"]   { border-top-color: var(--stage-proposal,   #ffaa00); }
+.pl-funnel__stage[data-stage="review"]     { border-top-color: var(--stage-review,     #9b59b6); }
+.pl-funnel__stage[data-stage="approved"]   { border-top-color: var(--stage-approved,   #00e5a0); }
+.pl-funnel__name {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text);
+}
+.pl-funnel__val {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  font-feature-settings: "tnum";
+  line-height: 1.1;
+}
+.pl-funnel__meta {
+  font-size: 11px;
+  color: var(--muted);
+  font-feature-settings: "tnum";
+}
+.pl-funnel__conv {
+  flex: 0 0 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+  color: var(--muted);
+}
+.pl-funnel__conv--good    { color: var(--green, #00e5a0); }
+.pl-funnel__conv--caution { color: var(--amber, #ffaa00); }
+.pl-funnel__conv--bad     { color: var(--red,   #ff4757); }
+
+/* Active deals list */
+.pl-deals { display: flex; flex-direction: column; }
+.pl-deal {
+  display: grid;
+  grid-template-columns: 4px 1fr auto auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .12s;
+}
+.pl-deal:last-child { border-bottom: none; }
+.pl-deal:hover { background: var(--surface2); }
+.pl-deal__bar {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 2px;
+  background: var(--green, #00e5a0);
+}
+.pl-deal__bar--ok  { background: var(--green, #00e5a0); }
+.pl-deal__bar--cau { background: var(--amber, #ffaa00); }
+.pl-deal__bar--bad { background: var(--red,   #ff4757); }
+.pl-deal__main { min-width: 0; }
+.pl-deal__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pl-deal__meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.pl-deal__stage {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.pl-deal__stage[data-stage="prospect"]   { color: var(--stage-prospect,   #00e5a0); border-color: var(--stage-prospect,   #00e5a0); background: rgba(0,229,160,.08); }
+.pl-deal__stage[data-stage="qualifying"] { color: var(--stage-qualifying, #5dcaa5); border-color: var(--stage-qualifying, #5dcaa5); background: rgba(93,202,165,.08); }
+.pl-deal__stage[data-stage="discovery"]  { color: var(--stage-discovery,  #00d2ff); border-color: var(--stage-discovery,  #00d2ff); background: rgba(0,210,255,.08); }
+.pl-deal__stage[data-stage="proposal"]   { color: var(--stage-proposal,   #ffaa00); border-color: var(--stage-proposal,   #ffaa00); background: rgba(255,170,0,.08); }
+.pl-deal__stage[data-stage="review"]     { color: var(--stage-review,     #9b59b6); border-color: var(--stage-review,     #9b59b6); background: rgba(155,89,182,.10); }
+.pl-deal__stage[data-stage="approved"]   { color: var(--stage-approved,   #00e5a0); border-color: var(--stage-approved,   #00e5a0); background: rgba(0,229,160,.08); }
+.pl-deal__status {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.pl-deal__status--ok  { color: var(--green, #00e5a0); }
+.pl-deal__status--cau { color: var(--amber, #ffaa00); }
+.pl-deal__status--bad { color: var(--red,   #ff4757); }
+.pl-deal__date {
+  font-size: 11px;
+  color: var(--muted);
+  font-feature-settings: "tnum";
+  white-space: nowrap;
+}
+.pl-deal__val {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-accent, #00d2ff);
+  font-feature-settings: "tnum";
+  text-align: right;
+  white-space: nowrap;
+  min-width: 60px;
+}
+.pl-deals-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Right rail — rings + lists */
+.pl-rings {
+  display: flex;
+  justify-content: space-around;
+  gap: 8px;
+  padding: 4px 0;
+}
+.pl-ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.pl-ring__svg { width: 64px; height: 64px; }
+.pl-ring__bg    { stroke: var(--border2); stroke-width: 8; fill: none; }
+.pl-ring__fill  { stroke: var(--text-accent, #00d2ff); stroke-width: 8; fill: none;
+                  stroke-linecap: round; transition: stroke-dasharray .6s ease; }
+.pl-ring__fill--good    { stroke: var(--green, #00e5a0); }
+.pl-ring__fill--caution { stroke: var(--amber, #ffaa00); }
+.pl-ring__fill--bad     { stroke: var(--red,   #ff4757); }
+.pl-ring__txt {
+  font-size: 14px;
+  font-weight: 700;
+  fill: var(--text);
+  font-feature-settings: "tnum";
+}
+.pl-ring__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  text-align: center;
+}
+
+.pl-rail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.pl-rail-row:last-child { border-bottom: none; }
+.pl-rail-row__rank {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  font-feature-settings: "tnum";
+  width: 18px;
+  flex-shrink: 0;
+}
+.pl-rail-row__main { flex: 1; min-width: 0; }
+.pl-rail-row__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pl-rail-row__sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pl-rail-row__right {
+  font-size: 12px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.pl-rail-row__right--bad     { color: var(--red,   #ff4757); }
+.pl-rail-row__right--caution { color: var(--amber, #ffaa00); }
+.pl-rail-row__right--accent  { color: var(--text-accent, #00d2ff); }
+.pl-rail-empty {
+  padding: 14px 4px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ── view-board (existing kanban — wrapped) ───────────── */
+.view-board {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* ── kanban toolbar (stats + search + new prospect) ───── */
@@ -105,6 +465,13 @@ body {
   color: #fff;
 }
 .btn-primary:hover { opacity: .88; }
+/* CMD101: ghost variant for Mark Inactive / Mark Active toggle */
+.btn-ghost {
+  background: transparent;
+  border-color: var(--border2);
+  color: var(--muted);
+}
+.btn-ghost:hover { background: var(--surface2); color: var(--text); }
 
 .search-box {
   display: flex;
@@ -140,11 +507,11 @@ body {
 }
 
 .kb-col {
-  flex: 1 1 240px;        /* CMD100.70: grow to fill, never shrink below 240px */
+  flex: 1 1 240px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: calc(100vh - 120px);
+  max-height: calc(100vh - 168px);
 }
 
 .kb-col-head {
@@ -215,7 +582,6 @@ body {
   border-color: var(--border2);
   transform: translateY(-1px);
 }
-/* CMD100.80: DnD visual states */
 .p-card[draggable="true"] { cursor: grab; }
 .p-card.p-card-dragging   { opacity: 0.45; cursor: grabbing; }
 .kb-col.kb-col-drop {
@@ -237,8 +603,6 @@ body {
   font-weight: 600;
   color: var(--text);
   line-height: 1.3;
-  /* CMD100.71: reserve exactly 2 lines so card heights align;
-     ellipsize anything that would wrap to a 3rd line. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -248,7 +612,7 @@ body {
 }
 
 .p-card-co {
-  font-size: 12px;       /* CMD100.71: bumped one size */
+  font-size: 12px;
   color: var(--muted);
   margin-bottom: 8px;
 }
@@ -267,12 +631,12 @@ body {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 4px;
-  min-height: 22px;       /* CMD100.78: reserve row height for cards w/o tag or value */
+  min-height: 22px;
   margin-bottom: 4px;
 }
 
 .tag {
-  font-size: 11px;       /* CMD100.70: bumped one size */
+  font-size: 11px;
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 500;
@@ -284,7 +648,7 @@ body {
 .tag-other{ background: #2a2a2a; color: #a0a0a0; }
 
 .p-card-val {
-  font-size: 17px;       /* CMD100.72: 13 → 17, the most important element per card */
+  font-size: 17px;
   color: var(--muted);
 }
 .p-card-val span { color: var(--text); font-weight: 600; }
@@ -302,7 +666,7 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;       /* CMD100.70: bumped one size */
+  font-size: 11px;
   color: var(--muted);
 }
 
@@ -314,14 +678,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;        /* CMD100.70: bumped proportional to chip text */
+  font-size: 9px;
   font-weight: 700;
   color: var(--accent);
   flex-shrink: 0;
 }
 
 .followup-chip {
-  font-size: 11px;       /* CMD100.70: bumped one size */
+  font-size: 11px;
   color: var(--muted);
 }
 .followup-chip.overdue { color: #f07a7a; }
@@ -391,7 +755,7 @@ body {
 /* ── new prospect slide-in ────────────────────────────── */
 .overlay {
   position: fixed;
-  inset: 48px 0 0 0;        /* CMD100.69: clear 48px hud-shell header */
+  inset: 48px 0 0 0;
   background: rgba(0,0,0,.5);
   z-index: 100;
   display: none;
@@ -402,7 +766,7 @@ body {
 
 .drawer {
   width: 480px;
-  height: calc(100vh - 48px);  /* CMD100.69: match overlay inset */
+  height: calc(100vh - 48px);
   background: var(--surface);
   border-left: 1px solid var(--border2);
   display: flex;
@@ -518,46 +882,156 @@ body {
 </head>
 <body>
 
-<div class="main">
-  <!-- kanban toolbar (stats + search + new prospect) -->
-  <div class="kb-toolbar">
-    <div class="topbar-stats" id="pipeline-stats">
-      <div class="stat-chip">
-        <strong id="stat-total">—</strong> prospects
-      </div>
-      <div class="stat-chip">
-        <strong id="stat-value">—</strong> total est. value
-      </div>
-      <div class="stat-chip" id="stat-overdue-wrap" style="display:none">
-        <strong id="stat-overdue" style="color:#f07a7a">—</strong> follow-ups overdue
-      </div>
-    </div>
-    <div class="toolbar">
-      <div class="search-box">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-          <circle cx="6.5" cy="6.5" r="5" stroke="#7a8099" stroke-width="1.5"/>
-          <path d="M10.5 10.5L14 14" stroke="#7a8099" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        <input id="search-input" placeholder="Search prospects..." />
-      </div>
-      <button class="btn btn-primary" onclick="openDrawer()">
-        + New prospect
-      </button>
+<div class="hud-shell">
+
+  <!-- CMD101: tab strip — Dashboard / Board -->
+  <div class="pipeline-tabs-wrap">
+    <div class="hud-tabs" id="pipeline-tabs">
+      <button class="hud-tab active" data-view="dashboard" onclick="switchView('dashboard')">Dashboard</button>
+      <button class="hud-tab"        data-view="board"     onclick="switchView('board')">Board</button>
     </div>
   </div>
 
-  <!-- board -->
-  <div id="board-wrap" class="board-wrap">
-    <div class="board-loading">
-      <div class="spinner"></div>
-      Loading pipeline…
+  <!-- CMD101: Dashboard view (default) -->
+  <section class="view-dashboard" id="view-dashboard">
+
+    <!-- KPI strip -->
+    <div class="pl-kpi-strip" id="pl-kpi-strip">
+      <div class="pl-kpi" id="kpi-pipeline">
+        <div class="pl-kpi__bar"></div>
+        <div class="pl-kpi__label">Pipeline Value</div>
+        <div class="pl-kpi__value pl-kpi__value--accent" id="kpi-pipeline-val">—</div>
+        <div class="pl-kpi__sub" id="kpi-pipeline-sub">Loading…</div>
+      </div>
+      <div class="pl-kpi" id="kpi-forecast">
+        <div class="pl-kpi__bar"></div>
+        <div class="pl-kpi__label">Weighted Forecast</div>
+        <div class="pl-kpi__value pl-kpi__value--accent" id="kpi-forecast-val">—</div>
+        <div class="pl-kpi__sub" id="kpi-forecast-sub">Loading…</div>
+      </div>
+      <div class="pl-kpi" id="kpi-winrate">
+        <div class="pl-kpi__bar pl-kpi__bar--good"></div>
+        <div class="pl-kpi__label">Win Rate</div>
+        <div class="pl-kpi__value pl-kpi__value--good" id="kpi-winrate-val">—</div>
+        <div class="pl-kpi__sub" id="kpi-winrate-sub">Last 90d</div>
+      </div>
+      <div class="pl-kpi" id="kpi-cycle">
+        <div class="pl-kpi__bar pl-kpi__bar--good"></div>
+        <div class="pl-kpi__label">Avg Cycle</div>
+        <div class="pl-kpi__value pl-kpi__value--good" id="kpi-cycle-val">—</div>
+        <div class="pl-kpi__sub" id="kpi-cycle-sub">Last 10 won</div>
+      </div>
+      <div class="pl-kpi" id="kpi-stuck">
+        <div class="pl-kpi__bar pl-kpi__bar--good"></div>
+        <div class="pl-kpi__label">Stuck Deals</div>
+        <div class="pl-kpi__value pl-kpi__value--good" id="kpi-stuck-val">—</div>
+        <div class="pl-kpi__sub" id="kpi-stuck-sub">$0 at risk</div>
+      </div>
+      <div class="pl-kpi" id="kpi-week">
+        <div class="pl-kpi__bar pl-kpi__bar--good"></div>
+        <div class="pl-kpi__label">This Week</div>
+        <div class="pl-kpi__value pl-kpi__value--good" id="kpi-week-val">—</div>
+        <div class="pl-kpi__sub" id="kpi-week-sub">0 advanced · 0 won</div>
+      </div>
     </div>
-  </div>
+
+    <!-- Two-column dashboard grid -->
+    <div class="pl-dash-grid">
+
+      <!-- Main column -->
+      <div>
+        <!-- Funnel velocity -->
+        <div class="pl-panel">
+          <div class="pl-panel__head">
+            <span>Funnel Velocity</span>
+            <span class="pl-panel__count" id="funnel-total">—</span>
+          </div>
+          <div class="pl-funnel" id="funnel-row"></div>
+        </div>
+
+        <!-- Active deals -->
+        <div class="pl-panel">
+          <div class="pl-panel__head">
+            <span>Active Deals</span>
+            <span class="pl-panel__count" id="deals-count">—</span>
+          </div>
+          <div class="pl-deals" id="deals-list">
+            <div class="pl-deals-empty">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right rail -->
+      <div>
+        <div class="pl-panel">
+          <div class="pl-panel__head"><span>Forecast Summary</span></div>
+          <div class="pl-rings" id="rings-row"></div>
+        </div>
+
+        <div class="pl-panel">
+          <div class="pl-panel__head">
+            <span>Alerts — Stuck</span>
+            <span class="pl-panel__count pl-panel__count--bad" id="stuck-count">—</span>
+          </div>
+          <div id="stuck-list">
+            <div class="pl-rail-empty">Loading…</div>
+          </div>
+        </div>
+
+        <div class="pl-panel">
+          <div class="pl-panel__head"><span>Touch Today</span></div>
+          <div id="touch-list">
+            <div class="pl-rail-empty">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- CMD101: Board view (existing kanban, unchanged behavior) -->
+  <section class="view-board" id="view-board" hidden>
+
+    <div class="kb-toolbar">
+      <div class="topbar-stats" id="pipeline-stats">
+        <div class="stat-chip">
+          <strong id="stat-total">—</strong> prospects
+        </div>
+        <div class="stat-chip">
+          <strong id="stat-value">—</strong> total est. value
+        </div>
+        <div class="stat-chip" id="stat-overdue-wrap" style="display:none">
+          <strong id="stat-overdue" style="color:#f07a7a">—</strong> follow-ups overdue
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="search-box">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <circle cx="6.5" cy="6.5" r="5" stroke="#7a8099" stroke-width="1.5"/>
+            <path d="M10.5 10.5L14 14" stroke="#7a8099" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <input id="search-input" placeholder="Search prospects..." />
+        </div>
+        <button class="btn btn-primary" onclick="openDrawer()">
+          + New prospect
+        </button>
+      </div>
+    </div>
+
+    <div id="board-wrap" class="board-wrap">
+      <div class="board-loading">
+        <div class="spinner"></div>
+        Loading pipeline…
+      </div>
+    </div>
+
+  </section>
+
 </div>
 
-<!-- new prospect drawer -->
+<!-- new/edit prospect drawer -->
 <div class="overlay" id="drawer-overlay" onclick="handleOverlayClick(event)">
-  <div class="drawer" onclick="event.stopPropagation()">
+  <div class="drawer" id="prospect-drawer" onclick="event.stopPropagation()">
     <div class="drawer-head">
       <span style="width:28px;flex-shrink:0" aria-hidden="true"></span>
       <span class="drawer-title">Add Prospect</span>
@@ -643,9 +1117,6 @@ body {
       <div class="sec-label">Our team</div>
       <div class="field">
         <label>Assigned to <span style="color:#f07a7a">*</span></label>
-        <!-- CMD100.82: PersonPicker-backed assignee picker.
-             Hidden input carries the resource_id; trigger button shows
-             avatar + name + title for the chosen resource. -->
         <input type="hidden" id="f-assigned" value="" />
         <button type="button" id="f-assigned-trigger" onclick="openAssigneePicker(event)"
           style="width:100%;padding:8px 10px;background:var(--bg2,#0a1424);border:1px solid var(--border1,#1d2c44);border-radius:4px;color:var(--text0,#e8eaf0);text-align:left;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;min-height:36px">
@@ -671,6 +1142,8 @@ body {
       </div>
     </div>
     <div class="drawer-foot">
+      <!-- CMD101: Mark Inactive / Mark Active toggle. Renders only in edit mode. -->
+      <button class="btn btn-ghost btn-toggle-active" id="f-toggle-active" onclick="toggleActiveFromDrawer()" style="display:none">Mark Inactive</button>
       <button class="btn btn-primary" onclick="saveProspect()">Save prospect</button>
       <button class="btn" onclick="saveAndOpen()">Save &amp; open detail</button>
       <button class="btn" style="margin-left:auto" onclick="closeDrawer()">Cancel</button>
@@ -702,44 +1175,92 @@ const INDUSTRY_TAGS = {
   'Aerospace':      'tag-aero',
 };
 
+// CMD101: stage probability map (KPI Weighted Forecast).
+const STAGE_PROB = {
+  prospect:   0.10,
+  qualifying: 0.25,
+  discovery:  0.40,
+  proposal:   0.60,
+  review:     0.80,
+  approved:   1.00
+};
+
+// CMD101: stuck thresholds in days (per-stage). approved => never stuck.
+const STUCK_THRESHOLD_DAYS = {
+  prospect:   14,
+  qualifying: 21,
+  discovery:  30,
+  proposal:   30,
+  review:     14,
+  approved:   Infinity
+};
+
+// CMD101: stage ordering index (used by Touch Today scoring).
+const STAGE_INDEX = {
+  prospect: 0, qualifying: 1, discovery: 2, proposal: 3, review: 4, approved: 5
+};
+
+// CMD101: Avg Cycle baseline (days). Anything above is amber.
+const AVG_CYCLE_BASELINE_DAYS = 45;
+
 let allProspects = [];
 let companies    = [];
 let resources    = [];
-// CMD100.78: expose for cross-script lookup (Edit Prospect command).
+let _closedWon12mo = [];   // CMD101: trailing-12mo approved deals (for forecast benchmark)
+
+// Cross-script lookup mirror (Edit/Move/Delete/Toggle Prospect commands).
 window.allProspects = [];
 
 // ── init ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   if (window.HUDShell) HUDShell.init({ page: 'pipeline', moduleName: 'Pipeline' });
   await loadData();
-  renderBoard(allProspects);
+  renderAll();
   bindSearch();
-  // CMD100.78: ?edit=<id> auto-opens the drawer pre-populated in edit mode.
+  // ?edit=<id> auto-opens the drawer pre-populated in edit mode.
   var editId = (new URLSearchParams(location.search)).get('edit');
   if (editId) openDrawerForEdit(editId);
 });
 
 async function loadData() {
   try {
-    const [pros, comps, ress] = await Promise.all([
-      API.get('v_pipeline_summary?order=created_at.desc&limit=200'),
+    // CMD101 / decision 1a: keep v_pipeline_summary, server-side filter is_active=eq.true.
+    // Client-side fallback filter applied in renderAll() in case the view does not propagate the column.
+    // CMD101 / decision 2: trailing-12mo lookup gets explicit firm_id; main fetch keeps RLS-only.
+    const cutoff = new Date(Date.now() - 365 * 86400 * 1000).toISOString();
+    const firmId = (window.CURRENT_USER && window.CURRENT_USER.firm_id) || null;
+    var closedWonPath = 'prospects?select=est_value,updated_at&stage=eq.approved&updated_at=gte.' + encodeURIComponent(cutoff);
+    if (firmId) closedWonPath += '&firm_id=eq.' + encodeURIComponent(firmId);
+
+    const [pros, comps, ress, won] = await Promise.all([
+      API.get('v_pipeline_summary?is_active=eq.true&order=created_at.desc&limit=200'),
       API.get('companies?order=name&select=id,name,industry,firm_id'),
       API.get('resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,avatar_url,department,title,is_external,user_id'),
+      API.get(closedWonPath).catch(function(e){ console.warn('[CMD101] closedWon fetch failed:', e); return []; })
     ]);
-    allProspects = pros || [];
-    window.allProspects = allProspects;   // CMD100.78: keep mirror in sync
-    companies    = comps || [];
-    resources    = ress || [];
+    allProspects = (pros || []).filter(function(p){ return p.is_active !== false; });   // safety net
+    window.allProspects = allProspects;
+    companies      = comps || [];
+    resources      = ress || [];
+    _closedWon12mo = won || [];
     populateFormSelects();
-    updateStats(allProspects);
   } catch (e) {
     console.error(e);
     document.getElementById('board-wrap').innerHTML =
       `<div class="board-loading" style="color:#f07a7a">Failed to load pipeline. Check console.</div>`;
+    document.getElementById('deals-list').innerHTML =
+      `<div class="pl-deals-empty" style="color:#f07a7a">Failed to load. Check console.</div>`;
   }
 }
 
-// ── stats strip ────────────────────────────────────────
+// CMD101: render both views from cache. Cheap — both sections always exist; only one is visible.
+function renderAll() {
+  renderDashboard(allProspects);
+  renderBoard(allProspects);
+  updateStats(allProspects);
+}
+
+// ── stats strip (Board toolbar) ────────────────────────
 function updateStats(prospects) {
   const total  = prospects.length;
   const value  = prospects.reduce((s, p) => s + (p.est_value || 0), 0);
@@ -748,26 +1269,431 @@ function updateStats(prospects) {
     p.next_follow_up_date && p.next_follow_up_date < today
   ).length;
 
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-value').textContent =
-    value > 0 ? '$' + (value / 1000).toFixed(0) + 'k' : '—';
+  var elTotal = document.getElementById('stat-total');
+  var elValue = document.getElementById('stat-value');
+  if (elTotal) elTotal.textContent = total;
+  if (elValue) elValue.textContent = value > 0 ? '$' + (value / 1000).toFixed(0) + 'k' : '—';
 
   if (overdue > 0) {
     document.getElementById('stat-overdue').textContent = overdue;
     document.getElementById('stat-overdue-wrap').style.display = 'flex';
+  } else {
+    var w = document.getElementById('stat-overdue-wrap');
+    if (w) w.style.display = 'none';
   }
 }
+
+// ── CMD101: Dashboard render ───────────────────────────
+
+function _daysSince(iso) {
+  if (!iso) return 0;
+  var t = new Date(iso).getTime();
+  if (isNaN(t)) return 0;
+  return (Date.now() - t) / 86400000;
+}
+
+function _daysInStage(p)        { return _daysSince(p.updated_at); }
+function _isStuck(p) {
+  var thr = STUCK_THRESHOLD_DAYS[p.stage];
+  if (thr === undefined || thr === Infinity) return false;
+  return _daysInStage(p) > thr;
+}
+function _fmt$(n) {
+  if (!isFinite(n) || !n) return '$0';
+  if (Math.abs(n) >= 1000000) return '$' + (n/1000000).toFixed(1) + 'M';
+  if (Math.abs(n) >= 1000)    return '$' + (n/1000).toFixed(0)   + 'k';
+  return '$' + Math.round(n);
+}
+function _fmtPct(p, digits) {
+  if (!isFinite(p)) return '—';
+  var d = (typeof digits === 'number') ? digits : 0;
+  return (p * 100).toFixed(d) + '%';
+}
+
+function renderDashboard(prospects) {
+  // KPI strip
+  var pipelineVal = 0, weightedFcst = 0;
+  var stuckList = [];
+  var weekAdvanced = 0, weekWon = 0, weekVal = 0;
+  var todayIso = new Date().toLocaleDateString('en-CA');
+  var sevenDaysAgo = Date.now() - 7 * 86400000;
+
+  prospects.forEach(function(p) {
+    if (p.stage !== 'approved') {
+      pipelineVal  += (p.est_value || 0);
+      weightedFcst += (p.est_value || 0) * (STAGE_PROB[p.stage] || 0);
+    }
+    if (_isStuck(p)) stuckList.push(p);
+    var u = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+    if (u && u >= sevenDaysAgo) {
+      weekAdvanced++;
+      weekVal += (p.est_value || 0);
+      if (p.stage === 'approved') weekWon++;
+    }
+  });
+
+  // Forecast benchmark from trailing-12mo closed-won.
+  var trailing12moTotal = (_closedWon12mo || []).reduce(function(s,r){ return s + (r.est_value || 0); }, 0);
+  var fcstPctOfBench = trailing12moTotal > 0 ? (weightedFcst / trailing12moTotal) : NaN;
+
+  // Win rate (90d) — approximation per brief §4.4: count(approved last 90d) / count(updates last 90d).
+  var ninetyDaysAgo = Date.now() - 90 * 86400000;
+  var won90 = 0, changed90 = 0;
+  prospects.forEach(function(p) {
+    var u = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+    if (u && u >= ninetyDaysAgo) {
+      changed90++;
+      if (p.stage === 'approved') won90++;
+    }
+  });
+  var winRate = changed90 > 0 ? (won90 / changed90) : NaN;
+
+  // Avg cycle — last 10 approved by updated_at.
+  var approvedSorted = prospects
+    .filter(function(p){ return p.stage === 'approved' && p.created_at && p.updated_at; })
+    .sort(function(a,b){ return new Date(b.updated_at) - new Date(a.updated_at); })
+    .slice(0, 10);
+  var avgCycle = NaN;
+  if (approvedSorted.length) {
+    var sum = approvedSorted.reduce(function(s,p){
+      return s + ((new Date(p.updated_at) - new Date(p.created_at)) / 86400000);
+    }, 0);
+    avgCycle = sum / approvedSorted.length;
+  }
+
+  var stuckAtRisk = stuckList.reduce(function(s,p){ return s + (p.est_value || 0); }, 0);
+
+  // Write KPI strip.
+  document.getElementById('kpi-pipeline-val').textContent = _fmt$(pipelineVal);
+  document.getElementById('kpi-pipeline-sub').textContent =
+    prospects.filter(function(p){ return p.stage !== 'approved'; }).length + ' active deals';
+
+  document.getElementById('kpi-forecast-val').textContent = _fmt$(weightedFcst);
+  document.getElementById('kpi-forecast-sub').textContent = isFinite(fcstPctOfBench)
+    ? (_fmtPct(fcstPctOfBench, 0) + ' vs trailing 12mo')
+    : 'No baseline yet';
+
+  var winEl    = document.getElementById('kpi-winrate-val');
+  var winBar   = document.querySelector('#kpi-winrate .pl-kpi__bar');
+  var winSub   = document.getElementById('kpi-winrate-sub');
+  if (isFinite(winRate)) {
+    winEl.textContent = _fmtPct(winRate, 0);
+    var winGood = winRate >= 0.30;
+    winEl.className  = 'pl-kpi__value ' + (winGood ? 'pl-kpi__value--good' : 'pl-kpi__value--caution');
+    winBar.className = 'pl-kpi__bar '   + (winGood ? 'pl-kpi__bar--good'   : 'pl-kpi__bar--caution');
+  } else {
+    winEl.textContent = '—';
+    winEl.className  = 'pl-kpi__value pl-kpi__value--good';
+    winBar.className = 'pl-kpi__bar pl-kpi__bar--good';
+  }
+  winSub.textContent = won90 + ' won · ' + changed90 + ' moves (90d)';
+
+  var cycEl  = document.getElementById('kpi-cycle-val');
+  var cycBar = document.querySelector('#kpi-cycle .pl-kpi__bar');
+  if (isFinite(avgCycle)) {
+    cycEl.textContent = avgCycle.toFixed(0) + 'd';
+    var cycGood = avgCycle <= AVG_CYCLE_BASELINE_DAYS;
+    cycEl.className  = 'pl-kpi__value ' + (cycGood ? 'pl-kpi__value--good' : 'pl-kpi__value--caution');
+    cycBar.className = 'pl-kpi__bar '   + (cycGood ? 'pl-kpi__bar--good'   : 'pl-kpi__bar--caution');
+  } else {
+    cycEl.textContent = '—';
+    cycEl.className  = 'pl-kpi__value pl-kpi__value--good';
+    cycBar.className = 'pl-kpi__bar pl-kpi__bar--good';
+  }
+  document.getElementById('kpi-cycle-sub').textContent =
+    'Last ' + approvedSorted.length + ' won · base ' + AVG_CYCLE_BASELINE_DAYS + 'd';
+
+  var stuckEl  = document.getElementById('kpi-stuck-val');
+  var stuckBar = document.querySelector('#kpi-stuck .pl-kpi__bar');
+  stuckEl.textContent = stuckList.length;
+  if (stuckList.length > 0) {
+    stuckEl.className  = 'pl-kpi__value pl-kpi__value--bad';
+    stuckBar.className = 'pl-kpi__bar pl-kpi__bar--bad';
+  } else {
+    stuckEl.className  = 'pl-kpi__value pl-kpi__value--good';
+    stuckBar.className = 'pl-kpi__bar pl-kpi__bar--good';
+  }
+  document.getElementById('kpi-stuck-sub').textContent = _fmt$(stuckAtRisk) + ' at risk';
+
+  var weekEl  = document.getElementById('kpi-week-val');
+  weekEl.textContent = '+' + _fmt$(weekVal);
+  document.getElementById('kpi-week-sub').textContent =
+    weekAdvanced + ' advanced · ' + weekWon + ' won';
+
+  // Funnel velocity
+  renderFunnel(prospects);
+
+  // Active deals list
+  renderActiveDeals(prospects);
+
+  // Right rail
+  renderForecastRings(weightedFcst, trailing12moTotal, winRate, prospects);
+  renderStuckPanel(stuckList);
+  renderTouchToday(prospects);
+
+  // Funnel total label.
+  var ft = document.getElementById('funnel-total');
+  if (ft) ft.textContent = prospects.length + ' deals · ' + _fmt$(prospects.reduce(function(s,p){return s+(p.est_value||0);},0));
+
+  // Deals count.
+  document.getElementById('deals-count').textContent = prospects.length;
+
+  // Stuck count.
+  var sc = document.getElementById('stuck-count');
+  sc.textContent = stuckList.length;
+  sc.className = 'pl-panel__count' + (stuckList.length > 0 ? ' pl-panel__count--bad' : '');
+}
+
+function renderFunnel(prospects) {
+  var row = document.getElementById('funnel-row');
+  if (!row) return;
+  var byStage = {};
+  STAGES.forEach(function(s){ byStage[s.key] = []; });
+  prospects.forEach(function(p){
+    if (byStage[p.stage]) byStage[p.stage].push(p);
+  });
+
+  var html = '';
+  STAGES.forEach(function(s, i) {
+    var arr = byStage[s.key];
+    var val = arr.reduce(function(a,p){ return a + (p.est_value || 0); }, 0);
+    var avgD = 0;
+    if (arr.length) {
+      avgD = arr.reduce(function(a,p){ return a + _daysInStage(p); }, 0) / arr.length;
+    }
+    html += '<div class="pl-funnel__stage" data-stage="' + s.key + '">'
+          + '<div class="pl-funnel__name">' + escHtml(s.label) + '</div>'
+          + '<div class="pl-funnel__val">' + _fmt$(val) + '</div>'
+          + '<div class="pl-funnel__meta">' + arr.length + ' · ' + avgD.toFixed(0) + 'd avg</div>'
+          + '</div>';
+
+    if (i < STAGES.length - 1) {
+      var next = byStage[STAGES[i+1].key];
+      var pct = arr.length > 0 ? (next.length / arr.length) : NaN;
+      var cls = '';
+      if (isFinite(pct)) {
+        cls = pct >= 0.50 ? 'pl-funnel__conv--good'
+            : pct >= 0.30 ? 'pl-funnel__conv--caution'
+            : 'pl-funnel__conv--bad';
+      }
+      html += '<div class="pl-funnel__conv ' + cls + '">' + (isFinite(pct) ? _fmtPct(pct, 0) : '—') + '</div>';
+    }
+  });
+  row.innerHTML = html;
+}
+
+function renderActiveDeals(prospects) {
+  var listEl = document.getElementById('deals-list');
+  if (!listEl) return;
+  if (!prospects.length) {
+    listEl.innerHTML = '<div class="pl-deals-empty">No active prospects.</div>';
+    return;
+  }
+
+  var sorted = prospects.slice().sort(function(a,b) {
+    var sa = STAGE_INDEX[a.stage] || 0, sb = STAGE_INDEX[b.stage] || 0;
+    if (sa !== sb) return sa - sb;
+    return (b.est_value || 0) - (a.est_value || 0);
+  });
+
+  var todayIso = new Date().toLocaleDateString('en-CA');
+  var html = sorted.map(function(p) {
+    var stuck = _isStuck(p);
+    var fu = p.next_follow_up_date;
+    var overdue = fu && fu < todayIso;
+
+    var statusClass, statusLabel, barClass;
+    if (stuck) { statusClass = 'pl-deal__status--bad'; statusLabel = 'Stuck'; barClass = 'pl-deal__bar--bad'; }
+    else if (overdue) { statusClass = 'pl-deal__status--cau'; statusLabel = 'Followup Nd'; barClass = 'pl-deal__bar--cau'; }
+    else { statusClass = 'pl-deal__status--ok'; statusLabel = 'On Track'; barClass = 'pl-deal__bar--ok'; }
+
+    var assignedInits = ((p.assigned_to_name || '').split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2)) || '—';
+    var dateStr = fu
+      ? new Date(fu + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' })
+      : (p.updated_at ? new Date(p.updated_at).toLocaleDateString('en-US', { month:'short', day:'numeric' }) : '—');
+    var meta = [
+      escHtml(p.company_name || '—'),
+      p.company_industry ? escHtml(p.company_industry) : null,
+      assignedInits
+    ].filter(Boolean).join(' · ');
+
+    var stageLabel = (STAGES.find(function(s){return s.key === p.stage;}) || {}).label || p.stage;
+
+    return '<div class="pl-deal" data-id="' + p.id + '" onclick="openProspect(\'' + p.id + '\')">'
+         +   '<div class="pl-deal__bar ' + barClass + '"></div>'
+         +   '<div class="pl-deal__main">'
+         +     '<div class="pl-deal__title">' + escHtml(p.title || '(untitled)') + '</div>'
+         +     '<div class="pl-deal__meta">' + meta + '</div>'
+         +   '</div>'
+         +   '<span class="pl-deal__stage" data-stage="' + p.stage + '">' + escHtml(stageLabel) + '</span>'
+         +   '<span class="pl-deal__status ' + statusClass + '">' + statusLabel + '</span>'
+         +   '<span class="pl-deal__date">' + dateStr + '</span>'
+         +   '<span class="pl-deal__val">' + (p.est_value ? _fmt$(p.est_value) : '—') + '</span>'
+         + '</div>';
+  }).join('');
+  listEl.innerHTML = html;
+}
+
+function renderForecastRings(weighted, trailing, winRate, prospects) {
+  var pctFcst = trailing > 0 ? Math.min(weighted / trailing, 1.0) : NaN;
+  var pctWin  = isFinite(winRate) ? winRate : NaN;
+
+  // Velocity: deals advanced last 30d / advanced prior 30d. Approximation: any update.
+  var now = Date.now();
+  var d30  = now - 30 * 86400000;
+  var d60  = now - 60 * 86400000;
+  var n30 = 0, n60 = 0;
+  prospects.forEach(function(p) {
+    var u = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+    if (!u) return;
+    if (u >= d30)               n30++;
+    else if (u >= d60 && u < d30) n60++;
+  });
+  var velRatio = n60 > 0 ? (n30 / n60) : (n30 > 0 ? 2.0 : NaN);
+  var pctVel = isFinite(velRatio) ? Math.min(velRatio, 2.0) / 2.0 : NaN;
+
+  function ringTone(p) {
+    if (!isFinite(p)) return '';
+    if (p >= 0.66) return 'pl-ring__fill--good';
+    if (p >= 0.33) return 'pl-ring__fill--caution';
+    return 'pl-ring__fill--bad';
+  }
+
+  function makeRing(label, fillPct, displayTxt, tone) {
+    var r = 26, c = 2 * Math.PI * r;
+    var dash = isFinite(fillPct) ? (fillPct * c) : 0;
+    return '<div class="pl-ring">'
+         +   '<svg class="pl-ring__svg" viewBox="0 0 64 64">'
+         +     '<circle class="pl-ring__bg" cx="32" cy="32" r="' + r + '"></circle>'
+         +     '<circle class="pl-ring__fill ' + tone + '" cx="32" cy="32" r="' + r + '"'
+         +     ' stroke-dasharray="' + dash.toFixed(2) + ' ' + c.toFixed(2) + '"'
+         +     ' transform="rotate(-90 32 32)"></circle>'
+         +     '<text class="pl-ring__txt" x="32" y="36" text-anchor="middle">' + escHtml(displayTxt) + '</text>'
+         +   '</svg>'
+         +   '<div class="pl-ring__label">' + escHtml(label) + '</div>'
+         + '</div>';
+  }
+
+  var html = '';
+  html += makeRing('Forecast', pctFcst,
+    isFinite(pctFcst) ? (Math.round(pctFcst * 100) + '%') : '—',
+    ringTone(pctFcst));
+  html += makeRing('Win Rate', pctWin,
+    isFinite(pctWin) ? (Math.round(pctWin * 100) + '%') : '—',
+    ringTone(pctWin));
+  html += makeRing('Velocity', pctVel,
+    isFinite(velRatio) ? (velRatio.toFixed(2) + 'x') : '—',
+    ringTone(pctVel));
+
+  var row = document.getElementById('rings-row');
+  if (row) row.innerHTML = html;
+}
+
+function renderStuckPanel(stuckList) {
+  var listEl = document.getElementById('stuck-list');
+  if (!listEl) return;
+  if (!stuckList.length) {
+    listEl.innerHTML = '<div class="pl-rail-empty">No stuck deals.</div>';
+    return;
+  }
+  var withOver = stuckList.map(function(p) {
+    var thr = STUCK_THRESHOLD_DAYS[p.stage] || 0;
+    var over = _daysInStage(p) - thr;
+    return { p: p, over: over };
+  }).sort(function(a,b){ return b.over - a.over; }).slice(0, 5);
+
+  var html = withOver.map(function(x) {
+    var p = x.p;
+    var stageLabel = (STAGES.find(function(s){return s.key === p.stage;}) || {}).label || p.stage;
+    var sub = stageLabel + ' · ' + escHtml(p.company_name || '—');
+    var rightCls = x.over > 14 ? 'pl-rail-row__right--bad' : 'pl-rail-row__right--caution';
+    return '<div class="pl-rail-row">'
+         +   '<div class="pl-rail-row__main">'
+         +     '<div class="pl-rail-row__title">' + escHtml(p.title || '(untitled)') + '</div>'
+         +     '<div class="pl-rail-row__sub">' + sub + '</div>'
+         +   '</div>'
+         +   '<div class="pl-rail-row__right ' + rightCls + '">+' + Math.round(x.over) + 'd</div>'
+         + '</div>';
+  }).join('');
+  listEl.innerHTML = html;
+}
+
+function renderTouchToday(prospects) {
+  var listEl = document.getElementById('touch-list');
+  if (!listEl) return;
+  if (!prospects.length) {
+    listEl.innerHTML = '<div class="pl-rail-empty">Nothing to touch.</div>';
+    return;
+  }
+  var todayIso = new Date().toLocaleDateString('en-CA');
+  var scored = prospects.filter(function(p){ return p.stage !== 'approved'; }).map(function(p) {
+    var dInStage = _daysInStage(p);
+    var overdue = 0;
+    if (p.next_follow_up_date && p.next_follow_up_date < todayIso) {
+      overdue = (new Date(todayIso) - new Date(p.next_follow_up_date)) / 86400000;
+    }
+    var stageIdx = STAGE_INDEX[p.stage] || 0;
+    var score = (dInStage * 10) + (overdue * 30) + ((p.est_value || 0) / 1000) + (stageIdx * 50);
+
+    var reasonBits = [];
+    if (overdue > 0)            reasonBits.push(Math.round(overdue) + 'd overdue');
+    if (_isStuck(p))            reasonBits.push('stuck');
+    if (stageIdx >= 3)          reasonBits.push('late stage');
+    var reason = reasonBits.length ? reasonBits.join(', ') : 'high score';
+    return { p: p, score: score, reason: reason };
+  }).sort(function(a,b){ return b.score - a.score; }).slice(0, 5);
+
+  var html = scored.map(function(x, i) {
+    var p = x.p;
+    var sub = _fmt$(p.est_value || 0) + ' · ' + x.reason;
+    return '<div class="pl-rail-row">'
+         +   '<div class="pl-rail-row__rank">#' + (i+1) + '</div>'
+         +   '<div class="pl-rail-row__main">'
+         +     '<div class="pl-rail-row__title">' + escHtml(p.title || '(untitled)') + '</div>'
+         +     '<div class="pl-rail-row__sub">' + sub + '</div>'
+         +   '</div>'
+         +   '<div class="pl-rail-row__right pl-rail-row__right--accent">' + Math.round(x.score) + '</div>'
+         + '</div>';
+  }).join('');
+  listEl.innerHTML = html;
+}
+
+// ── CMD101: View switching (DOM toggle, no re-fetch) ───
+// Module-scope memo of last view; not strictly required but lets page_ready
+// reflect the active view in _currentLocation downstream queries.
+var _activeView = 'dashboard';
+
+function switchView(name) {
+  var key = (name || '').toString().toLowerCase();
+  if (key !== 'dashboard' && key !== 'board') key = 'dashboard';
+  _activeView = key;
+
+  // Tab activation.
+  var tabs = document.querySelectorAll('.hud-tab[data-view]');
+  tabs.forEach(function(t) {
+    if (t.dataset.view === key) t.classList.add('active');
+    else t.classList.remove('active');
+  });
+
+  // View visibility.
+  var vd = document.getElementById('view-dashboard');
+  var vb = document.getElementById('view-board');
+  if (vd) { if (key === 'dashboard') vd.removeAttribute('hidden'); else vd.setAttribute('hidden',''); }
+  if (vb) { if (key === 'board')     vb.removeAttribute('hidden'); else vb.setAttribute('hidden',''); }
+}
+window.switchView = switchView;
 
 // ── board render ───────────────────────────────────────
 function renderBoard(prospects) {
   const wrap = document.getElementById('board-wrap');
+  if (!wrap) return;
   wrap.innerHTML = '';
 
   STAGES.forEach(stage => {
     const cards = prospects.filter(p => p.stage === stage.key);
     const col   = document.createElement('div');
     col.className = 'kb-col';
-    col.dataset.stage = stage.key;          // CMD100.80: tag for DnD drop target
+    col.dataset.stage = stage.key;
     col.innerHTML = `
       <div class="kb-col-head">
         <div class="kb-stage-label">
@@ -786,9 +1712,6 @@ function renderBoard(prospects) {
     wrap.appendChild(col);
   });
 
-  // CMD100.80: wire drag-drop after every render. Listeners attach to
-  // current DOM only; renderBoard rebuilds innerHTML each call so old
-  // handlers are discarded automatically.
   _wireKanbanDnD();
 }
 
@@ -838,15 +1761,11 @@ function renderCard(p) {
     </div>`;
 }
 
-// ── CMD100.80: kanban drag-and-drop ────────────────────
-// Card → column DnD: dragging a .p-card and dropping on a .kb-col
-// PATCHes the prospect's stage and re-renders. Suppresses the click
-// handler that would otherwise fire and navigate to prospect-detail.
+// ── kanban drag-and-drop (unchanged from CMD100.80) ────
 let _dragId = null;
 let _dragWasDragging = false;
 
 function _wireKanbanDnD() {
-  // Cards.
   document.querySelectorAll('.p-card[draggable="true"]').forEach(card => {
     card.addEventListener('dragstart', ev => {
       _dragId = card.dataset.id;
@@ -858,11 +1777,8 @@ function _wireKanbanDnD() {
     card.addEventListener('dragend', () => {
       card.classList.remove('p-card-dragging');
       _dragId = null;
-      // Reset suppression flag in next tick so the click handler that
-      // fires after dragend on simple drags doesn't accidentally trigger.
       setTimeout(() => { _dragWasDragging = false; }, 50);
     });
-    // Suppress click → openProspect when the click followed a drag.
     card.addEventListener('click', ev => {
       if (_dragWasDragging) {
         ev.stopPropagation();
@@ -871,7 +1787,6 @@ function _wireKanbanDnD() {
     }, true);
   });
 
-  // Columns.
   document.querySelectorAll('.kb-col').forEach(col => {
     col.addEventListener('dragover', ev => {
       ev.preventDefault();
@@ -891,8 +1806,6 @@ function _wireKanbanDnD() {
       const p = allProspects.find(pp => pp.id === id);
       if (!p || p.stage === newStage) return;
 
-      // Recorder-friendly: emit a synthetic Move Prospect via the
-      // recorder channel (so transcripts capture stage changes).
       try {
         if (typeof window._cmdCenterChannelSend === 'function') {
           const self = window._aegisSelf || window.CURRENT_USER || {};
@@ -910,29 +1823,24 @@ function _wireKanbanDnD() {
         }
       } catch(e) {}
 
-      // Optimistic UI: update local cache and re-render before PATCH.
       const prevStage = p.stage;
       p.stage = newStage;
       window.allProspects = allProspects;
-      renderBoard(allProspects);
-      updateStats(allProspects);
+      renderAll();
 
       try {
-        let result;
         const payload = { stage: newStage };
         if (typeof API.patch === 'function') {
-          result = await API.patch('prospects?id=eq.' + encodeURIComponent(id), payload);
+          await API.patch('prospects?id=eq.' + encodeURIComponent(id), payload);
         } else if (typeof API.update === 'function') {
-          result = await API.update('prospects', id, payload);
+          await API.update('prospects', id, payload);
         } else {
           throw new Error('No PATCH method available on API');
         }
       } catch (err) {
-        // Rollback on failure.
         p.stage = prevStage;
         window.allProspects = allProspects;
-        renderBoard(allProspects);
-        updateStats(allProspects);
+        renderAll();
         _showFormError('Could not move prospect', err.message || String(err));
       }
     });
@@ -941,7 +1849,9 @@ function _wireKanbanDnD() {
 
 // ── search ─────────────────────────────────────────────
 function bindSearch() {
-  document.getElementById('search-input').addEventListener('input', function () {
+  var el = document.getElementById('search-input');
+  if (!el) return;
+  el.addEventListener('input', function () {
     const q = this.value.toLowerCase();
     const filtered = allProspects.filter(p =>
       (p.title || '').toLowerCase().includes(q) ||
@@ -960,27 +1870,27 @@ function openProspect(id) {
 // ── drawer ─────────────────────────────────────────────
 let _drawerStage = 'prospect';
 let _saveAndNavigate = false;
-let _editingProspectId = null;   // CMD100.78: when set, drawer is in edit mode
+let _editingProspectId = null;
 
 function openDrawer(stage) {
   _drawerStage = stage || 'prospect';
   _saveAndNavigate = false;
   _editingProspectId = null;
-  // Reset drawer chrome to "Add" mode.
   document.querySelector('.drawer-title').textContent = 'Add Prospect';
   document.querySelector('.drawer-foot .btn-primary').textContent = 'Save prospect';
+  // CMD101: hide toggle button in Add mode; remove edit-mode marker class.
+  var tg = document.getElementById('f-toggle-active');
+  if (tg) tg.style.display = 'none';
+  var dr = document.getElementById('prospect-drawer');
+  if (dr) dr.classList.remove('prospect-edit-drawer');
   document.getElementById('drawer-overlay').classList.add('open');
-  // set default follow-up date to tomorrow
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   document.getElementById('f-followup').value = tomorrow.toLocaleDateString('en-CA');
 }
 
-function openDrawerForStage(stage) {
-  openDrawer(stage);
-}
+function openDrawerForStage(stage) { openDrawer(stage); }
 
-// CMD100.78: open drawer in edit mode pre-populated with the named prospect.
 async function openDrawerForEdit(id) {
   let row;
   try {
@@ -995,14 +1905,24 @@ async function openDrawerForEdit(id) {
     return;
   }
 
-  // Open drawer first (resets state), then override into edit mode.
   openDrawer(row.stage);
   _editingProspectId = id;
   _drawerStage = row.stage || 'prospect';
   document.querySelector('.drawer-title').textContent = 'Edit Prospect';
   document.querySelector('.drawer-foot .btn-primary').textContent = 'Save changes';
 
-  // Populate fields.
+  // CMD101: enter edit-mode — show the toggle, mark drawer.
+  var dr = document.getElementById('prospect-drawer');
+  if (dr) dr.classList.add('prospect-edit-drawer');
+  var tg = document.getElementById('f-toggle-active');
+  if (tg) {
+    tg.style.display = '';
+    tg.dataset.id    = id;
+    tg.dataset.title = row.title || '';
+    tg.dataset.active = (row.is_active === false ? 'false' : 'true');
+    tg.textContent = (row.is_active === false ? 'Mark Active' : 'Mark Inactive');
+  }
+
   document.getElementById('f-company').value       = row.company_id || '';
   document.getElementById('f-title').value         = row.title || '';
   document.getElementById('f-description').value   = row.description || '';
@@ -1010,7 +1930,6 @@ async function openDrawerForEdit(id) {
   document.getElementById('f-budget-high').value   = row.budget_range_high || '';
   document.getElementById('f-urgency').value       = row.timeline_urgency || '';
   document.getElementById('f-priority').value      = row.priority || '';
-  // CMD100.82: PersonPicker-backed assignee — use setAssignee helper.
   if (row.assigned_to) {
     var rsrc = (resources || []).find(r => r.id === row.assigned_to);
     var rname = rsrc ? ((rsrc.first_name||'') + ' ' + (rsrc.last_name||'')).trim() : '(unknown)';
@@ -1021,16 +1940,15 @@ async function openDrawerForEdit(id) {
   document.getElementById('f-followup').value      = row.next_follow_up_date || '';
   document.getElementById('f-followup-type').value = row.next_follow_up_type || 'phone_call';
 
-  // Pills: industry + source.
   if (row.industry_tag) {
     const pill = Array.from(document.querySelectorAll('#industry-pills .pill'))
       .find(p => p.dataset.val === row.industry_tag);
-    if (pill) { pill.classList.add('active'); }
+    if (pill) pill.classList.add('active');
   }
   if (row.source) {
     const pill = Array.from(document.querySelectorAll('#source-pills .pill'))
       .find(p => p.dataset.val === row.source);
-    if (pill) { pill.classList.add('active'); }
+    if (pill) pill.classList.add('active');
   }
 }
 
@@ -1038,7 +1956,16 @@ function closeDrawer() {
   document.getElementById('drawer-overlay').classList.remove('open');
   clearForm();
   _editingProspectId = null;
-  // Strip ?edit=<id> from URL so a refresh doesn't re-open the drawer.
+  // CMD101: clear edit-mode marker and hide toggle.
+  var dr = document.getElementById('prospect-drawer');
+  if (dr) dr.classList.remove('prospect-edit-drawer');
+  var tg = document.getElementById('f-toggle-active');
+  if (tg) {
+    tg.style.display = 'none';
+    delete tg.dataset.id;
+    delete tg.dataset.title;
+    delete tg.dataset.active;
+  }
   if ((new URLSearchParams(location.search)).has('edit')) {
     history.replaceState({}, '', location.pathname);
   }
@@ -1053,28 +1980,50 @@ function saveAndOpen() {
   saveProspect();
 }
 
+// CMD101: drawer-side handler for the Mark Inactive / Mark Active toggle.
+// Performs an immediate PATCH (no Save required), closes the drawer,
+// and refreshes both views. The recorder verb is captured by hud-shell's
+// .btn-toggle-active classifier.
+async function toggleActiveFromDrawer() {
+  var tg = document.getElementById('f-toggle-active');
+  if (!tg || !tg.dataset.id) return;
+  var id      = tg.dataset.id;
+  var current = tg.dataset.active !== 'false';   // currently active?
+  var next    = !current;
+  try {
+    if (typeof API.setProspectActive === 'function') {
+      await API.setProspectActive(id, next);
+    } else if (typeof API.patch === 'function') {
+      await API.patch('prospects?id=eq.' + encodeURIComponent(id), { is_active: next });
+    } else {
+      throw new Error('No PATCH method available on API');
+    }
+    closeDrawer();
+    await loadData();
+    renderAll();
+  } catch (e) {
+    console.error('[CMD101] toggleActive failed:', e);
+    _showFormError('Could not toggle active', e.message || String(e));
+  }
+}
+
 function populateFormSelects() {
-  // companies
   const cSel = document.getElementById('f-company');
+  // Reset (loadData may run more than once via toggleActive refresh).
+  cSel.innerHTML = '<option value="">— Select or add company —</option>';
   companies.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.id;
     opt.textContent = c.name;
     cSel.appendChild(opt);
   });
-  // CMD100.74: inline "+ Add new company" sentinel option.
   const addOpt = document.createElement('option');
   addOpt.value = '__add_new_company__';
   addOpt.textContent = '+ Add new company…';
   cSel.appendChild(addOpt);
 
-  // CMD100.82: resources are no longer poured into a <select> — the
-  // Assigned-to field is now backed by PersonPicker which reads
-  // _assigneeListForPicker() on demand.
-
-  // CMD100.74: company sentinel handler — when user picks "+ Add new
-  // company…", prompt for a name and POST to companies, then re-select
-  // the new company in the dropdown.
+  if (cSel._cmd101Bound) return;
+  cSel._cmd101Bound = true;
   cSel.addEventListener('change', async function() {
     if (cSel.value !== '__add_new_company__') return;
     const name = window.prompt('New company name:');
@@ -1083,10 +2032,6 @@ function populateFormSelects() {
       return;
     }
     try {
-      // CMD100.74: companies requires firm_id (NOT NULL, no default).
-      // Use the operator's firm_id from the existing companies cache.
-      // Every row in `companies` is firm-scoped via RLS so any cached
-      // company's firm_id is the right one.
       const firmId = companies[0]?.firm_id
                   || (window.CURRENT_USER && window.CURRENT_USER.firm_id)
                   || null;
@@ -1101,14 +2046,11 @@ function populateFormSelects() {
       });
       const newCo = result?.[0];
       if (!newCo) throw new Error('No company returned from insert');
-      // Add to local cache.
       companies.push(newCo);
-      // Insert the new <option> just before the sentinel.
       const opt = document.createElement('option');
       opt.value = newCo.id;
       opt.textContent = newCo.name;
       cSel.insertBefore(opt, addOpt);
-      // Select it.
       cSel.value = newCo.id;
     } catch (e) {
       console.error('Failed to add company:', e);
@@ -1118,9 +2060,6 @@ function populateFormSelects() {
   });
 }
 
-// CMD100.82: PersonPicker integration for the Assigned-to field.
-// resources cache is in module scope; PersonPicker accepts an array of
-// { id, user_id, name, department, is_external, title } objects.
 function _assigneeListForPicker() {
   return (resources || []).map(function(r) {
     return {
@@ -1144,10 +2083,6 @@ function openAssigneePicker(ev) {
   var current = document.getElementById('f-assigned').value;
   PersonPicker.show(trigger, function(pick) {
     setAssignee(pick.id, pick.name);
-    // CMD100.82: emit recorder line directly. The hidden input is not a
-    // real focusable element so the click recorder's blur/change paths
-    // never see it. Routing through the recorder channel keeps the
-    // transcript verb identical to the original <select> behavior.
     try {
       if (typeof window._cmdCenterChannelSend === 'function' && pick.name) {
         var self = window._aegisSelf || window.CURRENT_USER || {};
@@ -1167,7 +2102,6 @@ function openAssigneePicker(ev) {
   }, { resources: _assigneeListForPicker(), selected: current });
 }
 
-// Set the assignee state. Updates the hidden input AND the trigger face.
 function setAssignee(id, name) {
   document.getElementById('f-assigned').value = id || '';
   var disp = document.getElementById('f-assigned-display');
@@ -1181,10 +2115,6 @@ function setAssignee(id, name) {
   disp.style.color = 'var(--text0,#e8eaf0)';
 }
 
-// CMD100.79: rename the currently-selected company. Updates the row in
-// `companies` via PATCH; refreshes the local cache and the dropdown
-// option text. Also re-renders the kanban board so any cards displaying
-// the old company name update.
 async function renameSelectedCompany() {
   const cSel = document.getElementById('f-company');
   const id = cSel.value;
@@ -1209,16 +2139,12 @@ async function renameSelectedCompany() {
     const updated = Array.isArray(result) ? result[0] : result;
     if (!updated) throw new Error('No row returned from update');
 
-    // Update local cache.
     current.name = updated.name || next.trim();
-    // Update the <option> label.
     const opt = Array.from(cSel.options).find(o => o.value === id);
     if (opt) opt.textContent = current.name;
-    // Re-render board so existing cards show the new name.
     if (typeof loadData === 'function') {
       await loadData();
-      renderBoard(allProspects);
-      // Re-select after render (loadData may rebuild the dropdown).
+      renderAll();
       cSel.value = id;
     }
   } catch (e) {
@@ -1227,7 +2153,6 @@ async function renameSelectedCompany() {
   }
 }
 
-// pill toggle
 document.querySelectorAll('.pill-group').forEach(group => {
   group.querySelectorAll('.pill').forEach(pill => {
     pill.addEventListener('click', () => {
@@ -1248,8 +2173,6 @@ async function saveProspect() {
   const assigned   = document.getElementById('f-assigned').value;
   const followup   = document.getElementById('f-followup').value;
 
-  // CMD100.74: itemize missing required fields in a styled modal
-  // instead of a browser alert.
   const missing = [];
   if (!company_id || company_id === '__add_new_company__') missing.push('Company');
   if (!title)    missing.push('Initiative / project title');
@@ -1266,8 +2189,6 @@ async function saveProspect() {
   const payload = {
     title,
     company_id,
-    // CMD100.77: prospects.firm_id is NOT NULL. Source from the selected
-    // company's row in the local cache (every company is firm-scoped).
     firm_id:             companies.find(c => c.id === company_id)?.firm_id || null,
     stage:               _drawerStage,
     priority:            document.getElementById('f-priority').value || null,
@@ -1285,7 +2206,6 @@ async function saveProspect() {
   try {
     let resultId;
     if (_editingProspectId) {
-      // CMD100.78: edit mode — PATCH the existing row.
       let result;
       if (typeof API.patch === 'function') {
         result = await API.patch('prospects?id=eq.' + encodeURIComponent(_editingProspectId), payload);
@@ -1305,7 +2225,7 @@ async function saveProspect() {
       window.location.href = `/prospect-detail.html?id=${resultId}`;
     } else {
       await loadData();
-      renderBoard(allProspects);
+      renderAll();
     }
   } catch (e) {
     console.error(e);
@@ -1313,12 +2233,7 @@ async function saveProspect() {
   }
 }
 
-// CMD100.74: styled validation/error modal for the Add Prospect drawer
-// (and for inline-add-company errors). Replaces native browser alert().
-// Z-index sits above the drawer overlay (100) so it's visible while the
-// drawer is open.
 function _showFormError(title, message) {
-  // Remove any prior instance.
   const existing = document.getElementById('phud-form-error-modal');
   if (existing) existing.remove();
   const wrap = document.createElement('div');
@@ -1351,9 +2266,9 @@ function clearForm() {
     document.getElementById(id).value = '';
   });
   document.getElementById('f-company').value  = '';
-  setAssignee('', '');                                    // CMD100.82: reset PersonPicker face
-  document.getElementById('f-priority').value = '';   // CMD100.74: default is "— Select —"
-  document.getElementById('f-urgency').value  = '';   // CMD100.74: default is "— Select —"
+  setAssignee('', '');
+  document.getElementById('f-priority').value = '';
+  document.getElementById('f-urgency').value  = '';
   document.querySelectorAll('.pill.active').forEach(p => p.classList.remove('active'));
 }
 
@@ -1361,11 +2276,13 @@ function escHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// CMD100.80: expose helpers for cmd-center's Move Prospect command.
-window.renderBoard = renderBoard;
-window.updateStats = updateStats;
-// CMD100.82: expose for Form Select replay against PersonPicker-backed fields.
-window.setAssignee = setAssignee;
+// Cross-script exposure (cmd-center COMMANDS targets these).
+window.renderBoard   = renderBoard;
+window.renderAll     = renderAll;       // CMD101: cmd-center refreshes both views via renderAll
+window.updateStats   = updateStats;
+window.loadData      = loadData;        // CMD101: Delete Prospect / Toggle Active call this
+window.setAssignee   = setAssignee;
+window.switchView    = switchView;      // CMD101: Switch View command target
 Object.defineProperty(window, 'pipelineResources', {
   get: function(){ return resources; }
 });

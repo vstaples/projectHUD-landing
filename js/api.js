@@ -91,6 +91,10 @@ const API = (() => {
   const getActionItems  = ()       => get('action_items?select=*&status=neq.complete&order=target_date.asc');
   const getActionItemsByProject = (id) => get(`action_items?select=*&project_id=eq.${id}&order=target_date.asc`);
 
+  // Prospects (CMD101)
+  const deleteProspect    = (id)         => del(`prospects?id=eq.${id}`);
+  const setProspectActive = (id, active) => patch(`prospects?id=eq.${id}`, { is_active: active });
+
   // Risk Register
   const getRisksByProject = (id)   => get(`risk_register?select=*&project_id=eq.${id}&order=weighted_score.desc`);
 
@@ -129,6 +133,7 @@ const API = (() => {
     getTasks, getTasksByProject, updateTask,
     getMilestonesByProject,
     getActionItems, getActionItemsByProject,
+    deleteProspect, setProspectActive,   // CMD101
     getRisksByProject,
     getDocumentsByProject,
     getMessagesByProject, sendMessage,
