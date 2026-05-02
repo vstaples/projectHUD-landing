@@ -1503,6 +1503,64 @@ async function _aegisActivateTab(level, rawLabel) {
 }
 
 // ── Command registry ──────────────────────────────────────────────────────────
+// CMD100.76 — DOM helpers for inline-form replay (Pipeline drawer etc.).
+// These look up live form fields by their visible label text rather than
+// the iframe-postMessage path the Compass forms use.
+function _findFormFieldByLabel(labelText, allowedTags) {
+  var want = String(labelText || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!want) return null;
+  // Walk every .field wrapper; match its <label> text against the request.
+  var fields = document.querySelectorAll('.field');
+  for (var i = 0; i < fields.length; i++) {
+    var lbl = fields[i].querySelector('label');
+    var lblText = '';
+    if (lbl) {
+      // Extract label text minus required-marker spans (asterisks).
+      for (var j = 0; j < lbl.childNodes.length; j++) {
+        var n = lbl.childNodes[j];
+        if (n.nodeType === 3) lblText += n.nodeValue;
+        else if (n.nodeType === 1 && (n.textContent || '').trim() !== '*') lblText += n.textContent;
+      }
+      lblText = lblText.replace(/\*/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    }
+    if (!lblText) {
+      // Fall back to nearest preceding .sec-label sibling (textarea pattern).
+      var sib = fields[i].previousElementSibling;
+      while (sib) {
+        if (sib.classList && sib.classList.contains('sec-label')) {
+          lblText = (sib.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+          break;
+        }
+        sib = sib.previousElementSibling;
+      }
+    }
+    if (lblText !== want) continue;
+    // Find a child of allowed tag.
+    var children = fields[i].querySelectorAll(allowedTags.join(','));
+    if (children.length) return children[0];
+  }
+  return null;
+}
+
+function _findPillGroupBySectionLabel(sectionText) {
+  var want = String(sectionText || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!want) return null;
+  var groups = document.querySelectorAll('.pill-group');
+  for (var i = 0; i < groups.length; i++) {
+    // Walk preceding siblings for a .sec-label.
+    var sib = groups[i].previousElementSibling;
+    while (sib) {
+      if (sib.classList && sib.classList.contains('sec-label')) {
+        var txt = (sib.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        if (txt === want) return groups[i];
+        break;
+      }
+      sib = sib.previousElementSibling;
+    }
+  }
+  return null;
+}
+
 var COMMANDS = {
 
   // ── Navigation ──────────────────────────────────────────────────────────────
@@ -1674,47 +1732,79 @@ var COMMANDS = {
       return (f.source_name||'').toLowerCase() === name.toLowerCase() ||
              (f.source_name||'').toLowerCase().includes(name.toLowerCase());
     });
-    if (!def) return 'Form not found: ' + name + ' (available: ' + defs.map(function(f){ return f.source_name; }).join(', ') + ')';
-
-    if (typeof myrLaunchRequest === 'function') {
+    if (def && typeof myrLaunchRequest === 'function') {
       await myrLaunchRequest('form', def.id);
       return 'form opened: ' + def.source_name;
     }
-    return 'myrLaunchRequest not available';
+
+    // CMD100.76: DOM fallback for inline drawer triggers (Pipeline etc.).
+    // The Pipeline `+ Add` buttons all open the same Add Prospect drawer;
+    // any one will do. For other pages, look for a button matching the form
+    // name (e.g. "Add Prospect" → button with text containing "Add").
+    var lcName = name.toLowerCase();
+    if (lcName.indexOf('add prospect') !== -1 || lcName.indexOf('prospect') !== -1) {
+      var addBtn = document.querySelector('.add-card-btn');
+      if (addBtn) { addBtn.click(); return 'form opened (inline): ' + name; }
+    }
+    // Generic fallback: find a button whose text matches the form name.
+    var btns = document.querySelectorAll('button');
+    for (var bi = 0; bi < btns.length; bi++) {
+      var bt = (btns[bi].textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (bt === lcName || bt === '+ ' + lcName || bt === '+' + lcName) {
+        btns[bi].click();
+        return 'form opened (inline): ' + name;
+      }
+    }
+    return 'Form not found: ' + name + ' (no registered form def, no matching DOM button)';
   },
 
   'Form Submit': async function(args) {
     var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
-    if (!iframe) return 'No form overlay open';
-    // Clear any previous value so we can detect the new one
-    var prevInstanceId = window._lastSubmittedInstanceId;
-    iframe.contentWindow.postMessage({ source: 'cmd-center', cmd: 'Form Submit' }, '*');
-    // Wait up to 15s for the instance to be created (mw-tabs sets _lastSubmittedInstanceId)
-    for (var si = 0; si < 150; si++) {
-      await new Promise(function(r){ setTimeout(r, 100); });
-      if (window._lastSubmittedInstanceId && window._lastSubmittedInstanceId !== prevInstanceId) break;
-      if (_scriptAborted) return 'aborted';
+    if (iframe) {
+      // Existing Compass iframe path.
+      var prevInstanceId = window._lastSubmittedInstanceId;
+      iframe.contentWindow.postMessage({ source: 'cmd-center', cmd: 'Form Submit' }, '*');
+      for (var si = 0; si < 150; si++) {
+        await new Promise(function(r){ setTimeout(r, 100); });
+        if (window._lastSubmittedInstanceId && window._lastSubmittedInstanceId !== prevInstanceId) break;
+        if (_scriptAborted) return 'aborted';
+      }
+      var newId = window._lastSubmittedInstanceId;
+      if (newId && newId !== prevInstanceId) {
+        _storeVars['instance_id'] = newId;
+        return 'submitted · instance ' + newId;
+      }
+      return 'submit triggered (instance id not yet available)';
     }
-    var newId = window._lastSubmittedInstanceId;
-    if (newId && newId !== prevInstanceId) {
-      _storeVars['instance_id'] = newId;
-      // Return full UUID in ack so Aegis can capture it into its own _storeVars.
-      // Transcript rendering truncates on display — see _appendLine.
-      return 'submitted · instance ' + newId;
-    }
-    return 'submit triggered (instance id not yet available)';
+    // CMD100.76: DOM fallback for inline drawers (Pipeline etc.).
+    // Find the first .btn-primary inside an open .drawer or [role=dialog].
+    var btn = document.querySelector('.overlay.open .btn-primary, [role="dialog"][open] .btn-primary, .drawer .btn-primary');
+    if (!btn) return 'Form Submit: no primary action button found in any open drawer/dialog';
+    btn.click();
+    return 'submitted (clicked primary action)';
   },
 
   'Form Insert': async function(args) {
     var field = args[0];
     var value = args[1] !== undefined ? args[1] : '';
-    // Find the form overlay iframe and dispatch via postMessage
+    // CMD100.76: try iframe path first (Compass-style forms), then fall
+    // through to DOM-find for inline drawer forms (Pipeline etc.).
     var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
-    if (!iframe) return 'No form overlay open';
-    iframe.contentWindow.postMessage({
-      source: 'cmd-center', cmd: 'Form Insert', field: field, value: value
-    }, '*');
-    return 'inserted ' + field + ' = ' + value;
+    if (iframe) {
+      iframe.contentWindow.postMessage({
+        source: 'cmd-center', cmd: 'Form Insert', field: field, value: value
+      }, '*');
+      return 'inserted ' + field + ' = ' + value;
+    }
+    // DOM fallback.
+    var el = _findFormFieldByLabel(field, ['INPUT','TEXTAREA']);
+    if (!el) return 'Form Insert: field not found "' + field + '"';
+    el.focus();
+    el.value = value;
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.blur();
+    return 'inserted "' + field + '" = "' + value + '"';
   },
 
   // Form Select "field" "value" — for <select> dropdowns.
@@ -1723,11 +1813,101 @@ var COMMANDS = {
     var field = args[0];
     var value = args[1] !== undefined ? args[1] : '';
     var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
-    if (!iframe) return 'No form overlay open';
-    iframe.contentWindow.postMessage({
-      source: 'cmd-center', cmd: 'Form Select', field: field, value: value
-    }, '*');
-    return 'selected ' + field + ' = ' + value;
+    if (iframe) {
+      iframe.contentWindow.postMessage({
+        source: 'cmd-center', cmd: 'Form Select', field: field, value: value
+      }, '*');
+      return 'selected ' + field + ' = ' + value;
+    }
+    // CMD100.76: DOM fallback. Two paths:
+    // 1. <select> field: find the option whose visible text matches
+    //    the value, set selectedIndex, dispatch change.
+    // 2. Pill-group field: find the .pill inside the matching .pill-group
+    //    whose text matches value, click it.
+    var sel = _findFormFieldByLabel(field, ['SELECT']);
+    if (sel) {
+      var matchIdx = -1;
+      for (var i = 0; i < sel.options.length; i++) {
+        var optText = (sel.options[i].textContent || '').replace(/\s+/g, ' ').trim();
+        if (optText.toLowerCase() === String(value).toLowerCase()) { matchIdx = i; break; }
+      }
+      if (matchIdx === -1) return 'Form Select: no option "' + value + '" in "' + field + '"';
+      sel.selectedIndex = matchIdx;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return 'selected "' + field + '" = "' + value + '"';
+    }
+    // Try pill-group.
+    var pillGroup = _findPillGroupBySectionLabel(field);
+    if (pillGroup) {
+      var pills = pillGroup.querySelectorAll('.pill');
+      for (var pi = 0; pi < pills.length; pi++) {
+        var pillText = (pills[pi].textContent || '').replace(/\s+/g, ' ').trim();
+        if (pillText.toLowerCase() === String(value).toLowerCase()) {
+          pills[pi].click();
+          return 'selected pill "' + field + '" = "' + value + '"';
+        }
+      }
+      return 'Form Select: no pill "' + value + '" in "' + field + '"';
+    }
+    return 'Form Select: field not found "' + field + '"';
+  },
+
+  // ── Form Add (CMD100.76) ──────────────────────────────────────────────────
+  // Inline-add a new option to a <select> field via the field's "+ Add new …"
+  // sentinel option, then select the freshly-inserted value. Used when the
+  // recorder consolidated a sentinel-pick + prompt + value-set into a single
+  // line (see hud-shell.js _handleFieldCommit sentinel handling).
+  //
+  // Replay strategy:
+  //   1. Find the select by field label.
+  //   2. Locate its sentinel option (value matches /^__add_new_.+__$/).
+  //   3. Stub window.prompt so the page's existing change-handler picks up
+  //      the supplied value as if the user typed it.
+  //   4. Set selectedIndex to sentinel and dispatch change — the page does
+  //      the API insert and adds the new option.
+  //   5. Wait for the new option to appear, then select it.
+  'Form Add': async function(args) {
+    var field = args[0];
+    var value = args[1] !== undefined ? args[1] : '';
+    if (!value) return 'Form Add: missing value for "' + field + '"';
+
+    var sel = _findFormFieldByLabel(field, ['SELECT']);
+    if (!sel) return 'Form Add: field not found "' + field + '"';
+
+    // Locate sentinel option.
+    var sentinelIdx = -1;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (/^__add_new_[^_]+__$/.test(sel.options[i].value || '')) {
+        sentinelIdx = i; break;
+      }
+    }
+    if (sentinelIdx === -1) return 'Form Add: no sentinel option in "' + field + '"';
+
+    // Stub window.prompt for the duration of the change handler.
+    var origPrompt = window.prompt;
+    window.prompt = function() { return value; };
+
+    sel.selectedIndex = sentinelIdx;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // Restore prompt after a microtask so any synchronous prompt() call
+    // inside the change handler has already returned. The async API.post
+    // inside the handler runs without prompt access (which is fine).
+    Promise.resolve().then(function(){ window.prompt = origPrompt; });
+
+    // Poll up to 5s for the new option to appear and be selected.
+    for (var t = 0; t < 50; t++) {
+      await new Promise(function(r){ setTimeout(r, 100); });
+      // Page handler typically sets sel.value to the new id after insert.
+      var current = sel.options[sel.selectedIndex];
+      var currentText = current ? (current.textContent || '').replace(/\s+/g, ' ').trim() : '';
+      if (currentText.toLowerCase() === String(value).toLowerCase()) {
+        return 'added + selected "' + field + '" = "' + value + '"';
+      }
+    }
+    // Restore prompt unconditionally in case the microtask path missed.
+    window.prompt = origPrompt;
+    return 'Form Add: timed out waiting for "' + value + '" to appear in "' + field + '"';
   },
 
   'Form AddRow': async function(args) {

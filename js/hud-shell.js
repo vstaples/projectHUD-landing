@@ -1542,7 +1542,7 @@ const HUDShell = (() => {
         if (TAB_RX.test(cls) || role === 'tablist') { inTab = true; tabDepth++; }
         if (SUBTAB_RX.test(cls)) inSubtab = true;
         if (tag === 'FORM') inForm = true;
-        if (role === 'dialog' || /\b(modal|dialog|popover)\b/i.test(cls)) inDialog = true;
+        if (role === 'dialog' || /\b(modal|dialog|popover|drawer)\b/i.test(cls)) inDialog = true;
         p = p.parentElement;
         depth++;
       }
@@ -1554,6 +1554,12 @@ const HUDShell = (() => {
       if (inNav && !inTab) return `Set Page "${label}"`;
       if (inSubtab || tabDepth >= 2) return `Set SubTab "${label}"`;
       if (inTab || role === 'tab') return `Set Tab "${label}"`;
+      // CMD100.76: primary action button inside a drawer → Form Submit.
+      // Identified by class .btn-primary (HUD convention). Other buttons
+      // in the drawer (Cancel, secondary saves) keep their Click verb.
+      if (inDialog && el.classList && el.classList.contains('btn-primary')) {
+        return `Form Submit`;
+      }
       if (inDialog || inForm) return `Click "${label}"`;
       if (tag === 'A') return `Set Page "${label}"`;
       // Top-level standalone button → bare command
@@ -1668,6 +1674,36 @@ const HUDShell = (() => {
         if (tag === 'SELECT') {
           value = _selectVisibleText(el);
           verb  = 'Form Select';
+
+          // CMD100.76: "+ Add new …" sentinel handling.
+          // The sentinel is identified by an option value matching
+          // /^__add_new_.+__$/ (the convention used in pipeline.html for
+          // the company dropdown). When the user picks the sentinel, we
+          // suppress the emit and arm a pending-add flag on the element.
+          // The next change event emits `Form Add "<field>" "<new value>"`
+          // instead of `Form Select`. This collapses the two-step user
+          // action into a single replayable line.
+          const opt = el.options[el.selectedIndex];
+          const optValue = opt ? (opt.value || '') : '';
+          const isSentinel = /^__add_new_[^_]+__$/.test(optValue);
+
+          if (isSentinel) {
+            // Arm the pending-add flag and suppress this emit.
+            el.__hudAddPending = true;
+            return;
+          }
+
+          if (el.__hudAddPending) {
+            // The previous change was the sentinel; this one is the new
+            // value just inserted. Emit Form Add and clear the flag.
+            el.__hudAddPending = false;
+            // Update the dedup cache so a subsequent identical change
+            // doesn't double-emit.
+            _lastFieldValue.set(el, value);
+            if (!value) return;
+            emit(`Form Add "${label}" "${value.replace(/"/g, '\\"')}"`);
+            return;
+          }
         } else {
           value = (el.value || '').toString();
           verb  = 'Form Insert';
