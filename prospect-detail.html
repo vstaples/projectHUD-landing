@@ -1413,7 +1413,7 @@ function renderHeader() {
     ${p.est_value ? `
     <div class="meta-item">
       <span class="meta-lbl">Est. value</span>
-      <span class="meta-val">¥${Number(p.est_value).toLocaleString()}</span>
+      <span class="meta-val">$${Number(p.est_value).toLocaleString()}</span>
     </div>` : ''}
   `;
 
@@ -1466,9 +1466,13 @@ function renderOverview() {
         </div>`}
       </div>
       <div class="card">
-        <div class="card-title">Key signals</div>
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Key signals</span>
+          <button class="btn btn-edit" onclick="editProspect()" title="Edit prospect"
+            style="font-size:11px;padding:3px 10px;background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:4px;cursor:pointer">✎ Edit</button>
+        </div>
         ${renderSignal('Budget', p.budget_range_low || p.budget_range_high
-            ? `¥${Number(p.budget_range_low||0).toLocaleString()} – ¥${Number(p.budget_range_high||0).toLocaleString()}`
+            ? `$${Number(p.budget_range_low||0).toLocaleString()} – $${Number(p.budget_range_high||0).toLocaleString()}`
             : 'Unknown', 'amber')}
         ${renderSignal('Timeline', p.timeline_urgency
             ? p.timeline_urgency.replace(/_/g,' ') : '—', 'amber')}
@@ -2040,7 +2044,7 @@ function renderProposals() {
               <span style="padding:1px 7px;border-radius:4px;font-weight:600;
                 background:${bg};color:${color}">${capitalize(p.status||'draft')}</span>
               <span>v${escHtml(p.version||'1.0')}</span>
-              ${p.total_cost ? `<span>¥${Number(p.total_cost).toLocaleString()}</span>` : ''}
+              ${p.total_cost ? `<span>$${Number(p.total_cost).toLocaleString()}</span>` : ''}
               <span>${fmtDate(p.created_at)}</span>
               ${hasAttach ? `<span style="cursor:pointer;color:var(--accent)"
                 onclick="showProposalAttachments('${p.id}')">📎 ${_proposalAttachments[p.id].length}</span>` : ''}
