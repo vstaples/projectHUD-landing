@@ -1705,6 +1705,54 @@ var COMMANDS = {
     return 'Edit Prospect: name not in cache; routed to pipeline';
   },
 
+  // ── Move Prospect (CMD100.80) ──────────────────────────────────────────────
+  // Pipeline-specific: change a prospect's stage. Two-arg form:
+  //   Move Prospect "<name>" "<stage>"
+  // Stage values: prospect | qualifying | discovery | proposal | review | approved
+  // Looks up the prospect in window.allProspects, dispatches to the card's
+  // drop handler logic by directly PATCHing and re-rendering. Requires the
+  // Pipeline page to be loaded (not prospect-detail).
+  'Move Prospect': async function(args) {
+    var target = (args[0] || '').toString().trim().toLowerCase();
+    var newStage = (args[1] || '').toString().trim().toLowerCase();
+    console.log('[cmd:Move Prospect]', { target: target, newStage: newStage, currentLoc: window.location.pathname });
+    if (!target)   return 'Move Prospect: missing prospect name';
+    if (!newStage) return 'Move Prospect: missing destination stage';
+    var ap = window.allProspects || [];
+    var p = ap.find(function(pp){
+      return ((pp.title || '') + '').replace(/\s+/g,' ').trim().toLowerCase() === target;
+    });
+    if (!p) return 'Move Prospect: no card with name "' + args[0] + '"';
+    if (p.stage === newStage) return 'Move Prospect: already in stage "' + newStage + '"';
+
+    var prevStage = p.stage;
+    p.stage = newStage;
+    if (typeof window.renderBoard === 'function') {
+      window.renderBoard(ap);
+      if (typeof window.updateStats === 'function') window.updateStats(ap);
+    }
+
+    try {
+      var payload = { stage: newStage };
+      if (typeof window.API?.patch === 'function') {
+        await window.API.patch('prospects?id=eq.' + encodeURIComponent(p.id), payload);
+      } else if (typeof window.API?.update === 'function') {
+        await window.API.update('prospects', p.id, payload);
+      } else {
+        throw new Error('No PATCH method available on API');
+      }
+      return 'moved "' + args[0] + '" to ' + newStage;
+    } catch (err) {
+      // Rollback.
+      p.stage = prevStage;
+      if (typeof window.renderBoard === 'function') {
+        window.renderBoard(ap);
+        if (typeof window.updateStats === 'function') window.updateStats(ap);
+      }
+      return 'Move Prospect failed: ' + (err.message || String(err));
+    }
+  },
+
   // ── Set NarrateTarget (CMD87b / Brief Aegis Remote Narration) ────────────────
   // Redirects subsequent `Narrate` calls to render on a target Compass session.
   //   Set NarrateTarget               — read current value

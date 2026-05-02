@@ -215,6 +215,14 @@ body {
   border-color: var(--border2);
   transform: translateY(-1px);
 }
+/* CMD100.80: DnD visual states */
+.p-card[draggable="true"] { cursor: grab; }
+.p-card.p-card-dragging   { opacity: 0.45; cursor: grabbing; }
+.kb-col.kb-col-drop {
+  background: rgba(0,201,201,0.08);
+  outline: 1px dashed rgba(0,201,201,0.45);
+  outline-offset: -2px;
+}
 
 .p-card-top {
   display: flex;
@@ -753,6 +761,7 @@ function renderBoard(prospects) {
     const cards = prospects.filter(p => p.stage === stage.key);
     const col   = document.createElement('div');
     col.className = 'kb-col';
+    col.dataset.stage = stage.key;          // CMD100.80: tag for DnD drop target
     col.innerHTML = `
       <div class="kb-col-head">
         <div class="kb-stage-label">
@@ -770,6 +779,11 @@ function renderBoard(prospects) {
     `;
     wrap.appendChild(col);
   });
+
+  // CMD100.80: wire drag-drop after every render. Listeners attach to
+  // current DOM only; renderBoard rebuilds innerHTML each call so old
+  // handlers are discarded automatically.
+  _wireKanbanDnD();
 }
 
 function renderCard(p) {
@@ -796,7 +810,7 @@ function renderCard(p) {
   const val = p.est_value ? '$' + (p.est_value / 1000).toFixed(0) + 'k' : '';
 
   return `
-    <div class="p-card" onclick="openProspect('${p.id}')">
+    <div class="p-card" draggable="true" data-id="${p.id}" data-stage="${p.stage}" onclick="openProspect('${p.id}')">
       ${aiCount}
       <div class="p-card-top">
         <div class="p-card-name">${escHtml(p.title)}</div>
@@ -816,6 +830,107 @@ function renderCard(p) {
         <div class="followup-chip ${fuClass}">${fuText}</div>
       </div>
     </div>`;
+}
+
+// ── CMD100.80: kanban drag-and-drop ────────────────────
+// Card → column DnD: dragging a .p-card and dropping on a .kb-col
+// PATCHes the prospect's stage and re-renders. Suppresses the click
+// handler that would otherwise fire and navigate to prospect-detail.
+let _dragId = null;
+let _dragWasDragging = false;
+
+function _wireKanbanDnD() {
+  // Cards.
+  document.querySelectorAll('.p-card[draggable="true"]').forEach(card => {
+    card.addEventListener('dragstart', ev => {
+      _dragId = card.dataset.id;
+      _dragWasDragging = true;
+      card.classList.add('p-card-dragging');
+      try { ev.dataTransfer.setData('text/plain', _dragId); } catch(e) {}
+      ev.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('p-card-dragging');
+      _dragId = null;
+      // Reset suppression flag in next tick so the click handler that
+      // fires after dragend on simple drags doesn't accidentally trigger.
+      setTimeout(() => { _dragWasDragging = false; }, 50);
+    });
+    // Suppress click → openProspect when the click followed a drag.
+    card.addEventListener('click', ev => {
+      if (_dragWasDragging) {
+        ev.stopPropagation();
+        ev.preventDefault();
+      }
+    }, true);
+  });
+
+  // Columns.
+  document.querySelectorAll('.kb-col').forEach(col => {
+    col.addEventListener('dragover', ev => {
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'move';
+      col.classList.add('kb-col-drop');
+    });
+    col.addEventListener('dragleave', () => {
+      col.classList.remove('kb-col-drop');
+    });
+    col.addEventListener('drop', async ev => {
+      ev.preventDefault();
+      col.classList.remove('kb-col-drop');
+      const id = _dragId || ev.dataTransfer.getData('text/plain');
+      if (!id) return;
+      const newStage = col.dataset.stage;
+      if (!newStage) return;
+      const p = allProspects.find(pp => pp.id === id);
+      if (!p || p.stage === newStage) return;
+
+      // Recorder-friendly: emit a synthetic Move Prospect via the
+      // recorder channel (so transcripts capture stage changes).
+      try {
+        if (typeof window._cmdCenterChannelSend === 'function') {
+          const self = window._aegisSelf || window.CURRENT_USER || {};
+          window._cmdCenterChannelSend({
+            type: 'broadcast',
+            event: 'recorder_event',
+            payload: {
+              event_id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+              user_id: self.user_id || self.id || null,
+              alias:   self.alias || self.initials || '??',
+              command: `Move Prospect "${(p.title || '').replace(/"/g, '\\"')}" "${newStage}"`,
+              ts: Date.now()
+            }
+          });
+        }
+      } catch(e) {}
+
+      // Optimistic UI: update local cache and re-render before PATCH.
+      const prevStage = p.stage;
+      p.stage = newStage;
+      window.allProspects = allProspects;
+      renderBoard(allProspects);
+      updateStats(allProspects);
+
+      try {
+        let result;
+        const payload = { stage: newStage };
+        if (typeof API.patch === 'function') {
+          result = await API.patch('prospects?id=eq.' + encodeURIComponent(id), payload);
+        } else if (typeof API.update === 'function') {
+          result = await API.update('prospects', id, payload);
+        } else {
+          throw new Error('No PATCH method available on API');
+        }
+      } catch (err) {
+        // Rollback on failure.
+        p.stage = prevStage;
+        window.allProspects = allProspects;
+        renderBoard(allProspects);
+        updateStats(allProspects);
+        _showFormError('Could not move prospect', err.message || String(err));
+      }
+    });
+  });
 }
 
 // ── search ─────────────────────────────────────────────
@@ -1174,6 +1289,10 @@ function clearForm() {
 function escHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// CMD100.80: expose helpers for cmd-center's Move Prospect command.
+window.renderBoard = renderBoard;
+window.updateStats = updateStats;
 </script>
 </body>
 </html>
