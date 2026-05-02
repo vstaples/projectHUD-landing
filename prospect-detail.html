@@ -1921,9 +1921,6 @@ function renderStakeholders() {
   }).join('');
 
   panel.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-      <button class="btn" data-aegis-cmd='Form Open "Add Stakeholder"' onclick="openAddStakeholder()">+ Add stakeholder</button>
-    </div>
     <div class="sh-grid">
       ${cards}
       <div class="sh-add" data-aegis-cmd='Form Open "Add Stakeholder"' onclick="openAddStakeholder()">+ Add stakeholder</div>
@@ -3929,7 +3926,7 @@ function openAddStakeholder() {
   document.getElementById('sh-edit-notes').value       = '';
   // Drawer chrome — distinct title, hide Remove button.
   document.querySelector('#sh-edit-overlay .drawer-title').textContent = 'ADD STAKEHOLDER';
-  document.querySelector('#sh-edit-overlay .btn-primary').textContent  = 'Add stakeholder';
+  document.querySelector('#sh-edit-overlay .btn-primary').textContent  = 'Save';
   var rmBtn = document.querySelector('#sh-edit-overlay [onclick*="removeStakeholder"]');
   if (rmBtn) rmBtn.style.display = 'none';
   document.getElementById('sh-edit-overlay').classList.add('open');
