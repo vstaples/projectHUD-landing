@@ -1628,6 +1628,16 @@ const HUDShell = (() => {
           text = text.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
           if (text) return text;
         }
+        // 1b. CMD100.74: no inner <label> — walk wrapper's preceding
+        // siblings for the nearest .sec-label (e.g. "Brief description"
+        // textarea sits inside a .field whose section is set above).
+        let sib = wrapper.previousElementSibling;
+        while (sib) {
+          if (sib.classList && sib.classList.contains('sec-label')) {
+            return (sib.textContent || '').replace(/\s+/g, ' ').trim();
+          }
+          sib = sib.previousElementSibling;
+        }
       }
       // 2. Try aria-label.
       const al = el.getAttribute && el.getAttribute('aria-label');

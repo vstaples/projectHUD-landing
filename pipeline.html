@@ -408,7 +408,7 @@ body {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.drawer-title { font-size: 15px; font-weight: 600; }
+.drawer-title { font-size: 22px; font-weight: 600; flex: 1; text-align: center; }
 .drawer-close {
   width: 28px; height: 28px;
   border-radius: 6px;
@@ -549,6 +549,7 @@ body {
 <div class="overlay" id="drawer-overlay" onclick="handleOverlayClick(event)">
   <div class="drawer" onclick="event.stopPropagation()">
     <div class="drawer-head">
+      <span style="width:28px;flex-shrink:0" aria-hidden="true"></span>
       <span class="drawer-title">Add Prospect</span>
       <button class="drawer-close" onclick="closeDrawer()">✕</button>
     </div>
