@@ -938,11 +938,25 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
 }
-/* Updated freshness tones */
-.p-card-date-val.recent { color: #7af0a0; }
-.p-card-date-val.aging  { color: #f0c47a; }
-.p-card-date-val.stale  { color: #f07a7a; }
+/* Age "Nd ago" pill — neutral muted by default; tone classes color it. */
+.p-card-age {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: .02em;
+}
+/* Updated freshness tones — recolor BOTH the age pill and the date. */
+.p-card-date-val.recent .p-card-age,
+.p-card-date-val.recent .p-card-date-text { color: #7af0a0; }
+.p-card-date-val.aging  .p-card-age,
+.p-card-date-val.aging  .p-card-date-text { color: #f0c47a; }
+.p-card-date-val.stale  .p-card-age,
+.p-card-date-val.stale  .p-card-date-text { color: #f07a7a; }
 /* Follow-up urgency tones */
 .p-card-date-val.overdue { color: #f07a7a; }
 .p-card-date-val.today   { color: #f0c47a; }
@@ -2449,11 +2463,11 @@ function renderCard(p) {
   // Updated — relative-age tone: green ≤7d, amber 8–30d, red >30d.
   let updatedClass = '', updatedAge = '';
   if (p.updated_at) {
-    const ageDays = (Date.now() - new Date(p.updated_at).getTime()) / 86400000;
+    const ageDays = Math.round((Date.now() - new Date(p.updated_at).getTime()) / 86400000);
     if      (ageDays <= 7)  updatedClass = 'recent';
     else if (ageDays <= 30) updatedClass = 'aging';
     else                    updatedClass = 'stale';
-    updatedAge = ' · ' + Math.round(ageDays) + 'd ago';
+    updatedAge = ageDays + 'd ago';
   }
   const updatedText = fmt(p.updated_at);
 
@@ -2509,7 +2523,10 @@ function renderCard(p) {
         </div>
         <div class="p-card-date-row">
           <span class="p-card-date-lbl">Updated</span>
-          <span class="p-card-date-val ${updatedClass}">${updatedText}${updatedAge}</span>
+          <span class="p-card-date-val ${updatedClass}">
+            ${updatedAge ? `<span class="p-card-age">${updatedAge}</span>` : ''}
+            <span class="p-card-date-text">${updatedText}</span>
+          </span>
         </div>
         <div class="p-card-date-row">
           <span class="p-card-date-lbl">Follow Up</span>
