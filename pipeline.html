@@ -53,11 +53,15 @@ body {
   min-width: 0;
 }
 
-/* ── CMD101.5: permanent-row above tabs (Funnel + Forecast) ── */
+/* ── CMD101.5: permanent-row above tabs (Funnel + Forecast) ──
+   Right column width is computed to match a single KPI card
+   (1/6 of strip width minus 5 gaps), so Forecast Summary right
+   edge aligns with THIS WEEK card right edge above it. */
 .permanent-row {
+  --kpi-col: calc((100% - 5 * 10px) / 6);
   display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 14px;
+  grid-template-columns: 1fr var(--kpi-col);
+  gap: 10px;
   margin: 0 0 14px 0;
   align-items: stretch;
 }
@@ -1329,18 +1333,21 @@ function renderAll() {
 }
 
 // ── stats strip (Board toolbar) ────────────────────────
+// CMD101.5b: scope to open (non-approved) deals so totals reconcile
+// with the Pipeline Value KPI above.
 function updateStats(prospects) {
-  const total  = prospects.length;
-  const value  = prospects.reduce((s, p) => s + (p.est_value || 0), 0);
+  const open   = prospects.filter(function(p){ return p.stage !== 'approved'; });
+  const total  = open.length;
+  const value  = open.reduce(function(s, p){ return s + (p.est_value || 0); }, 0);
   const today  = new Date().toLocaleDateString('en-CA');
-  const overdue = prospects.filter(p =>
+  const overdue = open.filter(p =>
     p.next_follow_up_date && p.next_follow_up_date < today
   ).length;
 
   var elTotal = document.getElementById('stat-total');
   var elValue = document.getElementById('stat-value');
   if (elTotal) elTotal.textContent = total;
-  if (elValue) elValue.textContent = value > 0 ? '$' + (value / 1000).toFixed(0) + 'k' : '—';
+  if (elValue) elValue.textContent = value > 0 ? _fmt$(value) : '—';
 
   if (overdue > 0) {
     document.getElementById('stat-overdue').textContent = overdue;
@@ -1368,7 +1375,7 @@ function _isStuck(p) {
 }
 function _fmt$(n) {
   if (!isFinite(n) || !n) return '$0';
-  if (Math.abs(n) >= 1000000) return '$' + (n/1000000).toFixed(1) + 'M';
+  if (Math.abs(n) >= 1000000) return '$' + (n/1000000).toFixed(2) + 'M';
   if (Math.abs(n) >= 1000)    return '$' + (n/1000).toFixed(0)   + 'k';
   return '$' + Math.round(n);
 }
@@ -1434,7 +1441,7 @@ function renderDashboard(prospects) {
   // Write KPI strip.
   document.getElementById('kpi-pipeline-val').textContent = _fmt$(pipelineVal);
   document.getElementById('kpi-pipeline-sub').textContent =
-    prospects.filter(function(p){ return p.stage !== 'approved'; }).length + ' active deals';
+    prospects.filter(function(p){ return p.stage !== 'approved'; }).length + ' open deals';
 
   document.getElementById('kpi-forecast-val').textContent = _fmt$(weightedFcst);
   document.getElementById('kpi-forecast-sub').textContent = isFinite(fcstPctOfBench)
