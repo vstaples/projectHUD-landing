@@ -950,15 +950,15 @@ body {
   color: var(--muted);
   letter-spacing: .02em;
 }
-/* Updated freshness tones — recolor BOTH the age pill and the date. */
-.p-card-date-val.recent .p-card-age,
-.p-card-date-val.recent .p-card-date-text { color: #7af0a0; }
-.p-card-date-val.aging  .p-card-age,
-.p-card-date-val.aging  .p-card-date-text { color: #f0c47a; }
-.p-card-date-val.stale  .p-card-age,
-.p-card-date-val.stale  .p-card-date-text { color: #f07a7a; }
+/* CMD101.5j — Updated row: date is ALWAYS amber (it's an "updated" date,
+   yellow flags "this changed"). Age pill carries the freshness tone:
+   green ≤7d (recent), amber 8–30d (aging), red >30d (stale). */
+.p-card-date-val .p-card-date-text { color: #f0c47a; }       /* date always amber */
+.p-card-date-val.recent .p-card-age { color: #7af0a0; }
+.p-card-date-val.aging  .p-card-age { color: #f0c47a; }
+.p-card-date-val.stale  .p-card-age { color: #ff3b3b; }      /* bright red */
 /* Follow-up urgency tones */
-.p-card-date-val.overdue { color: #f07a7a; }
+.p-card-date-val.overdue { color: #ff3b3b; }                  /* bright red */
 .p-card-date-val.today   { color: #f0c47a; }
 
 /* action items badge */
