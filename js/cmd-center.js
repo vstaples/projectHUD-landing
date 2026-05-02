@@ -2054,9 +2054,9 @@ var COMMANDS = {
       }
       return 'submit triggered (instance id not yet available)';
     }
-    // CMD100.76: DOM fallback for inline drawers (Pipeline etc.).
-    // Find the first .btn-primary inside an open .drawer or [role=dialog].
-    var btn = document.querySelector('.overlay.open .btn-primary, [role="dialog"][open] .btn-primary, .drawer .btn-primary');
+    // CMD101.5x: inline drawer fallback. Require the button to be inside an
+    // OPEN overlay/dialog — same scoping fix applied to Form Save.
+    var btn = document.querySelector('.overlay.open .btn-primary, [role="dialog"][open] .btn-primary');
     if (!btn) return 'Form Submit: no primary action button found in any open drawer/dialog';
     btn.click();
     return 'submitted (clicked primary action)';
@@ -2243,11 +2243,11 @@ var COMMANDS = {
       iframe.contentWindow.postMessage({ source: 'cmd-center', cmd: 'Form Save' }, '*');
       return 'draft saved';
     }
-    // CMD101.5x: inline drawer fallback — same shape as Form Submit's
-    // fallback. Find the primary action button inside an open overlay/dialog
-    // and click it. Save flows that close the drawer and reload data trip
-    // their own loadAll() / refresh paths; we just need to deliver the click.
-    var btn = document.querySelector('.overlay.open .btn-primary, [role="dialog"][open] .btn-primary, .drawer .btn-primary');
+    // CMD101.5x: inline drawer fallback. Require the button to be inside an
+    // OPEN overlay/dialog — never use an unscoped `.drawer .btn-primary`
+    // selector, which matches every drawer's primary button in document
+    // order (including ones not currently visible to the user).
+    var btn = document.querySelector('.overlay.open .btn-primary, [role="dialog"][open] .btn-primary');
     if (!btn) return 'No form overlay open';
     btn.click();
     // Brief settle so any subsequent script step (or a final dedup-drop log
