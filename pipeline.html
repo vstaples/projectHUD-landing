@@ -608,6 +608,7 @@ body {
         <div class="field">
           <label>Timeline urgency</label>
           <select id="f-urgency">
+            <option value="">— Select —</option>
             <option value="exploring">Exploring</option>
             <option value="within_6_months">Within 6 months</option>
             <option value="within_3_months">Within 3 months</option>
@@ -617,8 +618,9 @@ body {
         <div class="field">
           <label>Priority</label>
           <select id="f-priority">
+            <option value="">— Select —</option>
             <option value="low">Low</option>
-            <option value="medium" selected>Medium</option>
+            <option value="medium">Medium</option>
             <option value="high">High</option>
           </select>
         </div>
@@ -863,6 +865,11 @@ function populateFormSelects() {
     opt.textContent = c.name;
     cSel.appendChild(opt);
   });
+  // CMD100.74: inline "+ Add new company" sentinel option.
+  const addOpt = document.createElement('option');
+  addOpt.value = '__add_new_company__';
+  addOpt.textContent = '+ Add new company…';
+  cSel.appendChild(addOpt);
 
   // resources
   const rSel = document.getElementById('f-assigned');
@@ -871,6 +878,36 @@ function populateFormSelects() {
     opt.value = r.id;
     opt.textContent = r.first_name + ' ' + r.last_name;
     rSel.appendChild(opt);
+  });
+
+  // CMD100.74: company sentinel handler — when user picks "+ Add new
+  // company…", prompt for a name and POST to companies, then re-select
+  // the new company in the dropdown.
+  cSel.addEventListener('change', async function() {
+    if (cSel.value !== '__add_new_company__') return;
+    const name = window.prompt('New company name:');
+    if (!name || !name.trim()) {
+      cSel.value = '';
+      return;
+    }
+    try {
+      const result = await API.post('companies', { name: name.trim() });
+      const newCo = result?.[0];
+      if (!newCo) throw new Error('No company returned from insert');
+      // Add to local cache.
+      companies.push(newCo);
+      // Insert the new <option> just before the sentinel.
+      const opt = document.createElement('option');
+      opt.value = newCo.id;
+      opt.textContent = newCo.name;
+      cSel.insertBefore(opt, addOpt);
+      // Select it.
+      cSel.value = newCo.id;
+    } catch (e) {
+      console.error('Failed to add company:', e);
+      _showFormError('Could not add company', 'Insert failed: ' + (e.message || e));
+      cSel.value = '';
+    }
   });
 }
 
@@ -895,8 +932,18 @@ async function saveProspect() {
   const assigned   = document.getElementById('f-assigned').value;
   const followup   = document.getElementById('f-followup').value;
 
-  if (!title || !company_id || !assigned || !followup) {
-    alert('Please fill in required fields: Company, Title, Assigned to, Follow-up date.');
+  // CMD100.74: itemize missing required fields in a styled modal
+  // instead of a browser alert.
+  const missing = [];
+  if (!company_id || company_id === '__add_new_company__') missing.push('Company');
+  if (!title)    missing.push('Initiative / project title');
+  if (!assigned) missing.push('Assigned to');
+  if (!followup) missing.push('Follow-up date');
+  if (missing.length) {
+    _showFormError(
+      'Required fields missing',
+      'Please fill in: ' + missing.join(', ') + '.'
+    );
     return;
   }
 
@@ -904,13 +951,13 @@ async function saveProspect() {
     title,
     company_id,
     stage:               _drawerStage,
-    priority:            document.getElementById('f-priority').value,
+    priority:            document.getElementById('f-priority').value || null,
     industry_tag:        getActivePill('industry-pills'),
     source:              getActivePill('source-pills'),
     description:         document.getElementById('f-description').value.trim() || null,
     budget_range_low:    +document.getElementById('f-budget-low').value || null,
     budget_range_high:   +document.getElementById('f-budget-high').value || null,
-    timeline_urgency:    document.getElementById('f-urgency').value,
+    timeline_urgency:    document.getElementById('f-urgency').value || null,
     assigned_to:         assigned,
     next_follow_up_date: followup,
     next_follow_up_type: document.getElementById('f-followup-type').value,
@@ -928,8 +975,41 @@ async function saveProspect() {
     }
   } catch (e) {
     console.error(e);
-    alert('Failed to save prospect. Check console.');
+    _showFormError('Could not save prospect', e.message || String(e));
   }
+}
+
+// CMD100.74: styled validation/error modal for the Add Prospect drawer
+// (and for inline-add-company errors). Replaces native browser alert().
+// Z-index sits above the drawer overlay (100) so it's visible while the
+// drawer is open.
+function _showFormError(title, message) {
+  // Remove any prior instance.
+  const existing = document.getElementById('phud-form-error-modal');
+  if (existing) existing.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'phud-form-error-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif';
+  wrap.innerHTML = `
+    <div style="min-width:340px;max-width:480px;background:#0b1626;border:1px solid #00c9c9;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.6);padding:18px 22px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:#f0c47a;color:#1a1a1a;font-weight:700;text-align:center;line-height:22px;font-size:14px">!</span>
+        <div style="font-size:15px;font-weight:600;color:#e8eaf0">${escHtml(title)}</div>
+      </div>
+      <div style="font-size:13px;color:#b8c4d4;line-height:1.45;margin-bottom:18px">${escHtml(message)}</div>
+      <div style="display:flex;justify-content:flex-end">
+        <button id="phud-form-error-ok" style="padding:7px 18px;background:transparent;color:#00c9c9;border:1px solid #00c9c9;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:0.04em">OK</button>
+      </div>
+    </div>`;
+  const close = () => wrap.remove();
+  wrap.addEventListener('click', (ev) => { if (ev.target === wrap) close(); });
+  document.addEventListener('keydown', function onKey(ev) {
+    if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+  });
+  document.body.appendChild(wrap);
+  const okBtn = document.getElementById('phud-form-error-ok');
+  okBtn.addEventListener('click', close);
+  okBtn.focus();
 }
 
 function clearForm() {
@@ -938,8 +1018,8 @@ function clearForm() {
   });
   document.getElementById('f-company').value  = '';
   document.getElementById('f-assigned').value = '';
-  document.getElementById('f-priority').value = 'medium';
-  document.getElementById('f-urgency').value  = 'exploring';
+  document.getElementById('f-priority').value = '';   // CMD100.74: default is "— Select —"
+  document.getElementById('f-urgency').value  = '';   // CMD100.74: default is "— Select —"
   document.querySelectorAll('.pill.active').forEach(p => p.classList.remove('active'));
 }
 
