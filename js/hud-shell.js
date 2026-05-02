@@ -1633,6 +1633,12 @@ const HUDShell = (() => {
         }
       });
     }
+    // CMD101.5z: expose emit so page code can synthesize recorder events
+    // (e.g. file-attach, where the source action is OS-mediated and not
+    // a click-classifiable DOM event). Page code calls
+    // `window.HUDShell.recorderEmit('Form Attach "filename.csv"')`.
+    window.HUDShell = window.HUDShell || {};
+    window.HUDShell.recorderEmit = emit;
 
     document.addEventListener('click', function(ev) {
       try {

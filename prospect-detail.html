@@ -3086,12 +3086,9 @@ function handleFindingFileAttach(input) {
     // the line is preserved in transcripts for documentation; replay-side
     // emits a no-op log line acknowledging the attach was authored.
     try {
-      if (typeof window._cmdCenterChannelSend === 'function') {
+      if (window.HUDShell && typeof window.HUDShell.recorderEmit === 'function') {
         var esc = String(f.name).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-        window._cmdCenterChannelSend({
-          event: 'recorder_event',
-          payload: { command: 'Form Attach "' + esc + '"' }
-        });
+        window.HUDShell.recorderEmit('Form Attach "' + esc + '"');
       }
     } catch(e) { /* recorder must never break the page */ }
   });
