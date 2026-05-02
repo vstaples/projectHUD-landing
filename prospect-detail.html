@@ -724,6 +724,7 @@ body {
       </div>
       <div class="ph-actions">
         <button class="btn btn-back" onclick="closeProspect()" title="Back to Pipeline" style="margin-right:6px">← Back</button>
+        <button class="btn btn-edit" onclick="editProspect()" title="Edit prospect">✎ Edit</button>
         <button class="btn" onclick="openMeetingDrawer()">+ Schedule meeting</button>
         <button class="btn" onclick="openActionItemDrawer()">+ Action item</button>
         <button class="btn btn-primary" onclick="openLogDrawer()">Log activity</button>
@@ -2184,6 +2185,19 @@ function switchTab(name) {
 // dispatches here.
 function closeProspect() {
   window.location.href = '/pipeline.html';
+}
+
+// CMD100.78: Edit-prospect navigator. Returns to pipeline with an
+// `?edit=<id>` query param that pipeline.html reads on bootstrap to
+// auto-open the drawer in edit mode pre-populated.
+function editProspect() {
+  // The current prospect's id lives in the URL of the detail page.
+  var pid = (new URLSearchParams(location.search)).get('id');
+  if (!pid) {
+    window.location.href = '/pipeline.html';
+    return;
+  }
+  window.location.href = '/pipeline.html?edit=' + encodeURIComponent(pid);
 }
 
 function openLogDrawer() {

@@ -1677,6 +1677,34 @@ var COMMANDS = {
     return 'closed prospect (returned to pipeline)';
   },
 
+  // ── Edit Prospect (CMD100.78) ──────────────────────────────────────────────
+  // Pipeline-specific: navigate to /pipeline.html?edit=<id> which auto-opens
+  // the drawer in edit mode. The id is resolved from the supplied prospect
+  // name by querying the local prospects cache; if not found, falls back to
+  // re-resolving via /v_pipeline_summary on the destination page.
+  'Edit Prospect': async function(args) {
+    var target = (args[0] || '').toString().trim().toLowerCase();
+    console.log('[cmd:Edit Prospect]', { args: args, target: target, currentLoc: window.location.pathname });
+    if (!target) return 'Edit Prospect: missing prospect name';
+    // If on a page that exposes allProspects (Pipeline list), match by name.
+    var ap = window.allProspects || [];
+    var match = ap.find(function(p){
+      return ((p.title || '') + '').replace(/\s+/g,' ').trim().toLowerCase() === target;
+    });
+    if (match && match.id) {
+      window.location.href = '/pipeline.html?edit=' + encodeURIComponent(match.id);
+      return 'navigating to edit "' + args[0] + '"';
+    }
+    // If on prospect-detail itself, just call the local editProspect helper.
+    if (typeof window.editProspect === 'function') {
+      window.editProspect();
+      return 'editing current prospect';
+    }
+    // Fallback: navigate to pipeline; user picks card again.
+    window.location.href = '/pipeline.html';
+    return 'Edit Prospect: name not in cache; routed to pipeline';
+  },
+
   // ── Set NarrateTarget (CMD87b / Brief Aegis Remote Narration) ────────────────
   // Redirects subsequent `Narrate` calls to render on a target Compass session.
   //   Set NarrateTarget               — read current value
@@ -3423,7 +3451,7 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
       // (Register / Set Page / Set View / Open Prospect) tear down the
       // target's WebSocket; the ack may not arrive before the page
       // reloads.
-      var _NAV_VERBS = ['Register','Set Page','Set View','Open Prospect','Close Prospect'];
+      var _NAV_VERBS = ['Register','Set Page','Set View','Open Prospect','Close Prospect','Edit Prospect'];
       var _isNavCmd = _NAV_VERBS.indexOf(parsed.verb) !== -1;
       var _preNavLastSeen = _sessions[targetUserId]
         ? (_sessions[targetUserId].lastSeen || 0)

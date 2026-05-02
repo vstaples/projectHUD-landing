@@ -259,6 +259,8 @@ body {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 4px;
+  min-height: 22px;       /* CMD100.78: reserve row height for cards w/o tag or value */
+  margin-bottom: 4px;
 }
 
 .tag {
@@ -685,6 +687,8 @@ const INDUSTRY_TAGS = {
 let allProspects = [];
 let companies    = [];
 let resources    = [];
+// CMD100.78: expose for cross-script lookup (Edit Prospect command).
+window.allProspects = [];
 
 // ── init ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -692,6 +696,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadData();
   renderBoard(allProspects);
   bindSearch();
+  // CMD100.78: ?edit=<id> auto-opens the drawer pre-populated in edit mode.
+  var editId = (new URLSearchParams(location.search)).get('edit');
+  if (editId) openDrawerForEdit(editId);
 });
 
 async function loadData() {
@@ -702,6 +709,7 @@ async function loadData() {
       API.get('resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,avatar_url'),
     ]);
     allProspects = pros || [];
+    window.allProspects = allProspects;   // CMD100.78: keep mirror in sync
     companies    = comps || [];
     resources    = ress || [];
     populateFormSelects();
@@ -827,10 +835,15 @@ function openProspect(id) {
 // ── drawer ─────────────────────────────────────────────
 let _drawerStage = 'prospect';
 let _saveAndNavigate = false;
+let _editingProspectId = null;   // CMD100.78: when set, drawer is in edit mode
 
 function openDrawer(stage) {
   _drawerStage = stage || 'prospect';
   _saveAndNavigate = false;
+  _editingProspectId = null;
+  // Reset drawer chrome to "Add" mode.
+  document.querySelector('.drawer-title').textContent = 'Add Prospect';
+  document.querySelector('.drawer-foot .btn-primary').textContent = 'Save prospect';
   document.getElementById('drawer-overlay').classList.add('open');
   // set default follow-up date to tomorrow
   const tomorrow = new Date();
@@ -842,9 +855,61 @@ function openDrawerForStage(stage) {
   openDrawer(stage);
 }
 
+// CMD100.78: open drawer in edit mode pre-populated with the named prospect.
+async function openDrawerForEdit(id) {
+  let row;
+  try {
+    const rows = await API.get('prospects?id=eq.' + encodeURIComponent(id) + '&select=*');
+    row = rows && rows[0];
+  } catch (e) {
+    _showFormError('Could not load prospect', e.message || String(e));
+    return;
+  }
+  if (!row) {
+    _showFormError('Prospect not found', 'No prospect with id ' + id);
+    return;
+  }
+
+  // Open drawer first (resets state), then override into edit mode.
+  openDrawer(row.stage);
+  _editingProspectId = id;
+  _drawerStage = row.stage || 'prospect';
+  document.querySelector('.drawer-title').textContent = 'Edit Prospect';
+  document.querySelector('.drawer-foot .btn-primary').textContent = 'Save changes';
+
+  // Populate fields.
+  document.getElementById('f-company').value       = row.company_id || '';
+  document.getElementById('f-title').value         = row.title || '';
+  document.getElementById('f-description').value   = row.description || '';
+  document.getElementById('f-budget-low').value    = row.budget_range_low || '';
+  document.getElementById('f-budget-high').value   = row.budget_range_high || '';
+  document.getElementById('f-urgency').value       = row.timeline_urgency || '';
+  document.getElementById('f-priority').value      = row.priority || '';
+  document.getElementById('f-assigned').value      = row.assigned_to || '';
+  document.getElementById('f-followup').value      = row.next_follow_up_date || '';
+  document.getElementById('f-followup-type').value = row.next_follow_up_type || 'phone_call';
+
+  // Pills: industry + source.
+  if (row.industry_tag) {
+    const pill = Array.from(document.querySelectorAll('#industry-pills .pill'))
+      .find(p => p.dataset.val === row.industry_tag);
+    if (pill) { pill.classList.add('active'); }
+  }
+  if (row.source) {
+    const pill = Array.from(document.querySelectorAll('#source-pills .pill'))
+      .find(p => p.dataset.val === row.source);
+    if (pill) { pill.classList.add('active'); }
+  }
+}
+
 function closeDrawer() {
   document.getElementById('drawer-overlay').classList.remove('open');
   clearForm();
+  _editingProspectId = null;
+  // Strip ?edit=<id> from URL so a refresh doesn't re-open the drawer.
+  if ((new URLSearchParams(location.search)).has('edit')) {
+    history.replaceState({}, '', location.pathname);
+  }
 }
 
 function handleOverlayClick(e) {
@@ -982,11 +1047,26 @@ async function saveProspect() {
   };
 
   try {
-    const result = await API.post('prospects', payload);
-    const newId  = result?.[0]?.id;
+    let resultId;
+    if (_editingProspectId) {
+      // CMD100.78: edit mode — PATCH the existing row.
+      let result;
+      if (typeof API.patch === 'function') {
+        result = await API.patch('prospects?id=eq.' + encodeURIComponent(_editingProspectId), payload);
+      } else if (typeof API.update === 'function') {
+        result = await API.update('prospects', _editingProspectId, payload);
+      } else {
+        throw new Error('No PATCH method available on API; cannot save edits.');
+      }
+      resultId = (Array.isArray(result) ? result[0]?.id : result?.id) || _editingProspectId;
+    } else {
+      const result = await API.post('prospects', payload);
+      resultId = result?.[0]?.id;
+    }
+
     closeDrawer();
-    if (_saveAndNavigate && newId) {
-      window.location.href = `/prospect-detail.html?id=${newId}`;
+    if (_saveAndNavigate && resultId) {
+      window.location.href = `/prospect-detail.html?id=${resultId}`;
     } else {
       await loadData();
       renderBoard(allProspects);

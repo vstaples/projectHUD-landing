@@ -1504,6 +1504,14 @@ const HUDShell = (() => {
       if (el.classList && el.classList.contains('btn-back')) {
         return `Close Prospect`;
       }
+      // CMD100.78: Edit-prospect button on prospect detail page. Reads
+      // the prospect name from the page header so the recorded line is
+      // self-describing on replay.
+      if (el.classList && el.classList.contains('btn-edit')) {
+        const hdr = document.getElementById('hdr-title') || document.getElementById('ph-title');
+        const pname = hdr ? _cleanLabel(hdr.textContent || '') : '';
+        return pname ? `Edit Prospect "${pname}"` : `Edit Prospect`;
+      }
       // CMD100.73: pill chip inside a .pill-group → Form Select with the
       // section label (taken from preceding .sec-label) and the pill's
       // visible text. Walks the pill-group's previous siblings for the
