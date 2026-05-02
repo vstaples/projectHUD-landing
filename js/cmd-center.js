@@ -2129,6 +2129,30 @@ var COMMANDS = {
   //   4. Set selectedIndex to sentinel and dispatch change — the page does
   //      the API insert and adds the new option.
   //   5. Wait for the new option to appear, then select it.
+  // CMD101.5t: Form Slide "<label>" "<value>" — for <input type="range">.
+  // Sets the value AND fires real input+change events so any oninput
+  // handlers (e.g. value display labels) update.
+  'Form Slide': async function(args) {
+    var field = args[0];
+    var value = args[1] !== undefined ? args[1] : '';
+    var iframe = document.querySelector('#myr-html-form-overlay iframe, #myr-html-form-modal iframe');
+    if (iframe) {
+      iframe.contentWindow.postMessage({
+        source: 'cmd-center', cmd: 'Form Slide', field: field, value: value
+      }, '*');
+      return 'slid ' + field + ' = ' + value;
+    }
+    var el = _findFormFieldByLabel(field, ['INPUT']);
+    if (!el) return 'Form Slide: field not found "' + field + '"';
+    if (el.type !== 'range') return 'Form Slide: field "' + field + '" is type=' + el.type + ' (expected range)';
+    el.focus();
+    el.value = value;
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.blur();
+    return 'slid "' + field + '" = "' + value + '"';
+  },
+
   'Form Add': async function(args) {
     var field = args[0];
     var value = args[1] !== undefined ? args[1] : '';

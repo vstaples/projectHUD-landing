@@ -1015,16 +1015,34 @@ body.prospect-inactive .prospect-header {
     </div>
     <div class="drawer-body">
       <input type="hidden" id="sh-edit-id" />
+      <input type="hidden" id="sh-edit-contact-id" />
       <div class="field">
-        <label>NAME</label>
-        <input type="text" id="sh-edit-name" disabled
-          style="opacity:.6;cursor:not-allowed" />
+        <label>Name</label>
+        <input type="text" id="sh-edit-name" placeholder="First Last" />
         <div style="font-size:10px;color:var(--muted);margin-top:3px">
-          Name is managed on the contact record
+          Edits to name, email, and phone update this person's contact record everywhere.
         </div>
       </div>
       <div class="field">
-        <label>ROLE</label>
+        <label>Title</label>
+        <input type="text" id="sh-edit-title" placeholder="e.g. VP Engineering" />
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="sh-edit-email" placeholder="name@example.com" />
+        </div>
+        <div class="field">
+          <label>Office Phone</label>
+          <input type="tel" id="sh-edit-phone" placeholder="555-555-5555" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Cell Phone</label>
+        <input type="tel" id="sh-edit-cell" placeholder="555-555-5555" />
+      </div>
+      <div class="field">
+        <label>Role</label>
         <select id="sh-edit-role">
           <option value="decision_maker">Decision maker</option>
           <option value="technical_authority">Technical authority</option>
@@ -1035,7 +1053,7 @@ body.prospect-inactive .prospect-header {
         </select>
       </div>
       <div class="field">
-        <label>INFLUENCE <span id="sh-influence-val" style="color:var(--accent);font-weight:700">5</span> / 10</label>
+        <label>Influence <span id="sh-influence-val" style="color:var(--accent);font-weight:700">5</span> / 10</label>
         <input type="range" id="sh-edit-influence" min="1" max="10" value="5"
           style="width:100%;accent-color:var(--accent)"
           oninput="document.getElementById('sh-influence-val').textContent=this.value" />
@@ -1044,7 +1062,7 @@ body.prospect-inactive .prospect-header {
         </div>
       </div>
       <div class="field">
-        <label>NOTES</label>
+        <label>Notes</label>
         <textarea id="sh-edit-notes" rows="4"
           placeholder="Key intelligence about this stakeholder…"></textarea>
       </div>
@@ -2723,18 +2741,45 @@ let _attachedFiles = [];       // files staged in current edit session
 const _aiAttachments = {};    // { [aiId]: [{name, size, url, type}] } — persists across drawer opens
 
 function openEditStakeholderFromBtn(btn) {
-  openEditStakeholder(
-    btn.dataset.shId,
-    btn.dataset.shName,
-    btn.dataset.shRole,
-    btn.dataset.shInfluence,
-    btn.dataset.shNotes
-  );
+  // CMD101.5t: pull the full link record (with .contacts) so we have access
+  // to title/email/phone/cell on the contact, not just dataset stubs.
+  var linkId = btn.dataset.shId;
+  var match = (stakeholders || []).find(function(s){ return s.id === linkId; });
+  if (!match) {
+    console.warn('[stakeholder] link not found in cache:', linkId);
+    return;
+  }
+  openEditStakeholderFromRecord(match);
 }
 
+function openEditStakeholderFromRecord(link) {
+  var c = link.contacts || {};
+  document.getElementById('sh-edit-id').value          = link.id;
+  document.getElementById('sh-edit-contact-id').value  = c.id || '';
+  document.getElementById('sh-edit-name').value        = ((c.first_name||'') + ' ' + (c.last_name||'')).trim();
+  document.getElementById('sh-edit-title').value       = c.title      || '';
+  document.getElementById('sh-edit-email').value       = c.email      || '';
+  document.getElementById('sh-edit-phone').value       = c.phone      || '';
+  document.getElementById('sh-edit-cell').value        = c.cell_phone || '';
+  document.getElementById('sh-edit-role').value        = link.stakeholder_role || 'technical';
+  document.getElementById('sh-edit-influence').value   = link.influence_score  || 5;
+  document.getElementById('sh-influence-val').textContent = link.influence_score || 5;
+  document.getElementById('sh-edit-notes').value       = link.notes || '';
+  document.getElementById('sh-edit-overlay').classList.add('open');
+}
+
+// Back-compat shim — older callers passing positional args still work.
 function openEditStakeholder(linkId, name, role, influence, notes) {
+  var match = (stakeholders || []).find(function(s){ return s.id === linkId; });
+  if (match) { openEditStakeholderFromRecord(match); return; }
+  // Fallback: use the args we got (incomplete — title/email/phone won't populate).
   document.getElementById('sh-edit-id').value          = linkId;
-  document.getElementById('sh-edit-name').value        = name;
+  document.getElementById('sh-edit-contact-id').value  = '';
+  document.getElementById('sh-edit-name').value        = name || '';
+  document.getElementById('sh-edit-title').value       = '';
+  document.getElementById('sh-edit-email').value       = '';
+  document.getElementById('sh-edit-phone').value       = '';
+  document.getElementById('sh-edit-cell').value        = '';
   document.getElementById('sh-edit-role').value        = role || 'technical';
   document.getElementById('sh-edit-influence').value   = influence || 5;
   document.getElementById('sh-influence-val').textContent = influence || 5;
@@ -2744,21 +2789,53 @@ function openEditStakeholder(linkId, name, role, influence, notes) {
 
 async function saveStakeholder() {
   const id        = document.getElementById('sh-edit-id').value;
+  const contactId = document.getElementById('sh-edit-contact-id').value;
   const role      = document.getElementById('sh-edit-role').value;
   const influence = parseInt(document.getElementById('sh-edit-influence').value);
   const notes     = document.getElementById('sh-edit-notes').value.trim();
+
+  // CMD101.5t: split full name → first/last on the first whitespace.
+  // "Mary Anne Voss" → first="Mary", last="Anne Voss". Edge cases (single
+  // word, all whitespace) fall back gracefully — first stays the input,
+  // last becomes empty.
+  const fullName = document.getElementById('sh-edit-name').value.trim();
+  const sp = fullName.indexOf(' ');
+  const first = sp >= 0 ? fullName.slice(0, sp).trim() : fullName;
+  const last  = sp >= 0 ? fullName.slice(sp + 1).trim() : '';
+
+  const title = document.getElementById('sh-edit-title').value.trim();
+  const email = document.getElementById('sh-edit-email').value.trim();
+  const phone = document.getElementById('sh-edit-phone').value.trim();
+  const cell  = document.getElementById('sh-edit-cell').value.trim();
+
   try {
-    await API.patch(`prospect_contact_links?id=eq.${id}`, {
-      stakeholder_role: role,
-      influence_score:  influence,
-      notes:            notes || null,
-    });
+    // Two parallel PATCHes — contacts (the person) and the link (their role
+    // on this opportunity). Cascade is intentional per operator decision:
+    // editing the contact updates them everywhere they appear.
+    var ops = [
+      API.patch(`prospect_contact_links?id=eq.${id}`, {
+        stakeholder_role: role,
+        influence_score:  influence,
+        notes:            notes || null,
+      })
+    ];
+    if (contactId) {
+      ops.push(API.patch(`contacts?id=eq.${contactId}`, {
+        first_name: first || null,
+        last_name:  last  || null,
+        title:      title || null,
+        email:      email || null,
+        phone:      phone || null,
+        cell_phone: cell  || null,
+      }));
+    }
+    await Promise.all(ops);
     closeDrawer('sh-edit-overlay');
     await loadAll();
     switchTab('stakeholders');
   } catch(e) {
     console.error(e);
-    alert('Failed to save stakeholder.');
+    alert('Failed to save stakeholder: ' + (e.message || String(e)));
   }
 }
 

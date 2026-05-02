@@ -1702,6 +1702,20 @@ const HUDShell = (() => {
         if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return;
         if (tag === 'INPUT') {
           const t = (el.type || 'text').toLowerCase();
+          // CMD101.5t: range inputs use the Form Slide verb and bypass the
+          // TEXT_INPUT_TYPES allow-list. They're caught from `change` events
+          // (release of drag), not blur or input-tick.
+          if (t === 'range') {
+            const label = _resolveFieldLabel(el);
+            if (!label) return;
+            const value = (el.value || '').toString();
+            if (!value) return;
+            const cached = _lastFieldValue.get(el);
+            if (cached === value) return;
+            _lastFieldValue.set(el, value);
+            emit(`Form Slide "${label}" "${value.replace(/"/g, '\\"')}"`);
+            return;
+          }
           if (!TEXT_INPUT_TYPES.has(t)) return; // skip checkbox/radio/file/button/submit
         }
         const label = _resolveFieldLabel(el);
@@ -1766,9 +1780,16 @@ const HUDShell = (() => {
       _handleFieldCommit(ev.target);
     }, true);
     // Selects emit on change (immediate), since their commit is the click.
+    // CMD101.5t: range inputs also commit on change (release of drag), not
+    // on blur — captured here for the Form Slide path in _handleFieldCommit.
     document.addEventListener('change', function(ev) {
       const el = ev.target;
-      if (el && el.tagName === 'SELECT') _handleFieldCommit(el);
+      if (!el) return;
+      if (el.tagName === 'SELECT') { _handleFieldCommit(el); return; }
+      if (el.tagName === 'INPUT' && (el.type || '').toLowerCase() === 'range') {
+        _handleFieldCommit(el);
+        return;
+      }
     }, true);
   }
 
