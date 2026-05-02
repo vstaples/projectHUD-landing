@@ -1628,6 +1628,11 @@ const HUDShell = (() => {
       try {
         const el = findActionable(ev.target);
         if (!el) return;
+        // CMD101.5t: honor data-aegis-cmd override BEFORE label extraction.
+        // Icon-only buttons (e.g. ✎) yield empty labels but their override
+        // attribute carries the full verb — no label resolution needed.
+        const override = el.getAttribute && el.getAttribute('data-aegis-cmd');
+        if (override) { emit(override); return; }
         const label = extractLabel(el);
         if (!label) return;
         const cmd = classify(el, label);
