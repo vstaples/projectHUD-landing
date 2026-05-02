@@ -639,6 +639,30 @@ body.prospect-inactive .prospect-header {
   color: var(--accent);
 }
 
+/* CMD101.5e — Edit Prospect drawer (port of pipeline.html drawer) */
+#edit-overlay .pill-group { display: flex; flex-wrap: wrap; gap: 6px; }
+#edit-overlay .pill {
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s;
+}
+#edit-overlay .pill.active {
+  border-color: var(--accent);
+  background: rgba(79,142,247,.15);
+  color: var(--accent);
+}
+#edit-overlay .btn-ghost {
+  background: transparent;
+  border-color: var(--border2);
+  color: var(--muted);
+}
+#edit-overlay .btn-ghost:hover { background: var(--surf2); color: var(--text); }
+
 .chip-add-row { display: flex; gap: 6px; margin-top: 6px; }
 .chip-add-row input {
   flex: 1; padding: 5px 8px;
@@ -1203,11 +1227,125 @@ body.prospect-inactive .prospect-header {
   </div>
 </div>
 
+<!-- ───── CMD101.5e: Edit Prospect drawer (in-place on detail page) ───── -->
+<div class="overlay" id="edit-overlay" onclick="handleOverlay(event,'edit-overlay')">
+  <div class="drawer prospect-edit-drawer" onclick="event.stopPropagation()">
+    <div class="drawer-head">
+      <div class="drawer-title">Edit Prospect</div>
+      <button class="drawer-close" onclick="closeDrawer('edit-overlay')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field">
+        <label>Company <span style="color:#f07a7a">*</span></label>
+        <select id="ep-company"><option value="">— Select —</option></select>
+      </div>
+      <div class="field">
+        <label>Initiative / project title <span style="color:#f07a7a">*</span></label>
+        <input id="ep-title" type="text" />
+      </div>
+
+      <div class="sec-label">Industry</div>
+      <div class="pill-group" id="ep-industry-pills">
+        <button class="pill" data-val="Medical device">Medical device</button>
+        <button class="pill" data-val="Industrial">Industrial</button>
+        <button class="pill" data-val="Software">Software</button>
+        <button class="pill" data-val="Aerospace">Aerospace</button>
+        <button class="pill" data-val="Consumer">Consumer</button>
+        <button class="pill" data-val="Energy">Energy</button>
+        <button class="pill" data-val="Defense">Defense</button>
+        <button class="pill" data-val="Other">Other</button>
+      </div>
+
+      <div class="sec-label">How did they find us?</div>
+      <div class="pill-group" id="ep-source-pills">
+        <button class="pill" data-val="Referral">Referral</button>
+        <button class="pill" data-val="LinkedIn">LinkedIn</button>
+        <button class="pill" data-val="Conference">Conference</button>
+        <button class="pill" data-val="Website">Website</button>
+        <button class="pill" data-val="Existing client">Existing client</button>
+        <button class="pill" data-val="Cold contact">Cold contact</button>
+        <button class="pill" data-val="Other">Other</button>
+      </div>
+
+      <div class="sec-label">Brief description</div>
+      <div class="field">
+        <textarea id="ep-description"></textarea>
+      </div>
+
+      <div class="sec-label">Budget &amp; timeline</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Budget low ($)</label>
+          <input id="ep-budget-low" type="number" />
+        </div>
+        <div class="field">
+          <label>Budget high ($)</label>
+          <input id="ep-budget-high" type="number" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Timeline urgency</label>
+          <select id="ep-urgency">
+            <option value="">— Select —</option>
+            <option value="exploring">Exploring</option>
+            <option value="within_6_months">Within 6 months</option>
+            <option value="within_3_months">Within 3 months</option>
+            <option value="immediate">Immediate</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Priority</label>
+          <select id="ep-priority">
+            <option value="">— Select —</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sec-label">Our team</div>
+      <div class="field">
+        <label>Assigned to <span style="color:#f07a7a">*</span></label>
+        <input type="hidden" id="ep-assigned" value="" />
+        <button type="button" id="ep-assigned-trigger" onclick="epOpenAssigneePicker(event)"
+          style="width:100%;padding:8px 10px;background:var(--surf2);border:1px solid var(--border2);border-radius:6px;color:var(--text);text-align:left;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;min-height:34px">
+          <span id="ep-assigned-display" style="color:var(--muted)">— Select —</span>
+        </button>
+      </div>
+
+      <div class="sec-label">Next follow-up</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Follow-up date <span style="color:#f07a7a">*</span></label>
+          <input id="ep-followup" type="date" />
+        </div>
+        <div class="field">
+          <label>Type</label>
+          <select id="ep-followup-type">
+            <option value="Phone call">Phone call</option>
+            <option value="Video call">Video call</option>
+            <option value="In-person meeting">In-person meeting</option>
+            <option value="Send info">Send info</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-ghost btn-toggle-active" id="ep-toggle-active" onclick="epToggleActive()">Mark Inactive</button>
+      <button class="btn btn-primary" onclick="epSave()">Save changes</button>
+      <button class="btn" style="margin-left:auto" onclick="closeDrawer('edit-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script src="/js/config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/version.js?v=seed"></script>
 <script src="/js/hud-shell.js"></script>
+<script src="/js/person-picker.js"></script>
 <script src="/js/meetings.js"></script>
 <script>
 const params   = new URLSearchParams(location.search);
@@ -2245,17 +2383,193 @@ function closeProspect() {
   window.location.href = '/pipeline.html';
 }
 
-// CMD100.78: Edit-prospect navigator. Returns to pipeline with an
-// `?edit=<id>` query param that pipeline.html reads on bootstrap to
-// auto-open the drawer in edit mode pre-populated.
-function editProspect() {
-  // The current prospect's id lives in the URL of the detail page.
-  var pid = (new URLSearchParams(location.search)).get('id');
-  if (!pid) {
-    window.location.href = '/pipeline.html';
+// CMD101.5e: Edit-prospect drawer — in-place on the detail page.
+// Replaces the prior navigate-to-pipeline?edit=ID flow so the user
+// stays on prospect-detail across Save / Cancel / Toggle Active.
+let _epCompanies = [];
+let _epResources = [];
+let _epLoaded    = false;
+
+async function editProspect() {
+  if (!prospect) return;
+  try {
+    if (!_epLoaded) {
+      var pair = await Promise.all([
+        API.get('companies?order=name&select=id,name,industry,firm_id'),
+        API.get('resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,avatar_url,department,title,is_external,user_id')
+      ]);
+      _epCompanies = pair[0] || [];
+      _epResources = pair[1] || [];
+      // Populate company select once.
+      var sel = document.getElementById('ep-company');
+      sel.innerHTML = '<option value="">— Select —</option>';
+      _epCompanies.forEach(function(c){
+        var o = document.createElement('option');
+        o.value = c.id; o.textContent = c.name;
+        sel.appendChild(o);
+      });
+      _epLoaded = true;
+    }
+  } catch (e) {
+    console.error('[CMD101.5e] edit drawer load failed:', e);
+    alert('Could not load edit form. Check console.');
     return;
   }
-  window.location.href = '/pipeline.html?edit=' + encodeURIComponent(pid);
+
+  // Populate fields from current prospect state.
+  document.getElementById('ep-company').value     = prospect.company_id || '';
+  document.getElementById('ep-title').value       = prospect.title || '';
+  document.getElementById('ep-description').value = prospect.description || '';
+  document.getElementById('ep-budget-low').value  = prospect.budget_range_low  || '';
+  document.getElementById('ep-budget-high').value = prospect.budget_range_high || '';
+  document.getElementById('ep-urgency').value     = prospect.timeline_urgency || '';
+  document.getElementById('ep-priority').value    = prospect.priority || '';
+  document.getElementById('ep-followup').value    = prospect.next_follow_up_date || '';
+  document.getElementById('ep-followup-type').value = prospect.next_follow_up_type || 'Phone call';
+
+  // Assignee.
+  if (prospect.assigned_to) {
+    var rsrc = _epResources.find(function(r){ return r.id === prospect.assigned_to; });
+    var rname = rsrc ? ((rsrc.first_name||'') + ' ' + (rsrc.last_name||'')).trim() : '(unknown)';
+    epSetAssignee(prospect.assigned_to, rname);
+  } else {
+    epSetAssignee('', '');
+  }
+
+  // Reset + apply pill state.
+  document.querySelectorAll('#ep-industry-pills .pill, #ep-source-pills .pill').forEach(function(p){
+    p.classList.remove('active');
+  });
+  if (prospect.industry_tag) {
+    var ip = Array.from(document.querySelectorAll('#ep-industry-pills .pill'))
+      .find(function(p){ return p.dataset.val === prospect.industry_tag; });
+    if (ip) ip.classList.add('active');
+  }
+  if (prospect.source) {
+    var sp = Array.from(document.querySelectorAll('#ep-source-pills .pill'))
+      .find(function(p){ return p.dataset.val === prospect.source; });
+    if (sp) sp.classList.add('active');
+  }
+
+  // Toggle button label per current is_active state.
+  var tg = document.getElementById('ep-toggle-active');
+  var inactive = (prospect.is_active === false);
+  tg.textContent = inactive ? 'Mark Active' : 'Mark Inactive';
+  tg.dataset.active = inactive ? 'false' : 'true';
+
+  document.getElementById('edit-overlay').classList.add('open');
+}
+
+// One-time bind for pill toggling inside the edit drawer.
+(function epBindPills(){
+  document.addEventListener('click', function(ev){
+    var pill = ev.target.closest && ev.target.closest('#ep-industry-pills .pill, #ep-source-pills .pill');
+    if (!pill) return;
+    var group = pill.parentElement;
+    group.querySelectorAll('.pill').forEach(function(p){ p.classList.remove('active'); });
+    pill.classList.add('active');
+  });
+})();
+
+function epGetActivePill(groupId) {
+  var active = document.querySelector('#' + groupId + ' .pill.active');
+  return active ? active.dataset.val : null;
+}
+
+function epSetAssignee(id, name) {
+  document.getElementById('ep-assigned').value = id || '';
+  var disp = document.getElementById('ep-assigned-display');
+  if (!disp) return;
+  if (!id) {
+    disp.textContent = '— Select —';
+    disp.style.color = 'var(--muted)';
+  } else {
+    disp.textContent = name || '(unknown)';
+    disp.style.color = 'var(--text)';
+  }
+}
+
+function epOpenAssigneePicker(ev) {
+  if (ev) ev.stopPropagation();
+  if (!window.PersonPicker) {
+    alert('PersonPicker module not loaded.');
+    return;
+  }
+  var trigger = document.getElementById('ep-assigned-trigger');
+  var current = document.getElementById('ep-assigned').value;
+  var list = (_epResources || []).map(function(r){
+    return {
+      id: r.id, user_id: r.user_id,
+      name: ((r.first_name||'') + ' ' + (r.last_name||'')).trim(),
+      department: r.department || null,
+      is_external: r.is_external || false,
+      title: r.title || null
+    };
+  });
+  PersonPicker.show(trigger, function(pick){
+    epSetAssignee(pick.id, pick.name);
+  }, { resources: list, selected: current });
+}
+
+async function epSave() {
+  if (!prospect) return;
+  var title       = document.getElementById('ep-title').value.trim();
+  var company_id  = document.getElementById('ep-company').value;
+  var assigned    = document.getElementById('ep-assigned').value;
+  var followup    = document.getElementById('ep-followup').value;
+
+  var missing = [];
+  if (!company_id) missing.push('Company');
+  if (!title)      missing.push('Initiative / project title');
+  if (!assigned)   missing.push('Assigned to');
+  if (!followup)   missing.push('Follow-up date');
+  if (missing.length) {
+    alert('Please fill in: ' + missing.join(', ') + '.');
+    return;
+  }
+
+  var payload = {
+    title: title,
+    company_id: company_id,
+    priority:            document.getElementById('ep-priority').value || null,
+    industry_tag:        epGetActivePill('ep-industry-pills'),
+    source:              epGetActivePill('ep-source-pills'),
+    description:         document.getElementById('ep-description').value.trim() || null,
+    budget_range_low:    +document.getElementById('ep-budget-low').value  || null,
+    budget_range_high:   +document.getElementById('ep-budget-high').value || null,
+    timeline_urgency:    document.getElementById('ep-urgency').value || null,
+    assigned_to:         assigned,
+    next_follow_up_date: followup,
+    next_follow_up_type: document.getElementById('ep-followup-type').value
+  };
+
+  try {
+    await API.patch('prospects?id=eq.' + encodeURIComponent(PROSPECT_ID), payload);
+    closeDrawer('edit-overlay');
+    await loadAll();   // refreshes prospect + re-renders header/overview/activity in place
+  } catch (e) {
+    console.error('[CMD101.5e] save failed:', e);
+    alert('Could not save: ' + (e.message || String(e)));
+  }
+}
+
+async function epToggleActive() {
+  if (!prospect) return;
+  var tg = document.getElementById('ep-toggle-active');
+  var current = (tg.dataset.active !== 'false');   // currently active?
+  var next = !current;
+  try {
+    if (typeof API.setProspectActive === 'function') {
+      await API.setProspectActive(PROSPECT_ID, next);
+    } else {
+      await API.patch('prospects?id=eq.' + encodeURIComponent(PROSPECT_ID), { is_active: next });
+    }
+    closeDrawer('edit-overlay');
+    await loadAll();   // header re-evaluates is_active and toggles badge/banner
+  } catch (e) {
+    console.error('[CMD101.5e] toggle active failed:', e);
+    alert('Could not toggle active: ' + (e.message || String(e)));
+  }
 }
 
 function openLogDrawer() {

@@ -1886,6 +1886,8 @@ var COMMANDS = {
     try {
       if (typeof window.loadData === 'function')   await window.loadData();
       if (typeof window.renderAll === 'function')  window.renderAll();
+      // CMD101.5e: prospect-detail page exposes loadAll() instead.
+      if (typeof window.loadAll === 'function')    await window.loadAll();
     } catch(e) { console.warn('[cmd:Toggle Active] refresh failed:', e); }
     try {
       if (_mySession && !window._aegisMode) {
