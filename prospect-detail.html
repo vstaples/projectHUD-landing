@@ -1243,6 +1243,21 @@ body.prospect-inactive .prospect-header {
         <label>Initiative / project title <span style="color:#f07a7a">*</span></label>
         <input id="ep-title" type="text" />
       </div>
+      <!-- CMD101.5o: Stage select (always shown — detail page only ever opens
+           drawer in Edit mode). 7th option 'closed' archives the deal off the
+           Board view while keeping it in the List + dashboard math. -->
+      <div class="field">
+        <label>Stage</label>
+        <select id="ep-stage">
+          <option value="prospect">Prospect</option>
+          <option value="qualifying">Qualifying</option>
+          <option value="discovery">Discovery</option>
+          <option value="proposal">Proposal</option>
+          <option value="review">Review</option>
+          <option value="approved">Approved</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
 
       <div class="sec-label">Industry</div>
       <div class="pill-group" id="ep-industry-pills">
@@ -2419,6 +2434,7 @@ async function editProspect() {
   // Populate fields from current prospect state.
   document.getElementById('ep-company').value     = prospect.company_id || '';
   document.getElementById('ep-title').value       = prospect.title || '';
+  document.getElementById('ep-stage').value       = prospect.stage || 'prospect';
   document.getElementById('ep-description').value = prospect.description || '';
   document.getElementById('ep-budget-low').value  = prospect.budget_range_low  || '';
   document.getElementById('ep-budget-high').value = prospect.budget_range_high || '';
@@ -2531,6 +2547,7 @@ async function epSave() {
   var payload = {
     title: title,
     company_id: company_id,
+    stage:               document.getElementById('ep-stage').value || prospect.stage,
     priority:            document.getElementById('ep-priority').value || null,
     industry_tag:        epGetActivePill('ep-industry-pills'),
     source:              epGetActivePill('ep-source-pills'),

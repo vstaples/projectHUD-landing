@@ -559,12 +559,18 @@ body {
 /* CMD101.5n: forecast row has 4 columns — title | badge | math | contribution */
 .pl-tip__row--fcst {
   grid-template-columns: 1fr max-content max-content auto;
+  gap: 16px;
+}
+.pl-tip__row--fcst > .pl-tip__badge {
+  justify-self: end;
 }
 .pl-tip__row--fcst > .pl-tip__math {
   color: var(--muted);
   font-size: 11px;
   white-space: nowrap;
   font-feature-settings: "tnum";
+  justify-self: end;
+  text-align: right;
 }
 /* When a row has no badge column (most non-list rows), span the badge slot */
 .pl-tip__row--nobadge { grid-template-columns: 1fr auto; }
@@ -1227,9 +1233,9 @@ body {
         </div>
         <div class="pl-kpi" id="kpi-week" data-tip-id="kpi-week">
           <div class="pl-kpi__bar pl-kpi__bar--good"></div>
-          <div class="pl-kpi__label">This Week</div>
+          <div class="pl-kpi__label">MTD</div>
           <div class="pl-kpi__value pl-kpi__value--good" id="kpi-week-val">—</div>
-          <div class="pl-kpi__sub" id="kpi-week-sub">0 advanced · 0 won</div>
+          <div class="pl-kpi__sub" id="kpi-week-sub">0 won this month</div>
         </div>
       </div>
 
@@ -1368,6 +1374,21 @@ body {
         <input id="f-title" type="text" placeholder="e.g. Endoscopic Platform Development" />
       </div>
 
+      <!-- CMD101.5o: Stage select — only renders in Edit mode. Add mode
+           inherits stage from the kanban column the operator clicked. -->
+      <div class="field" id="f-stage-wrap" style="display:none">
+        <label>Stage</label>
+        <select id="f-stage">
+          <option value="prospect">Prospect</option>
+          <option value="qualifying">Qualifying</option>
+          <option value="discovery">Discovery</option>
+          <option value="proposal">Proposal</option>
+          <option value="review">Review</option>
+          <option value="approved">Approved</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+
       <div class="sec-label">Industry</div>
       <div class="pill-group" id="industry-pills">
         <button class="pill" data-val="Medical device">Medical device</button>
@@ -1474,7 +1495,11 @@ body {
 <script src="/js/person-picker.js"></script>
 <script>
 // ── config ─────────────────────────────────────────────
-const STAGES = [
+// CMD101.5o: BOARD_STAGES are the six columns rendered on the kanban Board view.
+// ALL_STAGES adds the 7th 'closed' stage — assignable from the Edit drawer,
+// not displayed as a kanban column. Closed deals still surface in the List
+// view, in tooltips, and in MTD revenue math (they ARE counted as won).
+const BOARD_STAGES = [
   { key: 'prospect',   label: 'Prospect',   color: '#4f6080' },
   { key: 'qualifying', label: 'Qualifying', color: '#3a7abf' },
   { key: 'discovery',  label: 'Discovery',  color: '#2a9d7a' },
@@ -1482,6 +1507,12 @@ const STAGES = [
   { key: 'review',     label: 'Review',     color: '#c0407a' },
   { key: 'approved',   label: 'Approved',   color: '#2a9d40' },
 ];
+const ALL_STAGES = BOARD_STAGES.concat([
+  { key: 'closed',     label: 'Closed',     color: '#7a8099' },
+]);
+// Back-compat alias — many existing call sites use STAGES; point to ALL_STAGES
+// so label/color lookups for closed deals work in tooltips and List rows.
+const STAGES = ALL_STAGES;
 
 const INDUSTRY_TAGS = {
   'Medical device': 'tag-med',
@@ -1497,22 +1528,24 @@ const STAGE_PROB = {
   discovery:  0.40,
   proposal:   0.60,
   review:     0.80,
-  approved:   1.00
+  approved:   1.00,
+  closed:     1.00
 };
 
-// CMD101: stuck thresholds in days (per-stage). approved => never stuck.
+// CMD101: stuck thresholds in days (per-stage). approved/closed => never stuck.
 const STUCK_THRESHOLD_DAYS = {
   prospect:   14,
   qualifying: 21,
   discovery:  30,
   proposal:   30,
   review:     14,
-  approved:   Infinity
+  approved:   Infinity,
+  closed:     Infinity
 };
 
 // CMD101: stage ordering index (used by Touch Today scoring).
 const STAGE_INDEX = {
-  prospect: 0, qualifying: 1, discovery: 2, proposal: 3, review: 4, approved: 5
+  prospect: 0, qualifying: 1, discovery: 2, proposal: 3, review: 4, approved: 5, closed: 6
 };
 
 // CMD101: Avg Cycle baseline (days). Anything above is amber.
@@ -1555,7 +1588,7 @@ async function loadData() {
     // CMD101 / decision 2: trailing-12mo lookup gets explicit firm_id; main fetch keeps RLS-only.
     const cutoff = new Date(Date.now() - 365 * 86400 * 1000).toISOString();
     const firmId = (window.CURRENT_USER && window.CURRENT_USER.firm_id) || null;
-    var closedWonPath = 'prospects?select=est_value,updated_at&stage=eq.approved&updated_at=gte.' + encodeURIComponent(cutoff);
+    var closedWonPath = 'prospects?select=est_value,updated_at&stage=in.(approved,closed)&updated_at=gte.' + encodeURIComponent(cutoff);
     if (firmId) closedWonPath += '&firm_id=eq.' + encodeURIComponent(firmId);
 
     const [pros, comps, ress, won, activeIdRows] = await Promise.all([
@@ -1652,7 +1685,7 @@ function renderAll() {
 // CMD101.5b: scope to open (non-approved) deals so totals reconcile
 // with the Pipeline Value KPI above.
 function updateStats(prospects) {
-  const open   = prospects.filter(function(p){ return p.stage !== 'approved'; });
+  const open   = prospects.filter(function(p){ return p.stage !== 'approved' && p.stage !== 'closed'; });
   const total  = open.length;
   const value  = open.reduce(function(s, p){ return s + (p.est_value || 0); }, 0);
   const today  = new Date().toLocaleDateString('en-CA');
@@ -1705,21 +1738,27 @@ function renderDashboard(prospects) {
   // KPI strip
   var pipelineVal = 0, weightedFcst = 0;
   var stuckList = [];
-  var weekAdvanced = 0, weekWon = 0, weekVal = 0;
-  var todayIso = new Date().toLocaleDateString('en-CA');
-  var sevenDaysAgo = Date.now() - 7 * 86400000;
+  // CMD101.5o: Pipeline Value / Weighted Forecast exclude both 'approved'
+  // (won, in-pipeline) AND 'closed' (won, archived from kanban).
+  var DONE_STAGES = { approved: true, closed: true };
+
+  // CMD101.5o: MTD = sum of approved+closed deals whose updated_at falls
+  // within the current calendar month. Resets on the 1st.
+  var now = new Date();
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  var mtdWon = 0, mtdVal = 0;
+  var todayIso = now.toLocaleDateString('en-CA');
 
   prospects.forEach(function(p) {
-    if (p.stage !== 'approved') {
+    if (!DONE_STAGES[p.stage]) {
       pipelineVal  += (p.est_value || 0);
       weightedFcst += (p.est_value || 0) * (STAGE_PROB[p.stage] || 0);
     }
     if (_isStuck(p)) stuckList.push(p);
     var u = p.updated_at ? new Date(p.updated_at).getTime() : 0;
-    if (u && u >= sevenDaysAgo) {
-      weekAdvanced++;
-      weekVal += (p.est_value || 0);
-      if (p.stage === 'approved') weekWon++;
+    if (u && u >= monthStart && DONE_STAGES[p.stage]) {
+      mtdWon++;
+      mtdVal += (p.est_value || 0);
     }
   });
 
@@ -1734,14 +1773,14 @@ function renderDashboard(prospects) {
     var u = p.updated_at ? new Date(p.updated_at).getTime() : 0;
     if (u && u >= ninetyDaysAgo) {
       changed90++;
-      if (p.stage === 'approved') won90++;
+      if (DONE_STAGES[p.stage]) won90++;
     }
   });
   var winRate = changed90 > 0 ? (won90 / changed90) : NaN;
 
-  // Avg cycle — last 10 approved by updated_at.
+  // Avg cycle — last 10 won (approved+closed) by updated_at.
   var approvedSorted = prospects
-    .filter(function(p){ return p.stage === 'approved' && p.created_at && p.updated_at; })
+    .filter(function(p){ return DONE_STAGES[p.stage] && p.created_at && p.updated_at; })
     .sort(function(a,b){ return new Date(b.updated_at) - new Date(a.updated_at); })
     .slice(0, 10);
   var avgCycle = NaN;
@@ -1757,7 +1796,7 @@ function renderDashboard(prospects) {
   // Write KPI strip.
   document.getElementById('kpi-pipeline-val').textContent = _fmt$(pipelineVal);
   document.getElementById('kpi-pipeline-sub').textContent =
-    prospects.filter(function(p){ return p.stage !== 'approved'; }).length + ' open deals';
+    prospects.filter(function(p){ return !DONE_STAGES[p.stage]; }).length + ' open deals';
 
   document.getElementById('kpi-forecast-val').textContent = _fmt$(weightedFcst);
   document.getElementById('kpi-forecast-sub').textContent = isFinite(fcstPctOfBench)
@@ -1807,9 +1846,9 @@ function renderDashboard(prospects) {
   document.getElementById('kpi-stuck-sub').textContent = _fmt$(stuckAtRisk) + ' at risk';
 
   var weekEl  = document.getElementById('kpi-week-val');
-  weekEl.textContent = '+' + _fmt$(weekVal);
+  weekEl.textContent = mtdVal > 0 ? ('+' + _fmt$(mtdVal)) : '$0';
   document.getElementById('kpi-week-sub').textContent =
-    weekAdvanced + ' advanced · ' + weekWon + ' won';
+    mtdWon + ' won this month';
 
   // Funnel velocity
   renderFunnel(prospects);
@@ -1832,9 +1871,10 @@ function renderDashboard(prospects) {
     avgCycleSampleN:  approvedSorted.length,
     stuckList:        stuckList.slice(),
     stuckAtRisk:      stuckAtRisk,
-    weekAdvanced:     weekAdvanced,
-    weekWon:          weekWon,
-    weekVal:          weekVal,
+    mtdWon:           mtdWon,
+    mtdVal:           mtdVal,
+    monthStart:       monthStart,
+    doneStages:       DONE_STAGES,
     prospects:        prospects.slice(),    // for Pipeline Value detail list
   };
 
@@ -1858,28 +1898,41 @@ function renderDashboard(prospects) {
 function renderFunnel(prospects) {
   var row = document.getElementById('funnel-row');
   if (!row) return;
+  // CMD101.5o: iterate BOARD_STAGES — closed deals never appear in the
+  // funnel. Approved tile is windowed to the last 30 days so the column
+  // doesn't grow unbounded as won-deal history accumulates.
+  var APPROVED_WINDOW_DAYS = 30;
+  var approvedCutoff = Date.now() - APPROVED_WINDOW_DAYS * 86400000;
+
   var byStage = {};
-  STAGES.forEach(function(s){ byStage[s.key] = []; });
+  BOARD_STAGES.forEach(function(s){ byStage[s.key] = []; });
   prospects.forEach(function(p){
-    if (byStage[p.stage]) byStage[p.stage].push(p);
+    if (!byStage[p.stage]) return;
+    if (p.stage === 'approved') {
+      var u = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+      if (!u || u < approvedCutoff) return;
+    }
+    byStage[p.stage].push(p);
   });
 
   var html = '';
-  STAGES.forEach(function(s, i) {
+  BOARD_STAGES.forEach(function(s, i) {
     var arr = byStage[s.key];
     var val = arr.reduce(function(a,p){ return a + (p.est_value || 0); }, 0);
     var avgD = 0;
     if (arr.length) {
       avgD = arr.reduce(function(a,p){ return a + _daysInStage(p); }, 0) / arr.length;
     }
+    var meta = arr.length + ' · ' + avgD.toFixed(0) + 'd avg';
+    if (s.key === 'approved') meta = arr.length + ' · last ' + APPROVED_WINDOW_DAYS + 'd';
     html += '<div class="pl-funnel__stage" data-stage="' + s.key + '">'
           + '<div class="pl-funnel__name">' + escHtml(s.label) + '</div>'
           + '<div class="pl-funnel__val">' + _fmt$(val) + '</div>'
-          + '<div class="pl-funnel__meta">' + arr.length + ' · ' + avgD.toFixed(0) + 'd avg</div>'
+          + '<div class="pl-funnel__meta">' + meta + '</div>'
           + '</div>';
 
-    if (i < STAGES.length - 1) {
-      var next = byStage[STAGES[i+1].key];
+    if (i < BOARD_STAGES.length - 1) {
+      var next = byStage[BOARD_STAGES[i+1].key];
       var pct = arr.length > 0 ? (next.length / arr.length) : NaN;
       var cls = '';
       if (isFinite(pct)) {
@@ -2082,7 +2135,7 @@ function renderTouchToday(prospects) {
     return;
   }
   var todayIso = new Date().toLocaleDateString('en-CA');
-  var scored = prospects.filter(function(p){ return p.stage !== 'approved'; }).map(function(p) {
+  var scored = prospects.filter(function(p){ return p.stage !== 'approved' && p.stage !== 'closed'; }).map(function(p) {
     var dInStage = _daysInStage(p);
     var overdue = 0;
     if (p.next_follow_up_date && p.next_follow_up_date < todayIso) {
@@ -2248,6 +2301,7 @@ function _stagePill(stage) {
   else if (stage === 'proposal')   color = '#ffaa00';
   else if (stage === 'review')     color = '#9b59b6';
   else if (stage === 'approved')   color = '#00e5a0';
+  else if (stage === 'closed')     color = '#7a8099';
   return '<span class="pl-tip__stage-pill" style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' + escHtml(label) + '</span>';
 }
 
@@ -2255,7 +2309,7 @@ var _TIP_RENDERERS = {
   // ── KPI #1: Pipeline Value — itemized list of open deals ──
   'kpi-pipeline': function() {
     if (!_kpiSnapshot) return _tipNoSnapshot();
-    var open = (_kpiSnapshot.prospects || []).filter(function(p){ return p.stage !== 'approved'; });
+    var open = (_kpiSnapshot.prospects || []).filter(function(p){ return p.stage !== 'approved' && p.stage !== 'closed'; });
     open.sort(function(a,b){ return (b.est_value || 0) - (a.est_value || 0); });
     var rows = open.map(function(p) {
       return '<div class="pl-tip__row">'
@@ -2277,7 +2331,7 @@ var _TIP_RENDERERS = {
   // ── KPI #2: Weighted Forecast — formula breakdown by stage ──
   'kpi-forecast': function() {
     if (!_kpiSnapshot) return _tipNoSnapshot();
-    var open = (_kpiSnapshot.prospects || []).filter(function(p){ return p.stage !== 'approved'; });
+    var open = (_kpiSnapshot.prospects || []).filter(function(p){ return p.stage !== 'approved' && p.stage !== 'closed'; });
     // Sort by stage (latest first) then by est_value desc — biggest contributors near top.
     open.sort(function(a, b) {
       var sb = (STAGE_INDEX[b.stage] || 0) - (STAGE_INDEX[a.stage] || 0);
@@ -2381,21 +2435,31 @@ var _TIP_RENDERERS = {
   // ── KPI #6: This Week ──
   'kpi-week': function() {
     if (!_kpiSnapshot) return _tipNoSnapshot();
-    return '<div class="pl-tip__title">This Week · last 7 days</div>'
-         + '<div class="pl-tip__formula">Σ est_value where updated_at ≥ now − 7d</div>'
-         + '<div class="pl-tip__row">'
-         +   '<span class="pl-tip__label">Deals advanced</span>'
-         +   '<span class="pl-tip__val">' + _kpiSnapshot.weekAdvanced + '</span>'
+    var monthLabel = new Date(_kpiSnapshot.monthStart || Date.now())
+      .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    var done = _kpiSnapshot.doneStages || { approved: true, closed: true };
+    var monthStart = _kpiSnapshot.monthStart || 0;
+    var wonThisMonth = (_kpiSnapshot.prospects || []).filter(function(p){
+      var u = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+      return done[p.stage] && u >= monthStart;
+    }).sort(function(a,b){ return (b.est_value||0) - (a.est_value||0); });
+
+    var rows = wonThisMonth.map(function(p){
+      return '<div class="pl-tip__row">'
+           +   '<span class="pl-tip__label">' + escHtml(p.title || '(untitled)') + '</span>'
+           +   '<span class="pl-tip__badge">' + _stagePill(p.stage) + '</span>'
+           +   '<span class="pl-tip__val">' + _fmt$(p.est_value || 0) + '</span>'
+           + '</div>';
+    }).join('');
+    if (!rows) rows = '<div class="pl-tip__note">No deals won yet this month.</div>';
+
+    return '<div class="pl-tip__title">MTD · ' + escHtml(monthLabel) + '</div>'
+         + rows
+         + '<div class="pl-tip__row pl-tip__row--total pl-tip__row--nobadge">'
+         +   '<span class="pl-tip__label">Total won this month</span>'
+         +   '<span class="pl-tip__val">' + _fmt$(_kpiSnapshot.mtdVal) + '</span>'
          + '</div>'
-         + '<div class="pl-tip__row">'
-         +   '<span class="pl-tip__label">Deals won</span>'
-         +   '<span class="pl-tip__val">' + _kpiSnapshot.weekWon + '</span>'
-         + '</div>'
-         + '<div class="pl-tip__row pl-tip__row--total">'
-         +   '<span class="pl-tip__label">Value moved</span>'
-         +   '<span class="pl-tip__val">+' + _fmt$(_kpiSnapshot.weekVal) + '</span>'
-         + '</div>'
-         + '<div class="pl-tip__note">"Advanced" approximated as any update — true stage-history will replace this proxy in v2.</div>';
+         + '<div class="pl-tip__note">Calendar month-to-date. Counts deals in Approved or Closed with updated_at on or after the 1st. Resets monthly.</div>';
   },
 
   // ── Ring 1: Forecast (pipeline coverage vs last 12mo revenue) ──
@@ -2460,7 +2524,10 @@ function renderBoard(prospects) {
   if (!wrap) return;
   wrap.innerHTML = '';
 
-  STAGES.forEach(stage => {
+  // CMD101.5o: only the six BOARD_STAGES render as columns. 'closed' deals
+  // exist in the cache but never appear on the kanban — they live in the List
+  // view and continue counting toward MTD revenue + trailing-12mo coverage.
+  BOARD_STAGES.forEach(stage => {
     const cards = prospects.filter(p => p.stage === stage.key);
     const col   = document.createElement('div');
     col.className = 'kb-col';
@@ -2703,6 +2770,9 @@ function openDrawer(stage) {
   if (tg) tg.style.display = 'none';
   var dr = document.getElementById('prospect-drawer');
   if (dr) dr.classList.remove('prospect-edit-drawer');
+  // CMD101.5o: stage select hidden in Add mode — column click set _drawerStage.
+  var sw = document.getElementById('f-stage-wrap');
+  if (sw) sw.style.display = 'none';
   document.getElementById('drawer-overlay').classList.add('open');
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -2742,6 +2812,12 @@ async function openDrawerForEdit(id) {
     tg.dataset.active = (row.is_active === false ? 'false' : 'true');
     tg.textContent = (row.is_active === false ? 'Mark Active' : 'Mark Inactive');
   }
+
+  // CMD101.5o: reveal Stage select with current value pre-populated.
+  var sw = document.getElementById('f-stage-wrap');
+  var ss = document.getElementById('f-stage');
+  if (sw) sw.style.display = '';
+  if (ss) ss.value = row.stage || 'prospect';
 
   document.getElementById('f-company').value       = row.company_id || '';
   document.getElementById('f-title').value         = row.title || '';
@@ -3006,11 +3082,19 @@ async function saveProspect() {
     return;
   }
 
+  // CMD101.5o: stage source — Edit mode reads the dropdown, Add mode uses
+  // the column the user clicked (_drawerStage).
+  var stageVal = _drawerStage;
+  if (_editingProspectId) {
+    var sel = document.getElementById('f-stage');
+    if (sel && sel.value) stageVal = sel.value;
+  }
+
   const payload = {
     title,
     company_id,
     firm_id:             companies.find(c => c.id === company_id)?.firm_id || null,
-    stage:               _drawerStage,
+    stage:               stageVal,
     priority:            document.getElementById('f-priority').value || null,
     industry_tag:        getActivePill('industry-pills'),
     source:              getActivePill('source-pills'),
