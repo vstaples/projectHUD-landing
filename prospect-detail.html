@@ -640,6 +640,8 @@ body.prospect-inactive .prospect-header {
 }
 
 /* CMD101.5e — Edit Prospect drawer (port of pipeline.html drawer) */
+#edit-overlay { inset: 48px 0 0 0; }
+#edit-overlay .drawer { height: calc(100vh - 48px); }
 #edit-overlay .pill-group { display: flex; flex-wrap: wrap; gap: 6px; }
 #edit-overlay .pill {
   padding: 4px 10px;
@@ -1237,7 +1239,11 @@ body.prospect-inactive .prospect-header {
     <div class="drawer-body">
       <div class="field">
         <label>Company <span style="color:#f07a7a">*</span></label>
-        <select id="ep-company"><option value="">— Select —</option></select>
+        <div style="display:flex;gap:6px;align-items:stretch">
+          <select id="ep-company" style="flex:1"><option value="">— Select —</option></select>
+          <button type="button" id="ep-company-edit" onclick="epRenameSelectedCompany()" title="Rename selected company"
+            style="flex:0 0 auto;padding:0 10px;font-size:14px;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--muted);cursor:pointer">✎</button>
+        </div>
       </div>
       <div class="field">
         <label>Initiative / project title <span style="color:#f07a7a">*</span></label>
@@ -2525,6 +2531,33 @@ function epOpenAssigneePicker(ev) {
   PersonPicker.show(trigger, function(pick){
     epSetAssignee(pick.id, pick.name);
   }, { resources: list, selected: current });
+}
+
+async function epRenameSelectedCompany() {
+  var cSel = document.getElementById('ep-company');
+  var id = cSel.value;
+  if (!id) {
+    alert('No company selected — pick one from the dropdown first.');
+    return;
+  }
+  var current = (_epCompanies || []).find(function(c){ return c.id === id; });
+  if (!current) return;
+  var next = window.prompt('Rename company:', current.name);
+  if (!next || !next.trim() || next.trim() === current.name) return;
+  try {
+    var result = await API.patch('companies?id=eq.' + encodeURIComponent(id), { name: next.trim() });
+    var updated = Array.isArray(result) ? result[0] : result;
+    if (!updated) throw new Error('No row returned from update');
+    current.name = updated.name || next.trim();
+    var opt = Array.from(cSel.options).find(function(o){ return o.value === id; });
+    if (opt) opt.textContent = current.name;
+    cSel.value = id;
+    // Refresh page-level prospect data so header co name etc. update too.
+    if (typeof loadAll === 'function') await loadAll();
+  } catch (e) {
+    console.error('[CMD101.5e] rename failed:', e);
+    alert('Could not rename company: ' + (e.message || String(e)));
+  }
 }
 
 async function epSave() {
