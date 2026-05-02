@@ -2824,6 +2824,29 @@ async function saveStakeholder() {
 
   try {
     if (mode === 'add') {
+      // CMD101.5w — duplicate check: same first+last name within the same
+      // company is not allowed. Search before INSERT and warn the operator.
+      try {
+        var dupQuery = 'contacts?select=id,first_name,last_name&company_id=eq.'
+          + encodeURIComponent(prospect.company_id)
+          + '&first_name=eq.' + encodeURIComponent(first)
+          + '&last_name=eq.'  + encodeURIComponent(last || '');
+        var existing = await API.get(dupQuery);
+        if (Array.isArray(existing) && existing.length > 0) {
+          alert('A contact named "' + first + (last ? ' ' + last : '') +
+                '" already exists for this client. Cannot create a duplicate.\n\n' +
+                'If you want to link the existing contact as a stakeholder, ' +
+                'add that capability or remove the duplicate first.');
+          return;   // drawer stays open, fields preserved
+        }
+      } catch (dupErr) {
+        // Duplicate check failure is informational — surface and abort so
+        // we never blindly create a possibly-duplicate row.
+        console.error('[saveStakeholder] duplicate check failed:', dupErr);
+        alert('Could not verify uniqueness (network error). Please retry in a moment.');
+        return;
+      }
+
       // CMD101.5u: create a fresh contact + link.
       // Step 1 — INSERT contact, scoped to this prospect's company.
       // (`contacts` has company_id but no firm_id per current schema.)
@@ -2876,8 +2899,19 @@ async function saveStakeholder() {
     await loadAll();
     switchTab('stakeholders');
   } catch(e) {
-    console.error(e);
-    alert('Failed to save stakeholder: ' + (e.message || String(e)));
+    console.error('[saveStakeholder] error:', e);
+    // CMD101.5w: on failure, leave the drawer open with the user's data
+    // intact so they can retry. Network "Failed to fetch" is the common
+    // case — connection blip, server hiccup. The user shouldn't have to
+    // re-type everything.
+    var msg = e?.message || String(e);
+    var isNetwork = /failed to fetch|networkerror|connection.*closed|err_connection/i.test(msg);
+    if (isNetwork) {
+      alert('Network error during save. Your changes are preserved — click Save again to retry.');
+    } else {
+      alert('Failed to save stakeholder: ' + msg);
+    }
+    // Drawer intentionally stays open in both cases.
   }
 }
 
