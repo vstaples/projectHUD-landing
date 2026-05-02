@@ -86,17 +86,67 @@ body {
   align-items: center;
 }
 
-/* ── CMD101.5: tab strip wrapper (sits below permanent row, aligned with content gutter) ── */
+/* ── CMD101.5k: tab strip wrapper hosts unified toolbar ── */
 .pipeline-tabs-wrap {
-  padding: 4px 20px 0;
+  padding: 6px 20px;
   flex-shrink: 0;
   background: transparent;
+  border-bottom: 1px solid var(--border);
 }
-.pipeline-tabs-wrap .hud-tabs {
+.pipeline-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.pipeline-toolbar .hud-tabs {
   margin-bottom: 0;
+  border-bottom: none;
+  display: inline-flex;
+  gap: 4px;
 }
-.pipeline-tabs-wrap .hud-tab {
-  padding: 6px 14px;
+/* Tabs styled to match prospect-card titles: 13px, weight 600, --text color */
+.pipeline-toolbar .pipeline-tab {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color .15s, background .15s;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+.pipeline-toolbar .pipeline-tab:hover { color: var(--text); }
+.pipeline-toolbar .pipeline-tab.active {
+  color: var(--text);
+  background: rgba(255,255,255,.05);
+}
+.pipeline-toolbar .topbar-stats {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex: 1;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pipeline-toolbar .stat-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pipeline-toolbar .stat-chip strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.pipeline-toolbar .toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 /* ── CMD101.5: shell scroll area hosts both permanent widgets and tab body ── */
@@ -629,41 +679,6 @@ body {
   flex-direction: column;
   min-height: 0;
   padding: 0 20px 20px;
-}
-
-/* ── kanban toolbar (stats + search + new prospect) ───── */
-.kb-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.topbar-stats {
-  display: flex;
-  gap: 16px;
-  flex: 1;
-}
-
-.stat-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.stat-chip strong {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .btn {
@@ -1224,18 +1239,13 @@ body {
 
     </div>
 
-    <!-- ───── CMD101.5: TAB STRIP — Board / List (Board default) ───── -->
+    <!-- ───── CMD101.5k: unified toolbar — Tabs + Stats + Search + New ───── -->
     <div class="pipeline-tabs-wrap">
-      <div class="hud-tabs" id="pipeline-tabs">
-        <button class="hud-tab active" data-view="board" onclick="switchView('board')">Board</button>
-        <button class="hud-tab"        data-view="list"  onclick="switchView('list')">List</button>
-      </div>
-    </div>
-
-    <!-- ───── CMD101.5: BOARD VIEW (default, full-width kanban) ───── -->
-    <section class="view-board" id="view-board">
-
-      <div class="kb-toolbar">
+      <div class="pipeline-toolbar">
+        <div class="hud-tabs" id="pipeline-tabs">
+          <button class="hud-tab pipeline-tab active" data-view="board" onclick="switchView('board')">Board</button>
+          <button class="hud-tab pipeline-tab"        data-view="list"  onclick="switchView('list')">List</button>
+        </div>
         <div class="topbar-stats" id="pipeline-stats">
           <div class="stat-chip">
             <strong id="stat-total">—</strong> prospects
@@ -1260,6 +1270,10 @@ body {
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- ───── CMD101.5: BOARD VIEW (default, full-width kanban) ───── -->
+    <section class="view-board" id="view-board">
 
       <div id="board-wrap" class="board-wrap">
         <div class="board-loading">
