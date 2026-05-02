@@ -1053,13 +1053,15 @@ body.prospect-inactive .prospect-header {
         </select>
       </div>
       <div class="field">
-        <label>Influence <span id="sh-influence-val" style="color:var(--accent);font-weight:700">5</span> / 10</label>
+        <label>Influence</label>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted);margin:2px 0 4px">
+          <span>Low</span>
+          <span><span id="sh-influence-val" style="color:var(--accent);font-weight:700">5</span> / 10</span>
+          <span>High</span>
+        </div>
         <input type="range" id="sh-edit-influence" min="1" max="10" value="5"
           style="width:100%;accent-color:var(--accent)"
           oninput="document.getElementById('sh-influence-val').textContent=this.value" />
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">
-          <span>Low</span><span>High</span>
-        </div>
       </div>
       <div class="field">
         <label>Notes</label>
