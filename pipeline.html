@@ -558,9 +558,13 @@ body {
     <div class="drawer-body">
       <div class="field">
         <label>Company <span style="color:#f07a7a">*</span></label>
-        <select id="f-company">
-          <option value="">— Select or add company —</option>
-        </select>
+        <div style="display:flex;gap:6px;align-items:stretch">
+          <select id="f-company" style="flex:1">
+            <option value="">— Select or add company —</option>
+          </select>
+          <button type="button" id="f-company-edit" onclick="renameSelectedCompany()" title="Rename selected company"
+            style="flex:0 0 auto;padding:0 10px;font-size:14px;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--muted);cursor:pointer">✎</button>
+        </div>
       </div>
       <div class="field">
         <label>Initiative / project title <span style="color:#f07a7a">*</span></label>
@@ -989,6 +993,52 @@ function populateFormSelects() {
       cSel.value = '';
     }
   });
+}
+
+// CMD100.79: rename the currently-selected company. Updates the row in
+// `companies` via PATCH; refreshes the local cache and the dropdown
+// option text. Also re-renders the kanban board so any cards displaying
+// the old company name update.
+async function renameSelectedCompany() {
+  const cSel = document.getElementById('f-company');
+  const id = cSel.value;
+  if (!id || id === '__add_new_company__') {
+    _showFormError('No company selected', 'Pick a company from the dropdown first.');
+    return;
+  }
+  const current = companies.find(c => c.id === id);
+  if (!current) return;
+  const next = window.prompt('Rename company:', current.name);
+  if (!next || !next.trim() || next.trim() === current.name) return;
+
+  try {
+    let result;
+    if (typeof API.patch === 'function') {
+      result = await API.patch('companies?id=eq.' + encodeURIComponent(id), { name: next.trim() });
+    } else if (typeof API.update === 'function') {
+      result = await API.update('companies', id, { name: next.trim() });
+    } else {
+      throw new Error('No PATCH method available on API');
+    }
+    const updated = Array.isArray(result) ? result[0] : result;
+    if (!updated) throw new Error('No row returned from update');
+
+    // Update local cache.
+    current.name = updated.name || next.trim();
+    // Update the <option> label.
+    const opt = Array.from(cSel.options).find(o => o.value === id);
+    if (opt) opt.textContent = current.name;
+    // Re-render board so existing cards show the new name.
+    if (typeof loadData === 'function') {
+      await loadData();
+      renderBoard(allProspects);
+      // Re-select after render (loadData may rebuild the dropdown).
+      cSel.value = id;
+    }
+  } catch (e) {
+    console.error('Rename failed:', e);
+    _showFormError('Could not rename company', e.message || String(e));
+  }
 }
 
 // pill toggle
