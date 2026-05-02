@@ -1483,7 +1483,17 @@ const HUDShell = (() => {
     function classify(el, label) {
       // 1. Override
       const override = el.getAttribute && el.getAttribute('data-aegis-cmd');
-      if (override) return override;
+      if (override) {
+        // CMD101.5v: sentinel → resolve at click-time from drawer state.
+        // Used when the verb depends on a value (e.g. the stakeholder name)
+        // that the markup doesn't know at render time.
+        if (override === '__sh-remove__') {
+          var nameInput = document.getElementById('sh-edit-name');
+          var nm = nameInput ? _cleanLabel(nameInput.value || '') : '';
+          return nm ? `Remove Stakeholder "${nm}"` : null;
+        }
+        return override;
+      }
 
       const cls = (el.className && typeof el.className === 'string') ? el.className : '';
 

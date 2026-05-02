@@ -1921,6 +1921,36 @@ var COMMANDS = {
   //   re-resolves and falls back to local with a warning if offline.
   // §7: not persisted across script runs — _runScript resets to 'Aegis'.
   // Aegis-local (Rule 29): runs unprefixed; registered in _lv and _rl.
+  // CMD101.5v: Remove Stakeholder "<name>" — resolves the link by walking
+  // the rendered cards on prospect-detail (looking for matching .sh-name
+  // text), DELETEs the prospect_contact_links row, refreshes via loadAll().
+  // Bypasses the manual confirm() dialog — script runs are non-interactive.
+  'Remove Stakeholder': async function(args) {
+    var name = (args[0] || '').trim();
+    if (!name) return 'Remove Stakeholder: missing name argument';
+    var want = name.toLowerCase();
+    // Find matching .sh-card by visible name.
+    var cards = document.querySelectorAll('.sh-card');
+    var match = null;
+    for (var i = 0; i < cards.length; i++) {
+      var n = cards[i].querySelector('.sh-name');
+      var txt = (n ? n.textContent : '').trim().toLowerCase();
+      if (txt === want) { match = cards[i]; break; }
+    }
+    if (!match) return 'Remove Stakeholder: no card found for "' + name + '"';
+    // The edit ✎ button on the card carries data-sh-id (the link id).
+    var editBtn = match.querySelector('[data-sh-id]');
+    var linkId  = editBtn && editBtn.dataset ? editBtn.dataset.shId : null;
+    if (!linkId) return 'Remove Stakeholder: no link id resolvable for "' + name + '"';
+    try {
+      await API.del('prospect_contact_links?id=eq.' + encodeURIComponent(linkId));
+      if (typeof window.loadAll === 'function') await window.loadAll();
+      return 'Removed stakeholder: ' + name;
+    } catch (e) {
+      return 'Remove Stakeholder: API error — ' + (e.message || String(e));
+    }
+  },
+
   'Set NarrateTarget': async function(args) {
     var alias = args[0];
     if (!alias) return 'NarrateTarget = ' + _narrateTarget;
