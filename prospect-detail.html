@@ -1129,7 +1129,7 @@ body.prospect-inactive .prospect-header {
       </label>
     </div>
     <div class="drawer-foot">
-      <button class="btn btn-primary" onclick="saveFinding()">Save finding</button>
+      <button class="btn btn-primary" onclick="saveFinding()">Save</button>
       <button id="finding-delete-btn" class="btn"
         style="color:#f07a7a;border-color:rgba(192,64,74,.3);display:none"
         onclick="deleteFinding()">Delete</button>
@@ -3081,6 +3081,19 @@ function handleFindingFileAttach(input) {
   Array.from(input.files).forEach(f => {
     if (f.size > 20 * 1024 * 1024) { alert(f.name + ' exceeds 20MB.'); return; }
     _findingStagedFiles.push({ name: f.name, size: f.size, type: f.type, file: f });
+    // CMD101.5z: recorder event so scripts capture `Form Attach "<filename>"`.
+    // The actual file content cannot be replayed (OS-mediated picker), but
+    // the line is preserved in transcripts for documentation; replay-side
+    // emits a no-op log line acknowledging the attach was authored.
+    try {
+      if (typeof window._cmdCenterChannelSend === 'function') {
+        var esc = String(f.name).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        window._cmdCenterChannelSend({
+          event: 'recorder_event',
+          payload: { command: 'Form Attach "' + esc + '"' }
+        });
+      }
+    } catch(e) { /* recorder must never break the page */ }
   });
   input.value = '';
   renderFindingFiles();

@@ -2186,6 +2186,15 @@ var COMMANDS = {
   // CMD101.5t: Form Slide "<label>" "<value>" — for <input type="range">.
   // Sets the value AND fires real input+change events so any oninput
   // handlers (e.g. value display labels) update.
+  // CMD101.5z: Form Attach "<filename>" — recorder-only verb. The OS file
+  // picker cannot be driven from script (browser security), so on replay
+  // we acknowledge the original attach was authored and move on. The
+  // transcript line preserves intent for human review of the script.
+  'Form Attach': async function(args) {
+    var fname = args[0] || '(unnamed)';
+    return 'attach noted (replay cannot re-supply file): ' + fname;
+  },
+
   'Form Slide': async function(args) {
     var field = args[0];
     var value = args[1] !== undefined ? args[1] : '';
