@@ -2918,9 +2918,33 @@ async function saveStakeholder() {
 async function removeStakeholder() {
   const id = document.getElementById('sh-edit-id').value;
   const name = document.getElementById('sh-edit-name').value;
+  // CMD101.5x: contact_id is also stored in the drawer's hidden field;
+  // we use it for orphan-cleanup after deleting the link.
+  const contactId = document.getElementById('sh-edit-contact-id').value;
   if (!confirm(`Remove ${name} from this prospect's stakeholders?`)) return;
   try {
+    // Delete the link first.
     await API.del(`prospect_contact_links?id=eq.${id}`);
+
+    // CMD101.5x — orphan-contact cleanup. If this contact is no longer
+    // linked to ANY prospect, delete the contact row too. Multi-link
+    // contacts (linked to other prospects) stay intact.
+    if (contactId) {
+      try {
+        var remaining = await API.get(
+          'prospect_contact_links?select=id&contact_id=eq.' + encodeURIComponent(contactId)
+        );
+        if (Array.isArray(remaining) && remaining.length === 0) {
+          await API.del('contacts?id=eq.' + encodeURIComponent(contactId));
+          console.log('[stakeholder] orphan contact cleaned up:', contactId);
+        }
+      } catch (cleanupErr) {
+        // Non-fatal — link is already gone, contact may stay as orphan.
+        // Surface to console so we can spot drift but don't block UX.
+        console.warn('[stakeholder] orphan cleanup failed:', cleanupErr);
+      }
+    }
+
     closeDrawer('sh-edit-overlay');
     await loadAll();
     switchTab('stakeholders');

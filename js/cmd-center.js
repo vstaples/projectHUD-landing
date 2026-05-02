@@ -1925,6 +1925,8 @@ var COMMANDS = {
   // the rendered cards on prospect-detail (looking for matching .sh-name
   // text), DELETEs the prospect_contact_links row, refreshes via loadAll().
   // Bypasses the manual confirm() dialog — script runs are non-interactive.
+  // CMD101.5x — also cleans up the contact row if no other prospects link
+  // to it, keeping the contacts table free of orphans.
   'Remove Stakeholder': async function(args) {
     var name = (args[0] || '').trim();
     if (!name) return 'Remove Stakeholder: missing name argument';
@@ -1942,8 +1944,30 @@ var COMMANDS = {
     var editBtn = match.querySelector('[data-sh-id]');
     var linkId  = editBtn && editBtn.dataset ? editBtn.dataset.shId : null;
     if (!linkId) return 'Remove Stakeholder: no link id resolvable for "' + name + '"';
+    // Resolve the contact_id by looking up the link row before deleting it.
+    var contactId = null;
+    try {
+      var linkRow = await API.get('prospect_contact_links?select=contact_id&id=eq.' + encodeURIComponent(linkId));
+      if (Array.isArray(linkRow) && linkRow[0]) contactId = linkRow[0].contact_id;
+    } catch (e) {
+      // Non-fatal — proceed without orphan cleanup.
+      console.warn('[cmd:Remove Stakeholder] could not resolve contact_id:', e);
+    }
     try {
       await API.del('prospect_contact_links?id=eq.' + encodeURIComponent(linkId));
+      // Orphan-contact cleanup, same logic as the UI removeStakeholder().
+      if (contactId) {
+        try {
+          var remaining = await API.get(
+            'prospect_contact_links?select=id&contact_id=eq.' + encodeURIComponent(contactId)
+          );
+          if (Array.isArray(remaining) && remaining.length === 0) {
+            await API.del('contacts?id=eq.' + encodeURIComponent(contactId));
+          }
+        } catch (cleanupErr) {
+          console.warn('[cmd:Remove Stakeholder] orphan cleanup failed:', cleanupErr);
+        }
+      }
       if (typeof window.loadAll === 'function') await window.loadAll();
       return 'Removed stakeholder: ' + name;
     } catch (e) {
