@@ -22,8 +22,8 @@
   /* CMD101.5j — unified palette overrides. hud.css ships --red:#ff4757
      and --amber:#ffaa00; the pipeline page uses brighter red and the
      KPI yellow as canonical "warning" / "danger" tones. */
-  --red:    #E60000;
-  --amber:  #f0c47a;
+  --red:    #FF3030;
+  --amber:  #ffaa00;
 
   /* CMD101: kanban-stage swatches kept as pre-existing local tokens.
      The brief's stage-color tokens (--stage-prospect..--stage-approved)
@@ -169,8 +169,8 @@ body {
   background: var(--text-accent, #00d2ff);
 }
 .pl-kpi__bar--good    { background: var(--green, #00e5a0); }
-.pl-kpi__bar--caution { background: var(--amber, #f0c47a); }
-.pl-kpi__bar--bad     { background: var(--red,   #E60000); }
+.pl-kpi__bar--caution { background: var(--amber, #ffaa00); }
+.pl-kpi__bar--bad     { background: var(--red,   #FF3030); }
 .pl-kpi__label {
   font-size: 11px;
   font-weight: 700;
@@ -186,8 +186,8 @@ body {
   font-feature-settings: "tnum";
 }
 .pl-kpi__value--good    { color: var(--green, #00e5a0); }
-.pl-kpi__value--caution { color: var(--amber, #f0c47a); }
-.pl-kpi__value--bad     { color: var(--red,   #E60000); }
+.pl-kpi__value--caution { color: var(--amber, #ffaa00); }
+.pl-kpi__value--bad     { color: var(--red,   #FF3030); }
 .pl-kpi__value--accent  { color: var(--text-accent, #00d2ff); }
 .pl-kpi__sub {
   font-size: 11px;
@@ -221,7 +221,7 @@ body {
   color: var(--text);
   font-feature-settings: "tnum";
 }
-.pl-panel__count--bad { color: var(--red, #E60000); }
+.pl-panel__count--bad { color: var(--red, #FF3030); }
 
 /* Funnel velocity — six tiles + five conversion %s */
 .pl-funnel {
@@ -246,7 +246,7 @@ body {
 .pl-funnel__stage[data-stage="prospect"]   { border-top-color: var(--stage-prospect,   #00e5a0); }
 .pl-funnel__stage[data-stage="qualifying"] { border-top-color: var(--stage-qualifying, #5dcaa5); }
 .pl-funnel__stage[data-stage="discovery"]  { border-top-color: var(--stage-discovery,  #00d2ff); }
-.pl-funnel__stage[data-stage="proposal"]   { border-top-color: var(--stage-proposal,   #f0c47a); }
+.pl-funnel__stage[data-stage="proposal"]   { border-top-color: var(--stage-proposal,   #ffaa00); }
 .pl-funnel__stage[data-stage="review"]     { border-top-color: var(--stage-review,     #9b59b6); }
 .pl-funnel__stage[data-stage="approved"]   { border-top-color: var(--stage-approved,   #00e5a0); }
 .pl-funnel__name {
@@ -268,7 +268,7 @@ body {
 .pl-funnel__stage[data-stage="qualifying"] .pl-funnel__val,
 .pl-funnel__stage[data-stage="discovery"]  .pl-funnel__val { color: var(--text); }
 .pl-funnel__stage[data-stage="proposal"]   .pl-funnel__val,
-.pl-funnel__stage[data-stage="review"]     .pl-funnel__val { color: var(--amber, #f0c47a); }
+.pl-funnel__stage[data-stage="review"]     .pl-funnel__val { color: var(--amber, #ffaa00); }
 .pl-funnel__stage[data-stage="approved"]   .pl-funnel__val { color: var(--green, #00e5a0); }
 .pl-funnel__meta {
   font-size: 11px;
@@ -305,8 +305,8 @@ body {
   padding: 1px 6px;
 }
 .pl-funnel__conv--good    { color: var(--green, #00e5a0); }
-.pl-funnel__conv--caution { color: var(--amber, #f0c47a); }
-.pl-funnel__conv--bad     { color: var(--red,   #E60000); }
+.pl-funnel__conv--caution { color: var(--amber, #ffaa00); }
+.pl-funnel__conv--bad     { color: var(--red,   #FF3030); }
 
 /* Active deals list */
 .pl-deals { display: flex; flex-direction: column; }
@@ -329,8 +329,8 @@ body {
   background: var(--green, #00e5a0);
 }
 .pl-deal__bar--ok  { background: var(--green, #00e5a0); }
-.pl-deal__bar--cau { background: var(--amber, #f0c47a); }
-.pl-deal__bar--bad { background: var(--red,   #E60000); }
+.pl-deal__bar--cau { background: var(--amber, #ffaa00); }
+.pl-deal__bar--bad { background: var(--red,   #FF3030); }
 .pl-deal__main { min-width: 0; }
 .pl-deal__title {
   font-size: 13px;
@@ -359,7 +359,7 @@ body {
 .pl-deal__stage[data-stage="prospect"]   { color: var(--stage-prospect,   #00e5a0); border-color: var(--stage-prospect,   #00e5a0); background: rgba(0,229,160,.08); }
 .pl-deal__stage[data-stage="qualifying"] { color: var(--stage-qualifying, #5dcaa5); border-color: var(--stage-qualifying, #5dcaa5); background: rgba(93,202,165,.08); }
 .pl-deal__stage[data-stage="discovery"]  { color: var(--stage-discovery,  #00d2ff); border-color: var(--stage-discovery,  #00d2ff); background: rgba(0,210,255,.08); }
-.pl-deal__stage[data-stage="proposal"]   { color: var(--stage-proposal,   #f0c47a); border-color: var(--stage-proposal,   #f0c47a); background: rgba(240,196,122,.10); }
+.pl-deal__stage[data-stage="proposal"]   { color: var(--stage-proposal,   #ffaa00); border-color: var(--stage-proposal,   #ffaa00); background: rgba(255,170,0,.10); }
 .pl-deal__stage[data-stage="review"]     { color: var(--stage-review,     #9b59b6); border-color: var(--stage-review,     #9b59b6); background: rgba(155,89,182,.10); }
 .pl-deal__stage[data-stage="approved"]   { color: var(--stage-approved,   #00e5a0); border-color: var(--stage-approved,   #00e5a0); background: rgba(0,229,160,.08); }
 .pl-deal__status {
@@ -369,8 +369,8 @@ body {
   white-space: nowrap;
 }
 .pl-deal__status--ok  { color: var(--green, #00e5a0); }
-.pl-deal__status--cau { color: var(--amber, #f0c47a); }
-.pl-deal__status--bad { color: var(--red,   #E60000); }
+.pl-deal__status--cau { color: var(--amber, #ffaa00); }
+.pl-deal__status--bad { color: var(--red,   #FF3030); }
 .pl-deal__date {
   font-size: 11px;
   color: var(--muted);
@@ -556,8 +556,8 @@ body {
 .pl-ring__fill  { stroke: var(--text-accent, #00d2ff); stroke-width: 8; fill: none;
                   stroke-linecap: round; transition: stroke-dasharray .6s ease; }
 .pl-ring__fill--good    { stroke: var(--green, #00e5a0); }
-.pl-ring__fill--caution { stroke: var(--amber, #f0c47a); }
-.pl-ring__fill--bad     { stroke: var(--red,   #E60000); }
+.pl-ring__fill--caution { stroke: var(--amber, #ffaa00); }
+.pl-ring__fill--bad     { stroke: var(--red,   #FF3030); }
 .pl-ring__txt {
   font-size: 14px;
   font-weight: 700;
@@ -613,8 +613,8 @@ body {
   flex-shrink: 0;
   white-space: nowrap;
 }
-.pl-rail-row__right--bad     { color: var(--red,   #E60000); }
-.pl-rail-row__right--caution { color: var(--amber, #f0c47a); }
+.pl-rail-row__right--bad     { color: var(--red,   #FF3030); }
+.pl-rail-row__right--caution { color: var(--amber, #ffaa00); }
 .pl-rail-row__right--accent  { color: var(--text-accent, #00d2ff); }
 .pl-rail-empty {
   padding: 14px 4px;
@@ -858,8 +858,8 @@ body {
   flex-shrink: 0;
   line-height: 1;
 }
-.pri-chip--high   { background: rgba(230,0,0,.15); color: #E60000; border: 1px solid rgba(230,0,0,.45); }
-.pri-chip--medium { background: rgba(240,196,122,.15); color: #f0c47a; border: 1px solid rgba(240,196,122,.35); }
+.pri-chip--high   { background: rgba(255,48,48,.15); color: #FF3030; border: 1px solid rgba(255,48,48,.45); }
+.pri-chip--medium { background: rgba(255,170,0,.15); color: #ffaa00; border: 1px solid rgba(255,170,0,.35); }
 .pri-chip--low    { background: rgba(122,240,160,.15); color: #7af0a0; border: 1px solid rgba(122,240,160,.35); }
 
 .p-card-meta {
@@ -949,33 +949,34 @@ body {
   align-items: baseline;
   justify-content: flex-end;
   gap: 6px;
+  font-weight: 600;
 }
 /* Age "Nd ago" pill — neutral muted by default; tone classes color it. */
 .p-card-age {
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--muted);
   letter-spacing: .02em;
 }
 /* CMD101.5j — Updated row: date is ALWAYS amber (it's an "updated" date,
    yellow flags "this changed"). Age pill carries the freshness tone:
    green ≤7d (recent), amber 8–30d (aging), red >30d (stale). */
-.p-card-date-val .p-card-date-text { color: #f0c47a; }       /* date always amber */
+.p-card-date-val .p-card-date-text { color: #ffaa00; }       /* date always amber */
 .p-card-date-val.recent .p-card-age { color: #7af0a0; }
-.p-card-date-val.aging  .p-card-age { color: #f0c47a; }
-.p-card-date-val.stale  .p-card-age { color: #E60000; }      /* bright red */
+.p-card-date-val.aging  .p-card-age { color: #ffaa00; }
+.p-card-date-val.stale  .p-card-age { color: #FF3030; }      /* bright red */
 /* Follow-up urgency tones */
-.p-card-date-val.overdue { color: #E60000; }                  /* bright red */
-.p-card-date-val.today   { color: #f0c47a; }
+.p-card-date-val.overdue { color: #FF3030; }                  /* bright red */
+.p-card-date-val.today   { color: #ffaa00; }
 
 /* action items badge */
 .ai-badge {
   font-size: 9px;
   padding: 2px 6px;
   border-radius: 8px;
-  background: rgba(240,196,122,.15);
-  color: #f0c47a;
-  border: 1px solid rgba(240,196,122,.35);
+  background: rgba(255,170,0,.15);
+  color: #ffaa00;
+  border: 1px solid rgba(255,170,0,.35);
   white-space: nowrap;
   line-height: 1.2;
 }
@@ -1243,7 +1244,7 @@ body {
             <strong id="stat-value">—</strong> total est. value
           </div>
           <div class="stat-chip" id="stat-overdue-wrap" style="display:none">
-            <strong id="stat-overdue" style="color:#E60000">—</strong> follow-ups overdue
+            <strong id="stat-overdue" style="color:#FF3030">—</strong> follow-ups overdue
           </div>
         </div>
         <div class="toolbar">
@@ -1327,7 +1328,7 @@ body {
     </div>
     <div class="drawer-body">
       <div class="field">
-        <label>Company <span style="color:#E60000">*</span></label>
+        <label>Company <span style="color:#FF3030">*</span></label>
         <div style="display:flex;gap:6px;align-items:stretch">
           <select id="f-company" style="flex:1">
             <option value="">— Select or add company —</option>
@@ -1337,7 +1338,7 @@ body {
         </div>
       </div>
       <div class="field">
-        <label>Initiative / project title <span style="color:#E60000">*</span></label>
+        <label>Initiative / project title <span style="color:#FF3030">*</span></label>
         <input id="f-title" type="text" placeholder="e.g. Endoscopic Platform Development" />
       </div>
 
@@ -1404,7 +1405,7 @@ body {
 
       <div class="sec-label">Our team</div>
       <div class="field">
-        <label>Assigned to <span style="color:#E60000">*</span></label>
+        <label>Assigned to <span style="color:#FF3030">*</span></label>
         <input type="hidden" id="f-assigned" value="" />
         <button type="button" id="f-assigned-trigger" onclick="openAssigneePicker(event)"
           style="width:100%;padding:8px 10px;background:var(--bg2,#0a1424);border:1px solid var(--border1,#1d2c44);border-radius:4px;color:var(--text0,#e8eaf0);text-align:left;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;min-height:36px">
@@ -1415,7 +1416,7 @@ body {
       <div class="sec-label">First follow-up</div>
       <div class="field-row">
         <div class="field">
-          <label>Follow-up date <span style="color:#E60000">*</span></label>
+          <label>Follow-up date <span style="color:#FF3030">*</span></label>
           <input id="f-followup" type="date" />
         </div>
         <div class="field">
@@ -1573,9 +1574,9 @@ async function loadData() {
   } catch (e) {
     console.error(e);
     document.getElementById('board-wrap').innerHTML =
-      `<div class="board-loading" style="color:#E60000">Failed to load pipeline. Check console.</div>`;
+      `<div class="board-loading" style="color:#FF3030">Failed to load pipeline. Check console.</div>`;
     document.getElementById('deals-list').innerHTML =
-      `<div class="pl-deals-empty" style="color:#E60000">Failed to load. Check console.</div>`;
+      `<div class="pl-deals-empty" style="color:#FF3030">Failed to load. Check console.</div>`;
   }
 }
 
@@ -2213,7 +2214,7 @@ function _stagePill(stage) {
   if      (stage === 'prospect')   color = '#5dcaa5';
   else if (stage === 'qualifying') color = '#5dcaa5';
   else if (stage === 'discovery')  color = '#00d2ff';
-  else if (stage === 'proposal')   color = '#f0c47a';
+  else if (stage === 'proposal')   color = '#ffaa00';
   else if (stage === 'review')     color = '#9b59b6';
   else if (stage === 'approved')   color = '#00e5a0';
   return '<span class="pl-tip__stage-pill" style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55">' + escHtml(label) + '</span>';
@@ -2334,7 +2335,7 @@ var _TIP_RENDERERS = {
       return '<div class="pl-tip__row">'
            +   '<span class="pl-tip__label">' + escHtml(p.title || '(untitled)') + '</span>'
            +   '<span class="pl-tip__badge">' + _stagePill(p.stage) + '</span>'
-           +   '<span class="pl-tip__val" style="color:#E60000">+' + over + 'd</span>'
+           +   '<span class="pl-tip__val" style="color:#FF3030">+' + over + 'd</span>'
            + '</div>';
     }).join('');
     if (!rows) rows = '<div class="pl-tip__note">No stuck deals.</div>';
@@ -2347,7 +2348,7 @@ var _TIP_RENDERERS = {
          + rows
          + '<div class="pl-tip__row pl-tip__row--total pl-tip__row--nobadge">'
          +   '<span class="pl-tip__label">At risk</span>'
-         +   '<span class="pl-tip__val" style="color:#E60000">' + _fmt$(_kpiSnapshot.stuckAtRisk) + '</span>'
+         +   '<span class="pl-tip__val" style="color:#FF3030">' + _fmt$(_kpiSnapshot.stuckAtRisk) + '</span>'
          + '</div>'
          + '<div class="pl-tip__note">Stuck = days since updated_at &gt; per-stage threshold. Thresholds: ' + thresholds.replace(/ · $/, '') + '.</div>';
   },
@@ -3024,7 +3025,7 @@ function _showFormError(title, message) {
   wrap.innerHTML = `
     <div style="min-width:340px;max-width:480px;background:#0b1626;border:1px solid #00c9c9;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.6);padding:18px 22px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:#f0c47a;color:#1a1a1a;font-weight:700;text-align:center;line-height:22px;font-size:14px">!</span>
+        <span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:#ffaa00;color:#1a1a1a;font-weight:700;text-align:center;line-height:22px;font-size:14px">!</span>
         <div style="font-size:15px;font-weight:600;color:#e8eaf0">${escHtml(title)}</div>
       </div>
       <div style="font-size:13px;color:#b8c4d4;line-height:1.45;margin-bottom:18px">${escHtml(message)}</div>
