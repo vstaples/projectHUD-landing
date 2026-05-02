@@ -2828,9 +2828,9 @@ async function saveStakeholder() {
     if (mode === 'add') {
       // CMD101.5u: create a fresh contact + link.
       // Step 1 — INSERT contact, scoped to this prospect's company.
+      // (`contacts` has company_id but no firm_id per current schema.)
       var newContacts = await API.post('contacts', {
         company_id: prospect.company_id,
-        firm_id:    prospect.firm_id || null,
         first_name: first,
         last_name:  last  || null,
         title:      title || null,
@@ -2843,10 +2843,10 @@ async function saveStakeholder() {
         throw new Error('Contact insert returned no row');
       }
       // Step 2 — INSERT prospect_contact_links row binding this contact to the prospect.
+      // (Schema: id, prospect_id, contact_id, stakeholder_role, influence_score, notes, created_at)
       await API.post('prospect_contact_links', {
         prospect_id:      PROSPECT_ID,
         contact_id:       newContact.id,
-        firm_id:          prospect.firm_id || null,
         stakeholder_role: role,
         influence_score:  influence,
         notes:            notes || null,
