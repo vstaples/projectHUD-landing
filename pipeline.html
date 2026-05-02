@@ -76,12 +76,17 @@ body {
   align-items: center;
 }
 
-/* ── CMD101.5: tab strip wrapper (now sits below permanent row) ── */
+/* ── CMD101.5: tab strip wrapper (sits below permanent row, aligned with content gutter) ── */
 .pipeline-tabs-wrap {
-  padding: 12px 20px 0;
+  padding: 4px 20px 0;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: transparent;
+}
+.pipeline-tabs-wrap .hud-tabs {
+  margin-bottom: 0;
+}
+.pipeline-tabs-wrap .hud-tab {
+  padding: 6px 14px;
 }
 
 /* ── CMD101.5: shell scroll area hosts both permanent widgets and tab body ── */
@@ -980,50 +985,16 @@ body {
 
     </div>
 
-    <!-- ───── CMD101.5: TAB STRIP — List / Board ───── -->
+    <!-- ───── CMD101.5: TAB STRIP — Board / List (Board default) ───── -->
     <div class="pipeline-tabs-wrap">
       <div class="hud-tabs" id="pipeline-tabs">
-        <button class="hud-tab active" data-view="list"  onclick="switchView('list')">List</button>
-        <button class="hud-tab"        data-view="board" onclick="switchView('board')">Board</button>
+        <button class="hud-tab active" data-view="board" onclick="switchView('board')">Board</button>
+        <button class="hud-tab"        data-view="list"  onclick="switchView('list')">List</button>
       </div>
     </div>
 
-    <!-- ───── CMD101.5: LIST VIEW (default) ───── -->
-    <section class="view-list" id="view-list">
-      <div class="list-grid">
-        <section class="pl-panel active-deals">
-          <div class="pl-panel__head">
-            <span>Active Deals</span>
-            <span class="pl-panel__count" id="deals-count">—</span>
-          </div>
-          <div class="pl-deals" id="deals-list">
-            <div class="pl-deals-empty">Loading…</div>
-          </div>
-        </section>
-
-        <aside class="list-sidebar">
-          <section class="pl-panel alerts-stuck">
-            <div class="pl-panel__head">
-              <span>Alerts — Stuck</span>
-              <span class="pl-panel__count pl-panel__count--bad" id="stuck-count">—</span>
-            </div>
-            <div id="stuck-list">
-              <div class="pl-rail-empty">Loading…</div>
-            </div>
-          </section>
-
-          <section class="pl-panel touch-today">
-            <div class="pl-panel__head"><span>Touch Today</span></div>
-            <div id="touch-list">
-              <div class="pl-rail-empty">Loading…</div>
-            </div>
-          </section>
-        </aside>
-      </div>
-    </section>
-
-    <!-- ───── CMD101.5: BOARD VIEW (full-width kanban) ───── -->
-    <section class="view-board" id="view-board" hidden>
+    <!-- ───── CMD101.5: BOARD VIEW (default, full-width kanban) ───── -->
+    <section class="view-board" id="view-board">
 
       <div class="kb-toolbar">
         <div class="topbar-stats" id="pipeline-stats">
@@ -1058,6 +1029,40 @@ body {
         </div>
       </div>
 
+    </section>
+
+    <!-- ───── CMD101.5: LIST VIEW ───── -->
+    <section class="view-list" id="view-list" hidden>
+      <div class="list-grid">
+        <section class="pl-panel active-deals">
+          <div class="pl-panel__head">
+            <span>Active Deals</span>
+            <span class="pl-panel__count" id="deals-count">—</span>
+          </div>
+          <div class="pl-deals" id="deals-list">
+            <div class="pl-deals-empty">Loading…</div>
+          </div>
+        </section>
+
+        <aside class="list-sidebar">
+          <section class="pl-panel alerts-stuck">
+            <div class="pl-panel__head">
+              <span>Alerts — Stuck</span>
+              <span class="pl-panel__count pl-panel__count--bad" id="stuck-count">—</span>
+            </div>
+            <div id="stuck-list">
+              <div class="pl-rail-empty">Loading…</div>
+            </div>
+          </section>
+
+          <section class="pl-panel touch-today">
+            <div class="pl-panel__head"><span>Touch Today</span></div>
+            <div id="touch-list">
+              <div class="pl-rail-empty">Loading…</div>
+            </div>
+          </section>
+        </aside>
+      </div>
     </section>
 
   </div>
@@ -1699,11 +1704,11 @@ function renderTouchToday(prospects) {
 // ── CMD101.5: View switching (DOM toggle, no re-fetch) ─
 // Tabs control only the body below the permanent area.
 // KPI / Funnel / Forecast render unconditionally regardless of view.
-var _activeView = 'list';
+var _activeView = 'board';
 
 function switchView(name) {
   var key = (name || '').toString().toLowerCase();
-  if (key !== 'list' && key !== 'board') key = 'list';
+  if (key !== 'list' && key !== 'board') key = 'board';
   _activeView = key;
 
   // Tab activation.
