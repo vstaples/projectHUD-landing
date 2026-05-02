@@ -1753,17 +1753,19 @@ var COMMANDS = {
     }
   },
 
-  // ── Switch View (CMD101) ───────────────────────────────────────────────────
-  // Pipeline-specific: toggle between Dashboard and Board sub-views inside
+  // ── Switch View (CMD101 / CMD101.5) ────────────────────────────────────────
+  // Pipeline-specific: toggle between List and Board sub-views inside
   // pipeline.html. Pure DOM swap (hidden attribute) — no route change, no
   // re-fetch. Re-broadcasts page_ready after the swap settles so any
   // Aegis-side script-runner waiting on settle can proceed.
-  //   Switch View "Dashboard" | Switch View "Board"
+  //   Switch View "List" | Switch View "Board"
+  // Note: Existing scripts using `Switch View "Dashboard"` will no-op after
+  // CMD101.5. Re-record affected scripts.
   'Switch View': async function(args) {
     var name = (args[0] || '').toString().trim();
     var key  = name.toLowerCase();
-    if (key !== 'dashboard' && key !== 'board') {
-      return 'Switch View: unknown view "' + args[0] + '" (expected Dashboard|Board)';
+    if (key !== 'list' && key !== 'board') {
+      return 'Switch View: unknown view "' + args[0] + '" (expected List|Board)';
     }
     if (typeof window.switchView !== 'function') {
       return 'Switch View: pipeline.html not loaded (window.switchView missing)';
