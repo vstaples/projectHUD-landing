@@ -1358,16 +1358,31 @@ async function loadData() {
     var closedWonPath = 'prospects?select=est_value,updated_at&stage=eq.approved&updated_at=gte.' + encodeURIComponent(cutoff);
     if (firmId) closedWonPath += '&firm_id=eq.' + encodeURIComponent(firmId);
 
-    const [pros, comps, ress, won] = await Promise.all([
-      // CMD101: v_pipeline_summary view does not propagate prospects.is_active
-      // (confirmed via PostgREST 42703 on first deploy). Fall back to client-side
-      // filter applied immediately below. Defer view migration to a later brief.
+    const [pros, comps, ress, won, activeIdRows] = await Promise.all([
+      // CMD101: v_pipeline_summary view does not propagate prospects.is_active.
+      // Filter by cross-referencing active prospect IDs from the prospects
+      // table directly (CMD101.5d). Defer view migration to a later brief.
       API.get('v_pipeline_summary?order=created_at.desc&limit=200'),
       API.get('companies?order=name&select=id,name,industry,firm_id'),
       API.get('resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,avatar_url,department,title,is_external,user_id'),
-      API.get(closedWonPath).catch(function(e){ console.warn('[CMD101] closedWon fetch failed:', e); return []; })
+      API.get(closedWonPath).catch(function(e){ console.warn('[CMD101] closedWon fetch failed:', e); return []; }),
+      // CMD101.5d: positive whitelist of active prospect IDs. `not.eq.false`
+      // matches both `true` and `NULL` so a row never falls out due to
+      // missing-default. Used to filter the view rows below.
+      API.get('prospects?select=id&is_active=not.eq.false').catch(function(e){
+        console.warn('[CMD101.5d] active-id lookup failed:', e); return null;
+      })
     ]);
-    allProspects = (pros || []).filter(function(p){ return p.is_active !== false; });   // safety net
+    var _activeIdSet = null;
+    if (Array.isArray(activeIdRows)) {
+      _activeIdSet = {};
+      activeIdRows.forEach(function(r){ if (r && r.id) _activeIdSet[r.id] = true; });
+    }
+    // If the active-IDs lookup failed (returned null), don't filter — show all
+    // rather than blanking the page. Logged warning above flags the degradation.
+    allProspects = _activeIdSet
+      ? (pros || []).filter(function(p){ return _activeIdSet[p.id]; })
+      : (pros || []);
     window.allProspects = allProspects;
     companies      = comps || [];
     resources      = ress || [];
@@ -1393,13 +1408,21 @@ async function loadData() {
 
 // CMD101.5c: separate fetch for inactive prospects (List view, opt-in only).
 // Pulls from v_pipeline_summary so List rows have the same joined fields
-// (company_name, industry, assignee, est_value) as active rows. Filters
-// client-side to is_active=false since the view does not propagate the
-// column server-side.
+// (company_name, industry, assignee, est_value) as active rows. Cross-references
+// against an explicit inactive-ID list from the prospects table since the view
+// does not expose is_active.
 async function loadInactiveProspects() {
   try {
-    var rows = await API.get('v_pipeline_summary?order=updated_at.desc&limit=500');
-    _inactiveProspects = (rows || []).filter(function(p){ return p.is_active === false; });
+    var pair = await Promise.all([
+      API.get('v_pipeline_summary?order=updated_at.desc&limit=500'),
+      API.get('prospects?select=id&is_active=eq.false')
+    ]);
+    var rows         = pair[0] || [];
+    var inactiveRows = pair[1] || [];
+    var inactiveSet  = {};
+    inactiveRows.forEach(function(r){ if (r && r.id) inactiveSet[r.id] = true; });
+    _inactiveProspects = rows.filter(function(p){ return inactiveSet[p.id]; })
+                             .map(function(p){ p.is_active = false; return p; });   // tag for renderer
     _inactiveLoaded = true;
   } catch (e) {
     console.error('[CMD101.5c] inactive fetch failed:', e);
