@@ -258,7 +258,7 @@ body.prospect-inactive .prospect-header {
   display: flex; justify-content: space-between; align-items: center;
   padding: 5px 0;
   border-bottom: 1px solid var(--border);
-  font-size: 12px;
+  font-size: 13px;
 }
 .signal-row:last-child { border-bottom: none; }
 .signal-lbl { color: var(--muted); }
@@ -1658,21 +1658,21 @@ function renderOverview() {
           <button class="btn" style="font-size:10px;padding:3px 8px;height:auto"
             onclick="openBriefEditor()">✎ Edit</button>
         </div>
-        <div id="ov-brief-text" style="font-size:12px;color:var(--muted);line-height:1.7">
+        <div id="ov-brief-text" style="font-size:13px;color:var(--muted);line-height:1.7">
           ${escHtml(p.description || 'No description provided.')}
         </div>
         ${p.next_steps ? `
         <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;
             letter-spacing:.07em;color:var(--text);margin-bottom:6px">Next steps</div>
-          <div style="font-size:12px;color:var(--muted);line-height:1.7;white-space:pre-line">
+          <div style="font-size:13px;color:var(--muted);line-height:1.7;white-space:pre-line">
             ${escHtml(p.next_steps)}
           </div>
         </div>` : `
         <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;
             letter-spacing:.07em;color:var(--text);margin-bottom:6px">Next steps</div>
-          <div style="font-size:12px;color:var(--muted);font-style:italic">
+          <div style="font-size:13px;color:var(--muted);font-style:italic">
             No next steps recorded.
             <span style="color:var(--accent);cursor:pointer" onclick="openBriefEditor()">Add one →</span>
           </div>
@@ -1696,7 +1696,7 @@ function renderOverview() {
       <div class="card">
         <div class="card-title">Open action items</div>
         ${openAI.length === 0
-          ? '<div style="font-size:12px;color:var(--muted)">No open action items.</div>'
+          ? '<div style="font-size:13px;color:var(--muted)">No open action items.</div>'
           : openAI.map(ai => renderAIRow(ai, ai._table, ai.meeting_id||null)).join('')}
 
       </div>
@@ -1715,7 +1715,7 @@ function renderOverview() {
                 ${nextMeet.duration_minutes} min</div>
             </div>
           </div>`
-          : `<div style="font-size:12px;color:var(--muted)">No meetings scheduled.
+          : `<div style="font-size:13px;color:var(--muted)">No meetings scheduled.
               <span style="color:var(--accent);cursor:pointer" onclick="openMeetingDrawer()"> Schedule one →</span>
             </div>`}
       </div>
@@ -1739,7 +1739,7 @@ function meetingAIBadge(meetId) {
 function renderSignal(lbl, val, cls) {
   return `<div class="signal-row">
     <span class="signal-lbl">${lbl}</span>
-    <span class="${cls ? 'sv-'+cls : ''}" style="font-size:12px;font-weight:600">${escHtml(val)}</span>
+    <span class="${cls ? 'sv-'+cls : ''}" style="font-size:13px;font-weight:600">${escHtml(val)}</span>
   </div>`;
 }
 
@@ -1957,7 +1957,7 @@ function renderAIRow(ai, table, meetId) {
           onclick="event.stopPropagation();openEditActionItemFromRow(
             this.closest('[data-ai-id]'),
             this.closest('[data-ai-id]').dataset.aiMeetid||null)">
-        <div style="font-size:12px;line-height:1.45;margin-bottom:4px;
+        <div style="font-size:13px;line-height:1.45;margin-bottom:4px;
             color:${done?'var(--muted)':'var(--text)'};
             text-decoration:${done?'line-through':'none'}">
           ${escHtml(desc)}
