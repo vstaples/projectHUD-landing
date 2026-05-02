@@ -1233,7 +1233,10 @@ async function loadData() {
     if (firmId) closedWonPath += '&firm_id=eq.' + encodeURIComponent(firmId);
 
     const [pros, comps, ress, won] = await Promise.all([
-      API.get('v_pipeline_summary?is_active=eq.true&order=created_at.desc&limit=200'),
+      // CMD101: v_pipeline_summary view does not propagate prospects.is_active
+      // (confirmed via PostgREST 42703 on first deploy). Fall back to client-side
+      // filter applied immediately below. Defer view migration to a later brief.
+      API.get('v_pipeline_summary?order=created_at.desc&limit=200'),
       API.get('companies?order=name&select=id,name,industry,firm_id'),
       API.get('resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,avatar_url,department,title,is_external,user_id'),
       API.get(closedWonPath).catch(function(e){ console.warn('[CMD101] closedWon fetch failed:', e); return []; })
