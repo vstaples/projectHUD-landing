@@ -883,21 +883,14 @@ body {
 }
 .p-card-val span { color: var(--text); font-weight: 600; }
 
-.p-card-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 8px;
-  padding-top: 7px;
-  border-top: 1px solid var(--border);
-}
-
-.assigned-chip {
+/* CMD101.5i — assignee row promoted under company name */
+.p-card-assignee {
   display: flex;
   align-items: center;
   gap: 5px;
   font-size: 11px;
   color: var(--muted);
+  margin: 4px 0 8px;
 }
 
 .av-xs {
@@ -914,12 +907,45 @@ body {
   flex-shrink: 0;
 }
 
-.followup-chip {
-  font-size: 11px;
-  color: var(--muted);
+/* CMD101.5i — three stacked date rows replace footer chips */
+.p-card-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
 }
-.followup-chip.overdue { color: #f07a7a; }
-.followup-chip.today   { color: #f0c47a; }
+.p-card-date-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-feature-settings: "tnum";
+}
+.p-card-date-lbl {
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.p-card-date-val {
+  color: var(--text);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Updated freshness tones */
+.p-card-date-val.recent { color: #7af0a0; }
+.p-card-date-val.aging  { color: #f0c47a; }
+.p-card-date-val.stale  { color: #f07a7a; }
+/* Follow-up urgency tones */
+.p-card-date-val.overdue { color: #f07a7a; }
+.p-card-date-val.today   { color: #f0c47a; }
 
 /* action items badge */
 .ai-badge {
@@ -2409,11 +2435,34 @@ function renderBoard(prospects) {
 
 function renderCard(p) {
   const today = new Date().toLocaleDateString('en-CA');
-  const fu    = p.next_follow_up_date;
+
+  // ── Date formatting ─────────────────────────────────────────────────
+  const fmt = (iso) => {
+    if (!iso) return '—';
+    return new Date(iso.length > 10 ? iso : (iso + 'T00:00:00'))
+      .toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  };
+
+  // Created — static date.
+  const createdText = fmt(p.created_at);
+
+  // Updated — relative-age tone: green ≤7d, amber 8–30d, red >30d.
+  let updatedClass = '', updatedAge = '';
+  if (p.updated_at) {
+    const ageDays = (Date.now() - new Date(p.updated_at).getTime()) / 86400000;
+    if      (ageDays <= 7)  updatedClass = 'recent';
+    else if (ageDays <= 30) updatedClass = 'aging';
+    else                    updatedClass = 'stale';
+    updatedAge = ' · ' + Math.round(ageDays) + 'd ago';
+  }
+  const updatedText = fmt(p.updated_at);
+
+  // Follow Up — overdue/today/future.
+  const fu = p.next_follow_up_date;
   let fuClass = '', fuText = '—';
   if (fu) {
     fuText = new Date(fu + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-    if (fu < today)       fuClass = 'overdue';
+    if      (fu < today)  fuClass = 'overdue';
     else if (fu === today) fuClass = 'today';
   }
 
@@ -2422,8 +2471,7 @@ function renderCard(p) {
 
   const tagClass = INDUSTRY_TAGS[p.company_industry] || 'tag-other';
 
-  // CMD101.5g: replace bare priority dot with a labeled chip — clearer
-  // semantic, no redundant info-conveyance via 7px circle.
+  // CMD101.5g: priority chip (replaced bare dot in CMD101.5g).
   const priChip = p.priority
     ? `<span class="pri-chip pri-chip--${p.priority}" title="${p.priority} priority">${p.priority[0].toUpperCase()}</span>`
     : '';
@@ -2434,6 +2482,7 @@ function renderCard(p) {
 
   const val = p.est_value ? '$' + (p.est_value / 1000).toFixed(0) + 'k' : '';
 
+  // CMD101.5i: assignee promoted under company; footer holds 3 date rows.
   return `
     <div class="p-card" draggable="true" data-id="${p.id}" data-stage="${p.stage}" onclick="openProspect('${p.id}')">
       <div class="p-card-top">
@@ -2444,17 +2493,28 @@ function renderCard(p) {
         </div>
       </div>
       <div class="p-card-co">${escHtml(p.company_name || '—')}</div>
+      <div class="p-card-assignee">
+        <div class="av-xs">${initials}</div>
+        <span>${escHtml(p.assigned_to_name || '—')}</span>
+      </div>
       <div class="p-card-meta">
         ${p.company_industry
           ? `<span class="tag ${tagClass}">${escHtml(p.company_industry)}</span>` : ''}
         ${val ? `<span class="p-card-val"><span>${val}</span></span>` : ''}
       </div>
-      <div class="p-card-foot">
-        <div class="assigned-chip">
-          <div class="av-xs">${initials}</div>
-          ${escHtml(p.assigned_to_name || '—')}
+      <div class="p-card-dates">
+        <div class="p-card-date-row">
+          <span class="p-card-date-lbl">Created</span>
+          <span class="p-card-date-val">${createdText}</span>
         </div>
-        <div class="followup-chip ${fuClass}">${fuText}</div>
+        <div class="p-card-date-row">
+          <span class="p-card-date-lbl">Updated</span>
+          <span class="p-card-date-val ${updatedClass}">${updatedText}${updatedAge}</span>
+        </div>
+        <div class="p-card-date-row">
+          <span class="p-card-date-lbl">Follow Up</span>
+          <span class="p-card-date-val ${fuClass}">${fuText}</span>
+        </div>
       </div>
     </div>`;
 }
