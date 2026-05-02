@@ -1504,6 +1504,27 @@ const HUDShell = (() => {
       if (el.classList && el.classList.contains('btn-back')) {
         return `Close Prospect`;
       }
+      // CMD100.73: pill chip inside a .pill-group → Form Select with the
+      // section label (taken from preceding .sec-label) and the pill's
+      // visible text. Walks the pill-group's previous siblings for the
+      // nearest .sec-label.
+      if (el.classList && el.classList.contains('pill')) {
+        const group = el.closest('.pill-group');
+        let secLabel = '';
+        if (group) {
+          let sib = group.previousElementSibling;
+          while (sib) {
+            if (sib.classList && sib.classList.contains('sec-label')) {
+              secLabel = (sib.textContent || '').replace(/\s+/g, ' ').trim();
+              break;
+            }
+            sib = sib.previousElementSibling;
+          }
+        }
+        const pillText = _cleanLabel(label);
+        if (secLabel && pillText) return `Form Select "${secLabel}" "${pillText}"`;
+        // Fall through if we couldn't resolve the section.
+      }
 
       // 2. Container-based: walk ancestors, look for nav/tab signals
       let p = el.parentElement;
@@ -1577,6 +1598,94 @@ const HUDShell = (() => {
       } catch(e) {
         // Recorder must never break the page.
       }
+    }, true);
+
+    // ─────────────────────────────────────────────────────────────────
+    // CMD100.73 — Form-input recorder
+    // Captures text/textarea/number/date input values on blur and select
+    // dropdown changes on change. Resolves field label by walking up to
+    // the wrapping .field and reading its <label> text. Falls back to
+    // the input's name/id if no label found.
+    //
+    // Per-field last-emitted-value cache prevents consecutive duplicate
+    // emits when the user blurs without changing anything.
+    // ─────────────────────────────────────────────────────────────────
+    const _lastFieldValue = new WeakMap();
+    const TEXT_INPUT_TYPES = new Set(['text', 'number', 'date', 'email', 'tel', 'url', 'search', 'password', 'time', 'datetime-local']);
+
+    function _resolveFieldLabel(el) {
+      // 1. Walk up to .field and read its <label> child.
+      const wrapper = el.closest('.field');
+      if (wrapper) {
+        const lbl = wrapper.querySelector('label');
+        if (lbl) {
+          // Strip required-marker spans (asterisks etc.) by reading text only of direct text nodes + non-asterisk children.
+          let text = '';
+          for (const node of lbl.childNodes) {
+            if (node.nodeType === 3) text += node.nodeValue;
+            else if (node.nodeType === 1 && (node.textContent || '').trim() !== '*') text += node.textContent;
+          }
+          text = text.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+          if (text) return text;
+        }
+      }
+      // 2. Try aria-label.
+      const al = el.getAttribute && el.getAttribute('aria-label');
+      if (al && al.trim()) return al.trim();
+      // 3. Fall back to id (without leading "f-" prefix common in HUD forms).
+      const id = el.id || '';
+      return id.replace(/^f-/, '').replace(/[-_]/g, ' ') || el.name || '';
+    }
+
+    function _selectVisibleText(selectEl) {
+      const opt = selectEl.options[selectEl.selectedIndex];
+      if (!opt) return '';
+      return (opt.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function _handleFieldCommit(el) {
+      try {
+        const tag = el.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return;
+        if (tag === 'INPUT') {
+          const t = (el.type || 'text').toLowerCase();
+          if (!TEXT_INPUT_TYPES.has(t)) return; // skip checkbox/radio/file/button/submit
+        }
+        const label = _resolveFieldLabel(el);
+        if (!label) return;
+
+        let value, verb;
+        if (tag === 'SELECT') {
+          value = _selectVisibleText(el);
+          verb  = 'Form Select';
+        } else {
+          value = (el.value || '').toString();
+          verb  = 'Form Insert';
+        }
+
+        // Empty-value suppression (per A2).
+        if (!value) return;
+
+        // Duplicate suppression (per A3).
+        const cached = _lastFieldValue.get(el);
+        if (cached === value) return;
+        _lastFieldValue.set(el, value);
+
+        emit(`${verb} "${label}" "${value.replace(/"/g, '\\"')}"`);
+      } catch(e) {
+        // Never break the page.
+      }
+    }
+
+    // Blur fires per-element; capture phase so we get blurs even when
+    // focus moves to elements that stopPropagation.
+    document.addEventListener('blur', function(ev) {
+      _handleFieldCommit(ev.target);
+    }, true);
+    // Selects emit on change (immediate), since their commit is the click.
+    document.addEventListener('change', function(ev) {
+      const el = ev.target;
+      if (el && el.tagName === 'SELECT') _handleFieldCommit(el);
     }, true);
   }
 
