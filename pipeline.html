@@ -2636,6 +2636,12 @@ function _wireKanbanDnD() {
         } else {
           throw new Error('No PATCH method available on API');
         }
+        // CMD101.5m: refetch so updated_at (set by the BEFORE-UPDATE trigger)
+        // and the trailing-12mo closed-won lookup reflect the move. Without
+        // this, KPI math + Velocity/Forecast/Win-rate dials read stale
+        // in-memory values until the next page load.
+        await loadData();
+        renderAll();
       } catch (err) {
         p.stage = prevStage;
         window.allProspects = allProspects;
