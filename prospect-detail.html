@@ -651,6 +651,32 @@ body.prospect-inactive .prospect-header {
 /* CMD101.5t — Edit Stakeholder drawer below header */
 #sh-edit-overlay { inset: 48px 0 0 0; }
 #sh-edit-overlay .drawer { height: calc(100vh - 48px); }
+/* CMD101.5α — Schedule Meeting drawer below header */
+#meet-overlay { inset: 48px 0 0 0; }
+#meet-overlay .drawer { height: calc(100vh - 48px); }
+/* CMD101.5α — picker pill chips */
+.pp-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 6px 4px 4px; border-radius: 14px;
+  font-size: 11px; font-family: var(--font-mono, monospace);
+  background: rgba(0,210,255,.07); border: 1px solid rgba(0,210,255,.22);
+  color: var(--text);
+  margin: 0 4px 4px 0; max-width: 100%;
+}
+.pp-pill .pp-pill-name {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 200px;
+}
+.pp-pill .pp-pill-x {
+  cursor: pointer; color: var(--muted);
+  padding: 0 2px; border-radius: 50%;
+  font-size: 13px; line-height: 1;
+}
+.pp-pill .pp-pill-x:hover { color: var(--red); }
+.pp-pill-empty {
+  font-size: 11px; color: var(--muted);
+  padding: 4px 0; font-style: italic;
+}
 #edit-overlay .pill-group { display: flex; flex-wrap: wrap; gap: 6px; }
 #edit-overlay .pill {
   padding: 4px 10px;
@@ -992,9 +1018,19 @@ body.prospect-inactive .prospect-header {
         <input type="text" id="meet-location" placeholder="Zoom URL, address, etc." />
       </div>
       <div class="sec-label">Our team</div>
-      <select id="meet-our-team" multiple style="width:100%;height:80px;padding:6px;border-radius:6px;border:1px solid var(--border2);background:var(--surf2);color:var(--text);font-size:12px;outline:none"></select>
-      <div class="sec-label">Their team</div>
-      <select id="meet-their-team" multiple style="width:100%;height:80px;padding:6px;border-radius:6px;border:1px solid var(--border2);background:var(--surf2);color:var(--text);font-size:12px;outline:none"></select>
+      <div id="meet-our-pills" style="display:flex;flex-wrap:wrap;gap:0;margin-bottom:6px;min-height:24px">
+        <div class="pp-pill-empty">No team members added yet.</div>
+      </div>
+      <button type="button" class="ai-add-btn" id="meet-our-add"
+        onclick="meetOpenOurPicker(event)"
+        style="font-size:11px;padding:4px 10px;width:auto">+ Add resource</button>
+      <div class="sec-label" style="margin-top:14px">Their team</div>
+      <div id="meet-their-pills" style="display:flex;flex-wrap:wrap;gap:0;margin-bottom:6px;min-height:24px">
+        <div class="pp-pill-empty">No client attendees added yet.</div>
+      </div>
+      <button type="button" class="ai-add-btn" id="meet-their-add"
+        onclick="meetOpenTheirPicker(event)"
+        style="font-size:11px;padding:4px 10px;width:auto">+ Add stakeholder</button>
       <div class="sec-label">Agenda items</div>
       <div id="meet-agenda-list" style="margin-bottom:6px"></div>
       <div class="ai-add-row">
@@ -1003,7 +1039,7 @@ body.prospect-inactive .prospect-header {
       </div>
     </div>
     <div class="drawer-foot">
-      <button class="btn btn-primary" onclick="saveMeeting()">Save meeting</button>
+      <button class="btn btn-primary" onclick="saveMeeting()">Save</button>
       <button class="btn" onclick="closeDrawer('meet-overlay')">Cancel</button>
     </div>
   </div>
@@ -1450,7 +1486,7 @@ async function loadAll() {
       API.get(`prospect_action_items?prospect_id=eq.${PROSPECT_ID}&order=due_date`),
       API.get(`v_meetings?prospect_id=eq.${PROSPECT_ID}&order=meeting_date.desc`),
       API.get(`prospect_contact_links?prospect_id=eq.${PROSPECT_ID}&select=*,contacts(*)`),
-      API.get(`resources?is_active=eq.true&order=last_name&select=id,first_name,last_name,avatar_url`),
+      API.get(`resources?is_active=eq.true&order=last_name&select=id,user_id,first_name,last_name,avatar_url,department,is_external,title`),
     ]);
 
     prospect    = pro?.[0];
@@ -3871,26 +3907,114 @@ async function saveActivity() {
 }
 
 // ── meeting save ───────────────────────────────────────
+// CMD101.5α — Schedule Meeting attendee state. Pill lists + PersonPicker.
+// Selections are arrays of { id, name, kind } where kind ∈ 'resource' (our)
+// or 'contact' (their). On openMeetingDrawer we reset both lists; on Save
+// we INSERT meeting_attendees rows for each.
+let _meetOurTeam   = [];   // resources picked
+let _meetTheirTeam = [];   // stakeholder contacts picked
+
 function populateMeetingSelects() {
-  const ourSel   = document.getElementById('meet-our-team');
-  const theirSel = document.getElementById('meet-their-team');
-  ourSel.innerHTML   = '';
-  theirSel.innerHTML = '';
+  // Reset selection state and re-render pill rows. Resources/contacts
+  // candidate lists are pulled at picker-open time from the page caches.
+  _meetOurTeam   = [];
+  _meetTheirTeam = [];
+  renderMeetOurPills();
+  renderMeetTheirPills();
+}
 
-  resources.forEach(r => {
-    const o = document.createElement('option');
-    o.value = r.id;
-    o.textContent = r.first_name + ' ' + r.last_name;
-    ourSel.appendChild(o);
-  });
+function renderMeetOurPills() {
+  const el = document.getElementById('meet-our-pills');
+  if (!el) return;
+  if (_meetOurTeam.length === 0) {
+    el.innerHTML = '<div class="pp-pill-empty">No team members added yet.</div>';
+    return;
+  }
+  el.innerHTML = _meetOurTeam.map((p, i) => `
+    <div class="pp-pill" data-rid="${escHtml(p.id)}">
+      <span class="pp-pill-name">${escHtml(p.name)}</span>
+      <span class="pp-pill-x" onclick="removeMeetOur(${i})" title="Remove">×</span>
+    </div>`).join('');
+}
 
-  contacts.forEach(c => {
-    if (!c) return;
-    const o = document.createElement('option');
-    o.value = c.id;
-    o.textContent = c.first_name + ' ' + c.last_name + (c.title ? ' · ' + c.title : '');
-    theirSel.appendChild(o);
-  });
+function renderMeetTheirPills() {
+  const el = document.getElementById('meet-their-pills');
+  if (!el) return;
+  if (_meetTheirTeam.length === 0) {
+    el.innerHTML = '<div class="pp-pill-empty">No client attendees added yet.</div>';
+    return;
+  }
+  el.innerHTML = _meetTheirTeam.map((p, i) => `
+    <div class="pp-pill" data-cid="${escHtml(p.id)}">
+      <span class="pp-pill-name">${escHtml(p.name)}${p.title ? ' · ' + escHtml(p.title) : ''}</span>
+      <span class="pp-pill-x" onclick="removeMeetTheir(${i})" title="Remove">×</span>
+    </div>`).join('');
+}
+
+function removeMeetOur(i)   { _meetOurTeam.splice(i, 1);   renderMeetOurPills(); }
+function removeMeetTheir(i) { _meetTheirTeam.splice(i, 1); renderMeetTheirPills(); }
+
+// Open the shared PersonPicker against the full resources list. Already-
+// picked resources are filtered out so the operator can't double-add.
+function meetOpenOurPicker(ev) {
+  if (ev) ev.stopPropagation();
+  if (!window.PersonPicker) {
+    alert('PersonPicker module not loaded.');
+    return;
+  }
+  const trigger = document.getElementById('meet-our-add');
+  const taken   = new Set(_meetOurTeam.map(p => p.id));
+  const list    = (resources || [])
+    .filter(r => !taken.has(r.id))
+    .map(r => ({
+      id:          r.id,
+      user_id:     r.user_id,
+      name:        ((r.first_name || '') + ' ' + (r.last_name || '')).trim(),
+      department:  r.department  || null,
+      is_external: r.is_external || false,
+      title:       r.title       || null,
+    }));
+  PersonPicker.show(trigger, function(pick) {
+    _meetOurTeam.push({ id: pick.id, name: pick.name });
+    renderMeetOurPills();
+  }, { resources: list });
+}
+
+// Open PersonPicker against this prospect's stakeholders. Each stakeholder
+// row joins `contacts(*)`; we shape them into the picker's resource contract.
+// Filtered to exclude already-picked.
+function meetOpenTheirPicker(ev) {
+  if (ev) ev.stopPropagation();
+  if (!window.PersonPicker) {
+    alert('PersonPicker module not loaded.');
+    return;
+  }
+  const trigger = document.getElementById('meet-their-add');
+  const taken   = new Set(_meetTheirTeam.map(p => p.id));
+  // stakeholders[] is the page cache; each entry has .contacts (the person)
+  // and .stakeholder_role (their role on this prospect). External flag is
+  // hardcoded true so the PersonPicker groups them under "External".
+  const list    = (stakeholders || [])
+    .map(link => link.contacts)
+    .filter(c => c && !taken.has(c.id))
+    .map(c => ({
+      id:          c.id,
+      user_id:     null,
+      name:        ((c.first_name || '') + ' ' + (c.last_name || '')).trim(),
+      department:  null,
+      is_external: true,
+      title:       c.title || null,
+    }));
+  if (list.length === 0) {
+    alert('No stakeholders to choose from. Add stakeholders on the Stakeholders tab first.');
+    return;
+  }
+  PersonPicker.show(trigger, function(pick) {
+    // Look up title for the pill display.
+    const src = list.find(p => p.id === pick.id);
+    _meetTheirTeam.push({ id: pick.id, name: pick.name, title: src?.title || null });
+    renderMeetTheirPills();
+  }, { resources: list });
 }
 
 let _agendaItems = [];
@@ -3958,7 +4082,35 @@ async function saveMeeting() {
       });
     }
 
+    // CMD101.5α — save attendees to meeting_attendees.
+    // New columns resource_id (→ resources) and contact_id (→ contacts) accept
+    // any selection from the pickers without needing the users-table bridge.
+    for (const r of _meetOurTeam) {
+      try {
+        await API.post('meeting_attendees', {
+          meeting_id:  meetId,
+          resource_id: r.id,
+          is_required: true,
+        });
+      } catch(e) {
+        console.error('[saveMeeting] our-team attendee insert failed:', r, e);
+      }
+    }
+    for (const c of _meetTheirTeam) {
+      try {
+        await API.post('meeting_attendees', {
+          meeting_id: meetId,
+          contact_id: c.id,
+          is_required: true,
+        });
+      } catch(e) {
+        console.error('[saveMeeting] their-team attendee insert failed:', c, e);
+      }
+    }
+
     _agendaItems = [];
+    _meetOurTeam = [];
+    _meetTheirTeam = [];
     closeDrawer('meet-overlay');
     await loadAll();
     switchTab('meetings');
