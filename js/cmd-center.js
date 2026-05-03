@@ -250,15 +250,26 @@ function _safeSendOn(ch, payload) {
     // CMD100.21: Supabase deprecation warning — when the channel is not yet
     // joined, send() falls back to REST internally and warns. Pick the
     // explicit method based on connection state to silence the warning.
+    // CMD101.5z: httpSend returns a promise; swallow rejections so 401s
+    // (transient auth) and "Payload is required" don't become Uncaught
+    // promise rejections in the console.
+    var result;
     if (ch.state === 'joined') {
-      ch.send(payload);
+      result = ch.send(payload);
     } else if (typeof ch.httpSend === 'function') {
-      ch.httpSend(payload);
+      result = ch.httpSend(payload);
     } else {
       // Older SDKs without httpSend — fall through to send() and accept the warning.
-      ch.send(payload);
+      result = ch.send(payload);
     }
-  } catch(e) {}
+    if (result && typeof result.catch === 'function') {
+      result.catch(function(err) {
+        if (DEBUG_EVENTS) console.warn('[cmd-center] send rejected:', err && err.message || err);
+      });
+    }
+  } catch(e) {
+    if (DEBUG_EVENTS) console.warn('[cmd-center] send threw:', e && e.message || e);
+  }
 }
 
 function _connect() {
@@ -931,7 +942,12 @@ function _connect() {
     };
 
     try {
-      _channel.send({
+      // CMD101.5z: route through _safeSendOn so the joined/not-joined branch
+      // picks send() vs httpSend() correctly. Calling _channel.send() directly
+      // hits the new SDK's deprecated auto-REST-fallback path, which throws
+      // "Payload is required for httpSend()" + 401 when the channel isn't
+      // yet joined. _safeSendOn handles both states without warnings.
+      _safeSendOn(_channel, {
         type:    'broadcast',
         event:   'presence_heartbeat',
         payload: payload,
