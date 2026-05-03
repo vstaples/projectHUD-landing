@@ -972,7 +972,7 @@ body.prospect-inactive .prospect-header {
 <div class="overlay" id="meet-overlay" onclick="handleOverlay(event,'meet-overlay')">
   <div class="drawer" onclick="event.stopPropagation()">
     <div class="drawer-head">
-      <span class="drawer-title">Schedule meeting</span>
+      <span class="drawer-title">SCHEDULE MEETING</span>
       <button class="drawer-close" onclick="closeDrawer('meet-overlay')">✕</button>
     </div>
     <div class="drawer-body">
@@ -1014,7 +1014,7 @@ body.prospect-inactive .prospect-header {
         </div>
       </div>
       <div class="field">
-        <label>Location / link</label>
+        <label>Location / link *</label>
         <input type="text" id="meet-location" placeholder="Zoom URL, address, etc." />
       </div>
       <div class="sec-label">Our team</div>
@@ -1036,6 +1036,12 @@ body.prospect-inactive .prospect-header {
       <div class="ai-add-row">
         <input type="text" id="meet-agenda-input" placeholder="Add agenda item…" style="flex:1;padding:5px 8px;border-radius:5px;border:1px solid var(--border2);background:var(--surf2);color:var(--text);font-size:11px;outline:none" />
         <button class="ai-add-btn" onclick="addAgendaItem()">+ Add</button>
+      </div>
+      <div class="field" style="margin-top:14px">
+        <label>Narrative</label>
+        <textarea id="meet-narrative" rows="6"
+          placeholder="Free-form context, background, what to prepare, key questions, etc."
+          style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border2);background:var(--surf2);color:var(--text);font-size:12px;font-family:inherit;outline:none;resize:vertical"></textarea>
       </div>
     </div>
     <div class="drawer-foot">
@@ -4040,10 +4046,23 @@ function renderAgendaList() {
 function removeAgenda(i) { _agendaItems.splice(i,1); renderAgendaList(); }
 
 async function saveMeeting() {
-  const title = document.getElementById('meet-title').value.trim();
-  const date  = document.getElementById('meet-date').value;
-  const time  = document.getElementById('meet-time').value || '09:00';
-  if (!title || !date) { alert('Title and date are required.'); return; }
+  const title     = document.getElementById('meet-title').value.trim();
+  const date      = document.getElementById('meet-date').value;
+  const time      = document.getElementById('meet-time').value || '09:00';
+  const location  = document.getElementById('meet-location').value.trim();
+  const narrative = document.getElementById('meet-narrative').value.trim();
+
+  // CMD101.5α — collect ALL missing required fields and present together.
+  const missing = [];
+  if (!title)    missing.push('Title');
+  if (!date)     missing.push('Date');
+  if (!location) missing.push('Location / link');
+  if (missing.length) {
+    alert('Please complete the following required field' +
+          (missing.length === 1 ? '' : 's') + ':\n\n  • ' +
+          missing.join('\n  • '));
+    return;
+  }
 
   const meetingDatetime = date + 'T' + time + ':00';
 
@@ -4059,15 +4078,18 @@ async function saveMeeting() {
     };
     const payload = {
       firm_id:          prospect.firm_id,
-      project_id:       prospect.linked_project_id || null,  // null if schema allows, else omit field
+      project_id:       prospect.linked_project_id || null,
       prospect_id:      PROSPECT_ID,
       title,
       scheduled_date:   meetingDatetime,
       scheduled_duration_minutes: +document.getElementById('meet-dur').value || 60,
-      location:         document.getElementById('meet-location').value || null,
+      location:         location,
+      narrative:        narrative || null,
       status:           'scheduled',
       meeting_type:     meetingTypeMap[formatVal] || 'ad_hoc',
-      organizer_id:     _currentResource?.id || null,
+      // CMD101.5α — write organizer_resource_id (FK → resources). The legacy
+      // organizer_id column FKs against users and rejects most resources.
+      organizer_resource_id: _currentResource?.id || null,
     };
 
     const result  = await API.post('meetings', payload);
