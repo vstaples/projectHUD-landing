@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accord — Live Capture</title>
+<link rel="stylesheet" href="/css/hud.css">
+
+<!-- Editorial fonts (per Style Doctrine v1.7 §2 + prototype v3b-4) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   Accord — Live Capture surface (CMD-A3)
+   Scoped under #accord-app. Tokens follow prototype v3b-4 +
+   Style Doctrine v1.7 (§3.5 surface tiers, §7 glyphs, §6 markup).
+   No hex literals in JS-rendered DOM (per v1.7 §6.2).
+   All font sizes ≥ 11px (operator standing rule).
+   ============================================================ */
+
+#accord-app {
+  /* Canvas — warm slate palette from prototype v3b-4 */
+  --canvas-deep:   #1a1814;
+  --canvas:        #211e19;
+  --canvas-raised: #2a2620;
+  --canvas-elev:   #332e26;
+  --canvas-hover:  #3d372d;
+
+  /* Text — warm parchment hierarchy */
+  --ink-primary:   #f4ede0;
+  --ink-body:      #d6cdb8;
+  --ink-muted:     #b3a78f;
+  --ink-faint:     #908572;
+  --ink-ghost:     #5a5347;
+
+  /* Signal — muted amber, used sparingly */
+  --signal:        #d4a04a;
+  --signal-soft:   rgba(212, 160, 74, 0.15);
+  --signal-dim:    rgba(212, 160, 74, 0.4);
+
+  /* Tag colors — desaturated per IR45 (declared not measured) */
+  --tag-note:      #8ba89a;
+  --tag-decision:  #c9956a;
+  --tag-action:    #b07c8a;
+  --tag-risk:      #a86f5e;
+  --tag-question:  #7b8fa8;
+
+  /* Borders */
+  --rule:          rgba(244, 237, 224, 0.06);
+  --rule-strong:   rgba(244, 237, 224, 0.12);
+
+  --rail-w: 320px;
+  --meta-w: 320px;
+
+  background: var(--canvas-deep);
+  color: var(--ink-body);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#accord-app * { box-sizing: border-box; }
+
+/* ── Top nav ─────────────────────────────────────────────── */
+#accord-app .topnav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--canvas-deep);
+}
+#accord-app .brand {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--ink-primary);
+}
+#accord-app .brand-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  margin-left: 8px;
+}
+#accord-app .surface-switch {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+#accord-app .surface-switch button {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  font: 500 12px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms, background 120ms;
+}
+#accord-app .surface-switch button:hover {
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+}
+#accord-app .surface-switch button.active {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+  background: var(--signal-soft);
+}
+#accord-app .live-connect {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+#accord-app .live-connect.connected {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+}
+#accord-app .lc-pulse {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ink-faint);
+}
+#accord-app .live-connect.connected .lc-pulse {
+  background: var(--signal);
+  animation: lc-pulse 1.6s ease-in-out infinite;
+}
+@keyframes lc-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* ── Surface containers ─────────────────────────────────── */
+#accord-app .surface { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+#accord-app .surface.active { display: flex; }
+
+#accord-app .placeholder-surface {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+  color: var(--ink-faint);
+  text-align: center;
+  padding: 48px;
+}
+#accord-app .placeholder-surface h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--ink-muted);
+}
+#accord-app .placeholder-surface p {
+  font-size: 13px;
+  max-width: 420px;
+  line-height: 1.5;
+}
+
+/* ── Capture header ─────────────────────────────────────── */
+#accord-app .capture-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 24px 32px 18px;
+  gap: 24px;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .meeting-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  color: var(--ink-primary);
+  margin-bottom: 6px;
+}
+#accord-app .meeting-organizer {
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin-bottom: 8px;
+}
+#accord-app .meeting-organizer .organizer-label {
+  color: var(--ink-faint);
+  margin-right: 4px;
+}
+#accord-app .meeting-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  flex-wrap: wrap;
+}
+#accord-app .meeting-meta > span:not(.live-pulse) + span::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--ink-ghost);
+}
+#accord-app .live-pulse {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ink-ghost);
+  display: inline-block;
+}
+#accord-app .live-pulse.running {
+  background: var(--signal);
+  animation: lc-pulse 1.6s ease-in-out infinite;
+}
+
+#accord-app .capture-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+#accord-app .timer {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+  min-width: 110px;
+  text-align: right;
+}
+#accord-app .timer.ended { color: var(--signal); font-size: 13px; }
+
+#accord-app .btn {
+  font: 500 12px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 9px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+#accord-app .btn-signal {
+  background: var(--signal);
+  color: var(--canvas-deep);
+}
+#accord-app .btn-signal:hover { background: #e0b35d; }
+#accord-app .btn-end {
+  background: transparent;
+  border-color: var(--tag-risk);
+  color: var(--tag-risk);
+}
+#accord-app .btn-end:hover { background: rgba(168, 111, 94, 0.1); }
+#accord-app .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+#accord-app .btn-ghost {
+  background: transparent;
+  border-color: var(--rule);
+  color: var(--ink-muted);
+}
+#accord-app .btn-ghost:hover { color: var(--ink-primary); border-color: var(--rule-strong); }
+
+/* ── Closed-meeting banner ──────────────────────────────── */
+#accord-app .closed-banner {
+  display: none;
+  background: var(--signal-soft);
+  border-bottom: 1px solid var(--signal-dim);
+  padding: 12px 32px;
+  font-size: 12px;
+  color: var(--ink-body);
+  align-items: center;
+  gap: 16px;
+}
+#accord-app .closed-banner.visible { display: flex; }
+#accord-app .closed-banner-msg { flex: 1; }
+#accord-app .closed-banner-msg strong { color: var(--ink-primary); font-weight: 600; }
+
+/* ── Capture body 3-column ─────────────────────────────── */
+#accord-app .capture-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: var(--rail-w) 1fr var(--meta-w);
+  gap: 0;
+  overflow: hidden;
+}
+
+/* Agenda rail */
+#accord-app .agenda-rail {
+  border-right: 1px solid var(--rule);
+  padding: 18px 18px 24px;
+  overflow-y: auto;
+  background: var(--canvas-deep);
+}
+#accord-app .rail-section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+}
+#accord-app .rail-section-label .count { font-size: 11px; color: var(--ink-ghost); text-transform: none; letter-spacing: 0.02em; }
+
+#accord-app .rail-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+#accord-app .rail-actions .btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+#accord-app .agenda-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+#accord-app .agenda-toggle button {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-faint);
+  padding: 6px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+#accord-app .agenda-toggle button.active { color: var(--signal); border-color: var(--signal-dim); }
+
+#accord-app .agenda-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+}
+#accord-app .agenda-item:hover { background: var(--canvas-raised); }
+#accord-app .agenda-item.active {
+  background: var(--canvas-raised);
+  border-color: var(--signal-dim);
+}
+#accord-app .agenda-pos {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  min-width: 18px;
+  margin-top: 1px;
+}
+#accord-app .agenda-title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ink-body);
+}
+#accord-app .agenda-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+}
+#accord-app .agenda-item:hover .agenda-actions { opacity: 1; }
+#accord-app .agenda-actions button {
+  background: transparent;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+#accord-app .agenda-actions button:hover { color: var(--ink-primary); }
+
+/* Capture pane */
+#accord-app .capture-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--canvas);
+}
+#accord-app .context-strip {
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 12px;
+  color: var(--ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+#accord-app .context-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+#accord-app .context-target {
+  color: var(--ink-primary);
+  font-weight: 500;
+  font-size: 13px;
+}
+#accord-app .context-path { color: var(--ink-faint); font-size: 11px; }
+
+#accord-app .capture-input-wrap { padding: 16px 28px 0; }
+#accord-app .capture-input {
+  width: 100%;
+  min-height: 84px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--ink-primary);
+  padding: 12px 14px;
+  font: 400 14px 'IBM Plex Sans', system-ui, sans-serif;
+  resize: vertical;
+}
+#accord-app .capture-input:focus { outline: none; border-color: var(--signal-dim); }
+#accord-app .capture-input::placeholder { color: var(--ink-faint); }
+#accord-app .capture-input[disabled] { opacity: 0.4; cursor: not-allowed; background: var(--canvas-deep); }
+
+#accord-app .tag-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 28px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .tag-row-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-right: 4px;
+}
+#accord-app .tag-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  color: var(--ink-body);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+#accord-app .tag-btn:hover { background: var(--canvas-elev); }
+#accord-app .tag-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+#accord-app .tag-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block;
+}
+#accord-app .tag-dot.note     { background: var(--tag-note);     }
+#accord-app .tag-dot.decision { background: var(--tag-decision); }
+#accord-app .tag-dot.action   { background: var(--tag-action);   }
+#accord-app .tag-dot.risk     { background: var(--tag-risk);     }
+#accord-app .tag-dot.question { background: var(--tag-question); }
+#accord-app .tag-key {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  margin-left: 2px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+/* Stream */
+#accord-app .captures-stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 28px 32px;
+}
+#accord-app .stream-tabs {
+  display: flex;
+  gap: 16px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 8px;
+  margin-bottom: 14px;
+}
+#accord-app .stream-tab {
+  background: none;
+  border: none;
+  color: var(--ink-muted);
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 0;
+  cursor: pointer;
+  display: inline-flex; gap: 6px; align-items: center;
+}
+#accord-app .stream-tab.active { color: var(--signal); border-bottom: 2px solid var(--signal); margin-bottom: -10px; padding-bottom: 8px; }
+#accord-app .stream-tab-count {
+  font-size: 11px; color: var(--ink-faint);
+  background: var(--canvas-elev);
+  padding: 0 6px; border-radius: 8px;
+}
+
+#accord-app .capture-row {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0 10px 4px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+}
+#accord-app .capture-row .cap-time {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  min-width: 60px;
+  padding-top: 2px;
+}
+#accord-app .capture-row .cap-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ink-muted);
+  min-width: 90px;
+  padding-top: 2px;
+}
+#accord-app .capture-row .cap-summary {
+  flex: 1;
+  color: var(--ink-body);
+  line-height: 1.5;
+}
+#accord-app .capture-row .cap-author {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+
+#accord-app .stream-empty {
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding: 28px 0;
+  text-align: center;
+}
+
+/* Meta pane */
+#accord-app .meta-pane {
+  border-left: 1px solid var(--rule);
+  padding: 18px 18px 24px;
+  overflow-y: auto;
+  background: var(--canvas-deep);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+#accord-app .meta-section-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+#accord-app .coverage-bar {
+  width: 100%; height: 6px;
+  background: var(--canvas-elev);
+  border-radius: 3px; overflow: hidden;
+  margin-bottom: 6px;
+}
+#accord-app .coverage-fill { height: 100%; background: var(--signal); transition: width 240ms; }
+#accord-app .coverage-text { font-size: 11px; color: var(--ink-muted); }
+
+/* Attendees */
+#accord-app .attendee-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--ink-body);
+}
+#accord-app .presence-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ink-ghost);
+  flex-shrink: 0;
+}
+#accord-app .presence-dot.present  { background: #6ba88c; }       /* sage green per palette */
+#accord-app .presence-dot.unstable { background: var(--signal); animation: lc-pulse 1.4s ease-in-out infinite; }
+#accord-app .attendee-name { flex: 1; }
+#accord-app .attendee-self  { color: var(--ink-faint); font-size: 11px; }
+
+/* Chat */
+#accord-app .chat-stream {
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#accord-app .chat-stream:empty::after {
+  content: 'No chat messages yet.';
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+#accord-app .chat-msg { display: flex; gap: 6px; align-items: baseline; }
+#accord-app .chat-msg .chat-author { font-size: 11px; color: var(--ink-muted); font-weight: 500; min-width: 60px; }
+#accord-app .chat-msg .chat-text { color: var(--ink-body); flex: 1; word-break: break-word; }
+#accord-app .chat-msg .chat-time { font: 500 11px 'IBM Plex Mono', monospace; color: var(--ink-ghost); }
+
+#accord-app .chat-input-row { display: flex; gap: 6px; }
+#accord-app .chat-input {
+  flex: 1;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-primary);
+  padding: 6px 10px;
+  font-size: 12px;
+}
+#accord-app .chat-input:focus { outline: none; border-color: var(--signal-dim); }
+#accord-app .chat-send {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+#accord-app .chat-send:not([disabled]):hover { color: var(--signal); border-color: var(--signal-dim); }
+#accord-app .chat-send[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+/* New-meeting modal + END modal */
+#accord-app .modal-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  align-items: center; justify-content: center;
+}
+#accord-app .modal-backdrop.visible { display: flex; }
+#accord-app .modal {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  padding: 24px;
+  max-width: 480px;
+  width: calc(100% - 48px);
+  color: var(--ink-body);
+}
+#accord-app .modal h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--ink-primary);
+  margin-bottom: 12px;
+}
+#accord-app .modal p { font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+#accord-app .modal label {
+  display: block;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin: 12px 0 4px;
+}
+#accord-app .modal input[type=text],
+#accord-app .modal input[type=datetime-local] {
+  width: 100%;
+  background: var(--canvas);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-primary);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+#accord-app .modal-actions {
+  display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px;
+}
+
+/* Toast */
+#accord-app .toast {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  background: var(--canvas-elev);
+  border: 1px solid var(--signal-dim);
+  border-left-width: 3px;
+  border-radius: 4px;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--ink-body);
+  z-index: 900;
+  display: none;
+  align-items: center;
+  gap: 16px;
+  max-width: 360px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+#accord-app .toast.visible { display: flex; }
+#accord-app .toast-msg { flex: 1; }
+#accord-app .toast-msg strong { color: var(--ink-primary); font-weight: 600; }
+#accord-app .toast-close {
+  background: transparent;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 18px; line-height: 1;
+  cursor: pointer;
+}
+
+/* ── Disabled / closed-state cosmetics ─────────────────── */
+#accord-app .surface-capture.meeting-closed .capture-input,
+#accord-app .surface-capture.meeting-closed .tag-btn,
+#accord-app .surface-capture.meeting-closed .chat-input,
+#accord-app .surface-capture.meeting-closed .chat-send {
+  pointer-events: none;
+  opacity: 0.4;
+}
+</style>
+</head>
+
+<body>
+<div id="accord-app">
+
+  <!-- ── Top nav ──────────────────────────────────────────────── -->
+  <nav class="topnav">
+    <div class="brand">Accord<span class="brand-meta">CMD-A3 · Live Capture</span></div>
+
+    <button class="live-connect" id="liveConnectBtn" title="Subscribe to the meeting channel">
+      <span class="lc-pulse"></span>
+      <span class="lc-label">LIVE CONNECT</span>
+    </button>
+
+    <div class="surface-switch" role="tablist">
+      <button data-surface="capture"  class="active">Live Capture</button>
+      <button data-surface="document">Living Document</button>
+      <button data-surface="ledger">Decision Ledger</button>
+      <button data-surface="digest">Digest &amp; Send</button>
+      <button data-surface="minutes">Minutes</button>
+    </div>
+  </nav>
+
+  <!-- ── Surface: Live Capture ───────────────────────────────── -->
+  <section class="surface surface-capture active" id="surface-capture">
+
+    <!-- Header (populated by JS) -->
+    <header class="capture-header">
+      <div>
+        <h1 class="meeting-title" id="cap-title">No meeting loaded</h1>
+        <div class="meeting-organizer" id="cap-organizer" style="display:none">
+          <span class="organizer-label">Organized by</span>
+          <span class="organizer-name" id="cap-organizer-name"></span>
+        </div>
+        <div class="meeting-meta" id="cap-meta">
+          <span class="live-pulse" id="cap-pulse" title="Meeting status"></span>
+          <span id="cap-meta-text">Use NEW MEETING to begin.</span>
+        </div>
+      </div>
+      <div class="capture-controls">
+        <div class="timer" id="meetingTimer">00:00:00</div>
+        <button class="btn btn-ghost" id="newMeetingBtn">+ New meeting</button>
+        <button class="btn btn-signal" id="meetingToggleBtn" disabled>Start meeting →</button>
+      </div>
+    </header>
+
+    <!-- Closed-meeting banner -->
+    <div class="closed-banner" id="closedBanner">
+      <div class="closed-banner-msg">
+        <strong>Meeting committed to Chain of Custody.</strong>
+        Captures are now structurally immutable per Iron Rule 42.
+      </div>
+      <button class="btn btn-ghost" data-target-surface="document">View in Living Document</button>
+      <button class="btn btn-ghost" data-target-surface="minutes">Minutes archive</button>
+    </div>
+
+    <div class="capture-body">
+
+      <!-- Agenda rail -->
+      <aside class="agenda-rail">
+        <div class="rail-section-label">
+          <span>Agenda</span>
+          <span class="count" id="agendaCount">0 items</span>
+        </div>
+        <div class="agenda-toggle" role="group">
+          <button data-agenda-filter="active" class="active">Active</button>
+          <button data-agenda-filter="all">All</button>
+        </div>
+        <div class="rail-actions">
+          <button class="btn btn-ghost" id="newAgendaBtn">+ New item</button>
+        </div>
+        <div id="agendaList"></div>
+      </aside>
+
+      <!-- Capture pane -->
+      <div class="capture-pane">
+
+        <div class="context-strip">
+          <span class="context-label">Capturing under</span>
+          <span class="context-target" id="captureTarget">— pick an agenda item —</span>
+          <span class="context-path" id="capturePath"></span>
+        </div>
+
+        <div class="capture-input-wrap">
+          <textarea
+            class="capture-input"
+            id="captureInput"
+            placeholder="Type what's being said. Press a tag below (or N/D/A/R/Q) to commit."
+            disabled></textarea>
+        </div>
+
+        <div class="tag-row">
+          <span class="tag-row-label">Tag as</span>
+          <button class="tag-btn" data-tag="note"     disabled><span class="tag-dot note"></span>Note     <span class="tag-key">N</span></button>
+          <button class="tag-btn" data-tag="decision" disabled><span class="tag-dot decision"></span>Decision <span class="tag-key">D</span></button>
+          <button class="tag-btn" data-tag="action"   disabled><span class="tag-dot action"></span>Action   <span class="tag-key">A</span></button>
+          <button class="tag-btn" data-tag="risk"     disabled><span class="tag-dot risk"></span>Risk     <span class="tag-key">R</span></button>
+          <button class="tag-btn" data-tag="question" disabled><span class="tag-dot question"></span>Question <span class="tag-key">Q</span></button>
+        </div>
+
+        <div class="captures-stream">
+          <div class="stream-tabs">
+            <button class="stream-tab active" data-stream-tab="present">
+              <span>Captured this meeting</span>
+              <span class="stream-tab-count" id="streamCountPresent">0</span>
+            </button>
+            <button class="stream-tab" data-stream-tab="history">
+              <span>Thread history</span>
+              <span class="stream-tab-count" id="streamCountHistory">0</span>
+            </button>
+          </div>
+          <div id="captureStream"></div>
+          <div id="threadHistoryStream" style="display:none"></div>
+        </div>
+
+      </div>
+
+      <!-- Meta pane -->
+      <aside class="meta-pane">
+        <div>
+          <div class="meta-section-label">Coverage</div>
+          <div class="coverage-bar"><div class="coverage-fill" id="coverageFill" style="width:0%"></div></div>
+          <div class="coverage-text" id="coverageText">0 of 0 agenda items have entries</div>
+        </div>
+
+        <div>
+          <div class="meta-section-label">Attendees</div>
+          <div id="attendeesList"></div>
+        </div>
+
+        <div>
+          <div class="meta-section-label">Team chat</div>
+          <div class="chat-stream" id="chatStream"></div>
+          <div class="chat-input-row">
+            <input type="text" class="chat-input" id="chatInput"
+                   placeholder="Message the meeting…" autocomplete="off" disabled>
+            <button class="chat-send" id="chatSendBtn" disabled>Send</button>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </section>
+
+  <!-- Placeholder surfaces -->
+  <section class="surface" id="surface-document">
+    <div class="placeholder-surface">
+      <h2>Living Document</h2>
+      <p>Coming in CMD-A4. The Living Document surface synthesizes captured commits into a continuously-updated narrative scoped to the active thread.</p>
+    </div>
+  </section>
+  <section class="surface" id="surface-ledger">
+    <div class="placeholder-surface">
+      <h2>Decision Ledger</h2>
+      <p>Coming in CMD-A5. The Decision Ledger surfaces decision and risk nodes as cards with edge declarations and declared-belief trajectory.</p>
+    </div>
+  </section>
+  <section class="surface" id="surface-digest">
+    <div class="placeholder-surface">
+      <h2>Digest &amp; Send</h2>
+      <p>Coming in CMD-A6. Digest &amp; Send composes a meeting summary and routes it to attendees and stakeholders.</p>
+    </div>
+  </section>
+  <section class="surface" id="surface-minutes">
+    <div class="placeholder-surface">
+      <h2>Minutes</h2>
+      <p>Coming in CMD-A7. Minutes renders the sealed Chain of Custody record as a citable PDF.</p>
+    </div>
+  </section>
+
+  <!-- ── New-meeting modal ──────────────────────────────────── -->
+  <div class="modal-backdrop" id="newMeetingModal">
+    <div class="modal">
+      <h3>New meeting</h3>
+      <p>A new meeting will be created in the <code>idle</code> state and you'll become the organizer. Add agenda items pre-meeting; click Start meeting to enter the running state.</p>
+      <label for="nmTitle">Title</label>
+      <input type="text" id="nmTitle" placeholder="Meeting title">
+      <label for="nmThreadTitle">Thread (will be created if new)</label>
+      <input type="text" id="nmThreadTitle" placeholder="Thread title (e.g., 'Heatsink redesign')">
+      <div class="modal-actions">
+        <button class="btn btn-ghost"  id="nmCancel">Cancel</button>
+        <button class="btn btn-signal" id="nmCreate">Create meeting</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── End-meeting confirm modal ─────────────────────────── -->
+  <div class="modal-backdrop" id="endMeetingModal">
+    <div class="modal">
+      <h3>End meeting?</h3>
+      <p>Once committed, captured items become permanent evidence per Chain of Custody. This cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="emCancel">Cancel</button>
+        <button class="btn btn-end"   id="emConfirm">End meeting</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Async PDF mock toast ──────────────────────────────── -->
+  <div class="toast" id="pdfToast" role="status">
+    <div class="toast-msg">
+      <strong>Minutes record published.</strong> Open in Minutes archive when CMD-A7 lands.
+    </div>
+    <button class="toast-close" id="toastClose" aria-label="Dismiss">×</button>
+  </div>
+
+</div>
+
+<!-- ── Standard scripts (per compass.html / cadence.html convention) ── -->
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/coc.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/notif.js"></script>
+<script src="/js/version.js?v=seed"></script>
+
+<!-- ── Versioned shared loaders (matches compass.html pattern) ── -->
+<script>
+  (function() {
+    var v = window._PROJECTHUD_VERSION;
+    function load(src) {
+      var s = document.createElement('script');
+      s.src = src + '?v=' + v;
+      document.head.appendChild(s);
+    }
+    load('/js/sidebar.js');
+    load('/js/cmd-center.js');
+    load('/js/accord-core.js');
+    load('/js/accord-capture.js');
+  })();
+</script>
+
+</body>
+</html>

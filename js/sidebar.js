@@ -281,6 +281,7 @@ const HUDShell = (() => {
       { href: '/resources.html',           icon: '◎', label: 'Resources',  section: 'main'  },
       { href: '/resource-requests.html',   icon: '⬡', label: 'Requests',    section: 'main'  },
       { href: '/cadence.html',             icon: '⬡', label: 'Cadence',     section: 'main'  },
+      { href: '/accord.html',              icon: '◇', label: 'Accord',      section: 'main'  },
       { href: '/aegis.html',               icon: '⬡', label: 'Aegis',       section: 'admin', target: '_blank' },
       { href: '/audit-log.html',           icon: '▦', label: 'Audit Log',  section: 'admin' },
       { href: '/users.html',               icon: '◑', label: 'User Mgmt',  section: 'admin' },
