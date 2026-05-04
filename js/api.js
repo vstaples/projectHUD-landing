@@ -64,6 +64,41 @@ const API = (() => {
   const patch  = (path, body)   => query(path, { method: 'PATCH', body });
   const del    = (path)         => query(path, { method: 'DELETE' });
 
+  // ── EDGE FUNCTION: resolve-uri (CMD-A2) ────────────────────
+  // Resolves a cross-module URI (accord://, compass://, aegis://)
+  // to a rendered card structure. Always returns a response object;
+  // never throws. Inspect `.available` to decide whether to render
+  // the card or fall back to plain-text.
+  async function resolveURI(uri) {
+    try {
+      const token = await Auth.getFreshToken().catch(() => Auth.getToken());
+      const url = `${PHUD.SUPABASE_URL}/functions/v1/resolve-uri?uri=${encodeURIComponent(uri)}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey':        PHUD.SUPABASE_KEY,
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) {
+        return {
+          uri,
+          available:   false,
+          reason:      res.status === 401 ? 'unauthenticated' : 'resolver_error',
+          http_status: res.status,
+        };
+      }
+      return await res.json();
+    } catch (e) {
+      return {
+        uri,
+        available: false,
+        reason:    'resolver_error',
+        detail:    e?.message || String(e),
+      };
+    }
+  }
+
   // ── DOMAIN METHODS ─────────────────────────────────────────
 
   // Firms
@@ -127,6 +162,7 @@ const API = (() => {
 
   return {
     get, post, patch, del,
+    resolveURI,                          // CMD-A2 cross-module URI resolver
     getFirms, getInternalFirm,
     getUsers, getUserById,
     getProjects, getProjectById, getActiveProjects,

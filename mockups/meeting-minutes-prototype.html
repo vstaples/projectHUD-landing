@@ -1,0 +1,2318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meeting Minutes — ProjectHUD Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  /* Canvas — warm slate, not cold blue-black */
+  --canvas-deep:    #1a1814;
+  --canvas:         #211e19;
+  --canvas-raised:  #2a2620;
+  --canvas-elev:    #332e26;
+  --canvas-hover:   #3d372d;
+
+  /* Text — warm parchment hierarchy */
+  --ink-primary:    #f4ede0;
+  --ink-body:       #d6cdb8;
+  --ink-muted:      #998d76;
+  --ink-faint:      #6b6354;
+  --ink-ghost:      #4a4438;
+
+  /* The signal color — muted amber/saffron, used SPARINGLY */
+  --signal:         #d4a04a;
+  --signal-soft:    rgba(212, 160, 74, 0.15);
+  --signal-dim:     rgba(212, 160, 74, 0.4);
+
+  /* Tag colors — each tag gets a distinct hue, all desaturated */
+  --tag-note:       #8ba89a;  /* sage */
+  --tag-decision:   #c9956a;  /* terra */
+  --tag-action:     #b07c8a;  /* dusty rose */
+  --tag-risk:       #a86f5e;  /* rust */
+  --tag-question:   #7b8fa8;  /* slate blue */
+
+  /* Borders — barely there */
+  --rule:           rgba(244, 237, 224, 0.06);
+  --rule-strong:    rgba(244, 237, 224, 0.12);
+
+  /* Grid */
+  --max-w: 1400px;
+  --rail-w: 260px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background: var(--canvas-deep);
+  color: var(--ink-body);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'ss01', 'ss02';
+  min-height: 100vh;
+}
+
+/* Subtle paper texture on the canvas — adds warmth without imagery */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(212, 160, 74, 0.025) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(212, 160, 74, 0.02) 0%, transparent 40%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================
+   TOP NAV — minimal, editorial
+   ============================================ */
+.topnav {
+  display: flex;
+  align-items: center;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--canvas-deep);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.brand-mark {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  color: var(--ink-primary);
+}
+
+.brand-mark .em {
+  color: var(--signal);
+  font-style: italic;
+}
+
+.brand-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+.surface-switch {
+  margin-left: auto;
+  display: flex;
+  gap: 0;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 3px;
+}
+
+.surface-switch button {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  background: transparent;
+  border: none;
+  padding: 8px 18px;
+  cursor: pointer;
+  border-radius: 1px;
+  transition: all 0.15s ease;
+}
+
+.surface-switch button:hover {
+  color: var(--ink-body);
+}
+
+.surface-switch button.active {
+  background: var(--canvas-elev);
+  color: var(--ink-primary);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+
+.scenario-switch {
+  margin-left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scenario-switch label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+.scenario-switch select {
+  background: var(--canvas-raised);
+  color: var(--ink-body);
+  border: 1px solid var(--rule);
+  padding: 6px 10px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* ============================================
+   SURFACE CONTAINERS
+   ============================================ */
+.surface {
+  display: none;
+  flex: 1;
+  min-height: 0;
+}
+
+.surface.active {
+  display: flex;
+}
+
+/* ============================================
+   SURFACE A — LIVE CAPTURE
+   Two-column: agenda rail + capture
+   ============================================ */
+.capture-surface {
+  flex-direction: column;
+  width: 100%;
+}
+
+.capture-header {
+  padding: 28px 40px 20px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+.capture-header-main { flex: 1; min-width: 0; }
+
+.meeting-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+
+.meeting-eyebrow .live-pulse {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--signal);
+  border-radius: 50%;
+  margin-right: 6px;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.meeting-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+  color: var(--ink-primary);
+  line-height: 1.15;
+}
+
+.meeting-meta {
+  margin-top: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+}
+
+.meeting-meta span + span::before {
+  content: '·';
+  margin: 0 10px;
+  color: var(--ink-ghost);
+}
+
+.capture-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.timer {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--ink-primary);
+  letter-spacing: 0.02em;
+  padding: 6px 14px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+
+.btn {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  padding: 9px 16px;
+  background: var(--canvas-raised);
+  color: var(--ink-body);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+}
+
+.btn:hover {
+  background: var(--canvas-elev);
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+}
+
+.btn-signal {
+  background: var(--signal);
+  color: var(--canvas-deep);
+  border-color: var(--signal);
+  font-weight: 600;
+}
+
+.btn-signal:hover {
+  background: #e3b15a;
+  color: var(--canvas-deep);
+  border-color: #e3b15a;
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+/* Capture body — agenda rail + capture pane */
+.capture-body {
+  display: grid;
+  grid-template-columns: 380px 1fr 280px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Agenda rail */
+.agenda-rail {
+  border-right: 1px solid var(--rule);
+  padding: 24px 24px 24px 40px;
+  overflow-y: auto;
+  background: var(--canvas);
+}
+
+.rail-section-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rail-section-label .count {
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.agenda-item {
+  margin-bottom: 14px;
+  border-left: 2px solid transparent;
+  padding-left: 12px;
+  margin-left: -14px;
+  transition: border-color 0.2s ease;
+}
+
+.agenda-item.has-active {
+  border-left-color: var(--signal);
+}
+
+.agenda-item-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.agenda-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.agenda-item.has-active .agenda-num {
+  color: var(--signal);
+}
+
+.agenda-title {
+  font-family: 'Fraunces', serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-body);
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  flex: 1;
+}
+
+.agenda-item.has-active .agenda-title {
+  color: var(--ink-primary);
+}
+
+.agenda-status {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--ink-faint);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.agenda-status.done { color: var(--tag-note); }
+
+/* Threads under each agenda item */
+.thread-list {
+  margin-top: 8px;
+  margin-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.thread-item {
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  cursor: pointer;
+  border-radius: 2px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid transparent;
+  line-height: 1.4;
+  transition: all 0.15s ease;
+}
+
+.thread-item:hover {
+  background: var(--canvas-raised);
+  color: var(--ink-body);
+}
+
+.thread-item.active {
+  background: var(--signal-soft);
+  color: var(--ink-primary);
+  border-color: var(--signal-dim);
+}
+
+.thread-bullet {
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.thread-item.active .thread-bullet { color: var(--signal); }
+
+.thread-text { flex: 1; }
+
+.thread-count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+  background: var(--canvas-raised);
+  padding: 1px 6px;
+  border-radius: 2px;
+  border: 1px solid var(--rule);
+}
+
+.thread-item.active .thread-count {
+  background: var(--canvas-deep);
+  color: var(--signal);
+  border-color: var(--signal-dim);
+}
+
+.thread-add {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  padding: 6px 10px;
+  cursor: pointer;
+  border: 1px dashed var(--rule);
+  border-radius: 2px;
+  text-align: center;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: all 0.15s ease;
+}
+
+.thread-add:hover {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+  background: var(--signal-soft);
+}
+
+/* ===== CENTER PANE — capture ===== */
+.capture-pane {
+  padding: 32px 40px;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas-deep);
+  overflow-y: auto;
+  position: relative;
+}
+
+.context-strip {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 24px;
+}
+
+.context-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.context-target {
+  font-family: 'Fraunces', serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--signal);
+  font-style: italic;
+}
+
+.context-path {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-left: auto;
+  letter-spacing: 0.04em;
+}
+
+.capture-input-wrap {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.capture-input {
+  width: 100%;
+  background: var(--canvas);
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  padding: 18px 20px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-primary);
+  resize: vertical;
+  min-height: 120px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.capture-input:focus {
+  border-color: var(--signal-dim);
+  box-shadow: 0 0 0 3px var(--signal-soft);
+}
+
+.capture-input::placeholder {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+.tag-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tag-row-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-right: 6px;
+}
+
+.tag-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink-body);
+  text-transform: uppercase;
+}
+
+.tag-btn:hover {
+  background: var(--canvas-elev);
+  border-color: var(--rule-strong);
+  color: var(--ink-primary);
+}
+
+.tag-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.tag-dot.note     { background: var(--tag-note); }
+.tag-dot.decision { background: var(--tag-decision); }
+.tag-dot.action   { background: var(--tag-action); }
+.tag-dot.risk     { background: var(--tag-risk); }
+.tag-dot.question { background: var(--tag-question); }
+
+.tag-key {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+  border: 1px solid var(--rule);
+  padding: 1px 5px;
+  border-radius: 2px;
+  margin-left: 4px;
+}
+
+/* Recent captures stream */
+.captures-stream {
+  margin-top: 36px;
+  flex: 1;
+}
+
+.stream-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.capture-line {
+  display: grid;
+  grid-template-columns: 80px 80px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+  align-items: baseline;
+  animation: slide-in 0.4s ease;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.capture-time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+.capture-tag {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.capture-tag.note     { color: var(--tag-note); }
+.capture-tag.decision { color: var(--tag-decision); }
+.capture-tag.action   { color: var(--tag-action); }
+.capture-tag.risk     { color: var(--tag-risk); }
+.capture-tag.question { color: var(--tag-question); }
+
+.capture-content {
+  font-size: 14px;
+  color: var(--ink-body);
+  line-height: 1.55;
+}
+
+.capture-content .meta {
+  display: block;
+  margin-top: 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+}
+
+/* ===== RIGHT PANE — attendees + meta ===== */
+.meta-pane {
+  border-left: 1px solid var(--rule);
+  padding: 24px 28px;
+  background: var(--canvas);
+  overflow-y: auto;
+}
+
+.meta-section {
+  margin-bottom: 28px;
+}
+
+.meta-section-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+}
+
+.attendee {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.attendee-status {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink-faint);
+  flex-shrink: 0;
+}
+
+.attendee-status.attended {
+  background: var(--tag-note);
+  border-color: var(--tag-note);
+}
+
+.attendee-status.late {
+  background: var(--signal);
+  border-color: var(--signal);
+}
+
+.attendee-name {
+  font-size: 13px;
+  color: var(--ink-body);
+  flex: 1;
+}
+
+.attendee-role {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+/* Coverage indicator */
+.coverage-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coverage-bar {
+  display: flex;
+  height: 4px;
+  background: var(--canvas-raised);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.coverage-fill {
+  background: var(--tag-note);
+  height: 100%;
+}
+
+.coverage-text {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+}
+
+/* ============================================
+   SURFACE B — LIVING DOCUMENT
+   The hero surface
+   ============================================ */
+.document-surface {
+  flex-direction: column;
+  width: 100%;
+  overflow-y: auto;
+}
+
+.doc-header {
+  padding: 48px 60px 32px;
+  border-bottom: 1px solid var(--rule);
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.doc-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+}
+
+.doc-eyebrow .signal { color: var(--signal); }
+
+.doc-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: 44px;
+  letter-spacing: -0.025em;
+  color: var(--ink-primary);
+  line-height: 1.1;
+  margin-bottom: 12px;
+}
+
+.doc-title .em {
+  font-style: italic;
+  font-weight: 500;
+}
+
+.doc-subtitle {
+  font-family: 'Fraunces', serif;
+  font-size: 17px;
+  font-style: italic;
+  color: var(--ink-muted);
+  font-weight: 300;
+  margin-bottom: 28px;
+}
+
+.doc-stats {
+  display: flex;
+  gap: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+}
+
+.doc-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doc-stat-value {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--ink-primary);
+  letter-spacing: -0.01em;
+}
+
+.doc-stat-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.doc-actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 10px;
+}
+
+/* Document body */
+.doc-body {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 60px 80px;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 64px;
+}
+
+.doc-main { min-width: 0; }
+
+/* Agenda items in doc form */
+.doc-agenda-item {
+  margin-bottom: 56px;
+}
+
+.doc-agenda-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.doc-agenda-num {
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 300;
+  color: var(--signal);
+  font-style: italic;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.doc-agenda-title {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--ink-primary);
+  letter-spacing: -0.015em;
+  flex: 1;
+}
+
+.doc-agenda-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+}
+
+/* Threads */
+.doc-thread {
+  margin-bottom: 32px;
+  padding-left: 16px;
+  border-left: 2px solid var(--canvas-elev);
+  transition: border-color 0.2s ease;
+}
+
+.doc-thread.expanded {
+  border-left-color: var(--signal-dim);
+}
+
+.doc-thread-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  cursor: pointer;
+  padding: 6px 0;
+  user-select: none;
+}
+
+.doc-thread-marker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  width: 14px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.doc-thread.expanded .doc-thread-marker {
+  color: var(--signal);
+  transform: rotate(90deg);
+}
+
+.doc-thread-title {
+  font-family: 'Fraunces', serif;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--ink-primary);
+  flex: 1;
+  line-height: 1.4;
+}
+
+.doc-thread-status {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 2px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+}
+
+.doc-thread-status.open { color: var(--signal); border-color: var(--signal-dim); }
+.doc-thread-status.resolved { color: var(--tag-note); border-color: rgba(139, 168, 154, 0.3); }
+
+.doc-thread-count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+}
+
+/* Entries */
+.doc-entries {
+  margin-top: 12px;
+  margin-left: 26px;
+  display: none;
+}
+
+.doc-thread.expanded .doc-entries {
+  display: block;
+  animation: fade-in 0.3s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.doc-entry {
+  display: grid;
+  grid-template-columns: 76px 90px 1fr;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+  align-items: baseline;
+  position: relative;
+}
+
+.doc-entry:last-child { border-bottom: none; }
+
+/* The "newest" entry gets a subtle highlight */
+.doc-entry.newest::before {
+  content: '';
+  position: absolute;
+  left: -26px;
+  top: 18px;
+  width: 6px;
+  height: 6px;
+  background: var(--signal);
+  border-radius: 50%;
+}
+
+.doc-entry-date {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+.doc-entry-tag {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.doc-entry-tag.note     { color: var(--tag-note); }
+.doc-entry-tag.decision { color: var(--tag-decision); }
+.doc-entry-tag.action   { color: var(--tag-action); }
+.doc-entry-tag.risk     { color: var(--tag-risk); }
+.doc-entry-tag.question { color: var(--tag-question); }
+
+.doc-entry-body { font-size: 14px; color: var(--ink-body); line-height: 1.6; }
+
+.doc-entry-author {
+  display: block;
+  margin-top: 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+.doc-entry-meta-chip {
+  display: inline-block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-muted);
+  background: var(--canvas-raised);
+  padding: 2px 7px;
+  border-radius: 2px;
+  border: 1px solid var(--rule);
+  margin-right: 6px;
+  letter-spacing: 0.03em;
+}
+
+.doc-entry-meta-chip.due-soon { color: var(--signal); border-color: var(--signal-dim); }
+.doc-entry-meta-chip.overdue { color: var(--tag-risk); border-color: rgba(168, 111, 94, 0.4); }
+.doc-entry-meta-chip.complete { color: var(--tag-note); border-color: rgba(139, 168, 154, 0.3); }
+
+/* Comment indicator + thread */
+.doc-entry-comments {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-top: 8px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+
+.doc-entry-comments:hover { color: var(--signal); }
+.doc-entry-comments.has-unread { color: var(--signal); }
+
+.comment-thread {
+  grid-column: 3;
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: var(--canvas);
+  border-left: 2px solid var(--signal-dim);
+  border-radius: 0 2px 2px 0;
+  display: none;
+}
+
+.comment-thread.open { display: block; }
+
+.comment {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.comment:last-of-type { border-bottom: none; }
+
+.comment-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.comment-author {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-primary);
+}
+
+.comment-time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+.comment-body {
+  font-size: 13px;
+  color: var(--ink-body);
+  line-height: 1.5;
+}
+
+.comment-input {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  gap: 8px;
+}
+
+.comment-input input {
+  flex: 1;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  padding: 8px 12px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px;
+  color: var(--ink-body);
+  border-radius: 2px;
+  outline: none;
+}
+
+.comment-input input:focus {
+  border-color: var(--signal-dim);
+}
+
+.comment-input button {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 11px;
+  padding: 6px 14px;
+  background: var(--signal);
+  color: var(--canvas-deep);
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* Show resolved / archived links */
+.thread-extras {
+  margin-top: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  display: flex;
+  gap: 16px;
+}
+
+.thread-extras a {
+  color: var(--ink-muted);
+  cursor: pointer;
+  border-bottom: 1px dotted var(--ink-faint);
+}
+
+.thread-extras a:hover { color: var(--signal); border-color: var(--signal); }
+
+/* ===== Right column — meeting timeline + filters ===== */
+.doc-aside {
+  position: sticky;
+  top: 80px;
+  align-self: start;
+}
+
+.aside-section {
+  margin-bottom: 36px;
+}
+
+.aside-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.timeline-meeting {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 12px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  padding-left: 10px;
+  margin-left: -12px;
+}
+
+.timeline-meeting:hover {
+  border-left-color: var(--signal-dim);
+}
+
+.timeline-meeting.current {
+  border-left-color: var(--signal);
+}
+
+.timeline-date {
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ink-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.timeline-meeting.current .timeline-date { color: var(--signal); }
+
+.timeline-title {
+  color: var(--ink-body);
+  line-height: 1.4;
+}
+
+.timeline-meta {
+  display: block;
+  margin-top: 2px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+/* Filter chips */
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-chip {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  cursor: pointer;
+  color: var(--ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.filter-chip:hover { color: var(--ink-primary); }
+
+.filter-chip.active {
+  background: var(--canvas-elev);
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+}
+
+/* ============================================
+   SURFACE C — DIGEST (EMAIL PREVIEW)
+   ============================================ */
+.digest-surface {
+  flex-direction: column;
+  width: 100%;
+  overflow-y: auto;
+}
+
+.digest-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 60px 80px;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 40px;
+}
+
+.digest-preview {
+  background: #fdfaf2;
+  color: #2a2620;
+  padding: 56px 64px;
+  border-radius: 4px;
+  box-shadow: 0 30px 60px -20px rgba(0,0,0,0.5);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.digest-from {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.digest-subject {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 500;
+  color: #1a1814;
+  margin-bottom: 4px;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.digest-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: #888;
+  border-bottom: 1px solid #e0d8c4;
+  padding-bottom: 24px;
+  margin-bottom: 28px;
+  letter-spacing: 0.03em;
+}
+
+.digest-greeting {
+  font-size: 14px;
+  margin-bottom: 16px;
+  color: #4a4438;
+}
+
+.digest-section {
+  margin-bottom: 32px;
+}
+
+.digest-section-h {
+  font-family: 'Fraunces', serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1814;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e0d8c4;
+  letter-spacing: -0.005em;
+}
+
+.digest-section ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.digest-section li {
+  padding: 8px 0;
+  padding-left: 24px;
+  position: relative;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #2a2620;
+}
+
+.digest-section li::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 16px;
+  width: 4px;
+  height: 4px;
+  background: var(--signal);
+  border-radius: 50%;
+}
+
+.digest-section .meta {
+  display: block;
+  margin-top: 2px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: #888;
+  letter-spacing: 0.02em;
+}
+
+.digest-link {
+  display: inline-block;
+  margin-top: 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--signal);
+  text-decoration: none;
+  border-bottom: 1px solid var(--signal);
+  padding-bottom: 2px;
+}
+
+.digest-sig {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #e0d8c4;
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+}
+
+/* Send panel */
+.send-panel {
+  position: sticky;
+  top: 80px;
+  align-self: start;
+}
+
+.send-panel-section {
+  margin-bottom: 24px;
+}
+
+.send-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+
+.recipient {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--ink-body);
+}
+
+.recipient-remove {
+  margin-left: auto;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.coverage-check {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 14px 16px;
+  margin-bottom: 24px;
+}
+
+.coverage-check h4 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.coverage-check li {
+  list-style: none;
+  font-size: 12px;
+  padding: 4px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--ink-body);
+}
+
+.coverage-check .check-ok { color: var(--tag-note); }
+.coverage-check .check-warn { color: var(--signal); }
+
+.send-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.send-actions .btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 12px;
+}
+
+/* Responsive — collapse columns on small screens */
+@media (max-width: 1100px) {
+  .capture-body { grid-template-columns: 1fr; }
+  .agenda-rail, .meta-pane { display: none; }
+  .doc-body, .digest-wrap { grid-template-columns: 1fr; }
+  .doc-aside, .send-panel { position: static; }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--canvas-deep); }
+::-webkit-scrollbar-thumb { background: var(--canvas-raised); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--canvas-elev); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============= TOP NAV ============= -->
+  <nav class="topnav">
+    <div class="brand">
+      <div class="brand-mark">Meeting<span class="em"> Minutes</span></div>
+      <div class="brand-meta">ProjectHUD · Prototype</div>
+    </div>
+
+    <div class="scenario-switch">
+      <label>Scenario</label>
+      <select id="scenarioSelect">
+        <option value="orthomotion">OrthoMotion / Endoscopic Platform — discovery (Pipeline)</option>
+        <option value="flexscope">Electrical Design of Flexscope — weekly status (Cadence)</option>
+      </select>
+    </div>
+
+    <div class="surface-switch">
+      <button data-surface="capture" class="active">⏺ Live Capture</button>
+      <button data-surface="document">Living Document</button>
+      <button data-surface="digest">Digest & Send</button>
+    </div>
+  </nav>
+
+  <!-- ============= SURFACE A: LIVE CAPTURE ============= -->
+  <section class="surface capture-surface active" id="surface-capture">
+
+    <header class="capture-header">
+      <div class="capture-header-main">
+        <div class="meeting-eyebrow">
+          <span class="live-pulse"></span>Live capture · <span id="cap-eyebrow">Meeting 14 of series · Mondays 2:00pm</span>
+        </div>
+        <h1 class="meeting-title" id="cap-title">Electrical Design of Flexscope — Weekly Status</h1>
+        <div class="meeting-meta" id="cap-meta">
+          <span>Mon, May 4, 2026</span><span>2:00 PM EDT</span><span>60 min scheduled</span><span>Zoom</span>
+        </div>
+      </div>
+      <div class="capture-controls">
+        <div class="timer">00:23:14</div>
+        <button class="btn btn-ghost">Pause</button>
+        <button class="btn btn-signal">End meeting →</button>
+      </div>
+    </header>
+
+    <div class="capture-body">
+      <!-- AGENDA RAIL -->
+      <aside class="agenda-rail" id="agendaRail">
+        <div class="rail-section-label">
+          <span>Agenda</span>
+          <span class="count">3 items · 11 threads</span>
+        </div>
+        <!-- Populated by JS -->
+      </aside>
+
+      <!-- CAPTURE PANE -->
+      <div class="capture-pane">
+        <div class="context-strip">
+          <span class="context-label">Capturing under</span>
+          <span class="context-target" id="captureTarget">Prototype PCBs expected to arrive at Lighthouse on 5/15</span>
+          <span class="context-path" id="capturePath">Agenda 1 · Electrical Design of Flexscope</span>
+        </div>
+
+        <div class="capture-input-wrap">
+          <textarea class="capture-input" id="captureInput" placeholder="Type what's being said... press a tag below or use hotkey to file it."></textarea>
+        </div>
+
+        <div class="tag-row">
+          <span class="tag-row-label">Tag as</span>
+          <button class="tag-btn" data-tag="note"><span class="tag-dot note"></span>Note<span class="tag-key">N</span></button>
+          <button class="tag-btn" data-tag="decision"><span class="tag-dot decision"></span>Decision<span class="tag-key">D</span></button>
+          <button class="tag-btn" data-tag="action"><span class="tag-dot action"></span>Action<span class="tag-key">A</span></button>
+          <button class="tag-btn" data-tag="risk"><span class="tag-dot risk"></span>Risk<span class="tag-key">R</span></button>
+          <button class="tag-btn" data-tag="question"><span class="tag-dot question"></span>Question<span class="tag-key">Q</span></button>
+        </div>
+
+        <div class="captures-stream">
+          <div class="stream-label">Captured this meeting</div>
+          <div id="captureStream"></div>
+        </div>
+      </div>
+
+      <!-- META PANE -->
+      <aside class="meta-pane">
+        <div class="meta-section">
+          <div class="meta-section-label">Coverage</div>
+          <div class="coverage-meter">
+            <div class="coverage-bar"><div class="coverage-fill" style="width: 67%"></div></div>
+            <div class="coverage-text">2 of 3 agenda items have entries</div>
+          </div>
+        </div>
+
+        <div class="meta-section">
+          <div class="meta-section-label">Attendees</div>
+          <div id="attendeesList"></div>
+        </div>
+
+        <div class="meta-section">
+          <div class="meta-section-label">Since last meeting</div>
+          <div style="font-size: 12px; color: var(--ink-muted); line-height: 1.5;">
+            <strong style="color: var(--signal);">3 new comments</strong> on entries from
+            Apr 27 meeting. Review before continuing.
+            <a style="display: block; margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--signal); cursor: pointer;">View comments →</a>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============= SURFACE B: LIVING DOCUMENT ============= -->
+  <section class="surface document-surface" id="surface-document">
+    <header class="doc-header">
+      <div class="doc-eyebrow"><span class="signal">●</span> Active series · 14 meetings · last met Apr 27, 2026</div>
+      <h1 class="doc-title" id="doc-title">Electrical Design of <span class="em">Flexscope</span></h1>
+      <div class="doc-subtitle" id="doc-subtitle">Weekly engineering status — recurring Mondays at 2:00 PM EDT</div>
+
+      <div class="doc-stats">
+        <div class="doc-stat">
+          <div class="doc-stat-value">14</div>
+          <div class="doc-stat-label">Meetings held</div>
+        </div>
+        <div class="doc-stat">
+          <div class="doc-stat-value">11</div>
+          <div class="doc-stat-label">Open threads</div>
+        </div>
+        <div class="doc-stat">
+          <div class="doc-stat-value">7</div>
+          <div class="doc-stat-label">Resolved threads</div>
+        </div>
+        <div class="doc-stat">
+          <div class="doc-stat-value">8</div>
+          <div class="doc-stat-label">Open actions</div>
+        </div>
+        <div class="doc-stat">
+          <div class="doc-stat-value">3</div>
+          <div class="doc-stat-label">Unread comments</div>
+        </div>
+      </div>
+
+      <div class="doc-actions">
+        <button class="btn btn-signal">+ Schedule next meeting</button>
+        <button class="btn">Export full series</button>
+        <button class="btn">Archive resolved</button>
+      </div>
+    </header>
+
+    <div class="doc-body">
+      <main class="doc-main" id="docMain">
+        <!-- Populated by JS -->
+      </main>
+
+      <aside class="doc-aside">
+        <div class="aside-section">
+          <div class="aside-label">Filter</div>
+          <div class="filter-chips">
+            <div class="filter-chip active">All</div>
+            <div class="filter-chip"><span class="tag-dot decision"></span>Decisions</div>
+            <div class="filter-chip"><span class="tag-dot action"></span>Actions</div>
+            <div class="filter-chip"><span class="tag-dot risk"></span>Risks</div>
+            <div class="filter-chip"><span class="tag-dot question"></span>Open Qs</div>
+          </div>
+        </div>
+
+        <div class="aside-section">
+          <div class="aside-label">Meeting timeline</div>
+          <div id="timelineList"></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============= SURFACE C: DIGEST ============= -->
+  <section class="surface digest-surface" id="surface-digest">
+    <div class="digest-wrap">
+      <div class="digest-preview" id="digestPreview">
+        <!-- Populated by JS -->
+      </div>
+
+      <aside class="send-panel">
+        <div class="coverage-check">
+          <h4>Pre-flight checks</h4>
+          <ul>
+            <li class="check-ok">✓ All agenda items have entries</li>
+            <li class="check-ok">✓ Action items have assignees</li>
+            <li class="check-warn">⚠ 1 action item missing due date</li>
+            <li class="check-ok">✓ Attendees marked</li>
+            <li class="check-ok">✓ Subject line set</li>
+          </ul>
+        </div>
+
+        <div class="send-panel-section">
+          <div class="send-label">To — Attendees</div>
+          <div class="recipient">Mike Rucker · Lead EE <span class="recipient-remove">×</span></div>
+          <div class="recipient">Ben Roy · Hardware <span class="recipient-remove">×</span></div>
+          <div class="recipient">Sarah Chen · PM <span class="recipient-remove">×</span></div>
+          <div class="recipient">Vaughn Staples · Architect <span class="recipient-remove">×</span></div>
+        </div>
+
+        <div class="send-panel-section">
+          <div class="send-label">CC — Additional</div>
+          <div class="recipient">eng-leadership@apex.consulting <span class="recipient-remove">×</span></div>
+          <button class="btn btn-ghost" style="width: 100%; margin-top: 4px; font-size: 11px;">+ Add recipient</button>
+        </div>
+
+        <div class="send-panel-section">
+          <div class="send-label">Personal note (optional)</div>
+          <textarea style="width: 100%; background: var(--canvas-raised); border: 1px solid var(--rule); padding: 10px; font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; color: var(--ink-body); border-radius: 2px; min-height: 60px; resize: vertical;" placeholder="Optional message prepended to the digest..."></textarea>
+        </div>
+
+        <div class="send-actions">
+          <button class="btn btn-signal">Send digest →</button>
+          <button class="btn">Save as draft</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   DATA — Two scenarios, full fidelity
+   ============================================================ */
+
+const scenarios = {
+  flexscope: {
+    seriesTitle: 'Electrical Design of <span class="em">Flexscope</span>',
+    seriesSubtitle: 'Weekly engineering status — recurring Mondays at 2:00 PM EDT',
+    meetingTitle: 'Electrical Design of Flexscope — Weekly Status',
+    meetingEyebrow: 'Meeting 14 of series · Mondays 2:00pm',
+    meetingMeta: ['Mon, May 4, 2026', '2:00 PM EDT', '60 min scheduled', 'Zoom'],
+    attendees: [
+      { name: 'Mike Rucker', role: 'Lead EE', status: 'attended' },
+      { name: 'Ben Roy', role: 'Hardware', status: 'attended' },
+      { name: 'Sarah Chen', role: 'Project Mgr', status: 'late' },
+      { name: 'Vaughn Staples', role: 'Architect', status: 'attended' },
+      { name: 'Mei Tanaka', role: 'Mfg Liaison', status: '' }
+    ],
+    agenda: [
+      {
+        num: '01',
+        title: 'Electrical Design of Flexscope',
+        status: 'in progress',
+        threads: [
+          {
+            id: 't1',
+            title: 'Prototype PCBs expected to arrive at Lighthouse on 5/15',
+            status: 'open',
+            entries: [
+              { date: 'May 4', tag: 'note', author: 'Mike R', body: 'Lighthouse confirmed shipment will arrive 5/15. Build package received their end Friday.', newest: true, comments: [] },
+              { date: 'Apr 27', tag: 'decision', author: 'Mike R', body: 'Released build package to Nimbletronics on 4/25 per prior commitment. Lighthouse to fab by 5/15.', comments: [
+                { author: 'Sarah C', time: 'Apr 29', body: 'Heads up — this puts assembly on the critical path for 5/22 system integration. Any slip and we miss the integration window.' },
+                { author: 'Mike R', time: 'Apr 30', body: 'Acknowledged. Holding Nimbletronics to committed dates; will flag immediately if anything moves.' }
+              ]},
+              { date: 'Apr 22', tag: 'note', author: 'Mike R', body: 'PCB design review complete; purchasing to release build package to Nimbletronics by 4/25.' },
+              { date: 'Apr 19', tag: 'note', author: 'Ben R', body: 'PCB design review held; need further thermal reliefs · est. turnaround 1 day.' },
+              { date: 'Apr 15', tag: 'note', author: 'Mike R', body: 'Mike Rucker 50% through PCB layout; expects to complete by 4/17.' },
+              { date: 'Apr 08', tag: 'decision', author: 'Ben R', body: 'Design review discovered ground connection issues; B. Roy to correct schematics & hold updated design review on 4/11.' },
+              { date: 'Apr 01', tag: 'note', author: 'Ben R', body: 'Ben Roy has completed schematics of the transceiver board & will hold a design review on 4/05.' }
+            ]
+          },
+          {
+            id: 't2',
+            title: 'Schematic review feedback — thermal management',
+            status: 'open',
+            entries: [
+              { date: 'May 4', tag: 'risk', author: 'Ben R', body: 'Thermal sim for high-current path shows 12°C overrun under sustained load. Need either passive heatsink redesign or duty-cycle throttling.', newest: true },
+              { date: 'Apr 27', tag: 'action', author: 'Ben R', body: 'Run extended thermal sim under sustained 80% duty cycle.', meta: { assignee: 'Ben Roy', due: 'May 1', status: 'complete' } },
+              { date: 'Apr 19', tag: 'question', author: 'Mike R', body: 'Are we comfortable with current heatsink spec or should we revisit?' }
+            ]
+          },
+          {
+            id: 't3',
+            title: 'BGA reflow profile validation',
+            status: 'resolved',
+            entries: [
+              { date: 'Apr 19', tag: 'decision', author: 'Mei T', body: 'Reflow profile validated against IPC-7095. Closing thread.' },
+              { date: 'Apr 12', tag: 'action', author: 'Mei T', body: 'Validate reflow profile with Mfg.', meta: { assignee: 'Mei T', due: 'Apr 19', status: 'complete' } }
+            ]
+          }
+        ]
+      },
+      {
+        num: '02',
+        title: 'Mechanical Integration',
+        status: 'pending',
+        threads: [
+          {
+            id: 't4',
+            title: 'Enclosure tolerances for 5/22 integration build',
+            status: 'open',
+            entries: [
+              { date: 'Apr 27', tag: 'action', author: 'Sarah C', body: 'Confirm enclosure machining tolerances meet ±0.05mm for board-mount.', meta: { assignee: 'Sarah C', due: 'May 6', status: 'due-soon' } },
+              { date: 'Apr 20', tag: 'note', author: 'Sarah C', body: 'Vendor quoted ±0.10mm standard. Negotiating tighter spec or in-house finishing.' }
+            ]
+          },
+          {
+            id: 't5',
+            title: 'Cable strain-relief — flex circuit interface',
+            status: 'open',
+            entries: [
+              { date: 'Apr 27', tag: 'risk', author: 'Vaughn S', body: 'Flex circuit at the hinge sees ~50k flex cycles over service life. Current strain relief design is unproven for that count.' }
+            ]
+          }
+        ]
+      },
+      {
+        num: '03',
+        title: 'Risk Register Review',
+        status: 'pending',
+        threads: [
+          {
+            id: 't6',
+            title: 'FDA pre-submission timing',
+            status: 'open',
+            entries: [
+              { date: 'Apr 27', tag: 'decision', author: 'Vaughn S', body: 'Target FDA pre-submission package for 6/15. Walk back from there for design freeze: 5/30.' },
+              { date: 'Apr 20', tag: 'question', author: 'Vaughn S', body: 'When do we need to lock the design to hit Q3 pre-sub?' }
+            ]
+          }
+        ]
+      }
+    ],
+    timeline: [
+      { date: 'May 4', title: 'Weekly status', meta: '60 min · 4 attended', current: true },
+      { date: 'Apr 27', title: 'Weekly status', meta: '60 min · 5 attended' },
+      { date: 'Apr 20', title: 'Weekly status', meta: '45 min · 4 attended' },
+      { date: 'Apr 13', title: 'Weekly status', meta: '60 min · 5 attended' },
+      { date: 'Apr 06', title: 'Weekly status + design review', meta: '90 min · 6 attended' },
+      { date: 'Mar 30', title: 'Weekly status', meta: '60 min · 4 attended' },
+      { date: 'Mar 23', title: 'Weekly status', meta: '60 min · 5 attended' },
+      { date: 'Mar 16', title: 'Weekly status', meta: '45 min · 4 attended' },
+      { date: 'Mar 09', title: 'Kickoff', meta: '90 min · 6 attended' }
+    ]
+  },
+
+  orthomotion: {
+    seriesTitle: 'OrthoMotion · <span class="em">Endoscopic Platform</span>',
+    seriesSubtitle: 'Discovery engagement — ad-hoc cadence as needed',
+    meetingTitle: 'Discovery call — technical deep dive',
+    meetingEyebrow: 'Meeting 3 of engagement · ad-hoc',
+    meetingMeta: ['Mon, May 4, 2026', '5:06 PM EDT', '90 min scheduled', 'Zoom'],
+    attendees: [
+      { name: 'Vaughn Staples', role: 'Lead Architect', status: 'attended' },
+      { name: 'Robert Chen', role: 'PM', status: 'attended' },
+      { name: 'Kenji Tanaka', role: 'CTO · OrthoMotion', status: 'attended' },
+      { name: 'Claire Voss', role: 'VP Eng · OrthoMotion', status: 'attended' },
+      { name: 'Sandra Nge', role: 'Reg. Affairs · OrthoMotion', status: 'late' }
+    ],
+    agenda: [
+      {
+        num: '01',
+        title: 'Technical Approach',
+        status: 'in progress',
+        threads: [
+          {
+            id: 'o1',
+            title: 'FDA 510(k) predicate device strategy',
+            status: 'open',
+            entries: [
+              { date: 'May 4', tag: 'decision', author: 'Sandra N', body: 'Predicate device confirmed: K183421 from Pentax (similar imaging architecture, cleared 2018).', newest: true, comments: [
+                { author: 'Vaughn S', time: '12 min ago', body: 'Excellent — aligns with our 510(k) experience. Will draft the substantial-equivalence comparison framework for next meeting.' }
+              ]},
+              { date: 'Apr 28', tag: 'question', author: 'Vaughn S', body: 'What predicate are we comparing to for the 510(k) submission?' },
+              { date: 'Apr 21', tag: 'note', author: 'Sandra N', body: 'Initial scan of FDA database — 3 potential predicates identified for evaluation.' }
+            ]
+          },
+          {
+            id: 'o2',
+            title: 'Single-use COTS component sourcing',
+            status: 'open',
+            entries: [
+              { date: 'May 4', tag: 'risk', author: 'Robert C', body: 'COTS distal-tip components are in short supply; primary supplier quoted 16-week lead time. May need alternate-source qualification.', newest: true },
+              { date: 'May 4', tag: 'action', author: 'Robert C', body: 'Research single-use COTS suppliers for endoscopic-grade components.', meta: { assignee: 'Sandra Okafor', due: 'May 8', status: 'due-soon' }, newest: true },
+              { date: 'Apr 21', tag: 'note', author: 'Kenji T', body: 'OrthoMotion has prior relationship with three suppliers; can intro.' }
+            ]
+          }
+        ]
+      },
+      {
+        num: '02',
+        title: 'Commercial & Timeline',
+        status: 'in progress',
+        threads: [
+          {
+            id: 'o3',
+            title: 'Budget alignment — $200K–$280K range',
+            status: 'open',
+            entries: [
+              { date: 'May 4', tag: 'decision', author: 'Claire V', body: 'Budget formally approved at $260,000. Authorization in place pending SOW signature.', newest: true },
+              { date: 'Apr 28', tag: 'note', author: 'Claire V', body: 'Working through budget approval channels — tracking for first week of May.' },
+              { date: 'Apr 21', tag: 'note', author: 'Vaughn S', body: 'Initial range discussed: $200K–$280K. OrthoMotion to confirm.' }
+            ]
+          },
+          {
+            id: 'o4',
+            title: 'Concept prototype EOY 2026 timeline',
+            status: 'open',
+            entries: [
+              { date: 'May 4', tag: 'note', author: 'Kenji T', body: 'Reaffirmed EOY 2026 prototype delivery is firm. Aligns with Q1 2027 IRB submission target.', newest: true }
+            ]
+          }
+        ]
+      },
+      {
+        num: '03',
+        title: 'Stakeholder Alignment',
+        status: 'pending',
+        threads: [
+          {
+            id: 'o5',
+            title: 'Sample DHF for Dr. Tanaka review',
+            status: 'open',
+            entries: [
+              { date: 'Apr 28', tag: 'action', author: 'David N', body: 'Prepare sample Design History File (DHF) for Dr. Tanaka review.', meta: { assignee: 'David Nakamura', due: 'Apr 23', status: 'complete' } },
+              { date: 'Apr 21', tag: 'note', author: 'Vaughn S', body: 'Dr. Tanaka warm and engaged — wants sample DHF before formal proposal.' }
+            ]
+          }
+        ]
+      }
+    ],
+    timeline: [
+      { date: 'May 4', title: 'Discovery deep dive', meta: '90 min · 5 attended', current: true },
+      { date: 'Apr 28', title: 'Budget & timeline review', meta: '45 min · 4 attended' },
+      { date: 'Apr 21', title: 'Initial discovery', meta: '60 min · 5 attended' }
+    ]
+  }
+};
+
+let currentScenario = 'flexscope';
+let activeThread = 't1';
+let captureLines = []; // captured during this prototype session
+
+/* ============================================================
+   RENDER — Capture surface
+   ============================================================ */
+
+function renderCapture() {
+  const data = scenarios[currentScenario];
+
+  // Header
+  document.getElementById('cap-title').textContent = data.meetingTitle;
+  document.getElementById('cap-eyebrow').textContent = data.meetingEyebrow;
+  document.getElementById('cap-meta').innerHTML = data.meetingMeta.map(m => `<span>${m}</span>`).join('');
+
+  // Agenda rail
+  const rail = document.getElementById('agendaRail');
+  rail.innerHTML = `
+    <div class="rail-section-label">
+      <span>Agenda</span>
+      <span class="count">${data.agenda.length} items · ${data.agenda.reduce((sum, a) => sum + a.threads.length, 0)} threads</span>
+    </div>
+    ${data.agenda.map(item => {
+      const hasActive = item.threads.some(t => t.id === activeThread);
+      return `
+        <div class="agenda-item ${hasActive ? 'has-active' : ''}">
+          <div class="agenda-item-header">
+            <span class="agenda-num">${item.num}</span>
+            <span class="agenda-title">${item.title}</span>
+            <span class="agenda-status ${item.status === 'in progress' ? '' : 'done'}">${item.status}</span>
+          </div>
+          <div class="thread-list">
+            ${item.threads.map(t => `
+              <div class="thread-item ${t.id === activeThread ? 'active' : ''}" data-thread="${t.id}" data-thread-title="${t.title}" data-agenda-num="${item.num}" data-agenda-title="${item.title}">
+                <span class="thread-bullet">▸</span>
+                <span class="thread-text">${t.title}</span>
+                <span class="thread-count">${t.entries.length}</span>
+              </div>
+            `).join('')}
+            <div class="thread-add">+ new thread</div>
+          </div>
+        </div>
+      `;
+    }).join('')}
+  `;
+
+  // Bind thread clicks
+  rail.querySelectorAll('.thread-item').forEach(el => {
+    el.addEventListener('click', () => {
+      activeThread = el.dataset.thread;
+      document.getElementById('captureTarget').textContent = el.dataset.threadTitle;
+      document.getElementById('capturePath').textContent = `Agenda ${el.dataset.agendaNum} · ${el.dataset.agendaTitle}`;
+      renderCapture();
+    });
+  });
+
+  // Attendees
+  document.getElementById('attendeesList').innerHTML = data.attendees.map(a => `
+    <div class="attendee">
+      <div class="attendee-status ${a.status}"></div>
+      <span class="attendee-name">${a.name}</span>
+      <span class="attendee-role">${a.role}</span>
+    </div>
+  `).join('');
+
+  // Capture stream
+  renderCaptureStream();
+}
+
+function renderCaptureStream() {
+  const stream = document.getElementById('captureStream');
+  if (captureLines.length === 0) {
+    stream.innerHTML = `<div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-faint); padding: 20px 0; font-style: italic;">No captures yet this meeting. Type above and tag with N / D / A / R / Q.</div>`;
+    return;
+  }
+  stream.innerHTML = captureLines.slice().reverse().map(c => `
+    <div class="capture-line">
+      <span class="capture-time">${c.time}</span>
+      <span class="capture-tag ${c.tag}"><span class="tag-dot ${c.tag}"></span>${c.tag}</span>
+      <div class="capture-content">
+        ${c.body}
+        <span class="meta">→ ${c.target}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* Capture input + tagging */
+document.querySelectorAll('.tag-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById('captureInput');
+    const text = input.value.trim();
+    if (!text) {
+      input.placeholder = 'Type a thought first, then tag it...';
+      input.focus();
+      return;
+    }
+    const now = new Date();
+    captureLines.push({
+      time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+      tag: btn.dataset.tag,
+      body: text,
+      target: document.getElementById('captureTarget').textContent
+    });
+    input.value = '';
+    input.focus();
+    renderCaptureStream();
+  });
+});
+
+// Keyboard shortcuts for tags
+document.getElementById('captureInput').addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey) {
+    const map = { 'n': 'note', 'd': 'decision', 'a': 'action', 'r': 'risk', 'q': 'question' };
+    const tag = map[e.key.toLowerCase()];
+    if (tag) {
+      e.preventDefault();
+      document.querySelector(`.tag-btn[data-tag="${tag}"]`).click();
+    }
+  }
+});
+
+/* ============================================================
+   RENDER — Living document
+   ============================================================ */
+
+function renderDocument() {
+  const data = scenarios[currentScenario];
+
+  document.getElementById('doc-title').innerHTML = data.seriesTitle;
+  document.getElementById('doc-subtitle').textContent = data.seriesSubtitle;
+
+  // Main column
+  const main = document.getElementById('docMain');
+  main.innerHTML = data.agenda.map(item => `
+    <section class="doc-agenda-item">
+      <header class="doc-agenda-header">
+        <span class="doc-agenda-num">${item.num}</span>
+        <h2 class="doc-agenda-title">${item.title}</h2>
+        <span class="doc-agenda-meta">${item.threads.filter(t => t.status === 'open').length} open · ${item.threads.filter(t => t.status === 'resolved').length} resolved</span>
+      </header>
+      ${item.threads.filter(t => t.status === 'open').map(thread => renderThread(thread)).join('')}
+      ${item.threads.filter(t => t.status === 'resolved').length > 0 ? `
+        <div class="thread-extras">
+          <a>+ Show ${item.threads.filter(t => t.status === 'resolved').length} resolved thread${item.threads.filter(t => t.status === 'resolved').length === 1 ? '' : 's'}</a>
+          <a>+ Open new thread</a>
+        </div>
+      ` : `<div class="thread-extras"><a>+ Open new thread</a></div>`}
+    </section>
+  `).join('');
+
+  // Bind thread expansion
+  main.querySelectorAll('.doc-thread-header').forEach(header => {
+    header.addEventListener('click', () => {
+      header.parentElement.classList.toggle('expanded');
+    });
+  });
+
+  // Bind comment expansion
+  main.querySelectorAll('.doc-entry-comments').forEach(c => {
+    c.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const target = c.closest('.doc-entry').querySelector('.comment-thread');
+      if (target) target.classList.toggle('open');
+    });
+  });
+
+  // Timeline
+  document.getElementById('timelineList').innerHTML = data.timeline.map(t => `
+    <div class="timeline-meeting ${t.current ? 'current' : ''}">
+      <span class="timeline-date">${t.date}</span>
+      <div>
+        <span class="timeline-title">${t.title}</span>
+        <span class="timeline-meta">${t.meta}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderThread(thread) {
+  const expanded = thread.id === activeThread || thread.entries.some(e => e.newest);
+  return `
+    <div class="doc-thread ${expanded ? 'expanded' : ''}">
+      <div class="doc-thread-header">
+        <span class="doc-thread-marker">▸</span>
+        <span class="doc-thread-title">${thread.title}</span>
+        <span class="doc-thread-status ${thread.status}">${thread.status}</span>
+        <span class="doc-thread-count">${thread.entries.length} entries</span>
+      </div>
+      <div class="doc-entries">
+        ${thread.entries.map(e => renderEntry(e)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderEntry(entry) {
+  const meta = entry.meta ? `
+    ${entry.meta.assignee ? `<span class="doc-entry-meta-chip">@ ${entry.meta.assignee}</span>` : ''}
+    ${entry.meta.due ? `<span class="doc-entry-meta-chip ${entry.meta.status || ''}">due ${entry.meta.due}</span>` : ''}
+    ${entry.meta.status ? `<span class="doc-entry-meta-chip ${entry.meta.status}">${entry.meta.status}</span>` : ''}
+  ` : '';
+  const hasComments = entry.comments && entry.comments.length > 0;
+  const commentsBlock = hasComments ? `
+    <div class="comment-thread">
+      ${entry.comments.map(c => `
+        <div class="comment">
+          <div class="comment-header">
+            <span class="comment-author">${c.author}</span>
+            <span class="comment-time">${c.time}</span>
+          </div>
+          <div class="comment-body">${c.body}</div>
+        </div>
+      `).join('')}
+      <div class="comment-input">
+        <input type="text" placeholder="Add a comment...">
+        <button>Post</button>
+      </div>
+    </div>
+  ` : '';
+
+  return `
+    <div class="doc-entry ${entry.newest ? 'newest' : ''}">
+      <span class="doc-entry-date">${entry.date}</span>
+      <span class="doc-entry-tag ${entry.tag}"><span class="tag-dot ${entry.tag}"></span>${entry.tag}</span>
+      <div class="doc-entry-body">
+        ${entry.body}
+        ${meta ? `<div style="margin-top: 6px;">${meta}</div>` : ''}
+        <span class="doc-entry-author">${entry.author}</span>
+        ${hasComments
+          ? `<div class="doc-entry-comments has-unread">💬 ${entry.comments.length} comment${entry.comments.length === 1 ? '' : 's'} ${entry.comments.length > 0 ? '· click to view' : ''}</div>`
+          : `<div class="doc-entry-comments">💬 add comment</div>`
+        }
+        ${commentsBlock}
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   RENDER — Digest
+   ============================================================ */
+
+function renderDigest() {
+  const data = scenarios[currentScenario];
+  const today = 'May 4, 2026';
+
+  // Pull "this meeting's contributions" — the entries dated May 4
+  const newDecisions = [];
+  const newActions = [];
+  const newRisks = [];
+  const newNotes = [];
+  const openQuestions = [];
+
+  data.agenda.forEach(item => {
+    item.threads.forEach(thread => {
+      thread.entries.forEach(e => {
+        if (e.newest) {
+          const obj = { thread: thread.title, agenda: item.title, ...e };
+          if (e.tag === 'decision') newDecisions.push(obj);
+          else if (e.tag === 'action') newActions.push(obj);
+          else if (e.tag === 'risk') newRisks.push(obj);
+          else if (e.tag === 'note') newNotes.push(obj);
+          else if (e.tag === 'question') openQuestions.push(obj);
+        }
+      });
+    });
+  });
+
+  document.getElementById('digestPreview').innerHTML = `
+    <div class="digest-from">From: Vaughn Staples · Apex Consulting</div>
+    <h1 class="digest-subject">Meeting digest — ${data.meetingTitle.replace(' — Weekly Status', '').replace('Discovery call — technical deep dive', 'OrthoMotion discovery deep dive')} — ${today}</h1>
+    <div class="digest-meta">
+      Sent to ${data.attendees.length} attendees · Series link in footer
+    </div>
+
+    <p class="digest-greeting">Team,</p>
+    <p class="digest-greeting">Recap of today's session. Full series history with all threads is available at the link below.</p>
+
+    ${newDecisions.length > 0 ? `
+      <section class="digest-section">
+        <h2 class="digest-section-h">Decisions made today</h2>
+        <ul>
+          ${newDecisions.map(d => `<li>${d.body}<span class="meta">${d.thread} · ${d.author}</span></li>`).join('')}
+        </ul>
+      </section>
+    ` : ''}
+
+    ${newActions.length > 0 ? `
+      <section class="digest-section">
+        <h2 class="digest-section-h">New action items</h2>
+        <ul>
+          ${newActions.map(a => `<li>${a.body}<span class="meta">${a.meta?.assignee ? '@ ' + a.meta.assignee + ' · ' : ''}${a.meta?.due ? 'due ' + a.meta.due : ''}</span></li>`).join('')}
+        </ul>
+      </section>
+    ` : ''}
+
+    ${newRisks.length > 0 ? `
+      <section class="digest-section">
+        <h2 class="digest-section-h">Risks raised</h2>
+        <ul>
+          ${newRisks.map(r => `<li>${r.body}<span class="meta">${r.thread} · ${r.author}</span></li>`).join('')}
+        </ul>
+      </section>
+    ` : ''}
+
+    ${newNotes.length > 0 ? `
+      <section class="digest-section">
+        <h2 class="digest-section-h">Discussion highlights</h2>
+        <ul>
+          ${newNotes.map(n => `<li>${n.body}<span class="meta">${n.thread} · ${n.author}</span></li>`).join('')}
+        </ul>
+      </section>
+    ` : ''}
+
+    <a href="#" class="digest-link">View full series document →</a>
+
+    <div class="digest-sig">
+      Vaughn Staples · Apex Consulting<br>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px;">This digest was generated from the live meeting capture · ProjectHUD</span>
+    </div>
+  `;
+}
+
+/* ============================================================
+   SURFACE SWITCHING
+   ============================================================ */
+
+document.querySelectorAll('.surface-switch button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.surface-switch button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.surface').forEach(s => s.classList.remove('active'));
+    document.getElementById('surface-' + btn.dataset.surface).classList.add('active');
+    if (btn.dataset.surface === 'document') renderDocument();
+    if (btn.dataset.surface === 'digest') renderDigest();
+  });
+});
+
+document.getElementById('scenarioSelect').addEventListener('change', (e) => {
+  currentScenario = e.target.value;
+  // Reset active thread to first thread of new scenario
+  activeThread = scenarios[currentScenario].agenda[0].threads[0].id;
+  captureLines = [];
+  renderCapture();
+  renderDocument();
+  renderDigest();
+});
+
+/* Initial render */
+renderCapture();
+renderDocument();
+renderDigest();
+</script>
+</body>
+</html>
