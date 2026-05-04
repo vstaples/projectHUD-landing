@@ -503,6 +503,7 @@ const HUDShell = (() => {
     const currentPath = window.location.pathname;
     const NAV_ITEMS = [
       { href: '/dashboard.html',           icon: '◈', label: 'Dashboard',  section: 'top'   },
+      { href: '/accord.html',              icon: '◇', label: 'Accord',     section: 'main'  },
       { href: '/cadence.html',             icon: '⬡', label: 'Cadence',    section: 'main'  },
       { href: '/compass.html',             icon: '◈', label: 'Compass',    section: 'main'  },
       { href: '/pipeline.html',            icon: '▥', label: 'Pipeline',   section: 'main'  },
