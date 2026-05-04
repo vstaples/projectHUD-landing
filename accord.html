@@ -267,6 +267,18 @@
 }
 #accord-app .btn-ghost:hover { color: var(--ink-primary); border-color: var(--rule-strong); }
 
+/* Empty-state "+ New meeting" emphasis — when no meeting is loaded the
+   start button is disabled, so NEW MEETING is the primary affordance.  */
+#accord-app .btn-prominent {
+  background: transparent;
+  border-color: var(--signal);
+  color: var(--signal);
+}
+#accord-app .btn-prominent:hover {
+  background: var(--signal-soft);
+  color: var(--ink-primary);
+}
+
 /* ── Closed-meeting banner ──────────────────────────────── */
 #accord-app .closed-banner {
   display: none;
@@ -764,7 +776,7 @@
       </div>
       <div class="capture-controls">
         <div class="timer" id="meetingTimer">00:00:00</div>
-        <button class="btn btn-ghost" id="newMeetingBtn">+ New meeting</button>
+        <button class="btn btn-prominent" id="newMeetingBtn">+ New meeting</button>
         <button class="btn btn-signal" id="meetingToggleBtn" disabled>Start meeting →</button>
       </div>
     </header>

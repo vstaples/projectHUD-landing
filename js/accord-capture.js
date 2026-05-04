@@ -33,8 +33,8 @@
   window.addEventListener('accord:meeting-sealed', async (ev) => {
     // After seal, refresh nodes so sealed_at lands locally
     const m = ev.detail.meeting;
-    await _loadCaptureNodes(m.id);
-    await _loadThreadHistory(Accord.state.thread?.id);
+    await _loadCaptureNodes(m.meeting_id);
+    await _loadThreadHistory(Accord.state.thread?.thread_id);
     _renderStream();
   });
 
@@ -43,9 +43,9 @@
     const p = ev.detail?.payload || ev.detail;
     if (!p?.node_id) return;
     // Append remote node if not already present
-    if (!local.captureNodes.find(n => n.id === p.node_id)) {
+    if (!local.captureNodes.find(n => n.node_id === p.node_id)) {
       local.captureNodes.unshift({
-        id:         p.node_id,
+        node_id:    p.node_id,
         thread_id:  p.thread_id,
         meeting_id: p.meeting_id,
         tag:        p.tag,
@@ -69,15 +69,15 @@
     _renderChat();
   });
   window.addEventListener('accord:remote-agenda', async () => {
-    if (Accord.state.meeting) await _loadAgenda(Accord.state.meeting.id);
+    if (Accord.state.meeting) await _loadAgenda(Accord.state.meeting.meeting_id);
   });
 
   // ── Loaders ──────────────────────────────────────────────────
   async function _loadAll(meeting, thread) {
     if (!meeting) return;
-    await _loadAgenda(meeting.id);
-    await _loadCaptureNodes(meeting.id);
-    if (thread) await _loadThreadHistory(thread.id);
+    await _loadAgenda(meeting.meeting_id);
+    await _loadCaptureNodes(meeting.meeting_id);
+    if (thread) await _loadThreadHistory(thread.thread_id);
     _renderAgenda();
     _renderStream();
     _renderChat();
@@ -92,9 +92,9 @@
       );
       local.agendaItems = rows || [];
       // Default active agenda = first non-archived item
-      if (!local.activeAgenda || !local.agendaItems.find(a => a.id === local.activeAgenda)) {
+      if (!local.activeAgenda || !local.agendaItems.find(a => a.agenda_item_id === local.activeAgenda)) {
         const first = local.agendaItems.find(a => a.status !== 'archived');
-        local.activeAgenda = first?.id || null;
+        local.activeAgenda = first?.agenda_item_id || null;
       }
     } catch (e) { console.error('[Accord] agenda load failed', e); }
   }
@@ -131,7 +131,7 @@
     }
     const sealed = !!Accord.state.meeting?.sealed_at;
     el.innerHTML = filtered.map(a => `
-      <div class="agenda-item ${a.id === local.activeAgenda ? 'active' : ''}" data-agenda-id="${a.id}">
+      <div class="agenda-item ${a.agenda_item_id === local.activeAgenda ? 'active' : ''}" data-agenda-id="${a.agenda_item_id}">
         <span class="agenda-pos">${a.position}</span>
         <span class="agenda-title">${esc(a.title)}</span>
         <span class="agenda-actions">
@@ -152,18 +152,18 @@
       });
       node.querySelector('button[data-action]')?.addEventListener('click', async (ev) => {
         ev.stopPropagation();
-        const a = local.agendaItems.find(x => x.id === id);
+        const a = local.agendaItems.find(x => x.agenda_item_id === id);
         if (!a) return;
         const action = ev.currentTarget.dataset.action;
         try {
           if (action === 'delete') {
-            await API.del(`accord_agenda_items?id=eq.${id}`);
+            await API.del(`accord_agenda_items?agenda_item_id=eq.${id}`);
           } else if (action === 'archive') {
-            await API.patch(`accord_agenda_items?id=eq.${id}`, { status: 'archived' });
+            await API.patch(`accord_agenda_items?agenda_item_id=eq.${id}`, { status: 'archived' });
           }
-          await _loadAgenda(Accord.state.meeting.id);
+          await _loadAgenda(Accord.state.meeting.meeting_id);
           _renderAgenda();
-          Accord.broadcast('accord.agenda.changed', { meeting_id: Accord.state.meeting.id });
+          Accord.broadcast('accord.agenda.changed', { meeting_id: Accord.state.meeting.meeting_id });
         } catch (e) { console.error('[Accord] agenda mutate failed', e); }
       });
     });
@@ -189,14 +189,14 @@
       try {
         await API.post('accord_agenda_items', {
           firm_id:    m.firm_id,
-          meeting_id: m.id,
+          meeting_id: m.meeting_id,
           position:   nextPos,
           title:      title.trim(),
         });
-        await _loadAgenda(m.id);
+        await _loadAgenda(m.meeting_id);
         _renderAgenda();
         _updateCoverage();
-        Accord.broadcast('accord.agenda.changed', { meeting_id: m.id });
+        Accord.broadcast('accord.agenda.changed', { meeting_id: m.meeting_id });
       } catch (e) {
         alert('Failed to add agenda item: ' + (e?.message || e));
       }
@@ -205,7 +205,7 @@
 
   // ── Context strip ────────────────────────────────────────────
   function _updateContextStrip() {
-    const a = local.agendaItems.find(x => x.id === local.activeAgenda);
+    const a = local.agendaItems.find(x => x.agenda_item_id === local.activeAgenda);
     if (a) {
       $('captureTarget').textContent = a.title;
       $('capturePath').textContent   = `Agenda ${a.position} · ${Accord.state.meeting?.title || ''}`;
@@ -224,7 +224,7 @@
       return;
     }
     const covered = new Set(local.captureNodes.map(n => n.agenda_item_id).filter(Boolean));
-    const filled = local.agendaItems.filter(a => covered.has(a.id) && a.status !== 'archived').length;
+    const filled = local.agendaItems.filter(a => covered.has(a.agenda_item_id) && a.status !== 'archived').length;
     const pct = Math.round((filled / total) * 100);
     $('coverageFill').style.width = pct + '%';
     $('coverageText').textContent = `${filled} of ${total} agenda items have entries`;
@@ -260,14 +260,14 @@
       return;
     }
     const thread = Accord.state.thread;
-    if (!thread?.id) {
+    if (!thread?.thread_id) {
       alert('No thread bound to this meeting yet; commit aborted.');
       return;
     }
     const row = {
       firm_id:        me.firm_id,
-      thread_id:      thread.id,
-      meeting_id:     m.id,
+      thread_id:      thread.thread_id,
+      meeting_id:     m.meeting_id,
       agenda_item_id: local.activeAgenda || null,
       tag,
       summary:        text.slice(0, 280),
@@ -283,7 +283,7 @@
       _updateCoverage();
       // Realtime broadcast of the commit (Iron Rule 41 commit gesture only)
       Accord.broadcast('accord.node.committed', {
-        node_id:    node.id,
+        node_id:    node.node_id,
         thread_id:  node.thread_id,
         meeting_id: node.meeting_id,
         tag:        node.tag,
@@ -324,7 +324,7 @@
       const date = t.toLocaleDateString([], { month: 'short', day: 'numeric' });
       const tag = n.tag || 'note';
       return `
-        <div class="capture-row" data-node-id="${n.id}">
+        <div class="capture-row" data-node-id="${n.node_id}">
           <span class="cap-time">${date} ${time}</span>
           <span class="cap-tag"><span class="tag-dot ${tag}"></span>${tag.toUpperCase()}</span>
           <div>

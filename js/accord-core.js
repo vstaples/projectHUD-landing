@@ -84,7 +84,7 @@ const Accord = (() => {
   // ── Meeting load / create ────────────────────────────────────
   async function loadMeeting(meetingId) {
     try {
-      const rows = await API.get(`accord_meetings?id=eq.${meetingId}&select=*`);
+      const rows = await API.get(`accord_meetings?meeting_id=eq.${meetingId}&select=*`);
       const m = rows && rows[0];
       if (!m) {
         console.warn('[Accord] meeting not found / inaccessible:', meetingId);
@@ -97,22 +97,25 @@ const Accord = (() => {
       const oRows = await API.get(`users?id=eq.${m.organizer_id}&select=name`).catch(() => []);
       state.organizerName = oRows?.[0]?.name || null;
 
-      // Resolve thread (one-meeting → one-thread for CMD-A3 simplicity)
-      const tRows = await API.get(
-        `accord_threads?firm_id=eq.${m.firm_id}&select=*&order=created_at.desc&limit=1` +
-        // Prefer threads that have nodes in this meeting
-        ``
-      ).catch(() => []);
-      // Try to find a thread linked via existing nodes; fallback to most recent
+      // Resolve thread: prefer the thread linked via any existing node in this meeting;
+      // fall back to the most recent thread in the firm.
       const linked = await API.get(
-        `accord_nodes?meeting_id=eq.${m.id}&select=thread_id&limit=1`
+        `accord_nodes?meeting_id=eq.${m.meeting_id}&select=thread_id&limit=1`
       ).catch(() => []);
       let thread = null;
       if (linked && linked[0]?.thread_id) {
-        const tt = await API.get(`accord_threads?id=eq.${linked[0].thread_id}&select=*`).catch(() => []);
+        const tt = await API.get(
+          `accord_threads?thread_id=eq.${linked[0].thread_id}&select=*`
+        ).catch(() => []);
         thread = tt?.[0] || null;
       }
-      state.thread = thread || tRows?.[0] || null;
+      if (!thread) {
+        const tRows = await API.get(
+          `accord_threads?firm_id=eq.${m.firm_id}&select=*&order=created_at.desc&limit=1`
+        ).catch(() => []);
+        thread = tRows?.[0] || null;
+      }
+      state.thread = thread;
 
       _setMeetingHeader(m);
       _renderClosedBanner(m);
@@ -120,7 +123,7 @@ const Accord = (() => {
       _enableComposerForState();
 
       // Subscribe to the meeting channel (idempotent)
-      await _subscribeMeetingChannel(m.id);
+      await _subscribeMeetingChannel(m.meeting_id);
 
       // Notify accord-capture.js to render its data
       window.dispatchEvent(new CustomEvent('accord:meeting-loaded', { detail: { meeting: m, thread: state.thread } }));
@@ -147,22 +150,23 @@ const Accord = (() => {
       const thread = Array.isArray(tCreated) ? tCreated[0] : tCreated;
 
       // 2. Create meeting in idle state
+      // Note: accord_meetings has no scheduled_for NOT NULL; included only as informational
       const meetingRow = {
-        firm_id:        state.me.firm_id,
-        title:          title || 'Untitled meeting',
-        organizer_id:   state.me.id,
-        state:          'idle',
-        scheduled_for:  new Date().toISOString(),
+        firm_id:       state.me.firm_id,
+        title:         title || 'Untitled meeting',
+        organizer_id:  state.me.id,
+        state:         'idle',
+        scheduled_for: new Date().toISOString(),
       };
       const mCreated = await API.post('accord_meetings', meetingRow);
       const meeting = Array.isArray(mCreated) ? mCreated[0] : mCreated;
 
       // Stash thread reference for the loader
       state.thread = thread;
-      await loadMeeting(meeting.id);
+      await loadMeeting(meeting.meeting_id);
       // Persist meeting id in URL so refresh keeps the same meeting
       const url = new URL(window.location);
-      url.searchParams.set('meeting', meeting.id);
+      url.searchParams.set('meeting', meeting.meeting_id);
       window.history.replaceState(null, '', url);
       return meeting;
     } catch (e) {
@@ -177,7 +181,7 @@ const Accord = (() => {
     const m = state.meeting;
     if (!m || m.state !== 'idle') return;
     try {
-      const rows = await API.patch(`accord_meetings?id=eq.${m.id}`, {
+      const rows = await API.patch(`accord_meetings?meeting_id=eq.${m.meeting_id}`, {
         state:      'running',
         started_at: new Date().toISOString(),
       });
@@ -196,10 +200,10 @@ const Accord = (() => {
     const m = state.meeting;
     if (!m || m.state !== 'running') return;
     try {
-      const rows = await API.patch(`accord_meetings?id=eq.${m.id}`, { state: 'closed' });
+      const rows = await API.patch(`accord_meetings?meeting_id=eq.${m.meeting_id}`, { state: 'closed' });
       // The seal trigger populates ended_at, sealed_at, merkle_root server-side.
       // Refetch to get the sealed values.
-      const fresh = await API.get(`accord_meetings?id=eq.${m.id}&select=*`).catch(() => []);
+      const fresh = await API.get(`accord_meetings?meeting_id=eq.${m.meeting_id}&select=*`).catch(() => []);
       state.meeting = fresh?.[0] || (rows?.[0] || m);
       _setMeetingHeader(state.meeting);
       _renderClosedBanner(state.meeting);
@@ -485,7 +489,7 @@ const Accord = (() => {
         state.channel = null;
         $('liveConnectBtn').classList.remove('connected');
       } else {
-        await _subscribeMeetingChannel(state.meeting.id);
+        await _subscribeMeetingChannel(state.meeting.meeting_id);
       }
     });
   }
