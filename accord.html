@@ -59,9 +59,17 @@
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
   font-size: 13px;
   line-height: 1.55;
-  min-height: 100vh;
+  /* CMD-A4-POLISH-1: was `min-height: 100vh`. With min-height, inner flex
+     children could grow beyond the viewport, making the page itself
+     scrollable and disabling the rail/spine `overflow-y: auto` containers
+     (they never engage their own scroll because their parent grew to fit
+     content). Capping at exact viewport height forces all five surfaces'
+     three-region grids (rail · center · panel) to constrain inner content
+     to their own bounds, activating each region's own scroll. */
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 #accord-app * { box-sizing: border-box; }
