@@ -182,3 +182,10 @@ const API = (() => {
   };
 
 })();
+
+// CMD-A6: expose API on window so coc.js (and other modules)
+// can reach it via window.API. Previously API was only available
+// as a top-level const — accessible to scripts loaded after this
+// one, but not via window. CoC.write defensively checks
+// window.API and previously failed silently from accord-digest.js.
+window.API = API;

@@ -309,7 +309,12 @@
       console.warn(`[CoC] Unknown event type "${typeKey}" — writing anyway`);
     }
 
-    const [eventClass, eventType] = typeKey.split('.');
+    // CMD-A6: handle dotted-suffix event types (e.g. 'accord.digest.delivered').
+    // The original split('.') assignment dropped the third segment. Split on the
+    // FIRST '.' only so eventType retains everything after the class.
+    const _firstDot = typeKey.indexOf('.');
+    const eventClass = _firstDot >= 0 ? typeKey.slice(0, _firstDot) : typeKey;
+    const eventType  = _firstDot >= 0 ? typeKey.slice(_firstDot + 1) : '';
     const actor = _resolveActor();
     const now   = new Date().toISOString();
 
