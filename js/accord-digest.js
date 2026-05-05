@@ -243,7 +243,36 @@
     }
   }
 
-  // ── Belief headline (CMD-A5 §5.4 vocabulary) ──────────────────
+  // ── Identity translation cache ──────────────────────────────
+  // CoC writes need actor_resource_id (FK to resources.id) but Accord holds
+  // users.id. Use the accord_user_to_resource() helper (CMD-A6) to translate
+  // once per session and cache.
+  let _myResourceId = null;
+  async function _resolveMyResourceId() {
+    if (_myResourceId) return _myResourceId;
+    const me = Accord.state.me;
+    if (!me?.id) return null;
+    try {
+      // PostgREST exposes the function at /rpc/accord_user_to_resource.
+      // The function returns a single uuid (or null).
+      const result = await API.post('rpc/accord_user_to_resource', { p_user_id: me.id });
+      // PostgREST returns the scalar directly (not wrapped in an array for
+      // a single-row scalar return).
+      const rid = (typeof result === 'string') ? result :
+                  (Array.isArray(result) && result.length) ? (result[0]?.accord_user_to_resource ?? result[0]) :
+                  result;
+      _myResourceId = rid || null;
+    } catch (e) {
+      // Fallback: direct SELECT on resources.
+      try {
+        const rows = await API.get(`resources?user_id=eq.${me.id}&select=id&limit=1`);
+        _myResourceId = rows?.[0]?.id || null;
+      } catch (e2) {
+        console.warn('[Accord-digest] resource_id resolution failed', e2);
+      }
+    }
+    return _myResourceId;
+  }
   function _beliefHeadline(adjs) {
     if (!adjs.length) return 'no belief declared';
     // Most recent overall is index 0 (already sorted desc by declared_at)
@@ -590,6 +619,16 @@
     const me = Accord.state.me;
     if (!me?.id) { alert('Identity not resolved; cannot send.'); return; }
 
+    // CMD-A6: resolve actor_resource_id once before any CoC writes. Without
+    // this, coc.js _resolveActor() picks up window.CURRENT_USER.id (which
+    // is users.id, not resources.id) and the INSERT 23503-fails on the
+    // coc_events.actor_resource_id FK to resources(id).
+    const myResourceId = await _resolveMyResourceId();
+    if (!myResourceId) {
+      alert('Could not resolve your resource record; CoC writes blocked. Contact admin.');
+      return;
+    }
+
     local.sendStatus[d.meeting_id] = 'sending';
     let risksRegistered = 0;
     let recipientsDelivered = 0;
@@ -613,6 +652,7 @@
           }
           await window.CoC.write('risk.registered', r.node_id, {
             entityType: 'accord_node',
+            actorResourceId: myResourceId,
             notes: 'Risk registered via Accord digest send: ' + (r.summary || '').slice(0, 240),
             meta: {
               source_meeting_id: d.meeting_id,
@@ -639,6 +679,7 @@
         try {
           await window.CoC.write('accord.digest.delivered', d.meeting_id, {
             entityType: 'accord_meeting',
+            actorResourceId: myResourceId,
             notes: `Digest delivered to ${recipient.name}`,
             meta: {
               source_meeting_id: d.meeting_id,

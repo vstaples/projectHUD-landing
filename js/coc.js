@@ -316,6 +316,12 @@
     const eventClass = _firstDot >= 0 ? typeKey.slice(0, _firstDot) : typeKey;
     const eventType  = _firstDot >= 0 ? typeKey.slice(_firstDot + 1) : '';
     const actor = _resolveActor();
+    // CMD-A6: caller can override the resolved actor_resource_id when the
+    // calling context has already translated users.id → resources.id
+    // (e.g. accord-digest.js using accord_user_to_resource() helper).
+    if (opts.actorResourceId) {
+      actor.actor_resource_id = opts.actorResourceId;
+    }
     const now   = new Date().toISOString();
 
     const row = {
