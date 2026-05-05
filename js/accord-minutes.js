@@ -381,9 +381,10 @@
           await sb.auth.setSession({ access_token: token, refresh_token: token });
         }
       } catch (_) { /* fall through */ }
+      const filename = renderRow.storage_path.split('/').pop() || 'minutes';
       const { data, error } = await sb.storage
         .from('accord-minutes')
-        .createSignedUrl(renderRow.storage_path, 3600);
+        .createSignedUrl(renderRow.storage_path, 3600, { download: filename });
       if (error) {
         console.warn('[Accord-minutes] signed URL error:', error.message);
         return null;
