@@ -188,6 +188,20 @@
     'meeting.outcome_set':       { stepName: 'Meeting outcome set',     severity: 'info'  },
     'meeting.no_consensus':      { stepName: 'No consensus reached',    severity: 'warn'  },
 
+    // ── ACCORD MODULE (Evidence Layer · Iron Rules 41, 42, 44, 45, 46) ────────
+    // Sealed = Iron-Rule-42 commit moment. Post-seal artifacts are structurally
+    // immutable; "change" expressed via archive / supersede / retract.
+    'accord.node.sealed':         { glyph: '●', stepName: 'Node sealed',           severity: 'info', color: '#1D9E75' },
+    'accord.edge.sealed':         { glyph: '↗', stepName: 'Edge sealed',           severity: 'info', color: '#5B7FFF' },
+    'accord.belief.adjusted':     { glyph: '±', stepName: 'Belief adjusted',       severity: 'info', color: '#EF9F27' },
+    'accord.node.archived':       { glyph: '⊘', stepName: 'Node archived',         severity: 'info', color: 'rgba(255,255,255,.4)' },
+    'accord.node.restored':       { glyph: '⊕', stepName: 'Node restored',         severity: 'info', color: '#1D9E75' },
+    'accord.decision.superseded': { glyph: '↻', stepName: 'Decision superseded',   severity: 'warn', color: '#EF9F27' },
+    'accord.edge.retracted':      { glyph: '✕', stepName: 'Edge retracted',        severity: 'warn', color: '#E24B4A' },
+    'accord.meeting.ended':       { glyph: '▣', stepName: 'Meeting sealed',        severity: 'info', color: '#5B7FFF' },
+    'accord.digest.delivered':    { glyph: '✉', stepName: 'Digest delivered',      severity: 'info', color: '#5B7FFF' },
+    'risk.registered':            { glyph: '⚠', stepName: 'Risk registered',       severity: 'warn', color: '#EF9F27' },
+
     // ── PIPELINE / CRM ────────────────────────────────────────────────────────
     // Prospect lifecycle from first contact through project handoff.
     // entity_type = 'prospect' | 'proposal' | 'sow_document' | 'project'

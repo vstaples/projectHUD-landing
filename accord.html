@@ -1508,6 +1508,367 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ============================================================
+   Digest & Send surface (CMD-A6)
+   Three-region: meeting rail · digest preview · recipient panel
+   ============================================================ */
+
+#accord-app #surface-digest.surface { padding: 0; }
+
+#accord-app .digest-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px 1fr 0;
+  overflow: hidden;
+  transition: grid-template-columns 200ms ease;
+}
+#accord-app .digest-body.recipients-open {
+  grid-template-columns: 260px 1fr 340px;
+}
+
+/* Meeting rail (reuses ledger-rail visual register) */
+#accord-app .digest-rail {
+  border-right: 1px solid var(--rule);
+  padding: 18px 14px 24px;
+  overflow-y: auto;
+  background: var(--canvas-deep);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#accord-app .digest-rail .rail-section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+#accord-app .digest-rail .filter-group {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+#accord-app .digest-rail .filter-group-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  width: 100%;
+  margin-bottom: 2px;
+}
+#accord-app .digest-rail .filter-chip {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 100ms, border-color 100ms, background 100ms;
+}
+#accord-app .digest-rail .filter-chip:hover {
+  color: var(--ink-primary); border-color: var(--rule-strong);
+}
+#accord-app .digest-rail .filter-chip.active {
+  color: var(--signal); border-color: var(--signal-dim); background: var(--signal-soft);
+}
+
+#accord-app .digest-meeting-row {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 10px 12px;
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition: border-color 120ms, background 120ms;
+}
+#accord-app .digest-meeting-row:hover {
+  border-color: var(--rule-strong);
+  background: var(--canvas-elev);
+}
+#accord-app .digest-meeting-row.active {
+  border-color: var(--signal-dim);
+  background: var(--canvas-elev);
+}
+#accord-app .digest-meeting-row .meeting-title {
+  font-size: 13px;
+  color: var(--ink-primary);
+  font-weight: 500;
+  margin-bottom: 4px;
+  line-height: 1.35;
+}
+#accord-app .digest-meeting-row .meeting-meta {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+#accord-app .digest-meeting-row .meeting-status-pill {
+  display: inline-block;
+  font: 500 10px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+#accord-app .digest-meeting-row .meeting-status-pill.ready {
+  color: var(--signal); border: 1px solid var(--signal-dim);
+}
+#accord-app .digest-meeting-row .meeting-status-pill.sent {
+  color: var(--tag-note); border: 1px solid var(--tag-note);
+}
+
+/* Digest preview */
+#accord-app .digest-preview-wrap {
+  overflow-y: auto;
+  background: var(--canvas);
+  padding: 24px 36px 48px;
+}
+#accord-app .digest-preview {
+  max-width: 760px;
+}
+
+#accord-app .digest-empty-cta {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%;
+  color: var(--ink-faint);
+  font-size: 13px;
+  text-align: center;
+  padding: 56px 24px;
+}
+
+#accord-app .digest-header {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+}
+#accord-app .digest-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 24px;
+  color: var(--ink-primary);
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+#accord-app .digest-meta {
+  font-size: 12px; color: var(--ink-muted);
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+#accord-app .digest-meta .meta-pill {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  background: var(--canvas-raised);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+#accord-app .digest-cta-row {
+  display: flex; gap: 10px; align-items: center;
+  margin-bottom: 22px;
+  padding: 12px 0;
+}
+#accord-app .digest-send-btn {
+  background: var(--signal);
+  color: var(--canvas-deep);
+  border: none;
+  padding: 9px 18px;
+  border-radius: 4px;
+  font: 500 12px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+#accord-app .digest-send-btn:hover { background: #e0b35d; }
+#accord-app .digest-send-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+#accord-app .digest-send-status {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+}
+#accord-app .digest-send-status.sent { color: var(--tag-note); }
+
+#accord-app .digest-section {
+  margin-bottom: 22px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+#accord-app .digest-section:first-of-type { border-top: none; padding-top: 0; }
+
+#accord-app .digest-section-header {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-bottom: 10px;
+}
+#accord-app .digest-section-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+#accord-app .digest-section-count {
+  font-size: 11px;
+  color: var(--ink-ghost);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+#accord-app .digest-item {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 11px 14px;
+  margin-bottom: 8px;
+}
+#accord-app .digest-item .digest-summary {
+  font-size: 13px;
+  color: var(--ink-primary);
+  line-height: 1.45;
+  margin-bottom: 6px;
+}
+#accord-app .digest-item .digest-context {
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+#accord-app .digest-item .ctx-pill {
+  background: var(--canvas-elev);
+  padding: 1px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+}
+#accord-app .digest-item .ctx-pill.signal { color: var(--signal); border-color: var(--signal-dim); }
+#accord-app .digest-item .ctx-pill.warn   { color: var(--tag-risk); border-color: rgba(168, 111, 94, 0.4); }
+#accord-app .digest-item .ctx-pill.note   { color: var(--tag-note); border-color: var(--tag-note); }
+
+/* Action placeholder card — Path B deferral */
+#accord-app .digest-action-placeholder {
+  background: rgba(212, 160, 74, 0.06);
+  border: 1px dashed var(--signal-dim);
+  border-radius: 5px;
+  padding: 11px 14px;
+  margin-bottom: 8px;
+}
+#accord-app .digest-action-placeholder .placeholder-tag {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--signal);
+  margin-bottom: 4px;
+}
+#accord-app .digest-action-placeholder .digest-summary {
+  font-size: 13px;
+  color: var(--ink-primary);
+  line-height: 1.45;
+  margin-bottom: 6px;
+}
+#accord-app .digest-action-placeholder .placeholder-deferral {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* Recipient panel (mirrors ledger-detail) */
+#accord-app .digest-recipients {
+  border-left: 1px solid var(--rule);
+  background: var(--canvas-deep);
+  overflow-y: auto;
+  display: none;
+  position: relative;
+}
+#accord-app .digest-body.recipients-open .digest-recipients { display: block; }
+
+#accord-app .digest-recipients-body {
+  padding: 22px 22px 32px;
+}
+#accord-app .recipient-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--canvas-raised);
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+#accord-app .recipient-row:hover { border-color: var(--rule-strong); }
+#accord-app .recipient-row.active { border-color: var(--signal-dim); }
+#accord-app .recipient-row .recipient-checkbox {
+  width: 14px; height: 14px;
+  border: 1px solid var(--ink-muted);
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+#accord-app .recipient-row.selected .recipient-checkbox {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--canvas-deep);
+  font-size: 11px;
+  font-weight: 700;
+}
+#accord-app .recipient-row .recipient-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--ink-primary);
+}
+#accord-app .recipient-row .recipient-role {
+  font: 500 10px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+#accord-app .recipient-slice {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 12px 14px;
+  margin-top: 14px;
+}
+#accord-app .recipient-slice-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+#accord-app .recipient-slice-empty {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+#accord-app .recipient-slice .slice-item {
+  font-size: 12px;
+  color: var(--ink-body);
+  margin-bottom: 4px;
+  line-height: 1.45;
+}
+#accord-app .recipient-slice .slice-item .slice-tag {
+  font: 500 10px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  margin-right: 6px;
+}
+
+/* Digest send confirm modal — reuses .modal-backdrop styles */
+#accord-app .digest-confirm-list {
+  font-size: 12px;
+  color: var(--ink-body);
+  margin: 8px 0 12px;
+}
+#accord-app .digest-confirm-list li {
+  padding: 2px 0;
+}
 </style>
 </head>
 
@@ -1765,9 +2126,37 @@
     </div>
   </section>
   <section class="surface" id="surface-digest">
-    <div class="placeholder-surface">
-      <h2>Digest &amp; Send</h2>
-      <p>Coming in CMD-A6. Digest &amp; Send composes a meeting summary and routes it to attendees and stakeholders.</p>
+    <div class="digest-body">
+
+      <!-- MEETING RAIL — left column -->
+      <aside class="digest-rail" id="digestRail">
+        <div class="rail-section-label">
+          <span>Sealed meetings</span>
+          <button class="ledger-refresh-btn" id="digestRefreshBtn" title="Refresh from substrate">↻</button>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Status</span>
+          <button class="filter-chip active" data-filter-group="status" data-filter-value="ready">Ready to send</button>
+          <button class="filter-chip active" data-filter-group="status" data-filter-value="sent">Sent</button>
+        </div>
+
+        <div id="digestMeetingList"></div>
+
+        <div class="ledger-aggregate" id="digestAggregate"></div>
+      </aside>
+
+      <!-- DIGEST PREVIEW — center column -->
+      <div class="digest-preview-wrap">
+        <div class="digest-preview" id="digestPreview"></div>
+      </div>
+
+      <!-- RECIPIENT PANEL — right column (collapsed by default) -->
+      <aside class="digest-recipients" id="digestRecipients">
+        <button class="ledger-detail-close" id="digestRecipientsClose" title="Close recipients">×</button>
+        <div class="digest-recipients-body" id="digestRecipientsBody"></div>
+      </aside>
+
     </div>
   </section>
   <section class="surface" id="surface-minutes">
@@ -1802,6 +2191,18 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" id="emCancel">Cancel</button>
         <button class="btn btn-end"   id="emConfirm">End meeting</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Digest send confirm modal ─────────────────────────── -->
+  <div class="modal-backdrop" id="digestSendModal">
+    <div class="modal">
+      <h3>Send digest?</h3>
+      <p id="digestSendModalSummary"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"   id="digestSendCancel">Cancel</button>
+        <button class="btn btn-signal"  id="digestSendConfirm">Send</button>
       </div>
     </div>
   </div>
@@ -1871,6 +2272,7 @@
     load('/js/accord-capture.js');
     load('/js/accord-document.js');
     load('/js/accord-ledger.js');
+    load('/js/accord-digest.js');
   })();
 </script>
 
