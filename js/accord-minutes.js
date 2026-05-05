@@ -477,32 +477,42 @@
 
     // 5. Audit-trail CoC write. Non-blocking — print proceeds even if
     //    this fails. Three-segment EVENT_META key parsed by post-CMD-A6c
-    //    parser (Rule 56). Resolve actor_resource_id via the same path
-    //    accord-digest.js uses (Rule 58).
+    //    parser (Rule 56). Resolve actor_resource_id via window._myResource —
+    //    the established global populated by accord-core's _resolveMe path,
+    //    same source accord-digest.js uses at line 681 (Rule 64). Without
+    //    explicit resolution, CoC.write's fallback chain reads
+    //    window.CURRENT_USER.id, which is a user_id and violates the
+    //    resources FK (coc_events_actor_resource_id_fkey).
     try {
-      let actorResourceId = null;
-      try {
-        if (window.Auth?.getCurrentUserId) {
-          const uid = await window.Auth.getCurrentUserId();
-          if (uid) {
-            const rows = await API.get(
-              `resources?user_id=eq.${uid}&select=id&limit=1`
-            ).catch(() => []);
-            actorResourceId = rows?.[0]?.id || null;
-          }
-        }
-      } catch (_) { /* fall through; CoC.write resolves identity itself */ }
-
-      await window.CoC.write('accord.minutes.printed', renderRow.meeting_id, {
-        entityType: 'accord_meeting',
-        actorResourceId: actorResourceId,
-        notes: `Minutes printed (render ${(renderRow.render_id || '').slice(0, 8)})`,
-        meta: {
-          render_id:      renderRow.render_id,
-          render_version: renderRow.render_version || null,
-          content_hash:   renderRow.content_hash   || null,
-        },
-      });
+      let actorResourceId =
+        (window._myResource && window._myResource.id) || null;
+      // Last-resort fallback: query resources by current user_id. Used only
+      // if _myResource hasn't populated yet (race with accord-core init).
+      if (!actorResourceId && window.CURRENT_USER?.id) {
+        try {
+          const rows = await API.get(
+            `resources?user_id=eq.${window.CURRENT_USER.id}&select=id&limit=1`
+          ).catch(() => []);
+          actorResourceId = rows?.[0]?.id || null;
+        } catch (_) { /* swallow; write below will skip if still null */ }
+      }
+      // Skip the write if no resource id can be resolved — better to drop
+      // the audit row than to write a row that violates the FK and surfaces
+      // a 409 in console (Rule 53 — sentinel discipline).
+      if (!actorResourceId) {
+        console.warn('[Accord-minutes] no actor_resource_id resolvable; skipping CoC write for print');
+      } else {
+        await window.CoC.write('accord.minutes.printed', renderRow.meeting_id, {
+          entityType: 'accord_meeting',
+          actorResourceId: actorResourceId,
+          notes: `Minutes printed (render ${(renderRow.render_id || '').slice(0, 8)})`,
+          meta: {
+            render_id:      renderRow.render_id,
+            render_version: renderRow.render_version || null,
+            content_hash:   renderRow.content_hash   || null,
+          },
+        });
+      }
     } catch (err) {
       console.warn('[Accord-minutes] CoC write for print failed (non-blocking):', err);
     }
