@@ -1,26 +1,28 @@
 // ============================================================
 // ProjectHUD — accord-minutes.js
-// CMD-PROJECTION-ENGINE-1 · Minutes surface
+// CMD-PROJECTION-ENGINE-2 · Minutes surface
 //
 // Read-only surface over sealed meetings + accord_minutes_renders.
 // Drives template-dispatched rendering via the render-minutes
-// Edge Function (now a projection engine).
+// Edge Function (projection engine).
 //
-// Three templates available:
-//   - technical-briefing  (default, full Minutes record)
-//   - executive-briefing  (one-page summary, KPI strip, angles)
+// Four templates available (CMD-PROJECTION-ENGINE-2):
+//   - technical-briefing  (NEW; formal-governance Minutes,
+//                          mockup-aligned full record)
+//   - working-session     (renamed from CMD-1's
+//                          'technical-briefing'; lightweight
+//                          Minutes for informal sessions)
+//   - executive-briefing  (one-page summary; KPI strip; angles)
 //   - personal-digest     (addressed-to-reader; per-recipient)
 //
-// Doctrinal commitments (preserved across CMD-PROJECTION-ENGINE-1):
+// Doctrinal commitments preserved:
 //   - IR42 sealed-only render (substrate read filter)
 //   - IR45 declared belief; never confidence/probability
 //   - IR47 explicit accord_* PK names (render_id, meeting_id)
 //   - IR51 chip/badge/picker classes decided at construction
 //   - IR52 IIFE-wrapped, public surface namespaced
 //   - IR54 SELECT-after-mutation in render polling
-//   - IR64 codebase-as-spec: picker styled with the same
-//     minutes-action-btn / btn-ghost vocabulary as Generate /
-//     Re-render; no new affordance vocabulary invented.
+//   - IR64 codebase-as-spec
 // ============================================================
 
 (() => {
@@ -32,17 +34,27 @@
   // Order matters: this is the order shown in the picker.
   const TEMPLATES = [
     { id: 'technical-briefing', label: 'Technical Briefing', short: 'Technical' },
+    { id: 'working-session',    label: 'Working Session',    short: 'Working'   },
     { id: 'executive-briefing', label: 'Executive Briefing', short: 'Executive' },
     { id: 'personal-digest',    label: 'Personal Digest',    short: 'Personal'  },
   ];
-  const DEFAULT_TEMPLATE = 'technical-briefing';
+  // Default omitted-template behavior matches the Edge Function:
+  // 'working-session' (the renamed CMD-1 template). The new
+  // formal-governance Technical Briefing is opt-in via picker.
+  const DEFAULT_TEMPLATE = 'working-session';
+  // Pre-CMD-2 legacy rows lacking template_id were written
+  // under CMD-1's 'technical-briefing' label. Those rows have
+  // been migrated to 'working-session' by the SQL migration,
+  // but if any race-window legacy row still surfaces with no
+  // template_id at all, we treat it as Working Session.
+  const LEGACY_FALLBACK_TEMPLATE = 'working-session';
   function _templateLabel(id) {
     const t = TEMPLATES.find(t => t.id === id);
-    return t ? t.label : (id || 'Technical Briefing');
+    return t ? t.label : (id || 'Working Session');
   }
   function _templateShort(id) {
     const t = TEMPLATES.find(t => t.id === id);
-    return t ? t.short : (id || 'Technical');
+    return t ? t.short : (id || 'Working');
   }
 
   // ── Local state ──────────────────────────────────────────────
@@ -232,7 +244,7 @@
     $('minutesStatus').innerHTML =
       '<div class="minutes-empty-cta">' +
       '<div><h3 style="font-family:Fraunces,serif;font-weight:600;font-size:18px;color:var(--ink-muted);margin-bottom:6px">Select a sealed meeting from the rail.</h3>' +
-      '<p style="font-size:12px;color:var(--ink-faint);max-width:380px;line-height:1.55">Minutes renders the sealed Chain of Custody record as a citable, cryptographically-anchored PDF. Three templates are available: Technical Briefing, Executive Briefing, and Personal Digest.</p></div></div>';
+      '<p style="font-size:12px;color:var(--ink-faint);max-width:380px;line-height:1.55">Minutes renders the sealed Chain of Custody record as a citable, cryptographically-anchored PDF. Four templates are available: Technical Briefing, Working Session, Executive Briefing, and Personal Digest.</p></div></div>';
     document.querySelector('#accord-app .minutes-body')?.classList.remove('history-open');
   }
 
@@ -599,8 +611,8 @@
     _renderStatus();
     try {
       // Pass the active template_id; Edge Function defaults to
-      // technical-briefing if omitted (backward-compat for any
-      // legacy caller).
+      // working-session if omitted (CMD-2 default; auto-render-on-END
+      // and any other legacy caller continue under the renamed key).
       const result = await API.invokeEdgeFunction('render-minutes', {
         meeting_id:  meetingId,
         template_id: local.activeTemplate,
@@ -714,5 +726,5 @@
     TEMPLATES:      TEMPLATES,
   };
 
-  console.log('[Accord] minutes surface module loaded (CMD-PROJECTION-ENGINE-1)');
+  console.log('[Accord] minutes surface module loaded (CMD-PROJECTION-ENGINE-2)');
 })();
