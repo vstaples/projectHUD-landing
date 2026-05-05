@@ -2089,6 +2089,50 @@
   margin-top: 10px;
 }
 
+/* Template picker (CMD-PROJECTION-ENGINE-1)
+   Rendered inside #minutesStatus by accord-minutes.js; classes
+   chosen at construction time (IR51). Visual register mirrors
+   the rail's .filter-chip vocabulary per IR64. */
+#accord-app .minutes-template-picker {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+#accord-app .minutes-template-picker .picker-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+#accord-app .minutes-template-picker .picker-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#accord-app .minutes-template-picker .picker-chip {
+  background: transparent;
+  color: var(--ink-muted);
+  border: 1px solid var(--rule);
+  padding: 7px 14px;
+  border-radius: 4px;
+  font: 500 12px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms, background 120ms;
+}
+#accord-app .minutes-template-picker .picker-chip:hover {
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+  background: var(--canvas-elev);
+}
+#accord-app .minutes-template-picker .picker-chip.active {
+  color: var(--signal);
+  border-color: var(--signal);
+  background: rgba(217, 154, 61, 0.08);
+}
+
 /* History panel (right slide-in) */
 #accord-app .minutes-history {
   border-left: 1px solid var(--rule);
