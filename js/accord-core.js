@@ -212,8 +212,11 @@ const Accord = (() => {
       _refreshTimer();
       _enableComposerForState();
 
-      // Mock async PDF toast — fires ~6s post-END (real wiring in CMD-A7)
-      setTimeout(() => _showToast(), 6000);
+      // CMD-A7: real PDF render trigger replaces CMD-A3's 6-second mock.
+      // The Minutes Edge Function runs async and broadcasts
+      // accord.minutes.rendered (or .render_failed) on the meeting channel
+      // when complete. Toast subscriber (wired below) shows the result.
+      _onMeetingEndSealed(state.meeting.meeting_id);
 
       // Tell capture surface to refresh (sealed_at now populated on nodes)
       window.dispatchEvent(new CustomEvent('accord:meeting-sealed', { detail: { meeting: state.meeting } }));
@@ -362,7 +365,10 @@ const Accord = (() => {
       state.channel
         .on('broadcast', { event: 'accord.node.committed' },   payload => _onRemoteEvent('node', payload))
         .on('broadcast', { event: 'accord.chat.posted' },      payload => _onRemoteEvent('chat', payload))
-        .on('broadcast', { event: 'accord.agenda.changed' },   payload => _onRemoteEvent('agenda', payload))
+        .on('broadcast', { event: 'accord.agenda.changed' },   payload => _onRemoteEvent('agenda', payload));
+      // CMD-A7: relay minutes-render broadcasts to the toast surface.
+      _wireMinutesEventsForChannel(state.channel);
+      state.channel
         .subscribe(status => {
           const lc = $('liveConnectBtn');
           if (status === 'SUBSCRIBED') {
@@ -440,13 +446,75 @@ const Accord = (() => {
   }
 
   // ── Toast / modals ──────────────────────────────────────────
-  function _showToast() {
+  // CMD-A7: toast supports kind ('success'|'error') and optional download URL.
+  // The pdfToast element from CMD-A3 is preserved; only the JS API changes.
+  function _showToast(opts) {
+    opts = opts || {};
     const t = $('pdfToast');
     if (!t) return;
+    const msgEl = t.querySelector('.toast-msg');
+    const dlEl  = $('toastDownload');
+    const kind  = opts.kind || 'success';
+    if (msgEl) {
+      const msg = _esc(opts.message || 'Minutes record published.');
+      msgEl.innerHTML = '<strong>' + msg + '</strong>';
+    }
+    if (dlEl) {
+      if (opts.downloadUrl) {
+        dlEl.href = opts.downloadUrl;
+        dlEl.style.display = '';
+      } else {
+        dlEl.removeAttribute('href');
+        dlEl.style.display = 'none';
+      }
+    }
+    t.classList.toggle('error', kind === 'error');
     t.classList.add('visible');
   }
   function _wireToast() {
     $('toastClose')?.addEventListener('click', () => $('pdfToast')?.classList.remove('visible'));
+  }
+
+  // ── CMD-A7: render trigger + event subscription ─────────────
+  // After meeting END seals, fire the render-minutes Edge Function
+  // asynchronously. The function broadcasts accord.minutes.rendered
+  // (or .render_failed) on the meeting channel; the subscription
+  // installed below in _subscribeMeetingChannel relays to the toast.
+  async function _onMeetingEndSealed(meetingId) {
+    if (!meetingId) return;
+    try {
+      // Fire-and-forget; the toast renders on the broadcast event,
+      // not on this Promise's resolution. We still await to surface
+      // immediate trigger errors (network, auth) for fail-fast UX.
+      await API.invokeEdgeFunction('render-minutes', { meeting_id: meetingId });
+    } catch (e) {
+      console.error('[Accord] render-minutes invoke failed', e);
+      _showToast({
+        kind:    'error',
+        message: 'Minutes render failed to start. Retry from the Minutes tab.',
+      });
+    }
+  }
+
+  // Hook for the meeting-channel subscription to relay broadcast
+  // events to the toast. Called from _subscribeMeetingChannel below.
+  function _wireMinutesEventsForChannel(ch) {
+    if (!ch || typeof ch.on !== 'function') return;
+    ch.on('broadcast', { event: 'accord.minutes.rendered' }, (payload) => {
+      const p = payload?.payload || payload || {};
+      _showToast({
+        kind:        'success',
+        message:     'Minutes record published.',
+        downloadUrl: p.download_url || null,
+      });
+    });
+    ch.on('broadcast', { event: 'accord.minutes.render_failed' }, (payload) => {
+      const p = payload?.payload || payload || {};
+      _showToast({
+        kind:    'error',
+        message: 'Render failed' + (p.reason ? ': ' + p.reason : '.'),
+      });
+    });
   }
 
   function _wireNewMeetingModal() {

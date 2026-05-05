@@ -160,9 +160,40 @@ const API = (() => {
   // Invoices
   const getInvoicesByProject = (id)  => get(`invoices?select=*&project_id=eq.${id}&order=created_at.desc`);
 
+  // CMD-A7: generic Edge Function invoker. POST JSON body, return parsed
+  // JSON. Throws on non-2xx (caller handles). Mirrors resolveURI() auth
+  // pattern: user JWT bearer + apikey header. Functions inherit the
+  // caller's identity via the JWT, so RLS-bound queries inside the
+  // function resolve against the authenticated user's firm.
+  async function invokeEdgeFunction(name, body) {
+    const token = await Auth.getFreshToken().catch(() => Auth.getToken());
+    const url = `${PHUD.SUPABASE_URL}/functions/v1/${name}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'apikey':        PHUD.SUPABASE_KEY,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify(body || {}),
+    });
+    const text = await res.text();
+    let parsed;
+    try { parsed = text ? JSON.parse(text) : null; } catch (_) { parsed = text; }
+    if (!res.ok) {
+      const err = new Error(`Edge function ${name} → ${res.status}: ` +
+        (typeof parsed === 'string' ? parsed : JSON.stringify(parsed)));
+      err.status = res.status;
+      err.body = parsed;
+      throw err;
+    }
+    return parsed;
+  }
+
   return {
     get, post, patch, del,
     resolveURI,                          // CMD-A2 cross-module URI resolver
+    invokeEdgeFunction,                  // CMD-A7 generic Edge Function invoker
     getFirms, getInternalFirm,
     getUsers, getUserById,
     getProjects, getProjectById, getActiveProjects,

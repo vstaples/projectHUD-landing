@@ -207,6 +207,8 @@
     'accord.edge.retracted':      { glyph: '✕', stepName: 'Edge retracted',        severity: 'warn', color: '#E24B4A' },
     'accord.meeting.ended':       { glyph: '▣', stepName: 'Meeting sealed',        severity: 'info', color: '#5B7FFF' },
     'accord.digest.delivered':    { glyph: '✉', stepName: 'Digest delivered',      severity: 'info', color: '#5B7FFF' },
+    'accord.minutes.rendered':    { glyph: '⎙', stepName: 'Minutes rendered',      severity: 'info', color: '#1D9E75' },
+    'accord.minutes.render_failed': { glyph: '✕', stepName: 'Minutes render failed', severity: 'error', color: '#E24B4A' },
     'risk.registered':            { glyph: '⚠', stepName: 'Risk registered',       severity: 'warn', color: '#EF9F27' },
 
     // ── PIPELINE / CRM ────────────────────────────────────────────────────────
