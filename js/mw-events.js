@@ -1,6 +1,6 @@
 // VERSION: 20260423-CMD78g2
 window._mwEventsVersion = 'v20260423-CMD78g2';
-console.log('%c[mw-events] v20260423-CMD78g2 — B-UI-9 v2.0: workflow_request.resolved emit gated on confirmed success (no more stale-queue UI on rollback)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+console.log('%c[mw-events] v20260504-CMD-AEGIS-1.1 — B-UI-9 v2.0: workflow_request.resolved emit gated on confirmed success (no more stale-queue UI on rollback)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // Resolve FIRM_ID safely across page contexts.
 // CMD-AEGIS-1.1: hardcoded firm A fallback removed. Was previously:
