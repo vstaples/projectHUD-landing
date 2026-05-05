@@ -734,6 +734,324 @@
   pointer-events: none;
   opacity: 0.4;
 }
+
+/* ============================================================
+   Living Document surface (CMD-A4)
+   Three-region: thread rail (left) · spine (center)
+   ============================================================ */
+
+#accord-app .modal-helper {
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-style: italic;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+#accord-app #surface-document.surface { padding: 0; }
+
+#accord-app .document-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: var(--rail-w) 1fr;
+  overflow: hidden;
+}
+
+/* Thread rail */
+#accord-app .thread-rail {
+  border-right: 1px solid var(--rule);
+  padding: 18px 14px 24px;
+  overflow-y: auto;
+  background: var(--canvas-deep);
+}
+#accord-app .thread-rail .rail-section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+}
+#accord-app .thread-rail .count {
+  font-size: 11px; color: var(--ink-ghost);
+  text-transform: none; letter-spacing: 0.02em;
+}
+
+#accord-app .thread-row {
+  padding: 10px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#accord-app .thread-row:hover { background: var(--canvas-raised); }
+#accord-app .thread-row.active {
+  background: var(--canvas-raised);
+  border-color: var(--signal-dim);
+}
+#accord-app .thread-row .thread-title {
+  font-size: 13px;
+  color: var(--ink-primary);
+  font-weight: 500;
+  line-height: 1.35;
+}
+#accord-app .thread-row .thread-meta {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+#accord-app .thread-row .thread-meta .pill {
+  background: var(--canvas-elev);
+  padding: 0 6px;
+  border-radius: 8px;
+  color: var(--ink-muted);
+}
+#accord-app .thread-row .thread-meta .pill.warn  { color: var(--tag-risk); }
+#accord-app .thread-row .thread-meta .pill.signal { color: var(--signal); }
+
+/* Spine column */
+#accord-app .document-spine {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--canvas);
+  padding: 28px 36px 48px;
+}
+
+#accord-app .document-header {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+}
+#accord-app .document-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 26px;
+  letter-spacing: -0.01em;
+  color: var(--ink-primary);
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+#accord-app .document-aggregate {
+  font-size: 12px;
+  color: var(--ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+#accord-app .document-aggregate .agg-segment {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+#accord-app .document-aggregate .agg-segment:hover {
+  background: var(--canvas-raised);
+  color: var(--ink-primary);
+}
+#accord-app .document-aggregate .agg-sep {
+  color: var(--ink-ghost);
+  margin: 0 2px;
+}
+
+/* Filter chips */
+#accord-app .document-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .document-filters .filter-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+#accord-app .document-filters .filter-group-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-right: 6px;
+  min-width: 56px;
+}
+#accord-app .document-filters .filter-chip {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 100ms, border-color 100ms, background 100ms;
+}
+#accord-app .document-filters .filter-chip:hover {
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+}
+#accord-app .document-filters .filter-chip.active {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+  background: var(--signal-soft);
+}
+
+/* Spine stream */
+#accord-app .document-stream { display: flex; flex-direction: column; }
+
+#accord-app .meeting-group { margin-bottom: 24px; }
+#accord-app .meeting-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 0 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .meeting-group-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--ink-primary);
+}
+#accord-app .meeting-group-date {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+#accord-app .meeting-group-delta {
+  margin-left: 6px;
+  color: var(--signal);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+}
+
+#accord-app .doc-node {
+  display: grid;
+  grid-template-columns: 100px 110px 1fr;
+  gap: 14px;
+  padding: 9px 0;
+  align-items: start;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .doc-node .doc-time {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+#accord-app .doc-node .doc-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  padding-top: 2px;
+}
+#accord-app .doc-node .doc-content {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-body);
+}
+#accord-app .doc-node .doc-summary {
+  display: block;
+  margin-bottom: 4px;
+}
+#accord-app .doc-node .doc-byline {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+
+/* Edge-driven treatments */
+#accord-app .doc-node.is-superseded .doc-summary {
+  text-decoration: line-through;
+  color: var(--ink-faint);
+}
+#accord-app .doc-node.is-superseded .doc-content { opacity: 0.7; }
+#accord-app .doc-node.is-elevated .doc-summary {
+  color: var(--ink-primary);
+  font-weight: 500;
+}
+#accord-app .doc-node.is-elevated.tag-risk .doc-summary { color: var(--tag-risk); }
+#accord-app .doc-node.is-mitigated .doc-summary { color: var(--ink-muted); }
+#accord-app .doc-node.is-mitigated .doc-content { opacity: 0.85; }
+#accord-app .doc-node.is-answered .doc-tag::before {
+  content: '✓';
+  color: var(--tag-note);
+  margin-right: 4px;
+}
+#accord-app .doc-node.is-closed .doc-tag::before {
+  content: '✓';
+  color: var(--ink-muted);
+  margin-right: 4px;
+}
+
+#accord-app .doc-edge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin: 0 4px 4px 0;
+  cursor: pointer;
+}
+#accord-app .doc-edge-chip:hover {
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+}
+#accord-app .doc-edge-chip.contradiction {
+  color: var(--tag-risk);
+  border-color: rgba(168, 111, 94, 0.3);
+}
+#accord-app .doc-edge-chip.aggregate { font-style: italic; }
+
+#accord-app .doc-edge-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  gap: 4px;
+}
+
+#accord-app .doc-cross-link {
+  color: var(--signal);
+  cursor: pointer;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+/* Empty states */
+#accord-app .doc-empty {
+  text-align: center;
+  padding: 56px 32px;
+  color: var(--ink-faint);
+  font-size: 13px;
+  line-height: 1.55;
+}
+#accord-app .doc-empty h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 18px;
+  color: var(--ink-muted);
+  margin-bottom: 8px;
+}
 </style>
 </head>
 
@@ -881,9 +1199,54 @@
 
   <!-- Placeholder surfaces -->
   <section class="surface" id="surface-document">
-    <div class="placeholder-surface">
-      <h2>Living Document</h2>
-      <p>Coming in CMD-A4. The Living Document surface synthesizes captured commits into a continuously-updated narrative scoped to the active thread.</p>
+    <div class="document-body">
+
+      <!-- THREAD RAIL — left column -->
+      <aside class="thread-rail" id="docThreadRail">
+        <div class="rail-section-label">
+          <span>Threads</span>
+          <span class="count" id="docThreadCount">0</span>
+        </div>
+        <div id="docThreadList"></div>
+      </aside>
+
+      <!-- SPINE — center column -->
+      <div class="document-spine" id="docSpine">
+
+        <header class="document-header" id="docHeader" style="display:none">
+          <h1 class="document-title" id="docTitle"></h1>
+          <div class="document-aggregate" id="docAggregate"></div>
+        </header>
+
+        <div class="document-filters" id="docFilters" style="display:none">
+          <div class="filter-group">
+            <span class="filter-group-label">Tag</span>
+            <button class="filter-chip active" data-filter-group="tag" data-filter-value="note">Note</button>
+            <button class="filter-chip active" data-filter-group="tag" data-filter-value="decision">Decision</button>
+            <button class="filter-chip active" data-filter-group="tag" data-filter-value="action">Action</button>
+            <button class="filter-chip active" data-filter-group="tag" data-filter-value="risk">Risk</button>
+            <button class="filter-chip active" data-filter-group="tag" data-filter-value="question">Question</button>
+          </div>
+          <div class="filter-group">
+            <span class="filter-group-label">Status</span>
+            <button class="filter-chip active" data-filter-group="status" data-filter-value="active">Active</button>
+            <button class="filter-chip active" data-filter-group="status" data-filter-value="superseded">Superseded</button>
+            <button class="filter-chip active" data-filter-group="status" data-filter-value="answered">Answered</button>
+            <button class="filter-chip active" data-filter-group="status" data-filter-value="closed">Closed</button>
+          </div>
+          <div class="filter-group">
+            <span class="filter-group-label">Edges</span>
+            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-supersession">Has supersession</button>
+            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-contradicting">Has contradicting evidence</button>
+            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-open-questions">Has open questions</button>
+            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-unmitigated-risks">Has unmitigated risks</button>
+          </div>
+        </div>
+
+        <div class="document-stream" id="docStream"></div>
+
+      </div>
+
     </div>
   </section>
   <section class="surface" id="surface-ledger">
@@ -914,6 +1277,7 @@
       <input type="text" id="nmTitle" placeholder="Meeting title">
       <label for="nmThreadTitle">Thread (will be created if new)</label>
       <input type="text" id="nmThreadTitle" placeholder="Thread title (e.g., 'Heatsink redesign')">
+      <div class="modal-helper">Threads span meetings; add agenda items below after creating.</div>
       <div class="modal-actions">
         <button class="btn btn-ghost"  id="nmCancel">Cancel</button>
         <button class="btn btn-signal" id="nmCreate">Create meeting</button>
@@ -965,6 +1329,7 @@
     load('/js/cmd-center.js');
     load('/js/accord-core.js');
     load('/js/accord-capture.js');
+    load('/js/accord-document.js');
   })();
 </script>
 

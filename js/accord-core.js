@@ -79,6 +79,8 @@ const Accord = (() => {
     const btn     = document.querySelector(`#accord-app .surface-switch [data-surface="${name}"]`);
     if (surface) surface.classList.add('active');
     if (btn)     btn.classList.add('active');
+    // CMD-A4: notify other surface modules of the change so they can lazy-load.
+    window.dispatchEvent(new CustomEvent('accord:surface-changed', { detail: { surface: name } }));
   }
 
   // ── Meeting load / create ────────────────────────────────────
@@ -509,7 +511,15 @@ const Accord = (() => {
     // If URL has ?meeting=<id>, load it; otherwise show empty state.
     const params = new URLSearchParams(window.location.search);
     const meetingId = params.get('meeting');
-    if (meetingId) await loadMeeting(meetingId);
+    const validUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (meetingId && validUuid.test(meetingId)) {
+      await loadMeeting(meetingId);
+    } else if (meetingId) {
+      // Stale ?meeting=undefined or similar — clear it from the URL silently.
+      const url = new URL(window.location);
+      url.searchParams.delete('meeting');
+      window.history.replaceState(null, '', url);
+    }
 
     console.log('[Accord] core ready · ' + (window._PROJECTHUD_VERSION || 'no-version'));
   }
