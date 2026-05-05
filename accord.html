@@ -1052,6 +1052,462 @@
   color: var(--ink-muted);
   margin-bottom: 8px;
 }
+
+/* ============================================================
+   Decision Ledger surface (CMD-A5)
+   Three-region: filter rail · decision list · detail panel
+   ============================================================ */
+
+#accord-app #surface-ledger.surface { padding: 0; }
+
+#accord-app .ledger-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px 1fr 0;
+  overflow: hidden;
+  transition: grid-template-columns 200ms ease;
+}
+#accord-app .ledger-body.detail-open {
+  grid-template-columns: 260px 1fr 360px;
+}
+
+/* Filter rail */
+#accord-app .ledger-rail {
+  border-right: 1px solid var(--rule);
+  padding: 18px 14px 24px;
+  overflow-y: auto;
+  background: var(--canvas-deep);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#accord-app .ledger-rail .rail-section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+#accord-app .ledger-refresh-btn {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  width: 22px; height: 22px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px; line-height: 1;
+}
+#accord-app .ledger-refresh-btn:hover {
+  color: var(--signal); border-color: var(--signal-dim);
+}
+
+#accord-app .ledger-search {
+  width: 100%;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-primary);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: inherit;
+}
+#accord-app .ledger-search:focus { outline: none; border-color: var(--signal-dim); }
+#accord-app .ledger-search::placeholder { color: var(--ink-faint); }
+
+#accord-app .ledger-rail .filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+#accord-app .ledger-rail .filter-group-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  width: 100%;
+  margin-bottom: 2px;
+}
+#accord-app .ledger-rail .filter-chip {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 100ms, border-color 100ms, background 100ms;
+}
+#accord-app .ledger-rail .filter-chip:hover {
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+}
+#accord-app .ledger-rail .filter-chip.active {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+  background: var(--signal-soft);
+}
+#accord-app .ledger-rail .filter-chip.disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+#accord-app .ledger-aggregate {
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+  font-size: 11px;
+  color: var(--ink-faint);
+  line-height: 1.6;
+}
+#accord-app .ledger-aggregate .agg-line { display: block; }
+#accord-app .ledger-aggregate .agg-line.total {
+  color: var(--ink-primary);
+  font-weight: 500;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+/* Decision list */
+#accord-app .ledger-list-wrap {
+  overflow-y: auto;
+  background: var(--canvas);
+  padding: 24px 32px 48px;
+}
+#accord-app .ledger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#accord-app .decision-row {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
+  position: relative;
+}
+#accord-app .decision-row:hover {
+  border-color: var(--rule-strong);
+  background: var(--canvas-elev);
+}
+#accord-app .decision-row.active {
+  border-color: var(--signal-dim);
+  background: var(--canvas-elev);
+}
+
+#accord-app .decision-row .decision-summary {
+  font-size: 14px;
+  color: var(--ink-primary);
+  line-height: 1.45;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+#accord-app .decision-row.is-superseded .decision-summary {
+  text-decoration: line-through;
+  color: var(--ink-muted);
+}
+#accord-app .decision-row.is-contradicted {
+  border-left: 3px solid var(--tag-risk);
+}
+#accord-app .decision-row.has-counter-weight {
+  border-left: 3px solid var(--signal);
+}
+
+#accord-app .decision-row .decision-meta {
+  font-size: 11px;
+  color: var(--ink-faint);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: baseline;
+}
+#accord-app .decision-row .decision-meta .meta-byline {
+  color: var(--ink-muted);
+}
+#accord-app .decision-row .decision-meta .meta-crumb {
+  color: var(--ink-faint);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+}
+#accord-app .decision-row .decision-meta .meta-crumb a {
+  color: var(--ink-muted);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+#accord-app .decision-row .decision-meta .meta-crumb a:hover {
+  color: var(--signal);
+}
+
+#accord-app .decision-row .decision-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+#accord-app .decision-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--canvas-elev);
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+}
+#accord-app .decision-badge.superseded {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+}
+#accord-app .decision-badge.contradicted {
+  color: var(--tag-risk);
+  border-color: rgba(168, 111, 94, 0.3);
+}
+#accord-app .decision-badge.supporting {
+  color: var(--tag-note);
+}
+#accord-app .decision-badge.counter {
+  color: var(--signal);
+}
+#accord-app .decision-badge.belief-high  { color: var(--tag-note); }
+#accord-app .decision-badge.belief-mixed { color: var(--signal); }
+#accord-app .decision-badge.belief-low   { color: var(--tag-risk); }
+#accord-app .decision-badge.belief-none  { color: var(--ink-faint); }
+
+/* Detail panel (right slide-in) */
+#accord-app .ledger-detail {
+  border-left: 1px solid var(--rule);
+  background: var(--canvas-deep);
+  overflow-y: auto;
+  display: none;
+  position: relative;
+}
+#accord-app .ledger-body.detail-open .ledger-detail { display: block; }
+
+#accord-app .ledger-detail-close {
+  position: absolute;
+  top: 14px; right: 14px;
+  background: transparent;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 18px; line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+#accord-app .ledger-detail-close:hover {
+  color: var(--ink-primary); background: var(--canvas-raised);
+}
+
+#accord-app .ledger-detail-body {
+  padding: 22px 22px 32px;
+}
+#accord-app .ledger-detail-body .detail-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+#accord-app .ledger-detail-body .detail-section:first-child {
+  margin-top: 0; padding-top: 0; border-top: none;
+}
+#accord-app .ledger-detail-body .detail-section-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+#accord-app .ledger-detail-body .detail-summary {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 17px;
+  color: var(--ink-primary);
+  line-height: 1.4;
+  margin-right: 36px;
+}
+#accord-app .ledger-detail-body .detail-crumb {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+  margin-top: 8px;
+}
+#accord-app .ledger-detail-body .detail-crumb a {
+  color: var(--ink-muted);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+#accord-app .ledger-detail-body .detail-crumb a:hover { color: var(--signal); }
+
+/* Belief history rows */
+#accord-app .belief-history-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 12px;
+}
+#accord-app .belief-history-row:last-child { border-bottom: none; }
+#accord-app .belief-history-row .belief-line {
+  display: flex; gap: 8px; align-items: baseline;
+  flex-wrap: wrap;
+}
+#accord-app .belief-history-row .belief-level {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+#accord-app .belief-history-row .belief-level.high  { color: var(--tag-note); border-color: var(--tag-note); }
+#accord-app .belief-history-row .belief-level.mixed { color: var(--signal);   border-color: var(--signal-dim); }
+#accord-app .belief-history-row .belief-level.low   { color: var(--tag-risk); border-color: rgba(168, 111, 94, 0.4); }
+#accord-app .belief-history-row .belief-arrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+#accord-app .belief-history-row .belief-byline {
+  color: var(--ink-muted);
+}
+#accord-app .belief-history-row .belief-when {
+  color: var(--ink-faint);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+}
+#accord-app .belief-history-row .belief-rationale {
+  margin-top: 4px;
+  color: var(--ink-body);
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.5;
+  padding-left: 10px;
+  border-left: 2px solid var(--rule);
+}
+#accord-app .belief-history-row.is-unsealed .belief-when::after {
+  content: '· unsealed';
+  margin-left: 6px;
+  color: var(--signal);
+  font-style: italic;
+}
+
+/* Evidence chain chips */
+#accord-app .evidence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  color: var(--ink-body);
+  margin: 2px 4px 2px 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+#accord-app .evidence-chip:hover {
+  border-color: var(--rule-strong);
+  color: var(--ink-primary);
+}
+#accord-app .evidence-chip .tag-dot { width: 7px; height: 7px; }
+#accord-app .evidence-chip .evidence-tag {
+  font: 500 10px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-right: 2px;
+}
+
+/* Adjustment composer */
+#accord-app .belief-composer {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 14px;
+  margin-top: 4px;
+}
+#accord-app .belief-composer .composer-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  display: block;
+  margin-bottom: 6px;
+}
+#accord-app .belief-level-row {
+  display: flex; gap: 6px; margin-bottom: 12px;
+}
+#accord-app .belief-level-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 7px 10px;
+  border-radius: 4px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 100ms, border-color 100ms;
+}
+#accord-app .belief-level-btn:hover {
+  color: var(--ink-primary); border-color: var(--rule-strong);
+}
+#accord-app .belief-level-btn.selected.high {
+  color: var(--tag-note);
+  border-color: var(--tag-note);
+  background: rgba(139, 168, 154, 0.08);
+}
+#accord-app .belief-level-btn.selected.mixed {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+  background: var(--signal-soft);
+}
+#accord-app .belief-level-btn.selected.low {
+  color: var(--tag-risk);
+  border-color: rgba(168, 111, 94, 0.4);
+  background: rgba(168, 111, 94, 0.08);
+}
+
+#accord-app .belief-rationale {
+  width: 100%;
+  background: var(--canvas);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-primary);
+  padding: 8px 10px;
+  font: 400 12px 'IBM Plex Sans', system-ui, sans-serif;
+  resize: vertical;
+  min-height: 56px;
+  margin-bottom: 10px;
+}
+#accord-app .belief-rationale:focus { outline: none; border-color: var(--signal-dim); }
+#accord-app .belief-rationale::placeholder { color: var(--ink-faint); }
+
+#accord-app .belief-declare-btn {
+  background: var(--signal);
+  color: var(--canvas-deep);
+  border: none;
+  padding: 9px 16px;
+  border-radius: 4px;
+  font: 500 12px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 120ms;
+}
+#accord-app .belief-declare-btn:hover { background: #e0b35d; }
+#accord-app .belief-declare-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 </style>
 </head>
 
@@ -1060,7 +1516,7 @@
 
   <!-- ── Top nav ──────────────────────────────────────────────── -->
   <nav class="topnav">
-    <div class="brand">Accord<span class="brand-meta">CMD-A3 · Live Capture</span></div>
+    <div class="brand">Accord<span class="brand-meta" id="brandMeta">— loading —</span></div>
 
     <button class="live-connect" id="liveConnectBtn" title="Subscribe to the meeting channel">
       <span class="lc-pulse"></span>
@@ -1250,9 +1706,62 @@
     </div>
   </section>
   <section class="surface" id="surface-ledger">
-    <div class="placeholder-surface">
-      <h2>Decision Ledger</h2>
-      <p>Coming in CMD-A5. The Decision Ledger surfaces decision and risk nodes as cards with edge declarations and declared-belief trajectory.</p>
+    <div class="ledger-body">
+
+      <!-- FILTER RAIL — left column -->
+      <aside class="ledger-rail" id="ledgerRail">
+        <div class="rail-section-label">
+          <span>Filters</span>
+          <button class="ledger-refresh-btn" id="ledgerRefreshBtn" title="Refresh from substrate">↻</button>
+        </div>
+
+        <div class="ledger-search-wrap">
+          <input type="text" class="ledger-search" id="ledgerSearch"
+                 placeholder="Search summaries…" autocomplete="off">
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Tag</span>
+          <button class="filter-chip active disabled" data-filter-group="tag" data-filter-value="decision" disabled>Decision</button>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Status</span>
+          <button class="filter-chip active" data-filter-group="status" data-filter-value="active">Active</button>
+          <button class="filter-chip active" data-filter-group="status" data-filter-value="superseded">Superseded</button>
+          <button class="filter-chip active" data-filter-group="status" data-filter-value="contradicted">Contradicted</button>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Belief</span>
+          <button class="filter-chip active" data-filter-group="belief" data-filter-value="high">High</button>
+          <button class="filter-chip active" data-filter-group="belief" data-filter-value="mixed">Mixed</button>
+          <button class="filter-chip active" data-filter-group="belief" data-filter-value="low">Low</button>
+          <button class="filter-chip active" data-filter-group="belief" data-filter-value="none-declared">None declared</button>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Edges</span>
+          <button class="filter-chip" data-filter-group="edge" data-filter-value="has-supporting">Has supporting evidence</button>
+          <button class="filter-chip" data-filter-group="edge" data-filter-value="has-counter">Has counter-evidence</button>
+          <button class="filter-chip" data-filter-group="edge" data-filter-value="superseded">Superseded</button>
+          <button class="filter-chip" data-filter-group="edge" data-filter-value="contradicted">Contradicted</button>
+        </div>
+
+        <div class="ledger-aggregate" id="ledgerAggregate"></div>
+      </aside>
+
+      <!-- DECISION LIST — center column -->
+      <div class="ledger-list-wrap">
+        <div class="ledger-list" id="ledgerList"></div>
+      </div>
+
+      <!-- DETAIL PANEL — right column (collapsed by default) -->
+      <aside class="ledger-detail" id="ledgerDetail">
+        <button class="ledger-detail-close" id="ledgerDetailClose" title="Close detail panel">×</button>
+        <div class="ledger-detail-body" id="ledgerDetailBody"></div>
+      </aside>
+
     </div>
   </section>
   <section class="surface" id="surface-digest">
@@ -1316,6 +1825,37 @@
 <script src="/js/notif.js"></script>
 <script src="/js/version.js?v=seed"></script>
 
+<!-- ── Brand-meta dynamic label (CMD-A5 §8 polish) ── -->
+<script>
+  (function() {
+    const SURFACE_LABELS = {
+      capture:  'Live Capture',
+      document: 'Living Document',
+      ledger:   'Decision Ledger',
+      digest:   'Digest & Send',
+      minutes:  'Minutes',
+    };
+    function _setBrandMeta(surfaceKey) {
+      var el = document.getElementById('brandMeta');
+      if (!el) return;
+      var ver = window._PROJECTHUD_VERSION || '';
+      var label = SURFACE_LABELS[surfaceKey] || 'Live Capture';
+      var ver_short = ver.replace(/^v\d+-/, '');
+      el.textContent = ver_short + ' · ' + label;
+    }
+    // Initial
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() { _setBrandMeta('capture'); });
+    } else {
+      _setBrandMeta('capture');
+    }
+    // Track surface changes
+    window.addEventListener('accord:surface-changed', function(ev) {
+      _setBrandMeta(ev.detail && ev.detail.surface);
+    });
+  })();
+</script>
+
 <!-- ── Versioned shared loaders (matches compass.html pattern) ── -->
 <script>
   (function() {
@@ -1330,6 +1870,7 @@
     load('/js/accord-core.js');
     load('/js/accord-capture.js');
     load('/js/accord-document.js');
+    load('/js/accord-ledger.js');
   })();
 </script>
 

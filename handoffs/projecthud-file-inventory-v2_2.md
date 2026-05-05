@@ -6,27 +6,28 @@ ecosystem with one-line descriptions. Reference document — skim
 for shape, return to when researching specific surfaces.
 
 **Status:** Near-complete as of 2026-04-24. Phase 1 inventory
-pass done; gaps listed in §9. v2.1 (2026-05-04 afternoon) added
-verified FK target documentation for the 14 tables in the Accord
-blast radius (§7.6). v2.2 (2026-05-04 evening) extends §7.6
-with three additional drift cases surfaced by CMD-A3.
+pass done; gaps listed in §9. v2.2 (2026-05-04 evening) adds
+two new §7.6 subsections from CMD-A3 findings: PK naming
+convention divergence (§7.6.6) and Aegis cross-firm presence
+leak finding (§7.6.7).
 
-**Last revised:** 2026-05-04 evening (post-CMD-A3 — added
-§7.6.6 PK naming convention divergence, §7.6.7 Aegis cross-firm
-presence leak, §7.6.8 Realtime channel access discipline).
+**Last revised:** 2026-05-04 evening (CMD-A3 hand-off
+incorporated).
 
 **Supersedes:**
 - `projecthud-file-inventory.md` v1.0 (2026-04-23 stub)
 - `projecthud-file-inventory-v2.md` v2.0 (2026-04-24)
-- `projecthud-file-inventory-v2.md` v2.1 (2026-05-04 afternoon, CMD-A1.5)
+- `projecthud-file-inventory-v2.md` v2.1 (2026-05-04 afternoon,
+  CMD-A1.5)
 
 **Changelog:**
-- **v2.2 (2026-05-04 evening, post-CMD-A3):** §7.6 extended with
-  §7.6.6 (`accord_*` PK naming convention divergence — intentional,
-  documented), §7.6.7 (Aegis cross-firm presence leak — pre-dates
-  Accord, scheduled for CMD-AEGIS-1 fix), §7.6.8 (Realtime channel
-  access discipline — deferred to post-CMD-A7).
-- **v2.1 (2026-05-04 afternoon, CMD-A1.5):** Verified FK targets,
+- **v2.2 (2026-05-04 evening, post-CMD-A3):** Added §7.6.6
+  documenting the `accord_*` table PK naming convention
+  divergence (intentional). Added §7.6.7 documenting the Aegis
+  cross-firm presence leak surfaced by CMD-A3 §10.5
+  (CMD-AEGIS-1 brief commissioned to fix). No schema-level
+  changes.
+- **v2.1 (2026-05-04, CMD-A1.5):** Verified FK targets,
   PK column names, and NOT NULL constraints for the 14 tables
   in the Accord blast radius via `schema_fk_audit()` against
   production. Three drift cases discovered during CMD-A1
@@ -590,84 +591,94 @@ refresh passes call it directly; the supplied audit report
 in the Accord blast radius. Broader inventory refresh of the
 remaining ~117 production tables is deferred.
 
-#### §7.6.6 — `accord_*` PK naming convention divergence (CMD-A3)
+#### §7.6.6 — `accord_*` PK naming convention divergence (intentional)
 
-The `accord_*` table family uses explicit `<table>_id` primary
-key column names (`thread_id`, `meeting_id`, `node_id`,
-`edge_id`, `agenda_item_id`, `adjustment_id`). This diverges
-from the broader codebase convention where peer tables use bare
-`id` (`projects.id`, `users.id`, `meetings.id`, `coc_events.id`).
+The `accord_*` tables use explicit `<table>_id` PKs:
+`accord_threads.thread_id`, `accord_meetings.meeting_id`,
+`accord_nodes.node_id`, `accord_edges.edge_id`,
+`accord_agenda_items.agenda_item_id`,
+`accord_belief_adjustments.adjustment_id`. Peer tables in the
+production schema use bare `id`: `projects.id`, `users.id`,
+`meetings.id`, `coc_events.id`.
 
-**Status:** intentional. The explicit-suffix convention was
-chosen at brief time (Evidence Layer brief v0.1.1 §3) for two
-reasons:
+This is a deliberate naming divergence chosen at Evidence Layer
+brief drafting time, not a drift case. **Rationale:** explicit
+PK naming matches the FK column convention everywhere
+(`thread_id`, `meeting_id`, `node_id` are the FK column names
+when these tables are referenced); reusing the same name for PK
+and FK self-documents which table the row belongs to in
+multi-table joins.
 
-1. Multi-table joins are more legible when the PK and FK column
-   share the same name (`accord_nodes.thread_id` →
-   `accord_threads.thread_id`).
-2. Self-documents which table a row belongs to in cross-table
-   queries.
+**Surfaced by:** CMD-A3 self-violated Iron Rule 47 by
+referencing `accord_*` rows by `.id` in JS code, expecting the
+peer-table convention. Caught at runtime; patched. The incident
+informed Rule 47's amendment to broaden scope from SQL FK
+declarations to all layers (see
+`Iron_Rules_47-50_Ratifications.md` §2 amendment history).
 
-**Consequence for cross-codebase consistency:** the `accord_*`
-namespace is the only production table family using this
-convention. Briefs and code touching `accord_*` tables must use
-the explicit `*_id` PK columns; briefs touching peer tables
-(`projects`, `users`, `meetings`, etc.) use bare `id`. Iron Rule
-47's verification discipline catches missteps in both
-directions.
+**No migration recommended.** Renaming all `accord_*` PKs to bare
+`id` would require updating all FK references, application code,
+RLS policies, the resolver, and the seal trigger — roughly 4-6
+hours of careful work for stylistic consistency only. The
+convention divergence is preserved.
 
-**Discovered:** CMD-A3 self-violated Iron Rule 47 by referencing
-`accord_*` rows as `.id` in JavaScript (assuming the
-peer-table convention). Caught at first runtime; patched. Iron
-Rule 47 §2 was amended in response to broaden scope from SQL FK
-declarations to all layers including JS column references.
+#### §7.6.7 — Aegis cross-firm presence leak (CMD-AEGIS-1 brief commissioned)
 
-#### §7.6.7 — Aegis cross-firm presence leak (CMD-A3 surface; not Accord-side)
-
-CMD-A3's §10.5 cross-firm presence verification surfaced an
-Aegis-side defect that pre-dates Accord. `cmd-center.js`
-lines 67-68 fall back to a hardcoded firm A UUID when
-`window.PHUD.FIRM_ID` is unassigned:
+`cmd-center.js` contains a hardcoded firm A UUID fallback when
+`window.PHUD.FIRM_ID` is unassigned (lines 67–68 in the
+2026-05-04 production state):
 
 ```javascript
-var FIRM_ID  = (typeof PHUD !== 'undefined' && PHUD.FIRM_ID) ||
-               'aaaaaaaa-0001-0001-0001-000000000001';
+var FIRM_ID = (typeof PHUD !== 'undefined' && PHUD.FIRM_ID) ||
+              'aaaaaaaa-0001-0001-0001-000000000001';
 ```
 
-`PHUD.FIRM_ID` is never assigned during normal init flow —
-`config.js` defines `window.PHUD` with Supabase credentials and
-version, but firm_id is in the JWT claims and is not propagated
-to `PHUD.FIRM_ID` after authentication. Every session falls
-through to the hardcoded fallback and subscribes to
-`hud:aaaaaaaa-0001-0001-0001-000000000001`.
+`window.PHUD.FIRM_ID` is never assigned anywhere in production
+code. Every session falls through to the hardcoded fallback and
+subscribes to the same Aegis presence channel
+(`hud:aaaaaaaa-0001-0001-0001-000000000001`), regardless of the
+user's actual firm membership. The result is a cross-firm
+presence leak: a user in firm 1 sees presence indicators for
+users in firm 2 and vice versa.
 
-**Result:** cross-firm sessions converge on the same Aegis
-presence channel. User A in firm A and user B in firm B see each
-other's presence dots, see each other's session aliases, etc.
-This is a multi-tenant data exposure.
+**Compounding factor.** The `_resolveSession()` function at line
+155 snapshots `FIRM_ID` (the hardcoded fallback) into
+`_mySession.firmId` rather than reading the actual firm from
+`_myResource` or `CURRENT_USER`. The `resources` row lookup at
+line 5319 doesn't even SELECT the `firm_id` column. The
+leak's root cause is therefore two-layered: identity-resolution
+never fetches firm context, and channel-naming ignores it even
+if it had.
+
+**Surfaced by:** CMD-A3 §10.5 cross-firm presence verification.
+The leak pre-dates Accord and has been latent in Compass for an
+unknown period. CMD-A3 surfaced it; CMD-AEGIS-1 will fix it.
 
 **Blast radius:** every product using `cmd-center.js`'s presence
-sync — Compass, Cadence, Accord, anywhere `CMDCenter.sessions()`
-returns data. Accord's meeting-scoped channel
-(`accord:meeting:{uuid}`, §10.4) is correctly isolated; the
-defect is at the Aegis layer, not the Accord layer.
+sync (Compass, Accord, future modules). Likely a P1 cross-tenant
+data exposure for regulated-industry buyers; should be fixed
+before further cross-firm-aware surface CMDs (CMD-A4, CMD-A5).
 
-**Resolution:** scheduled as **CMD-AEGIS-1**, the first
-Aegis-side brief from the Accord arc. Estimated 2-4 hours.
-Recommended to ship before CMD-A4 to prevent the leak from
-biting future surface CMDs' verification.
+**Resolution status:** CMD-AEGIS-1 brief commissioned 2026-05-04
+evening. Three fixes:
+1. Populate `window.PHUD.FIRM_ID` (or equivalent) from
+   authenticated identity early in init.
+2. Remove the hardcoded fallback or convert to fatal error.
+3. Audit all channel-name derivation for hardcoded firm
+   assumptions.
 
-#### §7.6.8 — Realtime channel access discipline (deferred)
+**Mitigation while open:** Accord's meeting-scoped channel
+(`accord:meeting:{uuid}`) is correctly firm-isolated by
+UUID-unguessability + RLS-protected reads (verified via CMD-A3
+§10.4). The leak is exclusively in the Aegis presence layer.
 
+**Realtime channel access caveat (related, not blocking).**
 Supabase Broadcast channels are publicly subscribable by name.
-Accord's `accord:meeting:{meeting_id}` channel relies on UUID
-unguessability + RLS-protected reads for firm-isolation rather
-than channel-level access control. This is acceptable for v0.1
-(defense-in-depth via composition) but should be tightened in a
-future Realtime-RLS adoption brief.
-
-Lower priority than CMD-AEGIS-1 (which fixes a current leak);
-queued for after CMD-A7.
+Accord's meeting-scoped channel relies on UUID unguessability
+plus RLS-protected reads as defense-in-depth. A future
+Realtime-RLS adoption brief is queued (lower priority than
+CMD-AEGIS-1) to lock channel-level access by firm at the
+Supabase layer.
 
 
 ---

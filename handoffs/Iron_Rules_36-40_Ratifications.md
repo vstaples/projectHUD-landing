@@ -347,6 +347,14 @@ duplication generalizes to template duplication, partial
 duplication, and any pattern where the same visible element has
 multiple authoring sites.
 
+**Reinforcement note.** §2's function-duplication and surface-
+duplication paragraphs were originally drafted at Rule 38's
+retroactive ratification. CMD-A3's `renderSidebar` /
+`hud-shell.js` vs `sidebar.js` incident is now the second
+shipping confirmation that the discipline matters in practice.
+No amendment to text required; the rule held as written. Logged
+2026-05-04 evening for canon-history continuity.
+
 ---
 
 ## §3 — When the rule does NOT fire

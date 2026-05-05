@@ -1,0 +1,718 @@
+// ============================================================
+// ProjectHUD — accord-ledger.js
+// CMD-A5 · Decision Ledger surface
+//
+// Read-only across sealed decision nodes; mutation surface is
+// the belief-adjustment composer only (writes accord_belief_
+// adjustments rows with sealed_at NULL — sealed by next
+// meeting END via the CMD-A1 trigger).
+//
+// Doctrinal commitments:
+//   - Iron Rule 42 — sealed-only render. Pre-END nodes hidden.
+//   - Iron Rule 44 — visual treatments derived from edge graph.
+//     R-44-extension applied: chip class decided at construction.
+//   - Iron Rule 45 — declared belief, not measured confidence.
+//     Vocabulary: high / mixed / low / none-declared. No
+//     "confidence", "probability", "certainty", "likelihood",
+//     "posterior", or "prior" appears in user-facing strings.
+//   - Iron Rule 47 (amended) — explicit accord_* PK names
+//     everywhere: node_id, thread_id, meeting_id, edge_id,
+//     adjustment_id.
+// ============================================================
+
+(() => {
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+
+  function _defaultFilters() {
+    return {
+      tag:    new Set(['decision']),
+      status: new Set(['active', 'superseded', 'contradicted']),
+      belief: new Set(['high', 'mixed', 'low', 'none-declared']),
+      edge:   new Set(),
+    };
+  }
+
+  // ── Local state ───────────────────────────────────────────────
+  const local = {
+    initialized:    false,
+    decisions:      [],         // sealed decision nodes
+    threads:        {},         // { thread_id: thread } for crumb
+    meetings:       {},         // { meeting_id: meeting } for crumb
+    edges:          [],         // edges where from/to is a decision in scope
+    adjustments:    [],         // belief adjustments for visible decisions
+    declarers:      {},         // { user_id: name }
+    nodeIndex:      {},         // { node_id: node } including evidence-chain targets
+    activeDecision: null,       // node_id of currently expanded decision
+    activeFilters:  _defaultFilters(),
+    searchTerm:     '',
+    composer: {
+      level:     null,          // 'high' | 'mixed' | 'low'
+      rationale: '',
+    },
+  };
+
+  const esc = s => Accord._esc ? Accord._esc(s) : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // ── Surface activation ───────────────────────────────────────
+  window.addEventListener('accord:surface-changed', async (ev) => {
+    if (ev.detail?.surface !== 'ledger') return;
+    if (!local.initialized) {
+      _wireUI();
+      local.initialized = true;
+    }
+    await _refresh();
+  });
+
+  // ── Top-level refresh ────────────────────────────────────────
+  async function _refresh() {
+    await _loadDecisions();
+    await _loadThreadAndMeetingContext();
+    await _loadEdgesAndEvidenceContext();
+    await _loadAdjustments();
+    await _loadDeclarers();
+    _renderList();
+    _renderAggregate();
+    if (local.activeDecision &&
+        local.decisions.find(d => d.node_id === local.activeDecision)) {
+      _renderDetail();
+    } else {
+      _closeDetail();
+    }
+  }
+
+  // ── Loaders ──────────────────────────────────────────────────
+  async function _loadDecisions() {
+    try {
+      const rows = await API.get(
+        'accord_nodes?tag=eq.decision&sealed_at=not.is.null' +
+        '&select=*&order=sealed_at.desc'
+      );
+      local.decisions = rows || [];
+      local.nodeIndex = {};
+      local.decisions.forEach(d => { local.nodeIndex[d.node_id] = d; });
+    } catch (e) {
+      console.error('[Accord-ledger] loadDecisions failed', e);
+      local.decisions = [];
+    }
+  }
+
+  async function _loadThreadAndMeetingContext() {
+    const threadIds  = Array.from(new Set(local.decisions.map(d => d.thread_id).filter(Boolean)));
+    const meetingIds = Array.from(new Set(local.decisions.map(d => d.meeting_id).filter(Boolean)));
+    local.threads = {};
+    local.meetings = {};
+    if (threadIds.length) {
+      const rows = await API.get(
+        `accord_threads?thread_id=in.(${threadIds.join(',')})&select=*`
+      ).catch(() => []);
+      (rows || []).forEach(t => { local.threads[t.thread_id] = t; });
+    }
+    if (meetingIds.length) {
+      const rows = await API.get(
+        `accord_meetings?meeting_id=in.(${meetingIds.join(',')})&select=*`
+      ).catch(() => []);
+      (rows || []).forEach(m => { local.meetings[m.meeting_id] = m; });
+    }
+  }
+
+  async function _loadEdgesAndEvidenceContext() {
+    const decisionIds = local.decisions.map(d => d.node_id);
+    if (!decisionIds.length) {
+      local.edges = [];
+      return;
+    }
+    const idList = decisionIds.join(',');
+    try {
+      const rows = await API.get(
+        `accord_edges?or=(from_node_id.in.(${idList}),to_node_id.in.(${idList}))&select=*`
+      );
+      local.edges = rows || [];
+    } catch (e) {
+      console.error('[Accord-ledger] loadEdges failed', e);
+      local.edges = [];
+    }
+    // Hydrate any non-decision nodes referenced by edges (evidence chain)
+    const foreign = new Set();
+    local.edges.forEach(e => {
+      if (e.from_node_id && !local.nodeIndex[e.from_node_id]) foreign.add(e.from_node_id);
+      if (e.to_node_id   && !local.nodeIndex[e.to_node_id])   foreign.add(e.to_node_id);
+    });
+    if (foreign.size) {
+      const rows = await API.get(
+        `accord_nodes?node_id=in.(${Array.from(foreign).join(',')})&select=node_id,thread_id,tag,summary,sealed_at`
+      ).catch(() => []);
+      (rows || []).forEach(n => { local.nodeIndex[n.node_id] = n; });
+    }
+  }
+
+  async function _loadAdjustments() {
+    const decisionIds = local.decisions.map(d => d.node_id);
+    if (!decisionIds.length) {
+      local.adjustments = [];
+      return;
+    }
+    try {
+      const rows = await API.get(
+        `accord_belief_adjustments?target_node_id=in.(${decisionIds.join(',')})&select=*&order=declared_at.desc`
+      );
+      local.adjustments = rows || [];
+    } catch (e) {
+      console.error('[Accord-ledger] loadAdjustments failed', e);
+      local.adjustments = [];
+    }
+  }
+
+  async function _loadDeclarers() {
+    const ids = new Set();
+    local.decisions.forEach(d => d.created_by && ids.add(d.created_by));
+    local.adjustments.forEach(a => a.declared_by && ids.add(a.declared_by));
+    local.declarers = {};
+    if (!ids.size) return;
+    try {
+      const rows = await API.get(
+        `users?id=in.(${Array.from(ids).join(',')})&select=id,name`
+      );
+      (rows || []).forEach(u => { local.declarers[u.id] = u.name; });
+    } catch (e) {
+      console.error('[Accord-ledger] loadDeclarers failed', e);
+    }
+  }
+
+  // ── Per-decision derived state ──────────────────────────────
+  // All visual treatments are derived purely from the edge graph
+  // and the adjustment timeline — Iron Rule 44.
+  function _decorateDecision(d) {
+    const incoming = local.edges.filter(e => e.to_node_id   === d.node_id);
+    const outgoing = local.edges.filter(e => e.from_node_id === d.node_id);
+    const isSuperseded   = outgoing.some(e => e.edge_type === 'supersedes') ||
+                           incoming.some(e => e.edge_type === 'supersedes');
+    // §6.2: superseded chip means this decision has an OUTGOING supersedes edge
+    // (i.e., it supersedes something else). For the UI's "Superseded" status
+    // we want this decision to be the SUPERSEDED one — i.e., has INCOMING
+    // supersedes. The brief's §6.2 wording is ambiguous; we use the more
+    // common reader semantic: a "superseded" decision is the one being replaced.
+    const beingSuperseded = incoming.some(e => e.edge_type === 'supersedes');
+    const supersedingThis = outgoing.some(e => e.edge_type === 'supersedes');
+    const supportingCount = incoming.filter(e => e.edge_type === 'supports').length;
+    const counterCount    = incoming.filter(e => e.edge_type === 'weakens').length;
+    const contradictCount = incoming.filter(e => e.edge_type === 'contradicts').length;
+    const isContradicted  = contradictCount > 0;
+
+    // Belief aggregation per §5.4: most-recent-per-declarer; headline is the
+    // most-recent-overall. delta → level: +1 high, 0 mixed, -1 low.
+    const adjs = local.adjustments
+      .filter(a => a.target_node_id === d.node_id)
+      .slice() // already sorted desc by declared_at on load
+      .sort((a, b) => String(b.declared_at).localeCompare(String(a.declared_at)));
+    const perDeclarer = {};
+    adjs.forEach(a => {
+      if (!perDeclarer[a.declared_by]) perDeclarer[a.declared_by] = a;
+    });
+    const declarerCount = Object.keys(perDeclarer).length;
+    const headlineAdj   = adjs[0] || null;
+    const headlineLevel = headlineAdj ? _deltaToLevel(headlineAdj.delta) : 'none-declared';
+
+    return {
+      incoming,
+      outgoing,
+      beingSuperseded,
+      supersedingThis,
+      isSuperseded:   beingSuperseded,
+      isContradicted,
+      supportingCount,
+      counterCount,
+      contradictCount,
+      adjs,
+      perDeclarer,
+      declarerCount,
+      headlineAdj,
+      headlineLevel,
+    };
+  }
+
+  function _deltaToLevel(delta) {
+    if (delta == null) return 'none-declared';
+    if (delta > 0) return 'high';
+    if (delta < 0) return 'low';
+    return 'mixed';
+  }
+  function _levelToDelta(level) {
+    if (level === 'high')  return 1;
+    if (level === 'mixed') return 0;
+    if (level === 'low')   return -1;
+    return null;
+  }
+
+  // ── Filter pass ─────────────────────────────────────────────
+  function _passesFilters(d, derived) {
+    const f = local.activeFilters;
+    if (!f.tag.has(d.tag)) return false;
+
+    let status;
+    if (derived.isSuperseded) status = 'superseded';
+    else if (derived.isContradicted) status = 'contradicted';
+    else status = 'active';
+    if (!f.status.has(status)) return false;
+
+    if (!f.belief.has(derived.headlineLevel)) return false;
+
+    if (f.edge.size) {
+      if (f.edge.has('has-supporting') && derived.supportingCount === 0) return false;
+      if (f.edge.has('has-counter')    && derived.counterCount    === 0) return false;
+      if (f.edge.has('superseded')     && !derived.isSuperseded)         return false;
+      if (f.edge.has('contradicted')   && !derived.isContradicted)       return false;
+    }
+
+    if (local.searchTerm) {
+      const hay = (d.summary || '').toLowerCase();
+      if (!hay.includes(local.searchTerm)) return false;
+    }
+
+    return true;
+  }
+
+  // ── List render ─────────────────────────────────────────────
+  function _renderList() {
+    const el = $('ledgerList');
+    if (!local.decisions.length) {
+      el.innerHTML =
+        '<div class="doc-empty"><h3>No sealed decisions yet.</h3>' +
+        '<p>Decisions captured in Live Capture appear here once a meeting closes.</p></div>';
+      return;
+    }
+    const rows = [];
+    local.decisions.forEach(d => {
+      const derived = _decorateDecision(d);
+      d._derived = derived;
+      if (!_passesFilters(d, derived)) return;
+      rows.push(_renderDecisionRow(d, derived));
+    });
+    el.innerHTML = rows.join('') ||
+      '<div class="doc-empty"><h3>No decisions match filters.</h3>' +
+      '<p>Adjust the filter chips on the left.</p></div>';
+
+    el.querySelectorAll('.decision-row').forEach(node => {
+      const id = node.dataset.nodeId;
+      node.addEventListener('click', (ev) => {
+        // Don't open detail if a meta-link was clicked (e.g., crumb to Living Document)
+        if (ev.target.closest('a[data-nav]')) return;
+        _selectDecision(id);
+      });
+    });
+    // Crumb navigation (per §9.6)
+    el.querySelectorAll('a[data-nav-thread]').forEach(a => {
+      a.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const tid = a.dataset.navThread;
+        Accord.switchSurface('document');
+        // accord-document.js exposes _selectThread on AccordDocument
+        if (window.AccordDocument && tid) {
+          setTimeout(() => window.AccordDocument._selectThread(tid), 50);
+        }
+      });
+    });
+  }
+
+  function _renderDecisionRow(d, derived) {
+    const cls = ['decision-row', 'tag-' + d.tag];
+    if (d.node_id === local.activeDecision) cls.push('active');
+    if (derived.isSuperseded)   cls.push('is-superseded');
+    if (derived.isContradicted) cls.push('is-contradicted');
+    if (derived.counterCount > derived.supportingCount && !derived.isContradicted) {
+      cls.push('has-counter-weight');
+    }
+
+    const declarer = local.declarers[d.created_by] || 'Unknown';
+    const meeting  = d.meeting_id ? local.meetings[d.meeting_id] : null;
+    const thread   = d.thread_id  ? local.threads[d.thread_id]  : null;
+    const sealed   = d.sealed_at ? new Date(d.sealed_at) : null;
+    const sealedFmt = sealed ? sealed.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+
+    const badges = _renderRowBadges(d, derived);
+
+    return `
+      <div class="${cls.join(' ')}" data-node-id="${d.node_id}">
+        <div class="decision-summary">${esc(d.summary || '')}</div>
+        <div class="decision-meta">
+          <span class="meta-byline">Declared by ${esc(declarer)}</span>
+          <span class="meta-crumb">in
+            ${meeting ? esc(meeting.title || '(meeting)') : '(meeting)'}, ${esc(sealedFmt)}
+          </span>
+          ${thread ? `<span class="meta-crumb">· thread: <a data-nav data-nav-thread="${thread.thread_id}">${esc(thread.title || '(thread)')}</a></span>` : ''}
+        </div>
+        ${badges}
+      </div>`;
+  }
+
+  // R-44-extension: chip classes decided at construction-time
+  function _renderRowBadges(d, derived) {
+    const out = [];
+    // Belief headline
+    const belief = derived.headlineLevel;
+    const beliefCls = `decision-badge belief-${belief === 'none-declared' ? 'none' : belief}`;
+    const beliefText = belief === 'none-declared'
+      ? 'no belief declared'
+      : `belief: ${belief}` +
+        (derived.declarerCount > 1 ? ` · ${derived.declarerCount} declarers` : '');
+    out.push(`<span class="${beliefCls}">${esc(beliefText)}</span>`);
+
+    // Superseded
+    if (derived.isSuperseded) {
+      const supEdge = derived.incoming.find(e => e.edge_type === 'supersedes');
+      const supBy   = supEdge ? local.nodeIndex[supEdge.from_node_id] : null;
+      const summary = supBy?.summary ? _truncate(supBy.summary, 32) : '';
+      out.push(`<span class="decision-badge superseded">superseded${summary ? ' by "' + esc(summary) + '"' : ''}</span>`);
+    }
+
+    // Contradicted
+    if (derived.isContradicted) {
+      out.push(`<span class="decision-badge contradicted">⚠ contradicted${derived.contradictCount > 1 ? ` (${derived.contradictCount})` : ''}</span>`);
+    }
+
+    // Supporting / counter aggregate
+    if (derived.supportingCount) {
+      out.push(`<span class="decision-badge supporting">+${derived.supportingCount} supporting</span>`);
+    }
+    if (derived.counterCount) {
+      out.push(`<span class="decision-badge counter">−${derived.counterCount} counter-evidence</span>`);
+    }
+
+    return `<div class="decision-badges">${out.join('')}</div>`;
+  }
+
+  // ── Aggregate counts ────────────────────────────────────────
+  function _renderAggregate() {
+    const total = local.decisions.length;
+    let active = 0, superseded = 0, contradicted = 0;
+    let visible = 0;
+    local.decisions.forEach(d => {
+      const derived = d._derived || _decorateDecision(d);
+      if (derived.isSuperseded)        superseded++;
+      else if (derived.isContradicted) contradicted++;
+      else                              active++;
+      if (_passesFilters(d, derived)) visible++;
+    });
+    const lines = [];
+    lines.push(`<span class="agg-line total">${visible} of ${total} matching filters</span>`);
+    if (active)       lines.push(`<span class="agg-line">${active} active</span>`);
+    if (superseded)   lines.push(`<span class="agg-line">${superseded} superseded</span>`);
+    if (contradicted) lines.push(`<span class="agg-line">${contradicted} contradicted</span>`);
+    $('ledgerAggregate').innerHTML = lines.join('');
+  }
+
+  // ── Detail panel ────────────────────────────────────────────
+  function _selectDecision(nodeId) {
+    local.activeDecision = nodeId;
+    document.querySelectorAll('#ledgerList .decision-row').forEach(r => {
+      r.classList.toggle('active', r.dataset.nodeId === nodeId);
+    });
+    $('ledgerDetail').parentElement.classList.add('detail-open');
+    _renderDetail();
+  }
+
+  function _closeDetail() {
+    local.activeDecision = null;
+    document.querySelectorAll('#ledgerList .decision-row.active').forEach(r => r.classList.remove('active'));
+    document.querySelector('#accord-app .ledger-body')?.classList.remove('detail-open');
+  }
+
+  function _renderDetail() {
+    const d = local.decisions.find(x => x.node_id === local.activeDecision);
+    const body = $('ledgerDetailBody');
+    if (!d) { body.innerHTML = ''; return; }
+    const derived = d._derived || _decorateDecision(d);
+    const declarer = local.declarers[d.created_by] || 'Unknown';
+    const meeting  = d.meeting_id ? local.meetings[d.meeting_id] : null;
+    const thread   = d.thread_id  ? local.threads[d.thread_id]  : null;
+    const sealed   = d.sealed_at ? new Date(d.sealed_at) : null;
+    const sealedFmt = sealed ? sealed.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+
+    body.innerHTML = `
+      <div class="detail-section">
+        <div class="detail-section-label">Decision</div>
+        <div class="detail-summary">${esc(d.summary || '')}</div>
+        <div class="detail-crumb">
+          Declared by ${esc(declarer)}
+          ${meeting ? ` · in <a data-nav-meeting="${meeting.meeting_id}" data-nav-thread="${thread?.thread_id || ''}">${esc(meeting.title || '(meeting)')}</a>, ${esc(sealedFmt)}` : ''}
+          ${thread  ? `<br>thread: <a data-nav-thread="${thread.thread_id}">${esc(thread.title || '(thread)')}</a>` : ''}
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-label">Belief history</div>
+        ${_renderBeliefHistory(d, derived)}
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-label">Evidence chain</div>
+        ${_renderEvidenceChain(d, derived)}
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-label">Declare belief</div>
+        ${_renderComposer(d)}
+      </div>
+    `;
+
+    // Wire up nav links
+    body.querySelectorAll('a[data-nav-thread]').forEach(a => {
+      a.addEventListener('click', () => {
+        const tid = a.dataset.navThread;
+        if (!tid) return;
+        Accord.switchSurface('document');
+        if (window.AccordDocument) {
+          setTimeout(() => window.AccordDocument._selectThread(tid), 50);
+        }
+      });
+    });
+    body.querySelectorAll('.evidence-chip[data-nav-thread]').forEach(a => {
+      a.addEventListener('click', () => {
+        const tid = a.dataset.navThread;
+        if (!tid) return;
+        Accord.switchSurface('document');
+        if (window.AccordDocument) {
+          setTimeout(() => window.AccordDocument._selectThread(tid), 50);
+        }
+      });
+    });
+
+    _wireComposer(d);
+  }
+
+  function _renderBeliefHistory(d, derived) {
+    if (!derived.adjs.length) {
+      return '<div style="color:var(--ink-faint);font-size:12px;font-style:italic">No belief declarations yet.</div>';
+    }
+    // Compute delta direction relative to previous declaration by same declarer.
+    // ▲ raised, ▼ lowered, ▬ no-change.
+    const adjsAsc = derived.adjs.slice().reverse();
+    const dirs = {};
+    const prevPerDeclarer = {};
+    adjsAsc.forEach(a => {
+      const prev = prevPerDeclarer[a.declared_by];
+      if (prev == null) dirs[a.adjustment_id] = '·';
+      else if (a.delta > prev) dirs[a.adjustment_id] = '▲';
+      else if (a.delta < prev) dirs[a.adjustment_id] = '▼';
+      else dirs[a.adjustment_id] = '▬';
+      prevPerDeclarer[a.declared_by] = a.delta;
+    });
+
+    return derived.adjs.map(a => {
+      const level = _deltaToLevel(a.delta);
+      const declarer = local.declarers[a.declared_by] || 'Unknown';
+      const when = new Date(a.declared_at).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const unsealedCls = a.sealed_at ? '' : ' is-unsealed';
+      return `
+        <div class="belief-history-row${unsealedCls}">
+          <div class="belief-line">
+            <span class="belief-level ${level}">${esc(level)}</span>
+            <span class="belief-arrow">${dirs[a.adjustment_id] || ''}</span>
+            <span class="belief-byline">${esc(declarer)}</span>
+            <span class="belief-when">${esc(when)}</span>
+          </div>
+          ${a.rationale ? `<div class="belief-rationale">${esc(a.rationale)}</div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  function _renderEvidenceChain(d, derived) {
+    const chips = [];
+
+    const supports     = derived.incoming.filter(e => e.edge_type === 'supports');
+    const weakens      = derived.incoming.filter(e => e.edge_type === 'weakens');
+    const contradicts  = derived.incoming.filter(e => e.edge_type === 'contradicts');
+    const cites        = derived.outgoing.filter(e => e.edge_type === 'cites' && e.to_node_id);
+    const answersIn    = derived.incoming.filter(e => e.edge_type === 'answers');
+    const answersOut   = derived.outgoing.filter(e => e.edge_type === 'answers');
+    const supersedeOut = derived.outgoing.filter(e => e.edge_type === 'supersedes');
+    const supersedeIn  = derived.incoming.filter(e => e.edge_type === 'supersedes');
+
+    function chipFor(e, side) {
+      // side = 'from' (use e.from_node_id) or 'to' (use e.to_node_id)
+      const refId = side === 'from' ? e.from_node_id : e.to_node_id;
+      const node = refId ? local.nodeIndex[refId] : null;
+      if (!node) return '';
+      const summary = _truncate(node.summary || '', 56);
+      const navAttr = node.thread_id ? ` data-nav-thread="${node.thread_id}"` : '';
+      return `<a class="evidence-chip"${navAttr}>
+        <span class="tag-dot ${esc(node.tag)}"></span>
+        <span class="evidence-tag">${esc(node.tag)}</span>
+        ${esc(summary)}
+      </a>`;
+    }
+
+    function section(label, edges, side) {
+      if (!edges.length) return '';
+      return `
+        <div style="margin-bottom: 10px;">
+          <div style="font-size:11px;color:var(--ink-faint);margin-bottom:4px;font-family:'IBM Plex Mono',monospace;">${esc(label)}</div>
+          <div>${edges.map(e => chipFor(e, side)).join('')}</div>
+        </div>`;
+    }
+
+    chips.push(section('Supports',     supports,    'from'));
+    chips.push(section('Weakens',      weakens,     'from'));
+    chips.push(section('Contradicts',  contradicts, 'from'));
+    chips.push(section('Cites',        cites,       'to'));
+    chips.push(section('Answers',      answersOut,  'to'));
+    chips.push(section('Resolves',     answersIn,   'from'));
+    chips.push(section('Supersedes',   supersedeOut,'to'));
+    chips.push(section('Superseded by',supersedeIn, 'from'));
+
+    const inner = chips.join('').trim();
+    if (!inner) {
+      return '<div style="color:var(--ink-faint);font-size:12px;font-style:italic">No evidence chain yet.</div>';
+    }
+    return inner;
+  }
+
+  function _renderComposer(d) {
+    const lvl = local.composer.level;
+    const txt = local.composer.rationale;
+    return `
+      <div class="belief-composer">
+        <span class="composer-label">Belief level</span>
+        <div class="belief-level-row">
+          <button class="belief-level-btn high${lvl === 'high' ? ' selected' : ''}"  data-belief-level="high">High</button>
+          <button class="belief-level-btn mixed${lvl === 'mixed' ? ' selected' : ''}" data-belief-level="mixed">Mixed</button>
+          <button class="belief-level-btn low${lvl === 'low' ? ' selected' : ''}"   data-belief-level="low">Low</button>
+        </div>
+        <span class="composer-label">Rationale</span>
+        <textarea class="belief-rationale" id="ledgerComposerRationale"
+                  placeholder="Why this declaration?">${esc(txt)}</textarea>
+        <button class="belief-declare-btn" id="ledgerComposerDeclare"
+                ${(!lvl || !txt.trim()) ? 'disabled' : ''}>Declare belief</button>
+      </div>`;
+  }
+
+  function _wireComposer(d) {
+    document.querySelectorAll('#ledgerDetailBody .belief-level-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        local.composer.level = btn.dataset.beliefLevel;
+        // Re-render just the composer (cheap; preserves rationale text via local state)
+        const ta = $('ledgerComposerRationale');
+        if (ta) local.composer.rationale = ta.value;
+        const composerEl = document.querySelector('#ledgerDetailBody .belief-composer');
+        if (composerEl) composerEl.outerHTML = _renderComposer(d);
+        _wireComposer(d);
+      });
+    });
+    const ta = $('ledgerComposerRationale');
+    if (ta) {
+      ta.addEventListener('input', () => {
+        local.composer.rationale = ta.value;
+        const btn = $('ledgerComposerDeclare');
+        if (btn) btn.disabled = !(local.composer.level && ta.value.trim());
+      });
+    }
+    const submit = $('ledgerComposerDeclare');
+    if (submit) {
+      submit.addEventListener('click', () => _declareBelief(d));
+    }
+  }
+
+  async function _declareBelief(d) {
+    const me = Accord.state.me;
+    if (!me?.id || !me.firm_id) {
+      alert('Identity not resolved; cannot declare belief.');
+      return;
+    }
+    const level = local.composer.level;
+    const rationale = (local.composer.rationale || '').trim();
+    if (!level || !rationale) return;
+    const delta = _levelToDelta(level);
+    const row = {
+      firm_id:         me.firm_id,
+      target_node_id:  d.node_id,
+      delta,
+      rationale,
+      declared_by:     me.id,
+    };
+    try {
+      const created = await API.post('accord_belief_adjustments', row);
+      const adj = Array.isArray(created) ? created[0] : created;
+      // Update local state and re-render
+      local.adjustments.unshift(adj);
+      local.composer = { level: null, rationale: '' };
+      _renderList();
+      _renderAggregate();
+      _renderDetail();
+      _toast('Belief declared.');
+      // §5.3 step 5 — broadcast on the meeting channel if a meeting is running
+      try {
+        if (Accord.state.meeting && Accord.state.meeting.state === 'running' &&
+            typeof Accord.broadcast === 'function') {
+          Accord.broadcast('accord.belief.declared', {
+            adjustment_id:   adj.adjustment_id,
+            target_node_id:  adj.target_node_id,
+            declared_by:     adj.declared_by,
+            delta:           adj.delta,
+            declared_at:     adj.declared_at,
+          });
+        }
+      } catch (e) { /* broadcast best-effort */ }
+    } catch (e) {
+      console.error('[Accord-ledger] declareBelief failed', e);
+      alert('Belief declaration failed: ' + (e?.message || e));
+    }
+  }
+
+  function _toast(msg) {
+    // Reuse the existing #pdfToast surface for transient confirmations.
+    const t = $('pdfToast');
+    if (!t) return;
+    const m = t.querySelector('.toast-msg');
+    if (m) m.innerHTML = `<strong>${esc(msg)}</strong>`;
+    t.classList.add('visible');
+    setTimeout(() => t.classList.remove('visible'), 3500);
+  }
+
+  // ── Wire UI (one-time) ──────────────────────────────────────
+  function _wireUI() {
+    // Filter chips
+    $('ledgerRail').addEventListener('click', (ev) => {
+      const btn = ev.target.closest('.filter-chip');
+      if (!btn || btn.disabled) return;
+      const group = btn.dataset.filterGroup;
+      const value = btn.dataset.filterValue;
+      const set = local.activeFilters[group];
+      if (!set) return;
+      if (set.has(value)) set.delete(value);
+      else set.add(value);
+      btn.classList.toggle('active', set.has(value));
+      _renderList();
+      _renderAggregate();
+    });
+
+    // Search
+    $('ledgerSearch').addEventListener('input', (ev) => {
+      local.searchTerm = (ev.target.value || '').toLowerCase().trim();
+      _renderList();
+      _renderAggregate();
+    });
+
+    // Refresh
+    $('ledgerRefreshBtn').addEventListener('click', () => _refresh());
+
+    // Detail close
+    $('ledgerDetailClose').addEventListener('click', () => _closeDetail());
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────
+  function _truncate(s, n) {
+    s = String(s || '');
+    return s.length > n ? s.slice(0, n - 1) + '…' : s;
+  }
+
+  // Public surface (for debugging / future cross-surface hooks)
+  window.AccordLedger = {
+    _state:           local,
+    _renderList:      _renderList,
+    _selectDecision:  _selectDecision,
+    _refresh:         _refresh,
+  };
+
+  console.log('[Accord] ledger surface module loaded');
+})();
