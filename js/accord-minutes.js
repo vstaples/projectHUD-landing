@@ -225,7 +225,11 @@
       const dl = (latestSuccess && latestSuccess.storage_path)
         ? `<a class="minutes-action-btn" id="minutesDownloadBtn" target="_blank" rel="noopener">Download PDF</a>`
         : '<button class="minutes-action-btn" disabled>Download unavailable</button>';
+      const printBtn = (latestSuccess && latestSuccess.storage_path)
+        ? `<button class="minutes-action-btn" id="minutesPrintBtn" title="Open in new window and trigger your browser's Save as PDF dialog"><span aria-hidden="true" style="margin-right:6px">🖨</span>Print / Save as PDF</button>`
+        : '';
       ctaHtml = `${dl}
+                 ${printBtn}
                  <button class="minutes-action-btn btn-ghost" id="minutesRerenderBtn">Re-render</button>`;
     } else if (status === 'failed') {
       const reason = latest?.failure_reason || 'unknown error';
@@ -266,6 +270,10 @@
         const url = await _signedUrlFor(latestSuccess);
         if (url) window.open(url, '_blank', 'noopener');
       });
+    }
+    const prBtn = $('minutesPrintBtn');
+    if (prBtn && latestSuccess) {
+      prBtn.addEventListener('click', () => _printToPdf(latestSuccess));
     }
   }
 
@@ -396,6 +404,110 @@
     }
   }
 
+  // ── Print / Save as PDF (CMD-MINUTES-PRINT-FLOW) ─────────────
+  // Mirrors Cadence's _s9ExportCertPdf() pattern (Iron Rule 64 —
+  // codebase-as-spec). The Edge Function's render is the single
+  // source of truth (Option A per brief §4.1): we fetch the same
+  // signed-URL HTML the auditor downloads, write it into a new
+  // window with an autoprint shim, and let the OS native print
+  // dialog handle the Save-as-PDF.
+  //
+  // Iron Rule 52 §4 collision check: no other _printToPdf in
+  // js/accord-*.js or js/cadence-*.js (Cadence uses _s9ExportCertPdf).
+  // Iron Rule 42: read-only; no substrate mutation. CoC write is
+  // a side-channel audit row, not a substrate edge.
+  async function _printToPdf(renderRow) {
+    if (!renderRow?.storage_path) {
+      _toast('No render available to print.', null, true);
+      return;
+    }
+
+    // 1. Resolve signed URL via the same helper the download button uses.
+    const signedUrl = await _signedUrlFor(renderRow);
+    if (!signedUrl) {
+      _toast('Could not fetch render for printing.', null, true);
+      return;
+    }
+
+    // 2. Fetch the rendered HTML.
+    let html;
+    try {
+      const response = await fetch(signedUrl);
+      if (!response.ok) {
+        _toast('Could not fetch render for printing.', null, true);
+        return;
+      }
+      html = await response.text();
+    } catch (e) {
+      console.warn('[Accord-minutes] print fetch failed', e);
+      _toast('Could not fetch render for printing.', null, true);
+      return;
+    }
+
+    // 3. Open the print window before any further awaits to avoid
+    //    popup-blocker false positives (most browsers gate window.open
+    //    on a synchronous user-gesture chain). The fetch above is the
+    //    only async hop and runs while the click is still considered
+    //    user-initiated in current Chrome / Firefox / Safari.
+    const printWindow = window.open('', '_blank', 'width=850,height=1100');
+    if (!printWindow) {
+      _toast('Print window blocked. Allow popups to print.', null, true);
+      return;
+    }
+
+    // 4. Inject the rendered HTML with a tiny autoprint shim. The
+    //    250ms setTimeout gives Fraunces / IBM Plex fonts a moment to
+    //    settle before window.print() captures the page; otherwise
+    //    the print preview can latch onto system fallbacks.
+    const autoprint =
+      '<script>window.addEventListener("load",function(){' +
+      'setTimeout(function(){try{window.focus();window.print();}catch(e){}},250);' +
+      '});<\/script>';
+    let augmented;
+    if (html.indexOf('</body>') !== -1) {
+      augmented = html.replace('</body>', autoprint + '</body>');
+    } else {
+      // Defensive fallback — no </body> means the artifact is malformed
+      // (e.g. HTML-fallback path stored as text/html). Append anyway.
+      augmented = html + autoprint;
+    }
+    printWindow.document.open();
+    printWindow.document.write(augmented);
+    printWindow.document.close();
+
+    // 5. Audit-trail CoC write. Non-blocking — print proceeds even if
+    //    this fails. Three-segment EVENT_META key parsed by post-CMD-A6c
+    //    parser (Rule 56). Resolve actor_resource_id via the same path
+    //    accord-digest.js uses (Rule 58).
+    try {
+      let actorResourceId = null;
+      try {
+        if (window.Auth?.getCurrentUserId) {
+          const uid = await window.Auth.getCurrentUserId();
+          if (uid) {
+            const rows = await API.get(
+              `resources?user_id=eq.${uid}&select=id&limit=1`
+            ).catch(() => []);
+            actorResourceId = rows?.[0]?.id || null;
+          }
+        }
+      } catch (_) { /* fall through; CoC.write resolves identity itself */ }
+
+      await window.CoC.write('accord.minutes.printed', renderRow.meeting_id, {
+        entityType: 'accord_meeting',
+        actorResourceId: actorResourceId,
+        notes: `Minutes printed (render ${(renderRow.render_id || '').slice(0, 8)})`,
+        meta: {
+          render_id:      renderRow.render_id,
+          render_version: renderRow.render_version || null,
+          content_hash:   renderRow.content_hash   || null,
+        },
+      });
+    } catch (err) {
+      console.warn('[Accord-minutes] CoC write for print failed (non-blocking):', err);
+    }
+  }
+
   // ── Generate / Re-render flow ────────────────────────────────
   async function _generate(meetingId, isRerender) {
     if (!meetingId) return;
@@ -508,6 +620,7 @@
     _selectMeeting: _selectMeeting,
     _generate:      _generate,
     _refresh:       _refresh,
+    _printToPdf:    _printToPdf,
   };
 
   console.log('[Accord] minutes surface module loaded');
