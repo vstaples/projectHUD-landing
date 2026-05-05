@@ -1,470 +1,2605 @@
-// ============================================================
-// ProjectHUD — accord-minutes.js
-// CMD-A7 · Minutes surface
-//
-// Read-only surface over sealed meetings + accord_minutes_renders.
-// Drives PDF generation via the render-minutes Edge Function.
-// History panel shows full render provenance per meeting.
-//
-// Doctrinal commitments:
-//   - IR42 sealed-only render (substrate read filter)
-//   - IR45 declared belief; never confidence/probability
-//   - IR47 explicit accord_* PK names (render_id, meeting_id)
-//   - IR51 chip/badge classes decided at construction
-//   - IR52 IIFE-wrapped, public surface namespaced
-//   - IR54 SELECT-after-mutation in render polling
-// ============================================================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accord — Live Capture</title>
+<link rel="stylesheet" href="/css/hud.css">
 
-(() => {
-  'use strict';
+<!-- Editorial fonts (per Style Doctrine v1.7 §2 + prototype v3b-4) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  const $ = id => document.getElementById(id);
+<style>
+/* ============================================================
+   Accord — Live Capture surface (CMD-A3)
+   Scoped under #accord-app. Tokens follow prototype v3b-4 +
+   Style Doctrine v1.7 (§3.5 surface tiers, §7 glyphs, §6 markup).
+   No hex literals in JS-rendered DOM (per v1.7 §6.2).
+   All font sizes ≥ 11px (operator standing rule).
+   ============================================================ */
 
-  // ── Local state ──────────────────────────────────────────────
-  const local = {
-    initialized:    false,
-    meetings:       [],       // sealed meetings
-    renders:        {},       // { meeting_id: [render_row, ...] }
-    activeMeeting:  null,
-    activeFilter:   'all',    // 'all' | 'rendered' | 'not_yet' | 'failed'
-    inProgress:     new Set(),// meeting_ids currently rendering (optimistic UI)
-  };
+#accord-app {
+  /* Canvas — warm slate palette from prototype v3b-4 */
+  --canvas-deep:   #1a1814;
+  --canvas:        #211e19;
+  --canvas-raised: #2a2620;
+  --canvas-elev:   #332e26;
+  --canvas-hover:  #3d372d;
 
-  const esc = s => Accord._esc ? Accord._esc(s) : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  /* Text — warm parchment hierarchy */
+  --ink-primary:   #f4ede0;
+  --ink-body:      #d6cdb8;
+  --ink-muted:     #b3a78f;
+  --ink-faint:     #908572;
+  --ink-ghost:     #5a5347;
 
-  // ── Surface activation ───────────────────────────────────────
-  window.addEventListener('accord:surface-changed', async (ev) => {
-    if (ev.detail?.surface !== 'minutes') return;
-    if (!local.initialized) {
-      _wireUI();
-      local.initialized = true;
-    }
-    await _refresh();
-  });
+  /* Signal — muted amber, used sparingly */
+  --signal:        #d4a04a;
+  --signal-soft:   rgba(212, 160, 74, 0.15);
+  --signal-dim:    rgba(212, 160, 74, 0.4);
 
-  // ── Top-level refresh ────────────────────────────────────────
-  async function _refresh() {
-    await _loadMeetings();
-    await _loadRenders();
-    _renderRail();
-    _renderAggregate();
-    if (local.activeMeeting && local.meetings.find(m => m.meeting_id === local.activeMeeting)) {
-      _renderStatus();
-      _renderHistory();
-    } else {
-      _renderEmptyStatus();
-    }
-  }
+  /* Tag colors — desaturated per IR45 (declared not measured) */
+  --tag-note:      #8ba89a;
+  --tag-decision:  #c9956a;
+  --tag-action:    #b07c8a;
+  --tag-risk:      #a86f5e;
+  --tag-question:  #7b8fa8;
 
-  // ── Loaders ──────────────────────────────────────────────────
-  async function _loadMeetings() {
-    try {
-      const rows = await API.get(
-        'accord_meetings?sealed_at=not.is.null&select=*&order=sealed_at.desc'
-      );
-      local.meetings = rows || [];
-    } catch (e) {
-      console.error('[Accord-minutes] loadMeetings failed', e);
-      local.meetings = [];
-    }
-  }
+  /* Borders */
+  --rule:          rgba(244, 237, 224, 0.06);
+  --rule-strong:   rgba(244, 237, 224, 0.12);
 
-  async function _loadRenders() {
-    if (!local.meetings.length) {
-      local.renders = {};
-      return;
-    }
-    const meetingIds = local.meetings.map(m => m.meeting_id);
-    try {
-      const rows = await API.get(
-        `accord_minutes_renders?meeting_id=in.(${meetingIds.join(',')})` +
-        `&select=*&order=rendered_at.desc&limit=500`
-      );
-      local.renders = {};
-      (rows || []).forEach(r => {
-        if (!local.renders[r.meeting_id]) local.renders[r.meeting_id] = [];
-        local.renders[r.meeting_id].push(r);
-      });
-    } catch (e) {
-      console.error('[Accord-minutes] loadRenders failed', e);
-      local.renders = {};
-    }
-  }
+  --rail-w: 320px;
+  --meta-w: 320px;
 
-  // ── Per-meeting status derivation ────────────────────────────
-  function _latestRender(meetingId) {
-    const arr = local.renders[meetingId] || [];
-    return arr[0] || null; // already sorted desc
-  }
-  function _latestSuccess(meetingId) {
-    const arr = local.renders[meetingId] || [];
-    return arr.find(r => r.status === 'success') || null;
-  }
-  function _statusFor(meetingId) {
-    if (local.inProgress.has(meetingId)) return 'rendering';
-    const latest = _latestRender(meetingId);
-    if (!latest) return 'not_yet';
-    if (latest.status === 'success')   return 'rendered';
-    if (latest.status === 'failed')    return 'failed';
-    if (latest.status === 'rendering') return 'rendering';
-    return 'not_yet';
-  }
+  background: var(--canvas-deep);
+  color: var(--ink-body);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
-  // ── Rail render ──────────────────────────────────────────────
-  function _renderRail() {
-    const el = $('minutesMeetingList');
-    if (!local.meetings.length) {
-      el.innerHTML = '<div style="color:var(--ink-faint);font-size:11px;padding:16px 4px;font-style:italic">No sealed meetings yet.</div>';
-      return;
-    }
-    const f = local.activeFilter;
-    const visible = local.meetings.filter(m => {
-      if (f === 'all') return true;
-      const s = _statusFor(m.meeting_id);
-      if (f === 'rendered' && s === 'rendered') return true;
-      if (f === 'not_yet'  && s === 'not_yet')  return true;
-      if (f === 'failed'   && s === 'failed')   return true;
-      return false;
-    });
-    if (!visible.length) {
-      el.innerHTML = '<div style="color:var(--ink-faint);font-size:11px;padding:16px 4px;font-style:italic">No meetings match filter.</div>';
-      return;
-    }
-    el.innerHTML = visible.map(m => {
-      const status = _statusFor(m.meeting_id);
-      // IR51: pill class chosen at construction time
-      const pillClass = [
-        'render-pill',
-        status === 'rendered'  && 'pill-rendered',
-        status === 'rendering' && 'pill-rendering',
-        status === 'failed'    && 'pill-failed',
-        status === 'not_yet'   && 'pill-not-yet',
-      ].filter(Boolean).join(' ');
-      const sealedFmt = m.sealed_at
-        ? new Date(m.sealed_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
-        : '';
-      const cls = ['minutes-meeting-row'];
-      if (m.meeting_id === local.activeMeeting) cls.push('active');
-      const pillText =
-        status === 'rendered'  ? 'rendered' :
-        status === 'rendering' ? 'rendering' :
-        status === 'failed'    ? 'failed' :
-                                 'not yet';
-      return `
-        <div class="${cls.join(' ')}" data-meeting-id="${m.meeting_id}">
-          <div class="meeting-title">${esc(m.title || 'Untitled')}</div>
-          <div class="meeting-meta">${esc(sealedFmt)}</div>
-          <span class="${pillClass}">${esc(pillText)}</span>
-        </div>`;
-    }).join('');
-    el.querySelectorAll('.minutes-meeting-row').forEach(node => {
-      node.addEventListener('click', () => _selectMeeting(node.dataset.meetingId));
-    });
-  }
+#accord-app * { box-sizing: border-box; }
 
-  function _renderAggregate() {
-    const total = local.meetings.length;
-    let rendered = 0, notYet = 0, failed = 0, rendering = 0;
-    local.meetings.forEach(m => {
-      const s = _statusFor(m.meeting_id);
-      if (s === 'rendered')  rendered++;
-      else if (s === 'not_yet') notYet++;
-      else if (s === 'failed')  failed++;
-      else if (s === 'rendering') rendering++;
-    });
-    const lines = [];
-    lines.push(`<span class="agg-line total">${total} sealed meeting${total === 1 ? '' : 's'}</span>`);
-    if (rendered)  lines.push(`<span class="agg-line">${rendered} rendered</span>`);
-    if (rendering) lines.push(`<span class="agg-line">${rendering} rendering</span>`);
-    if (notYet)    lines.push(`<span class="agg-line">${notYet} not yet</span>`);
-    if (failed)    lines.push(`<span class="agg-line">${failed} failed</span>`);
-    $('minutesAggregate').innerHTML = lines.join('');
-  }
+/* ── Top nav ─────────────────────────────────────────────── */
+#accord-app .topnav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--canvas-deep);
+}
+#accord-app .brand {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--ink-primary);
+}
+#accord-app .brand-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  margin-left: 8px;
+}
+#accord-app .surface-switch {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+#accord-app .surface-switch button {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  font: 500 12px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms, background 120ms;
+}
+#accord-app .surface-switch button:hover {
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+}
+#accord-app .surface-switch button.active {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+  background: var(--signal-soft);
+}
+#accord-app .live-connect {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+#accord-app .live-connect.connected {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+}
+#accord-app .lc-pulse {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ink-faint);
+}
+#accord-app .live-connect.connected .lc-pulse {
+  background: var(--signal);
+  animation: lc-pulse 1.6s ease-in-out infinite;
+}
+@keyframes lc-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
 
-  async function _selectMeeting(meetingId) {
-    local.activeMeeting = meetingId;
-    document.querySelectorAll('#minutesMeetingList .minutes-meeting-row').forEach(r => {
-      r.classList.toggle('active', r.dataset.meetingId === meetingId);
-    });
-    _renderStatus();
-    document.querySelector('#accord-app .minutes-body')?.classList.add('history-open');
-    _renderHistory();
-  }
+/* ── Surface containers ─────────────────────────────────── */
+#accord-app .surface { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+#accord-app .surface.active { display: flex; }
 
-  // ── Status render (center column) ────────────────────────────
-  function _renderEmptyStatus() {
-    $('minutesStatus').innerHTML =
-      '<div class="minutes-empty-cta">' +
-      '<div><h3 style="font-family:Fraunces,serif;font-weight:600;font-size:18px;color:var(--ink-muted);margin-bottom:6px">Select a sealed meeting from the rail.</h3>' +
-      '<p style="font-size:12px;color:var(--ink-faint);max-width:380px;line-height:1.55">Minutes renders the sealed Chain of Custody record as a citable, cryptographically-anchored PDF.</p></div></div>';
-    document.querySelector('#accord-app .minutes-body')?.classList.remove('history-open');
-  }
+#accord-app .placeholder-surface {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+  color: var(--ink-faint);
+  text-align: center;
+  padding: 48px;
+}
+#accord-app .placeholder-surface h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--ink-muted);
+}
+#accord-app .placeholder-surface p {
+  font-size: 13px;
+  max-width: 420px;
+  line-height: 1.5;
+}
 
-  function _renderStatus() {
-    const m = local.meetings.find(x => x.meeting_id === local.activeMeeting);
-    const el = $('minutesStatus');
-    if (!m) { _renderEmptyStatus(); return; }
+/* ── Capture header ─────────────────────────────────────── */
+#accord-app .capture-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 24px 32px 18px;
+  gap: 24px;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .meeting-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  color: var(--ink-primary);
+  margin-bottom: 6px;
+}
+#accord-app .meeting-organizer {
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin-bottom: 8px;
+}
+#accord-app .meeting-organizer .organizer-label {
+  color: var(--ink-faint);
+  margin-right: 4px;
+}
+#accord-app .meeting-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  flex-wrap: wrap;
+}
+#accord-app .meeting-meta > span:not(.live-pulse) + span::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--ink-ghost);
+}
+#accord-app .live-pulse {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ink-ghost);
+  display: inline-block;
+}
+#accord-app .live-pulse.running {
+  background: var(--signal);
+  animation: lc-pulse 1.6s ease-in-out infinite;
+}
 
-    const status = _statusFor(m.meeting_id);
-    const latestSuccess = _latestSuccess(m.meeting_id);
-    const latest = _latestRender(m.meeting_id);
+#accord-app .capture-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+#accord-app .timer {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+  min-width: 110px;
+  text-align: right;
+}
+#accord-app .timer.ended { color: var(--signal); font-size: 13px; }
 
-    const sealedFmt = m.sealed_at
-      ? new Date(m.sealed_at).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })
-      : '';
+#accord-app .btn {
+  font: 500 12px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 9px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+#accord-app .btn-signal {
+  background: var(--signal);
+  color: var(--canvas-deep);
+}
+#accord-app .btn-signal:hover { background: #e0b35d; }
+#accord-app .btn-end {
+  background: transparent;
+  border-color: var(--tag-risk);
+  color: var(--tag-risk);
+}
+#accord-app .btn-end:hover { background: rgba(168, 111, 94, 0.1); }
+#accord-app .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+#accord-app .btn-ghost {
+  background: transparent;
+  border-color: var(--rule);
+  color: var(--ink-muted);
+}
+#accord-app .btn-ghost:hover { color: var(--ink-primary); border-color: var(--rule-strong); }
 
-    // CTA construction (IR51: classes/labels decided here)
-    let ctaHtml = '';
-    if (status === 'not_yet') {
-      ctaHtml = `<button class="minutes-action-btn" id="minutesGenerateBtn">Generate</button>
-                 <span class="muted" style="font-size:11px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace">Renders the sealed substrate as a PDF</span>`;
-    } else if (status === 'rendering') {
-      ctaHtml = `<button class="minutes-action-btn" disabled>Rendering…</button>
-                 <span class="muted" style="font-size:11px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace">PDF generation in progress</span>`;
-    } else if (status === 'rendered') {
-      const dl = (latestSuccess && latestSuccess.storage_path)
-        ? `<a class="minutes-action-btn" id="minutesDownloadBtn" target="_blank" rel="noopener">Download PDF</a>`
-        : '<button class="minutes-action-btn" disabled>Download unavailable</button>';
-      ctaHtml = `${dl}
-                 <button class="minutes-action-btn btn-ghost" id="minutesRerenderBtn">Re-render</button>`;
-    } else if (status === 'failed') {
-      const reason = latest?.failure_reason || 'unknown error';
-      ctaHtml = `<button class="minutes-action-btn" id="minutesGenerateBtn">Retry</button>
-                 <span class="muted" style="font-size:11px;color:var(--tag-risk);font-family:'IBM Plex Mono',monospace">Last render failed: ${esc(reason.slice(0, 100))}</span>`;
-    }
+/* Empty-state "+ New meeting" emphasis — when no meeting is loaded the
+   start button is disabled, so NEW MEETING is the primary affordance.  */
+#accord-app .btn-prominent {
+  background: transparent;
+  border-color: var(--signal);
+  color: var(--signal);
+}
+#accord-app .btn-prominent:hover {
+  background: var(--signal-soft);
+  color: var(--ink-primary);
+}
 
-    const fingerprint = (latestSuccess?.merkle_root_at_render || m.merkle_root || '').slice(0, 64);
-    const fingerprintHtml = fingerprint
-      ? `<div style="margin-top:14px">
-           <div class="label" style="font:500 11px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-faint);margin-bottom:4px">Merkle root at render</div>
-           <div class="minutes-current-fingerprint">${esc(fingerprint)}</div>
-         </div>`
-      : '';
+/* ── Closed-meeting banner ──────────────────────────────── */
+#accord-app .closed-banner {
+  display: none;
+  background: var(--signal-soft);
+  border-bottom: 1px solid var(--signal-dim);
+  padding: 12px 32px;
+  font-size: 12px;
+  color: var(--ink-body);
+  align-items: center;
+  gap: 16px;
+}
+#accord-app .closed-banner.visible { display: flex; }
+#accord-app .closed-banner-msg { flex: 1; }
+#accord-app .closed-banner-msg strong { color: var(--ink-primary); font-weight: 600; }
 
-    el.innerHTML = `
-      <div class="minutes-status-card">
-        <h2>${esc(m.title || 'Untitled')}</h2>
-        <div class="minutes-status-meta">
-          <span class="meta-pill">Sealed ${esc(sealedFmt)}</span>
-          ${latestSuccess
-            ? `<span class="meta-pill">Last rendered ${esc(new Date(latestSuccess.rendered_at).toLocaleString())}</span>
-               <span class="meta-pill">${esc(latestSuccess.render_version || '')}</span>`
-            : ''}
+/* ── Capture body 3-column ─────────────────────────────── */
+#accord-app .capture-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: var(--rail-w) 1fr var(--meta-w);
+  gap: 0;
+  overflow: hidden;
+}
+
+/* Agenda rail */
+#accord-app .agenda-rail {
+  border-right: 1px solid var(--rule);
+  padding: 18px 18px 24px;
+  overflow-y: auto;
+  background: var(--canvas-deep);
+}
+#accord-app .rail-section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+}
+#accord-app .rail-section-label .count { font-size: 11px; color: var(--ink-ghost); text-transform: none; letter-spacing: 0.02em; }
+
+#accord-app .rail-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+#accord-app .rail-actions .btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+#accord-app .agenda-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+#accord-app .agenda-toggle button {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-faint);
+  padding: 6px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+#accord-app .agenda-toggle button.active { color: var(--signal); border-color: var(--signal-dim); }
+
+#accord-app .agenda-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+}
+#accord-app .agenda-item:hover { background: var(--canvas-raised); }
+#accord-app .agenda-item.active {
+  background: var(--canvas-raised);
+  border-color: var(--signal-dim);
+}
+#accord-app .agenda-pos {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  min-width: 18px;
+  margin-top: 1px;
+}
+#accord-app .agenda-title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ink-body);
+}
+#accord-app .agenda-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+}
+#accord-app .agenda-item:hover .agenda-actions { opacity: 1; }
+#accord-app .agenda-actions button {
+  background: transparent;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+#accord-app .agenda-actions button:hover { color: var(--ink-primary); }
+
+/* Capture pane */
+#accord-app .capture-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--canvas);
+}
+#accord-app .context-strip {
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 12px;
+  color: var(--ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+#accord-app .context-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+#accord-app .context-target {
+  color: var(--ink-primary);
+  font-weight: 500;
+  font-size: 13px;
+}
+#accord-app .context-path { color: var(--ink-faint); font-size: 11px; }
+
+#accord-app .capture-input-wrap { padding: 16px 28px 0; }
+#accord-app .capture-input {
+  width: 100%;
+  min-height: 84px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--ink-primary);
+  padding: 12px 14px;
+  font: 400 14px 'IBM Plex Sans', system-ui, sans-serif;
+  resize: vertical;
+}
+#accord-app .capture-input:focus { outline: none; border-color: var(--signal-dim); }
+#accord-app .capture-input::placeholder { color: var(--ink-faint); }
+#accord-app .capture-input[disabled] { opacity: 0.4; cursor: not-allowed; background: var(--canvas-deep); }
+
+#accord-app .tag-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 28px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .tag-row-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-right: 4px;
+}
+#accord-app .tag-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  color: var(--ink-body);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+#accord-app .tag-btn:hover { background: var(--canvas-elev); }
+#accord-app .tag-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+#accord-app .tag-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block;
+}
+#accord-app .tag-dot.note     { background: var(--tag-note);     }
+#accord-app .tag-dot.decision { background: var(--tag-decision); }
+#accord-app .tag-dot.action   { background: var(--tag-action);   }
+#accord-app .tag-dot.risk     { background: var(--tag-risk);     }
+#accord-app .tag-dot.question { background: var(--tag-question); }
+#accord-app .tag-key {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  margin-left: 2px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+/* Stream */
+#accord-app .captures-stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 28px 32px;
+}
+#accord-app .stream-tabs {
+  display: flex;
+  gap: 16px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 8px;
+  margin-bottom: 14px;
+}
+#accord-app .stream-tab {
+  background: none;
+  border: none;
+  color: var(--ink-muted);
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 0;
+  cursor: pointer;
+  display: inline-flex; gap: 6px; align-items: center;
+}
+#accord-app .stream-tab.active { color: var(--signal); border-bottom: 2px solid var(--signal); margin-bottom: -10px; padding-bottom: 8px; }
+#accord-app .stream-tab-count {
+  font-size: 11px; color: var(--ink-faint);
+  background: var(--canvas-elev);
+  padding: 0 6px; border-radius: 8px;
+}
+
+#accord-app .capture-row {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0 10px 4px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+}
+#accord-app .capture-row .cap-time {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  min-width: 60px;
+  padding-top: 2px;
+}
+#accord-app .capture-row .cap-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ink-muted);
+  min-width: 90px;
+  padding-top: 2px;
+}
+#accord-app .capture-row .cap-summary {
+  flex: 1;
+  color: var(--ink-body);
+  line-height: 1.5;
+}
+#accord-app .capture-row .cap-author {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+
+#accord-app .stream-empty {
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding: 28px 0;
+  text-align: center;
+}
+
+/* Meta pane */
+#accord-app .meta-pane {
+  border-left: 1px solid var(--rule);
+  padding: 18px 18px 24px;
+  overflow-y: auto;
+  background: var(--canvas-deep);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+#accord-app .meta-section-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+#accord-app .coverage-bar {
+  width: 100%; height: 6px;
+  background: var(--canvas-elev);
+  border-radius: 3px; overflow: hidden;
+  margin-bottom: 6px;
+}
+#accord-app .coverage-fill { height: 100%; background: var(--signal); transition: width 240ms; }
+#accord-app .coverage-text { font-size: 11px; color: var(--ink-muted); }
+
+/* Attendees */
+#accord-app .attendee-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--ink-body);
+}
+#accord-app .presence-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ink-ghost);
+  flex-shrink: 0;
+}
+#accord-app .presence-dot.present  { background: #6ba88c; }       /* sage green per palette */
+#accord-app .presence-dot.unstable { background: var(--signal); animation: lc-pulse 1.4s ease-in-out infinite; }
+#accord-app .attendee-name { flex: 1; }
+#accord-app .attendee-self  { color: var(--ink-faint); font-size: 11px; }
+
+/* Chat */
+#accord-app .chat-stream {
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#accord-app .chat-stream:empty::after {
+  content: 'No chat messages yet.';
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+#accord-app .chat-msg { display: flex; gap: 6px; align-items: baseline; }
+#accord-app .chat-msg .chat-author { font-size: 11px; color: var(--ink-muted); font-weight: 500; min-width: 60px; }
+#accord-app .chat-msg .chat-text { color: var(--ink-body); flex: 1; word-break: break-word; }
+#accord-app .chat-msg .chat-time { font: 500 11px 'IBM Plex Mono', monospace; color: var(--ink-ghost); }
+
+#accord-app .chat-input-row { display: flex; gap: 6px; }
+#accord-app .chat-input {
+  flex: 1;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-primary);
+  padding: 6px 10px;
+  font-size: 12px;
+}
+#accord-app .chat-input:focus { outline: none; border-color: var(--signal-dim); }
+#accord-app .chat-send {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+#accord-app .chat-send:not([disabled]):hover { color: var(--signal); border-color: var(--signal-dim); }
+#accord-app .chat-send[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+/* New-meeting modal + END modal */
+#accord-app .modal-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  align-items: center; justify-content: center;
+}
+#accord-app .modal-backdrop.visible { display: flex; }
+#accord-app .modal {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  padding: 24px;
+  max-width: 480px;
+  width: calc(100% - 48px);
+  color: var(--ink-body);
+}
+#accord-app .modal h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--ink-primary);
+  margin-bottom: 12px;
+}
+#accord-app .modal p { font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+#accord-app .modal label {
+  display: block;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin: 12px 0 4px;
+}
+#accord-app .modal input[type=text],
+#accord-app .modal input[type=datetime-local] {
+  width: 100%;
+  background: var(--canvas);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-primary);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+#accord-app .modal-actions {
+  display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px;
+}
+
+/* Toast */
+#accord-app .toast {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  background: var(--canvas-elev);
+  border: 1px solid var(--signal-dim);
+  border-left-width: 3px;
+  border-radius: 4px;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--ink-body);
+  z-index: 900;
+  display: none;
+  align-items: center;
+  gap: 16px;
+  max-width: 360px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+#accord-app .toast.visible { display: flex; }
+#accord-app .toast-msg { flex: 1; }
+#accord-app .toast-msg strong { color: var(--ink-primary); font-weight: 600; }
+#accord-app .toast-close {
+  background: transparent;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 18px; line-height: 1;
+  cursor: pointer;
+}
+
+/* ── Disabled / closed-state cosmetics ─────────────────── */
+#accord-app .surface-capture.meeting-closed .capture-input,
+#accord-app .surface-capture.meeting-closed .tag-btn,
+#accord-app .surface-capture.meeting-closed .chat-input,
+#accord-app .surface-capture.meeting-closed .chat-send {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+/* ============================================================
+   Living Document surface (CMD-A4)
+   Three-region: thread rail (left) · spine (center)
+   ============================================================ */
+
+#accord-app .modal-helper {
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-style: italic;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+#accord-app #surface-document.surface { padding: 0; }
+
+#accord-app .document-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: var(--rail-w) 1fr;
+  overflow: hidden;
+}
+
+/* Thread rail */
+#accord-app .thread-rail {
+  border-right: 1px solid var(--rule);
+  padding: 18px 14px 24px;
+  overflow-y: auto;
+  background: var(--canvas-deep);
+}
+#accord-app .thread-rail .rail-section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+}
+#accord-app .thread-rail .count {
+  font-size: 11px; color: var(--ink-ghost);
+  text-transform: none; letter-spacing: 0.02em;
+}
+
+#accord-app .thread-row {
+  padding: 10px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#accord-app .thread-row:hover { background: var(--canvas-raised); }
+#accord-app .thread-row.active {
+  background: var(--canvas-raised);
+  border-color: var(--signal-dim);
+}
+#accord-app .thread-row .thread-title {
+  font-size: 13px;
+  color: var(--ink-primary);
+  font-weight: 500;
+  line-height: 1.35;
+}
+#accord-app .thread-row .thread-meta {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+#accord-app .thread-row .thread-meta .pill {
+  background: var(--canvas-elev);
+  padding: 0 6px;
+  border-radius: 8px;
+  color: var(--ink-muted);
+}
+#accord-app .thread-row .thread-meta .pill.warn  { color: var(--tag-risk); }
+#accord-app .thread-row .thread-meta .pill.signal { color: var(--signal); }
+
+/* Spine column */
+#accord-app .document-spine {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--canvas);
+  padding: 28px 36px 48px;
+}
+
+#accord-app .document-header {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+}
+#accord-app .document-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 26px;
+  letter-spacing: -0.01em;
+  color: var(--ink-primary);
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+#accord-app .document-aggregate {
+  font-size: 12px;
+  color: var(--ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+#accord-app .document-aggregate .agg-segment {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+#accord-app .document-aggregate .agg-segment:hover {
+  background: var(--canvas-raised);
+  color: var(--ink-primary);
+}
+#accord-app .document-aggregate .agg-sep {
+  color: var(--ink-ghost);
+  margin: 0 2px;
+}
+
+/* Filter chips */
+#accord-app .document-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .document-filters .filter-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+#accord-app .document-filters .filter-group-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-right: 6px;
+  min-width: 56px;
+}
+#accord-app .document-filters .filter-chip {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 100ms, border-color 100ms, background 100ms;
+}
+#accord-app .document-filters .filter-chip:hover {
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+}
+#accord-app .document-filters .filter-chip.active {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+  background: var(--signal-soft);
+}
+
+/* Spine stream */
+#accord-app .document-stream { display: flex; flex-direction: column; }
+
+#accord-app .meeting-group { margin-bottom: 24px; }
+#accord-app .meeting-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 0 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .meeting-group-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--ink-primary);
+}
+#accord-app .meeting-group-date {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+#accord-app .meeting-group-delta {
+  margin-left: 6px;
+  color: var(--signal);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+}
+
+#accord-app .doc-node {
+  display: grid;
+  grid-template-columns: 100px 110px 1fr;
+  gap: 14px;
+  padding: 9px 0;
+  align-items: start;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .doc-node .doc-time {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+#accord-app .doc-node .doc-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  padding-top: 2px;
+}
+#accord-app .doc-node .doc-content {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-body);
+}
+#accord-app .doc-node .doc-summary {
+  display: block;
+  margin-bottom: 4px;
+}
+#accord-app .doc-node .doc-byline {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+
+/* Edge-driven treatments */
+#accord-app .doc-node.is-superseded .doc-summary {
+  text-decoration: line-through;
+  color: var(--ink-faint);
+}
+#accord-app .doc-node.is-superseded .doc-content { opacity: 0.7; }
+#accord-app .doc-node.is-elevated .doc-summary {
+  color: var(--ink-primary);
+  font-weight: 500;
+}
+#accord-app .doc-node.is-elevated.tag-risk .doc-summary { color: var(--tag-risk); }
+#accord-app .doc-node.is-mitigated .doc-summary { color: var(--ink-muted); }
+#accord-app .doc-node.is-mitigated .doc-content { opacity: 0.85; }
+#accord-app .doc-node.is-answered .doc-tag::before {
+  content: '✓';
+  color: var(--tag-note);
+  margin-right: 4px;
+}
+#accord-app .doc-node.is-closed .doc-tag::before {
+  content: '✓';
+  color: var(--ink-muted);
+  margin-right: 4px;
+}
+
+#accord-app .doc-edge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin: 0 4px 4px 0;
+  cursor: pointer;
+}
+#accord-app .doc-edge-chip:hover {
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+}
+#accord-app .doc-edge-chip.contradiction {
+  color: var(--tag-risk);
+  border-color: rgba(168, 111, 94, 0.3);
+}
+#accord-app .doc-edge-chip.aggregate { font-style: italic; }
+
+#accord-app .doc-edge-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  gap: 4px;
+}
+
+#accord-app .doc-cross-link {
+  color: var(--signal);
+  cursor: pointer;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+/* Empty states */
+#accord-app .doc-empty {
+  text-align: center;
+  padding: 56px 32px;
+  color: var(--ink-faint);
+  font-size: 13px;
+  line-height: 1.55;
+}
+#accord-app .doc-empty h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 18px;
+  color: var(--ink-muted);
+  margin-bottom: 8px;
+}
+
+/* ============================================================
+   Decision Ledger surface (CMD-A5)
+   Three-region: filter rail · decision list · detail panel
+   ============================================================ */
+
+#accord-app #surface-ledger.surface { padding: 0; }
+
+#accord-app .ledger-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px 1fr 0;
+  overflow: hidden;
+  transition: grid-template-columns 200ms ease;
+}
+#accord-app .ledger-body.detail-open {
+  grid-template-columns: 260px 1fr 360px;
+}
+
+/* Filter rail */
+#accord-app .ledger-rail {
+  border-right: 1px solid var(--rule);
+  padding: 18px 14px 24px;
+  overflow-y: auto;
+  background: var(--canvas-deep);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#accord-app .ledger-rail .rail-section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+#accord-app .ledger-refresh-btn {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  width: 22px; height: 22px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px; line-height: 1;
+}
+#accord-app .ledger-refresh-btn:hover {
+  color: var(--signal); border-color: var(--signal-dim);
+}
+
+#accord-app .ledger-search {
+  width: 100%;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-primary);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: inherit;
+}
+#accord-app .ledger-search:focus { outline: none; border-color: var(--signal-dim); }
+#accord-app .ledger-search::placeholder { color: var(--ink-faint); }
+
+#accord-app .ledger-rail .filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+#accord-app .ledger-rail .filter-group-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  width: 100%;
+  margin-bottom: 2px;
+}
+#accord-app .ledger-rail .filter-chip {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 100ms, border-color 100ms, background 100ms;
+}
+#accord-app .ledger-rail .filter-chip:hover {
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+}
+#accord-app .ledger-rail .filter-chip.active {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+  background: var(--signal-soft);
+}
+#accord-app .ledger-rail .filter-chip.disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+#accord-app .ledger-aggregate {
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+  font-size: 11px;
+  color: var(--ink-faint);
+  line-height: 1.6;
+}
+#accord-app .ledger-aggregate .agg-line { display: block; }
+#accord-app .ledger-aggregate .agg-line.total {
+  color: var(--ink-primary);
+  font-weight: 500;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+/* Decision list */
+#accord-app .ledger-list-wrap {
+  overflow-y: auto;
+  background: var(--canvas);
+  padding: 24px 32px 48px;
+}
+#accord-app .ledger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#accord-app .decision-row {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
+  position: relative;
+}
+#accord-app .decision-row:hover {
+  border-color: var(--rule-strong);
+  background: var(--canvas-elev);
+}
+#accord-app .decision-row.active {
+  border-color: var(--signal-dim);
+  background: var(--canvas-elev);
+}
+
+#accord-app .decision-row .decision-summary {
+  font-size: 14px;
+  color: var(--ink-primary);
+  line-height: 1.45;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+#accord-app .decision-row.is-superseded .decision-summary {
+  text-decoration: line-through;
+  color: var(--ink-muted);
+}
+#accord-app .decision-row.is-contradicted {
+  border-left: 3px solid var(--tag-risk);
+}
+#accord-app .decision-row.has-counter-weight {
+  border-left: 3px solid var(--signal);
+}
+
+#accord-app .decision-row .decision-meta {
+  font-size: 11px;
+  color: var(--ink-faint);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: baseline;
+}
+#accord-app .decision-row .decision-meta .meta-byline {
+  color: var(--ink-muted);
+}
+#accord-app .decision-row .decision-meta .meta-crumb {
+  color: var(--ink-faint);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+}
+#accord-app .decision-row .decision-meta .meta-crumb a {
+  color: var(--ink-muted);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+#accord-app .decision-row .decision-meta .meta-crumb a:hover {
+  color: var(--signal);
+}
+
+#accord-app .decision-row .decision-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+#accord-app .decision-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--canvas-elev);
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+}
+#accord-app .decision-badge.superseded {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+}
+#accord-app .decision-badge.contradicted {
+  color: var(--tag-risk);
+  border-color: rgba(168, 111, 94, 0.3);
+}
+#accord-app .decision-badge.supporting {
+  color: var(--tag-note);
+}
+#accord-app .decision-badge.counter {
+  color: var(--signal);
+}
+#accord-app .decision-badge.belief-high  { color: var(--tag-note); }
+#accord-app .decision-badge.belief-mixed { color: var(--signal); }
+#accord-app .decision-badge.belief-low   { color: var(--tag-risk); }
+#accord-app .decision-badge.belief-none  { color: var(--ink-faint); }
+
+/* Detail panel (right slide-in) */
+#accord-app .ledger-detail {
+  border-left: 1px solid var(--rule);
+  background: var(--canvas-deep);
+  overflow-y: auto;
+  display: none;
+  position: relative;
+}
+#accord-app .ledger-body.detail-open .ledger-detail { display: block; }
+
+#accord-app .ledger-detail-close {
+  position: absolute;
+  top: 14px; right: 14px;
+  background: transparent;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 18px; line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+#accord-app .ledger-detail-close:hover {
+  color: var(--ink-primary); background: var(--canvas-raised);
+}
+
+#accord-app .ledger-detail-body {
+  padding: 22px 22px 32px;
+}
+#accord-app .ledger-detail-body .detail-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+#accord-app .ledger-detail-body .detail-section:first-child {
+  margin-top: 0; padding-top: 0; border-top: none;
+}
+#accord-app .ledger-detail-body .detail-section-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+#accord-app .ledger-detail-body .detail-summary {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 17px;
+  color: var(--ink-primary);
+  line-height: 1.4;
+  margin-right: 36px;
+}
+#accord-app .ledger-detail-body .detail-crumb {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+  margin-top: 8px;
+}
+#accord-app .ledger-detail-body .detail-crumb a {
+  color: var(--ink-muted);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+#accord-app .ledger-detail-body .detail-crumb a:hover { color: var(--signal); }
+
+/* Belief history rows */
+#accord-app .belief-history-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 12px;
+}
+#accord-app .belief-history-row:last-child { border-bottom: none; }
+#accord-app .belief-history-row .belief-line {
+  display: flex; gap: 8px; align-items: baseline;
+  flex-wrap: wrap;
+}
+#accord-app .belief-history-row .belief-level {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+#accord-app .belief-history-row .belief-level.high  { color: var(--tag-note); border-color: var(--tag-note); }
+#accord-app .belief-history-row .belief-level.mixed { color: var(--signal);   border-color: var(--signal-dim); }
+#accord-app .belief-history-row .belief-level.low   { color: var(--tag-risk); border-color: rgba(168, 111, 94, 0.4); }
+#accord-app .belief-history-row .belief-arrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+#accord-app .belief-history-row .belief-byline {
+  color: var(--ink-muted);
+}
+#accord-app .belief-history-row .belief-when {
+  color: var(--ink-faint);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+}
+#accord-app .belief-history-row .belief-rationale {
+  margin-top: 4px;
+  color: var(--ink-body);
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.5;
+  padding-left: 10px;
+  border-left: 2px solid var(--rule);
+}
+#accord-app .belief-history-row.is-unsealed .belief-when::after {
+  content: '· unsealed';
+  margin-left: 6px;
+  color: var(--signal);
+  font-style: italic;
+}
+
+/* Evidence chain chips */
+#accord-app .evidence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  color: var(--ink-body);
+  margin: 2px 4px 2px 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+#accord-app .evidence-chip:hover {
+  border-color: var(--rule-strong);
+  color: var(--ink-primary);
+}
+#accord-app .evidence-chip .tag-dot { width: 7px; height: 7px; }
+#accord-app .evidence-chip .evidence-tag {
+  font: 500 10px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-right: 2px;
+}
+
+/* Adjustment composer */
+#accord-app .belief-composer {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 14px;
+  margin-top: 4px;
+}
+#accord-app .belief-composer .composer-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  display: block;
+  margin-bottom: 6px;
+}
+#accord-app .belief-level-row {
+  display: flex; gap: 6px; margin-bottom: 12px;
+}
+#accord-app .belief-level-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 7px 10px;
+  border-radius: 4px;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 100ms, border-color 100ms;
+}
+#accord-app .belief-level-btn:hover {
+  color: var(--ink-primary); border-color: var(--rule-strong);
+}
+#accord-app .belief-level-btn.selected.high {
+  color: var(--tag-note);
+  border-color: var(--tag-note);
+  background: rgba(139, 168, 154, 0.08);
+}
+#accord-app .belief-level-btn.selected.mixed {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+  background: var(--signal-soft);
+}
+#accord-app .belief-level-btn.selected.low {
+  color: var(--tag-risk);
+  border-color: rgba(168, 111, 94, 0.4);
+  background: rgba(168, 111, 94, 0.08);
+}
+
+#accord-app .belief-rationale {
+  width: 100%;
+  background: var(--canvas);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-primary);
+  padding: 8px 10px;
+  font: 400 12px 'IBM Plex Sans', system-ui, sans-serif;
+  resize: vertical;
+  min-height: 56px;
+  margin-bottom: 10px;
+}
+#accord-app .belief-rationale:focus { outline: none; border-color: var(--signal-dim); }
+#accord-app .belief-rationale::placeholder { color: var(--ink-faint); }
+
+#accord-app .belief-declare-btn {
+  background: var(--signal);
+  color: var(--canvas-deep);
+  border: none;
+  padding: 9px 16px;
+  border-radius: 4px;
+  font: 500 12px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 120ms;
+}
+#accord-app .belief-declare-btn:hover { background: #e0b35d; }
+#accord-app .belief-declare-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   Digest & Send surface (CMD-A6)
+   Three-region: meeting rail · digest preview · recipient panel
+   ============================================================ */
+
+#accord-app #surface-digest.surface { padding: 0; }
+
+#accord-app .digest-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px 1fr 0;
+  overflow: hidden;
+  transition: grid-template-columns 200ms ease;
+}
+#accord-app .digest-body.recipients-open {
+  grid-template-columns: 260px 1fr 340px;
+}
+
+/* Meeting rail (reuses ledger-rail visual register) */
+#accord-app .digest-rail {
+  border-right: 1px solid var(--rule);
+  padding: 18px 14px 24px;
+  overflow-y: auto;
+  background: var(--canvas-deep);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#accord-app .digest-rail .rail-section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+#accord-app .digest-rail .filter-group {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+#accord-app .digest-rail .filter-group-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  width: 100%;
+  margin-bottom: 2px;
+}
+#accord-app .digest-rail .filter-chip {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 100ms, border-color 100ms, background 100ms;
+}
+#accord-app .digest-rail .filter-chip:hover {
+  color: var(--ink-primary); border-color: var(--rule-strong);
+}
+#accord-app .digest-rail .filter-chip.active {
+  color: var(--signal); border-color: var(--signal-dim); background: var(--signal-soft);
+}
+
+#accord-app .digest-meeting-row {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 10px 12px;
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition: border-color 120ms, background 120ms;
+}
+#accord-app .digest-meeting-row:hover {
+  border-color: var(--rule-strong);
+  background: var(--canvas-elev);
+}
+#accord-app .digest-meeting-row.active {
+  border-color: var(--signal-dim);
+  background: var(--canvas-elev);
+}
+#accord-app .digest-meeting-row .meeting-title {
+  font-size: 13px;
+  color: var(--ink-primary);
+  font-weight: 500;
+  margin-bottom: 4px;
+  line-height: 1.35;
+}
+#accord-app .digest-meeting-row .meeting-meta {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+#accord-app .digest-meeting-row .meeting-status-pill {
+  display: inline-block;
+  font: 500 10px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+#accord-app .digest-meeting-row .meeting-status-pill.ready {
+  color: var(--signal); border: 1px solid var(--signal-dim);
+}
+#accord-app .digest-meeting-row .meeting-status-pill.sent {
+  color: var(--tag-note); border: 1px solid var(--tag-note);
+}
+
+/* Digest preview */
+#accord-app .digest-preview-wrap {
+  overflow-y: auto;
+  background: var(--canvas);
+  padding: 24px 36px 48px;
+}
+#accord-app .digest-preview {
+  max-width: 760px;
+}
+
+#accord-app .digest-empty-cta {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%;
+  color: var(--ink-faint);
+  font-size: 13px;
+  text-align: center;
+  padding: 56px 24px;
+}
+
+#accord-app .digest-header {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+}
+#accord-app .digest-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 24px;
+  color: var(--ink-primary);
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+#accord-app .digest-meta {
+  font-size: 12px; color: var(--ink-muted);
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+#accord-app .digest-meta .meta-pill {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  background: var(--canvas-raised);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+#accord-app .digest-cta-row {
+  display: flex; gap: 10px; align-items: center;
+  margin-bottom: 22px;
+  padding: 12px 0;
+}
+#accord-app .digest-send-btn {
+  background: var(--signal);
+  color: var(--canvas-deep);
+  border: none;
+  padding: 9px 18px;
+  border-radius: 4px;
+  font: 500 12px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+#accord-app .digest-send-btn:hover { background: #e0b35d; }
+#accord-app .digest-send-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+#accord-app .digest-send-status {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+}
+#accord-app .digest-send-status.sent { color: var(--tag-note); }
+
+#accord-app .digest-section {
+  margin-bottom: 22px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+#accord-app .digest-section:first-of-type { border-top: none; padding-top: 0; }
+
+#accord-app .digest-section-header {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-bottom: 10px;
+}
+#accord-app .digest-section-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+#accord-app .digest-section-count {
+  font-size: 11px;
+  color: var(--ink-ghost);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+#accord-app .digest-item {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 11px 14px;
+  margin-bottom: 8px;
+}
+#accord-app .digest-item .digest-summary {
+  font-size: 13px;
+  color: var(--ink-primary);
+  line-height: 1.45;
+  margin-bottom: 6px;
+}
+#accord-app .digest-item .digest-context {
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+#accord-app .digest-item .ctx-pill {
+  background: var(--canvas-elev);
+  padding: 1px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+}
+#accord-app .digest-item .ctx-pill.signal { color: var(--signal); border-color: var(--signal-dim); }
+#accord-app .digest-item .ctx-pill.warn   { color: var(--tag-risk); border-color: rgba(168, 111, 94, 0.4); }
+#accord-app .digest-item .ctx-pill.note   { color: var(--tag-note); border-color: var(--tag-note); }
+
+/* Action placeholder card — Path B deferral */
+#accord-app .digest-action-placeholder {
+  background: rgba(212, 160, 74, 0.06);
+  border: 1px dashed var(--signal-dim);
+  border-radius: 5px;
+  padding: 11px 14px;
+  margin-bottom: 8px;
+}
+#accord-app .digest-action-placeholder .placeholder-tag {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--signal);
+  margin-bottom: 4px;
+}
+#accord-app .digest-action-placeholder .digest-summary {
+  font-size: 13px;
+  color: var(--ink-primary);
+  line-height: 1.45;
+  margin-bottom: 6px;
+}
+#accord-app .digest-action-placeholder .placeholder-deferral {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* Recipient panel (mirrors ledger-detail) */
+#accord-app .digest-recipients {
+  border-left: 1px solid var(--rule);
+  background: var(--canvas-deep);
+  overflow-y: auto;
+  display: none;
+  position: relative;
+}
+#accord-app .digest-body.recipients-open .digest-recipients { display: block; }
+
+#accord-app .digest-recipients-body {
+  padding: 22px 22px 32px;
+}
+#accord-app .recipient-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--canvas-raised);
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+#accord-app .recipient-row:hover { border-color: var(--rule-strong); }
+#accord-app .recipient-row.active { border-color: var(--signal-dim); }
+#accord-app .recipient-row .recipient-checkbox {
+  width: 14px; height: 14px;
+  border: 1px solid var(--ink-muted);
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+#accord-app .recipient-row.selected .recipient-checkbox {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--canvas-deep);
+  font-size: 11px;
+  font-weight: 700;
+}
+#accord-app .recipient-row .recipient-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--ink-primary);
+}
+#accord-app .recipient-row .recipient-role {
+  font: 500 10px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+#accord-app .recipient-slice {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 12px 14px;
+  margin-top: 14px;
+}
+#accord-app .recipient-slice-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+#accord-app .recipient-slice-empty {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+#accord-app .recipient-slice .slice-item {
+  font-size: 12px;
+  color: var(--ink-body);
+  margin-bottom: 4px;
+  line-height: 1.45;
+}
+#accord-app .recipient-slice .slice-item .slice-tag {
+  font: 500 10px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  margin-right: 6px;
+}
+
+/* Digest send confirm modal — reuses .modal-backdrop styles */
+#accord-app .digest-confirm-list {
+  font-size: 12px;
+  color: var(--ink-body);
+  margin: 8px 0 12px;
+}
+#accord-app .digest-confirm-list li {
+  padding: 2px 0;
+}
+
+/* ============================================================
+   Minutes surface (CMD-A7) + toast extensions
+   Three-region: meeting rail · render status · history panel
+   ============================================================ */
+
+#accord-app #surface-minutes.surface { padding: 0; }
+
+#accord-app .minutes-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px 1fr 0;
+  overflow: hidden;
+  transition: grid-template-columns 200ms ease;
+}
+#accord-app .minutes-body.history-open {
+  grid-template-columns: 280px 1fr 380px;
+}
+
+/* Meeting rail (visual register matches digest-rail) */
+#accord-app .minutes-rail {
+  border-right: 1px solid var(--rule);
+  padding: 18px 14px 24px;
+  overflow-y: auto;
+  background: var(--canvas-deep);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#accord-app .minutes-rail .rail-section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+#accord-app .minutes-rail .filter-group {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+#accord-app .minutes-rail .filter-group-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  width: 100%;
+  margin-bottom: 2px;
+}
+#accord-app .minutes-rail .filter-chip {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+}
+#accord-app .minutes-rail .filter-chip:hover {
+  color: var(--ink-primary); border-color: var(--rule-strong);
+}
+#accord-app .minutes-rail .filter-chip.active {
+  color: var(--signal); border-color: var(--signal-dim); background: var(--signal-soft);
+}
+
+#accord-app .minutes-meeting-row {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 10px 12px;
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition: border-color 120ms, background 120ms;
+}
+#accord-app .minutes-meeting-row:hover {
+  border-color: var(--rule-strong);
+  background: var(--canvas-elev);
+}
+#accord-app .minutes-meeting-row.active {
+  border-color: var(--signal-dim);
+  background: var(--canvas-elev);
+}
+#accord-app .minutes-meeting-row .meeting-title {
+  font-size: 13px;
+  color: var(--ink-primary);
+  font-weight: 500;
+  margin-bottom: 4px;
+  line-height: 1.35;
+}
+#accord-app .minutes-meeting-row .meeting-meta {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+/* Render-status pill — IR51 class chosen at construction time */
+#accord-app .render-pill {
+  display: inline-block;
+  font: 500 10px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+#accord-app .render-pill.pill-rendered {
+  color: var(--tag-note);
+  border: 1px solid var(--tag-note);
+}
+#accord-app .render-pill.pill-rendering {
+  color: var(--signal);
+  border: 1px solid var(--signal-dim);
+  background: var(--signal-soft);
+}
+#accord-app .render-pill.pill-failed {
+  color: var(--tag-risk);
+  border: 1px solid rgba(168, 111, 94, 0.4);
+}
+#accord-app .render-pill.pill-not-yet {
+  color: var(--ink-faint);
+  border: 1px solid var(--rule);
+}
+
+/* Render status (center column) */
+#accord-app .minutes-status-wrap {
+  overflow-y: auto;
+  background: var(--canvas);
+  padding: 24px 36px 48px;
+}
+#accord-app .minutes-status { max-width: 760px; }
+
+#accord-app .minutes-empty-cta {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%;
+  color: var(--ink-faint);
+  font-size: 13px;
+  text-align: center;
+  padding: 56px 24px;
+}
+
+#accord-app .minutes-status-card {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 24px 28px;
+}
+#accord-app .minutes-status-card h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--ink-primary);
+  letter-spacing: -0.01em;
+  margin-bottom: 10px;
+  line-height: 1.25;
+}
+#accord-app .minutes-status-meta {
+  font-size: 12px; color: var(--ink-muted);
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-bottom: 18px;
+}
+#accord-app .minutes-status-meta .meta-pill {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  background: var(--canvas-elev);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+#accord-app .minutes-cta-row {
+  display: flex; gap: 10px; align-items: center;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+#accord-app .minutes-action-btn {
+  background: var(--signal);
+  color: var(--canvas-deep);
+  border: none;
+  padding: 9px 18px;
+  border-radius: 4px;
+  font: 500 12px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+#accord-app .minutes-action-btn:hover { background: #e0b35d; }
+#accord-app .minutes-action-btn[disabled],
+#accord-app .minutes-action-btn.disabled {
+  opacity: 0.4; cursor: not-allowed;
+}
+#accord-app .minutes-action-btn.btn-ghost {
+  background: transparent;
+  color: var(--ink-muted);
+  border: 1px solid var(--rule);
+}
+#accord-app .minutes-action-btn.btn-ghost:hover {
+  color: var(--ink-primary); border-color: var(--rule-strong);
+  background: var(--canvas-elev);
+}
+
+#accord-app .minutes-current-fingerprint {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  word-break: break-all;
+  background: var(--canvas);
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+  margin-top: 10px;
+}
+
+/* History panel (right slide-in) */
+#accord-app .minutes-history {
+  border-left: 1px solid var(--rule);
+  background: var(--canvas-deep);
+  overflow-y: auto;
+  display: none;
+  position: relative;
+}
+#accord-app .minutes-body.history-open .minutes-history { display: block; }
+
+#accord-app .minutes-history-body {
+  padding: 22px 22px 32px;
+}
+#accord-app .minutes-history-section-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+#accord-app .minutes-history-row {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+#accord-app .minutes-history-row.current {
+  border-color: var(--signal-dim);
+}
+#accord-app .minutes-history-row .hist-when {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-primary);
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+}
+#accord-app .minutes-history-row .hist-line {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+  margin-bottom: 2px;
+}
+#accord-app .minutes-history-row .hist-line a {
+  color: var(--signal);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* Toast extensions for CMD-A7 (download link, error variant) */
+#accord-app .toast-action {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--signal);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  margin-right: 12px;
+  cursor: pointer;
+}
+#accord-app .toast-action:hover { color: #e0b35d; }
+#accord-app .toast.error {
+  border-color: rgba(226, 75, 74, 0.4);
+}
+#accord-app .toast.error .toast-msg strong {
+  color: var(--tag-risk);
+}
+</style>
+</head>
+
+<body>
+<div id="accord-app">
+
+  <!-- ── Top nav ──────────────────────────────────────────────── -->
+  <nav class="topnav">
+    <div class="brand">Accord<span class="brand-meta" id="brandMeta">— loading —</span></div>
+
+    <button class="live-connect" id="liveConnectBtn" title="Subscribe to the meeting channel">
+      <span class="lc-pulse"></span>
+      <span class="lc-label">LIVE CONNECT</span>
+    </button>
+
+    <div class="surface-switch" role="tablist">
+      <button data-surface="capture"  class="active">Live Capture</button>
+      <button data-surface="document">Living Document</button>
+      <button data-surface="ledger">Decision Ledger</button>
+      <button data-surface="digest">Digest &amp; Send</button>
+      <button data-surface="minutes">Minutes</button>
+    </div>
+  </nav>
+
+  <!-- ── Surface: Live Capture ───────────────────────────────── -->
+  <section class="surface surface-capture active" id="surface-capture">
+
+    <!-- Header (populated by JS) -->
+    <header class="capture-header">
+      <div>
+        <h1 class="meeting-title" id="cap-title">No meeting loaded</h1>
+        <div class="meeting-organizer" id="cap-organizer" style="display:none">
+          <span class="organizer-label">Organized by</span>
+          <span class="organizer-name" id="cap-organizer-name"></span>
         </div>
-        <div class="minutes-cta-row">${ctaHtml}</div>
-        ${fingerprintHtml}
+        <div class="meeting-meta" id="cap-meta">
+          <span class="live-pulse" id="cap-pulse" title="Meeting status"></span>
+          <span id="cap-meta-text">Use NEW MEETING to begin.</span>
+        </div>
       </div>
-    `;
+      <div class="capture-controls">
+        <div class="timer" id="meetingTimer">00:00:00</div>
+        <button class="btn btn-prominent" id="newMeetingBtn">+ New meeting</button>
+        <button class="btn btn-signal" id="meetingToggleBtn" disabled>Start meeting →</button>
+      </div>
+    </header>
 
-    // Wire CTAs
-    $('minutesGenerateBtn')?.addEventListener('click', () => _generate(m.meeting_id, false));
-    $('minutesRerenderBtn')?.addEventListener('click', () => _openRerenderModal(m));
-    const dlBtn = $('minutesDownloadBtn');
-    if (dlBtn && latestSuccess) {
-      dlBtn.addEventListener('click', async (ev) => {
-        ev.preventDefault();
-        const url = await _signedUrlFor(latestSuccess);
-        if (url) window.open(url, '_blank', 'noopener');
-      });
+    <!-- Closed-meeting banner -->
+    <div class="closed-banner" id="closedBanner">
+      <div class="closed-banner-msg">
+        <strong>Meeting committed to Chain of Custody.</strong>
+        Captures are now structurally immutable per Iron Rule 42.
+      </div>
+      <button class="btn btn-ghost" data-target-surface="document">View in Living Document</button>
+      <button class="btn btn-ghost" data-target-surface="minutes">Minutes archive</button>
+    </div>
+
+    <div class="capture-body">
+
+      <!-- Agenda rail -->
+      <aside class="agenda-rail">
+        <div class="rail-section-label">
+          <span>Agenda</span>
+          <span class="count" id="agendaCount">0 items</span>
+        </div>
+        <div class="agenda-toggle" role="group">
+          <button data-agenda-filter="active" class="active">Active</button>
+          <button data-agenda-filter="all">All</button>
+        </div>
+        <div class="rail-actions">
+          <button class="btn btn-ghost" id="newAgendaBtn">+ New item</button>
+        </div>
+        <div id="agendaList"></div>
+      </aside>
+
+      <!-- Capture pane -->
+      <div class="capture-pane">
+
+        <div class="context-strip">
+          <span class="context-label">Capturing under</span>
+          <span class="context-target" id="captureTarget">— pick an agenda item —</span>
+          <span class="context-path" id="capturePath"></span>
+        </div>
+
+        <div class="capture-input-wrap">
+          <textarea
+            class="capture-input"
+            id="captureInput"
+            placeholder="Type what's being said. Press a tag below (or N/D/A/R/Q) to commit."
+            disabled></textarea>
+        </div>
+
+        <div class="tag-row">
+          <span class="tag-row-label">Tag as</span>
+          <button class="tag-btn" data-tag="note"     disabled><span class="tag-dot note"></span>Note     <span class="tag-key">N</span></button>
+          <button class="tag-btn" data-tag="decision" disabled><span class="tag-dot decision"></span>Decision <span class="tag-key">D</span></button>
+          <button class="tag-btn" data-tag="action"   disabled><span class="tag-dot action"></span>Action   <span class="tag-key">A</span></button>
+          <button class="tag-btn" data-tag="risk"     disabled><span class="tag-dot risk"></span>Risk     <span class="tag-key">R</span></button>
+          <button class="tag-btn" data-tag="question" disabled><span class="tag-dot question"></span>Question <span class="tag-key">Q</span></button>
+        </div>
+
+        <div class="captures-stream">
+          <div class="stream-tabs">
+            <button class="stream-tab active" data-stream-tab="present">
+              <span>Captured this meeting</span>
+              <span class="stream-tab-count" id="streamCountPresent">0</span>
+            </button>
+            <button class="stream-tab" data-stream-tab="history">
+              <span>Thread history</span>
+              <span class="stream-tab-count" id="streamCountHistory">0</span>
+            </button>
+          </div>
+          <div id="captureStream"></div>
+          <div id="threadHistoryStream" style="display:none"></div>
+        </div>
+
+      </div>
+
+      <!-- Meta pane -->
+      <aside class="meta-pane">
+        <div>
+          <div class="meta-section-label">Coverage</div>
+          <div class="coverage-bar"><div class="coverage-fill" id="coverageFill" style="width:0%"></div></div>
+          <div class="coverage-text" id="coverageText">0 of 0 agenda items have entries</div>
+        </div>
+
+        <div>
+          <div class="meta-section-label">Attendees</div>
+          <div id="attendeesList"></div>
+        </div>
+
+        <div>
+          <div class="meta-section-label">Team chat</div>
+          <div class="chat-stream" id="chatStream"></div>
+          <div class="chat-input-row">
+            <input type="text" class="chat-input" id="chatInput"
+                   placeholder="Message the meeting…" autocomplete="off" disabled>
+            <button class="chat-send" id="chatSendBtn" disabled>Send</button>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </section>
+
+  <!-- Placeholder surfaces -->
+  <section class="surface" id="surface-document">
+    <div class="document-body">
+
+      <!-- THREAD RAIL — left column -->
+      <aside class="thread-rail" id="docThreadRail">
+        <div class="rail-section-label">
+          <span>Threads</span>
+          <span class="count" id="docThreadCount">0</span>
+        </div>
+        <div id="docThreadList"></div>
+      </aside>
+
+      <!-- SPINE — center column -->
+      <div class="document-spine" id="docSpine">
+
+        <header class="document-header" id="docHeader" style="display:none">
+          <h1 class="document-title" id="docTitle"></h1>
+          <div class="document-aggregate" id="docAggregate"></div>
+        </header>
+
+        <div class="document-filters" id="docFilters" style="display:none">
+          <div class="filter-group">
+            <span class="filter-group-label">Tag</span>
+            <button class="filter-chip active" data-filter-group="tag" data-filter-value="note">Note</button>
+            <button class="filter-chip active" data-filter-group="tag" data-filter-value="decision">Decision</button>
+            <button class="filter-chip active" data-filter-group="tag" data-filter-value="action">Action</button>
+            <button class="filter-chip active" data-filter-group="tag" data-filter-value="risk">Risk</button>
+            <button class="filter-chip active" data-filter-group="tag" data-filter-value="question">Question</button>
+          </div>
+          <div class="filter-group">
+            <span class="filter-group-label">Status</span>
+            <button class="filter-chip active" data-filter-group="status" data-filter-value="active">Active</button>
+            <button class="filter-chip active" data-filter-group="status" data-filter-value="superseded">Superseded</button>
+            <button class="filter-chip active" data-filter-group="status" data-filter-value="answered">Answered</button>
+            <button class="filter-chip active" data-filter-group="status" data-filter-value="closed">Closed</button>
+          </div>
+          <div class="filter-group">
+            <span class="filter-group-label">Edges</span>
+            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-supersession">Has supersession</button>
+            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-contradicting">Has contradicting evidence</button>
+            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-open-questions">Has open questions</button>
+            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-unmitigated-risks">Has unmitigated risks</button>
+          </div>
+        </div>
+
+        <div class="document-stream" id="docStream"></div>
+
+      </div>
+
+    </div>
+  </section>
+  <section class="surface" id="surface-ledger">
+    <div class="ledger-body">
+
+      <!-- FILTER RAIL — left column -->
+      <aside class="ledger-rail" id="ledgerRail">
+        <div class="rail-section-label">
+          <span>Filters</span>
+          <button class="ledger-refresh-btn" id="ledgerRefreshBtn" title="Refresh from substrate">↻</button>
+        </div>
+
+        <div class="ledger-search-wrap">
+          <input type="text" class="ledger-search" id="ledgerSearch"
+                 placeholder="Search summaries…" autocomplete="off">
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Tag</span>
+          <button class="filter-chip active disabled" data-filter-group="tag" data-filter-value="decision" disabled>Decision</button>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Status</span>
+          <button class="filter-chip active" data-filter-group="status" data-filter-value="active">Active</button>
+          <button class="filter-chip active" data-filter-group="status" data-filter-value="superseded">Superseded</button>
+          <button class="filter-chip active" data-filter-group="status" data-filter-value="contradicted">Contradicted</button>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Belief</span>
+          <button class="filter-chip active" data-filter-group="belief" data-filter-value="high">High</button>
+          <button class="filter-chip active" data-filter-group="belief" data-filter-value="mixed">Mixed</button>
+          <button class="filter-chip active" data-filter-group="belief" data-filter-value="low">Low</button>
+          <button class="filter-chip active" data-filter-group="belief" data-filter-value="none-declared">None declared</button>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Edges</span>
+          <button class="filter-chip" data-filter-group="edge" data-filter-value="has-supporting">Has supporting evidence</button>
+          <button class="filter-chip" data-filter-group="edge" data-filter-value="has-counter">Has counter-evidence</button>
+          <button class="filter-chip" data-filter-group="edge" data-filter-value="superseded">Superseded</button>
+          <button class="filter-chip" data-filter-group="edge" data-filter-value="contradicted">Contradicted</button>
+        </div>
+
+        <div class="ledger-aggregate" id="ledgerAggregate"></div>
+      </aside>
+
+      <!-- DECISION LIST — center column -->
+      <div class="ledger-list-wrap">
+        <div class="ledger-list" id="ledgerList"></div>
+      </div>
+
+      <!-- DETAIL PANEL — right column (collapsed by default) -->
+      <aside class="ledger-detail" id="ledgerDetail">
+        <button class="ledger-detail-close" id="ledgerDetailClose" title="Close detail panel">×</button>
+        <div class="ledger-detail-body" id="ledgerDetailBody"></div>
+      </aside>
+
+    </div>
+  </section>
+  <section class="surface" id="surface-digest">
+    <div class="digest-body">
+
+      <!-- MEETING RAIL — left column -->
+      <aside class="digest-rail" id="digestRail">
+        <div class="rail-section-label">
+          <span>Sealed meetings</span>
+          <button class="ledger-refresh-btn" id="digestRefreshBtn" title="Refresh from substrate">↻</button>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Status</span>
+          <button class="filter-chip active" data-filter-group="status" data-filter-value="ready">Ready to send</button>
+          <button class="filter-chip active" data-filter-group="status" data-filter-value="sent">Sent</button>
+        </div>
+
+        <div id="digestMeetingList"></div>
+
+        <div class="ledger-aggregate" id="digestAggregate"></div>
+      </aside>
+
+      <!-- DIGEST PREVIEW — center column -->
+      <div class="digest-preview-wrap">
+        <div class="digest-preview" id="digestPreview"></div>
+      </div>
+
+      <!-- RECIPIENT PANEL — right column (collapsed by default) -->
+      <aside class="digest-recipients" id="digestRecipients">
+        <button class="ledger-detail-close" id="digestRecipientsClose" title="Close recipients">×</button>
+        <div class="digest-recipients-body" id="digestRecipientsBody"></div>
+      </aside>
+
+    </div>
+  </section>
+  <section class="surface" id="surface-minutes">
+    <div class="minutes-body">
+
+      <!-- MEETING RAIL — left column -->
+      <aside class="minutes-rail" id="minutesRail">
+        <div class="rail-section-label">
+          <span>Sealed meetings</span>
+          <button class="ledger-refresh-btn" id="minutesRefreshBtn" title="Refresh from substrate">↻</button>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Status</span>
+          <button class="filter-chip active" data-filter-value="all">All</button>
+          <button class="filter-chip" data-filter-value="rendered">Rendered</button>
+          <button class="filter-chip" data-filter-value="not_yet">Not yet</button>
+          <button class="filter-chip" data-filter-value="failed">Failed</button>
+        </div>
+
+        <div id="minutesMeetingList"></div>
+
+        <div class="ledger-aggregate" id="minutesAggregate"></div>
+      </aside>
+
+      <!-- RENDER STATUS — center column -->
+      <div class="minutes-status-wrap">
+        <div class="minutes-status" id="minutesStatus"></div>
+      </div>
+
+      <!-- DOWNLOAD / HISTORY PANEL — right column (collapsed by default) -->
+      <aside class="minutes-history" id="minutesHistory">
+        <button class="ledger-detail-close" id="minutesHistoryClose" title="Close history">×</button>
+        <div class="minutes-history-body" id="minutesHistoryBody"></div>
+      </aside>
+
+    </div>
+  </section>
+
+  <!-- ── Re-render confirm modal ─────────────────────────────── -->
+  <div class="modal-backdrop" id="rerenderConfirmModal">
+    <div class="modal">
+      <h3>Re-render minutes?</h3>
+      <p id="rerenderModalSummary"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"  id="rerenderCancel">Cancel</button>
+        <button class="btn btn-signal" id="rerenderConfirm">Re-render</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── New-meeting modal ──────────────────────────────────── -->
+  <div class="modal-backdrop" id="newMeetingModal">
+    <div class="modal">
+      <h3>New meeting</h3>
+      <p>A new meeting will be created in the <code>idle</code> state and you'll become the organizer. Add agenda items pre-meeting; click Start meeting to enter the running state.</p>
+      <label for="nmTitle">Title</label>
+      <input type="text" id="nmTitle" placeholder="Meeting title">
+      <label for="nmThreadTitle">Thread (will be created if new)</label>
+      <input type="text" id="nmThreadTitle" placeholder="Thread title (e.g., 'Heatsink redesign')">
+      <div class="modal-helper">Threads span meetings; add agenda items below after creating.</div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"  id="nmCancel">Cancel</button>
+        <button class="btn btn-signal" id="nmCreate">Create meeting</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── End-meeting confirm modal ─────────────────────────── -->
+  <div class="modal-backdrop" id="endMeetingModal">
+    <div class="modal">
+      <h3>End meeting?</h3>
+      <p>Once committed, captured items become permanent evidence per Chain of Custody. This cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="emCancel">Cancel</button>
+        <button class="btn btn-end"   id="emConfirm">End meeting</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Digest send confirm modal ─────────────────────────── -->
+  <div class="modal-backdrop" id="digestSendModal">
+    <div class="modal">
+      <h3>Send digest?</h3>
+      <p id="digestSendModalSummary"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"   id="digestSendCancel">Cancel</button>
+        <button class="btn btn-signal"  id="digestSendConfirm">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Async PDF toast (CMD-A3 element preserved; CMD-A7 makes content live) ── -->
+  <div class="toast" id="pdfToast" role="status">
+    <div class="toast-msg">
+      <strong>Minutes record published.</strong>
+    </div>
+    <a class="toast-action" id="toastDownload" target="_blank" rel="noopener" style="display:none">Download PDF</a>
+    <button class="toast-close" id="toastClose" aria-label="Dismiss">×</button>
+  </div>
+
+</div>
+
+<!-- ── Standard scripts (per compass.html / cadence.html convention) ── -->
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/coc.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/notif.js"></script>
+<script src="/js/version.js?v=seed"></script>
+
+<!-- ── Brand-meta dynamic label (CMD-A5 §8 polish) ── -->
+<script>
+  (function() {
+    const SURFACE_LABELS = {
+      capture:  'Live Capture',
+      document: 'Living Document',
+      ledger:   'Decision Ledger',
+      digest:   'Digest & Send',
+      minutes:  'Minutes',
+    };
+    function _setBrandMeta(surfaceKey) {
+      var el = document.getElementById('brandMeta');
+      if (!el) return;
+      var ver = window._PROJECTHUD_VERSION || '';
+      var label = SURFACE_LABELS[surfaceKey] || 'Live Capture';
+      var ver_short = ver.replace(/^v\d+-/, '');
+      el.textContent = ver_short + ' · ' + label;
     }
-  }
-
-  // ── History panel (right column) ─────────────────────────────
-  function _renderHistory() {
-    const m = local.meetings.find(x => x.meeting_id === local.activeMeeting);
-    const body = $('minutesHistoryBody');
-    if (!m) { body.innerHTML = ''; return; }
-    const arr = local.renders[m.meeting_id] || [];
-    const latestSuccess = _latestSuccess(m.meeting_id);
-
-    let inner = '';
-    if (latestSuccess) {
-      inner += `
-        <div class="minutes-history-section-label">Current render</div>
-        ${_renderHistoryRow(latestSuccess, true)}`;
-    }
-    if (arr.length) {
-      inner += `<div class="minutes-history-section-label" style="margin-top:18px">Render history (${arr.length})</div>`;
-      inner += arr.map(r => _renderHistoryRow(r, r.render_id === latestSuccess?.render_id)).join('');
+    // Initial
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() { _setBrandMeta('capture'); });
     } else {
-      inner += `<div class="minutes-history-section-label">Render history</div>
-                <div style="font-size:12px;color:var(--ink-faint);font-style:italic">No renders yet.</div>`;
+      _setBrandMeta('capture');
     }
-    body.innerHTML = inner;
-
-    // Wire per-row download links
-    body.querySelectorAll('a[data-render-id]').forEach(a => {
-      a.addEventListener('click', async (ev) => {
-        ev.preventDefault();
-        const rid = a.getAttribute('data-render-id');
-        const r = arr.find(x => x.render_id === rid);
-        if (!r) return;
-        const url = await _signedUrlFor(r);
-        if (url) window.open(url, '_blank', 'noopener');
-      });
+    // Track surface changes
+    window.addEventListener('accord:surface-changed', function(ev) {
+      _setBrandMeta(ev.detail && ev.detail.surface);
     });
-  }
+  })();
+</script>
 
-  function _renderHistoryRow(r, isCurrent) {
-    const cls = ['minutes-history-row'];
-    if (isCurrent) cls.push('current');
-    const when = r.rendered_at ? new Date(r.rendered_at).toLocaleString() : '';
-    const versionLine = r.render_version ? `<div class="hist-line">${esc(r.render_version)}</div>` : '';
-    const hashLine    = r.content_hash
-      ? `<div class="hist-line">hash: ${esc(r.content_hash.slice(0, 16))}…</div>` : '';
-    const statusLine  = `<div class="hist-line">status: ${esc(r.status)}${r.failure_reason ? ' — ' + esc(r.failure_reason.slice(0, 60)) : ''}</div>`;
-    const dlLink      = (r.status === 'success' && r.storage_path)
-      ? `<div class="hist-line"><a data-render-id="${esc(r.render_id)}">download this version</a></div>`
-      : '';
-    return `
-      <div class="${cls.join(' ')}">
-        <div class="hist-when">${esc(when)}${isCurrent ? ' · current' : ''}</div>
-        ${versionLine}
-        ${hashLine}
-        ${statusLine}
-        ${dlLink}
-      </div>`;
-  }
-
-  // ── Signed URL resolution ────────────────────────────────────
-  async function _signedUrlFor(renderRow) {
-    if (!renderRow?.storage_path) return null;
-    try {
-      // PostgREST doesn't sign URLs directly. Use the supabase-js client if
-      // available; else fall back to public URL (requires bucket to be public).
-      // Our bucket is private — supabase-js storage client is the right path.
-      const sb = window.supabase || Accord?.state?.supabase;
-      if (!sb) {
-        console.warn('[Accord-minutes] supabase client unavailable for signed URL');
-        return null;
-      }
-      const { data, error } = await sb.storage
-        .from('accord-minutes')
-        .createSignedUrl(renderRow.storage_path, 3600);
-      if (error) {
-        console.warn('[Accord-minutes] signed URL error:', error.message);
-        return null;
-      }
-      return data?.signedUrl || null;
-    } catch (e) {
-      console.warn('[Accord-minutes] signed URL failed', e);
-      return null;
+<!-- ── Versioned shared loaders (matches compass.html pattern) ── -->
+<script>
+  (function() {
+    var v = window._PROJECTHUD_VERSION;
+    function load(src) {
+      var s = document.createElement('script');
+      s.src = src + '?v=' + v;
+      document.head.appendChild(s);
     }
-  }
+    load('/js/sidebar.js');
+    load('/js/cmd-center.js');
+    load('/js/accord-core.js');
+    load('/js/accord-capture.js');
+    load('/js/accord-document.js');
+    load('/js/accord-ledger.js');
+    load('/js/accord-digest.js');
+    load('/js/accord-minutes.js');
+  })();
+</script>
 
-  // ── Generate / Re-render flow ────────────────────────────────
-  async function _generate(meetingId, isRerender) {
-    if (!meetingId) return;
-    local.inProgress.add(meetingId);
-    _renderRail();
-    _renderAggregate();
-    _renderStatus();
-    try {
-      const result = await API.invokeEdgeFunction('render-minutes', { meeting_id: meetingId });
-      // Edge Function broadcasts via realtime; we also poll renders
-      // (IR54: SELECT-after-mutation) to ensure UI catches up.
-      await _pollUntilTerminal(meetingId, 30000); // 30s timeout
-      _toast(isRerender
-        ? `Re-render complete${result?.used_fallback ? ' (HTML fallback)' : ''}.`
-        : `Minutes rendered${result?.used_fallback ? ' (HTML fallback)' : ''}.`,
-        result?.download_url || null);
-    } catch (e) {
-      console.error('[Accord-minutes] generate failed', e);
-      _toast('Render failed: ' + (e?.message || e), null, true);
-    } finally {
-      local.inProgress.delete(meetingId);
-      await _loadRenders();
-      _renderRail();
-      _renderAggregate();
-      _renderStatus();
-      _renderHistory();
-    }
-  }
-
-  // Poll until the latest render row reaches a terminal status or timeout.
-  async function _pollUntilTerminal(meetingId, timeoutMs) {
-    const start = Date.now();
-    const interval = 2000;
-    while (Date.now() - start < timeoutMs) {
-      const rows = await API.get(
-        `accord_minutes_renders?meeting_id=eq.${meetingId}` +
-        `&select=*&order=rendered_at.desc&limit=1`
-      ).catch(() => []);
-      const r = rows?.[0];
-      if (r && (r.status === 'success' || r.status === 'failed')) return r;
-      await new Promise(res => setTimeout(res, interval));
-    }
-    return null;
-  }
-
-  function _openRerenderModal(meeting) {
-    $('rerenderModalSummary').textContent =
-      `Re-render minutes for "${meeting.title || 'Untitled'}"? The previous render is preserved in render history; the new render becomes the canonical one.`;
-    $('rerenderConfirmModal').classList.add('visible');
-  }
-
-  function _closeRerenderModal() {
-    $('rerenderConfirmModal').classList.remove('visible');
-  }
-
-  // ── Toast (reuses pdfToast surface) ──────────────────────────
-  function _toast(msg, downloadUrl, isError) {
-    const t = $('pdfToast');
-    if (!t) return;
-    const m = t.querySelector('.toast-msg');
-    if (m) m.innerHTML = `<strong>${esc(msg)}</strong>`;
-    const dl = $('toastDownload');
-    if (dl) {
-      if (downloadUrl) {
-        dl.href = downloadUrl;
-        dl.style.display = '';
-      } else {
-        dl.removeAttribute('href');
-        dl.style.display = 'none';
-      }
-    }
-    t.classList.toggle('error', !!isError);
-    t.classList.add('visible');
-    setTimeout(() => t.classList.remove('visible'), isError ? 6000 : 5000);
-  }
-
-  // ── Wire UI (one-time) ───────────────────────────────────────
-  function _wireUI() {
-    $('minutesRail').addEventListener('click', (ev) => {
-      const btn = ev.target.closest('.filter-chip');
-      if (!btn) return;
-      local.activeFilter = btn.dataset.filterValue;
-      // Single-select: deactivate siblings
-      btn.parentElement.querySelectorAll('.filter-chip').forEach(b => {
-        b.classList.toggle('active', b === btn);
-      });
-      _renderRail();
-    });
-    $('minutesRefreshBtn').addEventListener('click', () => _refresh());
-    $('minutesHistoryClose').addEventListener('click', () => {
-      document.querySelector('#accord-app .minutes-body')?.classList.remove('history-open');
-    });
-    $('rerenderCancel').addEventListener('click', () => _closeRerenderModal());
-    $('rerenderConfirm').addEventListener('click', async () => {
-      _closeRerenderModal();
-      if (local.activeMeeting) {
-        await _generate(local.activeMeeting, true);
-      }
-    });
-
-    // Listen for real-time minutes-render broadcasts to refresh state
-    window.addEventListener('accord:minutes-rendered', () => _refresh());
-    window.addEventListener('accord:minutes-render_failed', () => _refresh());
-  }
-
-  // Public surface
-  window.AccordMinutes = {
-    _state:         local,
-    _renderRail:    _renderRail,
-    _selectMeeting: _selectMeeting,
-    _generate:      _generate,
-    _refresh:       _refresh,
-  };
-
-  console.log('[Accord] minutes surface module loaded');
-})();
+</body>
+</html>
