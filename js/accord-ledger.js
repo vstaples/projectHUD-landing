@@ -250,11 +250,18 @@
     const f = local.activeFilters;
     if (!f.tag.has(d.tag)) return false;
 
-    let status;
-    if (derived.isSuperseded) status = 'superseded';
-    else if (derived.isContradicted) status = 'contradicted';
-    else status = 'active';
-    if (!f.status.has(status)) return false;
+    // §6.2 status filter — a decision can be in multiple status states
+    // simultaneously (e.g., both superseded and contradicted). The chip
+    // is satisfied if ANY of the decision's status states is currently
+    // active in the filter set. A decision is "active" only when it has
+    // none of the decoration states.
+    const statusSet = new Set();
+    if (derived.isSuperseded)   statusSet.add('superseded');
+    if (derived.isContradicted) statusSet.add('contradicted');
+    if (statusSet.size === 0)   statusSet.add('active');
+    let statusMatch = false;
+    for (const s of statusSet) { if (f.status.has(s)) { statusMatch = true; break; } }
+    if (!statusMatch) return false;
 
     if (!f.belief.has(derived.headlineLevel)) return false;
 
@@ -389,9 +396,9 @@
     let visible = 0;
     local.decisions.forEach(d => {
       const derived = d._derived || _decorateDecision(d);
-      if (derived.isSuperseded)        superseded++;
-      else if (derived.isContradicted) contradicted++;
-      else                              active++;
+      if (derived.isSuperseded)   superseded++;
+      if (derived.isContradicted) contradicted++;
+      if (!derived.isSuperseded && !derived.isContradicted) active++;
       if (_passesFilters(d, derived)) visible++;
     });
     const lines = [];
