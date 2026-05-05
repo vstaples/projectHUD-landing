@@ -123,6 +123,71 @@ const Auth = (() => {
     }
   }
 
-  return { getToken, getSession, getCurrentUserId, requireAuth, logout, getFreshToken };
+  // ── ensureFirmId ──────────────────────────────────────────
+  // CMD-AEGIS-1: populate window.PHUD.FIRM_ID from the
+  // authenticated user's users-table row. Cached in localStorage
+  // under phud:firm_id:{user_id} so subsequent loads are sync.
+  // Resolves to the firm_id string, or null if no auth / no firm
+  // could be established. Never throws.
+  //
+  // The fast (cached) path completes synchronously at module-load
+  // for warm sessions; the cold path is a single REST round-trip.
+  async function ensureFirmId() {
+    try {
+      if (typeof window === 'undefined' || !window.PHUD) return null;
+
+      // Already populated by a previous call in this tab.
+      if (window.PHUD.FIRM_ID) return window.PHUD.FIRM_ID;
+
+      const sub = getCurrentUserId();
+      if (!sub) return null;
+
+      // Cache hit.
+      const cacheKey = 'phud:firm_id:' + sub;
+      const cached   = localStorage.getItem(cacheKey);
+      if (cached && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cached)) {
+        window.PHUD.FIRM_ID = cached;
+        return cached;
+      }
+
+      // Cache miss — fetch from users table. We do not use api.js here
+      // because auth.js loads before api.js per the standard loader order.
+      const token  = await getFreshToken();
+      const url    = `${PHUD.SUPABASE_URL}/rest/v1/users?id=eq.${sub}&select=firm_id`;
+      const res    = await fetch(url, {
+        headers: {
+          apikey:        PHUD.SUPABASE_KEY,
+          Authorization: 'Bearer ' + token,
+          Accept:        'application/json',
+        },
+      });
+      if (!res.ok) {
+        console.warn('[Auth] ensureFirmId: users lookup failed:', res.status);
+        return null;
+      }
+      const rows = await res.json();
+      const firmId = rows && rows[0] && rows[0].firm_id;
+      if (!firmId) {
+        console.warn('[Auth] ensureFirmId: no firm_id for user', sub.slice(0, 8) + '...');
+        return null;
+      }
+      window.PHUD.FIRM_ID = firmId;
+      try { localStorage.setItem(cacheKey, firmId); } catch (e) { /* quota — non-fatal */ }
+      return firmId;
+    } catch (e) {
+      console.warn('[Auth] ensureFirmId error:', e && e.message);
+      return null;
+    }
+  }
+
+  // CMD-AEGIS-1: kick off firm_id population immediately at module load.
+  // cmd-center.js awaits window._phudFirmIdReady inside _init() before
+  // declaring its channel name. The fast (cache) path resolves before
+  // the next microtask; the cold path resolves before DOMContentLoaded.
+  if (typeof window !== 'undefined') {
+    window._phudFirmIdReady = ensureFirmId();
+  }
+
+  return { getToken, getSession, getCurrentUserId, requireAuth, logout, getFreshToken, ensureFirmId };
 
 })();

@@ -64,8 +64,14 @@ var SUPA_URL = (typeof PHUD !== 'undefined' && PHUD.SUPABASE_URL) ||
                'https://dvbetgdzksatcgdfftbs.supabase.co';
 var SUPA_KEY = (typeof PHUD !== 'undefined' && PHUD.SUPABASE_KEY) ||
                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
-var FIRM_ID  = (typeof PHUD !== 'undefined' && PHUD.FIRM_ID) ||
-               'aaaaaaaa-0001-0001-0001-000000000001';
+var FIRM_ID  = (typeof PHUD !== 'undefined' && PHUD.FIRM_ID) || null;
+// CMD-AEGIS-1: hardcoded firm A fallback removed. Was previously:
+//   var FIRM_ID = (PHUD.FIRM_ID) || 'aaaaaaaa-0001-0001-0001-000000000001';
+// That fallback caused every session — regardless of authenticated
+// firm — to subscribe to firm A's hud: channel, leaking presence
+// across firms (CMD-A3 §10.5). _init() now awaits
+// window._phudFirmIdReady (populated by auth.js) and fails fast if
+// FIRM_ID still cannot be established. See brief CMD-AEGIS-1 §3.
 
 // ── State ─────────────────────────────────────────────────────────────────────
 var _supabase    = null;   // Supabase JS client
@@ -5079,7 +5085,12 @@ function _hookAppEvents() {
     // Look up who step seq routes to from the pre-resolved step chain
     setTimeout(function() {
       // Re-fetch instance from DB to get latest notes (written async after routing)
-      var firmId = typeof FIRM_ID !== 'undefined' ? FIRM_ID : (window.PHUD && window.PHUD.FIRM_ID) || '';
+      // CMD-AEGIS-1: matches §3 discipline — no hardcoded firm_id fallback. If
+      // FIRM_ID is unresolved here, the script-runner enrich step is skipped
+      // rather than executing with an empty/wrong firm context.
+      var firmId = (typeof FIRM_ID !== 'undefined' && FIRM_ID) ||
+                   (window.PHUD && window.PHUD.FIRM_ID) || null;
+      if (!firmId) { return; }
       var supaUrl = typeof SUPA_URL !== 'undefined' ? SUPA_URL : (window.PHUD && window.PHUD.SUPABASE_URL) || '';
       var supaKey = typeof SUPA_KEY !== 'undefined' ? SUPA_KEY : (window.PHUD && window.PHUD.SUPABASE_KEY) || '';
       fetch(supaUrl + '/rest/v1/workflow_instances?id=eq.' + instanceId + '&select=notes&limit=1', {
@@ -5271,6 +5282,32 @@ window.CMDCenter = {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function _init() {
+  // ── CMD-AEGIS-1: gate channel subscription on firm_id resolution ─────────
+  // auth.js exposes window._phudFirmIdReady as a Promise that resolves to
+  // the firm_id string (or null if no auth / no firm could be established).
+  // We await it here, then re-read PHUD.FIRM_ID into the module-local
+  // FIRM_ID before any code-path that builds channel names or session
+  // identity. If firm_id is still unresolved after the await, we log a
+  // clear error and return without subscribing — Aegis features become
+  // unavailable but the page renders normally.
+  try {
+    if (window._phudFirmIdReady && typeof window._phudFirmIdReady.then === 'function') {
+      await window._phudFirmIdReady;
+    }
+  } catch (e) { /* ensureFirmId never throws, but defensive */ }
+  if (!FIRM_ID && window.PHUD && window.PHUD.FIRM_ID) {
+    FIRM_ID = window.PHUD.FIRM_ID;
+  }
+  if (!FIRM_ID) {
+    console.error(
+      '[cmd-center] auth.js did not populate window.PHUD.FIRM_ID; ' +
+      'cmd-center.js cannot initialize; presence and command features unavailable. ' +
+      '(See brief CMD-AEGIS-1 §6.)'
+    );
+    window._cmdCenterUninitialized = true;
+    return;
+  }
+
   // Clean up any alias keys persisted under anon- userIds from previous sessions
   Object.keys(localStorage).forEach(function(k) {
     if (k.startsWith('phud:cmd:alias:anon-')) localStorage.removeItem(k);
