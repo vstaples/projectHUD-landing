@@ -480,13 +480,18 @@
       const tgtSummary = tgt?.summary ? _truncate(tgt.summary, 64) : null;
       const xthread    = tgt && tgt.thread_id !== local.activeThread;
 
+      // Build linkAttrs with the correct class up-front. If the target lives
+      // in another thread, add doc-cross-link so the click handler at the
+      // top of _renderSpine() picks it up. Without this, cross-thread chips
+      // for non-supersedes edge types render but don't navigate.
+      const baseClass = xthread ? 'doc-edge-chip doc-cross-link' : 'doc-edge-chip';
       const linkAttrs = (xthread && tgt) ?
-        ` class="doc-edge-chip" data-thread-id="${tgt.thread_id}" data-node-id="${tgt.node_id}"` :
-        ' class="doc-edge-chip"';
+        ` class="${baseClass}" data-thread-id="${tgt.thread_id}" data-node-id="${tgt.node_id}"` :
+        ` class="${baseClass}"`;
 
       switch (e.edge_type) {
         case 'supersedes':
-          out.push(`<span${linkAttrs.replace('class="doc-edge-chip"', xthread ? 'class="doc-edge-chip doc-cross-link"' : 'class="doc-edge-chip"')}>supersedes${tgtSummary ? ' "' + esc(tgtSummary) + '"' : ''}</span>`);
+          out.push(`<span${linkAttrs}>supersedes${tgtSummary ? ' "' + esc(tgtSummary) + '"' : ''}</span>`);
           break;
         case 'retracts':
           out.push(`<span${linkAttrs}>retracts${tgtSummary ? ' "' + esc(tgtSummary) + '"' : ''}</span>`);
@@ -503,9 +508,11 @@
         case 'weakens':
           out.push(`<span${linkAttrs}>weakens${tgtSummary ? ' "' + esc(tgtSummary) + '"' : ''}</span>`);
           break;
-        case 'contradicts':
-          out.push(`<span class="doc-edge-chip contradiction"${xthread && tgt ? ' data-thread-id="' + tgt.thread_id + '" data-node-id="' + tgt.node_id + '"' : ''}>⚠ contradicts${tgtSummary ? ' "' + esc(tgtSummary) + '"' : ''}</span>`);
+        case 'contradicts': {
+          const contraClass = xthread ? 'doc-edge-chip doc-cross-link contradiction' : 'doc-edge-chip contradiction';
+          out.push(`<span class="${contraClass}"${xthread && tgt ? ' data-thread-id="' + tgt.thread_id + '" data-node-id="' + tgt.node_id + '"' : ''}>⚠ contradicts${tgtSummary ? ' "' + esc(tgtSummary) + '"' : ''}</span>`);
           break;
+        }
         case 'raises':
           out.push(`<span${linkAttrs}>raises${tgtSummary ? ' "' + esc(tgtSummary) + '"' : ''}</span>`);
           break;
