@@ -203,10 +203,25 @@ window._mwLoadUserView = async function() {
       }
     }
 
+    // CMD-AEGIS-1.1: resolve firm_id once before the parallel fetch.
+    // Was previously inlined as `window.FIRM_ID||'aaaaaaaa-0001-...'`,
+    // which would query firm A's workflow_instances regardless of
+    // authenticated firm. Empty result on missing firm_id is safer
+    // than wrong-firm data; the rest of the dashboard fetches still
+    // succeed because they're scoped by resource_id, not firm_id.
+    const _firmId = window.FIRM_ID
+                 || (window.PHUD && window.PHUD.FIRM_ID)
+                 || null;
+    if (!_firmId) {
+      console.warn('[mw-core] firm_id unresolved; workflow_instances query will return []');
+    }
+
     const [myTasks, myActionItems, wfInstances, myTimeEntries, myWeek, completedThisWeek, resolvedThisWeek, myPendingReviews] = await Promise.all([
       API.get(`tasks?select=id,name,project_id,status,due_date,pct_complete,budget_hours,effort_days,actual_hours,actual_start,complexity_rating&assigned_to=eq.${_myResource.user_id}&status=neq.complete&order=created_at.desc&limit=200`).catch(() => []),
       API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
-      API.get(`workflow_instances?select=id,title,status,current_step_name,project_id,task_id&firm_id=eq.${window.FIRM_ID||'aaaaaaaa-0001-0001-0001-000000000001'}&status=in.(active,in_progress,pending,cancelled)&limit=200`).catch(() => []),
+      _firmId
+        ? API.get(`workflow_instances?select=id,title,status,current_step_name,project_id,task_id&firm_id=eq.${_firmId}&status=in.(active,in_progress,pending,cancelled)&limit=200`).catch(() => [])
+        : Promise.resolve([]),
       API.get(`time_entries?resource_id=eq.${resId}&order=date.desc&limit=200&select=id,date,hours,is_billable,project_id,task_id,step_name,source_type,notes,week_start_date`).catch(() => []),
       API.get(`timesheet_weeks?resource_id=eq.${resId}&week_start_date=eq.${weekStartDate}&select=id,status,total_hours,billable_hours,submitted_at,approved_at,approver_name,rejection_reason&limit=1`).catch(() => []),
       API.get(`tasks?select=id,name,updated_at&assigned_to=eq.${_myResource.user_id}&status=eq.complete&updated_at=gte.${weekStartDate}T00:00:00&limit=100`).catch(() => []),

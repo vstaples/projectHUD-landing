@@ -908,7 +908,14 @@
 'use strict';
 
 // ── Constants ─────────────────────────────────────────────
-const FIRM_ID = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+// CMD-AEGIS-1.1: hardcoded firm A fallback removed. Was previously:
+//   const FIRM_ID = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+// auth.js (CMD-AEGIS-1) populates window.PHUD.FIRM_ID + window.FIRM_ID
+// from the authenticated session before page-init reads. Compass page
+// reads should resolve via this chain; falling back to null instead of
+// a hardcoded UUID prevents silent firm-A leak when identity is not yet
+// resolved.
+const FIRM_ID = window.FIRM_ID || (window.PHUD && window.PHUD.FIRM_ID) || null;
 
 // ── State ─────────────────────────────────────────────────
 let _projects   = [];

@@ -2,8 +2,20 @@
 window._mwEventsVersion = 'v20260423-CMD78g2';
 console.log('%c[mw-events] v20260423-CMD78g2 — B-UI-9 v2.0: workflow_request.resolved emit gated on confirmed success (no more stale-queue UI on rollback)','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
-// Resolve FIRM_ID safely across page contexts
-function _mwFirmId() { try { return FIRM_ID; } catch(_) { return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001"; } }
+// Resolve FIRM_ID safely across page contexts.
+// CMD-AEGIS-1.1: hardcoded firm A fallback removed. Was previously:
+//   return window.FIRM_ID || "aaaaaaaa-0001-0001-0001-000000000001";
+// That fallback caused every session — regardless of authenticated firm —
+// to attribute mw-events writes to firm A. CMD-AEGIS-1 fixed cmd-center.js's
+// version of the same pattern; CMD-A6 surfaced this duplicate; CMD-AEGIS-1.1
+// closes it. Caller must handle null and either await Auth.ensureFirmId()
+// or fail the operation.
+function _mwFirmId() {
+  try { if (typeof FIRM_ID !== 'undefined' && FIRM_ID) return FIRM_ID; } catch(_) { /* ignore */ }
+  if (window.FIRM_ID)              return window.FIRM_ID;
+  if (window.PHUD && window.PHUD.FIRM_ID) return window.PHUD.FIRM_ID;
+  return null;
+}
 
 // ── B-UI-9 (CMD78e) — Approval-failure blocking modal ───────────────────────
 // Replaces the transient 4s compassToast that was auto-dismissing before the
@@ -533,10 +545,19 @@ window.saveInProgressUpdate = async function saveInProgressUpdate(itemId, projec
     const ps=[API.patch(`tasks?id=eq.${itemId}`,{pct_complete:pct,status,updated_at:new Date().toISOString()}).catch(()=>{})];
     if (hours>0&&_myResource?.id) {
       const id=crypto.randomUUID();
-      ps.push(API.post('time_entries',{id,firm_id:'aaaaaaaa-0001-0001-0001-000000000001',
-        resource_id:_myResource.id,user_id:_myResource.user_id||null,
-        project_id:projectId||null,task_id:itemId,source_type:'direct',
-        date:today,hours,is_billable:true}).catch(()=>{}));
+      // CMD-AEGIS-1.1: was firm_id:'aaaaaaaa-0001-...' literal — leaked time_entries
+      // to firm A regardless of authenticated firm. Now resolved via _mwFirmId().
+      // If firm_id can't be resolved, skip the time_entry write rather than
+      // mis-attribute it; the task patch above still succeeds.
+      const _firmId = _mwFirmId();
+      if (_firmId) {
+        ps.push(API.post('time_entries',{id,firm_id:_firmId,
+          resource_id:_myResource.id,user_id:_myResource.user_id||null,
+          project_id:projectId||null,task_id:itemId,source_type:'direct',
+          date:today,hours,is_billable:true}).catch(()=>{}));
+      } else {
+        console.warn('[mw-events] time_entry skipped: firm_id unresolved');
+      }
     }
     await Promise.all(ps);
     document.getElementById('inprogress-panel')?.remove();

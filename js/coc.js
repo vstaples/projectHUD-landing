@@ -97,7 +97,14 @@
 
   // ── Constants ────────────────────────────────────────────────────────────────
 
-  const FIRM_ID = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  // CMD-AEGIS-1.1: hardcoded firm A fallback removed. Was previously:
+  //   const FIRM_ID = window.FIRM_ID || 'aaaaaaaa-0001-0001-0001-000000000001';
+  // That fallback caused every CoC.write() — regardless of authenticated firm
+  // — to fall through to firm A's UUID. CMD-AEGIS-1 fixed cmd-center.js's
+  // version; CMD-A6 surfaced this duplicate; CMD-AEGIS-1.1 closes it.
+  // The variable is read at write-time (see write() below) so that a deferred
+  // identity resolution via Auth.ensureFirmId() is picked up automatically.
+  const FIRM_ID = (typeof window !== 'undefined' && window.FIRM_ID) || null;
 
   // ── Event vocabulary ─────────────────────────────────────────────────────────
   // Format: 'event_class.event_type'
@@ -294,6 +301,13 @@
    *   @param {string}  opts.outcome       'on_track'|'at_risk'|'blocked'|'resolved'|...
    *   @param {string}  opts.actorName     override resolved actor name
    *   @param {string}  opts.actorRole     override resolved actor role
+   *   @param {string}  opts.actorResourceId  override resolved actor_resource_id.
+   *                                          Use when the calling context has
+   *                                          already translated users.id →
+   *                                          resources.id (e.g. via the
+   *                                          accord_user_to_resource() helper).
+   *                                          Required pattern per Iron Rule 58
+   *                                          until _resolveActor() is refactored.
    *   @param {object}  opts.meta          metadata JSONB payload (legacy fields, etc.)
    *   @param {boolean} opts.silent        if true, suppress optimistic cache update
    * @returns {Promise<object>}  the written row
@@ -324,9 +338,22 @@
     }
     const now   = new Date().toISOString();
 
+    // CMD-AEGIS-1.1: resolve firm_id at write time. Without a hardcoded
+    // fallback, an unresolved firm_id would write a NULL row that either
+    // RLS-rejects or pollutes audit data. Fail-fast here with a clear
+    // diagnostic so callers see the problem immediately.
+    const _firmId = (typeof window !== 'undefined' && window.FIRM_ID)
+                 || ((typeof window !== 'undefined' && window.PHUD && window.PHUD.FIRM_ID))
+                 || FIRM_ID
+                 || null;
+    if (!_firmId) {
+      console.error('[CoC] write() aborted: firm_id unresolved. Caller should await Auth.ensureFirmId() before writing.', { typeKey, entityId });
+      return null;
+    }
+
     const row = {
       id:               crypto.randomUUID(),
-      firm_id:          window.FIRM_ID || FIRM_ID,
+      firm_id:          _firmId,
 
       // What
       event_class:      eventClass,
