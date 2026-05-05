@@ -327,17 +327,60 @@
   }
 
   // ── Signed URL resolution ────────────────────────────────────
+  // Build a one-shot supabase-js client with the user's JWT and use it to
+  // mint a signed URL. window.supabase is the supabase-js factory (with
+  // createClient method), not a client instance — accord-core.js line 347
+  // uses the same pattern.
+  let _signClient = null;
+  async function _signClientGet() {
+    if (_signClient) return _signClient;
+    if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+      // Wait for supabase-js to load (mirrors accord-core's polling pattern)
+      let waits = 0;
+      while ((!window.supabase || typeof window.supabase.createClient !== 'function') && waits < 40) {
+        await new Promise(r => setTimeout(r, 50));
+        waits++;
+      }
+    }
+    if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+      console.warn('[Accord-minutes] supabase-js factory unavailable for signed URL');
+      return null;
+    }
+    const url = (window.PHUD && window.PHUD.SUPABASE_URL) || null;
+    const key = (window.PHUD && window.PHUD.SUPABASE_KEY) || null;
+    if (!url || !key) {
+      console.warn('[Accord-minutes] PHUD.SUPABASE_URL/KEY missing');
+      return null;
+    }
+    _signClient = window.supabase.createClient(url, key, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    // Inject current JWT so storage RLS sees the authenticated user
+    try {
+      const token = await Auth.getFreshToken().catch(() => Auth.getToken());
+      if (token && _signClient.auth?.setSession) {
+        await _signClient.auth.setSession({ access_token: token, refresh_token: token });
+      } else if (token && _signClient.realtime?.setAuth) {
+        _signClient.realtime.setAuth(token);
+      }
+    } catch (e) {
+      console.warn('[Accord-minutes] auth injection failed (storage RLS may reject)', e);
+    }
+    return _signClient;
+  }
+
   async function _signedUrlFor(renderRow) {
     if (!renderRow?.storage_path) return null;
     try {
-      // PostgREST doesn't sign URLs directly. Use the supabase-js client if
-      // available; else fall back to public URL (requires bucket to be public).
-      // Our bucket is private — supabase-js storage client is the right path.
-      const sb = window.supabase || Accord?.state?.supabase;
-      if (!sb) {
-        console.warn('[Accord-minutes] supabase client unavailable for signed URL');
-        return null;
-      }
+      const sb = await _signClientGet();
+      if (!sb) return null;
+      // Refresh the JWT each call so the RLS check runs against current identity
+      try {
+        const token = await Auth.getFreshToken().catch(() => Auth.getToken());
+        if (token && sb.auth?.setSession) {
+          await sb.auth.setSession({ access_token: token, refresh_token: token });
+        }
+      } catch (_) { /* fall through */ }
       const { data, error } = await sb.storage
         .from('accord-minutes')
         .createSignedUrl(renderRow.storage_path, 3600);
