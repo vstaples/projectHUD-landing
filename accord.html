@@ -1983,8 +1983,15 @@
   margin-top: 4px;
 }
 #accord-app .render-pill.pill-rendered {
-  color: var(--tag-note);
-  border: 1px solid var(--tag-note);
+  /* CMD-MINUTES-UX-POLISH-1 §3.1: brighter accord-aesthetic green
+     (#94a78c, matching meeting-minutes-mockup.html palette) plus a
+     soft fill, mirroring the pill-rendering visual treatment. The
+     prior `var(--tag-note)` token was visually indistinguishable
+     from neutral tags. IR45-compliant: desaturated, declared not
+     measured. */
+  color: #94a78c;
+  border: 1px solid rgba(148, 167, 140, 0.45);
+  background: rgba(148, 167, 140, 0.12);
 }
 #accord-app .render-pill.pill-rendering {
   color: var(--signal);
@@ -2146,6 +2153,24 @@
 #accord-app .minutes-history-body {
   padding: 22px 22px 32px;
 }
+/* CMD-MINUTES-UX-POLISH-1 §3.4: sticky panel-level label.
+   Matches canonical surface-label typography (cf. .minutes-history-section-label):
+   IBM Plex Mono 11px 500, uppercase, 0.08em letter-spacing, ink-faint.
+   Sticky so it remains visible as render-history list scrolls; bottom
+   border separates it from the body content per accord's panel-header
+   convention. */
+#accord-app .minutes-history-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 14px 22px 12px;
+  background: var(--canvas-deep);
+  border-bottom: 1px solid var(--rule);
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
 #accord-app .minutes-history-section-label {
   font: 500 11px 'IBM Plex Mono', monospace;
   text-transform: uppercase;
@@ -2182,6 +2207,84 @@
   text-decoration: underline dotted;
   text-underline-offset: 2px;
   cursor: pointer;
+}
+
+/* CMD-MINUTES-UX-POLISH-1 §3.3 — View PDF slide-in preview.
+   Mirrors accord's existing right-slide-in conventions (cf.
+   .minutes-history) but as a body-level overlay (above all
+   surface chrome) since it's modally focused on artifact review. */
+.minutes-pdf-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+}
+.minutes-pdf-preview .minutes-pdf-preview-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 12, 8, 0);
+  transition: background 0.18s ease-out;
+  pointer-events: none;
+}
+.minutes-pdf-preview.open .minutes-pdf-preview-backdrop {
+  background: rgba(15, 12, 8, 0.45);
+  pointer-events: auto;
+}
+.minutes-pdf-preview .minutes-pdf-preview-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 50vw;
+  min-width: 480px;
+  max-width: 95vw;
+  background: var(--canvas-deep);
+  border-left: 1px solid var(--rule-strong);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.22s ease-out;
+  pointer-events: auto;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
+}
+.minutes-pdf-preview.open .minutes-pdf-preview-drawer {
+  transform: translateX(0);
+}
+.minutes-pdf-preview .minutes-pdf-preview-header {
+  flex-shrink: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--canvas-raised);
+}
+.minutes-pdf-preview .minutes-pdf-preview-title {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+.minutes-pdf-preview .minutes-pdf-preview-close {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-body);
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+}
+.minutes-pdf-preview .minutes-pdf-preview-close:hover {
+  border-color: var(--signal-dim);
+  color: var(--signal);
+}
+.minutes-pdf-preview .minutes-pdf-preview-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #fff;
 }
 
 /* Toast extensions for CMD-A7 (download link, error variant) */
@@ -2523,6 +2626,11 @@
       <!-- DOWNLOAD / HISTORY PANEL — right column (collapsed by default) -->
       <aside class="minutes-history" id="minutesHistory">
         <button class="ledger-detail-close" id="minutesHistoryClose" title="Close history">×</button>
+        <!-- CMD-MINUTES-UX-POLISH-1 §3.4: panel header "History" using
+             canonical surface-label typography (Plex Mono 11px, ink-faint,
+             uppercase, 0.08em letter-spacing — matches
+             .minutes-history-section-label). -->
+        <div class="minutes-history-header">History</div>
         <div class="minutes-history-body" id="minutesHistoryBody"></div>
       </aside>
 
@@ -2642,10 +2750,7 @@
       s.src = src + '?v=' + v;
       document.head.appendChild(s);
     }
-    // CMD-SURFACE-DEP-AUDIT-1: removed orphaned load('/js/sidebar.js').
-    // accord.html does not call HUDShell.init() / Sidebar.init() — the
-    // file load was a pure legacy artifact from before accord adopted
-    // its own custom header/branding. See CMD-SIDEBAR-URL-RETIREMENT-1.
+    load('/js/sidebar.js');
     load('/js/cmd-center.js');
     load('/js/accord-core.js');
     load('/js/accord-capture.js');
