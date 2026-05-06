@@ -5155,7 +5155,12 @@ function _wirePanel() {
   };
 
   // CMD-AEGIS-PLAYBOOK-FOUNDATION: lifecycle buttons.
-  p.querySelector('#phr-publish-pb').onclick = async function() {
+  // Null-guarded: aegis.html's #aegis-cmd-panel markup may not include
+  // these buttons (they're in cmd-center's inline floating-panel markup
+  // only). Aegis-mode panels can wire them after operator opens Editor
+  // — for v1, lifecycle is editor-tab-only in floating mode.
+  var publishBtn = p.querySelector('#phr-publish-pb');
+  if (publishBtn) publishBtn.onclick = async function() {
     if (!_activePlaybookId) { alert('No playbook loaded'); return; }
     var pb = _playbooks[_activePlaybookId];
     if (!pb) { alert('Playbook row not found locally'); return; }
@@ -5181,7 +5186,8 @@ function _wirePanel() {
     }
   };
 
-  p.querySelector('#phr-edit-pb').onclick = async function() {
+  var editBtn = p.querySelector('#phr-edit-pb');
+  if (editBtn) editBtn.onclick = async function() {
     if (!_activePlaybookId) return;
     var pb = _playbooks[_activePlaybookId];
     if (!pb || pb.state !== 'published') { alert('Edit only valid on published rows'); return; }
@@ -5198,7 +5204,8 @@ function _wirePanel() {
     }
   };
 
-  p.querySelector('#phr-archive-pb').onclick = async function() {
+  var archiveBtn = p.querySelector('#phr-archive-pb');
+  if (archiveBtn) archiveBtn.onclick = async function() {
     if (!_activePlaybookId) return;
     var pb = _playbooks[_activePlaybookId];
     if (!pb) return;
@@ -5213,7 +5220,8 @@ function _wirePanel() {
     }
   };
 
-  p.querySelector('#phr-restore-pb').onclick = async function() {
+  var restoreBtn = p.querySelector('#phr-restore-pb');
+  if (restoreBtn) restoreBtn.onclick = async function() {
     if (!_activePlaybookId) return;
     var pb = _playbooks[_activePlaybookId];
     if (!pb || pb.state !== 'archived') { alert('Restore only valid on archived rows'); return; }
@@ -5262,16 +5270,16 @@ function _wirePanel() {
   // Update lifecycle button visibility based on _activePlaybookId state.
   function _updateLifecycleButtons() {
     var pubBtn = p.querySelector('#phr-publish-pb');
+    if (!pubBtn) return; // markup not present in this surface
     var editBtn = p.querySelector('#phr-edit-pb');
     var arcBtn = p.querySelector('#phr-archive-pb');
     var resBtn = p.querySelector('#phr-restore-pb');
-    if (!pubBtn) return;
     var pb = _activePlaybookId ? _playbooks[_activePlaybookId] : null;
     var state = pb ? pb.state : null;
     pubBtn.style.display  = (state === 'draft')                                 ? '' : 'none';
-    editBtn.style.display = (state === 'published')                             ? '' : 'none';
-    arcBtn.style.display  = (state === 'published' || state === 'superseded')   ? '' : 'none';
-    resBtn.style.display  = (state === 'archived')                              ? '' : 'none';
+    if (editBtn) editBtn.style.display = (state === 'published')                ? '' : 'none';
+    if (arcBtn)  arcBtn.style.display  = (state === 'published' || state === 'superseded') ? '' : 'none';
+    if (resBtn)  resBtn.style.display  = (state === 'archived')                 ? '' : 'none';
   }
   // Expose for re-use after script-name input changes
   p._updateLifecycleButtons = _updateLifecycleButtons;
@@ -6145,10 +6153,23 @@ async function _init() {
     FIRM_ID = window.PHUD.FIRM_ID;
   }
   if (!FIRM_ID) {
+    // CMD-AUTH-INIT-RACE: distinguish three failure modes so operators
+    // can triage cold-load issues without reading source. The fail-fast
+    // behavior itself is preserved (function returns early without
+    // subscribing to any presence channel) — CMD-AEGIS-1's cross-firm
+    // isolation holds. No fallback firm_id is ever introduced.
+    var _authLoaded = (typeof Auth !== 'undefined') &&
+                      !!window._phudFirmIdReady;
+    var _hasJwt = _authLoaded && !!Auth.getCurrentUserId();
+    var _detail = !_authLoaded
+      ? 'auth.js was not loaded on this page'
+      : !_hasJwt
+        ? 'no authenticated session'
+        : 'authenticated user has no firm_id (check users table)';
     console.error(
-      '[cmd-center] auth.js did not populate window.PHUD.FIRM_ID; ' +
+      '[cmd-center] FIRM_ID could not be established: ' + _detail + '. ' +
       'cmd-center.js cannot initialize; presence and command features unavailable. ' +
-      '(See brief CMD-AEGIS-1 §6.)'
+      '(See brief CMD-AEGIS-1 §6 / CMD-AUTH-INIT-RACE.)'
     );
     window._cmdCenterUninitialized = true;
     return;
