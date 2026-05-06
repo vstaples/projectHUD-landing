@@ -1,17 +1,24 @@
 // ============================================================
 // ProjectHUD — accord-minutes.js
-// CMD-PROJECTION-ENGINE-2 · Minutes surface
+// CMD-MINUTES-TEST-INFRA-1 · Minutes surface
+//
+// CMD-MINUTES-TEST-INFRA-1 changes (client-only; IR65 does NOT fire):
+//   1. Console echo on _selectMeeting() emitting structured object
+//      (test-infrastructure prerequisite for CMD-AEGIS-CMD-RUNNER).
+//   2. Humanized download filenames via _composeFilename()
+//      (<title-slug>-<template_id>.<ext>; fallback for empty title).
+//   3. (No template body change; RENDER_VERSION constant unchanged.)
 //
 // Read-only surface over sealed meetings + accord_minutes_renders.
 // Drives template-dispatched rendering via the render-minutes
 // Edge Function (projection engine).
 //
-// Four templates available (CMD-PROJECTION-ENGINE-2):
-//   - technical-briefing  (NEW; formal-governance Minutes,
+// Four templates available (per CMD-PROJECTION-ENGINE-2):
+//   - technical-briefing  (formal-governance Minutes,
 //                          mockup-aligned full record)
-//   - working-session     (renamed from CMD-1's
-//                          'technical-briefing'; lightweight
-//                          Minutes for informal sessions)
+//   - working-session     (lightweight Minutes for informal
+//                          sessions; default for omitted
+//                          template_id)
 //   - executive-briefing  (one-page summary; KPI strip; angles)
 //   - personal-digest     (addressed-to-reader; per-recipient)
 //
@@ -23,6 +30,7 @@
 //   - IR52 IIFE-wrapped, public surface namespaced
 //   - IR54 SELECT-after-mutation in render polling
 //   - IR64 codebase-as-spec
+//   - IR65 dual-pin discipline (does not fire here; client-only)
 // ============================================================
 
 (() => {
@@ -231,6 +239,17 @@
 
   async function _selectMeeting(meetingId) {
     local.activeMeeting = meetingId;
+    // Structured echo for test-infrastructure consumers (CMD-MINUTES-TEST-INFRA-1).
+    // Object form (not string) — Aegis runner scripts depend on parsing this.
+    const _m = local.meetings.find(x => x.meeting_id === meetingId);
+    if (_m) {
+      console.log('[Accord-minutes] meeting selected:', {
+        meeting_id:   _m.meeting_id,
+        title:        _m.title || null,
+        sealed_at:    _m.sealed_at || null,
+        render_count: (local.renders[_m.meeting_id] || []).length,
+      });
+    }
     document.querySelectorAll('#minutesMeetingList .minutes-meeting-row').forEach(r => {
       r.classList.toggle('active', r.dataset.meetingId === meetingId);
     });
@@ -356,7 +375,7 @@
     if (dlBtn && tplSuccess) {
       dlBtn.addEventListener('click', async (ev) => {
         ev.preventDefault();
-        const url = await _signedUrlFor(tplSuccess);
+        const url = await _signedUrlFor(tplSuccess, m);
         if (url) window.open(url, '_blank', 'noopener');
       });
     }
@@ -413,7 +432,7 @@
         const rid = a.getAttribute('data-render-id');
         const r = arr.find(x => x.render_id === rid);
         if (!r) return;
-        const url = await _signedUrlFor(r);
+        const url = await _signedUrlFor(r, m);
         if (url) window.open(url, '_blank', 'noopener');
       });
     });
@@ -483,7 +502,28 @@
     return _signClient;
   }
 
-  async function _signedUrlFor(renderRow) {
+  // ── Filename composition (CMD-MINUTES-TEST-INFRA-1) ──────────
+  // Humanized filename for downloaded artifacts:
+  //   <title-slug>-<template_id>.<ext>
+  // Falls back to meeting-<id-prefix>-<template_id>.<ext> when
+  // the title is empty or sanitizes to nothing.
+  function _composeFilename(meeting, templateId, fileExt) {
+    const ext = (fileExt || 'html').replace(/^\.+/, '');
+    const tpl = templateId || DEFAULT_TEMPLATE;
+    const rawTitle = (meeting && meeting.title) ? String(meeting.title) : '';
+    const slug = rawTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 60);
+    if (slug) return `${slug}-${tpl}.${ext}`;
+    const idPrefix = meeting && meeting.meeting_id
+      ? String(meeting.meeting_id).substring(0, 8)
+      : 'unknown';
+    return `meeting-${idPrefix}-${tpl}.${ext}`;
+  }
+
+  async function _signedUrlFor(renderRow, meeting) {
     if (!renderRow?.storage_path) return null;
     try {
       const sb = await _signClientGet();
@@ -495,7 +535,14 @@
           await sb.auth.setSession({ access_token: token, refresh_token: token });
         }
       } catch (_) { /* fall through */ }
-      const filename = renderRow.storage_path.split('/').pop() || 'minutes';
+      // Derive file extension from the storage path tail.
+      const pathTail = renderRow.storage_path.split('/').pop() || '';
+      const dotIdx = pathTail.lastIndexOf('.');
+      const fileExt = dotIdx > 0 ? pathTail.substring(dotIdx + 1) : 'html';
+      // Humanized filename if a meeting is provided; else legacy fallback.
+      const filename = meeting
+        ? _composeFilename(meeting, renderRow.template_id, fileExt)
+        : (pathTail || 'minutes');
       const { data, error } = await sb.storage
         .from('accord-minutes')
         .createSignedUrl(renderRow.storage_path, 3600, { download: filename });
@@ -726,5 +773,5 @@
     TEMPLATES:      TEMPLATES,
   };
 
-  console.log('[Accord] minutes surface module loaded (CMD-PROJECTION-ENGINE-2)');
+  console.log('[Accord] minutes surface module loaded (CMD-MINUTES-TEST-INFRA-1)');
 })();
