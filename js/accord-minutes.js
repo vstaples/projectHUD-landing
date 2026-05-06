@@ -1,36 +1,18 @@
 // ============================================================
 // ProjectHUD — accord-minutes.js
-// CMD-MINUTES-TEST-INFRA-1 · Minutes surface
-//
-// CMD-MINUTES-TEST-INFRA-1 changes (client-only; IR65 does NOT fire):
-//   1. Console echo on _selectMeeting() emitting structured object
-//      (test-infrastructure prerequisite for CMD-AEGIS-CMD-RUNNER).
-//   2. Humanized download filenames via _composeFilename()
-//      (<title-slug>-<template_id>.<ext>; fallback for empty title).
-//   3. (No template body change; RENDER_VERSION constant unchanged.)
+// CMD-A7 · Minutes surface
 //
 // Read-only surface over sealed meetings + accord_minutes_renders.
-// Drives template-dispatched rendering via the render-minutes
-// Edge Function (projection engine).
+// Drives PDF generation via the render-minutes Edge Function.
+// History panel shows full render provenance per meeting.
 //
-// Four templates available (per CMD-PROJECTION-ENGINE-2):
-//   - technical-briefing  (formal-governance Minutes,
-//                          mockup-aligned full record)
-//   - working-session     (lightweight Minutes for informal
-//                          sessions; default for omitted
-//                          template_id)
-//   - executive-briefing  (one-page summary; KPI strip; angles)
-//   - personal-digest     (addressed-to-reader; per-recipient)
-//
-// Doctrinal commitments preserved:
+// Doctrinal commitments:
 //   - IR42 sealed-only render (substrate read filter)
 //   - IR45 declared belief; never confidence/probability
 //   - IR47 explicit accord_* PK names (render_id, meeting_id)
-//   - IR51 chip/badge/picker classes decided at construction
+//   - IR51 chip/badge classes decided at construction
 //   - IR52 IIFE-wrapped, public surface namespaced
 //   - IR54 SELECT-after-mutation in render polling
-//   - IR64 codebase-as-spec
-//   - IR65 dual-pin discipline (does not fire here; client-only)
 // ============================================================
 
 (() => {
@@ -38,42 +20,14 @@
 
   const $ = id => document.getElementById(id);
 
-  // ── Template registry (UI-side; mirrors Edge Function) ───────
-  // Order matters: this is the order shown in the picker.
-  const TEMPLATES = [
-    { id: 'technical-briefing', label: 'Technical Briefing', short: 'Technical' },
-    { id: 'working-session',    label: 'Working Session',    short: 'Working'   },
-    { id: 'executive-briefing', label: 'Executive Briefing', short: 'Executive' },
-    { id: 'personal-digest',    label: 'Personal Digest',    short: 'Personal'  },
-  ];
-  // Default omitted-template behavior matches the Edge Function:
-  // 'working-session' (the renamed CMD-1 template). The new
-  // formal-governance Technical Briefing is opt-in via picker.
-  const DEFAULT_TEMPLATE = 'working-session';
-  // Pre-CMD-2 legacy rows lacking template_id were written
-  // under CMD-1's 'technical-briefing' label. Those rows have
-  // been migrated to 'working-session' by the SQL migration,
-  // but if any race-window legacy row still surfaces with no
-  // template_id at all, we treat it as Working Session.
-  const LEGACY_FALLBACK_TEMPLATE = 'working-session';
-  function _templateLabel(id) {
-    const t = TEMPLATES.find(t => t.id === id);
-    return t ? t.label : (id || 'Working Session');
-  }
-  function _templateShort(id) {
-    const t = TEMPLATES.find(t => t.id === id);
-    return t ? t.short : (id || 'Working');
-  }
-
   // ── Local state ──────────────────────────────────────────────
   const local = {
-    initialized:      false,
-    meetings:         [],       // sealed meetings
-    renders:          {},       // { meeting_id: [render_row, ...] }
-    activeMeeting:    null,
-    activeFilter:     'all',    // 'all' | 'rendered' | 'not_yet' | 'failed'
-    activeTemplate:   DEFAULT_TEMPLATE,
-    inProgress:       new Set(),// meeting_ids currently rendering (optimistic UI)
+    initialized:    false,
+    meetings:       [],       // sealed meetings
+    renders:        {},       // { meeting_id: [render_row, ...] }
+    activeMeeting:  null,
+    activeFilter:   'all',    // 'all' | 'rendered' | 'not_yet' | 'failed'
+    inProgress:     new Set(),// meeting_ids currently rendering (optimistic UI)
   };
 
   const esc = s => Accord._esc ? Accord._esc(s) : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -138,9 +92,6 @@
   }
 
   // ── Per-meeting status derivation ────────────────────────────
-  // Status is per meeting (any successful render of any template
-  // counts as "rendered"). The picker drives which template the
-  // next Generate/Re-render call uses.
   function _latestRender(meetingId) {
     const arr = local.renders[meetingId] || [];
     return arr[0] || null; // already sorted desc
@@ -148,13 +99,6 @@
   function _latestSuccess(meetingId) {
     const arr = local.renders[meetingId] || [];
     return arr.find(r => r.status === 'success') || null;
-  }
-  // Latest successful render for a SPECIFIC template — used by
-  // the status card's Download/Print buttons so they target the
-  // currently-selected template.
-  function _latestSuccessForTemplate(meetingId, templateId) {
-    const arr = local.renders[meetingId] || [];
-    return arr.find(r => r.status === 'success' && (r.template_id || DEFAULT_TEMPLATE) === templateId) || null;
   }
   function _statusFor(meetingId) {
     if (local.inProgress.has(meetingId)) return 'rendering';
@@ -170,7 +114,7 @@
   function _renderRail() {
     const el = $('minutesMeetingList');
     if (!local.meetings.length) {
-      el.innerHTML = '<div style="color:var(--ink-faint);font-size:12px;padding:16px 4px;font-style:italic">No sealed meetings yet.</div>';
+      el.innerHTML = '<div style="color:var(--ink-faint);font-size:11px;padding:16px 4px;font-style:italic">No sealed meetings yet.</div>';
       return;
     }
     const f = local.activeFilter;
@@ -183,7 +127,7 @@
       return false;
     });
     if (!visible.length) {
-      el.innerHTML = '<div style="color:var(--ink-faint);font-size:12px;padding:16px 4px;font-style:italic">No meetings match filter.</div>';
+      el.innerHTML = '<div style="color:var(--ink-faint);font-size:11px;padding:16px 4px;font-style:italic">No meetings match filter.</div>';
       return;
     }
     el.innerHTML = visible.map(m => {
@@ -199,6 +143,15 @@
       const sealedFmt = m.sealed_at
         ? new Date(m.sealed_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
         : '';
+      // CMD-MINUTES-UX-POLISH-1 §3.5: short meeting_id prefix in rail-card
+      // metadata for cross-reference during testing. Prepended to existing
+      // sealed-date in the same .meeting-meta line, separated by middle-dot
+      // (canonical accord secondary-metadata separator). Typography
+      // unchanged — .meeting-meta already uses Plex Mono 11px ink-faint.
+      const idPrefix = (m.meeting_id || '').slice(0, 8);
+      const metaText = idPrefix
+        ? `${idPrefix} · ${sealedFmt}`
+        : sealedFmt;
       const cls = ['minutes-meeting-row'];
       if (m.meeting_id === local.activeMeeting) cls.push('active');
       const pillText =
@@ -209,7 +162,7 @@
       return `
         <div class="${cls.join(' ')}" data-meeting-id="${m.meeting_id}">
           <div class="meeting-title">${esc(m.title || 'Untitled')}</div>
-          <div class="meeting-meta">${esc(sealedFmt)}</div>
+          <div class="meeting-meta">${esc(metaText)}</div>
           <span class="${pillClass}">${esc(pillText)}</span>
         </div>`;
     }).join('');
@@ -239,17 +192,6 @@
 
   async function _selectMeeting(meetingId) {
     local.activeMeeting = meetingId;
-    // Structured echo for test-infrastructure consumers (CMD-MINUTES-TEST-INFRA-1).
-    // Object form (not string) — Aegis runner scripts depend on parsing this.
-    const _m = local.meetings.find(x => x.meeting_id === meetingId);
-    if (_m) {
-      console.log('[Accord-minutes] meeting selected:', {
-        meeting_id:   _m.meeting_id,
-        title:        _m.title || null,
-        sealed_at:    _m.sealed_at || null,
-        render_count: (local.renders[_m.meeting_id] || []).length,
-      });
-    }
     document.querySelectorAll('#minutesMeetingList .minutes-meeting-row').forEach(r => {
       r.classList.toggle('active', r.dataset.meetingId === meetingId);
     });
@@ -263,7 +205,7 @@
     $('minutesStatus').innerHTML =
       '<div class="minutes-empty-cta">' +
       '<div><h3 style="font-family:Fraunces,serif;font-weight:600;font-size:18px;color:var(--ink-muted);margin-bottom:6px">Select a sealed meeting from the rail.</h3>' +
-      '<p style="font-size:12px;color:var(--ink-faint);max-width:380px;line-height:1.55">Minutes renders the sealed Chain of Custody record as a citable, cryptographically-anchored PDF. Four templates are available: Technical Briefing, Working Session, Executive Briefing, and Personal Digest.</p></div></div>';
+      '<p style="font-size:12px;color:var(--ink-faint);max-width:380px;line-height:1.55">Minutes renders the sealed Chain of Custody record as a citable, cryptographically-anchored PDF.</p></div></div>';
     document.querySelector('#accord-app .minutes-body')?.classList.remove('history-open');
   }
 
@@ -273,68 +215,49 @@
     if (!m) { _renderEmptyStatus(); return; }
 
     const status = _statusFor(m.meeting_id);
-    // CTA buttons target the currently selected template; if no
-    // success exists for that template yet, show Generate (even
-    // when other templates have been rendered).
-    const tplSuccess = _latestSuccessForTemplate(m.meeting_id, local.activeTemplate);
-    const anySuccess = _latestSuccess(m.meeting_id);
-    const latest     = _latestRender(m.meeting_id);
+    const latestSuccess = _latestSuccess(m.meeting_id);
+    const latest = _latestRender(m.meeting_id);
 
     const sealedFmt = m.sealed_at
       ? new Date(m.sealed_at).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })
       : '';
 
-    // Template picker (IR51: classes/labels decided at construction)
-    const pickerHtml = `
-      <div class="minutes-template-picker">
-        <div class="picker-label">Template</div>
-        <div class="picker-row" id="minutesTemplatePicker">
-          ${TEMPLATES.map(t => {
-            const active = t.id === local.activeTemplate;
-            const cls = ['picker-chip'];
-            if (active) cls.push('active');
-            return `<button class="${cls.join(' ')}" data-template-id="${t.id}">${esc(t.label)}</button>`;
-          }).join('')}
-        </div>
-      </div>`;
-
     // CTA construction (IR51: classes/labels decided here)
     let ctaHtml = '';
-    if (status === 'rendering') {
+    if (status === 'not_yet') {
+      ctaHtml = `<button class="minutes-action-btn" id="minutesGenerateBtn">Generate</button>
+                 <span class="muted" style="font-size:11px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace">Renders the sealed substrate as a PDF</span>`;
+    } else if (status === 'rendering') {
       ctaHtml = `<button class="minutes-action-btn" disabled>Rendering…</button>
-                 <span class="muted" style="font-size:12px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace">PDF generation in progress</span>`;
-    } else if (tplSuccess) {
-      // This template has a successful render — show download / print / re-render
-      const dlBtnHtml = tplSuccess.storage_path
+                 <span class="muted" style="font-size:11px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace">PDF generation in progress</span>`;
+    } else if (status === 'rendered') {
+      const dl = (latestSuccess && latestSuccess.storage_path)
         ? `<a class="minutes-action-btn" id="minutesDownloadBtn" target="_blank" rel="noopener">Download PDF</a>`
         : '<button class="minutes-action-btn" disabled>Download unavailable</button>';
-      const printBtnHtml = tplSuccess.storage_path
-        ? `<button class="minutes-action-btn" id="minutesPrintBtn" title="Open in new window and trigger your browser's Save as PDF dialog"><span aria-hidden="true" style="margin-right:6px">🖨</span>Print / Save as PDF</button>`
+      // CMD-MINUTES-UX-POLISH-1 §3.3: View PDF opens an in-surface slide-in
+      // preview panel against the same signed URL as Download. CMD-MINUTES-
+      // UX-POLISH-1 §3.2: "Print / Save as PDF" → "Print" (Download already
+      // covers Save-as-PDF semantically).
+      const viewBtn = (latestSuccess && latestSuccess.storage_path)
+        ? `<button class="minutes-action-btn" id="minutesViewBtn" title="Preview the rendered PDF inline"><span aria-hidden="true" style="margin-right:6px">👁</span>View PDF</button>`
         : '';
-      ctaHtml = `${dlBtnHtml}
-                 ${printBtnHtml}
+      const printBtn = (latestSuccess && latestSuccess.storage_path)
+        ? `<button class="minutes-action-btn" id="minutesPrintBtn" title="Open in new window and trigger your browser's print dialog"><span aria-hidden="true" style="margin-right:6px">🖨</span>Print</button>`
+        : '';
+      ctaHtml = `${dl}
+                 ${viewBtn}
+                 ${printBtn}
                  <button class="minutes-action-btn btn-ghost" id="minutesRerenderBtn">Re-render</button>`;
-    } else if (status === 'failed' && (latest?.template_id || DEFAULT_TEMPLATE) === local.activeTemplate) {
+    } else if (status === 'failed') {
       const reason = latest?.failure_reason || 'unknown error';
-      ctaHtml = `<button class="minutes-action-btn" id="minutesGenerateBtn">Retry ${esc(_templateShort(local.activeTemplate))}</button>
-                 <span class="muted" style="font-size:12px;color:var(--tag-risk);font-family:'IBM Plex Mono',monospace">Last render failed: ${esc(reason.slice(0, 100))}</span>`;
-    } else {
-      // No success yet for this template
-      const otherSuccessNote = anySuccess
-        ? `<span class="muted" style="font-size:12px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace">Other templates already rendered for this meeting</span>`
-        : `<span class="muted" style="font-size:12px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace">Renders the sealed substrate as a PDF</span>`;
-      ctaHtml = `<button class="minutes-action-btn" id="minutesGenerateBtn">Generate ${esc(_templateShort(local.activeTemplate))}</button>
-                 ${otherSuccessNote}`;
+      ctaHtml = `<button class="minutes-action-btn" id="minutesGenerateBtn">Retry</button>
+                 <span class="muted" style="font-size:11px;color:var(--tag-risk);font-family:'IBM Plex Mono',monospace">Last render failed: ${esc(reason.slice(0, 100))}</span>`;
     }
 
-    // Fingerprint shows the merkle root of the latest success of
-    // this template (or fall back to any successful render, or to
-    // the meeting's own merkle root if nothing has rendered yet).
-    const fpSource = tplSuccess || anySuccess;
-    const fingerprint = (fpSource?.merkle_root_at_render || m.merkle_root || '').slice(0, 64);
+    const fingerprint = (latestSuccess?.merkle_root_at_render || m.merkle_root || '').slice(0, 64);
     const fingerprintHtml = fingerprint
       ? `<div style="margin-top:14px">
-           <div class="label" style="font:500 12px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-faint);margin-bottom:4px">Merkle root at render</div>
+           <div class="label" style="font:500 11px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-faint);margin-bottom:4px">Merkle root at render</div>
            <div class="minutes-current-fingerprint">${esc(fingerprint)}</div>
          </div>`
       : '';
@@ -344,84 +267,58 @@
         <h2>${esc(m.title || 'Untitled')}</h2>
         <div class="minutes-status-meta">
           <span class="meta-pill">Sealed ${esc(sealedFmt)}</span>
-          ${tplSuccess
-            ? `<span class="meta-pill">Last rendered ${esc(new Date(tplSuccess.rendered_at).toLocaleString())}</span>
-               <span class="meta-pill">${esc(tplSuccess.render_version || '')}</span>`
+          ${latestSuccess
+            ? `<span class="meta-pill">Last rendered ${esc(new Date(latestSuccess.rendered_at).toLocaleString())}</span>
+               <span class="meta-pill">${esc(latestSuccess.render_version || '')}</span>`
             : ''}
         </div>
-        ${pickerHtml}
         <div class="minutes-cta-row">${ctaHtml}</div>
         ${fingerprintHtml}
       </div>
     `;
 
-    // Wire picker
-    const pickerEl = $('minutesTemplatePicker');
-    if (pickerEl) {
-      pickerEl.querySelectorAll('.picker-chip').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const newTemplate = btn.dataset.templateId;
-          if (!newTemplate || newTemplate === local.activeTemplate) return;
-          local.activeTemplate = newTemplate;
-          _renderStatus();
-        });
-      });
-    }
-
     // Wire CTAs
     $('minutesGenerateBtn')?.addEventListener('click', () => _generate(m.meeting_id, false));
     $('minutesRerenderBtn')?.addEventListener('click', () => _openRerenderModal(m));
     const dlBtn = $('minutesDownloadBtn');
-    if (dlBtn && tplSuccess) {
+    if (dlBtn && latestSuccess) {
       dlBtn.addEventListener('click', async (ev) => {
         ev.preventDefault();
-        const url = await _signedUrlFor(tplSuccess, m);
+        const url = await _signedUrlFor(latestSuccess);
         if (url) window.open(url, '_blank', 'noopener');
       });
     }
     const prBtn = $('minutesPrintBtn');
-    if (prBtn && tplSuccess) {
-      prBtn.addEventListener('click', () => _printToPdf(tplSuccess));
+    if (prBtn && latestSuccess) {
+      prBtn.addEventListener('click', () => _printToPdf(latestSuccess));
+    }
+    // CMD-MINUTES-UX-POLISH-1 §3.3: View PDF opens slide-in preview.
+    const vwBtn = $('minutesViewBtn');
+    if (vwBtn && latestSuccess) {
+      vwBtn.addEventListener('click', () => _openPdfPreview(latestSuccess));
     }
   }
 
   // ── History panel (right column) ─────────────────────────────
-  // Grouped by template_id per brief §7 / §6.6.
   function _renderHistory() {
     const m = local.meetings.find(x => x.meeting_id === local.activeMeeting);
     const body = $('minutesHistoryBody');
     if (!m) { body.innerHTML = ''; return; }
     const arr = local.renders[m.meeting_id] || [];
-
-    // Group by template_id; missing template_id (legacy rows) → DEFAULT_TEMPLATE
-    const byTemplate = {};
-    TEMPLATES.forEach(t => { byTemplate[t.id] = []; });
-    arr.forEach(r => {
-      const tid = r.template_id || DEFAULT_TEMPLATE;
-      if (!byTemplate[tid]) byTemplate[tid] = [];
-      byTemplate[tid].push(r);
-    });
+    const latestSuccess = _latestSuccess(m.meeting_id);
 
     let inner = '';
-    if (!arr.length) {
-      inner = `<div class="minutes-history-section-label">Render history</div>
-               <div style="font-size:13px;color:var(--ink-faint);font-style:italic">No renders yet.</div>`;
+    if (latestSuccess) {
+      inner += `
+        <div class="minutes-history-section-label">Current render</div>
+        ${_renderHistoryRow(latestSuccess, true)}`;
+    }
+    if (arr.length) {
+      inner += `<div class="minutes-history-section-label" style="margin-top:18px">Render history (${arr.length})</div>`;
+      inner += arr.map(r => _renderHistoryRow(r, r.render_id === latestSuccess?.render_id)).join('');
     } else {
-      TEMPLATES.forEach(t => {
-        const rows = byTemplate[t.id] || [];
-        if (!rows.length) return;
-        const latestSuccess = rows.find(r => r.status === 'success');
-        inner += `<div class="minutes-history-section-label" style="margin-top:18px">${esc(t.label)} (${rows.length})</div>`;
-        inner += rows.map(r => _renderHistoryRow(r, r.render_id === latestSuccess?.render_id)).join('');
-      });
-      // Surface any leftover rows under unknown template_id (defensive)
-      Object.keys(byTemplate).forEach(tid => {
-        if (TEMPLATES.find(t => t.id === tid)) return;
-        const rows = byTemplate[tid];
-        if (!rows.length) return;
-        inner += `<div class="minutes-history-section-label" style="margin-top:18px">${esc(tid)} (${rows.length})</div>`;
-        inner += rows.map(r => _renderHistoryRow(r, false)).join('');
-      });
+      inner += `<div class="minutes-history-section-label">Render history</div>
+                <div style="font-size:12px;color:var(--ink-faint);font-style:italic">No renders yet.</div>`;
     }
     body.innerHTML = inner;
 
@@ -432,7 +329,7 @@
         const rid = a.getAttribute('data-render-id');
         const r = arr.find(x => x.render_id === rid);
         if (!r) return;
-        const url = await _signedUrlFor(r, m);
+        const url = await _signedUrlFor(r);
         if (url) window.open(url, '_blank', 'noopener');
       });
     });
@@ -502,28 +399,7 @@
     return _signClient;
   }
 
-  // ── Filename composition (CMD-MINUTES-TEST-INFRA-1) ──────────
-  // Humanized filename for downloaded artifacts:
-  //   <title-slug>-<template_id>.<ext>
-  // Falls back to meeting-<id-prefix>-<template_id>.<ext> when
-  // the title is empty or sanitizes to nothing.
-  function _composeFilename(meeting, templateId, fileExt) {
-    const ext = (fileExt || 'html').replace(/^\.+/, '');
-    const tpl = templateId || DEFAULT_TEMPLATE;
-    const rawTitle = (meeting && meeting.title) ? String(meeting.title) : '';
-    const slug = rawTitle
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .substring(0, 60);
-    if (slug) return `${slug}-${tpl}.${ext}`;
-    const idPrefix = meeting && meeting.meeting_id
-      ? String(meeting.meeting_id).substring(0, 8)
-      : 'unknown';
-    return `meeting-${idPrefix}-${tpl}.${ext}`;
-  }
-
-  async function _signedUrlFor(renderRow, meeting) {
+  async function _signedUrlFor(renderRow) {
     if (!renderRow?.storage_path) return null;
     try {
       const sb = await _signClientGet();
@@ -535,14 +411,7 @@
           await sb.auth.setSession({ access_token: token, refresh_token: token });
         }
       } catch (_) { /* fall through */ }
-      // Derive file extension from the storage path tail.
-      const pathTail = renderRow.storage_path.split('/').pop() || '';
-      const dotIdx = pathTail.lastIndexOf('.');
-      const fileExt = dotIdx > 0 ? pathTail.substring(dotIdx + 1) : 'html';
-      // Humanized filename if a meeting is provided; else legacy fallback.
-      const filename = meeting
-        ? _composeFilename(meeting, renderRow.template_id, fileExt)
-        : (pathTail || 'minutes');
+      const filename = renderRow.storage_path.split('/').pop() || 'minutes';
       const { data, error } = await sb.storage
         .from('accord-minutes')
         .createSignedUrl(renderRow.storage_path, 3600, { download: filename });
@@ -557,6 +426,84 @@
     }
   }
 
+  // ── View PDF slide-in preview (CMD-MINUTES-UX-POLISH-1 §3.3) ──
+  // Opens a right-edge slide-in panel containing an iframe pointed at
+  // the same signed URL the Download button uses. Reuses accord's
+  // existing right-slide-in pattern (cf. minutes-history). The signed
+  // URL is generated WITHOUT the {download: filename} option so the
+  // browser displays the artifact inline rather than triggering a
+  // download. Closes via X button, Escape key, or backdrop click.
+  // Iron Rule 52 §4: no name collision with other _open* handlers.
+  async function _openPdfPreview(renderRow) {
+    if (!renderRow?.storage_path) {
+      _toast('No render available to preview.', null, true);
+      return;
+    }
+    // Build inline-display signed URL (no download disposition)
+    let inlineUrl = null;
+    try {
+      const sb = window.supabaseClient || window._sb || (window.supabase && window.supabase._client);
+      if (sb && sb.storage) {
+        const { data, error } = await sb.storage
+          .from('accord-minutes')
+          .createSignedUrl(renderRow.storage_path, 3600);
+        if (!error) inlineUrl = data?.signedUrl || null;
+      }
+    } catch (e) {
+      console.warn('[Accord-minutes] preview signed URL failed', e);
+    }
+    if (!inlineUrl) {
+      _toast('Could not fetch render for preview.', null, true);
+      return;
+    }
+
+    // Build the slide-in if not already in DOM. Always re-source iframe
+    // for current render.
+    let panel = document.getElementById('minutesPdfPreviewPanel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'minutesPdfPreviewPanel';
+      panel.className = 'minutes-pdf-preview';
+      panel.innerHTML = `
+        <div class="minutes-pdf-preview-backdrop" id="minutesPdfPreviewBackdrop"></div>
+        <div class="minutes-pdf-preview-drawer" role="dialog" aria-label="PDF preview">
+          <div class="minutes-pdf-preview-header">
+            <span class="minutes-pdf-preview-title">PDF preview</span>
+            <button class="minutes-pdf-preview-close" id="minutesPdfPreviewClose" aria-label="Close preview">✕</button>
+          </div>
+          <iframe class="minutes-pdf-preview-frame" id="minutesPdfPreviewFrame"
+                  title="Rendered minutes PDF preview"></iframe>
+        </div>`;
+      document.body.appendChild(panel);
+
+      // Wire close affordances (idempotent — only added once)
+      const close = () => _closePdfPreview();
+      panel.querySelector('#minutesPdfPreviewClose').addEventListener('click', close);
+      panel.querySelector('#minutesPdfPreviewBackdrop').addEventListener('click', close);
+      window.addEventListener('keydown', _pdfPreviewEscHandler);
+    }
+
+    const frame = document.getElementById('minutesPdfPreviewFrame');
+    if (frame) frame.src = inlineUrl;
+    panel.classList.add('open');
+  }
+
+  function _closePdfPreview() {
+    const panel = document.getElementById('minutesPdfPreviewPanel');
+    if (!panel) return;
+    panel.classList.remove('open');
+    // Drop iframe src so the artifact is unloaded (privacy + memory)
+    const frame = document.getElementById('minutesPdfPreviewFrame');
+    if (frame) frame.src = 'about:blank';
+  }
+
+  function _pdfPreviewEscHandler(ev) {
+    if (ev.key === 'Escape') {
+      const panel = document.getElementById('minutesPdfPreviewPanel');
+      if (panel && panel.classList.contains('open')) _closePdfPreview();
+    }
+  }
+
   // ── Print / Save as PDF (CMD-MINUTES-PRINT-FLOW) ─────────────
   // Mirrors Cadence's _s9ExportCertPdf() pattern (Iron Rule 64 —
   // codebase-as-spec). The Edge Function's render is the single
@@ -564,6 +511,11 @@
   // signed-URL HTML the auditor downloads, write it into a new
   // window with an autoprint shim, and let the OS native print
   // dialog handle the Save-as-PDF.
+  //
+  // Iron Rule 52 §4 collision check: no other _printToPdf in
+  // js/accord-*.js or js/cadence-*.js (Cadence uses _s9ExportCertPdf).
+  // Iron Rule 42: read-only; no substrate mutation. CoC write is
+  // a side-channel audit row, not a substrate edge.
   async function _printToPdf(renderRow) {
     if (!renderRow?.storage_path) {
       _toast('No render available to print.', null, true);
@@ -593,14 +545,20 @@
     }
 
     // 3. Open the print window before any further awaits to avoid
-    //    popup-blocker false positives.
+    //    popup-blocker false positives (most browsers gate window.open
+    //    on a synchronous user-gesture chain). The fetch above is the
+    //    only async hop and runs while the click is still considered
+    //    user-initiated in current Chrome / Firefox / Safari.
     const printWindow = window.open('', '_blank', 'width=850,height=1100');
     if (!printWindow) {
       _toast('Print window blocked. Allow popups to print.', null, true);
       return;
     }
 
-    // 4. Inject the rendered HTML with a tiny autoprint shim.
+    // 4. Inject the rendered HTML with a tiny autoprint shim. The
+    //    250ms setTimeout gives Fraunces / IBM Plex fonts a moment to
+    //    settle before window.print() captures the page; otherwise
+    //    the print preview can latch onto system fallbacks.
     const autoprint =
       '<script>window.addEventListener("load",function(){' +
       'setTimeout(function(){try{window.focus();window.print();}catch(e){}},250);' +
@@ -609,36 +567,47 @@
     if (html.indexOf('</body>') !== -1) {
       augmented = html.replace('</body>', autoprint + '</body>');
     } else {
+      // Defensive fallback — no </body> means the artifact is malformed
+      // (e.g. HTML-fallback path stored as text/html). Append anyway.
       augmented = html + autoprint;
     }
     printWindow.document.open();
     printWindow.document.write(augmented);
     printWindow.document.close();
 
-    // 5. Audit-trail CoC write. Three-segment EVENT_META key
-    //    parsed by post-CMD-A6c parser (Rule 56). Resolve
-    //    actor_resource_id via window._myResource.
+    // 5. Audit-trail CoC write. Non-blocking — print proceeds even if
+    //    this fails. Three-segment EVENT_META key parsed by post-CMD-A6c
+    //    parser (Rule 56). Resolve actor_resource_id via window._myResource —
+    //    the established global populated by accord-core's _resolveMe path,
+    //    same source accord-digest.js uses at line 681 (Rule 64). Without
+    //    explicit resolution, CoC.write's fallback chain reads
+    //    window.CURRENT_USER.id, which is a user_id and violates the
+    //    resources FK (coc_events_actor_resource_id_fkey).
     try {
       let actorResourceId =
         (window._myResource && window._myResource.id) || null;
+      // Last-resort fallback: query resources by current user_id. Used only
+      // if _myResource hasn't populated yet (race with accord-core init).
       if (!actorResourceId && window.CURRENT_USER?.id) {
         try {
           const rows = await API.get(
             `resources?user_id=eq.${window.CURRENT_USER.id}&select=id&limit=1`
           ).catch(() => []);
           actorResourceId = rows?.[0]?.id || null;
-        } catch (_) { /* swallow */ }
+        } catch (_) { /* swallow; write below will skip if still null */ }
       }
+      // Skip the write if no resource id can be resolved — better to drop
+      // the audit row than to write a row that violates the FK and surfaces
+      // a 409 in console (Rule 53 — sentinel discipline).
       if (!actorResourceId) {
         console.warn('[Accord-minutes] no actor_resource_id resolvable; skipping CoC write for print');
       } else {
         await window.CoC.write('accord.minutes.printed', renderRow.meeting_id, {
           entityType: 'accord_meeting',
           actorResourceId: actorResourceId,
-          notes: `Minutes printed (${renderRow.template_id || DEFAULT_TEMPLATE}, render ${(renderRow.render_id || '').slice(0, 8)})`,
+          notes: `Minutes printed (render ${(renderRow.render_id || '').slice(0, 8)})`,
           meta: {
             render_id:      renderRow.render_id,
-            template_id:    renderRow.template_id || DEFAULT_TEMPLATE,
             render_version: renderRow.render_version || null,
             content_hash:   renderRow.content_hash   || null,
           },
@@ -657,20 +626,13 @@
     _renderAggregate();
     _renderStatus();
     try {
-      // Pass the active template_id; Edge Function defaults to
-      // working-session if omitted (CMD-2 default; auto-render-on-END
-      // and any other legacy caller continue under the renamed key).
-      const result = await API.invokeEdgeFunction('render-minutes', {
-        meeting_id:  meetingId,
-        template_id: local.activeTemplate,
-      });
+      const result = await API.invokeEdgeFunction('render-minutes', { meeting_id: meetingId });
       // Edge Function broadcasts via realtime; we also poll renders
       // (IR54: SELECT-after-mutation) to ensure UI catches up.
       await _pollUntilTerminal(meetingId, 30000); // 30s timeout
-      const tplLabel = _templateLabel(local.activeTemplate);
       _toast(isRerender
-        ? `${tplLabel} re-rendered${result?.used_fallback ? ' (HTML fallback)' : ''}.`
-        : `${tplLabel} rendered${result?.used_fallback ? ' (HTML fallback)' : ''}.`,
+        ? `Re-render complete${result?.used_fallback ? ' (HTML fallback)' : ''}.`
+        : `Minutes rendered${result?.used_fallback ? ' (HTML fallback)' : ''}.`,
         result?.download_url || null);
     } catch (e) {
       console.error('[Accord-minutes] generate failed', e);
@@ -702,9 +664,8 @@
   }
 
   function _openRerenderModal(meeting) {
-    const tplLabel = _templateLabel(local.activeTemplate);
     $('rerenderModalSummary').textContent =
-      `Re-render ${tplLabel} for "${meeting.title || 'Untitled'}"? The previous render is preserved in render history; the new render becomes the canonical one for this template.`;
+      `Re-render minutes for "${meeting.title || 'Untitled'}"? The previous render is preserved in render history; the new render becomes the canonical one.`;
     $('rerenderConfirmModal').classList.add('visible');
   }
 
@@ -770,8 +731,7 @@
     _generate:      _generate,
     _refresh:       _refresh,
     _printToPdf:    _printToPdf,
-    TEMPLATES:      TEMPLATES,
   };
 
-  console.log('[Accord] minutes surface module loaded (CMD-MINUTES-TEST-INFRA-1)');
+  console.log('[Accord] minutes surface module loaded');
 })();
