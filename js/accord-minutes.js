@@ -445,12 +445,34 @@
       _toast('No render available to preview.', null, true);
       return;
     }
-    // CMD-MINUTES-UX-POLISH-1 §3.3 (post-deploy fix): use canonical
-    // _signedUrlFor() with inlineDisplay flag rather than reaching for
-    // window.supabaseClient/_sb globals that aren't exposed in this
-    // codebase. Iron Rule 64 — codebase-as-spec.
+    // CMD-MINUTES-UX-POLISH-1 §3.3 (post-deploy fix v3): the storage bucket
+    // serves rendered HTML with Content-Type: text/plain, so feeding the
+    // signed URL directly to an iframe shows raw source instead of a
+    // rendered page (the Download path side-steps this because the
+    // {download} disposition forces the browser to save with the real
+    // extension and the OS opens it correctly). Mirror _printToPdf's
+    // canonical fetch-then-render pattern: fetch the artifact text, wrap
+    // in a Blob with the correct MIME, and feed the iframe a blob: URL.
+    // Iron Rule 64 — this is the same pattern accord-minutes already uses
+    // for print; we're just rendering inline instead of in a new window.
     const inlineUrl = await _signedUrlFor(renderRow, { inlineDisplay: true });
     if (!inlineUrl) {
+      _toast('Could not fetch render for preview.', null, true);
+      return;
+    }
+
+    let blobUrl;
+    try {
+      const response = await fetch(inlineUrl);
+      if (!response.ok) {
+        _toast('Could not fetch render for preview.', null, true);
+        return;
+      }
+      const html = await response.text();
+      const blob = new Blob([html], { type: 'text/html' });
+      blobUrl = URL.createObjectURL(blob);
+    } catch (e) {
+      console.warn('[Accord-minutes] preview fetch failed', e);
       _toast('Could not fetch render for preview.', null, true);
       return;
     }
@@ -482,7 +504,15 @@
     }
 
     const frame = document.getElementById('minutesPdfPreviewFrame');
-    if (frame) frame.src = inlineUrl;
+    if (frame) {
+      // Revoke any prior blob URL before swapping (memory hygiene)
+      const prior = frame.dataset.priorBlobUrl;
+      if (prior) {
+        try { URL.revokeObjectURL(prior); } catch (_) { /* noop */ }
+      }
+      frame.src = blobUrl;
+      frame.dataset.priorBlobUrl = blobUrl;
+    }
     panel.classList.add('open');
   }
 
@@ -490,9 +520,17 @@
     const panel = document.getElementById('minutesPdfPreviewPanel');
     if (!panel) return;
     panel.classList.remove('open');
-    // Drop iframe src so the artifact is unloaded (privacy + memory)
+    // Drop iframe src so the artifact is unloaded (privacy + memory).
+    // Revoke the blob URL to free its underlying memory.
     const frame = document.getElementById('minutesPdfPreviewFrame');
-    if (frame) frame.src = 'about:blank';
+    if (frame) {
+      const prior = frame.dataset.priorBlobUrl;
+      if (prior) {
+        try { URL.revokeObjectURL(prior); } catch (_) { /* noop */ }
+        delete frame.dataset.priorBlobUrl;
+      }
+      frame.src = 'about:blank';
+    }
   }
 
   function _pdfPreviewEscHandler(ev) {
