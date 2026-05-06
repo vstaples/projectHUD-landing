@@ -6,7 +6,7 @@
 // To bump the version: change the literal below. Every loader
 // and every internal banner picks up the change automatically
 // on next deploy.
-window._PROJECTHUD_VERSION = "v20260506-CMD-AEGIS-VERIFICATION-PATTERN-b";
+window._PROJECTHUD_VERSION = "v20260506-CMD-AEGIS-VERIFICATION-PATTERN-c";
 
 // CMD100 migration — Compass My Work sub-view vocabulary collapse.
 // Legacy tab-keys 'timesheet' and 'concerns' rewritten to canonical

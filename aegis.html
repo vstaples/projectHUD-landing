@@ -874,7 +874,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
   <div style="display:flex;flex:1;min-height:0;overflow:hidden">
 
     <!-- ── Sidebar ── -->
-    <div class="sess-bar" style="width:196px;display:flex;flex-direction:column;flex-shrink:0">
+    <div id="aegis-sidebar" class="sess-bar" style="width:260px;display:flex;flex-direction:column;flex-shrink:0">
 
       <!-- Sessions -->
       <div style="border-bottom:0.5px solid var(--b);padding-bottom:6px">
@@ -882,7 +882,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
           <span style="font-size:10px;color:var(--aq);letter-spacing:.1em;text-transform:uppercase">Sessions</span>
           <div style="display:flex;align-items:center;gap:5px">
             <span style="font-size:10px;color:var(--aq)">alias</span>
-            <input id="phr-alias-input" maxlength="4" placeholder="VS"
+            <input id="phr-alias-input" maxlength="4" placeholder="OP"
               style="width:34px;font-family:monospace;font-size:11px;font-weight:500;background:var(--aqd);border:0.5px solid rgba(0,201,201,.35);border-radius:3px;color:var(--aq);text-align:center;outline:none;padding:2px 3px;text-transform:uppercase">
           </div>
         </div>
@@ -896,6 +896,44 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
         <button id="phr-new-script" style="width:100%;font-family:monospace;font-size:10px;font-weight:500;padding:5px;border:0.5px solid rgba(0,201,201,.3);border-radius:4px;background:transparent;color:var(--aq);cursor:pointer;letter-spacing:.05em">+ New Playbook</button>
       </div>
     </div>
+
+    <!-- Drag handle for resizing aegis-sidebar (CMD-AEGIS-VERIFICATION-PATTERN) -->
+    <div id="aegis-sidebar-resizer" title="Drag to resize"
+      style="width:4px;cursor:col-resize;background:transparent;flex-shrink:0;border-right:0.5px solid var(--b);transition:background .15s"
+      onmouseover="this.style.background='rgba(0,201,201,.25)'"
+      onmouseout="this.style.background='transparent'"></div>
+    <script>
+      (function(){
+        var sidebar = document.getElementById('aegis-sidebar');
+        var resizer = document.getElementById('aegis-sidebar-resizer');
+        if (!sidebar || !resizer) return;
+        // Restore persisted width
+        try {
+          var w = parseInt(localStorage.getItem('phud:aegis:sidebar-width') || '0', 10);
+          if (w >= 180 && w <= 600) sidebar.style.width = w + 'px';
+        } catch(_) {}
+        var dragging = false;
+        var startX = 0, startW = 0;
+        resizer.addEventListener('mousedown', function(ev) {
+          dragging = true;
+          startX = ev.clientX;
+          startW = sidebar.getBoundingClientRect().width;
+          document.body.style.userSelect = 'none';
+          ev.preventDefault();
+        });
+        document.addEventListener('mousemove', function(ev) {
+          if (!dragging) return;
+          var newW = Math.max(180, Math.min(600, startW + (ev.clientX - startX)));
+          sidebar.style.width = newW + 'px';
+        });
+        document.addEventListener('mouseup', function() {
+          if (!dragging) return;
+          dragging = false;
+          document.body.style.userSelect = '';
+          try { localStorage.setItem('phud:aegis:sidebar-width', sidebar.getBoundingClientRect().width|0); } catch(_) {}
+        });
+      })();
+    </script>
 
     <!-- ── Main ── -->
     <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">

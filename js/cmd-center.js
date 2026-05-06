@@ -182,8 +182,19 @@ function _resolveSession() {
   };
   // Load persisted alias for this userId, or fall back to initials.
   // Only load from localStorage once we have a real (non-anon) userId.
+  // CMD-AEGIS-VERIFICATION-PATTERN: alias is surface-scoped — Aegis-mode
+  // and user-facing surfaces (Compass/Accord/etc.) persist alias under
+  // distinct keys so the operator can run Aegis as e.g. "OP" while
+  // their Compass tab keeps "VS". Without this, both surfaces share
+  // the same alias and `VS:` dispatch becomes ambiguous.
+  // Aegis-mode also defaults to "OP" (operator) instead of initials so
+  // the alias namespace doesn't collide with the operator's own initials
+  // on first visit.
   if (!_myAlias && !_mySession.userId.startsWith('anon-')) {
-    _myAlias = localStorage.getItem('phud:cmd:alias:' + _mySession.userId) || _mySession.initials;
+    var _aliasKeyPrefix = window._aegisMode ? 'phud:cmd:alias:aegis:' : 'phud:cmd:alias:';
+    var _stored = localStorage.getItem(_aliasKeyPrefix + _mySession.userId);
+    var _default = window._aegisMode ? 'OP' : _mySession.initials;
+    _myAlias = _stored || _default;
   }
   // CMD100.66: expose resolved session as a global so hud-shell's recorder
   // has a reliable identity source even on pages where CURRENT_USER fails
@@ -5067,8 +5078,11 @@ function _wirePanel() {
       if (!newAlias) { aliasInput.value = _myAlias || _mySession.initials; return; }
       if (newAlias === _myAlias) return;
       _myAlias = newAlias;
-      // Persist for this userId
-      if (_mySession) localStorage.setItem('phud:cmd:alias:' + _mySession.userId, _myAlias);
+      // Persist for this userId (surface-scoped — see load site)
+      if (_mySession) {
+        var _aliasKey = (window._aegisMode ? 'phud:cmd:alias:aegis:' : 'phud:cmd:alias:') + _mySession.userId;
+        localStorage.setItem(_aliasKey, _myAlias);
+      }
       // Re-track presence with new alias so other sessions pick it up.
       // CMD62: re-track on both channels so stale (legacy-only) tabs
       // see the alias update too.
@@ -6290,7 +6304,10 @@ window.CMDCenter = {
   setAlias:     function(a) {
     if (!a) return;
     _myAlias = a.trim().toUpperCase();
-    if (_mySession) localStorage.setItem('phud:cmd:alias:' + _mySession.userId, _myAlias);
+    if (_mySession) {
+      var _aliasKey = (window._aegisMode ? 'phud:cmd:alias:aegis:' : 'phud:cmd:alias:') + _mySession.userId;
+      localStorage.setItem(_aliasKey, _myAlias);
+    }
     var ai = document.getElementById('phr-alias-input');
     if (ai) ai.value = _myAlias;
   },
