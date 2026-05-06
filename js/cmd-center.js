@@ -1439,11 +1439,23 @@ window._cmdEmit = function(eventName, data) {
 // (matches the recorder's actionable-class signature) and finds one whose
 // visible text equals the label (case-insensitive, badge-stripped).
 function _findTabInDOM(label, level) {
+  // CMD-AEGIS-VERIFICATION-PATTERN: original CMD100.57 selector list
+  // (.tab, .tab-btn, [role="tab"], etc.) misses bare <button> elements
+  // used by surfaces like accord.html where tab markup is class-free.
+  // Two-tier scan: try the canonical class/role selectors first; if
+  // nothing matches, fall back to bare <button>/<a> with exact text
+  // match. The exact-match guard at line `if (txt === want)` keeps
+  // the broader scan safe from false positives.
   var TAB_SELECTORS = [
     '[role="tab"]',
     '.tab', '.tab-btn', '.tab-strip-item',
     '.subnav-item', '.sub-nav-item',
     '.nav-item', '.menu-item'
+  ];
+  var FALLBACK_SELECTORS = [
+    'button:not([type="submit"])',
+    'a[href]',
+    '[role="button"]'
   ];
   var BADGE_RX = /\b(badge|count|pill|chip|notif|tag-count|num)\b/i;
   function cleanText(el) {
@@ -1467,6 +1479,14 @@ function _findTabInDOM(label, level) {
     for (var i = 0; i < els.length; i++) {
       var txt = cleanText(els[i]).toLowerCase();
       if (txt === want) return els[i];
+    }
+  }
+  // Fallback: bare buttons / anchors with exact-text match.
+  for (var s2 = 0; s2 < FALLBACK_SELECTORS.length; s2++) {
+    var els2 = document.querySelectorAll(FALLBACK_SELECTORS[s2]);
+    for (var j = 0; j < els2.length; j++) {
+      var txt2 = cleanText(els2[j]).toLowerCase();
+      if (txt2 === want) return els2[j];
     }
   }
   return null;
