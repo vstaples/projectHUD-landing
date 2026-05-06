@@ -2784,6 +2784,69 @@ var COMMANDS = {
     return 'modal.opened: ' + modalName;
   },
 
+  // ── Wait ForConsole (CMD-AEGIS-VERIFICATION-PATTERN) ─────────────────────────
+  // Hooks console.log; captures the second argument from the first call whose
+  // first string argument starts with <prefix>. Stores the captured value
+  // (JSON-serialized when object) into $varname, then restores console.log.
+  // Intended companion to surface modules that emit structured-prefix telemetry
+  // (e.g., '[Accord-minutes] meeting selected:' from CMD-MINUTES-TEST-INFRA-1).
+  // Only one Wait ForConsole runs at a time per script; concurrent invocation
+  // throws (per Iron Rule 60 first-caller hazard awareness — re-entrancy on
+  // the global console hook would corrupt capture state).
+  //
+  // Usage: Wait ForConsole "<prefix>" → $varname [timeout=<ms>]
+  'Wait ForConsole': async function(args) {
+    var prefix = args[0];
+    if (!prefix) throw new Error('Wait ForConsole: usage: Wait ForConsole "<prefix>" → $varname [timeout=<ms>]');
+    var storeAs = null;
+    var timeoutMs = 30000;
+    for (var pi = 1; pi < args.length; pi++) {
+      if ((args[pi] === '→' || args[pi] === '->') && args[pi+1]) {
+        storeAs = args[pi+1].replace(/^\$/, ''); pi++;
+      } else {
+        var tm = String(args[pi]).match(/^timeout=(\d+)$/);
+        if (tm) timeoutMs = parseInt(tm[1], 10);
+      }
+    }
+    if (!storeAs) throw new Error('Wait ForConsole: missing → $varname');
+    if (window.__aegisConsoleHookActive) {
+      throw new Error('Wait ForConsole: another capture already active in this script run');
+    }
+    var originalLog = console.log;
+    var captured = null;
+    var capturedSentinel = false;
+    window.__aegisConsoleHookActive = true;
+    console.log = function() {
+      var a = arguments;
+      if (!capturedSentinel && a.length >= 1 && typeof a[0] === 'string' && a[0].indexOf(prefix) === 0) {
+        captured = a.length >= 2 ? a[1] : null;
+        capturedSentinel = true;
+      }
+      return originalLog.apply(console, a);
+    };
+    var deadline = Date.now() + timeoutMs;
+    try {
+      while (Date.now() < deadline) {
+        if (_scriptAborted) return 'aborted';
+        if (capturedSentinel) break;
+        await new Promise(function(r){ setTimeout(r, 100); });
+      }
+    } finally {
+      console.log = originalLog;
+      window.__aegisConsoleHookActive = false;
+    }
+    if (!capturedSentinel) {
+      throw new Error('Wait ForConsole timeout: no console.log starting with "' + prefix + '" within ' + (timeoutMs/1000) + 's');
+    }
+    var storedValue = (captured !== null && typeof captured === 'object')
+      ? JSON.stringify(captured)
+      : (captured === null ? '' : String(captured));
+    _storeVars[storeAs] = storedValue;
+    var preview = storedValue.length > 80 ? storedValue.substring(0, 80) + '…' : storedValue;
+    _appendLine('SYS', 'result', '→ stored $' + storeAs + ' = ' + preview);
+    return preview;
+  },
+
   // ── Storage ──────────────────────────────────────────────────────────────────
   'Store': async function(args) {
     var key = args[0];
@@ -5133,9 +5196,12 @@ function _wirePanel() {
 
   // Save script (CMD-AEGIS-PLAYBOOK-FOUNDATION: also persists to substrate as draft).
   p.querySelector('#phr-save-script').onclick = async function() {
+    var saveBtn = this;
+    var origText = saveBtn.textContent;
     var name = p.querySelector('#phr-script-name').value.trim().replace(/\s+/g, '-');
     var text = p.querySelector('#phr-editor').value;
     if (!name) { alert('Enter a playbook name'); return; }
+    saveBtn.textContent = 'Saving…'; saveBtn.disabled = true;
     // localStorage parity (backward compat; non-blocking).
     _saveScript(name, text);
     _activeScript = name;
@@ -5165,6 +5231,8 @@ function _wirePanel() {
     _renderScriptList();
     if (_renderLibrary) _renderLibrary();
     if (p._updateLifecycleButtons) p._updateLifecycleButtons();
+    saveBtn.textContent = '✓ Saved';
+    setTimeout(function(){ saveBtn.textContent = origText; saveBtn.disabled = false; }, 1200);
   };
 
   // Run script from editor (CMD-AEGIS-PLAYBOOK-FOUNDATION: passes playbook_id).
