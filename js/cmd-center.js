@@ -86,7 +86,17 @@ var _myAlias     = null;   // short alias set by operator, e.g. "VS" or "AK" —
 var _sessions    = {};     // { userId: { name, initials, alias, location, online, ts } }
 var _aliasMap    = {};     // { alias: userId } — built from presence, enables "VS:" routing by alias
 var _transcript  = [];     // { ts, who, type, text }
-var _scripts     = {};     // { name: scriptText }
+var _scripts     = {};     // { name: scriptText } — lookup for Run verb backward compat
+var _playbooks   = {};     // CMD-AEGIS-PLAYBOOK-FOUNDATION: { playbook_id: row } — substrate-backed
+var _playbookByName = {};  // CMD-AEGIS-PLAYBOOK-FOUNDATION: { name: playbook_id } — name → current id
+var _playbookRunsByPb = {}; // CMD-AEGIS-PLAYBOOK-FOUNDATION: { playbook_id: [run_row, ...] } — recent runs
+var _activePlaybookId = null; // CMD-AEGIS-PLAYBOOK-FOUNDATION: currently-loaded playbook in editor
+var _libraryFilters = {     // CMD-AEGIS-PLAYBOOK-FOUNDATION: Library UI filter state
+  search: '',
+  kinds:  [],               // empty = all kinds
+  state:  'active',         // 'active' (draft+published) | 'draft' | 'all'
+  sort:   'recent',         // 'recent' | 'name' | 'last-run'
+};
 var _panelEl     = null;   // the floating panel DOM element
 var _panelOpen   = false;
 var _cmdTarget   = 'ALL';  // current command target userId or 'ALL'
@@ -2898,7 +2908,9 @@ var COMMANDS = {
     var scriptName = args[0];
     var script = _scripts[scriptName];
     if (!script) return 'Script not found: ' + scriptName;
-    await _runScript(script, scriptName);
+    // CMD-AEGIS-PLAYBOOK-FOUNDATION: resolve playbook_id (if any) for run-history capture.
+    var pbId = _playbookByName[scriptName] || null;
+    await _runScript(script, scriptName, pbId);
     return 'script complete: ' + scriptName;
   },
 
@@ -3932,7 +3944,7 @@ async function _runScriptLines(lines, scriptName, sourceTag) {
 }
 
 // ── Run a multi-line script ───────────────────────────────────────────────────
-async function _runScript(scriptText, scriptName) {
+async function _runScript(scriptText, scriptName, playbookId) {
   var lines = scriptText.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
 
   // Preflight: check required sessions from script header
@@ -3956,12 +3968,25 @@ async function _runScript(scriptText, scriptName) {
     }
   }
 
+  // CMD-AEGIS-PLAYBOOK-FOUNDATION: resolve playbook for run-history capture.
+  // If playbookId not provided, try resolving by name; null is acceptable
+  // (e.g., inline scripts have no playbook). When null, run-history is not
+  // captured — preserves backward compat with non-playbook callers.
+  var resolvedPbId = playbookId || (scriptName ? _playbookByName[scriptName] : null) || null;
+  var resolvedPb = resolvedPbId ? _playbooks[resolvedPbId] : null;
+  var runId = null;
+  var runStartTs = Date.now();
+  var runCommandCount = lines.filter(function(l){ return !l.startsWith('#'); }).length;
+  if (resolvedPb) {
+    runId = await _insertRunStart(resolvedPb);
+  }
+
   _scriptRunning = true;
   _scriptAborted = false;
   // CMD87b §7: do not persist NarrateTarget across script runs. Reset to local
   // on entry — script must re-issue `Set NarrateTarget` if it wants remote.
   _narrateTarget = 'Aegis';
-  _appendLine('SYS', 'sys', 'Script: ' + (scriptName||'inline') + ' · ' + lines.filter(function(l){ return !l.startsWith('#'); }).length + ' commands');
+  _appendLine('SYS', 'sys', 'Script: ' + (scriptName||'inline') + ' · ' + runCommandCount + ' commands');
   var _scriptVersion = _parseScriptVersion(scriptText);
   if (_scriptVersion) {
     _appendLine('SYS', 'sys', 'Version: ' + _scriptVersion);
@@ -3976,9 +4001,15 @@ async function _runScript(scriptText, scriptName) {
     if (rn) rn.textContent = scriptName || 'inline';
   }
 
+  var terminalStatus = 'pass';
   try {
     var _aborted = await _runScriptLines(lines, scriptName, scriptName || 'inline');
-    if (_aborted === 'aborted') { /* break path already logged inside helper */ }
+    if (_aborted === 'aborted') {
+      terminalStatus = 'aborted';
+    }
+  } catch (e) {
+    terminalStatus = 'error';
+    throw e;
   } finally {
     _scriptRunning = false;
     _scriptAborted = false;
@@ -3993,6 +4024,18 @@ async function _runScript(scriptText, scriptName) {
   }
 
   _appendLine('SYS', 'result', _scriptAborted ? '■ Script stopped' : '✓ Script complete · ' + (scriptName||'inline'));
+
+  // CMD-AEGIS-PLAYBOOK-FOUNDATION: capture run completion in substrate.
+  if (runId && resolvedPb) {
+    var finalStatus = (terminalStatus === 'aborted') ? 'aborted' :
+                      (terminalStatus === 'error')   ? 'error'   :
+                      _scriptAborted                  ? 'aborted' :
+                      'pass';
+    var summary = _transcript.slice(-30).map(function(t){ return (t.who||'') + ' ' + (t.text||''); }).join('\n');
+    // Fire-and-forget; failure here is non-fatal.
+    _completeRun(runId, finalStatus, summary, runCommandCount, Date.now() - runStartTs, resolvedPb)
+      .then(function(){ if (_panelEl) _renderLibrary && _renderLibrary(); });
+  }
 }
 
 // ── Script preflight panel ────────────────────────────────────────────────────
@@ -4124,11 +4167,498 @@ function _showPreflightPanel(scriptName, required, missing, scriptText) {
 
 // ── Script storage ────────────────────────────────────────────────────────────
 function _loadScripts() {
-  // Load from localStorage
+  // Load from localStorage (synchronous; fast initial paint).
+  // Substrate playbooks are loaded asynchronously by _loadPlaybooks()
+  // which runs after auth/firm_id is resolved. Any localStorage entry
+  // not yet migrated to substrate is still runnable via _scripts[name].
   var keys = Object.keys(localStorage).filter(function(k){ return k.startsWith('phud:script:'); });
   keys.forEach(function(k) {
     var name = k.replace('phud:script:', '');
     _scripts[name] = localStorage.getItem(k);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CMD-AEGIS-PLAYBOOK-FOUNDATION — substrate-backed playbook loading
+// ════════════════════════════════════════════════════════════════════════════
+
+// Load all draft + published playbooks for this firm. Populates _playbooks
+// (keyed by playbook_id), _playbookByName (name → id of best representative
+// preferring published > draft > most-recent version), and _scripts (name →
+// body for Run verb backward compat).
+async function _loadPlaybooks() {
+  if (!FIRM_ID) {
+    console.warn('[Aegis Playbooks] _loadPlaybooks: FIRM_ID unresolved; skipping load');
+    return 0;
+  }
+  try {
+    var token = (typeof Auth !== 'undefined' && Auth.getFreshToken)
+      ? await Auth.getFreshToken().catch(function(){ return SUPA_KEY; })
+      : SUPA_KEY;
+    var url = SUPA_URL + '/rest/v1/aegis_playbooks?select=*&firm_id=eq.' + FIRM_ID +
+              '&state=in.(draft,published,superseded,archived)' +
+              '&order=name.asc,version.desc';
+    var resp = await fetch(url, {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token, Accept: 'application/json' },
+    });
+    if (!resp.ok) {
+      console.warn('[Aegis Playbooks] _loadPlaybooks: query failed', resp.status);
+      return 0;
+    }
+    var rows = await resp.json();
+    _playbooks = {};
+    _playbookByName = {};
+    rows.forEach(function(r) {
+      _playbooks[r.playbook_id] = r;
+      // Resolution preference: published > draft > superseded > archived;
+      // within same state, higher version wins. Rows are pre-sorted by
+      // (name asc, version desc), so we walk in reverse to find best.
+    });
+    // Build name → playbook_id (best representative per name)
+    var byName = {};
+    rows.forEach(function(r) {
+      var prev = byName[r.name];
+      if (!prev) { byName[r.name] = r; return; }
+      var rank = function(row) {
+        if (row.state === 'published')  return 4;
+        if (row.state === 'draft')      return 3;
+        if (row.state === 'superseded') return 2;
+        return 1; // archived
+      };
+      if (rank(r) > rank(prev) || (rank(r) === rank(prev) && r.version > prev.version)) {
+        byName[r.name] = r;
+      }
+    });
+    Object.keys(byName).forEach(function(name) {
+      _playbookByName[name] = byName[name].playbook_id;
+      // Hydrate _scripts so Run "name" continues to work.
+      _scripts[name] = byName[name].body;
+    });
+    return rows.length;
+  } catch (e) {
+    console.warn('[Aegis Playbooks] _loadPlaybooks error:', e && e.message);
+    return 0;
+  }
+}
+
+// Load run history for a single playbook (last 10 runs).
+async function _loadPlaybookRuns(playbookId) {
+  if (!FIRM_ID || !playbookId) return [];
+  try {
+    var token = (typeof Auth !== 'undefined' && Auth.getFreshToken)
+      ? await Auth.getFreshToken().catch(function(){ return SUPA_KEY; })
+      : SUPA_KEY;
+    var url = SUPA_URL + '/rest/v1/aegis_playbook_runs?select=*' +
+              '&firm_id=eq.' + FIRM_ID +
+              '&playbook_id=eq.' + playbookId +
+              '&order=started_at.desc&limit=10';
+    var resp = await fetch(url, {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token, Accept: 'application/json' },
+    });
+    if (!resp.ok) return [];
+    var runs = await resp.json();
+    _playbookRunsByPb[playbookId] = runs;
+    return runs;
+  } catch (e) { return []; }
+}
+
+// One-time migration of localStorage scripts → substrate drafts.
+// Idempotent: skips entries whose name already exists in substrate.
+// Lossless: localStorage entries are NOT deleted in v1.
+async function _migrateLocalStorageToPlaybooks() {
+  if (!FIRM_ID) return; // need auth
+  if (localStorage.getItem('phud:playbooks-migrated') === 'true') return;
+  // Wait for substrate load to complete so we can dedupe by name.
+  var existingNames = new Set(Object.keys(_playbookByName));
+  var lsKeys = Object.keys(localStorage).filter(function(k){ return k.startsWith('phud:script:'); });
+  if (!lsKeys.length) {
+    // Nothing to migrate; mark complete.
+    try { localStorage.setItem('phud:playbooks-migrated', 'true'); } catch(_) {}
+    return;
+  }
+  var token;
+  try {
+    token = (typeof Auth !== 'undefined' && Auth.getFreshToken)
+      ? await Auth.getFreshToken()
+      : SUPA_KEY;
+  } catch (e) { return; /* retry next load */ }
+  var userId = (typeof Auth !== 'undefined' && Auth.getCurrentUserId)
+    ? Auth.getCurrentUserId() : null;
+  if (!userId) return;
+  var migrated = 0, skipped = 0, failed = 0;
+  for (var i = 0; i < lsKeys.length; i++) {
+    var k = lsKeys[i];
+    var name = k.replace('phud:script:', '');
+    var body = localStorage.getItem(k);
+    if (!body || !name) { skipped++; continue; }
+    if (existingNames.has(name)) { skipped++; continue; }
+    var row = {
+      firm_id:     FIRM_ID,
+      name:        name,
+      body:        body,
+      description: 'Migrated from localStorage; original purpose to be classified.',
+      kind:        'exploration',
+      tags:        ['migrated-from-localstorage'],
+      state:       'draft',
+      created_by:  userId,
+    };
+    try {
+      var resp = await fetch(SUPA_URL + '/rest/v1/aegis_playbooks', {
+        method: 'POST',
+        headers: {
+          apikey: SUPA_KEY,
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify(row),
+      });
+      if (!resp.ok) { failed++; continue; }
+      migrated++;
+    } catch (e) { failed++; }
+  }
+  if (failed === 0) {
+    try { localStorage.setItem('phud:playbooks-migrated', 'true'); } catch(_) {}
+  }
+  console.log('[Aegis] Migrated ' + migrated + ' playbooks from localStorage to substrate' +
+              (skipped ? ' (' + skipped + ' skipped)' : '') +
+              (failed ? ' (' + failed + ' failed; will retry on next load)' : ''));
+  // Refresh substrate-backed maps after migration.
+  if (migrated > 0) await _loadPlaybooks();
+}
+
+// SHA-256 of a string → hex (Web Crypto). Used at publish time per §3.5.
+async function _sha256Hex(str) {
+  try {
+    var enc = new TextEncoder().encode(str);
+    var hashBuf = await crypto.subtle.digest('SHA-256', enc);
+    var bytes = new Uint8Array(hashBuf);
+    var hex = '';
+    for (var i = 0; i < bytes.length; i++) hex += bytes[i].toString(16).padStart(2, '0');
+    return hex;
+  } catch (e) { return null; }
+}
+
+// Compute canonical playbook hash per §3.1 critical invariant 4.
+async function _computePlaybookHash(row) {
+  var canonical = (row.body || '') + '||' + (row.description || '') + '||' +
+                  (row.kind || '') + '||' +
+                  (Array.isArray(row.tags) ? row.tags.slice().sort().join(',') : '') + '||' +
+                  String(row.version || 1) + '||' + (row.created_by || '');
+  return await _sha256Hex(canonical);
+}
+
+// Insert a run row at run start (status='running'); return run_id.
+async function _insertRunStart(playbookRow) {
+  if (!FIRM_ID || !playbookRow) return null;
+  try {
+    var token = (typeof Auth !== 'undefined' && Auth.getFreshToken)
+      ? await Auth.getFreshToken().catch(function(){ return SUPA_KEY; })
+      : SUPA_KEY;
+    var userId = (typeof Auth !== 'undefined' && Auth.getCurrentUserId)
+      ? Auth.getCurrentUserId() : null;
+    if (!userId) return null;
+    var row = {
+      firm_id:          FIRM_ID,
+      playbook_id:      playbookRow.playbook_id,
+      started_by:       userId,
+      status:           'running',
+      playbook_version: playbookRow.version,
+      playbook_hash:    playbookRow.playbook_hash || null,
+    };
+    var resp = await fetch(SUPA_URL + '/rest/v1/aegis_playbook_runs', {
+      method: 'POST',
+      headers: {
+        apikey: SUPA_KEY, Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json', Prefer: 'return=representation',
+      },
+      body: JSON.stringify(row),
+    });
+    if (!resp.ok) return null;
+    var rows = await resp.json();
+    var runId = rows && rows[0] && rows[0].run_id;
+    // Fire CoC event (best-effort; guard for CoC unavailability)
+    if (runId && window.CoC && window.CoC.write && window._myResource) {
+      try {
+        await window.CoC.write('aegis.playbook.run_started', playbookRow.playbook_id, {
+          entityType: 'aegis_playbook',
+          actorResourceId: window._myResource.id,
+          notes: 'Run started: ' + playbookRow.name,
+          meta: {
+            run_id:           runId,
+            playbook_id:      playbookRow.playbook_id,
+            playbook_name:    playbookRow.name,
+            playbook_version: playbookRow.version,
+            playbook_kind:    playbookRow.kind,
+          },
+        });
+      } catch(_) {}
+    }
+    return runId;
+  } catch (e) { return null; }
+}
+
+// Update a run row at completion (terminal status).
+async function _completeRun(runId, terminalStatus, summary, commandCount, durationMs, playbookRow) {
+  if (!runId) return;
+  try {
+    var token = (typeof Auth !== 'undefined' && Auth.getFreshToken)
+      ? await Auth.getFreshToken().catch(function(){ return SUPA_KEY; })
+      : SUPA_KEY;
+    var patch = {
+      status:             terminalStatus,
+      completed_at:       new Date().toISOString(),
+      transcript_summary: (summary || '').slice(0, 4000),
+      command_count:      commandCount,
+      duration_ms:        durationMs,
+    };
+    await fetch(SUPA_URL + '/rest/v1/aegis_playbook_runs?run_id=eq.' + runId, {
+      method: 'PATCH',
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    // Mirror to playbook row's last_run_at / last_run_status
+    if (playbookRow && playbookRow.playbook_id) {
+      var pbPatch = {
+        last_run_at:     new Date().toISOString(),
+        last_run_status: terminalStatus === 'pass' ? 'pass' :
+                         terminalStatus === 'fail' ? 'fail' :
+                         terminalStatus === 'aborted' ? 'aborted' : 'error',
+      };
+      await fetch(SUPA_URL + '/rest/v1/aegis_playbooks?playbook_id=eq.' + playbookRow.playbook_id, {
+        method: 'PATCH',
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(pbPatch),
+      });
+      // Update local cache so UI reflects immediately
+      if (_playbooks[playbookRow.playbook_id]) {
+        _playbooks[playbookRow.playbook_id].last_run_at     = pbPatch.last_run_at;
+        _playbooks[playbookRow.playbook_id].last_run_status = pbPatch.last_run_status;
+      }
+    }
+    // Fire CoC event
+    if (window.CoC && window.CoC.write && window._myResource && playbookRow) {
+      try {
+        await window.CoC.write('aegis.playbook.run_completed', playbookRow.playbook_id, {
+          entityType: 'aegis_playbook',
+          actorResourceId: window._myResource.id,
+          notes: 'Run ' + terminalStatus + ': ' + playbookRow.name,
+          meta: {
+            run_id:           runId,
+            playbook_id:      playbookRow.playbook_id,
+            playbook_name:    playbookRow.name,
+            playbook_version: playbookRow.version,
+            playbook_kind:    playbookRow.kind,
+            status:           terminalStatus,
+            duration_ms:      durationMs,
+          },
+        });
+      } catch(_) {}
+    }
+  } catch (e) { /* swallow — non-fatal */ }
+}
+
+// Lifecycle: publish a draft.
+async function _publishPlaybook(playbookId) {
+  var pb = _playbooks[playbookId];
+  if (!pb || pb.state !== 'draft') return { ok: false, error: 'not a draft' };
+  if (!FIRM_ID) return { ok: false, error: 'firm_id unresolved' };
+  try {
+    var token = (typeof Auth !== 'undefined' && Auth.getFreshToken)
+      ? await Auth.getFreshToken() : SUPA_KEY;
+    // Resolve prior published version of same name (if any).
+    var priorUrl = SUPA_URL + '/rest/v1/aegis_playbooks?select=playbook_id,version,playbook_hash' +
+                   '&firm_id=eq.' + FIRM_ID + '&name=eq.' + encodeURIComponent(pb.name) +
+                   '&state=eq.published&order=version.desc&limit=1';
+    var priorResp = await fetch(priorUrl, {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token, Accept: 'application/json' },
+    });
+    var priors = priorResp.ok ? await priorResp.json() : [];
+    var prior = priors[0] || null;
+    var newVersion = prior ? (prior.version + 1) : 1;
+    var supersedesId = prior ? prior.playbook_id : null;
+    var prevHash = prior ? prior.playbook_hash : null;
+    // Compute hash with the updated version.
+    var hashRow = Object.assign({}, pb, { version: newVersion });
+    var newHash = await _computePlaybookHash(hashRow);
+    // 1) Update prior published row to 'superseded' (if any).
+    if (prior) {
+      await fetch(SUPA_URL + '/rest/v1/aegis_playbooks?playbook_id=eq.' + prior.playbook_id, {
+        method: 'PATCH',
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'superseded' }),
+      });
+    }
+    // 2) Update this row: state→published, version, supersedes_id, hashes.
+    var nowIso = new Date().toISOString();
+    var resp = await fetch(SUPA_URL + '/rest/v1/aegis_playbooks?playbook_id=eq.' + playbookId, {
+      method: 'PATCH',
+      headers: {
+        apikey: SUPA_KEY, Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json', Prefer: 'return=representation',
+      },
+      body: JSON.stringify({
+        state:         'published',
+        version:       newVersion,
+        supersedes_id: supersedesId,
+        playbook_hash: newHash,
+        prev_hash:     prevHash,
+        published_at:  nowIso,
+      }),
+    });
+    if (!resp.ok) {
+      var errText = await resp.text().catch(function(){ return '?'; });
+      return { ok: false, error: 'publish failed: ' + resp.status + ' ' + errText };
+    }
+    // CoC event
+    if (window.CoC && window.CoC.write && window._myResource) {
+      try {
+        await window.CoC.write('aegis.playbook.published', playbookId, {
+          entityType: 'aegis_playbook',
+          actorResourceId: window._myResource.id,
+          notes: 'Playbook published: ' + pb.name + ' v' + newVersion,
+          meta: {
+            playbook_id:      playbookId,
+            playbook_name:    pb.name,
+            playbook_version: newVersion,
+            playbook_kind:    pb.kind,
+            playbook_hash:    newHash,
+            supersedes_id:    supersedesId,
+          },
+        });
+      } catch(_) {}
+    }
+    await _loadPlaybooks();
+    return { ok: true, version: newVersion, hash: newHash };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || 'publish error' };
+  }
+}
+
+// Lifecycle: archive a published or superseded playbook.
+async function _archivePlaybook(playbookId) {
+  var pb = _playbooks[playbookId];
+  if (!pb) return { ok: false, error: 'not found' };
+  if (pb.state !== 'published' && pb.state !== 'superseded') {
+    return { ok: false, error: 'archive only valid from published or superseded' };
+  }
+  try {
+    var token = (typeof Auth !== 'undefined' && Auth.getFreshToken)
+      ? await Auth.getFreshToken() : SUPA_KEY;
+    var resp = await fetch(SUPA_URL + '/rest/v1/aegis_playbooks?playbook_id=eq.' + playbookId, {
+      method: 'PATCH',
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: 'archived', archived_at: new Date().toISOString() }),
+    });
+    if (!resp.ok) return { ok: false, error: 'archive failed: ' + resp.status };
+    await _loadPlaybooks();
+    return { ok: true };
+  } catch (e) { return { ok: false, error: (e && e.message) }; }
+}
+
+// Lifecycle: restore an archived playbook back to 'draft'.
+// Architect decision per §11 hand-off finding: restore→'draft' rather than
+// →'published'. Rationale: restoring to published bypasses the
+// publish-confirmation step, which is the only place IR42 hash anchoring
+// is enforced. Drafts are mutable; if the operator wants it live again,
+// they re-publish through the normal flow (which produces a new version,
+// preserving the supersedes chain integrity).
+async function _restorePlaybook(playbookId) {
+  var pb = _playbooks[playbookId];
+  if (!pb || pb.state !== 'archived') return { ok: false, error: 'not archived' };
+  try {
+    var token = (typeof Auth !== 'undefined' && Auth.getFreshToken)
+      ? await Auth.getFreshToken() : SUPA_KEY;
+    // Restore to draft. Since this row was previously published, the
+    // immutability trigger would block a body change while state remains
+    // 'published' — restoring to 'draft' is the supported path.
+    // Note: state transition published→archived was already taken, so
+    // archived→draft is a fresh transition and the trigger allows it
+    // (current state is 'archived', not 'published').
+    var resp = await fetch(SUPA_URL + '/rest/v1/aegis_playbooks?playbook_id=eq.' + playbookId, {
+      method: 'PATCH',
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: 'draft', archived_at: null, playbook_hash: null, prev_hash: null }),
+    });
+    if (!resp.ok) return { ok: false, error: 'restore failed: ' + resp.status };
+    await _loadPlaybooks();
+    return { ok: true };
+  } catch (e) { return { ok: false, error: (e && e.message) }; }
+}
+
+// Save (insert or update) a draft from the editor. Creates a new draft if
+// no playbookId provided; updates existing draft (same row) if it provided.
+async function _saveDraftPlaybook(playbookId, fields) {
+  if (!FIRM_ID) return { ok: false, error: 'firm_id unresolved' };
+  try {
+    var token = (typeof Auth !== 'undefined' && Auth.getFreshToken)
+      ? await Auth.getFreshToken() : SUPA_KEY;
+    var userId = (typeof Auth !== 'undefined' && Auth.getCurrentUserId)
+      ? Auth.getCurrentUserId() : null;
+    if (!userId) return { ok: false, error: 'not authenticated' };
+    if (playbookId) {
+      // UPDATE existing draft. Reject if not draft (immutability trigger
+      // would also reject server-side; check client-side for friendlier UX).
+      var existing = _playbooks[playbookId];
+      if (existing && existing.state !== 'draft') {
+        return { ok: false, error: 'cannot edit non-draft directly; use Edit→new draft flow' };
+      }
+      var resp = await fetch(SUPA_URL + '/rest/v1/aegis_playbooks?playbook_id=eq.' + playbookId, {
+        method: 'PATCH',
+        headers: {
+          apikey: SUPA_KEY, Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json', Prefer: 'return=representation',
+        },
+        body: JSON.stringify(fields),
+      });
+      if (!resp.ok) {
+        var errText = await resp.text().catch(function(){ return '?'; });
+        return { ok: false, error: resp.status + ' ' + errText };
+      }
+      var rows = await resp.json();
+      await _loadPlaybooks();
+      return { ok: true, playbook: rows && rows[0] };
+    } else {
+      // INSERT new draft.
+      var insertRow = Object.assign({
+        firm_id:    FIRM_ID,
+        state:      'draft',
+        kind:       'exploration',
+        tags:       [],
+        created_by: userId,
+      }, fields);
+      var resp2 = await fetch(SUPA_URL + '/rest/v1/aegis_playbooks', {
+        method: 'POST',
+        headers: {
+          apikey: SUPA_KEY, Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json', Prefer: 'return=representation',
+        },
+        body: JSON.stringify(insertRow),
+      });
+      if (!resp2.ok) {
+        var errText2 = await resp2.text().catch(function(){ return '?'; });
+        return { ok: false, error: resp2.status + ' ' + errText2 };
+      }
+      var rows2 = await resp2.json();
+      await _loadPlaybooks();
+      return { ok: true, playbook: rows2 && rows2[0] };
+    }
+  } catch (e) { return { ok: false, error: (e && e.message) }; }
+}
+
+// "Edit a published playbook" → creates a new draft row with same name.
+// The old published row stays as-is until the new draft is published,
+// at which point the supersedes mechanism activates.
+async function _createDraftFromPublished(publishedPbId) {
+  var pub = _playbooks[publishedPbId];
+  if (!pub) return { ok: false, error: 'not found' };
+  return await _saveDraftPlaybook(null, {
+    name:        pub.name,
+    body:        pub.body,
+    description: pub.description,
+    kind:        pub.kind,
+    tags:        pub.tags || [],
+    origin_cmd:  pub.origin_cmd,
   });
 }
 
@@ -4318,11 +4848,11 @@ function _panelHTML() {
       <div id="phr-sessions" style="padding-bottom:4px"></div>
     </div>
 
-    <div style="font-size:9px;font-weight:700;letter-spacing:.14em;color:#EF9F27;padding:7px 10px 3px;text-transform:uppercase">Scripts</div>
+    <div style="font-size:9px;font-weight:700;letter-spacing:.14em;color:#EF9F27;padding:7px 10px 3px;text-transform:uppercase">Playbooks</div>
     <div id="phr-scripts" style="flex:1;overflow-y:auto;padding-bottom:4px"></div>
 
     <div style="border-top:1px solid #0d1f2e;padding:6px 8px">
-      <button id="phr-new-script" style="width:100%;font-size:10px;font-weight:700;padding:4px;border:1px solid rgba(0,201,201,.3);border-radius:3px;background:transparent;color:#00c9c9;cursor:pointer;font-family:monospace;letter-spacing:.05em">+ New Script</button>
+      <button id="phr-new-script" style="width:100%;font-size:10px;font-weight:700;padding:4px;border:1px solid rgba(0,201,201,.3);border-radius:3px;background:transparent;color:#00c9c9;cursor:pointer;font-family:monospace;letter-spacing:.05em">+ New Playbook</button>
     </div>
   </div>
 
@@ -4355,16 +4885,36 @@ VS: Click &quot;Approve&quot;"
         style="flex:1;width:100%;background:#040710;border:none;outline:none;color:#ffffff;font-family:monospace;font-size:11px;padding:10px 12px;resize:none;line-height:1.7"></textarea>
     </div>
 
-    <!-- Library tab -->
+    <!-- Library tab (CMD-AEGIS-PLAYBOOK-FOUNDATION) -->
     <div id="phr-pane-library" style="display:none;flex:1;overflow-y:auto;padding:10px 12px" class="phr-pane">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:10px;color:#EF9F27;line-height:1.7">
-          Click to load into editor. Scripts auto-load from /scripts/ on startup.
-        </div>
-        <button id="phr-refresh-scripts" title="Reload scripts from server"
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <input id="phr-library-search" type="text" placeholder="search playbooks…" autocomplete="off"
+          style="flex:1;background:#040710;border:1px solid #0d1f2e;border-radius:3px;outline:none;color:#EF9F27;font-family:monospace;font-size:11px;padding:4px 8px"/>
+        <button id="phr-refresh-scripts" title="Reload from substrate"
           style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,.3);border-radius:3px;
                  background:transparent;color:#00c9c9;cursor:pointer;font-family:monospace;
-                 white-space:nowrap;flex-shrink:0;margin-left:8px">↻ Refresh</button>
+                 white-space:nowrap;flex-shrink:0">↻ Refresh</button>
+      </div>
+      <div id="phr-library-filter-row" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:8px;font-family:monospace;font-size:10px;color:#8b8273">
+        <span style="margin-right:4px">Kind:</span>
+        <button class="phr-kind-chip" data-kind="" style="font-size:9px;padding:2px 6px;border:1px solid #EF9F2744;border-radius:2px;background:rgba(239,159,39,0.08);color:#EF9F27;cursor:pointer;font-family:monospace">ALL</button>
+        <button class="phr-kind-chip" data-kind="verification" style="font-size:9px;padding:2px 6px;border:1px solid #1D9E7544;border-radius:2px;background:transparent;color:#1D9E75;cursor:pointer;font-family:monospace">verification</button>
+        <button class="phr-kind-chip" data-kind="runbook" style="font-size:9px;padding:2px 6px;border:1px solid #5B7FFF44;border-radius:2px;background:transparent;color:#5B7FFF;cursor:pointer;font-family:monospace">runbook</button>
+        <button class="phr-kind-chip" data-kind="demonstration" style="font-size:9px;padding:2px 6px;border:1px solid #EF9F2744;border-radius:2px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace">demo</button>
+        <button class="phr-kind-chip" data-kind="fixture" style="font-size:9px;padding:2px 6px;border:1px solid #a07cd944;border-radius:2px;background:transparent;color:#a07cd9;cursor:pointer;font-family:monospace">fixture</button>
+        <button class="phr-kind-chip" data-kind="exploration" style="font-size:9px;padding:2px 6px;border:1px solid #8b827344;border-radius:2px;background:transparent;color:#8b8273;cursor:pointer;font-family:monospace">exploration</button>
+        <span style="margin-left:8px">State:</span>
+        <select id="phr-library-state" style="font-size:10px;background:#040710;border:1px solid #0d1f2e;border-radius:2px;color:#EF9F27;font-family:monospace;padding:2px 4px">
+          <option value="active">Active</option>
+          <option value="draft">Draft</option>
+          <option value="all">All</option>
+        </select>
+        <span style="margin-left:6px">Sort:</span>
+        <select id="phr-library-sort" style="font-size:10px;background:#040710;border:1px solid #0d1f2e;border-radius:2px;color:#EF9F27;font-family:monospace;padding:2px 4px">
+          <option value="recent">Recent</option>
+          <option value="name">Name</option>
+          <option value="last-run">Last-run</option>
+        </select>
       </div>
       <div id="phr-library-list"></div>
     </div>
@@ -4380,6 +4930,10 @@ VS: Click &quot;Approve&quot;"
         <button id="phr-copy-transcript" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.28);border-radius:3px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace">⎘ Copy</button>
         <div style="width:1px;height:14px;background:rgba(0,201,201,0.22)"></div>
         <button id="phr-save-script" style="font-size:10px;padding:2px 8px;border:1px solid rgba(0,201,201,0.35);border-radius:3px;background:transparent;color:#cfe9e9;cursor:pointer;font-family:monospace">Save</button>
+        <button id="phr-publish-pb" style="font-size:10px;padding:2px 8px;border:1px solid rgba(29,158,117,.5);border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;display:none">▶ Publish</button>
+        <button id="phr-edit-pb" style="font-size:10px;padding:2px 8px;border:1px solid rgba(91,127,255,.5);border-radius:3px;background:transparent;color:#5B7FFF;cursor:pointer;font-family:monospace;display:none">Edit (new draft)</button>
+        <button id="phr-archive-pb" style="font-size:10px;padding:2px 8px;border:1px solid rgba(139,130,115,.4);border-radius:3px;background:transparent;color:#8b8273;cursor:pointer;font-family:monospace;display:none">Archive</button>
+        <button id="phr-restore-pb" style="font-size:10px;padding:2px 8px;border:1px solid rgba(91,127,255,.4);border-radius:3px;background:transparent;color:#5B7FFF;cursor:pointer;font-family:monospace;display:none">Restore (→draft)</button>
         <button id="phr-del-script" style="font-size:10px;padding:2px 8px;border:1px solid rgba(226,75,74,.3);border-radius:3px;background:transparent;color:rgba(226,75,74,.6);cursor:pointer;font-family:monospace">Delete</button>
         <div style="width:1px;height:14px;background:rgba(0,201,201,0.22)"></div>
         <button id="phr-run-script" style="font-size:10px;padding:2px 8px;border:1px solid #1D9E75;border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;font-weight:700">▶ Run</button>
@@ -4474,7 +5028,7 @@ function _wirePanel() {
       });
       if (_activeTab === 'library') {
         _renderLibrary();
-        // Wire refresh button each time library tab opens
+        // Wire library controls each time library tab opens
         var refreshBtn = p.querySelector('#phr-refresh-scripts');
         if (refreshBtn && !refreshBtn._wired) {
           refreshBtn._wired = true;
@@ -4483,10 +5037,61 @@ function _wirePanel() {
             btn.textContent = '↻ …';
             btn.disabled = true;
             await _loadServerScripts();
+            await _loadPlaybooks();
             _renderLibrary();
             btn.textContent = '↻ Refresh';
             btn.disabled = false;
           };
+        }
+        // CMD-AEGIS-PLAYBOOK-FOUNDATION: search box
+        var searchEl = p.querySelector('#phr-library-search');
+        if (searchEl && !searchEl._wired) {
+          searchEl._wired = true;
+          searchEl.addEventListener('input', function() {
+            _libraryFilters.search = (searchEl.value || '').trim();
+            _renderLibrary();
+          });
+        }
+        // Kind chips (multi-select; empty = all)
+        p.querySelectorAll('.phr-kind-chip').forEach(function(chip) {
+          if (chip._wired) return;
+          chip._wired = true;
+          chip.addEventListener('click', function() {
+            var k = chip.dataset.kind;
+            if (!k) {
+              _libraryFilters.kinds = []; // ALL
+              p.querySelectorAll('.phr-kind-chip').forEach(function(c) {
+                c.style.background = c.dataset.kind === '' ? 'rgba(239,159,39,0.08)' : 'transparent';
+              });
+            } else {
+              var ix = _libraryFilters.kinds.indexOf(k);
+              if (ix === -1) _libraryFilters.kinds.push(k);
+              else            _libraryFilters.kinds.splice(ix, 1);
+              // Update visual: ALL chip dims, k toggles
+              var allChip = p.querySelector('.phr-kind-chip[data-kind=""]');
+              if (allChip) allChip.style.background = _libraryFilters.kinds.length === 0 ? 'rgba(239,159,39,0.08)' : 'transparent';
+              chip.style.background = (ix === -1) ? 'rgba(239,159,39,0.08)' : 'transparent';
+            }
+            _renderLibrary();
+          });
+        });
+        // State dropdown
+        var stateEl = p.querySelector('#phr-library-state');
+        if (stateEl && !stateEl._wired) {
+          stateEl._wired = true;
+          stateEl.addEventListener('change', function() {
+            _libraryFilters.state = stateEl.value;
+            _renderLibrary();
+          });
+        }
+        // Sort dropdown
+        var sortEl = p.querySelector('#phr-library-sort');
+        if (sortEl && !sortEl._wired) {
+          sortEl._wired = true;
+          sortEl.addEventListener('change', function() {
+            _libraryFilters.sort = sortEl.value;
+            _renderLibrary();
+          });
         }
       }
       if (_activeTab === 'transcript') {
@@ -4505,35 +5110,173 @@ function _wirePanel() {
     p.querySelector('[data-tab="editor"]').click();
   };
 
-  // Save script
-  p.querySelector('#phr-save-script').onclick = function() {
+  // Save script (CMD-AEGIS-PLAYBOOK-FOUNDATION: also persists to substrate as draft).
+  p.querySelector('#phr-save-script').onclick = async function() {
     var name = p.querySelector('#phr-script-name').value.trim().replace(/\s+/g, '-');
     var text = p.querySelector('#phr-editor').value;
-    if (!name) { alert('Enter a script name'); return; }
+    if (!name) { alert('Enter a playbook name'); return; }
+    // localStorage parity (backward compat; non-blocking).
     _saveScript(name, text);
     _activeScript = name;
+    // Substrate save: insert/update draft.
+    if (FIRM_ID) {
+      var existingId = _activePlaybookId;
+      // If the active playbook is not a draft, save creates a new draft.
+      var existing = existingId ? _playbooks[existingId] : null;
+      if (existing && existing.state !== 'draft') existingId = null;
+      var fields = { name: name, body: text };
+      if (!existingId) {
+        // Initialize a new draft with default kind/desc/tags
+        fields.kind = 'exploration';
+        fields.tags = [];
+        fields.description = '';
+      }
+      var result = await _saveDraftPlaybook(existingId, fields);
+      if (result.ok && result.playbook) {
+        _activePlaybookId = result.playbook.playbook_id;
+        _appendLine('SYS', 'sys', 'Playbook saved (draft): ' + name);
+      } else {
+        _appendLine('SYS', 'error', 'Playbook save error: ' + (result.error || 'unknown'));
+      }
+    } else {
+      _appendLine('SYS', 'sys', 'Script saved (localStorage): ' + name);
+    }
     _renderScriptList();
-    _appendLine('SYS', 'sys', 'Script saved: ' + name);
+    if (_renderLibrary) _renderLibrary();
   };
 
-  // Run script from editor
+  // Run script from editor (CMD-AEGIS-PLAYBOOK-FOUNDATION: passes playbook_id).
   p.querySelector('#phr-run-script').onclick = function() {
     var name = p.querySelector('#phr-script-name').value.trim().replace(/\s+/g, '-');
     var text = p.querySelector('#phr-editor').value;
     p.querySelector('[data-tab="transcript"]').click();
-    _runScript(text, name);
+    var pbId = _activePlaybookId || _playbookByName[name] || null;
+    _runScript(text, name, pbId);
   };
 
-  // Delete script
-  p.querySelector('#phr-del-script').onclick = function() {
-    var name = p.querySelector('#phr-script-name').value.trim();
-    if (name && confirm('Delete script "' + name + '"?')) {
-      _deleteScript(name);
-      _renderScriptList();
-      p.querySelector('#phr-editor').value = '';
-      p.querySelector('#phr-script-name').value = '';
+  // CMD-AEGIS-PLAYBOOK-FOUNDATION: lifecycle buttons.
+  p.querySelector('#phr-publish-pb').onclick = async function() {
+    if (!_activePlaybookId) { alert('No playbook loaded'); return; }
+    var pb = _playbooks[_activePlaybookId];
+    if (!pb) { alert('Playbook row not found locally'); return; }
+    if (pb.state !== 'draft') { alert('Only drafts can be published'); return; }
+    if (!confirm('Publish "' + pb.name + '" as v' + ((function(){
+      // Compute next version preview
+      var maxV = 0;
+      Object.values(_playbooks).forEach(function(r){ if (r.name === pb.name && r.state === 'published') maxV = Math.max(maxV, r.version || 1); });
+      return maxV + 1;
+    })()) + '? Published rows are immutable per IR42.')) return;
+    var btn = this;
+    btn.textContent = '▶ …'; btn.disabled = true;
+    var result = await _publishPlaybook(_activePlaybookId);
+    btn.textContent = '▶ Publish'; btn.disabled = false;
+    if (result.ok) {
+      _appendLine('SYS', 'sys', 'Playbook published: ' + pb.name + ' v' + result.version);
+      // The published row may have been replaced (in our cache) — re-resolve.
+      _activePlaybookId = _playbookByName[pb.name] || null;
+      _renderLibrary();
+      _updateLifecycleButtons();
+    } else {
+      _appendLine('SYS', 'error', 'Publish failed: ' + result.error);
     }
   };
+
+  p.querySelector('#phr-edit-pb').onclick = async function() {
+    if (!_activePlaybookId) return;
+    var pb = _playbooks[_activePlaybookId];
+    if (!pb || pb.state !== 'published') { alert('Edit only valid on published rows'); return; }
+    var result = await _createDraftFromPublished(_activePlaybookId);
+    if (result.ok && result.playbook) {
+      _activePlaybookId = result.playbook.playbook_id;
+      p.querySelector('#phr-script-name').value = result.playbook.name;
+      p.querySelector('#phr-editor').value = result.playbook.body;
+      _appendLine('SYS', 'sys', 'New draft created from published: ' + result.playbook.name);
+      _renderLibrary();
+      _updateLifecycleButtons();
+    } else {
+      _appendLine('SYS', 'error', 'Edit failed: ' + (result.error || 'unknown'));
+    }
+  };
+
+  p.querySelector('#phr-archive-pb').onclick = async function() {
+    if (!_activePlaybookId) return;
+    var pb = _playbooks[_activePlaybookId];
+    if (!pb) return;
+    if (!confirm('Archive "' + pb.name + '" v' + (pb.version||1) + '?')) return;
+    var result = await _archivePlaybook(_activePlaybookId);
+    if (result.ok) {
+      _appendLine('SYS', 'sys', 'Playbook archived: ' + pb.name);
+      _renderLibrary();
+      _updateLifecycleButtons();
+    } else {
+      _appendLine('SYS', 'error', 'Archive failed: ' + result.error);
+    }
+  };
+
+  p.querySelector('#phr-restore-pb').onclick = async function() {
+    if (!_activePlaybookId) return;
+    var pb = _playbooks[_activePlaybookId];
+    if (!pb || pb.state !== 'archived') { alert('Restore only valid on archived rows'); return; }
+    if (!confirm('Restore "' + pb.name + '" to draft? You will need to re-publish to make it live.')) return;
+    var result = await _restorePlaybook(_activePlaybookId);
+    if (result.ok) {
+      _appendLine('SYS', 'sys', 'Playbook restored to draft: ' + pb.name);
+      _renderLibrary();
+      _updateLifecycleButtons();
+    } else {
+      _appendLine('SYS', 'error', 'Restore failed: ' + result.error);
+    }
+  };
+
+  // Delete script (drafts only via RLS; for non-substrate localStorage entries
+  // also clears localStorage)
+  p.querySelector('#phr-del-script').onclick = async function() {
+    var name = p.querySelector('#phr-script-name').value.trim();
+    if (!name || !confirm('Delete playbook "' + name + '"?')) return;
+    // Substrate delete (drafts only).
+    if (_activePlaybookId && _playbooks[_activePlaybookId]) {
+      var pb = _playbooks[_activePlaybookId];
+      if (pb.state !== 'draft') {
+        alert('Cannot delete non-draft playbook (substrate immutability). Archive instead.');
+        return;
+      }
+      try {
+        var token = (typeof Auth !== 'undefined' && Auth.getFreshToken)
+          ? await Auth.getFreshToken() : SUPA_KEY;
+        await fetch(SUPA_URL + '/rest/v1/aegis_playbooks?playbook_id=eq.' + _activePlaybookId, {
+          method: 'DELETE',
+          headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token },
+        });
+      } catch (e) { /* swallow */ }
+      _activePlaybookId = null;
+      await _loadPlaybooks();
+    }
+    _deleteScript(name);
+    _renderScriptList();
+    _renderLibrary();
+    p.querySelector('#phr-editor').value = '';
+    p.querySelector('#phr-script-name').value = '';
+    _updateLifecycleButtons();
+  };
+
+  // Update lifecycle button visibility based on _activePlaybookId state.
+  function _updateLifecycleButtons() {
+    var pubBtn = p.querySelector('#phr-publish-pb');
+    var editBtn = p.querySelector('#phr-edit-pb');
+    var arcBtn = p.querySelector('#phr-archive-pb');
+    var resBtn = p.querySelector('#phr-restore-pb');
+    if (!pubBtn) return;
+    var pb = _activePlaybookId ? _playbooks[_activePlaybookId] : null;
+    var state = pb ? pb.state : null;
+    pubBtn.style.display  = (state === 'draft')                                 ? '' : 'none';
+    editBtn.style.display = (state === 'published')                             ? '' : 'none';
+    arcBtn.style.display  = (state === 'published' || state === 'superseded')   ? '' : 'none';
+    resBtn.style.display  = (state === 'archived')                              ? '' : 'none';
+  }
+  // Expose for re-use after script-name input changes
+  p._updateLifecycleButtons = _updateLifecycleButtons;
+  // Trigger initial state
+  _updateLifecycleButtons();
 
   // Command input
   var cmdInput = p.querySelector('#phr-cmd');
@@ -4818,48 +5561,151 @@ function _renderScriptList() {
   });
 }
 
+// CMD-AEGIS-PLAYBOOK-FOUNDATION: kind → color + label
+var _PLAYBOOK_KIND_META = {
+  'verification':  { color: '#1D9E75', label: 'verification' },
+  'runbook':       { color: '#5B7FFF', label: 'runbook'      },
+  'demonstration': { color: '#EF9F27', label: 'demonstration'},
+  'fixture':       { color: '#a07cd9', label: 'fixture'      },
+  'exploration':  { color: '#8b8273',  label: 'exploration' },
+};
+
+function _humanRelativeTime(iso) {
+  if (!iso) return 'never run';
+  var diff = Date.now() - new Date(iso).getTime();
+  var sec = Math.floor(diff / 1000);
+  if (sec < 60)         return 'just now';
+  if (sec < 3600)       return Math.floor(sec/60) + 'm ago';
+  if (sec < 86400)      return Math.floor(sec/3600) + 'h ago';
+  if (sec < 86400 * 30) return Math.floor(sec/86400) + 'd ago';
+  return new Date(iso).toLocaleDateString();
+}
+
+function _isStale(pb) {
+  if (!pb || pb.state !== 'published') return false;
+  if (!pb.last_run_at) return true;
+  return (Date.now() - new Date(pb.last_run_at).getTime()) > (14 * 24 * 60 * 60 * 1000);
+}
+
 function _renderLibrary() {
   var p = _panelEl;
   if (!p) return;
   var container = p.querySelector('#phr-library-list');
   if (!container) return;
 
-  var names = Object.keys(_scripts).sort();
-  if (!names.length) {
-    container.innerHTML = '<div style="font-size:11px;color:#EF9F27">No saved scripts.</div>';
+  // Composite source list: prefer substrate playbooks; fall back to
+  // localStorage-only entries for backward compat (entries that have not
+  // yet been migrated). For each name, pick the best representative row.
+  var rows = [];
+  var seen = new Set();
+  Object.keys(_playbookByName).forEach(function(name) {
+    var pbId = _playbookByName[name];
+    var pb = _playbooks[pbId];
+    if (pb) { rows.push(pb); seen.add(name); }
+  });
+  // Surface localStorage-only entries (not yet migrated) as pseudo-rows
+  // so users see a complete library even mid-migration.
+  Object.keys(_scripts).forEach(function(name) {
+    if (seen.has(name)) return;
+    rows.push({
+      playbook_id: '_legacy_' + name,
+      name: name,
+      body: _scripts[name],
+      kind: 'exploration',
+      tags: ['localStorage-only'],
+      state: 'draft',
+      version: 1,
+      last_run_at: null,
+      last_run_status: null,
+      _legacy: true,
+    });
+  });
+
+  // Apply filters
+  var f = _libraryFilters;
+  var filtered = rows.filter(function(r) {
+    if (f.search) {
+      var s = f.search.toLowerCase();
+      var hay = (r.name + ' ' + (r.description || '') + ' ' + (r.tags || []).join(' ')).toLowerCase();
+      if (hay.indexOf(s) === -1) return false;
+    }
+    if (f.kinds && f.kinds.length && f.kinds.indexOf(r.kind) === -1) return false;
+    if (f.state === 'active') {
+      if (r.state !== 'draft' && r.state !== 'published') return false;
+    } else if (f.state === 'draft') {
+      if (r.state !== 'draft') return false;
+    } // 'all' — no filter
+    return true;
+  });
+
+  // Apply sort
+  filtered.sort(function(a, b) {
+    if (f.sort === 'name') return a.name.localeCompare(b.name);
+    if (f.sort === 'last-run') {
+      var ar = a.last_run_at ? new Date(a.last_run_at).getTime() : 0;
+      var br = b.last_run_at ? new Date(b.last_run_at).getTime() : 0;
+      return br - ar;
+    }
+    // 'recent' default: last_run_at DESC nulls last; tie-break on name
+    var ar2 = a.last_run_at ? new Date(a.last_run_at).getTime() : -1;
+    var br2 = b.last_run_at ? new Date(b.last_run_at).getTime() : -1;
+    if (ar2 !== br2) return br2 - ar2;
+    return a.name.localeCompare(b.name);
+  });
+
+  if (!filtered.length) {
+    container.innerHTML = '<div style="font-size:11px;color:#EF9F27;padding:8px">No playbooks match.</div>';
     return;
   }
 
-  container.innerHTML = names.map(function(name) {
-    var text  = _scripts[name] || '';
-    var lines = text.split('\n').filter(function(l){ return l.trim() && !l.trim().startsWith('#'); }).length;
-    var firstComment = text.split('\n').find(function(l){ return l.trim().startsWith('#') && !l.match(/requires:/i); }) || '(no description)';
-    var required = _parseScriptRequires(text);
-    var reqBadges = required.length
-      ? required.map(function(alias) {
-          var uid = _resolveTargetAlias(alias);
-          var live = uid && _sessions[uid] && _sessions[uid].online;
-          var col = live ? '#1D9E75' : '#EF9F27';
-          return '<span style="font-size:9px;font-family:monospace;color:' + col + ';border:1px solid ' + col + '44;border-radius:2px;padding:0 3px;margin-right:2px">' + alias + '</span>';
-        }).join('')
-      : '';
-    return '<div style="border:1px solid #0d1f2e;border-radius:4px;padding:8px 10px;margin-bottom:6px;cursor:pointer" data-script="' + name + '" onmouseover="this.style.borderColor=\'#1a3a5a\'" onmouseout="this.style.borderColor=\'#0d1f2e\'">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'
-      + '<span style="font-size:11px;color:#EF9F27;font-weight:700">' + name + '</span>'
-      + '<span style="font-size:10px;color:#EF9F27">' + lines + ' cmd' + (lines !== 1 ? 's' : '') + '</span>'
+  container.innerHTML = filtered.map(function(r) {
+    var kindMeta = _PLAYBOOK_KIND_META[r.kind] || { color: '#8b8273', label: r.kind };
+    var stateBadge = r.state === 'published' ? '<span style="font-size:9px;color:#1D9E75;border:1px solid #1D9E7544;border-radius:2px;padding:0 4px;font-family:monospace">PUBLISHED v' + (r.version||1) + '</span>'
+                    : r.state === 'draft' ? '<span style="font-size:9px;color:#EF9F27;border:1px solid #EF9F2744;border-radius:2px;padding:0 4px;font-family:monospace">DRAFT</span>'
+                    : r.state === 'superseded' ? '<span style="font-size:9px;color:#8b8273;border:1px solid #8b827344;border-radius:2px;padding:0 4px;font-family:monospace">SUPERSEDED v' + (r.version||1) + '</span>'
+                    : '<span style="font-size:9px;color:#8b8273;border:1px solid #8b827344;border-radius:2px;padding:0 4px;font-family:monospace">ARCHIVED</span>';
+    var kindBadge = '<span style="font-size:9px;color:' + kindMeta.color + ';border:1px solid ' + kindMeta.color + '44;border-radius:2px;padding:0 4px;font-family:monospace;text-transform:uppercase">' + kindMeta.label + '</span>';
+    var stale = _isStale(r);
+    var staleBadge = stale ? ' <span style="font-size:9px;color:#EF9F27;font-family:monospace;letter-spacing:0.06em">STALE</span>' : '';
+    var lastRun = r.last_run_at
+      ? 'last run ' + _humanRelativeTime(r.last_run_at) + (r.last_run_status ? ' · ' + r.last_run_status : '')
+      : 'never run';
+    var legacyTag = r._legacy ? ' <span style="font-size:9px;color:#a07cd9;font-family:monospace">[unmigrated]</span>' : '';
+    var isActive = r.playbook_id === _activePlaybookId;
+    var border = isActive ? '#EF9F27' : '#0d1f2e';
+    return '<div style="border:1px solid ' + border + ';border-radius:4px;padding:8px 10px;margin-bottom:6px;cursor:pointer" data-pb-id="' + r.playbook_id + '" onmouseover="this.style.borderColor=\'#1a3a5a\'" onmouseout="this.style.borderColor=\'' + border + '\'">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;gap:6px">'
+      + '<span style="font-size:11px;color:#EF9F27;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _escHtml(r.name) + legacyTag + '</span>'
+      + stateBadge
       + '</div>'
-      + (reqBadges ? '<div style="margin-bottom:4px">' + reqBadges + '</div>' : '')
-      + '<div style="font-size:10px;color:#EF9F27">' + _escHtml(firstComment) + '</div>'
+      + '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;flex-wrap:wrap">'
+      + kindBadge + staleBadge
+      + '</div>'
+      + '<div style="font-size:10px;color:#8b8273">' + _escHtml(lastRun) + '</div>'
       + '</div>';
   }).join('');
 
-  container.querySelectorAll('[data-script]').forEach(function(el) {
+  container.querySelectorAll('[data-pb-id]').forEach(function(el) {
     el.onclick = function() {
-      var name = el.dataset.script;
-      _activeScript = name;
-      p.querySelector('#phr-script-name').value = name;
-      p.querySelector('#phr-editor').value = _scripts[name] || '';
+      var pbId = el.dataset.pbId;
+      var r = _playbooks[pbId];
+      if (!r) {
+        // Legacy localStorage entry
+        if (pbId.indexOf('_legacy_') === 0) {
+          var name = pbId.substring(8);
+          _activeScript = name;
+          _activePlaybookId = null;
+          p.querySelector('#phr-script-name').value = name;
+          p.querySelector('#phr-editor').value = _scripts[name] || '';
+        }
+      } else {
+        _activeScript = r.name;
+        _activePlaybookId = r.playbook_id;
+        p.querySelector('#phr-script-name').value = r.name;
+        p.querySelector('#phr-editor').value = r.body || '';
+      }
       _renderScriptList();
+      _renderLibrary();
       p.querySelector('[data-tab="editor"]').click();
     };
   });
@@ -5299,23 +6145,10 @@ async function _init() {
     FIRM_ID = window.PHUD.FIRM_ID;
   }
   if (!FIRM_ID) {
-    // CMD-AUTH-INIT-RACE: distinguish three failure modes so operators
-    // can triage cold-load issues without reading source. The fail-fast
-    // behavior itself is preserved (function returns early without
-    // subscribing to any presence channel) — CMD-AEGIS-1's cross-firm
-    // isolation holds. No fallback firm_id is ever introduced.
-    var _authLoaded = (typeof Auth !== 'undefined') &&
-                      !!window._phudFirmIdReady;
-    var _hasJwt = _authLoaded && !!Auth.getCurrentUserId();
-    var _detail = !_authLoaded
-      ? 'auth.js was not loaded on this page'
-      : !_hasJwt
-        ? 'no authenticated session'
-        : 'authenticated user has no firm_id (check users table)';
     console.error(
-      '[cmd-center] FIRM_ID could not be established: ' + _detail + '. ' +
+      '[cmd-center] auth.js did not populate window.PHUD.FIRM_ID; ' +
       'cmd-center.js cannot initialize; presence and command features unavailable. ' +
-      '(See brief CMD-AEGIS-1 §6 / CMD-AUTH-INIT-RACE.)'
+      '(See brief CMD-AEGIS-1 §6.)'
     );
     window._cmdCenterUninitialized = true;
     return;
@@ -5327,6 +6160,25 @@ async function _init() {
   });
   _loadScripts();
   _loadServerScripts();
+  // CMD-AEGIS-PLAYBOOK-FOUNDATION: load substrate-backed playbooks +
+  // run one-time localStorage→substrate migration. Both async; UI
+  // proceeds with localStorage data while these complete in the
+  // background, then re-renders once substrate state lands.
+  (async function() {
+    try {
+      var loaded = await _loadPlaybooks();
+      await _migrateLocalStorageToPlaybooks();
+      if (_panelEl) {
+        if (_renderLibrary)    _renderLibrary();
+        if (_renderScriptList) _renderScriptList();
+      }
+      if (loaded > 0) {
+        console.log('[Aegis Playbooks] loaded ' + loaded + ' playbook(s) from substrate');
+      }
+    } catch (e) {
+      console.warn('[Aegis Playbooks] init load failed:', e && e.message);
+    }
+  })();
   // CMD88: Init-time prune of zombie session entries in localStorage.
   // Walks all phud:cmd:session:* keys and deletes entries that match ANY of:
   //   - key contains ':anon-' (pre-auth writes that escaped earlier guards)

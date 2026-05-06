@@ -212,6 +212,14 @@
     'accord.minutes.printed':     { glyph: '🖨', stepName: 'Minutes printed',       severity: 'info', color: '#5B7FFF' },
     'risk.registered':            { glyph: '⚠', stepName: 'Risk registered',       severity: 'warn', color: '#EF9F27' },
 
+    // ── AEGIS PLAYBOOKS (CMD-AEGIS-PLAYBOOK-FOUNDATION) ───────────────────────
+    // Three-segment keys per Iron Rule 56. Lifecycle anchors a playbook into
+    // CoC at publish; run events anchor each execution. See aegis_playbooks
+    // and aegis_playbook_runs tables.
+    'aegis.playbook.published':       { glyph: '▶', stepName: 'Playbook published',     severity: 'info', color: '#1D9E75' },
+    'aegis.playbook.run_started':     { glyph: '▷', stepName: 'Playbook run started',   severity: 'info', color: '#5B7FFF' },
+    'aegis.playbook.run_completed':   { glyph: '✓', stepName: 'Playbook run completed', severity: 'info', color: '#1D9E75' },
+
     // ── PIPELINE / CRM ────────────────────────────────────────────────────────
     // Prospect lifecycle from first contact through project handoff.
     // entity_type = 'prospect' | 'proposal' | 'sow_document' | 'project'

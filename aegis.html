@@ -889,11 +889,11 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
         <div id="phr-sessions" style="padding:0 0 4px"></div>
       </div>
 
-      <!-- Scripts -->
-      <div style="font-size:10px;color:var(--aq);letter-spacing:.1em;text-transform:uppercase;padding:8px 12px 5px">Scripts</div>
+      <!-- Playbooks -->
+      <div style="font-size:10px;color:var(--aq);letter-spacing:.1em;text-transform:uppercase;padding:8px 12px 5px">Playbooks</div>
       <div id="phr-scripts" style="flex:1;overflow-y:auto;padding-bottom:4px"></div>
       <div style="border-top:0.5px solid var(--b);padding:7px 10px">
-        <button id="phr-new-script" style="width:100%;font-family:monospace;font-size:10px;font-weight:500;padding:5px;border:0.5px solid rgba(0,201,201,.3);border-radius:4px;background:transparent;color:var(--aq);cursor:pointer;letter-spacing:.05em">+ New Script</button>
+        <button id="phr-new-script" style="width:100%;font-family:monospace;font-size:10px;font-weight:500;padding:5px;border:0.5px solid rgba(0,201,201,.3);border-radius:4px;background:transparent;color:var(--aq);cursor:pointer;letter-spacing:.05em">+ New Playbook</button>
       </div>
     </div>
 
@@ -925,10 +925,10 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 
       <div id="phr-pane-editor" class="phr-pane" style="display:none;flex:1;flex-direction:column">
         <div style="padding:7px 12px;border-bottom:0.5px solid var(--b);flex-shrink:0;background:var(--bg2)">
-          <input id="phr-script-name" placeholder="script-name"
+          <input id="phr-script-name" placeholder="playbook-name"
             style="font-family:monospace;font-size:12px;background:transparent;border:none;outline:none;color:var(--am);width:100%">
         </div>
-        <textarea id="phr-editor" placeholder="# Script commands — one per line
+        <textarea id="phr-editor" placeholder="# Playbook commands — one per line
 # Example:
 VS: Set Tab &quot;MY REQUESTS&quot;
 VS: Form Open &quot;Expense Report&quot;
@@ -943,7 +943,7 @@ VS: Click &quot;Approve&quot;"
 
       <div id="phr-pane-library" class="phr-pane" style="display:none;flex:1;overflow-y:auto;padding:10px 12px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div style="font-size:10px;color:var(--t3);line-height:1.7">Click to load into editor. Scripts auto-load from /scripts/ on startup.</div>
+          <div style="font-size:10px;color:var(--t3);line-height:1.7">Click to load into editor. Playbooks load from substrate; legacy scripts auto-load from /scripts/ on startup.</div>
           <button id="phr-refresh-scripts" style="font-size:10px;padding:3px 9px;border:0.5px solid rgba(0,201,201,.3);border-radius:3px;background:transparent;color:var(--aq);cursor:pointer;font-family:monospace;white-space:nowrap;margin-left:8px;flex-shrink:0">↻ Refresh</button>
         </div>
         <div id="phr-library-list"></div>
@@ -1719,16 +1719,6 @@ document.addEventListener('DOMContentLoaded',function(){
   }, 50);
 })();
 </script>
-<!-- CMD-AUTH-INIT-RACE Part 1: config.js + auth.js loaded synchronously
-     before any dynamic-script loader. Mirrors accord.html convention
-     per IR64. Required because cmd-center.js (loaded via dynamic
-     loader below) consumes window._phudFirmIdReady (auth.js) and
-     window.PHUD.SUPABASE_URL (config.js). Pre-CMD-AUTH-INIT-RACE,
-     these were missing — cmd-center.js's _init() failed fast on
-     every aegis.html load with "auth.js did not populate
-     window.PHUD.FIRM_ID". -->
-<script src="/js/config.js"></script>
-<script src="/js/auth.js"></script>
 <script src="/js/version.js?v=seed"></script>
 <script src="/js/hud-shell.js"></script>
 <script>

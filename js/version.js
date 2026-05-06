@@ -6,7 +6,7 @@
 // To bump the version: change the literal below. Every loader
 // and every internal banner picks up the change automatically
 // on next deploy.
-window._PROJECTHUD_VERSION = "v20260506-CMD-AUTH-INIT-RACE";
+window._PROJECTHUD_VERSION = "v20260506-CMD-AEGIS-PLAYBOOK-FOUNDATION";
 
 // CMD100 migration — Compass My Work sub-view vocabulary collapse.
 // Legacy tab-keys 'timesheet' and 'concerns' rewritten to canonical
