@@ -4378,21 +4378,27 @@ async function _insertRunStart(playbookRow) {
     var rows = await resp.json();
     var runId = rows && rows[0] && rows[0].run_id;
     // Fire CoC event (best-effort; guard for CoC unavailability)
-    if (runId && window.CoC && window.CoC.write && window._myResource) {
-      try {
-        await window.CoC.write('aegis.playbook.run_started', playbookRow.playbook_id, {
-          entityType: 'aegis_playbook',
-          actorResourceId: window._myResource.id,
-          notes: 'Run started: ' + playbookRow.name,
-          meta: {
-            run_id:           runId,
-            playbook_id:      playbookRow.playbook_id,
-            playbook_name:    playbookRow.name,
-            playbook_version: playbookRow.version,
-            playbook_kind:    playbookRow.kind,
-          },
-        });
-      } catch(_) {}
+    if (runId && window.CoC && window.CoC.write && playbookRow) {
+      var actorResId = (window._myResource && window._myResource.id) || null;
+      if (!actorResId) {
+        console.warn('[Aegis Playbooks] CoC run_started skipped: no _myResource.id');
+      } else {
+        try {
+          await window.CoC.write('aegis.playbook.run_started', playbookRow.playbook_id, {
+            entityType: 'aegis_playbook',
+            actorResourceId: actorResId,
+            notes: 'Run started: ' + playbookRow.name,
+            meta: {
+              run_id:           runId,
+              playbook_id:      playbookRow.playbook_id,
+              playbook_name:    playbookRow.name,
+              playbook_version: playbookRow.version,
+              playbook_kind:    playbookRow.kind,
+            },
+          });
+          console.log('[Aegis Playbooks] CoC run_started written for', playbookRow.name);
+        } catch(e) { console.warn('[Aegis Playbooks] CoC run_started failed:', e && e.message); }
+      }
     }
     return runId;
   } catch (e) { return null; }
@@ -4412,11 +4418,14 @@ async function _completeRun(runId, terminalStatus, summary, commandCount, durati
       command_count:      commandCount,
       duration_ms:        durationMs,
     };
-    await fetch(SUPA_URL + '/rest/v1/aegis_playbook_runs?run_id=eq.' + runId, {
+    var resp1 = await fetch(SUPA_URL + '/rest/v1/aegis_playbook_runs?run_id=eq.' + runId, {
       method: 'PATCH',
       headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     });
+    if (!resp1.ok) {
+      console.warn('[Aegis Playbooks] run PATCH failed:', resp1.status, await resp1.text().catch(function(){ return '?'; }));
+    }
     // Mirror to playbook row's last_run_at / last_run_status
     if (playbookRow && playbookRow.playbook_id) {
       var pbPatch = {
@@ -4425,11 +4434,16 @@ async function _completeRun(runId, terminalStatus, summary, commandCount, durati
                          terminalStatus === 'fail' ? 'fail' :
                          terminalStatus === 'aborted' ? 'aborted' : 'error',
       };
-      await fetch(SUPA_URL + '/rest/v1/aegis_playbooks?playbook_id=eq.' + playbookRow.playbook_id, {
+      var resp2 = await fetch(SUPA_URL + '/rest/v1/aegis_playbooks?playbook_id=eq.' + playbookRow.playbook_id, {
         method: 'PATCH',
         headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify(pbPatch),
       });
+      if (!resp2.ok) {
+        console.warn('[Aegis Playbooks] playbook last_run PATCH failed:', resp2.status, await resp2.text().catch(function(){ return '?'; }));
+      } else {
+        console.log('[Aegis Playbooks] last_run_at updated for', playbookRow.name);
+      }
       // Update local cache so UI reflects immediately
       if (_playbooks[playbookRow.playbook_id]) {
         _playbooks[playbookRow.playbook_id].last_run_at     = pbPatch.last_run_at;
@@ -4437,23 +4451,29 @@ async function _completeRun(runId, terminalStatus, summary, commandCount, durati
       }
     }
     // Fire CoC event
-    if (window.CoC && window.CoC.write && window._myResource && playbookRow) {
-      try {
-        await window.CoC.write('aegis.playbook.run_completed', playbookRow.playbook_id, {
-          entityType: 'aegis_playbook',
-          actorResourceId: window._myResource.id,
-          notes: 'Run ' + terminalStatus + ': ' + playbookRow.name,
-          meta: {
-            run_id:           runId,
-            playbook_id:      playbookRow.playbook_id,
-            playbook_name:    playbookRow.name,
-            playbook_version: playbookRow.version,
-            playbook_kind:    playbookRow.kind,
-            status:           terminalStatus,
-            duration_ms:      durationMs,
-          },
-        });
-      } catch(_) {}
+    if (window.CoC && window.CoC.write && playbookRow) {
+      var actorResId = (window._myResource && window._myResource.id) || null;
+      if (!actorResId) {
+        console.warn('[Aegis Playbooks] CoC run_completed skipped: no _myResource.id (identity not yet resolved)');
+      } else {
+        try {
+          await window.CoC.write('aegis.playbook.run_completed', playbookRow.playbook_id, {
+            entityType: 'aegis_playbook',
+            actorResourceId: actorResId,
+            notes: 'Run ' + terminalStatus + ': ' + playbookRow.name,
+            meta: {
+              run_id:           runId,
+              playbook_id:      playbookRow.playbook_id,
+              playbook_name:    playbookRow.name,
+              playbook_version: playbookRow.version,
+              playbook_kind:    playbookRow.kind,
+              status:           terminalStatus,
+              duration_ms:      durationMs,
+            },
+          });
+          console.log('[Aegis Playbooks] CoC run_completed written for', playbookRow.name);
+        } catch(e) { console.warn('[Aegis Playbooks] CoC run_completed failed:', e && e.message); }
+      }
     }
   } catch (e) { /* swallow — non-fatal */ }
 }
@@ -5719,30 +5739,34 @@ function _renderLibrary() {
 
   container.innerHTML = filtered.map(function(r) {
     var kindMeta = _PLAYBOOK_KIND_META[r.kind] || { color: '#8b8273', label: r.kind };
-    var stateBadge = r.state === 'published' ? '<span style="font-size:13px;color:#1D9E75;border:1px solid #1D9E7544;border-radius:3px;padding:2px 7px;font-family:monospace">PUBLISHED v' + (r.version||1) + '</span>'
+    var stateBadge = r.state === 'published' ? '<span style="font-size:13px;color:#1D9E75;border:1px solid #1D9E7544;border-radius:3px;padding:2px 7px;font-family:monospace">PUB v' + (r.version||1) + '</span>'
                     : r.state === 'draft' ? '<span style="font-size:13px;color:#EF9F27;border:1px solid #EF9F2744;border-radius:3px;padding:2px 7px;font-family:monospace">DRAFT</span>'
-                    : r.state === 'superseded' ? '<span style="font-size:13px;color:#8b8273;border:1px solid #8b827344;border-radius:3px;padding:2px 7px;font-family:monospace">SUPERSEDED v' + (r.version||1) + '</span>'
+                    : r.state === 'superseded' ? '<span style="font-size:13px;color:#8b8273;border:1px solid #8b827344;border-radius:3px;padding:2px 7px;font-family:monospace">SUPER v' + (r.version||1) + '</span>'
                     : '<span style="font-size:13px;color:#8b8273;border:1px solid #8b827344;border-radius:3px;padding:2px 7px;font-family:monospace">ARCHIVED</span>';
     var kindBadge = '<span style="font-size:13px;color:' + kindMeta.color + ';border:1px solid ' + kindMeta.color + '44;border-radius:3px;padding:2px 7px;font-family:monospace;text-transform:uppercase">' + kindMeta.label + '</span>';
     var stale = _isStale(r);
-    var staleBadge = stale ? ' <span style="font-size:13px;color:#EF9F27;font-family:monospace;letter-spacing:0.06em;font-weight:700">STALE</span>' : '';
+    var staleBadge = stale ? '<span style="font-size:13px;color:#EF9F27;font-family:monospace;letter-spacing:0.06em;font-weight:700;margin-left:4px">STALE</span>' : '';
     var lastRun = r.last_run_at
-      ? 'last run ' + _humanRelativeTime(r.last_run_at) + (r.last_run_status ? ' · ' + r.last_run_status : '')
+      ? _humanRelativeTime(r.last_run_at) + (r.last_run_status ? ' · ' + r.last_run_status : '')
       : 'never run';
     var legacyTag = r._legacy ? ' <span style="font-size:13px;color:#a07cd9;font-family:monospace">[unmigrated]</span>' : '';
     var isActive = r.playbook_id === _activePlaybookId;
     var border = isActive ? '#EF9F27' : '#0d1f2e';
-    return '<div style="border:1px solid ' + border + ';border-radius:4px;padding:8px 10px;margin-bottom:6px;cursor:pointer" data-pb-id="' + r.playbook_id + '" onmouseover="this.style.borderColor=\'#1a3a5a\'" onmouseout="this.style.borderColor=\'' + border + '\'">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;gap:6px">'
-      + '<span style="font-size:13px;color:#EF9F27;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _escHtml(r.name) + legacyTag + '</span>'
-      + stateBadge
-      + '</div>'
-      + '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;flex-wrap:wrap">'
-      + kindBadge + staleBadge
-      + '</div>'
-      + '<div style="font-size:13px;color:#8b8273">' + _escHtml(lastRun) + '</div>'
+    return '<div style="display:grid;grid-template-columns:minmax(0,1fr) 130px 110px 160px;gap:10px;align-items:center;border:1px solid ' + border + ';border-radius:4px;padding:6px 10px;margin-bottom:4px;cursor:pointer" data-pb-id="' + r.playbook_id + '" onmouseover="this.style.borderColor=\'#1a3a5a\'" onmouseout="this.style.borderColor=\'' + border + '\'">'
+      + '<span style="font-size:13px;color:#EF9F27;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">' + _escHtml(r.name) + legacyTag + '</span>'
+      + '<span style="font-family:monospace">' + kindBadge + '</span>'
+      + '<span style="font-family:monospace">' + stateBadge + '</span>'
+      + '<span style="font-size:13px;color:#8b8273;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _escHtml(lastRun) + staleBadge + '</span>'
       + '</div>';
   }).join('');
+
+  // Prepend header row
+  if (filtered.length) {
+    container.innerHTML =
+      '<div style="display:grid;grid-template-columns:minmax(0,1fr) 130px 110px 160px;gap:10px;padding:4px 10px 6px 10px;border-bottom:1px solid #0d1f2e;margin-bottom:6px;font-size:11px;color:#8b8273;font-family:monospace;letter-spacing:.08em;text-transform:uppercase">'
+      + '<span>Name</span><span>Kind</span><span>State</span><span>Last run</span>'
+      + '</div>' + container.innerHTML;
+  }
 
   container.querySelectorAll('[data-pb-id]').forEach(function(el) {
     el.onclick = function() {
