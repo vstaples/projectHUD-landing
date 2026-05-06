@@ -6,7 +6,14 @@
 // To bump the version: change the literal below. Every loader
 // and every internal banner picks up the change automatically
 // on next deploy.
-window._PROJECTHUD_VERSION = "v20260506-CMD-AEGIS-VERIFICATION-PATTERN-d";
+//
+// R-RENDER-VERSION-DUAL-PIN (Iron Rule 65, ratified 2026-05-06):
+// applies only when render template body bytes change.
+// CMD-SURFACE-DEP-AUDIT-1 is a static-script-tag propagation +
+// shell URL deprecation across surface HTMLs. Render template
+// body unchanged → single-pin bump; RENDER_VERSION in render-
+// minutes/index.ts stays at v20260505-CMD-PROJECTION-ENGINE-2.
+window._PROJECTHUD_VERSION = "v20260506-CMD-SURFACE-DEP-AUDIT-1";
 
 // CMD100 migration — Compass My Work sub-view vocabulary collapse.
 // Legacy tab-keys 'timesheet' and 'concerns' rewritten to canonical

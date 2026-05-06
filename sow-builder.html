@@ -488,8 +488,13 @@ body {
 <script src="/js/config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
+<!-- CMD-SURFACE-DEP-AUDIT-1: canonical shared modules (was: missing coc/ui/notif/cmd-center) -->
+<script src="/js/coc.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/notif.js"></script>
 <script src="/js/version.js?v=seed"></script>
-<script src="/js/sidebar.js"></script>
+<script src="/js/hud-shell.js"></script>
+<script src="/js/cmd-center.js"></script>
 <script>
 const params      = new URLSearchParams(location.search);
 const PROPOSAL_ID = params.get('proposal_id');

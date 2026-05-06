@@ -2642,7 +2642,10 @@
       s.src = src + '?v=' + v;
       document.head.appendChild(s);
     }
-    load('/js/sidebar.js');
+    // CMD-SURFACE-DEP-AUDIT-1: removed orphaned load('/js/sidebar.js').
+    // accord.html does not call HUDShell.init() / Sidebar.init() — the
+    // file load was a pure legacy artifact from before accord adopted
+    // its own custom header/branding. See CMD-SIDEBAR-URL-RETIREMENT-1.
     load('/js/cmd-center.js');
     load('/js/accord-core.js');
     load('/js/accord-capture.js');
