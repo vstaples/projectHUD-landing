@@ -5143,6 +5143,7 @@ function _wirePanel() {
     }
     _renderScriptList();
     if (_renderLibrary) _renderLibrary();
+    if (p._updateLifecycleButtons) p._updateLifecycleButtons();
   };
 
   // Run script from editor (CMD-AEGIS-PLAYBOOK-FOUNDATION: passes playbook_id).
@@ -5559,12 +5560,14 @@ function _renderScriptList() {
     el.onclick = function() {
       var name = el.dataset.script;
       _activeScript = name;
+      _activePlaybookId = _playbookByName[name] || null;
       var scriptEl = p.querySelector('#phr-script-name');
       var editorEl = p.querySelector('#phr-editor');
       if (scriptEl) scriptEl.value = name;
       if (editorEl) editorEl.value = _scripts[name] || '';
       _renderScriptList();
       p.querySelector('[data-tab="editor"]').click();
+      if (p._updateLifecycleButtons) p._updateLifecycleButtons();
     };
   });
 }
@@ -5662,34 +5665,34 @@ function _renderLibrary() {
   });
 
   if (!filtered.length) {
-    container.innerHTML = '<div style="font-size:11px;color:#EF9F27;padding:8px">No playbooks match.</div>';
+    container.innerHTML = '<div style="font-size:15px;color:#EF9F27;padding:8px">No playbooks match.</div>';
     return;
   }
 
   container.innerHTML = filtered.map(function(r) {
     var kindMeta = _PLAYBOOK_KIND_META[r.kind] || { color: '#8b8273', label: r.kind };
-    var stateBadge = r.state === 'published' ? '<span style="font-size:9px;color:#1D9E75;border:1px solid #1D9E7544;border-radius:2px;padding:0 4px;font-family:monospace">PUBLISHED v' + (r.version||1) + '</span>'
-                    : r.state === 'draft' ? '<span style="font-size:9px;color:#EF9F27;border:1px solid #EF9F2744;border-radius:2px;padding:0 4px;font-family:monospace">DRAFT</span>'
-                    : r.state === 'superseded' ? '<span style="font-size:9px;color:#8b8273;border:1px solid #8b827344;border-radius:2px;padding:0 4px;font-family:monospace">SUPERSEDED v' + (r.version||1) + '</span>'
-                    : '<span style="font-size:9px;color:#8b8273;border:1px solid #8b827344;border-radius:2px;padding:0 4px;font-family:monospace">ARCHIVED</span>';
-    var kindBadge = '<span style="font-size:9px;color:' + kindMeta.color + ';border:1px solid ' + kindMeta.color + '44;border-radius:2px;padding:0 4px;font-family:monospace;text-transform:uppercase">' + kindMeta.label + '</span>';
+    var stateBadge = r.state === 'published' ? '<span style="font-size:15px;color:#1D9E75;border:1px solid #1D9E7544;border-radius:3px;padding:2px 7px;font-family:monospace">PUBLISHED v' + (r.version||1) + '</span>'
+                    : r.state === 'draft' ? '<span style="font-size:15px;color:#EF9F27;border:1px solid #EF9F2744;border-radius:3px;padding:2px 7px;font-family:monospace">DRAFT</span>'
+                    : r.state === 'superseded' ? '<span style="font-size:15px;color:#8b8273;border:1px solid #8b827344;border-radius:3px;padding:2px 7px;font-family:monospace">SUPERSEDED v' + (r.version||1) + '</span>'
+                    : '<span style="font-size:15px;color:#8b8273;border:1px solid #8b827344;border-radius:3px;padding:2px 7px;font-family:monospace">ARCHIVED</span>';
+    var kindBadge = '<span style="font-size:15px;color:' + kindMeta.color + ';border:1px solid ' + kindMeta.color + '44;border-radius:3px;padding:2px 7px;font-family:monospace;text-transform:uppercase">' + kindMeta.label + '</span>';
     var stale = _isStale(r);
-    var staleBadge = stale ? ' <span style="font-size:9px;color:#EF9F27;font-family:monospace;letter-spacing:0.06em">STALE</span>' : '';
+    var staleBadge = stale ? ' <span style="font-size:15px;color:#EF9F27;font-family:monospace;letter-spacing:0.06em;font-weight:700">STALE</span>' : '';
     var lastRun = r.last_run_at
       ? 'last run ' + _humanRelativeTime(r.last_run_at) + (r.last_run_status ? ' · ' + r.last_run_status : '')
       : 'never run';
-    var legacyTag = r._legacy ? ' <span style="font-size:9px;color:#a07cd9;font-family:monospace">[unmigrated]</span>' : '';
+    var legacyTag = r._legacy ? ' <span style="font-size:15px;color:#a07cd9;font-family:monospace">[unmigrated]</span>' : '';
     var isActive = r.playbook_id === _activePlaybookId;
     var border = isActive ? '#EF9F27' : '#0d1f2e';
     return '<div style="border:1px solid ' + border + ';border-radius:4px;padding:8px 10px;margin-bottom:6px;cursor:pointer" data-pb-id="' + r.playbook_id + '" onmouseover="this.style.borderColor=\'#1a3a5a\'" onmouseout="this.style.borderColor=\'' + border + '\'">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;gap:6px">'
-      + '<span style="font-size:11px;color:#EF9F27;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _escHtml(r.name) + legacyTag + '</span>'
+      + '<span style="font-size:15px;color:#EF9F27;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _escHtml(r.name) + legacyTag + '</span>'
       + stateBadge
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;flex-wrap:wrap">'
       + kindBadge + staleBadge
       + '</div>'
-      + '<div style="font-size:10px;color:#8b8273">' + _escHtml(lastRun) + '</div>'
+      + '<div style="font-size:15px;color:#8b8273">' + _escHtml(lastRun) + '</div>'
       + '</div>';
   }).join('');
 
@@ -5715,6 +5718,7 @@ function _renderLibrary() {
       _renderScriptList();
       _renderLibrary();
       p.querySelector('[data-tab="editor"]').click();
+      if (p._updateLifecycleButtons) p._updateLifecycleButtons();
     };
   });
 }
