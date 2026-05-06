@@ -140,7 +140,15 @@ const Auth = (() => {
       if (window.PHUD.FIRM_ID) return window.PHUD.FIRM_ID;
 
       const sub = getCurrentUserId();
-      if (!sub) return null;
+      if (!sub) {
+        // CMD-AUTH-INIT-RACE: log the no-auth path so cold-load
+        // failures surface diagnostically before cmd-center.js's
+        // fail-fast fires. Common when a fresh window opens with
+        // no persisted session, or when token expiry has cleared
+        // the JWT before re-login.
+        console.warn('[Auth] ensureFirmId: no authenticated user; firm_id unavailable until login');
+        return null;
+      }
 
       // Cache hit.
       const cacheKey = 'phud:firm_id:' + sub;

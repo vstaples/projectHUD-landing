@@ -5299,10 +5299,23 @@ async function _init() {
     FIRM_ID = window.PHUD.FIRM_ID;
   }
   if (!FIRM_ID) {
+    // CMD-AUTH-INIT-RACE: distinguish three failure modes so operators
+    // can triage cold-load issues without reading source. The fail-fast
+    // behavior itself is preserved (function returns early without
+    // subscribing to any presence channel) — CMD-AEGIS-1's cross-firm
+    // isolation holds. No fallback firm_id is ever introduced.
+    var _authLoaded = (typeof Auth !== 'undefined') &&
+                      !!window._phudFirmIdReady;
+    var _hasJwt = _authLoaded && !!Auth.getCurrentUserId();
+    var _detail = !_authLoaded
+      ? 'auth.js was not loaded on this page'
+      : !_hasJwt
+        ? 'no authenticated session'
+        : 'authenticated user has no firm_id (check users table)';
     console.error(
-      '[cmd-center] auth.js did not populate window.PHUD.FIRM_ID; ' +
+      '[cmd-center] FIRM_ID could not be established: ' + _detail + '. ' +
       'cmd-center.js cannot initialize; presence and command features unavailable. ' +
-      '(See brief CMD-AEGIS-1 §6.)'
+      '(See brief CMD-AEGIS-1 §6 / CMD-AUTH-INIT-RACE.)'
     );
     window._cmdCenterUninitialized = true;
     return;
