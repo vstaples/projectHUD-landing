@@ -1612,7 +1612,7 @@ var COMMANDS = {
   'Set SubTab': async function(args) {
     return _aegisActivateTab('subtab', args[0]);
   },
-  'Set View': async function(args){var v=(args[0]||'').toLowerCase().replace(/\.html$/,'');var m={'compass':'/compass.html','cadence':'/cadence.html','dashboard':'/dashboard.html'};var h=m[v];if(!h)return 'Unknown view: '+args[0];window.location.href=h;return 'navigating to '+h;},
+  'Set View': async function(args){var v=(args[0]||'').toLowerCase().replace(/\.html$/,'');var m={'compass':'/compass.html','cadence':'/cadence.html','dashboard':'/dashboard.html','accord':'/accord.html','aegis':'/aegis.html','pipeline':'/pipeline.html','requests':'/resource-requests.html','resources':'/resources.html','users':'/users.html'};var h=m[v];if(!h)return 'Unknown view: '+args[0];window.location.href=h;return 'navigating to '+h;},
 
   // ── Register <Module> (CMD100.57) ──────────────────────────────────────────
   // Canonical script-start primitive. Auto-routes the executing session to
@@ -1632,6 +1632,7 @@ var COMMANDS = {
       'cadence':    '/cadence.html',
       'pipeline':   '/pipeline.html',
       'aegis':      '/aegis.html',
+      'accord':     '/accord.html',
       'requests':   '/resource-requests.html',
       'resources':  '/resources.html',
       'user mgmt':  '/users.html',
@@ -1658,6 +1659,7 @@ var COMMANDS = {
       'cadence':    '/cadence.html',
       'pipeline':   '/pipeline.html',
       'aegis':      '/aegis.html',
+      'accord':     '/accord.html',
       'requests':   '/resource-requests.html',
       'resources':  '/resources.html',
       'user mgmt':  '/users.html',
