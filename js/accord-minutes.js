@@ -399,7 +399,7 @@
     return _signClient;
   }
 
-  async function _signedUrlFor(renderRow) {
+  async function _signedUrlFor(renderRow, opts = {}) {
     if (!renderRow?.storage_path) return null;
     try {
       const sb = await _signClientGet();
@@ -412,9 +412,15 @@
         }
       } catch (_) { /* fall through */ }
       const filename = renderRow.storage_path.split('/').pop() || 'minutes';
+      // CMD-MINUTES-UX-POLISH-1 §3.3: opts.inlineDisplay=true omits the
+      // {download} option so the signed URL serves the artifact inline
+      // (View PDF slide-in path) instead of triggering a download.
+      // Default behavior (opts unset / inlineDisplay=false) preserves the
+      // download-disposition for the Download PDF button — unchanged.
+      const signOpts = opts.inlineDisplay ? undefined : { download: filename };
       const { data, error } = await sb.storage
         .from('accord-minutes')
-        .createSignedUrl(renderRow.storage_path, 3600, { download: filename });
+        .createSignedUrl(renderRow.storage_path, 3600, signOpts);
       if (error) {
         console.warn('[Accord-minutes] signed URL error:', error.message);
         return null;
@@ -439,19 +445,11 @@
       _toast('No render available to preview.', null, true);
       return;
     }
-    // Build inline-display signed URL (no download disposition)
-    let inlineUrl = null;
-    try {
-      const sb = window.supabaseClient || window._sb || (window.supabase && window.supabase._client);
-      if (sb && sb.storage) {
-        const { data, error } = await sb.storage
-          .from('accord-minutes')
-          .createSignedUrl(renderRow.storage_path, 3600);
-        if (!error) inlineUrl = data?.signedUrl || null;
-      }
-    } catch (e) {
-      console.warn('[Accord-minutes] preview signed URL failed', e);
-    }
+    // CMD-MINUTES-UX-POLISH-1 §3.3 (post-deploy fix): use canonical
+    // _signedUrlFor() with inlineDisplay flag rather than reaching for
+    // window.supabaseClient/_sb globals that aren't exposed in this
+    // codebase. Iron Rule 64 — codebase-as-spec.
+    const inlineUrl = await _signedUrlFor(renderRow, { inlineDisplay: true });
     if (!inlineUrl) {
       _toast('Could not fetch render for preview.', null, true);
       return;
