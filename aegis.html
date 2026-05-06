@@ -112,7 +112,7 @@ html,body{height:100%;background:var(--bg);color:var(--t);font-family:var(--mono
 /* mod header */
 .mod-hd{padding:12px 16px 10px;border-bottom:0.5px solid var(--b);display:flex;align-items:center;justify-content:space-between;background:var(--bg2);flex-shrink:0}
 .mod-eyebrow{font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
-.mod-title{font-size:15px;font-weight:500;color:var(--t);letter-spacing:.03em}
+.mod-title{font-size:13px;font-weight:500;color:var(--t);letter-spacing:.03em}
 .mod-title .hi{color:var(--aq)}.mod-title .hi-am{color:var(--am)}
 .mod-tabs-wrap{display:flex;gap:0;background:var(--bg3);border-radius:6px;border:0.5px solid var(--b);overflow:hidden}
 .mt{font-size:11px;color:var(--t3);padding:5px 14px;cursor:pointer;border-right:0.5px solid var(--b);letter-spacing:.03em;transition:all .1s}
@@ -944,25 +944,25 @@ VS: Click &quot;Approve&quot;"
       <div id="phr-pane-library" class="phr-pane" style="display:none;flex:1;overflow-y:auto;padding:10px 12px">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
           <input id="phr-library-search" type="text" placeholder="search playbooks…" autocomplete="off"
-            style="flex:1;background:#040710;border:1px solid #0d1f2e;border-radius:3px;outline:none;color:#EF9F27;font-family:monospace;font-size:15px;padding:4px 8px"/>
-          <button id="phr-refresh-scripts" style="font-size:15px;padding:4px 10px;border:0.5px solid rgba(0,201,201,.3);border-radius:3px;background:transparent;color:var(--aq);cursor:pointer;font-family:monospace;white-space:nowrap;flex-shrink:0">↻ Refresh</button>
+            style="flex:1;background:#040710;border:1px solid #0d1f2e;border-radius:3px;outline:none;color:#EF9F27;font-family:monospace;font-size:13px;padding:4px 8px"/>
+          <button id="phr-refresh-scripts" style="font-size:13px;padding:4px 10px;border:0.5px solid rgba(0,201,201,.3);border-radius:3px;background:transparent;color:var(--aq);cursor:pointer;font-family:monospace;white-space:nowrap;flex-shrink:0">↻ Refresh</button>
         </div>
-        <div id="phr-library-filter-row" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:8px;font-family:monospace;font-size:15px;color:#8b8273">
+        <div id="phr-library-filter-row" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:8px;font-family:monospace;font-size:13px;color:#8b8273">
           <span style="margin-right:4px">Kind:</span>
-          <button class="phr-kind-chip" data-kind="" style="font-size:15px;padding:4px 9px;border:1px solid #EF9F2744;border-radius:2px;background:rgba(239,159,39,0.08);color:#EF9F27;cursor:pointer;font-family:monospace">ALL</button>
-          <button class="phr-kind-chip" data-kind="verification" style="font-size:15px;padding:4px 9px;border:1px solid #1D9E7544;border-radius:2px;background:transparent;color:#1D9E75;cursor:pointer;font-family:monospace">verification</button>
-          <button class="phr-kind-chip" data-kind="runbook" style="font-size:15px;padding:4px 9px;border:1px solid #5B7FFF44;border-radius:2px;background:transparent;color:#5B7FFF;cursor:pointer;font-family:monospace">runbook</button>
-          <button class="phr-kind-chip" data-kind="demonstration" style="font-size:15px;padding:4px 9px;border:1px solid #EF9F2744;border-radius:2px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace">demo</button>
-          <button class="phr-kind-chip" data-kind="fixture" style="font-size:15px;padding:4px 9px;border:1px solid #a07cd944;border-radius:2px;background:transparent;color:#a07cd9;cursor:pointer;font-family:monospace">fixture</button>
-          <button class="phr-kind-chip" data-kind="exploration" style="font-size:15px;padding:4px 9px;border:1px solid #8b827344;border-radius:2px;background:transparent;color:#8b8273;cursor:pointer;font-family:monospace">exploration</button>
+          <button class="phr-kind-chip" data-kind="" style="font-size:13px;padding:4px 9px;border:1px solid #EF9F2744;border-radius:2px;background:rgba(239,159,39,0.08);color:#EF9F27;cursor:pointer;font-family:monospace">ALL</button>
+          <button class="phr-kind-chip" data-kind="verification" style="font-size:13px;padding:4px 9px;border:1px solid #1D9E7544;border-radius:2px;background:transparent;color:#1D9E75;cursor:pointer;font-family:monospace">verification</button>
+          <button class="phr-kind-chip" data-kind="runbook" style="font-size:13px;padding:4px 9px;border:1px solid #5B7FFF44;border-radius:2px;background:transparent;color:#5B7FFF;cursor:pointer;font-family:monospace">runbook</button>
+          <button class="phr-kind-chip" data-kind="demonstration" style="font-size:13px;padding:4px 9px;border:1px solid #EF9F2744;border-radius:2px;background:transparent;color:#EF9F27;cursor:pointer;font-family:monospace">demo</button>
+          <button class="phr-kind-chip" data-kind="fixture" style="font-size:13px;padding:4px 9px;border:1px solid #a07cd944;border-radius:2px;background:transparent;color:#a07cd9;cursor:pointer;font-family:monospace">fixture</button>
+          <button class="phr-kind-chip" data-kind="exploration" style="font-size:13px;padding:4px 9px;border:1px solid #8b827344;border-radius:2px;background:transparent;color:#8b8273;cursor:pointer;font-family:monospace">exploration</button>
           <span style="margin-left:8px">State:</span>
-          <select id="phr-library-state" style="font-size:15px;background:#040710;border:1px solid #0d1f2e;border-radius:2px;color:#EF9F27;font-family:monospace;padding:2px 4px">
+          <select id="phr-library-state" style="font-size:13px;background:#040710;border:1px solid #0d1f2e;border-radius:2px;color:#EF9F27;font-family:monospace;padding:2px 4px">
             <option value="active">Active</option>
             <option value="draft">Draft</option>
             <option value="all">All</option>
           </select>
           <span style="margin-left:6px">Sort:</span>
-          <select id="phr-library-sort" style="font-size:15px;background:#040710;border:1px solid #0d1f2e;border-radius:2px;color:#EF9F27;font-family:monospace;padding:2px 4px">
+          <select id="phr-library-sort" style="font-size:13px;background:#040710;border:1px solid #0d1f2e;border-radius:2px;color:#EF9F27;font-family:monospace;padding:2px 4px">
             <option value="recent">Recent</option>
             <option value="name">Name</option>
             <option value="last-run">Last-run</option>
@@ -979,10 +979,10 @@ VS: Click &quot;Approve&quot;"
           <button id="phr-copy-transcript" class="btn wh">⎘ Copy</button>
           <div style="width:0.5px;height:14px;background:var(--b2)"></div>
           <button id="phr-save-script" class="btn wh">Save</button>
-          <button id="phr-publish-pb" class="btn" style="font-size:15px;padding:4px 10px;border:0.5px solid rgba(29,158,117,.5);border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;display:none">▶ Publish</button>
-          <button id="phr-edit-pb" class="btn" style="font-size:15px;padding:4px 10px;border:0.5px solid rgba(91,127,255,.5);border-radius:3px;background:transparent;color:#5B7FFF;cursor:pointer;font-family:monospace;display:none">Edit (new draft)</button>
-          <button id="phr-archive-pb" class="btn" style="font-size:15px;padding:4px 10px;border:0.5px solid rgba(139,130,115,.4);border-radius:3px;background:transparent;color:#8b8273;cursor:pointer;font-family:monospace;display:none">Archive</button>
-          <button id="phr-restore-pb" class="btn" style="font-size:15px;padding:4px 10px;border:0.5px solid rgba(91,127,255,.4);border-radius:3px;background:transparent;color:#5B7FFF;cursor:pointer;font-family:monospace;display:none">Restore (→draft)</button>
+          <button id="phr-publish-pb" class="btn" style="font-size:13px;padding:4px 10px;border:0.5px solid rgba(29,158,117,.5);border-radius:3px;background:rgba(29,158,117,.1);color:#1D9E75;cursor:pointer;font-family:monospace;display:none">▶ Publish</button>
+          <button id="phr-edit-pb" class="btn" style="font-size:13px;padding:4px 10px;border:0.5px solid rgba(91,127,255,.5);border-radius:3px;background:transparent;color:#5B7FFF;cursor:pointer;font-family:monospace;display:none">Edit (new draft)</button>
+          <button id="phr-archive-pb" class="btn" style="font-size:13px;padding:4px 10px;border:0.5px solid rgba(139,130,115,.4);border-radius:3px;background:transparent;color:#8b8273;cursor:pointer;font-family:monospace;display:none">Archive</button>
+          <button id="phr-restore-pb" class="btn" style="font-size:13px;padding:4px 10px;border:0.5px solid rgba(91,127,255,.4);border-radius:3px;background:transparent;color:#5B7FFF;cursor:pointer;font-family:monospace;display:none">Restore (→draft)</button>
           <button id="phr-del-script" class="btn wh-rd">Delete</button>
           <div style="width:0.5px;height:14px;background:var(--b2)"></div>
           <button id="phr-stop-btn" class="btn rd">■ Stop</button>

@@ -5081,6 +5081,7 @@ function _wirePanel() {
           stateEl._wired = true;
           stateEl.addEventListener('change', function() {
             _libraryFilters.state = stateEl.value;
+            console.log('[Aegis Playbooks] state filter →', stateEl.value);
             _renderLibrary();
           });
         }
@@ -5166,19 +5167,26 @@ function _wirePanel() {
     var pb = _playbooks[_activePlaybookId];
     if (!pb) { alert('Playbook row not found locally'); return; }
     if (pb.state !== 'draft') { alert('Only drafts can be published'); return; }
-    if (!confirm('Publish "' + pb.name + '" as v' + ((function(){
-      // Compute next version preview
+    var nextV = (function(){
       var maxV = 0;
       Object.values(_playbooks).forEach(function(r){ if (r.name === pb.name && r.state === 'published') maxV = Math.max(maxV, r.version || 1); });
       return maxV + 1;
-    })()) + '? Published rows are immutable per IR42.')) return;
+    })();
+    var go = await _confirmDialog({
+      title: 'Publish playbook',
+      body: 'Publish "<b>' + _escHtml(pb.name) + '</b>" as version <b>v' + nextV + '</b>?<br><br>' +
+            '<span style="color:#EF9F27">Once published, the body of this playbook can no longer be edited.</span> ' +
+            'To make changes later, click "Edit (new draft)" — that creates a new version you can modify and re-publish.',
+      okLabel: 'Publish v' + nextV,
+      okColor: '#1D9E75',
+    });
+    if (!go) return;
     var btn = this;
     btn.textContent = '▶ …'; btn.disabled = true;
     var result = await _publishPlaybook(_activePlaybookId);
     btn.textContent = '▶ Publish'; btn.disabled = false;
     if (result.ok) {
       _appendLine('SYS', 'sys', 'Playbook published: ' + pb.name + ' v' + result.version);
-      // The published row may have been replaced (in our cache) — re-resolve.
       _activePlaybookId = _playbookByName[pb.name] || null;
       _renderLibrary();
       _updateLifecycleButtons();
@@ -5210,7 +5218,14 @@ function _wirePanel() {
     if (!_activePlaybookId) return;
     var pb = _playbooks[_activePlaybookId];
     if (!pb) return;
-    if (!confirm('Archive "' + pb.name + '" v' + (pb.version||1) + '?')) return;
+    var go = await _confirmDialog({
+      title: 'Archive playbook',
+      body: 'Archive "<b>' + _escHtml(pb.name) + '</b>" v' + (pb.version||1) + '?<br><br>' +
+            'Archived playbooks stay in the library (filter by State → All to see them) and can still be run, but are hidden from the default Active view. You can restore an archived playbook back to a draft at any time.',
+      okLabel: 'Archive',
+      okColor: '#8b8273',
+    });
+    if (!go) return;
     var result = await _archivePlaybook(_activePlaybookId);
     if (result.ok) {
       _appendLine('SYS', 'sys', 'Playbook archived: ' + pb.name);
@@ -5226,7 +5241,14 @@ function _wirePanel() {
     if (!_activePlaybookId) return;
     var pb = _playbooks[_activePlaybookId];
     if (!pb || pb.state !== 'archived') { alert('Restore only valid on archived rows'); return; }
-    if (!confirm('Restore "' + pb.name + '" to draft? You will need to re-publish to make it live.')) return;
+    var go = await _confirmDialog({
+      title: 'Restore playbook',
+      body: 'Restore "<b>' + _escHtml(pb.name) + '</b>" to a draft?<br><br>' +
+            'The playbook becomes editable again. To use it across the firm as the live version, click "Publish" after any edits — that will produce a new version (e.g. v' + ((pb.version||1)+1) + ') and supersede the previous published one.',
+      okLabel: 'Restore as draft',
+      okColor: '#5B7FFF',
+    });
+    if (!go) return;
     var result = await _restorePlaybook(_activePlaybookId);
     if (result.ok) {
       _appendLine('SYS', 'sys', 'Playbook restored to draft: ' + pb.name);
@@ -5241,12 +5263,25 @@ function _wirePanel() {
   // also clears localStorage)
   p.querySelector('#phr-del-script').onclick = async function() {
     var name = p.querySelector('#phr-script-name').value.trim();
-    if (!name || !confirm('Delete playbook "' + name + '"?')) return;
+    if (!name) return;
+    var go = await _confirmDialog({
+      title: 'Delete playbook',
+      body: 'Delete "<b>' + _escHtml(name) + '</b>"?<br><br>This cannot be undone. Only drafts can be deleted; if you want to remove a published playbook, archive it instead.',
+      okLabel: 'Delete',
+      okColor: '#E24B4A',
+    });
+    if (!go) return;
     // Substrate delete (drafts only).
     if (_activePlaybookId && _playbooks[_activePlaybookId]) {
       var pb = _playbooks[_activePlaybookId];
       if (pb.state !== 'draft') {
-        alert('Cannot delete non-draft playbook (substrate immutability). Archive instead.');
+        await _confirmDialog({
+          title: 'Cannot delete',
+          body: 'This playbook is published (or has been previously published). To remove it from the active library, click <b>Archive</b> instead.',
+          okLabel: 'OK',
+          cancelLabel: '',
+          okColor: '#8b8273',
+        });
         return;
       }
       try {
@@ -5544,14 +5579,27 @@ function _renderScriptList() {
   var names = Object.keys(_scripts).sort();
   var html = names.map(function(name) {
     var isActive = name === _activeScript;
-    return `<div data-script="${name}" style="display:flex;align-items:center;gap:5px;padding:4px 10px;cursor:pointer;${isActive?'color:#00c9c9':'color:#ffffff'}">
-      <span style="font-size:10px">${isActive?'▶':'◇'}</span>
-      <span style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</span>
+    // CMD-AEGIS-PLAYBOOK-FOUNDATION: state-aware tint + dot.
+    var pbId = _playbookByName[name];
+    var pb = pbId ? _playbooks[pbId] : null;
+    var state = pb ? pb.state : 'legacy';
+    var dotColor = state === 'published'  ? '#1D9E75' :
+                   state === 'draft'      ? '#EF9F27' :
+                   state === 'superseded' ? '#8b8273' :
+                   state === 'archived'   ? '#5b5347' :
+                                            '#a07cd9';   // legacy / unmigrated
+    var dotChar = isActive ? '▶' : '●';
+    var nameColor = isActive ? '#00c9c9'
+                  : state === 'published' ? '#cfe9e9'
+                  : '#ffffff';
+    return `<div data-script="${name}" title="${state}" style="display:flex;align-items:center;gap:5px;padding:4px 10px;cursor:pointer;color:${nameColor}">
+      <span style="font-size:13px;color:${dotColor}">${dotChar}</span>
+      <span style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</span>
     </div>`;
   }).join('');
 
   if (!names.length) {
-    html = '<div style="font-size:10px;color:#EF9F27;padding:6px 10px">No scripts saved</div>';
+    html = '<div style="font-size:13px;color:#EF9F27;padding:6px 10px">No playbooks saved</div>';
   }
 
   container.innerHTML = html;
@@ -5665,34 +5713,34 @@ function _renderLibrary() {
   });
 
   if (!filtered.length) {
-    container.innerHTML = '<div style="font-size:15px;color:#EF9F27;padding:8px">No playbooks match.</div>';
+    container.innerHTML = '<div style="font-size:13px;color:#EF9F27;padding:8px">No playbooks match.</div>';
     return;
   }
 
   container.innerHTML = filtered.map(function(r) {
     var kindMeta = _PLAYBOOK_KIND_META[r.kind] || { color: '#8b8273', label: r.kind };
-    var stateBadge = r.state === 'published' ? '<span style="font-size:15px;color:#1D9E75;border:1px solid #1D9E7544;border-radius:3px;padding:2px 7px;font-family:monospace">PUBLISHED v' + (r.version||1) + '</span>'
-                    : r.state === 'draft' ? '<span style="font-size:15px;color:#EF9F27;border:1px solid #EF9F2744;border-radius:3px;padding:2px 7px;font-family:monospace">DRAFT</span>'
-                    : r.state === 'superseded' ? '<span style="font-size:15px;color:#8b8273;border:1px solid #8b827344;border-radius:3px;padding:2px 7px;font-family:monospace">SUPERSEDED v' + (r.version||1) + '</span>'
-                    : '<span style="font-size:15px;color:#8b8273;border:1px solid #8b827344;border-radius:3px;padding:2px 7px;font-family:monospace">ARCHIVED</span>';
-    var kindBadge = '<span style="font-size:15px;color:' + kindMeta.color + ';border:1px solid ' + kindMeta.color + '44;border-radius:3px;padding:2px 7px;font-family:monospace;text-transform:uppercase">' + kindMeta.label + '</span>';
+    var stateBadge = r.state === 'published' ? '<span style="font-size:13px;color:#1D9E75;border:1px solid #1D9E7544;border-radius:3px;padding:2px 7px;font-family:monospace">PUBLISHED v' + (r.version||1) + '</span>'
+                    : r.state === 'draft' ? '<span style="font-size:13px;color:#EF9F27;border:1px solid #EF9F2744;border-radius:3px;padding:2px 7px;font-family:monospace">DRAFT</span>'
+                    : r.state === 'superseded' ? '<span style="font-size:13px;color:#8b8273;border:1px solid #8b827344;border-radius:3px;padding:2px 7px;font-family:monospace">SUPERSEDED v' + (r.version||1) + '</span>'
+                    : '<span style="font-size:13px;color:#8b8273;border:1px solid #8b827344;border-radius:3px;padding:2px 7px;font-family:monospace">ARCHIVED</span>';
+    var kindBadge = '<span style="font-size:13px;color:' + kindMeta.color + ';border:1px solid ' + kindMeta.color + '44;border-radius:3px;padding:2px 7px;font-family:monospace;text-transform:uppercase">' + kindMeta.label + '</span>';
     var stale = _isStale(r);
-    var staleBadge = stale ? ' <span style="font-size:15px;color:#EF9F27;font-family:monospace;letter-spacing:0.06em;font-weight:700">STALE</span>' : '';
+    var staleBadge = stale ? ' <span style="font-size:13px;color:#EF9F27;font-family:monospace;letter-spacing:0.06em;font-weight:700">STALE</span>' : '';
     var lastRun = r.last_run_at
       ? 'last run ' + _humanRelativeTime(r.last_run_at) + (r.last_run_status ? ' · ' + r.last_run_status : '')
       : 'never run';
-    var legacyTag = r._legacy ? ' <span style="font-size:15px;color:#a07cd9;font-family:monospace">[unmigrated]</span>' : '';
+    var legacyTag = r._legacy ? ' <span style="font-size:13px;color:#a07cd9;font-family:monospace">[unmigrated]</span>' : '';
     var isActive = r.playbook_id === _activePlaybookId;
     var border = isActive ? '#EF9F27' : '#0d1f2e';
     return '<div style="border:1px solid ' + border + ';border-radius:4px;padding:8px 10px;margin-bottom:6px;cursor:pointer" data-pb-id="' + r.playbook_id + '" onmouseover="this.style.borderColor=\'#1a3a5a\'" onmouseout="this.style.borderColor=\'' + border + '\'">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;gap:6px">'
-      + '<span style="font-size:15px;color:#EF9F27;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _escHtml(r.name) + legacyTag + '</span>'
+      + '<span style="font-size:13px;color:#EF9F27;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _escHtml(r.name) + legacyTag + '</span>'
       + stateBadge
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;flex-wrap:wrap">'
       + kindBadge + staleBadge
       + '</div>'
-      + '<div style="font-size:15px;color:#8b8273">' + _escHtml(lastRun) + '</div>'
+      + '<div style="font-size:13px;color:#8b8273">' + _escHtml(lastRun) + '</div>'
       + '</div>';
   }).join('');
 
@@ -5736,6 +5784,45 @@ function _appendMonitor(text) {
     + '<span style="display:table-cell;color:rgba(125,211,252,.7);vertical-align:top">' + _escHtml(text) + '</span>';
   pane.appendChild(div);
   pane.scrollTop = pane.scrollHeight;
+}
+
+// CMD-AEGIS-PLAYBOOK-FOUNDATION: Promise-based confirm modal —
+// replaces native confirm()/alert() with a styled dialog that
+// matches Aegis visual register. Returns a Promise<boolean>.
+function _confirmDialog(opts) {
+  opts = opts || {};
+  var title = opts.title || 'Confirm';
+  var body = opts.body || '';
+  var okLabel = opts.okLabel || 'Confirm';
+  var cancelLabel = opts.cancelLabel || 'Cancel';
+  var okColor = opts.okColor || '#1D9E75';
+  return new Promise(function(resolve) {
+    var backdrop = document.createElement('div');
+    backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:monospace';
+    var dialog = document.createElement('div');
+    dialog.style.cssText = 'background:#0a1322;border:1px solid #1a3a5a;border-radius:6px;padding:20px 24px;max-width:480px;color:#cfe9e9;box-shadow:0 8px 32px rgba(0,0,0,.5)';
+    dialog.innerHTML =
+      '<div style="font-size:13px;font-weight:700;color:#EF9F27;letter-spacing:.06em;margin-bottom:10px;text-transform:uppercase">' + title + '</div>' +
+      '<div style="font-size:13px;line-height:1.55;color:#cfe9e9;margin-bottom:16px">' + body + '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+        '<button id="_cd-cancel" style="font-size:13px;padding:5px 12px;border:1px solid rgba(139,130,115,.4);border-radius:3px;background:transparent;color:#8b8273;cursor:pointer;font-family:monospace">' + cancelLabel + '</button>' +
+        '<button id="_cd-ok" style="font-size:13px;padding:5px 12px;border:1px solid ' + okColor + ';border-radius:3px;background:' + okColor + '22;color:' + okColor + ';cursor:pointer;font-family:monospace;font-weight:700">' + okLabel + '</button>' +
+      '</div>';
+    backdrop.appendChild(dialog);
+    document.body.appendChild(backdrop);
+    function cleanup(result) {
+      document.body.removeChild(backdrop);
+      resolve(result);
+    }
+    dialog.querySelector('#_cd-ok').onclick = function(){ cleanup(true); };
+    dialog.querySelector('#_cd-cancel').onclick = function(){ cleanup(false); };
+    backdrop.addEventListener('click', function(ev){ if (ev.target === backdrop) cleanup(false); });
+    document.addEventListener('keydown', function escHandler(ev){
+      if (ev.key === 'Escape') { document.removeEventListener('keydown', escHandler); cleanup(false); }
+      if (ev.key === 'Enter')  { document.removeEventListener('keydown', escHandler); cleanup(true); }
+    });
+    setTimeout(function(){ dialog.querySelector('#_cd-ok').focus(); }, 0);
+  });
 }
 
 function _appendLine(who, type, text) {
