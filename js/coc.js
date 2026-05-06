@@ -74,14 +74,23 @@
 //   window.CoC.render('task', taskId, document.getElementById('coc-panel'));
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// IDENTITY RESOLUTION
+// IDENTITY RESOLUTION (amended by CMD-COC-ACTOR-RESOURCE-1)
 // ─────────────────────────────────────────────────────────────────────────────
-// CoC.write() resolves the actor from the platform identity chain, in order:
-//   1. window.CURRENT_USER              { id, name, role }   ← new platform global
-//   2. window._myResource               { id, name }         ← compass IC identity
-//   3. window.CURRENT_USER_RESOURCE_ID  string UUID          ← legacy projects.html
-//   4. STATE.currentUserId              string               ← legacy project-detail.html
-//   5. null / 'System'                  fallback
+// CoC.write() resolves the actor via centralized async chain. First non-null
+// wins; throws on definitive miss in an authenticated context.
+//   1. opts.actorResourceId              — caller override (preserves CMD-A6 path)
+//   2. opts.actorUserId                  — caller passed user_id; resolved via
+//                                          resources?user_id=eq.<id>&limit=1 lookup
+//   3. window._myResource.id             — Compass / cmd-center cached resource row
+//   4. cached _resolvedResourceIdCache   — session-scoped cache from prior resolve
+//   5. live lookup against authenticated user (slot 5)
+//   6. throw structured diagnostic       — authenticated user has no resource
+//      (no auth context) → System actor with null actor_resource_id
+//
+// The legacy slots window.CURRENT_USER, CURRENT_USER_RESOURCE_ID, and
+// STATE.currentUserId are NO LONGER consulted. CURRENT_USER.id was the
+// silent-corruption root cause (hud-shell.js populates it from users.id);
+// the legacy globals had no live populators or were demo artifacts.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // PLATFORM RULE (embed in every module header that touches CoC)
@@ -212,14 +221,6 @@
     'accord.minutes.printed':     { glyph: '🖨', stepName: 'Minutes printed',       severity: 'info', color: '#5B7FFF' },
     'risk.registered':            { glyph: '⚠', stepName: 'Risk registered',       severity: 'warn', color: '#EF9F27' },
 
-    // ── AEGIS PLAYBOOKS (CMD-AEGIS-PLAYBOOK-FOUNDATION) ───────────────────────
-    // Three-segment keys per Iron Rule 56. Lifecycle anchors a playbook into
-    // CoC at publish; run events anchor each execution. See aegis_playbooks
-    // and aegis_playbook_runs tables.
-    'aegis.playbook.published':       { glyph: '▶', stepName: 'Playbook published',     severity: 'info', color: '#1D9E75' },
-    'aegis.playbook.run_started':     { glyph: '▷', stepName: 'Playbook run started',   severity: 'info', color: '#5B7FFF' },
-    'aegis.playbook.run_completed':   { glyph: '✓', stepName: 'Playbook run completed', severity: 'info', color: '#1D9E75' },
-
     // ── PIPELINE / CRM ────────────────────────────────────────────────────────
     // Prospect lifecycle from first contact through project handoff.
     // entity_type = 'prospect' | 'proposal' | 'sow_document' | 'project'
@@ -261,33 +262,177 @@
   };
 
   // ── Identity resolution ───────────────────────────────────────────────────
+  //
+  // CMD-COC-ACTOR-RESOURCE-1 (amending IR58):
+  //
+  // Pre-amendment, _resolveActor() trusted window.CURRENT_USER.id as a
+  // resource_id. hud-shell.js populates CURRENT_USER from the users table
+  // (users.id === user_id, NOT resource_id), so the priority-1 slot was
+  // silently writing user_id values into actor_resource_id — which then
+  // FK-violated against resources.id whenever the column was actually
+  // checked. The FK was not checked uniformly across surfaces (CoC writes
+  // were silently no-op'd on most surfaces because coc.js wasn't loaded
+  // there), so the bug accumulated invisibly until CMD-SURFACE-DEP-AUDIT-1
+  // canonicalized coc.js loading and the F12 incident fired loudly.
+  //
+  // The amendment:
+  //   - Removes the CURRENT_USER.id slot, the legacy CURRENT_USER_RESOURCE_ID
+  //     slot (only populated by buggy/demo callers in projects.html and
+  //     resource-requests.html), and the legacy STATE.currentUserId slot
+  //     (no populators found).
+  //   - Centralizes the resolution pattern that accord-minutes.js was
+  //     inlining (per CMD-A6): try _myResource.id; fall back to a live
+  //     `resources?user_id=eq.<auth uid>&limit=1` lookup; cache the result.
+  //   - Adds opts.actorUserId support so callers that have a user_id (not
+  //     a resource_id) can pass it without hand-rolling a lookup.
+  //   - Throws a structured diagnostic on definitive miss in an authenticated
+  //     context (per Phase 1 §H Q1). System-context writes (no auth) still
+  //     fall back to the System actor with null resource_id.
+  //
+  // IR58's intent is preserved: actor_resource_id values written to coc_events
+  // are always resources.id, never users.id. The mechanism shifts from
+  // call-site discipline to centralized defensive resolution.
 
-  function _resolveActor() {
-    // Chain: new platform global → compass IC → legacy resource ID → legacy user ID
-    if (window.CURRENT_USER?.id) {
+  let _resolvedResourceIdCache = null;        // session-scoped cache
+  let _resolvedResourceIdInflight = null;     // dedup concurrent lookups
+
+  /**
+   * Async user_id → resource_id lookup with session cache.
+   * Returns the resolved resource_id or null if no row matches.
+   */
+  async function _lookupResourceIdForUserId(userId) {
+    if (!userId) return null;
+    if (_resolvedResourceIdCache && _resolvedResourceIdCache.userId === userId) {
+      return _resolvedResourceIdCache.resourceId;
+    }
+    if (_resolvedResourceIdInflight && _resolvedResourceIdInflight.userId === userId) {
+      return _resolvedResourceIdInflight.promise;
+    }
+    const promise = (async () => {
+      try {
+        if (typeof window === 'undefined' || !window.API || !window.API.get) return null;
+        const rows = await window.API.get(
+          `resources?user_id=eq.${encodeURIComponent(userId)}&select=id&limit=1`
+        ).catch(() => []);
+        const id = (rows && rows[0] && rows[0].id) || null;
+        _resolvedResourceIdCache = { userId, resourceId: id };
+        return id;
+      } finally {
+        _resolvedResourceIdInflight = null;
+      }
+    })();
+    _resolvedResourceIdInflight = { userId, promise };
+    return promise;
+  }
+
+  /**
+   * Resolve the actor for a write.
+   *
+   * Resolution chain (first non-null wins):
+   *   1. opts.actorResourceId     — caller override (preserves CMD-A6 path)
+   *   2. opts.actorUserId         — caller passed user_id; resolve via lookup
+   *   3. window._myResource.id    — Compass / cmd-center cached resource row
+   *   4. cached _resolvedResourceIdCache.resourceId
+   *   5. live lookup: resources?user_id=eq.<authenticated-user-id>&limit=1
+   *
+   * Returns { actor_resource_id, actor_name, actor_role } on success.
+   * Throws structured Error on definitive miss in an authenticated context.
+   * Returns System actor (null resource_id) when no auth context exists.
+   */
+  async function _resolveActorAsync(opts = {}) {
+    // Slot 1: explicit override
+    if (opts.actorResourceId) {
       return {
-        actor_resource_id: window.CURRENT_USER.id,
-        actor_name:        window.CURRENT_USER.name  || null,
-        actor_role:        window.CURRENT_USER.role  || null,
+        actor_resource_id: opts.actorResourceId,
+        actor_name:        opts.actorName || (window._myResource && window._myResource.name) || null,
+        actor_role:        opts.actorRole || null,
       };
     }
-    if (window._myResource?.id) {
+
+    // Slot 2: caller passed user_id; resolve internally
+    if (opts.actorUserId) {
+      const rid = await _lookupResourceIdForUserId(opts.actorUserId);
+      if (rid) {
+        return {
+          actor_resource_id: rid,
+          actor_name:        opts.actorName || null,
+          actor_role:        opts.actorRole || null,
+        };
+      }
+      throw new Error(
+        '[CoC.write] actor_resource_id resolution failed: no resources row found for ' +
+        'opts.actorUserId=' + opts.actorUserId + '. The user may not have a resource ' +
+        'row in the current firm. Caller passed actorUserId; verify the user has a ' +
+        'resource provisioned, or pass an explicit opts.actorResourceId.'
+      );
+    }
+
+    // Slot 3: cached _myResource global (Compass / cmd-center init populated)
+    if (window._myResource && window._myResource.id) {
       return {
         actor_resource_id: window._myResource.id,
-        actor_name:        window._myResource.name   || null,
+        actor_name:        opts.actorName || window._myResource.name || null,
+        actor_role:        opts.actorRole || null,
+      };
+    }
+
+    // Slot 4: previously-cached resolution from this session
+    if (_resolvedResourceIdCache && _resolvedResourceIdCache.resourceId) {
+      return {
+        actor_resource_id: _resolvedResourceIdCache.resourceId,
+        actor_name:        opts.actorName || null,
+        actor_role:        opts.actorRole || null,
+      };
+    }
+
+    // Slot 5: live lookup against authenticated user
+    let authUserId = null;
+    try {
+      if (typeof window !== 'undefined' && window.Auth && window.Auth.getCurrentUserId) {
+        authUserId = window.Auth.getCurrentUserId();
+      }
+    } catch (_) { /* unauthenticated */ }
+
+    if (!authUserId) {
+      // No auth context — System event (legitimate fallback per Q1)
+      return { actor_resource_id: null, actor_name: 'System', actor_role: 'system' };
+    }
+
+    const rid = await _lookupResourceIdForUserId(authUserId);
+    if (rid) {
+      return {
+        actor_resource_id: rid,
+        actor_name:        opts.actorName || null,
+        actor_role:        opts.actorRole || null,
+      };
+    }
+
+    // Definitive miss in an authenticated context — throw per Q1
+    throw new Error(
+      '[CoC.write] actor_resource_id resolution failed: authenticated user ' +
+      authUserId + ' has no resources row in the current firm. Either ' +
+      'provision a resource for this user, or pass an explicit opts.actorResourceId. ' +
+      'See IR58 (CMD-COC-ACTOR-RESOURCE-1 amendment) for resolution chain.'
+    );
+  }
+
+  /**
+   * Legacy sync facade. Retained for any non-write() consumers (e.g. badge
+   * rendering paths that read the current-actor identity for display only).
+   * The amended chain still excludes CURRENT_USER.id; the worst case is a
+   * null actor_resource_id (rendered as System) instead of a wrong-type id.
+   */
+  function _resolveActor() {
+    if (window._myResource && window._myResource.id) {
+      return {
+        actor_resource_id: window._myResource.id,
+        actor_name:        window._myResource.name || null,
         actor_role:        null,
       };
     }
-    if (window.CURRENT_USER_RESOURCE_ID) {
+    if (_resolvedResourceIdCache && _resolvedResourceIdCache.resourceId) {
       return {
-        actor_resource_id: window.CURRENT_USER_RESOURCE_ID,
-        actor_name:        null,   // caller should pass name in opts.actorName
-        actor_role:        null,
-      };
-    }
-    if (window.STATE?.currentUserId) {
-      return {
-        actor_resource_id: window.STATE.currentUserId,
+        actor_resource_id: _resolvedResourceIdCache.resourceId,
         actor_name:        null,
         actor_role:        null,
       };
@@ -315,13 +460,18 @@
    *   @param {string}  opts.actorResourceId  override resolved actor_resource_id.
    *                                          Use when the calling context has
    *                                          already translated users.id →
-   *                                          resources.id (e.g. via the
-   *                                          accord_user_to_resource() helper).
-   *                                          Required pattern per Iron Rule 58
-   *                                          until _resolveActor() is refactored.
+   *                                          resources.id. Bypasses the
+   *                                          centralized chain (slot 1).
+   *   @param {string}  opts.actorUserId      caller has a user_id but not
+   *                                          a resource_id. coc.js resolves
+   *                                          via resources?user_id=eq.<id>
+   *                                          lookup (slot 2). Throws if no
+   *                                          matching resource row.
    *   @param {object}  opts.meta          metadata JSONB payload (legacy fields, etc.)
    *   @param {boolean} opts.silent        if true, suppress optimistic cache update
    * @returns {Promise<object>}  the written row
+   * @throws {Error} if actor resolution fails in an authenticated context
+   *                 (per IR58 amendment, CMD-COC-ACTOR-RESOURCE-1)
    */
   async function write(typeKey, entityId, opts = {}) {
     if (!typeKey || !entityId) {
@@ -340,13 +490,19 @@
     const _firstDot = typeKey.indexOf('.');
     const eventClass = _firstDot >= 0 ? typeKey.slice(0, _firstDot) : typeKey;
     const eventType  = _firstDot >= 0 ? typeKey.slice(_firstDot + 1) : '';
-    const actor = _resolveActor();
-    // CMD-A6: caller can override the resolved actor_resource_id when the
-    // calling context has already translated users.id → resources.id
-    // (e.g. accord-digest.js using accord_user_to_resource() helper).
-    if (opts.actorResourceId) {
-      actor.actor_resource_id = opts.actorResourceId;
+
+    // CMD-COC-ACTOR-RESOURCE-1: resolve actor via centralized async chain.
+    // Throws on definitive miss in an authenticated context. Caller can
+    // override via opts.actorResourceId (preserves CMD-A6 path) or pass
+    // opts.actorUserId for internal resolution.
+    let actor;
+    try {
+      actor = await _resolveActorAsync(opts);
+    } catch (err) {
+      console.error('[CoC] write() aborted:', err.message, { typeKey, entityId });
+      throw err;
     }
+
     const now   = new Date().toISOString();
 
     // CMD-AEGIS-1.1: resolve firm_id at write time. Without a hardcoded
