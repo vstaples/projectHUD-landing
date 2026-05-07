@@ -13,7 +13,7 @@
 // shell URL deprecation across surface HTMLs. Render template
 // body unchanged → single-pin bump; RENDER_VERSION in render-
 // minutes/index.ts stays at v20260505-CMD-PROJECTION-ENGINE-2.
-window._PROJECTHUD_VERSION = "v20260506-CMD-SUBSTRATE-COUNTERFACTUAL-MIN-p4";
+window._PROJECTHUD_VERSION = "v20260506-CMD-SUBSTRATE-COUNTERFACTUAL-MIN-final";
 
 // CMD100 migration — Compass My Work sub-view vocabulary collapse.
 // Legacy tab-keys 'timesheet' and 'concerns' rewritten to canonical

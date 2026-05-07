@@ -457,12 +457,18 @@
 
     const chips = _renderEdgeChips(node);
 
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 5: seq_id prefix on inline
+    // node references in the document spine. Applies to all node tags
+    // (DC-NNN, AX-NNN, RK-NNN, OQ-NNN, NT-NNN, DS-NNN). Mono treatment
+    // to match Decision Ledger row prefix.
+    const seqPrefix = node.seq_id ? `<span class="doc-seq">${esc(node.seq_id)}</span> · ` : '';
+
     return `
       <div class="${classes.join(' ')}" data-node-id="${node.node_id}">
         <span class="doc-time">${esc(date)} ${esc(time)}</span>
         <span class="doc-tag"><span class="tag-dot ${esc(node.tag)}"></span>${esc(node.tag.toUpperCase())}</span>
         <div class="doc-content">
-          <span class="doc-summary">${esc(node.summary || '')}</span>
+          <span class="doc-summary">${seqPrefix}${esc(node.summary || '')}</span>
           ${chips ? `<div class="doc-edge-row">${chips}</div>` : ''}
         </div>
       </div>`;

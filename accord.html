@@ -1165,6 +1165,15 @@
   display: block;
   margin-bottom: 4px;
 }
+/* CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 5: seq_id prefix on inline
+   document references. Mono treatment matching Decision Ledger row prefix. */
+#accord-app .doc-node .doc-summary .doc-seq {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
 #accord-app .doc-node .doc-byline {
   font-size: 11px;
   color: var(--ink-faint);
@@ -1415,6 +1424,16 @@
   line-height: 1.45;
   margin-bottom: 8px;
   font-weight: 500;
+}
+/* CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 5: seq_id prefix in row summary.
+   Mono treatment to set off the sequence identifier from the prose
+   summary; muted color so the summary itself stays the focal element. */
+#accord-app .decision-row .decision-summary .decision-seq {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  font-weight: 600;
 }
 #accord-app .decision-row.is-superseded .decision-summary {
   text-decoration: line-through;

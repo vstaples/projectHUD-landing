@@ -384,17 +384,32 @@
     const sealed   = d.sealed_at ? new Date(d.sealed_at) : null;
     const sealedFmt = sealed ? sealed.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '';
 
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 5: seq_id prefix on summary
+    const seqPrefix = d.seq_id ? `<span class="decision-seq">${esc(d.seq_id)}</span> · ` : '';
+
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 5 / F-P4-8 Option B:
+    // surface effective_date in the meta crumb chain when present.
+    // Matches existing meta-crumb typography (same span class).
+    const effFmt = d.effective_date
+      ? new Date(d.effective_date + 'T00:00:00').toLocaleDateString([], { year:'numeric', month:'short', day:'numeric' })
+      : '';
+    const effBasis = d.effective_date_basis ? ` (${esc(d.effective_date_basis)})` : '';
+    const effCrumb = effFmt
+      ? `<span class="meta-crumb">· effective ${esc(effFmt)}${effBasis}</span>`
+      : '';
+
     const badges = _renderRowBadges(d, derived);
 
     return `
       <div class="${cls.join(' ')}" data-node-id="${d.node_id}">
-        <div class="decision-summary">${esc(d.summary || '')}</div>
+        <div class="decision-summary">${seqPrefix}${esc(d.summary || '')}</div>
         <div class="decision-meta">
           <span class="meta-byline">Declared by ${esc(declarer)}</span>
           <span class="meta-crumb">in
             ${meeting ? esc(meeting.title || '(meeting)') : '(meeting)'}, ${esc(sealedFmt)}
           </span>
           ${thread ? `<span class="meta-crumb">· thread: <a data-nav data-nav-thread="${thread.thread_id}">${esc(thread.title || '(thread)')}</a></span>` : ''}
+          ${effCrumb}
         </div>
         ${badges}
       </div>`;
