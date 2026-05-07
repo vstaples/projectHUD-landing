@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accord — Meeting Setup (Briefing Pack v3)</title>
+<!--
+  README — Accord Meeting Setup v3 (Briefing Pack — 15-target)
+
+  Upgrades from v2:
+  1. Fade-in educational slides on EVERY primary panel during first-ever context
+     (Briefing column, Composition column, Anticipation column).
+     Each panel rotates 2-3 slides explaining its purpose.
+  2. Richer Follow-up Briefing column:
+     - Last meeting outcome summary + read-full link
+     - Action items with updated status (live since last meeting)
+     - Prior decisions sealed + their belief-declaration state
+     - Risks raised + mitigation status
+     - Attendee feedback / annotations on prior minutes
+     - Substrate momentum metrics
+  3. Deeper substrate visibility per-attendee in Anticipation column.
+
+  Three-column workspace; readiness verdict footer; cinematic commit transition.
+  Single self-contained HTML; no external dependencies.
+-->
+<style>
+  :root {
+    --bg-deep: #0a0e14;
+    --bg-pane: #11161e;
+    --bg-elevated: #161c26;
+    --bg-tile: #1a212c;
+    --bg-tile-hover: #1f2733;
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-mid: rgba(255, 255, 255, 0.12);
+    --border-active: rgba(94, 234, 212, 0.4);
+    --text-primary: #e8edf2;
+    --text-secondary: #8a95a5;
+    --text-tertiary: #5a6678;
+    --text-faint: #3a4456;
+    --accent-cyan: #5eead4;
+    --accent-cyan-dim: rgba(94, 234, 212, 0.15);
+    --accent-amber: #fbbf77;
+    --accent-amber-dim: rgba(251, 191, 119, 0.18);
+    --accent-rose: #fb7185;
+    --accent-rose-dim: rgba(251, 113, 133, 0.18);
+    --accent-violet: #a78bfa;
+    --accent-violet-dim: rgba(167, 139, 250, 0.18);
+    --accent-green: #4ade80;
+    --accent-green-dim: rgba(74, 222, 128, 0.18);
+    --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", Menlo, monospace;
+    --font-serif: "Lora", "Charter", "Georgia", serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.5;
+    height: 100%;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background:
+      radial-gradient(ellipse at top left, rgba(94, 234, 212, 0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(167, 139, 250, 0.03) 0%, transparent 60%),
+      var(--bg-deep);
+    background-attachment: fixed;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---- chrome ---- */
+  .chrome {
+    height: 52px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 20px;
+    background: rgba(10, 14, 20, 0.7);
+    backdrop-filter: blur(20px);
+    flex-shrink: 0;
+  }
+  .chrome-brand {
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+  .chrome-context { display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
+  .crumb { color: var(--text-tertiary); cursor: pointer; transition: color .2s; }
+  .crumb:hover { color: var(--text-secondary); }
+  .crumb-sep { color: var(--text-faint); }
+  .crumb-current { color: var(--text-primary); font-weight: 500; }
+  .chrome-spacer { flex: 1; }
+  .context-toggle {
+    display: flex;
+    background: var(--bg-pane);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 2px;
+  }
+  .context-tab {
+    padding: 5px 11px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1.3px;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: color .2s, background .2s;
+  }
+  .context-tab:hover { color: var(--text-secondary); }
+  .context-tab.active { color: var(--accent-cyan); background: var(--accent-cyan-dim); }
+
+  /* ---- header strip ---- */
+  .header-strip {
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: grid;
+    grid-template-columns: auto auto auto auto auto auto 1fr auto;
+    gap: 24px;
+    align-items: center;
+    background: rgba(17, 22, 30, 0.4);
+  }
+  .meeting-title {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    color: var(--text-primary);
+    font-weight: 500;
+    cursor: text;
+    border: 1px solid transparent;
+    padding: 4px 8px;
+    margin-left: -8px;
+    border-radius: 6px;
+    transition: border-color .2s, background .2s;
+    min-width: 240px;
+    outline: none;
+  }
+  .meeting-title:hover, .meeting-title:focus {
+    border-color: var(--border-mid);
+    background: var(--bg-pane);
+  }
+  .meeting-title-derived {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-tertiary);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 4px;
+    font-weight: normal;
+  }
+  .header-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    cursor: pointer;
+  }
+  .header-meta-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-tertiary);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .header-meta-value {
+    font-size: 13px;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .header-meta-value .accent { color: var(--accent-cyan); }
+  .header-meta-value .urgent { color: var(--accent-amber); }
+  .ws-context-pill {
+    background: var(--bg-pane);
+    border: 1px solid var(--border-subtle);
+    border-radius: 18px;
+    padding: 5px 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+  }
+  .ws-context-pill .seq { color: var(--accent-cyan); }
+  .header-pulse {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--accent-amber-dim);
+    border: 1px solid rgba(251, 191, 119, 0.3);
+    border-radius: 18px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-amber);
+    letter-spacing: 0.5px;
+  }
+  .pulse-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-amber);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* ---- 3-column workspace ---- */
+  .workspace {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 340px 1fr 360px;
+    gap: 0;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .col {
+    overflow-y: auto;
+    padding: 22px 22px 100px 22px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+    position: relative;
+  }
+  .col::-webkit-scrollbar { width: 6px; }
+  .col::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 3px; }
+  .col-briefing {
+    background: rgba(17, 22, 30, 0.4);
+    border-right: 1px solid var(--border-subtle);
+  }
+  .col-composition { padding: 22px 28px 100px 28px; }
+  .col-anticipation {
+    background: rgba(17, 22, 30, 0.4);
+    border-left: 1px solid var(--border-subtle);
+  }
+
+  .col-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .col-title {
+    font-family: var(--font-serif);
+    font-size: 17px;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .col-subtitle {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  /* ---- briefing column blocks ---- */
+  .briefing-block {
+    margin-bottom: 22px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .briefing-block:last-child { border-bottom: none; padding-bottom: 0; }
+  .block-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .block-count {
+    color: var(--accent-cyan);
+    font-weight: 600;
+  }
+
+  /* ---- last meeting summary ---- */
+  .last-summary-card {
+    background: var(--bg-tile);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 13px;
+  }
+  .last-summary {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    font-style: italic;
+    margin-bottom: 8px;
+  }
+  .last-summary-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+  }
+  .last-summary-link {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-cyan);
+    cursor: pointer;
+    margin-top: 4px;
+    display: inline-block;
+  }
+  .last-summary-link:hover { text-decoration: underline; }
+
+  /* ---- prior action items ---- */
+  .prior-action {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 12px;
+  }
+  .prior-action:last-child { border-bottom: none; }
+  .action-status-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .action-status-icon.complete { background: var(--accent-green-dim); color: var(--accent-green); }
+  .action-status-icon.in-progress { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+  .action-status-icon.overdue { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .action-status-icon.pending { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .action-content {
+    flex: 1;
+    min-width: 0;
+  }
+  .action-text {
+    color: var(--text-primary);
+    font-size: 12px;
+    line-height: 1.4;
+    margin-bottom: 2px;
+  }
+  .action-text.complete { color: var(--text-tertiary); text-decoration: line-through; }
+  .action-meta {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .action-meta .substrate-id { color: var(--accent-cyan); }
+  .action-meta .owner { color: var(--text-secondary); }
+  .action-meta .overdue { color: var(--accent-rose); }
+  .action-meta .due-soon { color: var(--accent-amber); }
+
+  /* ---- prior decisions ---- */
+  .prior-decision {
+    background: var(--bg-tile);
+    border: 1px solid var(--border-subtle);
+    border-left: 2px solid var(--accent-cyan);
+    border-radius: 0 6px 6px 0;
+    padding: 9px 12px;
+    margin-bottom: 6px;
+  }
+  .decision-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .decision-id {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-cyan);
+    letter-spacing: 0.5px;
+  }
+  .decision-state {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .decision-state.sealed { background: var(--accent-green-dim); color: var(--accent-green); }
+  .decision-state.awaiting { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .decision-state.dissented { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .decision-text {
+    font-size: 12px;
+    color: var(--text-primary);
+    line-height: 1.4;
+    margin-bottom: 4px;
+  }
+  .decision-meta {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+  }
+
+  /* ---- prior risks ---- */
+  .prior-risk {
+    background: var(--bg-tile);
+    border: 1px solid var(--border-subtle);
+    border-left: 2px solid var(--accent-rose);
+    border-radius: 0 6px 6px 0;
+    padding: 9px 12px;
+    margin-bottom: 6px;
+  }
+  .risk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .risk-id {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-rose);
+  }
+  .risk-status {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .risk-status.unmitigated { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .risk-status.in-progress { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .risk-text { font-size: 12px; color: var(--text-primary); line-height: 1.4; }
+
+  /* ---- annotations ---- */
+  .annotation-card {
+    background: var(--bg-tile);
+    border-left: 2px solid var(--accent-violet);
+    padding: 9px 12px;
+    margin-bottom: 6px;
+    border-radius: 0 6px 6px 0;
+  }
+  .annotation-meta {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+  }
+  .annotation-meta .author { color: var(--accent-violet); }
+  .annotation-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  /* ---- momentum ---- */
+  .momentum-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 6px;
+  }
+  .momentum-cell {
+    background: var(--bg-tile);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 9px 6px;
+    text-align: center;
+  }
+  .momentum-num {
+    font-family: var(--font-serif);
+    font-size: 18px;
+    color: var(--text-primary);
+  }
+  .momentum-num.positive { color: var(--accent-green); }
+  .momentum-num.warning { color: var(--accent-amber); }
+  .momentum-num.negative { color: var(--accent-rose); }
+  .momentum-label {
+    font-family: var(--font-mono);
+    font-size: 7.5px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* ---- composition column ---- */
+  .agenda-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .agenda-item {
+    background: var(--bg-pane);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+  .agenda-item:hover { border-color: var(--border-mid); }
+  .agenda-item.from-carry { border-left: 3px solid var(--accent-cyan); }
+  .agenda-row {
+    display: flex;
+    align-items: center;
+    padding: 11px 14px;
+    gap: 12px;
+  }
+  .agenda-handle {
+    color: var(--text-faint);
+    font-size: 12px;
+    cursor: grab;
+    user-select: none;
+  }
+  .agenda-text { flex: 1; font-size: 13px; color: var(--text-primary); }
+  .nra-pill {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+  .nra-pill.decision { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+  .nra-pill.action { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .nra-pill.risk { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .nra-pill.question { background: var(--accent-violet-dim); color: var(--accent-violet); }
+  .agenda-remove {
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 14px;
+    transition: color .2s;
+    user-select: none;
+  }
+  .agenda-remove:hover { color: var(--accent-rose); }
+  .agenda-meta-tag {
+    padding: 0 14px 9px 14px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .agenda-meta-tag .substrate-id { color: var(--accent-cyan); }
+  .add-agenda-row {
+    background: transparent;
+    border: 1px dashed var(--border-mid);
+    border-radius: 8px;
+    padding: 11px 14px;
+    cursor: text;
+    color: var(--text-tertiary);
+    font-size: 13px;
+    font-style: italic;
+    transition: border-color .2s, color .2s, background .2s;
+  }
+  .add-agenda-row:hover {
+    border-color: var(--border-active);
+    color: var(--text-secondary);
+    background: rgba(94, 234, 212, 0.03);
+  }
+
+  .ref-strip {
+    margin-top: 22px;
+    padding-top: 22px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .ref-cards {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .ref-card {
+    background: var(--bg-tile);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color .2s;
+  }
+  .ref-card:hover { border-color: var(--border-mid); }
+  .ref-icon {
+    width: 18px; height: 18px;
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--accent-cyan);
+    flex-shrink: 0;
+  }
+  .ref-icon.pdf { color: var(--accent-rose); }
+  .ref-icon.xlsx { color: var(--accent-green); }
+  .ref-icon.zip { color: var(--accent-amber); }
+  .ref-name {
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ref-prune {
+    color: var(--text-faint);
+    font-size: 11px;
+    cursor: pointer;
+    margin-left: 4px;
+    transition: color .2s;
+  }
+  .ref-prune:hover { color: var(--accent-rose); }
+  .ref-add {
+    background: transparent;
+    border: 1px dashed var(--border-mid);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+  }
+  .ref-add:hover { border-color: var(--border-active); color: var(--accent-cyan); }
+
+  .async-indicator {
+    background: var(--accent-violet-dim);
+    border: 1px solid rgba(167, 139, 250, 0.3);
+    border-radius: 6px;
+    padding: 8px 11px;
+    margin-bottom: 12px;
+    font-size: 11px;
+    color: var(--accent-violet);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ---- anticipation column ---- */
+  .ant-attendee-card {
+    background: var(--bg-tile);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 12px 13px;
+    margin-bottom: 8px;
+    transition: border-color .2s;
+  }
+  .ant-attendee-card:hover { border-color: var(--border-mid); }
+  .ant-attendee-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .ant-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+  .ant-name-block { flex: 1; }
+  .ant-name { font-size: 13px; color: var(--text-primary); font-weight: 500; }
+  .ant-role {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.5px;
+  }
+  .ant-status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+  .ant-status-dot.confirmed { background: var(--accent-green); box-shadow: 0 0 8px rgba(74, 222, 128, 0.5); }
+  .ant-status-dot.pending { background: var(--accent-amber); box-shadow: 0 0 8px rgba(251, 191, 119, 0.5); animation: pulse 2.5s ease-in-out infinite; }
+  .ant-stake {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    padding-left: 38px;
+  }
+  .stake-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-right: 4px;
+    margin-bottom: 3px;
+    letter-spacing: 0.5px;
+  }
+  .stake-tag.dissent { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .stake-tag.belief { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .stake-tag.action { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .stake-tag.absent { background: rgba(255,255,255,0.04); color: var(--text-tertiary); }
+
+  .ant-block {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .ant-info-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .ant-info-icon {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .ant-info-icon.warn { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .ant-info-icon.cross { background: var(--accent-violet-dim); color: var(--accent-violet); }
+  .ant-info-icon.risk { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .ant-info-row strong { color: var(--text-primary); font-weight: 600; }
+
+  /* ---- readiness footer ---- */
+  .readiness {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(10, 14, 20, 0.92);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-subtle);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    z-index: 50;
+  }
+  .verdict-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent-amber-dim);
+    border: 1px solid rgba(251, 191, 119, 0.3);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent-amber);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .verdict-pill.go {
+    background: var(--accent-green-dim);
+    border-color: rgba(74, 222, 128, 0.3);
+    color: var(--accent-green);
+  }
+  .checks { display: flex; gap: 18px; flex: 1; }
+  .check-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .check-icon {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .check-icon.ok { background: var(--accent-green-dim); color: var(--accent-green); }
+  .check-icon.warn { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .commit-actions { display: flex; gap: 10px; }
+  .btn {
+    border: none;
+    padding: 9px 18px;
+    border-radius: 7px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .2s;
+    font-weight: 500;
+    font-family: inherit;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-mid);
+  }
+  .btn-secondary:hover { color: var(--text-primary); border-color: var(--border-active); }
+  .btn-primary {
+    background: var(--accent-cyan);
+    color: var(--bg-deep);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    padding: 9px 22px;
+  }
+  .btn-primary:hover {
+    background: #7dffe6;
+    box-shadow: 0 0 24px rgba(94, 234, 212, 0.4);
+  }
+
+  /* ---- first-meeting slide rotation (used in all 3 columns) ---- */
+  .slide-rotation {
+    position: relative;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .slide {
+    opacity: 0;
+    transition: opacity .8s ease-in-out;
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 8px 4px;
+  }
+  .slide.active { opacity: 1; }
+  .slide-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--accent-cyan);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .slide-title {
+    font-family: var(--font-serif);
+    font-size: 19px;
+    color: var(--text-primary);
+    line-height: 1.3;
+    margin-bottom: 12px;
+  }
+  .slide-body {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+  .slide-dots {
+    display: flex;
+    gap: 6px;
+    margin-top: 24px;
+    justify-content: center;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+  .slide-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    transition: background .3s;
+  }
+  .slide-dot.active { background: var(--accent-cyan); }
+
+  .first-templates {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 24px;
+  }
+  .template-card {
+    background: var(--bg-tile);
+    border: 1px solid var(--border-subtle);
+    border-radius: 7px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  .template-card:hover {
+    border-color: var(--border-active);
+    background: var(--bg-tile-hover);
+  }
+  .template-name {
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 3px;
+  }
+  .template-desc {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    line-height: 1.4;
+  }
+
+  /* ---- animations ---- */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---- commit transition ---- */
+  .commit-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-deep);
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .4s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .commit-overlay.active { opacity: 1; pointer-events: all; }
+  .commit-swirl {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--accent-cyan) 0%, transparent 70%);
+    opacity: 0;
+    transform: scale(0);
+    transition: opacity .3s, transform .8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .commit-overlay.active .commit-swirl { opacity: 1; transform: scale(4.5); }
+  .commit-msg {
+    position: absolute;
+    bottom: 38%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity .4s .3s;
+  }
+  .commit-overlay.active .commit-msg { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="chrome">
+  <div class="chrome-brand">Accord</div>
+  <div class="chrome-context">
+    <span class="crumb">Constellation</span>
+    <span class="crumb-sep">›</span>
+    <span class="crumb" id="crumbWs">Endoscope Replacement</span>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">New Meeting</span>
+  </div>
+  <div class="chrome-spacer"></div>
+  <div class="context-toggle">
+    <div class="context-tab active" data-ctx="followup">Follow-up</div>
+    <div class="context-tab" data-ctx="first">First-ever</div>
+  </div>
+</div>
+
+<div class="header-strip">
+  <div>
+    <div class="meeting-title" contenteditable="true" id="meetingTitle">Endoscope Replacement — Phase 2 Review</div>
+    <div class="meeting-title-derived">derived · click to edit</div>
+  </div>
+  <div class="header-meta">
+    <div class="header-meta-label">When</div>
+    <div class="header-meta-value">Today · <span class="accent">14:00</span></div>
+  </div>
+  <div class="header-meta">
+    <div class="header-meta-label">Duration</div>
+    <div class="header-meta-value">60 min · <span class="urgent">tight</span></div>
+  </div>
+  <div class="header-meta">
+    <div class="header-meta-label">Where</div>
+    <div class="header-meta-value">Video · Vaughn's room</div>
+  </div>
+  <div class="header-meta">
+    <div class="header-meta-label">Attendees</div>
+    <div class="header-meta-value">5 · <span class="accent">3 confirmed</span></div>
+  </div>
+  <div class="ws-context-pill" id="wsPill">
+    Endoscope · <span class="seq">13th meeting</span> · last met 6d ago
+  </div>
+  <div></div>
+  <div class="header-pulse">
+    <div class="pulse-dot"></div>
+    Starts in 23 min
+  </div>
+</div>
+
+<div class="workspace">
+
+  <!-- ============== LEFT: BRIEFING ============== -->
+  <div class="col col-briefing">
+
+    <!-- Follow-up: rich substrate briefing -->
+    <div id="briefingFollowup">
+      <div class="col-header">
+        <div class="col-title">Briefing</div>
+        <div class="col-subtitle">what came before</div>
+      </div>
+
+      <div class="briefing-block">
+        <div class="block-label">Last meeting · May 1</div>
+        <div class="last-summary-card">
+          <div class="last-summary-meta">M-2026-05-01 · sealed · 4 dec · 6 act · 1 dis · 2 risks</div>
+          <div class="last-summary">"Phase 1 closed clean. Sterilization tray protocol approved with one dissent from Tom on supplier exclusivity. Sarah owes belief on optical array. Risk flagged on FDA submission timing."</div>
+          <div class="last-summary-link">Read full minutes ↗</div>
+        </div>
+      </div>
+
+      <div class="briefing-block">
+        <div class="block-label">
+          <span>Prior actions · live status</span>
+          <span class="block-count">6 tracked</span>
+        </div>
+        <div class="prior-action">
+          <div class="action-status-icon complete">✓</div>
+          <div class="action-content">
+            <div class="action-text complete">Sterilization tray spec drafted</div>
+            <div class="action-meta">
+              <span class="substrate-id">AX-088</span>
+              <span class="owner">Amara</span>
+              <span>completed 5/3</span>
+            </div>
+          </div>
+        </div>
+        <div class="prior-action">
+          <div class="action-status-icon overdue">!</div>
+          <div class="action-content">
+            <div class="action-text">Owner-side cost analysis for cleaner platform B</div>
+            <div class="action-meta">
+              <span class="substrate-id">AX-091</span>
+              <span class="owner">Marcus</span>
+              <span class="overdue">overdue 2d</span>
+            </div>
+          </div>
+        </div>
+        <div class="prior-action">
+          <div class="action-status-icon in-progress">→</div>
+          <div class="action-content">
+            <div class="action-text">Engineering questionnaire for sterilization compatibility</div>
+            <div class="action-meta">
+              <span class="substrate-id">AX-093</span>
+              <span class="owner">Tom</span>
+              <span class="due-soon">due Wed</span>
+            </div>
+          </div>
+        </div>
+        <div class="prior-action">
+          <div class="action-status-icon complete">✓</div>
+          <div class="action-content">
+            <div class="action-text complete">Schedule risk-review with Quality</div>
+            <div class="action-meta">
+              <span class="substrate-id">AX-094</span>
+              <span class="owner">Marcus</span>
+              <span>completed 5/4</span>
+            </div>
+          </div>
+        </div>
+        <div class="prior-action">
+          <div class="action-status-icon pending">○</div>
+          <div class="action-content">
+            <div class="action-text">Confirm regulatory submission window for Q3</div>
+            <div class="action-meta">
+              <span class="substrate-id">AX-095</span>
+              <span class="owner">Amara</span>
+              <span>due 5/15</span>
+            </div>
+          </div>
+        </div>
+        <div class="prior-action">
+          <div class="action-status-icon in-progress">→</div>
+          <div class="action-content">
+            <div class="action-text">EMI test protocol authoring</div>
+            <div class="action-meta">
+              <span class="substrate-id">AX-096</span>
+              <span class="owner">Marcus</span>
+              <span>due 5/12</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="briefing-block">
+        <div class="block-label">
+          <span>Prior decisions</span>
+          <span class="block-count">4 sealed</span>
+        </div>
+        <div class="prior-decision">
+          <div class="decision-header">
+            <span class="decision-id">DC-117</span>
+            <span class="decision-state awaiting">Awaiting belief · 3 of 5</span>
+          </div>
+          <div class="decision-text">Adopt Olympus optical array for Phase 1 build</div>
+          <div class="decision-meta">declared by Sarah · effective Sept 1, 2026</div>
+        </div>
+        <div class="prior-decision">
+          <div class="decision-header">
+            <span class="decision-id">DC-114</span>
+            <span class="decision-state dissented">Dissent open · DS-005</span>
+          </div>
+          <div class="decision-text">Sole-source supplier exclusivity for fiber optic components</div>
+          <div class="decision-meta">declared by Tom (dissented) · effective immediately</div>
+        </div>
+        <div class="prior-decision">
+          <div class="decision-header">
+            <span class="decision-id">DC-115</span>
+            <span class="decision-state sealed">Sealed</span>
+          </div>
+          <div class="decision-text">Sterilization tray validation protocol approved</div>
+          <div class="decision-meta">declared by Amara · effective May 5</div>
+        </div>
+        <div class="prior-decision">
+          <div class="decision-header">
+            <span class="decision-id">DC-116</span>
+            <span class="decision-state sealed">Sealed</span>
+          </div>
+          <div class="decision-text">Phase 2 prototype build greenlit pending FDA window</div>
+          <div class="decision-meta">declared by Vaughn · effective May 1</div>
+        </div>
+      </div>
+
+      <div class="briefing-block">
+        <div class="block-label">
+          <span>Open risks</span>
+          <span class="block-count">2 unmitigated</span>
+        </div>
+        <div class="prior-risk">
+          <div class="risk-header">
+            <span class="risk-id">RX-014</span>
+            <span class="risk-status unmitigated">Unmitigated</span>
+          </div>
+          <div class="risk-text">FDA 510(k) review window may slip if validation protocol delays continue</div>
+        </div>
+        <div class="prior-risk">
+          <div class="risk-header">
+            <span class="risk-id">RX-015</span>
+            <span class="risk-status in-progress">Mitigation underway</span>
+          </div>
+          <div class="risk-text">EMI shielding margin in latest CPU revision under threshold</div>
+        </div>
+      </div>
+
+      <div class="briefing-block">
+        <div class="block-label">
+          <span>Annotations on prior minutes</span>
+          <span class="block-count">3 since seal</span>
+        </div>
+        <div class="annotation-card">
+          <div class="annotation-meta"><span class="author">Tom Liu</span> · May 4 · on DS-005</div>
+          <div class="annotation-text">"Adding context: my dissent isn't about Olympus per se — it's about being locked in before sterilization is proven."</div>
+        </div>
+        <div class="annotation-card">
+          <div class="annotation-meta"><span class="author">Sarah Chen</span> · May 6 · on AX-091</div>
+          <div class="annotation-text">"Marcus, can we sync on this before Wednesday?"</div>
+        </div>
+        <div class="annotation-card">
+          <div class="annotation-meta"><span class="author">Amara Okafor</span> · May 5 · on RX-014</div>
+          <div class="annotation-text">"Talked to FDA contact informally — window may extend by 2 weeks if we file by 5/20."</div>
+        </div>
+      </div>
+
+      <div class="briefing-block">
+        <div class="block-label">Substrate momentum · since May 1</div>
+        <div class="momentum-row">
+          <div class="momentum-cell"><div class="momentum-num positive">2</div><div class="momentum-label">closed</div></div>
+          <div class="momentum-cell"><div class="momentum-num warning">1</div><div class="momentum-label">new dissent</div></div>
+          <div class="momentum-cell"><div class="momentum-num">3</div><div class="momentum-label">comments</div></div>
+          <div class="momentum-cell"><div class="momentum-num negative">1</div><div class="momentum-label">overdue</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- First-ever: educational rotation -->
+    <div id="briefingFirst" style="display:none;">
+      <div class="col-header">
+        <div class="col-title">Establishing Format</div>
+        <div class="col-subtitle">first meeting in workstream</div>
+      </div>
+
+      <div class="slide-rotation">
+        <div class="slide active" data-deck="briefing" data-idx="0">
+          <div class="slide-eyebrow">Why It Matters</div>
+          <div class="slide-title">Your first meeting sets the rhythm.</div>
+          <div class="slide-body">Whatever format you establish here becomes the seed Accord carries forward to every follow-up. Pick a template that matches the meeting's nature — or start blank if it's truly bespoke.</div>
+        </div>
+        <div class="slide" data-deck="briefing" data-idx="1">
+          <div class="slide-eyebrow">How Accord Helps</div>
+          <div class="slide-title">After today, this column fills with intelligence.</div>
+          <div class="slide-body">Open commitments by attendee. Decisions awaiting belief. Comments from people who read the minutes. Substrate momentum since you last met. Right now there's no history — but Accord is about to start building it.</div>
+        </div>
+        <div class="slide" data-deck="briefing" data-idx="2">
+          <div class="slide-eyebrow">The Discipline</div>
+          <div class="slide-title">Every thread terminates somewhere.</div>
+          <div class="slide-body">Each agenda item must end in a decision, an assigned action, a recorded risk, a posed question — or an explicit deferral. Discussion-without-commitment is structurally eliminated.</div>
+        </div>
+      </div>
+
+      <div class="briefing-block" style="margin-top: 24px;">
+        <div class="block-label">Meeting templates</div>
+        <div class="first-templates">
+          <div class="template-card">
+            <div class="template-name">Recurring 1:1</div>
+            <div class="template-desc">Status update · Blockers · Career discussion · Open mic</div>
+          </div>
+          <div class="template-card">
+            <div class="template-name">Project Review</div>
+            <div class="template-desc">Phase status · Risks · Decisions needed · Next milestones</div>
+          </div>
+          <div class="template-card">
+            <div class="template-name">Kickoff</div>
+            <div class="template-desc">Scope · Stakeholders · Success criteria · First commitments</div>
+          </div>
+          <div class="template-card">
+            <div class="template-name">Decision Review</div>
+            <div class="template-desc">Frame · Surface alternatives · Belief declarations · Seal</div>
+          </div>
+          <div class="template-card">
+            <div class="template-name">Start blank</div>
+            <div class="template-desc">No template · author your own structure</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== CENTER: COMPOSITION ============== -->
+  <div class="col col-composition">
+
+    <!-- Follow-up: live agenda -->
+    <div id="compositionFollowup">
+      <div class="col-header">
+        <div class="col-title">Agenda</div>
+        <div class="col-subtitle">3 threads · 2 carried · 1 fresh</div>
+      </div>
+
+      <div class="async-indicator">
+        <span>↗</span>
+        Marcus suggested adding "EMI test results review" via async — review below
+      </div>
+
+      <div class="agenda-list">
+        <div class="agenda-item from-carry">
+          <div class="agenda-row">
+            <span class="agenda-handle">⋮⋮</span>
+            <div class="agenda-text">Resolve Tom's dissent on supplier exclusivity (DS-005)</div>
+            <span class="nra-pill decision">Decide</span>
+            <span class="agenda-remove">×</span>
+          </div>
+          <div class="agenda-meta-tag">↳ carried from M-2026-05-01 · references <span class="substrate-id">DS-005</span> · <span class="substrate-id">DC-114</span></div>
+        </div>
+        <div class="agenda-item from-carry">
+          <div class="agenda-row">
+            <span class="agenda-handle">⋮⋮</span>
+            <div class="agenda-text">Sarah's belief declaration on optical array (DC-117)</div>
+            <span class="nra-pill decision">Decide</span>
+            <span class="agenda-remove">×</span>
+          </div>
+          <div class="agenda-meta-tag">↳ carried from M-2026-05-01 · awaiting belief from <span style="color:var(--accent-amber)">S. Chen</span></div>
+        </div>
+        <div class="agenda-item">
+          <div class="agenda-row">
+            <span class="agenda-handle">⋮⋮</span>
+            <div class="agenda-text">Phase 2 prototype timeline & vendor coordination</div>
+            <span class="nra-pill action">Assign</span>
+            <span class="agenda-remove">×</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="add-agenda-row">+ Add agenda item · Accord will infer the NRA shape</div>
+
+      <div class="ref-strip">
+        <div class="block-label">
+          <span>Carried references</span>
+          <span class="col-subtitle">canvas + docs from prior meetings</span>
+        </div>
+        <div class="ref-cards">
+          <div class="ref-card">
+            <div class="ref-icon">IMG</div>
+            <div class="ref-name">PCB-Layout-Rev3.png</div>
+            <span class="ref-prune">×</span>
+          </div>
+          <div class="ref-card">
+            <div class="ref-icon pdf">PDF</div>
+            <div class="ref-name">thermal_sim_apr27.pdf</div>
+            <span class="ref-prune">×</span>
+          </div>
+          <div class="ref-card">
+            <div class="ref-icon xlsx">XLS</div>
+            <div class="ref-name">BOM_revised.xlsx</div>
+            <span class="ref-prune">×</span>
+          </div>
+          <div class="ref-card">
+            <div class="ref-icon zip">ZIP</div>
+            <div class="ref-name">Flexscope_PCB_v3.zip</div>
+            <span class="ref-prune">×</span>
+          </div>
+          <button class="ref-add">+ attach</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- First-ever: educational rotation -->
+    <div id="compositionFirst" style="display:none;">
+      <div class="col-header">
+        <div class="col-title">Composing the Agenda</div>
+        <div class="col-subtitle">your meeting's structure</div>
+      </div>
+
+      <div class="slide-rotation" style="min-height:280px;">
+        <div class="slide active" data-deck="composition" data-idx="0">
+          <div class="slide-eyebrow">The Composition Surface</div>
+          <div class="slide-title">This is where your agenda comes alive.</div>
+          <div class="slide-body">Each agenda item is a thread. Every thread will produce substrate during the meeting — a decision, an action, a risk, a question. Type freely; Accord infers the NRA shape from your language.</div>
+        </div>
+        <div class="slide" data-deck="composition" data-idx="1">
+          <div class="slide-eyebrow">Async Collaboration</div>
+          <div class="slide-title">Attendees can suggest items before you begin.</div>
+          <div class="slide-body">Once you send the invite, attendees see the draft agenda. They can suggest threads to add, comment on existing items, or pre-declare beliefs on pending decisions. Their input arrives here as you prep.</div>
+        </div>
+        <div class="slide" data-deck="composition" data-idx="2">
+          <div class="slide-eyebrow">References & Canvas</div>
+          <div class="slide-title">Documents and visuals carry forward.</div>
+          <div class="slide-body">Attached canvas images, PDFs, spreadsheets, build packages — they persist across meetings in this workstream. At setup you decide what's still relevant; pruning happens here, not in some buried settings page.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== RIGHT: ANTICIPATION ============== -->
+  <div class="col col-anticipation">
+
+    <!-- Follow-up: substrate-derived intelligence -->
+    <div id="anticipationFollowup">
+      <div class="col-header">
+        <div class="col-title">Anticipation</div>
+        <div class="col-subtitle">what to watch for</div>
+      </div>
+
+      <div class="block-label" style="margin-bottom:10px;">Per attendee</div>
+
+      <div class="ant-attendee-card">
+        <div class="ant-attendee-header">
+          <div class="ant-avatar" style="background:var(--accent-cyan-dim);color:var(--accent-cyan);">VS</div>
+          <div class="ant-name-block">
+            <div class="ant-name">Vaughn Staples</div>
+            <div class="ant-role">YOU · OPERATOR</div>
+          </div>
+          <div class="ant-status-dot confirmed"></div>
+        </div>
+      </div>
+
+      <div class="ant-attendee-card">
+        <div class="ant-attendee-header">
+          <div class="ant-avatar">SC</div>
+          <div class="ant-name-block">
+            <div class="ant-name">Sarah Chen</div>
+            <div class="ant-role">ENGINEERING LEAD</div>
+          </div>
+          <div class="ant-status-dot confirmed"></div>
+        </div>
+        <div class="ant-stake">
+          <span class="stake-tag belief">OWES BELIEF · 12d</span>
+          <span class="stake-tag action">3 ACTIONS</span>
+          <br>Will likely be asked about DC-117. Owns 5/12 actions in this workstream.
+        </div>
+      </div>
+
+      <div class="ant-attendee-card">
+        <div class="ant-attendee-header">
+          <div class="ant-avatar">TL</div>
+          <div class="ant-name-block">
+            <div class="ant-name">Tom Liu</div>
+            <div class="ant-role">SUPPLIER OPS</div>
+          </div>
+          <div class="ant-status-dot pending"></div>
+        </div>
+        <div class="ant-stake">
+          <span class="stake-tag dissent">DISSENT OPEN</span>
+          Likely to push back on supplier-related items. Hasn't responded to invite — follow up.
+        </div>
+      </div>
+
+      <div class="ant-attendee-card">
+        <div class="ant-attendee-header">
+          <div class="ant-avatar">MR</div>
+          <div class="ant-name-block">
+            <div class="ant-name">Marcus Reed</div>
+            <div class="ant-role">SPEC AUTHOR</div>
+          </div>
+          <div class="ant-status-dot confirmed"></div>
+        </div>
+        <div class="ant-stake">
+          <span class="stake-tag action">3 OPEN · 1 OVERDUE</span>
+          Defensive on Phase 2 timeline. Suggested adding EMI test results.
+        </div>
+      </div>
+
+      <div class="ant-attendee-card">
+        <div class="ant-attendee-header">
+          <div class="ant-avatar">AO</div>
+          <div class="ant-name-block">
+            <div class="ant-name">Amara Okafor</div>
+            <div class="ant-role">REGULATORY</div>
+          </div>
+          <div class="ant-status-dot pending"></div>
+        </div>
+        <div class="ant-stake">
+          <span class="stake-tag absent">MISSED LAST 2</span>
+          May need re-onboarding. Critical for FDA submission discussion.
+        </div>
+      </div>
+
+      <div class="ant-block">
+        <div class="block-label">Time pressure</div>
+        <div class="ant-info-row">
+          <div class="ant-info-icon warn">!</div>
+          <div>Previous similar meetings averaged <strong>47 min</strong>. Scheduled for 30. Consider trimming agenda.</div>
+        </div>
+      </div>
+
+      <div class="ant-block">
+        <div class="block-label">Cross-workstream</div>
+        <div class="ant-info-row">
+          <div class="ant-info-icon cross">↗</div>
+          <div>DC-117 referenced from <strong>Camera CPU Redesign</strong>. Decisions here may affect that program.</div>
+        </div>
+      </div>
+
+      <div class="ant-block">
+        <div class="block-label">Risk surface</div>
+        <div class="ant-info-row">
+          <div class="ant-info-icon risk">▲</div>
+          <div>FDA 510(k) window: <strong>23 days</strong>. RX-014 unmitigated. Phase 2 review pending.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- First-ever: educational rotation -->
+    <div id="anticipationFirst" style="display:none;">
+      <div class="col-header">
+        <div class="col-title">Anticipation</div>
+        <div class="col-subtitle">substrate intelligence</div>
+      </div>
+
+      <div class="slide-rotation" style="min-height:280px;">
+        <div class="slide active" data-deck="anticipation" data-idx="0">
+          <div class="slide-eyebrow">After Today</div>
+          <div class="slide-title">This column reveals what each attendee needs from each other.</div>
+          <div class="slide-body">Open commitments per person. Decisions they owe a belief on. Dissents they've registered. Actions they're behind on. Whether they've been quiet for too long. Right now you have no history — so we'll watch and learn together.</div>
+        </div>
+        <div class="slide" data-deck="anticipation" data-idx="1">
+          <div class="slide-eyebrow">Time Pressure</div>
+          <div class="slide-title">Accord learns your meeting rhythm.</div>
+          <div class="slide-body">After a few meetings in this workstream, Accord knows how long similar meetings actually take. If you've scheduled 30 minutes for what historically runs 47, the column will warn you. Trim the agenda or extend the slot.</div>
+        </div>
+        <div class="slide" data-deck="anticipation" data-idx="2">
+          <div class="slide-eyebrow">Cross-Workstream Awareness</div>
+          <div class="slide-title">Decisions ripple beyond this workstream.</div>
+          <div class="slide-body">When a decision in this meeting will affect another workstream's substrate, Anticipation surfaces the connection. You walk in knowing what's at stake beyond the room you're in.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- readiness footer -->
+<div class="readiness">
+  <div class="verdict-pill" id="verdictPill">GO with caveats</div>
+  <div class="checks">
+    <div class="check-item"><div class="check-icon ok">✓</div>Agenda has NRA shape</div>
+    <div class="check-item"><div class="check-icon ok">✓</div>References attached</div>
+    <div class="check-item"><div class="check-icon warn">!</div>Tom hasn't responded</div>
+    <div class="check-item"><div class="check-icon warn">!</div>Time slot may be tight</div>
+  </div>
+  <div class="commit-actions">
+    <button class="btn btn-secondary">Save & send invite</button>
+    <button class="btn btn-primary" id="beginBtn">Begin Meeting →</button>
+  </div>
+</div>
+
+<!-- commit overlay -->
+<div class="commit-overlay" id="commitOverlay">
+  <div class="commit-swirl"></div>
+  <div class="commit-msg">Instantiating substrate · meeting beginning</div>
+</div>
+
+<script>
+  // context toggle
+  const tabs = document.querySelectorAll('.context-tab');
+  tabs.forEach(t => t.addEventListener('click', () => {
+    tabs.forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    const ctx = t.dataset.ctx;
+    const isFirst = ctx === 'first';
+    
+    document.getElementById('briefingFollowup').style.display = isFirst ? 'none' : 'block';
+    document.getElementById('briefingFirst').style.display = isFirst ? 'block' : 'none';
+    document.getElementById('compositionFollowup').style.display = isFirst ? 'none' : 'block';
+    document.getElementById('compositionFirst').style.display = isFirst ? 'block' : 'none';
+    document.getElementById('anticipationFollowup').style.display = isFirst ? 'none' : 'block';
+    document.getElementById('anticipationFirst').style.display = isFirst ? 'block' : 'none';
+    
+    if (isFirst) {
+      document.getElementById('meetingTitle').textContent = 'New Workstream — May 7';
+      document.getElementById('crumbWs').textContent = 'New Workstream';
+      document.getElementById('wsPill').innerHTML = 'New workstream · <span class="seq">1st meeting</span>';
+    } else {
+      document.getElementById('meetingTitle').textContent = 'Endoscope Replacement — Phase 2 Review';
+      document.getElementById('crumbWs').textContent = 'Endoscope Replacement';
+      document.getElementById('wsPill').innerHTML = 'Endoscope · <span class="seq">13th meeting</span> · last met 6d ago';
+    }
+  }));
+
+  // independent slide rotation per deck
+  const decks = ['briefing', 'composition', 'anticipation'];
+  const deckIdx = { briefing: 0, composition: 0, anticipation: 0 };
+  
+  function rotateDeck(deckName) {
+    const slides = document.querySelectorAll(`.slide[data-deck="${deckName}"]`);
+    if (slides.length === 0) return;
+    const total = slides.length;
+    deckIdx[deckName] = (deckIdx[deckName] + 1) % total;
+    slides.forEach((s, i) => s.classList.toggle('active', i === deckIdx[deckName]));
+  }
+
+  // stagger the deck rotations so they don't all fade at the same instant
+  setInterval(() => { 
+    if (document.getElementById('briefingFirst').style.display === 'block') rotateDeck('briefing');
+  }, 6000);
+  setTimeout(() => {
+    setInterval(() => { 
+      if (document.getElementById('compositionFirst').style.display === 'block') rotateDeck('composition');
+    }, 6000);
+  }, 2000);
+  setTimeout(() => {
+    setInterval(() => { 
+      if (document.getElementById('anticipationFirst').style.display === 'block') rotateDeck('anticipation');
+    }, 6000);
+  }, 4000);
+
+  // template card → switch back to followup view as if seeded
+  document.querySelectorAll('.template-card').forEach(tc => {
+    tc.addEventListener('click', () => tabs[0].click());
+  });
+
+  // agenda remove
+  document.querySelectorAll('.agenda-remove').forEach(r => {
+    r.addEventListener('click', e => e.target.closest('.agenda-item').remove());
+  });
+  document.querySelectorAll('.ref-prune').forEach(r => {
+    r.addEventListener('click', e => e.target.closest('.ref-card').remove());
+  });
+
+  // commit transition
+  document.getElementById('beginBtn').addEventListener('click', () => {
+    document.getElementById('commitOverlay').classList.add('active');
+    setTimeout(() => {
+      alert('Meeting workspace would now be live. (Mockup ends here.)');
+      document.getElementById('commitOverlay').classList.remove('active');
+    }, 1500);
+  });
+</script>
+
+</body>
+</html>

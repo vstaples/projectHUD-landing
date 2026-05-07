@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accord — New Meeting</title>
+<!--
+  README — Accord New Meeting Experience (Architect's Mockup)
+
+  Scenarios addressed:
+    - Primary: Scenario 1 (PM descended into workstream with rich history)
+    - Secondary: Scenario 4 (quick capture from constellation, no workstream context)
+
+  Three design moves I'm proudest of:
+
+  1. The meeting form is not a form. It's a Composition Surface.
+     Title is derived from agenda + workstream + date — never asked.
+     Time defaults to "now" with an inline override.
+     Agenda items are first-class tiles that announce their NRA expectation
+     (decision needed / action to assign / risk to surface / question to resolve).
+     The operator composes the meeting; they don't fill out a form.
+
+  2. The Continuation Lane.
+     Carried-forward substrate from prior meetings in the workstream lives
+     in a horizontally-scrolling lane above the agenda composer. Each open
+     action / pending decision / unresolved dissent appears as a card the
+     operator can drag down into the agenda. They're not buried in archives;
+     they're alive and present. The continuation lane pulses subtly to draw
+     attention without nagging.
+
+  3. The Commit Moment.
+     Hitting "Begin Meeting" doesn't submit a form. It dissolves the
+     composition surface into the meeting workspace through a short,
+     deliberate transition that visually communicates "the substrate is
+     being instantiated." A brief swirl, the agenda tiles align into
+     thread positions, the workspace materializes around them. The operator
+     experiences the meeting beginning, not the form submitting.
+
+  What I'd do with another week:
+    - Wire the attendees affordance (sketched, not interactive) to a real
+      resource picker with substrate-aware ranking by prior co-participation
+    - Add the empty-state slide treatment for first-time operators (Scenario 3)
+    - Build the schedule-for-later affordance (currently sketched)
+    - Sound design: subtle cues at compose-complete, NRA-set, commit-moment
+
+  Built as single self-contained HTML; no external dependencies.
+-->
+<style>
+  :root {
+    --bg-deep: #0a0e14;
+    --bg-pane: #11161e;
+    --bg-elevated: #161c26;
+    --bg-tile: #1a212c;
+    --bg-tile-hover: #1f2733;
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-mid: rgba(255, 255, 255, 0.12);
+    --border-active: rgba(94, 234, 212, 0.4);
+    --text-primary: #e8edf2;
+    --text-secondary: #8a95a5;
+    --text-tertiary: #5a6678;
+    --text-faint: #3a4456;
+    --accent-cyan: #5eead4;
+    --accent-cyan-dim: rgba(94, 234, 212, 0.15);
+    --accent-amber: #fbbf77;
+    --accent-amber-dim: rgba(251, 191, 119, 0.18);
+    --accent-rose: #fb7185;
+    --accent-rose-dim: rgba(251, 113, 133, 0.18);
+    --accent-violet: #a78bfa;
+    --accent-violet-dim: rgba(167, 139, 250, 0.18);
+    --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --shadow-glow: 0 0 24px rgba(94, 234, 212, 0.15);
+    --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", Menlo, monospace;
+    --font-serif: "Lora", "Charter", "Georgia", serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    height: 100%;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background:
+      radial-gradient(ellipse at top, rgba(94, 234, 212, 0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(167, 139, 250, 0.03) 0%, transparent 60%),
+      var(--bg-deep);
+    background-attachment: fixed;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---- chrome ---- */
+  .chrome {
+    height: 56px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    padding: 0 28px;
+    gap: 24px;
+    background: rgba(10, 14, 20, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    flex-shrink: 0;
+    z-index: 100;
+  }
+  .chrome-brand {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    color: var(--text-primary);
+  }
+  .chrome-pin {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.5px;
+  }
+  .chrome-spacer { flex: 1; }
+  .chrome-link {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .chrome-link:hover { color: var(--accent-cyan); }
+  .chrome-context {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .chrome-context .crumb {
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .chrome-context .crumb:hover { color: var(--text-secondary); }
+  .chrome-context .crumb-sep {
+    color: var(--text-faint);
+    margin: 0 2px;
+  }
+  .chrome-context .crumb-current {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  /* ---- main composition surface ---- */
+  .surface {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 32px 0 80px 0;
+    position: relative;
+  }
+  .surface-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 40px;
+  }
+
+  /* ---- mode header ---- */
+  .mode-header {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 32px;
+    opacity: 0;
+    animation: fadeInUp 0.5s 0.1s ease-out forwards;
+  }
+  .mode-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-cyan);
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+  }
+  .mode-title {
+    font-family: var(--font-serif);
+    font-size: 38px;
+    font-weight: 500;
+    letter-spacing: -0.5px;
+    color: var(--text-primary);
+    line-height: 1.15;
+  }
+  .mode-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  /* ---- meta strip ---- */
+  .meta-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 36px;
+    opacity: 0;
+    animation: fadeInUp 0.5s 0.2s ease-out forwards;
+  }
+  .meta-cell {
+    background: var(--bg-pane);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .meta-cell:hover {
+    border-color: var(--border-mid);
+    background: var(--bg-elevated);
+  }
+  .meta-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .meta-value {
+    font-size: 14px;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .meta-cell .meta-edit-hint {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .meta-cell:hover .meta-edit-hint { opacity: 1; }
+
+  /* ---- continuation lane ---- */
+  .continuation {
+    margin-bottom: 36px;
+    opacity: 0;
+    animation: fadeInUp 0.5s 0.3s ease-out forwards;
+  }
+  .continuation-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .continuation-hint {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
+  .lane {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 4px 2px 12px 2px;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+  }
+  .lane::-webkit-scrollbar { height: 6px; }
+  .lane::-webkit-scrollbar-track { background: transparent; }
+  .lane::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+  }
+  .carried-card {
+    flex-shrink: 0;
+    width: 280px;
+    background: var(--bg-tile);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor: grab;
+    transition: transform 0.2s, border-color 0.2s, background 0.2s, box-shadow 0.3s;
+    position: relative;
+    user-select: none;
+  }
+  .carried-card:hover {
+    border-color: var(--border-active);
+    background: var(--bg-tile-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-soft);
+  }
+  .carried-card.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+  }
+  .carried-card.added {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .carried-card .card-pulse {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .card-pulse.action {
+    background: var(--accent-amber);
+    box-shadow: 0 0 12px var(--accent-amber);
+    animation: pulse-amber 2.5s ease-in-out infinite;
+  }
+  .card-pulse.decision {
+    background: var(--accent-cyan);
+    box-shadow: 0 0 12px var(--accent-cyan);
+  }
+  .card-pulse.dissent {
+    background: var(--accent-rose);
+    box-shadow: 0 0 12px var(--accent-rose);
+    animation: pulse-rose 2s ease-in-out infinite;
+  }
+  .card-pulse.question {
+    background: var(--accent-violet);
+    box-shadow: 0 0 12px var(--accent-violet);
+  }
+  .card-type {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .card-type.action { color: var(--accent-amber); }
+  .card-type.decision { color: var(--accent-cyan); }
+  .card-type.dissent { color: var(--accent-rose); }
+  .card-type.question { color: var(--accent-violet); }
+  .card-summary {
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.4;
+    margin-bottom: 10px;
+  }
+  .card-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-tertiary);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .card-overdue {
+    color: var(--accent-rose);
+    font-weight: 600;
+  }
+  .lane-empty {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-style: italic;
+    padding: 20px 0;
+  }
+
+  /* ---- composer ---- */
+  .composer {
+    margin-bottom: 28px;
+    opacity: 0;
+    animation: fadeInUp 0.5s 0.4s ease-out forwards;
+  }
+  .composer-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .composer-counter {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .agenda-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+    min-height: 4px;
+  }
+  .agenda-item {
+    background: var(--bg-pane);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 0;
+    overflow: hidden;
+    transition: border-color 0.2s, background 0.2s;
+    animation: itemAppear 0.4s ease-out;
+    position: relative;
+  }
+  .agenda-item:hover {
+    border-color: var(--border-mid);
+  }
+  .agenda-item.focused {
+    border-color: var(--border-active);
+    box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.08);
+  }
+  .agenda-item.from-carry {
+    border-left: 3px solid var(--accent-amber);
+  }
+  .agenda-item.from-carry.decision { border-left-color: var(--accent-cyan); }
+  .agenda-item.from-carry.dissent { border-left-color: var(--accent-rose); }
+  .agenda-item.from-carry.question { border-left-color: var(--accent-violet); }
+  .agenda-row {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 14px;
+  }
+  .agenda-handle {
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    cursor: grab;
+    user-select: none;
+    transition: color 0.2s;
+  }
+  .agenda-item:hover .agenda-handle { color: var(--text-tertiary); }
+  .agenda-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 15px;
+    font-family: var(--font-sans);
+    padding: 2px 0;
+  }
+  .agenda-input::placeholder {
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
+  .agenda-nra-picker {
+    display: flex;
+    gap: 4px;
+  }
+  .nra-chip {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    padding: 5px 9px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-tertiary);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    user-select: none;
+  }
+  .nra-chip:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+  }
+  .nra-chip.active.decision {
+    background: var(--accent-cyan-dim);
+    color: var(--accent-cyan);
+    border-color: rgba(94, 234, 212, 0.3);
+  }
+  .nra-chip.active.action {
+    background: var(--accent-amber-dim);
+    color: var(--accent-amber);
+    border-color: rgba(251, 191, 119, 0.3);
+  }
+  .nra-chip.active.risk {
+    background: var(--accent-rose-dim);
+    color: var(--accent-rose);
+    border-color: rgba(251, 113, 133, 0.3);
+  }
+  .nra-chip.active.question {
+    background: var(--accent-violet-dim);
+    color: var(--accent-violet);
+    border-color: rgba(167, 139, 250, 0.3);
+  }
+  .agenda-remove {
+    color: var(--text-faint);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    width: 20px;
+    text-align: center;
+    transition: color 0.2s;
+    user-select: none;
+  }
+  .agenda-remove:hover { color: var(--accent-rose); }
+  .carry-source-tag {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    padding: 0 16px 10px 16px;
+    margin-top: -4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .carry-source-tag::before {
+    content: '↳';
+    color: var(--text-faint);
+  }
+  .add-agenda-row {
+    background: transparent;
+    border: 1px dashed var(--border-mid);
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor: text;
+    color: var(--text-tertiary);
+    font-size: 14px;
+    font-style: italic;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+  }
+  .add-agenda-row:hover {
+    border-color: var(--border-active);
+    color: var(--text-secondary);
+    background: rgba(94, 234, 212, 0.03);
+  }
+
+  /* ---- attendees ---- */
+  .attendees {
+    margin-bottom: 32px;
+    opacity: 0;
+    animation: fadeInUp 0.5s 0.5s ease-out forwards;
+  }
+  .attendees-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .attendees-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .attendee-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-pane);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    padding: 6px 12px 6px 6px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .attendee-chip:hover {
+    background: var(--bg-elevated);
+    border-color: var(--border-mid);
+  }
+  .attendee-chip.suggested {
+    border-style: dashed;
+    opacity: 0.7;
+  }
+  .attendee-chip.suggested:hover {
+    opacity: 1;
+    border-style: solid;
+  }
+  .attendee-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .attendee-avatar.you {
+    background: var(--accent-cyan-dim);
+    color: var(--accent-cyan);
+  }
+  .attendee-name { font-size: 13px; color: var(--text-primary); }
+  .attendee-chip.suggested .attendee-name { color: var(--text-secondary); }
+  .attendee-rationale {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    margin-left: 4px;
+  }
+  .attendee-add {
+    color: var(--text-tertiary);
+    background: transparent;
+    border: 1px dashed var(--border-mid);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .attendee-add:hover {
+    color: var(--accent-cyan);
+    border-color: var(--border-active);
+  }
+
+  /* ---- commit bar ---- */
+  .commit-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(10, 14, 20, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-subtle);
+    padding: 16px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 50;
+    opacity: 0;
+    animation: fadeInUp 0.5s 0.6s ease-out forwards;
+  }
+  .commit-summary {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .commit-summary .summary-counts {
+    display: flex;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .commit-summary .count-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .count-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .count-dot.decision { background: var(--accent-cyan); }
+  .count-dot.action { background: var(--accent-amber); }
+  .count-dot.risk { background: var(--accent-rose); }
+  .count-dot.question { background: var(--accent-violet); }
+  .commit-actions { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+  }
+  .btn-secondary:hover {
+    color: var(--text-primary);
+    background: var(--bg-pane);
+  }
+  .btn-primary {
+    background: var(--accent-cyan);
+    color: var(--bg-deep);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    padding: 10px 22px;
+  }
+  .btn-primary:hover {
+    background: #7dffe6;
+    box-shadow: 0 0 24px rgba(94, 234, 212, 0.4);
+    transform: translateY(-1px);
+  }
+  .btn-primary:disabled {
+    background: var(--bg-elevated);
+    color: var(--text-faint);
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  /* ---- inline editor popovers ---- */
+  .inline-editor {
+    position: fixed;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-mid);
+    border-radius: 10px;
+    padding: 16px;
+    min-width: 280px;
+    box-shadow: var(--shadow-soft);
+    z-index: 200;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+  }
+  .inline-editor.open {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+  }
+  .editor-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .editor-options { display: flex; flex-direction: column; gap: 4px; }
+  .editor-option {
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-secondary);
+    transition: background 0.15s, color 0.15s;
+  }
+  .editor-option:hover {
+    background: var(--bg-tile);
+    color: var(--text-primary);
+  }
+  .editor-option.selected {
+    color: var(--accent-cyan);
+    background: var(--accent-cyan-dim);
+  }
+  .editor-input {
+    width: 100%;
+    background: var(--bg-tile);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .editor-input:focus { border-color: var(--accent-cyan); }
+
+  /* ---- mode switcher ---- */
+  .mode-switcher {
+    position: absolute;
+    top: 30px;
+    right: 40px;
+    display: flex;
+    background: var(--bg-pane);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 3px;
+    z-index: 10;
+  }
+  .mode-tab {
+    padding: 7px 14px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: 5px;
+    transition: color 0.2s, background 0.2s;
+  }
+  .mode-tab:hover { color: var(--text-secondary); }
+  .mode-tab.active {
+    color: var(--accent-cyan);
+    background: var(--accent-cyan-dim);
+  }
+
+  /* ---- commit transition overlay ---- */
+  .commit-transition {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-deep);
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .commit-transition.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .commit-swirl {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--accent-cyan) 0%, transparent 70%);
+    opacity: 0;
+    transform: scale(0);
+    transition: opacity 0.3s, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .commit-transition.active .commit-swirl {
+    opacity: 1;
+    transform: scale(4);
+  }
+  .commit-message {
+    position: absolute;
+    bottom: 35%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 0.4s 0.3s;
+  }
+  .commit-transition.active .commit-message { opacity: 1; }
+
+  /* ---- "after commit" placeholder workspace ---- */
+  .post-commit {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-deep);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s 0.6s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    text-align: center;
+  }
+  .post-commit.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .post-commit-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .post-commit-title {
+    font-family: var(--font-serif);
+    font-size: 32px;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+  }
+  .post-commit-meta {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+  }
+  .post-commit-restart {
+    margin-top: 32px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .post-commit-restart:hover { color: var(--accent-cyan); }
+
+  /* ---- animations ---- */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes itemAppear {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes pulse-amber {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  @keyframes pulse-rose {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.9); }
+  }
+</style>
+</head>
+<body>
+
+<div class="chrome">
+  <div class="chrome-brand">Accord</div>
+  <div class="chrome-pin">v20260507-CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1-p4</div>
+  <div class="chrome-spacer"></div>
+  <div class="chrome-context" id="chromeContext">
+    <span class="crumb">Constellation</span>
+    <span class="crumb-sep">›</span>
+    <span class="crumb">Endoscope Replacement</span>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">New Meeting</span>
+  </div>
+  <div class="chrome-link">Manage Workstreams</div>
+</div>
+
+<div class="surface" id="surface">
+  <div class="surface-inner">
+
+    <div class="mode-switcher">
+      <div class="mode-tab active" data-mode="cadence">Cadence</div>
+      <div class="mode-tab" data-mode="quick">Quick Capture</div>
+      <div class="mode-tab" data-mode="formal">Formal</div>
+    </div>
+
+    <div class="mode-header">
+      <div class="mode-eyebrow" id="modeEyebrow">Continuing — Endoscope Replacement</div>
+      <div class="mode-title" id="modeTitle">What needs Next Required Action today?</div>
+      <div class="mode-subtitle" id="modeSubtitle">12 prior meetings · last met 6 days ago · 8 open commitments carried forward</div>
+    </div>
+
+    <div class="meta-strip">
+      <div class="meta-cell" id="metaWhen">
+        <div class="meta-label">When</div>
+        <div class="meta-value">Now · Thu, May 7</div>
+        <div class="meta-edit-hint">click to schedule for later</div>
+      </div>
+      <div class="meta-cell" id="metaWhere">
+        <div class="meta-label">Where</div>
+        <div class="meta-value">Video · Vaughn's room</div>
+        <div class="meta-edit-hint">click to change location</div>
+      </div>
+      <div class="meta-cell" id="metaTitle">
+        <div class="meta-label">Title</div>
+        <div class="meta-value" id="derivedTitle">Endoscope Replacement — May 7</div>
+        <div class="meta-edit-hint">derived · click to override</div>
+      </div>
+    </div>
+
+    <div class="continuation" id="continuationSection">
+      <div class="continuation-header">
+        <div class="section-label">Continuation Lane</div>
+        <div class="continuation-hint">drag any card down to add it as an agenda item</div>
+      </div>
+      <div class="lane" id="carriedLane">
+        <!-- carried cards injected by JS -->
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-header">
+        <div class="section-label">Agenda — what we'll work through</div>
+        <div class="composer-counter" id="agendaCounter">0 items</div>
+      </div>
+      <div class="agenda-list" id="agendaList"></div>
+      <div class="add-agenda-row" id="addAgendaRow">+ Add agenda item · type and Accord will suggest its NRA shape</div>
+    </div>
+
+    <div class="attendees">
+      <div class="attendees-header">
+        <div class="section-label">Attendees</div>
+        <div class="continuation-hint">suggested from prior meetings in this workstream</div>
+      </div>
+      <div class="attendees-list" id="attendeesList">
+        <div class="attendee-chip">
+          <div class="attendee-avatar you">VS</div>
+          <div class="attendee-name">Vaughn Staples</div>
+        </div>
+        <div class="attendee-chip suggested" data-name="Sarah Chen">
+          <div class="attendee-avatar">SC</div>
+          <div class="attendee-name">Sarah Chen</div>
+          <div class="attendee-rationale">in 11/12 prior</div>
+        </div>
+        <div class="attendee-chip suggested" data-name="Tom Liu">
+          <div class="attendee-avatar">TL</div>
+          <div class="attendee-name">Tom Liu</div>
+          <div class="attendee-rationale">in 9/12 prior</div>
+        </div>
+        <div class="attendee-chip suggested" data-name="Marcus Reed">
+          <div class="attendee-avatar">MR</div>
+          <div class="attendee-name">Marcus Reed</div>
+          <div class="attendee-rationale">in 8/12 prior</div>
+        </div>
+        <div class="attendee-chip suggested" data-name="Amara Okafor">
+          <div class="attendee-avatar">AO</div>
+          <div class="attendee-name">Amara Okafor</div>
+          <div class="attendee-rationale">in 6/12 prior</div>
+        </div>
+        <button class="attendee-add">+ add</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="commit-bar">
+  <div class="commit-summary">
+    <span id="commitNarrative">Add agenda items to begin</span>
+    <span class="summary-counts" id="summaryCounts"></span>
+  </div>
+  <div class="commit-actions">
+    <button class="btn btn-secondary">Save as draft</button>
+    <button class="btn btn-primary" id="beginBtn" disabled>Begin Meeting →</button>
+  </div>
+</div>
+
+<!-- inline editor for meta cells -->
+<div class="inline-editor" id="inlineEditor"></div>
+
+<!-- commit transition -->
+<div class="commit-transition" id="commitTransition">
+  <div class="commit-swirl"></div>
+  <div class="commit-message">Instantiating substrate · meeting beginning</div>
+</div>
+
+<!-- post-commit placeholder -->
+<div class="post-commit" id="postCommit">
+  <div class="post-commit-eyebrow">Live Capture · Meeting in Progress</div>
+  <div class="post-commit-title" id="postCommitTitle">Endoscope Replacement — May 7</div>
+  <div class="post-commit-meta" id="postCommitMeta">3 threads ready · 4 attendees · capturing now</div>
+  <div class="post-commit-restart" id="restartLink">↺ restart mockup from new-meeting screen</div>
+</div>
+
+<script>
+  // -------- state --------
+  const carriedItems = [
+    {id: 'c1', type: 'action', code: 'AX-091', summary: 'Sarah to circulate revised optical bench tolerances by Friday', meta: 'overdue 2d', overdue: true, source: 'Apr 30 — Engineering Review'},
+    {id: 'c2', type: 'decision', code: 'DC-117', summary: 'Sterilization method selection — awaiting Tom\'s belief declaration', meta: '3 belief decls pending', overdue: false, source: 'Apr 23 — Sterilization deep-dive'},
+    {id: 'c3', type: 'dissent', code: 'DS-005', summary: 'Tom Liu dissented on sole-source for fiber optic supply', meta: 'unacknowledged', overdue: false, source: 'Apr 16 — Supply chain review'},
+    {id: 'c4', type: 'action', code: 'AX-094', summary: 'Marcus to schedule risk-review with Quality before phase gate', meta: 'due tomorrow', overdue: false, source: 'Apr 30 — Engineering Review'},
+    {id: 'c5', type: 'question', code: 'QX-007', summary: 'Will the camera CPU redesign affect endoscope timeline?', meta: 'unanswered 14d', overdue: false, source: 'Apr 23 — Sterilization deep-dive'},
+    {id: 'c6', type: 'action', code: 'AX-088', summary: 'Amara to confirm regulatory submission window for Q3', meta: 'due 5/15', overdue: false, source: 'Apr 16 — Supply chain review'}
+  ];
+
+  let agenda = []; // {id, text, nra, fromCarry?: {id, type, code, source}}
+  let nextAgendaId = 1;
+
+  // -------- carried lane --------
+  const carriedLane = document.getElementById('carriedLane');
+  function renderCarried() {
+    carriedLane.innerHTML = carriedItems.map(item => `
+      <div class="carried-card ${agenda.find(a => a.fromCarry?.id === item.id) ? 'added' : ''}" 
+           data-id="${item.id}" draggable="true">
+        <div class="card-pulse ${item.type}"></div>
+        <div class="card-type ${item.type}">${item.type}</div>
+        <div class="card-summary">${item.summary}</div>
+        <div class="card-meta">
+          <span>${item.code}</span>
+          <span class="${item.overdue ? 'card-overdue' : ''}">${item.meta}</span>
+        </div>
+      </div>
+    `).join('');
+    
+    // drag start
+    carriedLane.querySelectorAll('.carried-card:not(.added)').forEach(card => {
+      card.addEventListener('dragstart', (e) => {
+        card.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', card.dataset.id);
+        e.dataTransfer.effectAllowed = 'copy';
+      });
+      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+      // also click to add
+      card.addEventListener('click', () => {
+        addFromCarry(card.dataset.id);
+      });
+    });
+  }
+
+  function addFromCarry(carryId) {
+    const item = carriedItems.find(c => c.id === carryId);
+    if (!item || agenda.find(a => a.fromCarry?.id === carryId)) return;
+    
+    const nraMap = {action: 'action', decision: 'decision', dissent: 'decision', question: 'question'};
+    agenda.push({
+      id: nextAgendaId++,
+      text: item.summary,
+      nra: nraMap[item.type],
+      fromCarry: {id: item.id, type: item.type, code: item.code, source: item.source}
+    });
+    renderAgenda();
+    renderCarried();
+    updateCommitBar();
+    updateDerivedTitle();
+  }
+
+  // -------- agenda --------
+  const agendaList = document.getElementById('agendaList');
+  const agendaCounter = document.getElementById('agendaCounter');
+  const addAgendaRow = document.getElementById('addAgendaRow');
+
+  function renderAgenda() {
+    agendaList.innerHTML = agenda.map(item => {
+      const carrySource = item.fromCarry ? `<div class="carry-source-tag">carried from ${item.fromCarry.source} · ${item.fromCarry.code}</div>` : '';
+      return `
+        <div class="agenda-item ${item.fromCarry ? 'from-carry ' + item.fromCarry.type : ''}" data-id="${item.id}">
+          <div class="agenda-row">
+            <span class="agenda-handle">⋮⋮</span>
+            <input class="agenda-input" type="text" value="${item.text.replace(/"/g, '&quot;')}" placeholder="What needs to happen?" data-id="${item.id}">
+            <div class="agenda-nra-picker" data-id="${item.id}">
+              <span class="nra-chip decision ${item.nra === 'decision' ? 'active' : ''}" data-nra="decision">Decide</span>
+              <span class="nra-chip action ${item.nra === 'action' ? 'active' : ''}" data-nra="action">Assign</span>
+              <span class="nra-chip risk ${item.nra === 'risk' ? 'active' : ''}" data-nra="risk">Risk</span>
+              <span class="nra-chip question ${item.nra === 'question' ? 'active' : ''}" data-nra="question">Ask</span>
+            </div>
+            <span class="agenda-remove" data-id="${item.id}">×</span>
+          </div>
+          ${carrySource}
+        </div>
+      `;
+    }).join('');
+    agendaCounter.textContent = `${agenda.length} item${agenda.length === 1 ? '' : 's'}`;
+    
+    // wire input changes
+    agendaList.querySelectorAll('.agenda-input').forEach(inp => {
+      inp.addEventListener('input', (e) => {
+        const id = +inp.dataset.id;
+        const item = agenda.find(a => a.id === id);
+        if (item) {
+          item.text = inp.value;
+          if (!item.nra && item.text.length > 8) {
+            item.nra = inferNRA(item.text);
+            renderAgenda();
+            updateDerivedTitle();
+          } else {
+            updateCommitBar();
+            updateDerivedTitle();
+          }
+        }
+      });
+      inp.addEventListener('focus', () => {
+        inp.closest('.agenda-item').classList.add('focused');
+      });
+      inp.addEventListener('blur', () => {
+        inp.closest('.agenda-item').classList.remove('focused');
+      });
+    });
+
+    // wire NRA chips
+    agendaList.querySelectorAll('.nra-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const id = +chip.parentElement.dataset.id;
+        const item = agenda.find(a => a.id === id);
+        if (item) {
+          item.nra = chip.dataset.nra;
+          renderAgenda();
+          updateCommitBar();
+        }
+      });
+    });
+
+    // wire remove
+    agendaList.querySelectorAll('.agenda-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = +btn.dataset.id;
+        agenda = agenda.filter(a => a.id !== id);
+        renderAgenda();
+        renderCarried();
+        updateCommitBar();
+        updateDerivedTitle();
+      });
+    });
+  }
+
+  function inferNRA(text) {
+    const t = text.toLowerCase();
+    if (/\b(decide|decision|approve|sign off|select|choose|pick|determine)\b/.test(t)) return 'decision';
+    if (/\b(do|complete|deliver|implement|execute|prepare|build|send|circulate|review|check|update|finish|draft|create|fix|finalize)\b/.test(t)) return 'action';
+    if (/\b(risk|concern|issue|problem|threat|exposure|vulnerab)\b/.test(t)) return 'risk';
+    if (/\b(why|how|what|when|where|whether|should we|can we|is it|will it)\b/.test(t) || /\?$/.test(text)) return 'question';
+    return null;
+  }
+
+  // -------- add agenda row --------
+  addAgendaRow.addEventListener('click', () => {
+    const id = nextAgendaId++;
+    agenda.push({id, text: '', nra: null});
+    renderAgenda();
+    updateCommitBar();
+    setTimeout(() => {
+      const newInput = agendaList.querySelector(`.agenda-input[data-id="${id}"]`);
+      if (newInput) newInput.focus();
+    }, 50);
+  });
+
+  // drop on agenda area from carried lane
+  [agendaList, addAgendaRow].forEach(el => {
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      el.style.background = 'rgba(94, 234, 212, 0.05)';
+    });
+    el.addEventListener('dragleave', () => el.style.background = '');
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      el.style.background = '';
+      const carryId = e.dataTransfer.getData('text/plain');
+      if (carryId) addFromCarry(carryId);
+    });
+  });
+
+  // -------- derived title --------
+  function updateDerivedTitle() {
+    const titleEl = document.getElementById('derivedTitle');
+    if (agenda.length === 0) {
+      titleEl.textContent = 'Endoscope Replacement — May 7';
+      return;
+    }
+    const decisionCount = agenda.filter(a => a.nra === 'decision').length;
+    const actionCount = agenda.filter(a => a.nra === 'action').length;
+    const tags = [];
+    if (decisionCount) tags.push(`${decisionCount} decision${decisionCount > 1 ? 's' : ''}`);
+    if (actionCount) tags.push(`${actionCount} action${actionCount > 1 ? 's' : ''}`);
+    const summary = tags.length ? ` · ${tags.join(', ')}` : '';
+    titleEl.textContent = `Endoscope Replacement — May 7${summary}`;
+  }
+
+  // -------- commit bar --------
+  function updateCommitBar() {
+    const beginBtn = document.getElementById('beginBtn');
+    const narrative = document.getElementById('commitNarrative');
+    const counts = document.getElementById('summaryCounts');
+    
+    const counted = {
+      decision: agenda.filter(a => a.nra === 'decision').length,
+      action: agenda.filter(a => a.nra === 'action').length,
+      risk: agenda.filter(a => a.nra === 'risk').length,
+      question: agenda.filter(a => a.nra === 'question').length
+    };
+    
+    const totalReady = agenda.filter(a => a.text.trim() && a.nra).length;
+    const totalEmpty = agenda.filter(a => !a.text.trim() || !a.nra).length;
+    
+    if (agenda.length === 0) {
+      narrative.textContent = 'Add agenda items to begin';
+      counts.innerHTML = '';
+      beginBtn.disabled = true;
+    } else {
+      narrative.textContent = totalEmpty > 0 
+        ? `${totalReady} ready · ${totalEmpty} need${totalEmpty === 1 ? 's' : ''} attention` 
+        : `${totalReady} thread${totalReady === 1 ? '' : 's'} ready for capture`;
+      counts.innerHTML = Object.entries(counted)
+        .filter(([_, n]) => n > 0)
+        .map(([type, n]) => `<span class="count-item"><span class="count-dot ${type}"></span>${n}</span>`)
+        .join('');
+      beginBtn.disabled = totalReady === 0;
+    }
+  }
+
+  // -------- meta cell editors --------
+  const editor = document.getElementById('inlineEditor');
+  let activeMetaCell = null;
+
+  function openEditor(cell, content) {
+    activeMetaCell = cell;
+    editor.innerHTML = content;
+    editor.classList.add('open');
+    const rect = cell.getBoundingClientRect();
+    editor.style.left = rect.left + 'px';
+    editor.style.top = (rect.bottom + 8) + 'px';
+  }
+  function closeEditor() {
+    editor.classList.remove('open');
+    activeMetaCell = null;
+  }
+  document.addEventListener('click', (e) => {
+    if (!editor.contains(e.target) && !e.target.closest('.meta-cell')) closeEditor();
+  });
+
+  document.getElementById('metaWhen').addEventListener('click', () => {
+    openEditor(document.getElementById('metaWhen'), `
+      <div class="editor-label">When</div>
+      <div class="editor-options">
+        <div class="editor-option selected">Now</div>
+        <div class="editor-option">In 1 hour</div>
+        <div class="editor-option">Tomorrow morning</div>
+        <div class="editor-option">Schedule specific time…</div>
+      </div>
+    `);
+  });
+  document.getElementById('metaWhere').addEventListener('click', () => {
+    openEditor(document.getElementById('metaWhere'), `
+      <div class="editor-label">Where</div>
+      <div class="editor-options">
+        <div class="editor-option selected">Video — Vaughn's room</div>
+        <div class="editor-option">Conference room — Wexler</div>
+        <div class="editor-option">In person — TBD</div>
+        <div class="editor-option">Phone</div>
+      </div>
+    `);
+  });
+  document.getElementById('metaTitle').addEventListener('click', () => {
+    const current = document.getElementById('derivedTitle').textContent;
+    openEditor(document.getElementById('metaTitle'), `
+      <div class="editor-label">Override title</div>
+      <input type="text" class="editor-input" value="${current}" id="titleOverride">
+    `);
+    setTimeout(() => document.getElementById('titleOverride')?.focus(), 50);
+  });
+
+  // -------- attendee suggestions --------
+  document.querySelectorAll('.attendee-chip.suggested').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.classList.remove('suggested');
+      chip.querySelector('.attendee-rationale').remove();
+    });
+  });
+
+  // -------- mode switcher (visual only for mockup) --------
+  document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const mode = tab.dataset.mode;
+      const eyebrow = document.getElementById('modeEyebrow');
+      const title = document.getElementById('modeTitle');
+      const subtitle = document.getElementById('modeSubtitle');
+      const continuationSection = document.getElementById('continuationSection');
+      const chromeContext = document.getElementById('chromeContext');
+      
+      if (mode === 'cadence') {
+        eyebrow.textContent = 'Continuing — Endoscope Replacement';
+        title.textContent = 'What needs Next Required Action today?';
+        subtitle.textContent = '12 prior meetings · last met 6 days ago · 8 open commitments carried forward';
+        continuationSection.style.display = 'block';
+        chromeContext.innerHTML = `<span class="crumb">Constellation</span><span class="crumb-sep">›</span><span class="crumb">Endoscope Replacement</span><span class="crumb-sep">›</span><span class="crumb-current">New Meeting</span>`;
+      } else if (mode === 'quick') {
+        eyebrow.textContent = 'Quick Capture — from Constellation';
+        title.textContent = 'Just start. File it later.';
+        subtitle.textContent = 'No workstream context · meeting begins immediately · lands in parking lot';
+        continuationSection.style.display = 'none';
+        chromeContext.innerHTML = `<span class="crumb">Constellation</span><span class="crumb-sep">›</span><span class="crumb-current">New Meeting</span>`;
+      } else if (mode === 'formal') {
+        eyebrow.textContent = 'Formal — Endoscope Replacement';
+        title.textContent = 'Schedule a structured session.';
+        subtitle.textContent = 'External attendees expected · time slot required · agenda visible to all parties';
+        continuationSection.style.display = 'block';
+        chromeContext.innerHTML = `<span class="crumb">Constellation</span><span class="crumb-sep">›</span><span class="crumb">Endoscope Replacement</span><span class="crumb-sep">›</span><span class="crumb-current">New Meeting</span>`;
+      }
+    });
+  });
+
+  // -------- commit moment --------
+  document.getElementById('beginBtn').addEventListener('click', () => {
+    const transition = document.getElementById('commitTransition');
+    const postCommit = document.getElementById('postCommit');
+    const title = document.getElementById('derivedTitle').textContent;
+    const ready = agenda.filter(a => a.text.trim() && a.nra).length;
+    const attendeeCount = document.querySelectorAll('.attendee-chip:not(.suggested)').length;
+    
+    transition.classList.add('active');
+    
+    setTimeout(() => {
+      document.getElementById('postCommitTitle').textContent = title;
+      document.getElementById('postCommitMeta').textContent = `${ready} thread${ready === 1 ? '' : 's'} ready · ${attendeeCount} attendee${attendeeCount === 1 ? '' : 's'} · capturing now`;
+      postCommit.classList.add('active');
+    }, 800);
+  });
+
+  document.getElementById('restartLink').addEventListener('click', () => {
+    document.getElementById('postCommit').classList.remove('active');
+    document.getElementById('commitTransition').classList.remove('active');
+    agenda = [];
+    nextAgendaId = 1;
+    renderAgenda();
+    renderCarried();
+    updateCommitBar();
+    updateDerivedTitle();
+  });
+
+  // -------- initial render --------
+  renderCarried();
+  renderAgenda();
+  updateCommitBar();
+</script>
+
+</body>
+</html>

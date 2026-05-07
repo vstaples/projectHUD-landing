@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accord — Meeting Setup v4 (Magic Wand)</title>
+<!--
+  README — Accord Meeting Setup v4 (Magic Wand)
+
+  What I threw out from v3:
+    - Three-column briefing/composition/anticipation layout
+    - Vertical agenda list
+    - Per-attendee text cards
+    - File icon row labeled "references"
+    - The form-paradigm entirely
+
+  What replaces it (the bets):
+
+  1. CANVAS-PRIMARY. Center stage is a living canvas — the accumulated 
+     visual state of the workstream. PCB layout, thermal sim, BOM table, 
+     architecture diagrams — all surfaced together with annotation history 
+     layered as scrubable timeline. The canvas IS the meeting; the meeting 
+     IS the canvas continuing. Operators don't ask "what's the agenda" — 
+     they walk the canvas and pull threads from where attention has 
+     accumulated (red marks, comment threads, unresolved annotations).
+     
+  2. FILMSTRIP. Below the canvas, a horizontal strip of every prior 
+     meeting in the workstream — each frame a thumbnail of canvas state 
+     at that meeting's seal. Click any frame to scrub the canvas to 
+     that historical state. The workstream is video, not events.
+
+  3. SESSION-VIEW AGENDA. Right rail is a 4×3 grid (time slices × 
+     thread types) borrowed directly from Ableton Live. Carry-forward 
+     substrate appears as available clips. Operator drags clips into 
+     cells to compose the meeting's *temporal shape*. Empty cells stay 
+     empty. The grid IS the score.
+
+  4. SPATIAL ATTENDEE MAP. Top-right corner — attendees positioned in 
+     2D space relative to substrate clusters they're stake-holding. 
+     Edges connect to canvas annotations / decisions / dissents. Hover 
+     an attendee → their stake illuminates across the canvas. Hover an 
+     annotation → relevant attendees light up in the map. Bidirectional 
+     graph of who-cares-about-what.
+
+  5. AMBIENT STATE CUES. Sound design described in comments (not 
+     implemented in HTML). Subtle pen-on-paper, soft chimes, orchestral 
+     swell on commit. Bloomberg-trader-station audio register.
+
+  Source domains drawn from:
+    - Ableton Live (session view)
+    - Final Cut / DaVinci Resolve (filmstrip)
+    - Figma / Sketch (canvas + cursors)
+    - Maltego / Palantir (link analysis spatial map)
+    - Bloomberg Terminal (information density + power-user vocabulary)
+
+  What production would require:
+    - Canvas infrastructure: vector + raster compositing per workstream
+    - Annotation substrate: positionable comments, drawing strokes, 
+      reactions per canvas object, with author/timestamp/seal-state
+    - Per-meeting canvas snapshot mechanism (filmstrip frames)
+    - Spatial layout algorithm for attendee positioning based on 
+      substrate-stake graph (force-directed; ~few hundred ms compute)
+    - Drag-drop session-view with clip pre-population from substrate 
+      query
+    - Custom hardware integration deferred (knob, foot pedal — out of 
+      v4 scope)
+    - Sound design assets: ~12-15 short audio cues, professionally 
+      composed; could license/commission
+
+  Built as single self-contained HTML; no external dependencies.
+-->
+<style>
+  :root {
+    --bg-deep: #0a0e14;
+    --bg-canvas: #0d1218;
+    --bg-pane: #11161e;
+    --bg-elevated: #161c26;
+    --bg-tile: #1a212c;
+    --bg-tile-hover: #1f2733;
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-mid: rgba(255, 255, 255, 0.12);
+    --border-active: rgba(94, 234, 212, 0.4);
+    --text-primary: #e8edf2;
+    --text-secondary: #8a95a5;
+    --text-tertiary: #5a6678;
+    --text-faint: #3a4456;
+    --accent-cyan: #5eead4;
+    --accent-cyan-dim: rgba(94, 234, 212, 0.15);
+    --accent-amber: #fbbf77;
+    --accent-amber-dim: rgba(251, 191, 119, 0.18);
+    --accent-rose: #fb7185;
+    --accent-rose-dim: rgba(251, 113, 133, 0.18);
+    --accent-violet: #a78bfa;
+    --accent-violet-dim: rgba(167, 139, 250, 0.18);
+    --accent-green: #4ade80;
+    --accent-green-dim: rgba(74, 222, 128, 0.18);
+    --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", Menlo, monospace;
+    --font-serif: "Lora", "Charter", "Georgia", serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.5;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background: var(--bg-deep);
+    display: grid;
+    grid-template-rows: 48px 1fr 140px 56px;
+    grid-template-columns: 1fr 360px;
+    grid-template-areas:
+      "chrome chrome"
+      "canvas session"
+      "filmstrip session"
+      "footer footer";
+    height: 100vh;
+  }
+
+  /* ============ CHROME ============ */
+  .chrome {
+    grid-area: chrome;
+    height: 48px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 16px;
+    background: rgba(10, 14, 20, 0.85);
+    backdrop-filter: blur(20px);
+    z-index: 100;
+  }
+  .chrome-brand {
+    font-family: var(--font-serif);
+    font-size: 19px;
+    font-weight: 500;
+  }
+  .chrome-context { display: flex; align-items: baseline; gap: 7px; font-size: 12px; }
+  .crumb { color: var(--text-tertiary); cursor: pointer; transition: color .2s; }
+  .crumb:hover { color: var(--text-secondary); }
+  .crumb-sep { color: var(--text-faint); }
+  .crumb-current { color: var(--text-primary); font-weight: 500; }
+  .chrome-spacer { flex: 1; }
+  .chrome-meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.5px;
+  }
+  .chrome-meta .pulse-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-amber);
+    animation: pulse 2s ease-in-out infinite;
+    display: inline-block;
+    margin-right: 6px;
+  }
+  .chrome-meta .starting { color: var(--accent-amber); }
+  .meeting-title-mini {
+    font-family: var(--font-serif);
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+  .ctx-toggle {
+    display: flex;
+    background: var(--bg-pane);
+    border: 1px solid var(--border-subtle);
+    border-radius: 5px;
+    padding: 2px;
+  }
+  .ctx-tab {
+    padding: 4px 9px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: 3px;
+    transition: color .2s, background .2s;
+  }
+  .ctx-tab:hover { color: var(--text-secondary); }
+  .ctx-tab.active { color: var(--accent-cyan); background: var(--accent-cyan-dim); }
+
+  /* ============ CANVAS (CENTER) ============ */
+  .canvas {
+    grid-area: canvas;
+    background:
+      radial-gradient(ellipse at center, rgba(94, 234, 212, 0.025) 0%, transparent 70%),
+      var(--bg-canvas);
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .canvas-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+  }
+  /* Canvas objects — PCB image, thermal sim, etc — positioned freeform */
+  .canvas-obj {
+    position: absolute;
+    background: var(--bg-pane);
+    border: 1px solid var(--border-mid);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color .2s, transform .2s;
+    cursor: move;
+  }
+  .canvas-obj:hover { border-color: var(--border-active); transform: scale(1.01); }
+  .canvas-obj.focused { border-color: var(--accent-cyan); box-shadow: 0 0 24px rgba(94,234,212,0.3); }
+  .obj-pcb {
+    top: 80px; left: 60px;
+    width: 380px; height: 240px;
+    background: linear-gradient(135deg, #1a3a4a 0%, #0d2030 100%);
+  }
+  .obj-pcb::before {
+    content: '';
+    position: absolute;
+    inset: 18px;
+    background:
+      radial-gradient(circle at 25% 30%, var(--accent-amber) 0 3px, transparent 4px),
+      radial-gradient(circle at 75% 30%, var(--accent-amber) 0 3px, transparent 4px),
+      radial-gradient(circle at 50% 60%, var(--accent-cyan) 0 4px, transparent 5px),
+      linear-gradient(90deg, transparent 0 30%, rgba(94,234,212,0.4) 30% 32%, transparent 32%),
+      linear-gradient(180deg, transparent 0 50%, rgba(94,234,212,0.3) 50% 52%, transparent 52%);
+    border: 1px solid rgba(94,234,212,0.2);
+  }
+  .obj-thermal {
+    top: 60px; right: 120px;
+    width: 280px; height: 200px;
+    background:
+      radial-gradient(ellipse at 40% 50%, var(--accent-rose) 0%, var(--accent-amber) 25%, var(--accent-cyan) 60%, transparent 90%),
+      var(--bg-elevated);
+  }
+  .obj-bom {
+    bottom: 90px; left: 100px;
+    width: 280px; height: 160px;
+    padding: 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    background: var(--bg-pane);
+    line-height: 1.7;
+  }
+  .obj-arch {
+    bottom: 80px; right: 80px;
+    width: 240px; height: 180px;
+    background: var(--bg-pane);
+    padding: 18px;
+  }
+  .obj-arch-svg {
+    width: 100%; height: 100%;
+  }
+  .obj-label {
+    position: absolute;
+    top: 6px; left: 8px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.5px;
+    background: rgba(10,14,20,0.8);
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+  
+  /* Annotations on canvas */
+  .annot {
+    position: absolute;
+    cursor: pointer;
+    transition: transform .2s;
+  }
+  .annot:hover { transform: scale(1.15); }
+  .annot-circle {
+    width: 32px; height: 32px;
+    border: 2px solid var(--accent-rose);
+    border-radius: 50%;
+    box-shadow: 0 0 16px rgba(251, 113, 133, 0.4);
+    animation: annotPulse 3s ease-in-out infinite;
+  }
+  .annot-comment {
+    width: 22px; height: 22px;
+    background: var(--accent-violet);
+    border: 2px solid var(--bg-deep);
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  .annot-comment-num {
+    position: absolute;
+    inset: 0;
+    transform: rotate(45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .annot-arrow {
+    position: absolute;
+    pointer-events: none;
+  }
+  .annot-author-pin {
+    position: absolute;
+    background: rgba(10,14,20,0.92);
+    border: 1px solid var(--border-mid);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    pointer-events: none;
+    white-space: nowrap;
+    backdrop-filter: blur(8px);
+  }
+  .annot-author-pin .author { color: var(--accent-violet); font-weight: 600; }
+  .annot-author-pin .ago { color: var(--text-tertiary); font-family: var(--font-mono); font-size: 9px; margin-left: 5px; }
+  
+  /* Spatial attendee map (top-right overlay) */
+  .attendee-map {
+    position: absolute;
+    top: 16px; right: 16px;
+    width: 240px;
+    background: rgba(10,14,20,0.85);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    backdrop-filter: blur(12px);
+    padding: 12px;
+    z-index: 5;
+  }
+  .attendee-map-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .map-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+  }
+  .map-count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-cyan);
+  }
+  .map-canvas {
+    position: relative;
+    height: 150px;
+    background:
+      radial-gradient(circle at center, rgba(94,234,212,0.04) 0%, transparent 70%);
+    border-radius: 6px;
+  }
+  .map-attendee {
+    position: absolute;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    border: 2px solid var(--border-mid);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color .2s, transform .2s, box-shadow .2s;
+  }
+  .map-attendee:hover {
+    border-color: var(--accent-cyan);
+    transform: scale(1.15);
+    box-shadow: 0 0 16px rgba(94,234,212,0.5);
+    z-index: 10;
+  }
+  .map-attendee.you { background: var(--accent-cyan-dim); border-color: var(--accent-cyan); color: var(--accent-cyan); }
+  .map-attendee.has-stake { border-color: var(--accent-amber); }
+  .map-attendee.has-dissent { border-color: var(--accent-rose); }
+  .map-attendee.absent { opacity: 0.55; border-style: dashed; }
+  .map-edge {
+    position: absolute;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(94,234,212,0.3), transparent);
+    transform-origin: left center;
+    pointer-events: none;
+  }
+  .map-edge.dissent { background: linear-gradient(90deg, transparent, rgba(251,113,133,0.4), transparent); }
+  .map-edge.belief { background: linear-gradient(90deg, transparent, rgba(251,191,119,0.4), transparent); }
+  .map-attendee-name {
+    position: absolute;
+    font-size: 9px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Canvas toolbar */
+  .canvas-toolbar {
+    position: absolute;
+    bottom: 16px; left: 16px;
+    display: flex;
+    gap: 6px;
+    background: rgba(10,14,20,0.85);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 5px;
+    backdrop-filter: blur(12px);
+  }
+  .tool-btn {
+    width: 32px; height: 32px;
+    border-radius: 5px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color .2s, background .2s, border-color .2s;
+    font-size: 14px;
+  }
+  .tool-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-tile);
+  }
+  .tool-btn.active {
+    color: var(--accent-cyan);
+    background: var(--accent-cyan-dim);
+    border-color: rgba(94,234,212,0.3);
+  }
+  .canvas-mode-label {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    background: rgba(10,14,20,0.85);
+    border: 1px solid var(--border-subtle);
+    padding: 5px 12px;
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
+  }
+
+  /* ============ FILMSTRIP ============ */
+  .filmstrip {
+    grid-area: filmstrip;
+    background: rgba(13, 18, 24, 0.95);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+  }
+  .filmstrip-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .strip-label {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--text-tertiary);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .strip-controls {
+    display: flex;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-tertiary);
+  }
+  .strip-control { cursor: pointer; transition: color .2s; }
+  .strip-control:hover { color: var(--accent-cyan); }
+  .strip-control.active { color: var(--accent-cyan); }
+  .strip-frames {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    flex: 1;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+  }
+  .strip-frames::-webkit-scrollbar { height: 4px; }
+  .strip-frames::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+  .strip-frame {
+    flex-shrink: 0;
+    width: 110px;
+    height: 78px;
+    background: var(--bg-pane);
+    border: 1px solid var(--border-subtle);
+    border-radius: 5px;
+    cursor: pointer;
+    position: relative;
+    transition: border-color .2s, transform .2s;
+    overflow: hidden;
+  }
+  .strip-frame:hover {
+    border-color: var(--border-active);
+    transform: translateY(-2px);
+  }
+  .strip-frame.current {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 12px rgba(94,234,212,0.4);
+  }
+  .strip-frame.future {
+    border-style: dashed;
+    background: transparent;
+  }
+  .strip-frame-thumb {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.55;
+  }
+  .strip-frame-thumb.f1 { background: linear-gradient(135deg, #1a3a4a 0%, #0d2030 100%); }
+  .strip-frame-thumb.f2 { background: linear-gradient(135deg, #2a3a4a 0%, #1d2030 100%); }
+  .strip-frame-thumb.f3 { background: linear-gradient(135deg, #1a3a3a 0%, #0d3020 100%); }
+  .strip-frame-thumb.f4 { background: linear-gradient(135deg, #1a3a4a 30%, #2d1030 100%); }
+  .strip-frame-thumb.f5 { background: linear-gradient(135deg, #2a3a5a 0%, #0d2040 100%); }
+  .strip-frame-thumb.f6 { background: linear-gradient(135deg, #1a4a4a 0%, #0d2030 100%); }
+  .strip-frame-thumb.f7 { background: linear-gradient(135deg, #1a3a4a 50%, #3d1020 100%); }
+  .strip-frame-thumb.f8 { background: linear-gradient(135deg, #1a3a4a 70%, #1d2030 100%); }
+  .strip-frame-thumb.f9 { background: linear-gradient(135deg, #2a3a3a 0%, #1d3030 100%); }
+  .strip-frame-thumb.f10 { background: linear-gradient(135deg, #1a4a5a 0%, #0d2040 100%); }
+  .strip-frame-thumb.f11 { background: linear-gradient(135deg, #1a3a4a 60%, #2d2030 100%); }
+  .strip-frame-thumb.f12 { background: linear-gradient(135deg, #1a3a4a 0%, #0d2030 100%); }
+  .strip-frame-meta {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(180deg, transparent, rgba(10,14,20,0.95));
+    padding: 12px 6px 4px 6px;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+  .strip-frame-date { color: var(--text-primary); font-weight: 600; }
+  .strip-frame-counts { color: var(--text-tertiary); }
+  .strip-frame-marker {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+  .strip-frame-marker.dissent { background: var(--accent-rose); box-shadow: 0 0 6px rgba(251,113,133,0.6); }
+  .strip-frame-marker.decision { background: var(--accent-cyan); }
+  .strip-frame.current .strip-frame-thumb { opacity: 0.8; }
+
+  /* ============ SESSION VIEW (RIGHT) ============ */
+  .session {
+    grid-area: session;
+    background: rgba(17, 22, 30, 0.6);
+    border-left: 1px solid var(--border-subtle);
+    padding: 16px 16px 8px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+  }
+  .session-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .session-title {
+    font-family: var(--font-serif);
+    font-size: 16px;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .session-subtitle {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .session-grid {
+    display: grid;
+    grid-template-columns: 80px repeat(4, 1fr);
+    grid-template-rows: 24px repeat(3, 1fr);
+    gap: 4px;
+    flex: 1;
+    min-height: 240px;
+  }
+  .grid-corner { }
+  .grid-col-head {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 4px 0;
+    border-radius: 3px;
+  }
+  .grid-col-head.decision { color: var(--accent-cyan); background: var(--accent-cyan-dim); }
+  .grid-col-head.action { color: var(--accent-amber); background: var(--accent-amber-dim); }
+  .grid-col-head.risk { color: var(--accent-rose); background: var(--accent-rose-dim); }
+  .grid-col-head.question { color: var(--accent-violet); background: var(--accent-violet-dim); }
+  .grid-row-head {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+    text-align: right;
+  }
+  .grid-cell {
+    background: rgba(255,255,255,0.015);
+    border: 1px dashed transparent;
+    border-radius: 4px;
+    transition: background .2s, border-color .2s;
+    min-height: 50px;
+    padding: 3px;
+    cursor: pointer;
+    position: relative;
+  }
+  .grid-cell:hover {
+    background: rgba(255,255,255,0.04);
+    border-color: var(--border-mid);
+  }
+  .grid-cell.drag-over {
+    background: rgba(94,234,212,0.08);
+    border-color: var(--accent-cyan);
+    border-style: solid;
+  }
+  .clip {
+    background: var(--bg-tile);
+    border: 1px solid var(--border-mid);
+    border-left-width: 3px;
+    border-radius: 3px;
+    padding: 5px 7px;
+    font-size: 10.5px;
+    color: var(--text-primary);
+    line-height: 1.3;
+    cursor: grab;
+    margin-bottom: 3px;
+    transition: border-color .2s, transform .2s;
+    user-select: none;
+  }
+  .clip:hover { transform: translateX(2px); }
+  .clip.decision { border-left-color: var(--accent-cyan); }
+  .clip.action { border-left-color: var(--accent-amber); }
+  .clip.risk { border-left-color: var(--accent-rose); }
+  .clip.question { border-left-color: var(--accent-violet); }
+  .clip.dragging { opacity: 0.4; }
+  .clip-id {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.4px;
+    margin-bottom: 1px;
+  }
+  .clip-id.decision { color: var(--accent-cyan); }
+  .clip-id.action { color: var(--accent-amber); }
+  .clip-id.risk { color: var(--accent-rose); }
+  .clip-id.question { color: var(--accent-violet); }
+
+  .clip-pool {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .pool-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .pool-count { color: var(--accent-cyan); }
+  .pool-clips {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 130px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+  }
+  .pool-clips::-webkit-scrollbar { width: 4px; }
+  .pool-clips::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+
+  /* ============ FOOTER ============ */
+  .footer {
+    grid-area: footer;
+    background: rgba(10, 14, 20, 0.92);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-subtle);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    z-index: 50;
+  }
+  .verdict-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--accent-amber-dim);
+    border: 1px solid rgba(251, 191, 119, 0.3);
+    border-radius: 16px;
+    padding: 5px 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-amber);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .verdict-pill.go {
+    background: var(--accent-green-dim);
+    border-color: rgba(74, 222, 128, 0.3);
+    color: var(--accent-green);
+  }
+  .checks { display: flex; gap: 14px; flex: 1; }
+  .check-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10.5px;
+    color: var(--text-secondary);
+  }
+  .check-icon {
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-weight: 700;
+  }
+  .check-icon.ok { background: var(--accent-green-dim); color: var(--accent-green); }
+  .check-icon.warn { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .commit-actions { display: flex; gap: 9px; }
+  .btn {
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .2s;
+    font-weight: 500;
+    font-family: inherit;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-mid);
+  }
+  .btn-secondary:hover { color: var(--text-primary); border-color: var(--border-active); }
+  .btn-primary {
+    background: var(--accent-cyan);
+    color: var(--bg-deep);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    padding: 8px 20px;
+  }
+  .btn-primary:hover {
+    background: #7dffe6;
+    box-shadow: 0 0 24px rgba(94, 234, 212, 0.4);
+  }
+
+  /* ---- detail flyout (when clicking a canvas annotation) ---- */
+  .flyout {
+    position: absolute;
+    background: rgba(10,14,20,0.95);
+    border: 1px solid var(--border-mid);
+    border-radius: 8px;
+    padding: 12px 14px;
+    width: 280px;
+    backdrop-filter: blur(16px);
+    z-index: 20;
+    display: none;
+  }
+  .flyout.active { display: block; animation: flyoutAppear .25s ease-out; }
+  .flyout-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .flyout-id {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-rose);
+  }
+  .flyout-author {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-left: auto;
+  }
+  .flyout-author .name { color: var(--accent-violet); font-weight: 600; }
+  .flyout-text {
+    font-size: 12px;
+    color: var(--text-primary);
+    line-height: 1.5;
+    margin-bottom: 8px;
+  }
+  .flyout-meta {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.5px;
+  }
+  .flyout-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .flyout-action {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    background: var(--bg-tile);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: color .2s, background .2s;
+  }
+  .flyout-action:hover {
+    background: var(--bg-tile-hover);
+    color: var(--text-primary);
+  }
+  .flyout-action.primary {
+    background: var(--accent-cyan-dim);
+    color: var(--accent-cyan);
+    border-color: rgba(94,234,212,0.3);
+  }
+
+  /* ============ ANIMATIONS ============ */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  @keyframes annotPulse {
+    0%, 100% { box-shadow: 0 0 16px rgba(251, 113, 133, 0.4); }
+    50% { box-shadow: 0 0 24px rgba(251, 113, 133, 0.7); }
+  }
+  @keyframes flyoutAppear {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---- commit transition ---- */
+  .commit-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-deep);
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .4s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .commit-overlay.active { opacity: 1; pointer-events: all; }
+  .commit-swirl {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--accent-cyan) 0%, transparent 70%);
+    opacity: 0;
+    transform: scale(0);
+    transition: opacity .3s, transform 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .commit-overlay.active .commit-swirl { opacity: 1; transform: scale(5); }
+  .commit-msg {
+    position: absolute;
+    bottom: 36%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity .4s .3s;
+    text-align: center;
+  }
+  .commit-msg-2 {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    color: var(--text-primary);
+    letter-spacing: 0;
+    text-transform: none;
+    margin-top: 14px;
+    font-weight: 500;
+  }
+  .commit-overlay.active .commit-msg { opacity: 1; }
+
+  /* ---- audio cue legend (corner badge) ---- */
+  .audio-legend {
+    position: fixed;
+    top: 60px;
+    left: 18px;
+    background: rgba(10,14,20,0.85);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.5px;
+    backdrop-filter: blur(12px);
+    z-index: 60;
+    line-height: 1.5;
+    display: none;
+  }
+  .audio-legend.visible { display: block; animation: flyoutAppear .25s ease-out; }
+  .audio-legend strong { color: var(--accent-violet); }
+  .audio-toggle {
+    position: fixed;
+    top: 60px;
+    left: 18px;
+    background: rgba(10,14,20,0.85);
+    border: 1px solid var(--border-subtle);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 61;
+    color: var(--accent-violet);
+    font-size: 12px;
+    backdrop-filter: blur(12px);
+    transition: border-color .2s;
+  }
+  .audio-toggle:hover { border-color: var(--accent-violet); }
+</style>
+</head>
+<body>
+
+<!-- ============== CHROME ============== -->
+<div class="chrome">
+  <div class="chrome-brand">Accord</div>
+  <div class="chrome-context">
+    <span class="crumb">Constellation</span>
+    <span class="crumb-sep">›</span>
+    <span class="crumb">Endoscope Replacement</span>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">Phase 2 Review · setup</span>
+  </div>
+  <div class="chrome-spacer"></div>
+  <div class="meeting-title-mini">Phase 2 Review</div>
+  <div class="ctx-toggle">
+    <div class="ctx-tab active">Follow-up</div>
+    <div class="ctx-tab">First-ever</div>
+  </div>
+  <div class="chrome-meta">
+    <span class="starting"><span class="pulse-dot"></span>Starts 14:00 · in 23m</span>
+    <span>·</span>
+    <span>5 attendees · 3 confirmed</span>
+  </div>
+</div>
+
+<!-- ============== CANVAS ============== -->
+<div class="canvas">
+  <div class="canvas-grid"></div>
+
+  <!-- Canvas objects: PCB, thermal, BOM, architecture diagram -->
+  <div class="canvas-obj obj-pcb">
+    <div class="obj-label">PCB-Layout-Rev3.png · added Apr 17</div>
+  </div>
+  
+  <div class="canvas-obj obj-thermal">
+    <div class="obj-label">thermal_sim_apr27.pdf</div>
+  </div>
+
+  <div class="canvas-obj obj-bom">
+    <div class="obj-label">BOM_revised.xlsx</div>
+    <div style="margin-top: 16px;">
+      <div style="color:var(--text-tertiary);">PART · QTY · SUPPLIER</div>
+      <div>OPT-MOUNT-A · 1 · <span style="color:var(--accent-amber);">Olympus</span></div>
+      <div>FIBER-LINE-K · 12 · <span style="color:var(--accent-rose);">SOLE-SOURCE</span></div>
+      <div>STERIL-TRAY · 1 · TBD</div>
+      <div>CPU-V3 · 1 · pending</div>
+      <div style="color: var(--text-tertiary); margin-top: 4px;">+ 47 more...</div>
+    </div>
+  </div>
+
+  <div class="canvas-obj obj-arch">
+    <div class="obj-label">arch-diagram.svg</div>
+    <svg class="obj-arch-svg" viewBox="0 0 200 140">
+      <rect x="20" y="20" width="50" height="30" rx="4" fill="none" stroke="rgba(94,234,212,0.6)" stroke-width="1.5"/>
+      <text x="45" y="38" text-anchor="middle" fill="rgba(94,234,212,0.8)" font-size="8" font-family="monospace">CPU</text>
+      <rect x="130" y="20" width="50" height="30" rx="4" fill="none" stroke="rgba(94,234,212,0.6)" stroke-width="1.5"/>
+      <text x="155" y="38" text-anchor="middle" fill="rgba(94,234,212,0.8)" font-size="8" font-family="monospace">CAM</text>
+      <rect x="75" y="80" width="50" height="30" rx="4" fill="none" stroke="rgba(94,234,212,0.6)" stroke-width="1.5"/>
+      <text x="100" y="98" text-anchor="middle" fill="rgba(94,234,212,0.8)" font-size="8" font-family="monospace">FIBER</text>
+      <line x1="45" y1="50" x2="100" y2="80" stroke="rgba(94,234,212,0.4)" stroke-width="1"/>
+      <line x1="155" y1="50" x2="100" y2="80" stroke="rgba(94,234,212,0.4)" stroke-width="1"/>
+      <line x1="70" y1="35" x2="130" y2="35" stroke="rgba(251,113,133,0.5)" stroke-width="1" stroke-dasharray="3,2"/>
+    </svg>
+  </div>
+
+  <!-- Annotations: red circles for unresolved, comments for threads -->
+  <div class="annot annot-circle" style="top: 110px; left: 130px;" data-annot="ann-1"></div>
+  <div class="annot-author-pin" style="top: 92px; left: 168px;">
+    <span class="author">Sarah</span>
+    <span class="ago">3d ago</span>
+  </div>
+  
+  <div class="annot annot-circle" style="top: 145px; left: 250px;" data-annot="ann-2" style-color="amber"></div>
+  
+  <div class="annot annot-comment" style="top: 80px; right: 280px;" data-annot="comm-1">
+    <div class="annot-comment-num">3</div>
+  </div>
+  <div class="annot-author-pin" style="top: 60px; right: 240px;">
+    <span class="author">Tom</span>
+    <span class="ago">5d · supply chain thread</span>
+  </div>
+
+  <div class="annot annot-comment" style="top: 130px; right: 175px;" data-annot="comm-2">
+    <div class="annot-comment-num">2</div>
+  </div>
+
+  <div class="annot annot-comment" style="bottom: 180px; left: 135px;" data-annot="comm-3">
+    <div class="annot-comment-num">1</div>
+  </div>
+  <div class="annot-author-pin" style="bottom: 168px; left: 175px;">
+    <span class="author">Sarah</span>
+    <span class="ago">on FIBER-LINE-K</span>
+  </div>
+
+  <div class="annot annot-comment" style="bottom: 130px; right: 170px;" data-annot="comm-4">
+    <div class="annot-comment-num">4</div>
+  </div>
+  <div class="annot-author-pin" style="bottom: 116px; right: 235px;">
+    <span class="author">Marcus</span>
+    <span class="ago">on architecture</span>
+  </div>
+
+  <!-- Spatial attendee map (top-right overlay) -->
+  <div class="attendee-map">
+    <div class="attendee-map-header">
+      <span class="map-label">Attendee Stake Map</span>
+      <span class="map-count">5 · 4 staked</span>
+    </div>
+    <div class="map-canvas" id="mapCanvas">
+      <div class="map-attendee you" style="top: 60px; left: 100px;" data-name="Vaughn">VS</div>
+      <div class="map-attendee has-stake" style="top: 18px; left: 70px;" data-name="Sarah">SC</div>
+      <div class="map-attendee has-dissent" style="top: 90px; left: 40px;" data-name="Tom">TL</div>
+      <div class="map-attendee has-stake" style="top: 100px; right: 30px;" data-name="Marcus">MR</div>
+      <div class="map-attendee absent" style="top: 30px; right: 22px;" data-name="Amara">AO</div>
+      
+      <!-- Edges -->
+      <div class="map-edge belief" style="top: 38px; left: 100px; width: 30px; transform: rotate(-110deg);"></div>
+      <div class="map-edge dissent" style="top: 105px; left: 70px; width: 35px; transform: rotate(0deg);"></div>
+      <div class="map-edge" style="top: 115px; left: 130px; width: 70px; transform: rotate(-10deg);"></div>
+      <div class="map-edge belief" style="top: 50px; right: 30px; width: 30px; transform: rotate(110deg);"></div>
+
+      <!-- Names -->
+      <div class="map-attendee-name" style="top: 0px; left: 64px;">Sarah</div>
+      <div class="map-attendee-name" style="top: 122px; left: 28px;">Tom</div>
+      <div class="map-attendee-name" style="top: 132px; right: 24px;">Marcus</div>
+      <div class="map-attendee-name" style="top: 14px; right: 18px;">Amara</div>
+    </div>
+  </div>
+
+  <!-- Canvas toolbar -->
+  <div class="canvas-toolbar">
+    <button class="tool-btn active" title="Select">↖</button>
+    <button class="tool-btn" title="Annotate">✎</button>
+    <button class="tool-btn" title="Comment">💬</button>
+    <button class="tool-btn" title="Frame">▢</button>
+    <button class="tool-btn" title="Measure">⟝</button>
+  </div>
+  <div class="canvas-mode-label">Canvas · live · 7 unresolved annotations · 4 comment threads</div>
+
+  <!-- Annotation flyout (initially hidden) -->
+  <div class="flyout" id="annotFlyout" style="top: 95px; left: 145px;">
+    <div class="flyout-header">
+      <span class="flyout-id">RX-014 · UNRESOLVED</span>
+      <span class="flyout-author"><span class="name">Sarah Chen</span> · 3d ago</span>
+    </div>
+    <div class="flyout-text">"Optical mount tolerance is too tight here — we'll see assembly yield drops below 80% if we don't relax."</div>
+    <div class="flyout-meta">2 replies · linked to AX-091, RX-014</div>
+    <div class="flyout-actions">
+      <button class="flyout-action">View thread</button>
+      <button class="flyout-action primary">Pull as agenda thread →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============== FILMSTRIP ============== -->
+<div class="filmstrip">
+  <div class="filmstrip-header">
+    <div class="strip-label">Workstream Timeline · 12 prior meetings · scrub to replay canvas</div>
+    <div class="strip-controls">
+      <span class="strip-control">⏮ first</span>
+      <span class="strip-control">▶ play history</span>
+      <span class="strip-control active">⊙ today</span>
+      <span class="strip-control">⏭ next</span>
+    </div>
+  </div>
+  <div class="strip-frames">
+    <div class="strip-frame" title="M-2026-01-08 · Kickoff">
+      <div class="strip-frame-thumb f1"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date">Jan 8</div>
+        <div class="strip-frame-counts">Kickoff · 4D · 3A</div>
+      </div>
+    </div>
+    <div class="strip-frame" title="M-2026-01-22 · Phase 0">
+      <div class="strip-frame-thumb f2"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date">Jan 22</div>
+        <div class="strip-frame-counts">Phase 0 · 2D · 5A</div>
+      </div>
+    </div>
+    <div class="strip-frame" title="M-2026-02-05">
+      <div class="strip-frame-thumb f3"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date">Feb 5</div>
+        <div class="strip-frame-counts">Spec lock · 3D · 4A</div>
+      </div>
+    </div>
+    <div class="strip-frame" title="M-2026-02-19 · DC-114 sealed; Tom dissented">
+      <div class="strip-frame-thumb f4"></div>
+      <div class="strip-frame-marker dissent"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date">Feb 19</div>
+        <div class="strip-frame-counts">DC-114 · DS-001</div>
+      </div>
+    </div>
+    <div class="strip-frame" title="M-2026-03-05">
+      <div class="strip-frame-thumb f5"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date">Mar 5</div>
+        <div class="strip-frame-counts">Vendor select · 5D</div>
+      </div>
+    </div>
+    <div class="strip-frame" title="M-2026-03-19 · Phase 1 entry">
+      <div class="strip-frame-thumb f6"></div>
+      <div class="strip-frame-marker decision"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date">Mar 19</div>
+        <div class="strip-frame-counts">P1 entry · 6D · 8A</div>
+      </div>
+    </div>
+    <div class="strip-frame" title="M-2026-04-02 · DS-005 dissent">
+      <div class="strip-frame-thumb f7"></div>
+      <div class="strip-frame-marker dissent"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date">Apr 2</div>
+        <div class="strip-frame-counts">DS-005 · sole-src</div>
+      </div>
+    </div>
+    <div class="strip-frame" title="M-2026-04-15">
+      <div class="strip-frame-thumb f8"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date">Apr 15</div>
+        <div class="strip-frame-counts">Optical · 4D · 6A</div>
+      </div>
+    </div>
+    <div class="strip-frame" title="M-2026-04-22 · DC-117 awaiting">
+      <div class="strip-frame-thumb f9"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date">Apr 22</div>
+        <div class="strip-frame-counts">DC-117 · awt</div>
+      </div>
+    </div>
+    <div class="strip-frame" title="M-2026-04-29">
+      <div class="strip-frame-thumb f10"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date">Apr 29</div>
+        <div class="strip-frame-counts">Eng review · 3D</div>
+      </div>
+    </div>
+    <div class="strip-frame" title="M-2026-05-01 · last sealed">
+      <div class="strip-frame-thumb f11"></div>
+      <div class="strip-frame-marker decision"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date">May 1</div>
+        <div class="strip-frame-counts">P1 close · 4D · 6A</div>
+      </div>
+    </div>
+    <div class="strip-frame current" title="Today · in setup">
+      <div class="strip-frame-thumb f12"></div>
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date" style="color: var(--accent-cyan);">Today</div>
+        <div class="strip-frame-counts">Phase 2 · setup</div>
+      </div>
+    </div>
+    <div class="strip-frame future" title="Future scheduled meeting">
+      <div class="strip-frame-meta">
+        <div class="strip-frame-date" style="color: var(--text-faint);">May 22</div>
+        <div class="strip-frame-counts" style="color: var(--text-faint);">P2 review</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== SESSION VIEW (RIGHT) ============== -->
+<div class="session">
+  <div class="session-header">
+    <div class="session-title">Session</div>
+    <div class="session-subtitle">compose · 60 min</div>
+  </div>
+
+  <!-- 4-column × 3-row grid: time-slice rows, NRA-type columns -->
+  <div class="session-grid" id="sessionGrid">
+    <div class="grid-corner"></div>
+    <div class="grid-col-head decision">Decide</div>
+    <div class="grid-col-head action">Assign</div>
+    <div class="grid-col-head risk">Risk</div>
+    <div class="grid-col-head question">Ask</div>
+
+    <div class="grid-row-head">opening<br>0–20m</div>
+    <div class="grid-cell" data-row="0" data-col="decision">
+      <div class="clip decision" draggable="true" data-clip="DS-005">
+        <div class="clip-id decision">DS-005 · DC-114</div>
+        Resolve Tom's supplier dissent
+      </div>
+    </div>
+    <div class="grid-cell" data-row="0" data-col="action"></div>
+    <div class="grid-cell" data-row="0" data-col="risk"></div>
+    <div class="grid-cell" data-row="0" data-col="question"></div>
+
+    <div class="grid-row-head">middle<br>20–45m</div>
+    <div class="grid-cell" data-row="1" data-col="decision">
+      <div class="clip decision" draggable="true" data-clip="DC-117">
+        <div class="clip-id decision">DC-117 · belief</div>
+        Sarah declares on optical array
+      </div>
+    </div>
+    <div class="grid-cell" data-row="1" data-col="action">
+      <div class="clip action" draggable="true" data-clip="P2-coord">
+        <div class="clip-id action">FRESH</div>
+        Phase 2 vendor coordination
+      </div>
+    </div>
+    <div class="grid-cell" data-row="1" data-col="risk">
+      <div class="clip risk" draggable="true" data-clip="RX-014">
+        <div class="clip-id risk">RX-014</div>
+        FDA window mitigation
+      </div>
+    </div>
+    <div class="grid-cell" data-row="1" data-col="question"></div>
+
+    <div class="grid-row-head">close<br>45–60m</div>
+    <div class="grid-cell" data-row="2" data-col="decision"></div>
+    <div class="grid-cell" data-row="2" data-col="action"></div>
+    <div class="grid-cell" data-row="2" data-col="risk"></div>
+    <div class="grid-cell" data-row="2" data-col="question">
+      <div class="clip question" draggable="true" data-clip="QX-003">
+        <div class="clip-id question">QX-003 · Marcus</div>
+        EMI test results review
+      </div>
+    </div>
+  </div>
+
+  <!-- Available clips pool -->
+  <div class="clip-pool">
+    <div class="pool-label">
+      <span>Available clips · drag to grid</span>
+      <span class="pool-count">3 unused</span>
+    </div>
+    <div class="pool-clips" id="clipPool">
+      <div class="clip action" draggable="true" data-clip="AX-091">
+        <div class="clip-id action">AX-091 · overdue 2d</div>
+        Marcus: cleaner platform B cost analysis
+      </div>
+      <div class="clip question" draggable="true" data-clip="QX-007">
+        <div class="clip-id question">QX-007 · cross-WS</div>
+        CPU redesign timeline impact?
+      </div>
+      <div class="clip risk" draggable="true" data-clip="RX-015">
+        <div class="clip-id risk">RX-015 · mit</div>
+        EMI shielding margin
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== FOOTER ============== -->
+<div class="footer">
+  <div class="verdict-pill" id="verdictPill">GO with caveats</div>
+  <div class="checks">
+    <div class="check-item"><div class="check-icon ok">✓</div>5 clips composed across 3 time slices</div>
+    <div class="check-item"><div class="check-icon ok">✓</div>Canvas reviewed · 4 annotations marked</div>
+    <div class="check-item"><div class="check-icon warn">!</div>Tom unresponded · stake-map flagged</div>
+    <div class="check-item"><div class="check-icon warn">!</div>Opening row stacked · 2 decisions in 20m</div>
+  </div>
+  <div class="commit-actions">
+    <button class="btn btn-secondary">Save & send invite</button>
+    <button class="btn btn-primary" id="beginBtn">Begin Meeting →</button>
+  </div>
+</div>
+
+<!-- audio cue toggle + legend -->
+<div class="audio-toggle" id="audioToggle" title="Audio cue legend">♪</div>
+<div class="audio-legend" id="audioLegend">
+  <strong>Sound design</strong> (described, not implemented):<br>
+  • <strong>pen-on-paper</strong> when clip lands in grid<br>
+  • <strong>soft chime</strong> on attendee confirmation<br>
+  • <strong>timpani pulse</strong> when overdue surfaces<br>
+  • <strong>orchestral swell</strong> on Begin Meeting (2s)<br>
+  • <strong>ambient drone</strong> during live session<br>
+  Inspired by Brian Eno · Bloomberg trader-station<br>
+  <em style="color:var(--text-faint)">click ♪ to dismiss</em>
+</div>
+
+<!-- commit overlay -->
+<div class="commit-overlay" id="commitOverlay">
+  <div class="commit-swirl"></div>
+  <div class="commit-msg">
+    Instantiating substrate · meeting beginning
+    <div class="commit-msg-2">5 clips ready · canvas live · attendees gathering</div>
+  </div>
+</div>
+
+<script>
+  // === ANNOTATION FLYOUT ===
+  const flyout = document.getElementById('annotFlyout');
+  document.querySelectorAll('.annot').forEach(a => {
+    a.addEventListener('click', e => {
+      flyout.classList.toggle('active');
+    });
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.annot') && !e.target.closest('.flyout')) {
+      flyout.classList.remove('active');
+    }
+  });
+
+  // === ATTENDEE MAP HOVER → highlight canvas annotations (visual hint) ===
+  document.querySelectorAll('.map-attendee').forEach(att => {
+    att.addEventListener('mouseenter', () => {
+      const name = att.dataset.name;
+      // Visual: dim non-relevant annotations
+      document.querySelectorAll('.annot').forEach(a => a.style.opacity = '0.3');
+      document.querySelectorAll('.annot-author-pin').forEach(p => {
+        if (p.textContent.includes(name)) {
+          p.style.borderColor = 'var(--accent-cyan)';
+          // Light up the nearest annot
+          const prev = p.previousElementSibling;
+          if (prev && prev.classList.contains('annot')) prev.style.opacity = '1';
+        }
+      });
+    });
+    att.addEventListener('mouseleave', () => {
+      document.querySelectorAll('.annot').forEach(a => a.style.opacity = '');
+      document.querySelectorAll('.annot-author-pin').forEach(p => p.style.borderColor = '');
+    });
+  });
+
+  // === SESSION VIEW DRAG-DROP ===
+  let draggedClip = null;
+  document.addEventListener('dragstart', e => {
+    if (e.target.classList.contains('clip')) {
+      draggedClip = e.target;
+      e.target.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+  });
+  document.addEventListener('dragend', e => {
+    if (e.target.classList.contains('clip')) {
+      e.target.classList.remove('dragging');
+      draggedClip = null;
+    }
+  });
+  document.querySelectorAll('.grid-cell').forEach(cell => {
+    cell.addEventListener('dragover', e => {
+      e.preventDefault();
+      cell.classList.add('drag-over');
+    });
+    cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+    cell.addEventListener('drop', e => {
+      e.preventDefault();
+      cell.classList.remove('drag-over');
+      if (draggedClip) {
+        cell.appendChild(draggedClip);
+      }
+    });
+  });
+  // Also allow dropping back to pool
+  document.getElementById('clipPool').addEventListener('dragover', e => e.preventDefault());
+  document.getElementById('clipPool').addEventListener('drop', e => {
+    e.preventDefault();
+    if (draggedClip) document.getElementById('clipPool').appendChild(draggedClip);
+  });
+
+  // === FILMSTRIP NAVIGATION (scrub canvas to historical state — visual hint only) ===
+  document.querySelectorAll('.strip-frame:not(.future)').forEach(frame => {
+    frame.addEventListener('click', () => {
+      document.querySelectorAll('.strip-frame').forEach(f => f.classList.remove('current'));
+      frame.classList.add('current');
+      // Visually: dim canvas + show "viewing historical state" hint
+      const canvas = document.querySelector('.canvas');
+      canvas.style.filter = frame === document.querySelectorAll('.strip-frame')[11] ? '' : 'sepia(0.4) brightness(0.7)';
+      const label = document.querySelector('.canvas-mode-label');
+      const date = frame.querySelector('.strip-frame-date').textContent;
+      if (date === 'Today') {
+        label.textContent = 'Canvas · live · 7 unresolved annotations · 4 comment threads';
+        label.style.color = 'var(--text-tertiary)';
+      } else {
+        label.textContent = `Canvas · viewing state at ${date} · click "Today" to return`;
+        label.style.color = 'var(--accent-amber)';
+      }
+    });
+  });
+
+  // === AUDIO LEGEND TOGGLE ===
+  const audioToggle = document.getElementById('audioToggle');
+  const audioLegend = document.getElementById('audioLegend');
+  audioToggle.addEventListener('click', () => {
+    audioLegend.classList.toggle('visible');
+    audioToggle.style.display = audioLegend.classList.contains('visible') ? 'none' : 'flex';
+  });
+  audioLegend.addEventListener('click', () => {
+    audioLegend.classList.remove('visible');
+    audioToggle.style.display = 'flex';
+  });
+
+  // === COMMIT TRANSITION ===
+  document.getElementById('beginBtn').addEventListener('click', () => {
+    document.getElementById('commitOverlay').classList.add('active');
+    setTimeout(() => {
+      alert('Live capture would begin. Canvas locks; session-grid scrubs left-to-right in real time.');
+      document.getElementById('commitOverlay').classList.remove('active');
+    }, 1800);
+  });
+</script>
+
+</body>
+</html>
