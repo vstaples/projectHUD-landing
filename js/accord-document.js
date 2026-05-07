@@ -545,6 +545,15 @@
         const cls = ct ? 'doc-edge-chip aggregate contradiction' : 'doc-edge-chip aggregate';
         out.push(`<span class="${cls}">${parts.join(' · ')}</span>`);
       }
+
+      // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3: dissent count badge.
+      // Inline counterpart to the Decision Ledger badge; uses same .has-dissent
+      // class for visual consistency. Click is non-interactive in Living
+      // Document; dissent details are accessed via the Decision Ledger surface.
+      const dis = i.filter(e => e.edge_type === 'dissents_from').length;
+      if (dis) {
+        out.push(`<span class="doc-edge-chip has-dissent" title="View dissent details on Decision Ledger">⚑ ${dis} dissent${dis === 1 ? '' : 's'}</span>`);
+      }
     }
 
     // Question target-side: "answered by" link (most-recent answers/closes)

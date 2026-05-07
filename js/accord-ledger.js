@@ -51,6 +51,10 @@
       level:     null,          // 'high' | 'mixed' | 'low'
       rationale: '',
     },
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3: dissent substrate
+    dissents:       [],         // dissent nodes (sealed and unsealed) for visible decisions
+    dissentEdges:   [],         // dissents_from edges for visible decisions
+    dissentersById: {},         // { resource_id: name } for attribution
   };
 
   const esc = s => Accord._esc ? Accord._esc(s) : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -72,6 +76,7 @@
     await _loadEdgesAndEvidenceContext();
     await _loadAdjustments();
     await _loadDeclarers();
+    await _loadDissents();
     _renderList();
     _renderAggregate();
     if (local.activeDecision &&
@@ -180,6 +185,45 @@
     }
   }
 
+  // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3: load dissent nodes
+  // and their dissents_from edges into local state. Includes both
+  // sealed and unsealed dissents (operator UI shows draft dissents
+  // pre-seal so the dissenter can see their work).
+  async function _loadDissents() {
+    local.dissents = [];
+    local.dissentEdges = [];
+    local.dissentersById = {};
+    const decisionIds = local.decisions.map(d => d.node_id);
+    if (!decisionIds.length) return;
+    try {
+      // Edges first — defines the visible dissent set
+      const eRows = await API.get(
+        `accord_edges?edge_type=eq.dissents_from&to_node_id=in.(${decisionIds.join(',')})&select=*`
+      );
+      local.dissentEdges = eRows || [];
+      const dissentNodeIds = local.dissentEdges.map(e => e.from_node_id);
+      if (!dissentNodeIds.length) return;
+      const nRows = await API.get(
+        `accord_nodes?node_id=in.(${dissentNodeIds.join(',')})&select=*`
+      );
+      local.dissents = nRows || [];
+      // Hydrate dissenter names via resources → users
+      const resIds = Array.from(new Set(local.dissents
+        .map(n => n.dissented_by).filter(Boolean)));
+      if (resIds.length) {
+        const rRows = await API.get(
+          `resources?id=in.(${resIds.join(',')})&select=id,first_name,last_name,email`
+        );
+        (rRows || []).forEach(r => {
+          const nm = `${r.first_name||''} ${r.last_name||''}`.trim() || r.email || '—';
+          local.dissentersById[r.id] = nm;
+        });
+      }
+    } catch (e) {
+      console.error('[Accord-ledger] loadDissents failed', e);
+    }
+  }
+
   // ── Per-decision derived state ──────────────────────────────
   // All visual treatments are derived purely from the edge graph
   // and the adjustment timeline — Iron Rule 44.
@@ -229,6 +273,9 @@
       declarerCount,
       headlineAdj,
       headlineLevel,
+      // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3: dissent count derived
+      // from dissents_from edges targeting this decision.
+      dissentCount: local.dissentEdges.filter(e => e.to_node_id === d.node_id).length,
     };
   }
 
@@ -386,6 +433,11 @@
       out.push(`<span class="decision-badge counter">−${derived.counterCount} counter-evidence</span>`);
     }
 
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3: dissent badge
+    if (derived.dissentCount) {
+      out.push(`<span class="decision-badge has-dissent">⚑ ${derived.dissentCount} dissent${derived.dissentCount === 1 ? '' : 's'}</span>`);
+    }
+
     return `<div class="decision-badges">${out.join('')}</div>`;
   }
 
@@ -461,6 +513,14 @@
         <div class="detail-section-label">Declare belief</div>
         ${_renderComposer(d)}
       </div>
+
+      <div class="detail-section">
+        <div class="detail-section-label">
+          Dissent${derived.dissentCount ? ` (${derived.dissentCount})` : ''}
+          <button class="ledger-detail-action" id="ledgerOpenDissent" type="button">Register dissent</button>
+        </div>
+        ${_renderDissentList(d, derived)}
+      </div>
     `;
 
     // Wire up nav links
@@ -486,6 +546,12 @@
     });
 
     _wireComposer(d);
+
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3: Register-Dissent button
+    const dBtn = body.querySelector('#ledgerOpenDissent');
+    if (dBtn) {
+      dBtn.addEventListener('click', () => _openDissentModal(d));
+    }
   }
 
   function _renderBeliefHistory(d, derived) {
@@ -666,6 +732,205 @@
     }
   }
 
+  // ── Dissent (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3) ──────
+
+  // CMD-A6 / IR58 amended: dissented_by references resources.id, not users.id.
+  // Same pattern as accord-digest._resolveMyResourceId — translate the current
+  // session's users.id to resources.id once per session and cache.
+  let _myResourceId = null;
+  async function _resolveMyResourceId() {
+    if (_myResourceId) return _myResourceId;
+    // Prefer window._myResource (set by Compass IC layer per Phase 1 §F)
+    if (window._myResource?.id) {
+      _myResourceId = window._myResource.id;
+      return _myResourceId;
+    }
+    const me = Accord.state.me;
+    if (!me?.id) return null;
+    try {
+      const result = await API.post('rpc/accord_user_to_resource', { p_user_id: me.id });
+      const rid = (typeof result === 'string') ? result :
+                  (Array.isArray(result) && result.length) ? (result[0]?.accord_user_to_resource ?? result[0]) :
+                  result;
+      _myResourceId = rid || null;
+    } catch (e) {
+      try {
+        const rows = await API.get(`resources?user_id=eq.${me.id}&select=id&limit=1`);
+        _myResourceId = rows?.[0]?.id || null;
+      } catch (e2) {
+        console.warn('[Accord-ledger] resource_id resolution failed', e2);
+      }
+    }
+    return _myResourceId;
+  }
+
+  function _renderDissentList(d, derived) {
+    const dissents = local.dissentEdges
+      .filter(e => e.to_node_id === d.node_id)
+      .map(e => local.dissents.find(n => n.node_id === e.from_node_id))
+      .filter(Boolean)
+      .sort((a, b) => String(b.dissent_recorded_at || b.created_at)
+                       .localeCompare(String(a.dissent_recorded_at || a.created_at)));
+    if (!dissents.length) {
+      return '<div style="color:var(--ink-faint);font-size:12px;font-style:italic">No dissents registered.</div>';
+    }
+    const rows = dissents.map(n => {
+      const who = n.dissented_by ? (local.dissentersById[n.dissented_by] || '—') : '—';
+      const when = n.dissent_recorded_at
+        ? new Date(n.dissent_recorded_at).toLocaleDateString([], { year:'numeric', month:'short', day:'numeric' })
+        : '';
+      const sealedBadge = n.sealed_at
+        ? '<span class="dissent-sealed-badge">sealed</span>'
+        : '<span class="dissent-draft-badge">draft</span>';
+      const predicted = n.dissent_predicted_outcome
+        ? `<div class="dissent-predicted"><span class="dissent-predicted-label">predicted alternative:</span> ${esc(n.dissent_predicted_outcome)}</div>`
+        : '';
+      return `
+        <div class="dissent-entry">
+          <div class="dissent-entry-head">
+            <span class="dissent-entry-who">${esc(who)}</span>
+            <span class="dissent-entry-when">${esc(when)}</span>
+            ${sealedBadge}
+          </div>
+          <div class="dissent-entry-rationale">${esc(n.dissent_rationale || '')}</div>
+          ${predicted}
+        </div>`;
+    }).join('');
+    return `<div class="dissent-list">${rows}</div>`;
+  }
+
+  function _openDissentModal(d) {
+    const modal = $('dissentModal');
+    if (!modal) {
+      console.error('[Accord-ledger] dissentModal not found in DOM');
+      return;
+    }
+    // Populate target callout (decision being dissented from)
+    const tgt = $('dissentModalTarget');
+    if (tgt) {
+      const seq = d.seq_id || '(decision)';
+      tgt.textContent = `${seq} · ${(d.summary || '').slice(0, 140)}${(d.summary || '').length > 140 ? '…' : ''}`;
+    }
+    // Reset form
+    const r = $('dissentRationale');
+    const p = $('dissentPredicted');
+    if (r) r.value = '';
+    if (p) p.value = '';
+    // Stash target on modal for submit
+    modal.dataset.targetNodeId = d.node_id;
+    modal.classList.add('visible');
+    if (r) setTimeout(() => r.focus(), 30);
+  }
+
+  function _closeDissentModal() {
+    const modal = $('dissentModal');
+    if (modal) {
+      modal.classList.remove('visible');
+      delete modal.dataset.targetNodeId;
+    }
+  }
+
+  async function _submitDissent() {
+    const modal = $('dissentModal');
+    if (!modal) return;
+    const targetNodeId = modal.dataset.targetNodeId;
+    const rationale = ($('dissentRationale')?.value || '').trim();
+    const predicted = ($('dissentPredicted')?.value || '').trim();
+    if (!targetNodeId) {
+      alert('No target decision identified; close and reopen the modal.');
+      return;
+    }
+    if (!rationale) {
+      alert('Rationale is required.');
+      return;
+    }
+    const me = Accord.state.me;
+    if (!me?.id || !me.firm_id) {
+      alert('Identity not resolved; cannot register dissent.');
+      return;
+    }
+    const myResourceId = await _resolveMyResourceId();
+    if (!myResourceId) {
+      alert('Could not resolve your resource identity (required for dissent attribution).');
+      return;
+    }
+    const target = local.decisions.find(x => x.node_id === targetNodeId);
+    if (!target) {
+      alert('Target decision not found in current set; refresh and try again.');
+      return;
+    }
+
+    // Step 1: insert dissent node (tag=dissent + dissent_* typed columns).
+    // The seq_alloc trigger assigns DS-NNN automatically; the dissent_fields_check
+    // constraint enforces dissented_by + rationale + recorded_at presence.
+    const dissentNodeRow = {
+      firm_id:                   me.firm_id,
+      thread_id:                 target.thread_id,
+      meeting_id:                target.meeting_id || null,
+      tag:                       'dissent',
+      summary:                   `Dissent on ${target.seq_id || target.node_id}: ${rationale.slice(0, 80)}${rationale.length > 80 ? '…' : ''}`,
+      created_by:                me.id,
+      dissented_by:              myResourceId,
+      dissent_rationale:         rationale,
+      dissent_predicted_outcome: predicted || null,
+      dissent_recorded_at:       new Date().toISOString(),
+    };
+    let dissentNode;
+    try {
+      const created = await API.post('accord_nodes', dissentNodeRow);
+      dissentNode = Array.isArray(created) ? created[0] : created;
+    } catch (e) {
+      console.error('[Accord-ledger] dissent node insert failed', e);
+      alert('Dissent registration failed: ' + (e?.message || e));
+      return;
+    }
+
+    // Step 2: insert dissents_from edge (dissent → decision).
+    // The enforce_dissents_from_invariants trigger validates source/target tags
+    // and 1:1 cardinality.
+    const edgeRow = {
+      firm_id:      me.firm_id,
+      from_node_id: dissentNode.node_id,
+      to_node_id:   target.node_id,
+      edge_type:    'dissents_from',
+      rationale:    rationale.slice(0, 200),
+      declared_by:  me.id,
+    };
+    try {
+      await API.post('accord_edges', edgeRow);
+    } catch (e) {
+      console.error('[Accord-ledger] dissents_from edge insert failed', e);
+      alert('Dissent edge insert failed: ' + (e?.message || e) +
+            '\n(The dissent node was created but is not linked. Refresh and re-register.)');
+      _closeDissentModal();
+      await _refresh();
+      return;
+    }
+
+    // Step 3: CoC.write for accord.dissent.recorded (uses IR58-amended writer;
+    // actor resolution flows via window._myResource per Phase 1 §F).
+    try {
+      if (window.CoC && typeof window.CoC.write === 'function') {
+        await window.CoC.write('accord.dissent.recorded', dissentNode.node_id, {
+          entityType: 'accord_dissent',
+          notes: rationale.slice(0, 500),
+          meta: {
+            decision_id:        target.node_id,
+            decision_seq_id:    target.seq_id || null,
+            dissent_seq_id:     dissentNode.seq_id || null,
+            predicted_outcome:  predicted || null,
+          },
+        });
+      }
+    } catch (e) {
+      console.warn('[Accord-ledger] CoC.write best-effort failure', e);
+    }
+
+    _closeDissentModal();
+    await _refresh();
+    _toast('Dissent registered.');
+  }
+
   function _toast(msg) {
     // Reuse the existing #pdfToast surface for transient confirmations.
     const t = $('pdfToast');
@@ -705,6 +970,25 @@
 
     // Detail close
     $('ledgerDetailClose').addEventListener('click', () => _closeDetail());
+
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3: dissent modal handlers
+    const cancelBtn  = $('dissentCancel');
+    const confirmBtn = $('dissentConfirm');
+    const modal      = $('dissentModal');
+    if (cancelBtn)  cancelBtn.addEventListener('click', () => _closeDissentModal());
+    if (confirmBtn) confirmBtn.addEventListener('click', () => _submitDissent());
+    if (modal) {
+      // Backdrop click closes (matches newMeetingModal pattern); inner clicks don't bubble out
+      modal.addEventListener('click', (ev) => {
+        if (ev.target === modal) _closeDissentModal();
+      });
+    }
+    // Esc closes when modal is open
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && modal && modal.classList.contains('visible')) {
+        _closeDissentModal();
+      }
+    });
   }
 
   // ── Helpers ─────────────────────────────────────────────────

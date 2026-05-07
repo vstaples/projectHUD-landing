@@ -756,6 +756,141 @@
   line-height: 1.4;
 }
 
+/* CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3: dissent-modal additions.
+   Reuses canonical .modal-backdrop / .modal / .modal-actions pattern;
+   adds textarea + meta-label styling not present in modal scope. */
+#accord-app .modal textarea.dissent-textarea {
+  width: 100%;
+  background: var(--canvas);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-primary);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.45;
+  resize: vertical;
+  margin-bottom: 4px;
+}
+#accord-app .modal .dissent-modal-target {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+  padding: 6px 10px;
+  background: var(--canvas-deep);
+  border-left: 2px solid var(--signal-dim);
+  border-radius: 3px;
+  word-break: break-word;
+}
+#accord-app .modal .dissent-required {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--tag-risk);
+  text-transform: uppercase;
+  margin-left: 6px;
+}
+#accord-app .modal .dissent-optional {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  margin-left: 6px;
+}
+
+/* Decision-row dissent badge (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3).
+   Appears alongside other .decision-badge entries on dissented decisions
+   in Decision Ledger and as inline marker in Living Document. */
+#accord-app .decision-badge.has-dissent {
+  color: #b58a76;
+  border: 1px solid rgba(181, 138, 118, 0.45);
+  background: rgba(181, 138, 118, 0.08);
+}
+
+/* Dissent detail-section list (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3) */
+#accord-app .ledger-detail-action {
+  float: right;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: var(--ink-primary);
+  font: 500 11px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+#accord-app .ledger-detail-action:hover {
+  border-color: #b58a76;
+  color: #b58a76;
+}
+#accord-app .dissent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#accord-app .dissent-entry {
+  border-left: 2px solid rgba(181, 138, 118, 0.55);
+  padding: 6px 10px;
+  background: rgba(181, 138, 118, 0.04);
+  border-radius: 0 3px 3px 0;
+}
+#accord-app .dissent-entry-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+#accord-app .dissent-entry-who {
+  font-weight: 600;
+  color: var(--ink-primary);
+}
+#accord-app .dissent-entry-when {
+  color: var(--ink-faint);
+  font-family: 'IBM Plex Mono', monospace;
+}
+#accord-app .dissent-sealed-badge,
+#accord-app .dissent-draft-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+#accord-app .dissent-sealed-badge {
+  color: #1D9E75;
+  border: 1px solid rgba(29, 158, 117, 0.4);
+}
+#accord-app .dissent-draft-badge {
+  color: var(--ink-faint);
+  border: 1px solid var(--rule);
+}
+#accord-app .dissent-entry-rationale {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-primary);
+  white-space: pre-wrap;
+}
+#accord-app .dissent-predicted {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+  white-space: pre-wrap;
+}
+#accord-app .dissent-predicted-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-right: 6px;
+}
+
 #accord-app #surface-document.surface { padding: 0; }
 
 #accord-app .document-body {
@@ -1028,6 +1163,12 @@
   border-color: rgba(168, 111, 94, 0.3);
 }
 #accord-app .doc-edge-chip.aggregate { font-style: italic; }
+#accord-app .doc-edge-chip.has-dissent {
+  color: #b58a76;
+  border-color: rgba(181, 138, 118, 0.45);
+  background: rgba(181, 138, 118, 0.08);
+  cursor: default;
+}
 
 #accord-app .doc-edge-row {
   display: flex;
@@ -2686,6 +2827,25 @@
       <div class="modal-actions">
         <button class="btn btn-ghost"   id="digestSendCancel">Cancel</button>
         <button class="btn btn-signal"  id="digestSendConfirm">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Register-dissent modal (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3) ── -->
+  <div class="modal-backdrop" id="dissentModal">
+    <div class="modal">
+      <h3>Register dissent</h3>
+      <p id="dissentModalTarget" class="dissent-modal-target"></p>
+      <label for="dissentRationale">Rationale <span class="dissent-required">required</span></label>
+      <textarea id="dissentRationale" class="dissent-textarea" rows="4"
+                placeholder="Why do you dissent from this decision?"></textarea>
+      <label for="dissentPredicted">Predicted alternative outcome <span class="dissent-optional">optional</span></label>
+      <textarea id="dissentPredicted" class="dissent-textarea" rows="3"
+                placeholder="What outcome do you predict if the dissent had carried?"></textarea>
+      <div class="modal-helper">Dissent is a permanent substrate record. It does not modify the ratified decision; it preserves the rejected alternative for retrospective review.</div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"  id="dissentCancel">Cancel</button>
+        <button class="btn btn-signal" id="dissentConfirm">Register dissent</button>
       </div>
     </div>
   </div>

@@ -1,0 +1,41 @@
+-- §3.1: tag enum (existing values)
+SELECT tag, count(*) FROM accord_nodes GROUP BY tag ORDER BY tag;
+
+-- §3.2: accord_edges columns
+SELECT column_name, data_type, is_nullable, column_default
+  FROM information_schema.columns
+ WHERE table_schema = 'public' AND table_name = 'accord_edges'
+ ORDER BY ordinal_position;
+
+-- §3.2: edge_type values
+SELECT edge_type, count(*) FROM accord_edges GROUP BY edge_type ORDER BY edge_type;
+
+-- §3.1: triggers on accord_nodes / accord_edges
+SELECT trigger_name, event_manipulation, action_timing, action_statement
+  FROM information_schema.triggers
+ WHERE event_object_schema='public'
+   AND event_object_table IN ('accord_nodes','accord_edges')
+ ORDER BY event_object_table, trigger_name;
+
+-- §3.6 Q1: existing PostgreSQL sequences
+SELECT sequence_name FROM information_schema.sequences
+ WHERE sequence_schema='public' ORDER BY sequence_name;
+
+-- §3.2 RLS policies
+SELECT tablename, policyname, cmd, qual, with_check
+  FROM pg_policies
+ WHERE schemaname='public' AND tablename IN ('accord_nodes','accord_edges')
+ ORDER BY tablename, policyname;
+
+-- §3.1: indexes
+SELECT indexname, indexdef
+  FROM pg_indexes
+ WHERE schemaname='public' AND tablename IN ('accord_nodes','accord_edges')
+ ORDER BY tablename, indexname;
+
+-- Bonus: any check constraints on tag (validates enum values)
+SELECT conname, pg_get_constraintdef(oid)
+  FROM pg_constraint
+ WHERE conrelid IN ('accord_nodes'::regclass, 'accord_edges'::regclass)
+   AND contype IN ('c','u','f')
+ ORDER BY conrelid::regclass::text, conname;

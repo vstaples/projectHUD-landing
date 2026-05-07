@@ -219,6 +219,9 @@
     'accord.minutes.rendered':    { glyph: '⎙', stepName: 'Minutes rendered',      severity: 'info', color: '#1D9E75' },
     'accord.minutes.render_failed': { glyph: '✕', stepName: 'Minutes render failed', severity: 'error', color: '#E24B4A' },
     'accord.minutes.printed':     { glyph: '🖨', stepName: 'Minutes printed',       severity: 'info', color: '#5B7FFF' },
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3 — dissent substrate
+    'accord.dissent.recorded':    { glyph: '⚑', stepName: 'Dissent recorded',       severity: 'info', color: '#b58a76' },
+    'accord.dissent.archived':    { glyph: '⊘', stepName: 'Dissent archived',       severity: 'info', color: 'rgba(255,255,255,.4)' },
     'risk.registered':            { glyph: '⚠', stepName: 'Risk registered',       severity: 'warn', color: '#EF9F27' },
 
     // ── PIPELINE / CRM ────────────────────────────────────────────────────────
