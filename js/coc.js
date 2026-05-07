@@ -227,6 +227,15 @@
     // values will be 'node.effective_date_changed' / 'node.due_date_changed'.
     'accord.node.effective_date_changed': { glyph: '◷', stepName: 'Effective date changed', severity: 'info', color: '#7d9a8c' },
     'accord.node.due_date_changed':       { glyph: '◷', stepName: 'Due date changed',       severity: 'info', color: '#7d9a8c' },
+    // CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4 — workstream lifecycle
+    'accord.workstream.created':          { glyph: '◈', stepName: 'Workstream created',     severity: 'info', color: '#7d9a8c' },
+    'accord.workstream.renamed':          { glyph: '✎', stepName: 'Workstream renamed',     severity: 'info', color: '#7d9a8c' },
+    'accord.workstream.archived':         { glyph: '⊘', stepName: 'Workstream archived',    severity: 'info', color: 'rgba(255,255,255,.4)' },
+    'accord.workstream.restored':         { glyph: '⊕', stepName: 'Workstream restored',    severity: 'info', color: '#1D9E75' },
+    // CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4 — meeting placement
+    'accord.meeting.placed':              { glyph: '▤', stepName: 'Meeting filed',          severity: 'info', color: '#7d9a8c' },
+    'accord.meeting.unplaced':            { glyph: '▥', stepName: 'Meeting unfiled',        severity: 'info', color: 'rgba(255,255,255,.4)' },
+    'accord.meeting.refiled':             { glyph: '⇄', stepName: 'Meeting refiled',        severity: 'info', color: '#7d9a8c' },
     'risk.registered':            { glyph: '⚠', stepName: 'Risk registered',       severity: 'warn', color: '#EF9F27' },
 
     // ── PIPELINE / CRM ────────────────────────────────────────────────────────

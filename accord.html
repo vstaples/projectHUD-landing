@@ -102,6 +102,176 @@
   gap: 4px;
   margin-left: auto;
 }
+
+/* ============================================================
+   CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4 — chrome additions
+   ============================================================ */
+
+/* Q-INV-2 Option B: small chrome link to Manage Workstreams.
+   Sits between LIVE CONNECT and surface-switch. Mono treatment
+   matching surface-switch button typography but lower-weight
+   to signal admin-functional rather than daily-use. */
+#accord-app .chrome-link {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+  padding-bottom: 1px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+#accord-app .chrome-link:hover {
+  color: var(--ink-muted);
+  border-bottom-color: var(--rule);
+}
+#accord-app .chrome-link.active {
+  color: var(--ink-primary);
+  border-bottom-color: var(--ink-primary);
+}
+
+/* Q-INV-1 Option C: Filed-under row in running-meeting header
+   AND post-seal closed-banner. Mono label, summary value,
+   inline action affordance. */
+#accord-app .meeting-filed,
+#accord-app .closed-banner-filed {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  margin-top: 6px;
+}
+#accord-app .closed-banner-filed {
+  margin-top: 0;
+  margin-right: auto;
+  margin-left: 16px;
+}
+#accord-app .filed-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+#accord-app .filed-value {
+  color: var(--ink-primary);
+  font-weight: 500;
+}
+#accord-app .filed-value.unfiled {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+#accord-app .filed-action {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-muted);
+  text-decoration: none;
+  cursor: pointer;
+}
+#accord-app .filed-action:hover {
+  color: var(--ink-primary);
+  text-decoration: underline;
+}
+
+/* Workstream management surface */
+#accord-app #surface-workstreams { padding: 0; }
+#accord-app .ws-archived-toggle {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  margin-right: 16px;
+  cursor: pointer;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+#accord-app .ws-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px;
+}
+#accord-app .ws-empty {
+  font-style: italic;
+  color: var(--ink-faint);
+  font-size: 14px;
+  padding: 32px 0;
+  text-align: center;
+}
+#accord-app .ws-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+#accord-app .ws-table thead th {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule);
+  font-weight: 500;
+}
+#accord-app .ws-table tbody tr {
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .ws-table tbody tr.ws-row-archived {
+  opacity: 0.5;
+}
+#accord-app .ws-table tbody td {
+  padding: 12px;
+  vertical-align: top;
+  color: var(--ink-primary);
+}
+#accord-app .ws-table .ws-name {
+  font-weight: 500;
+}
+#accord-app .ws-table .ws-name.ws-sub-name {
+  padding-left: 18px;
+  position: relative;
+}
+#accord-app .ws-table .ws-name.ws-sub-name::before {
+  content: '↳';
+  position: absolute;
+  left: 0;
+  color: var(--ink-faint);
+}
+#accord-app .ws-table .ws-level-pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: 2px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  display: inline-block;
+}
+#accord-app .ws-table .ws-meetings-col,
+#accord-app .ws-table .ws-actions-col {
+  text-align: right;
+  width: 120px;
+}
+#accord-app .ws-row-action {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-muted);
+  text-decoration: none;
+  margin-left: 10px;
+  cursor: pointer;
+}
+#accord-app .ws-row-action:hover {
+  color: var(--ink-primary);
+  text-decoration: underline;
+}
+#accord-app .ws-row-action.ws-action-archive { color: #b58a76; }
+#accord-app .ws-row-action.ws-action-archive:hover { color: #d6a594; }
+
 #accord-app .surface-switch button {
   background: transparent;
   border: 1px solid var(--rule);
@@ -2541,6 +2711,11 @@
       <span class="lc-label">LIVE CONNECT</span>
     </button>
 
+    <!-- CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4: small chrome link for
+         Manage Workstreams surface (Q-INV-2 Option B). -->
+    <a href="#" class="chrome-link" id="manageWorkstreamsLink"
+       title="Manage workstream organizing buckets">Manage workstreams</a>
+
     <div class="surface-switch" role="tablist">
       <button data-surface="capture"  class="active">Live Capture</button>
       <button data-surface="document">Living Document</button>
@@ -2565,6 +2740,13 @@
           <span class="live-pulse" id="cap-pulse" title="Meeting status"></span>
           <span id="cap-meta-text">Use NEW MEETING to begin.</span>
         </div>
+        <!-- CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4: Filed-under
+             affordance in running-meeting header (Q-INV-1 Option C). -->
+        <div class="meeting-filed" id="cap-filed" style="display:none">
+          <span class="filed-label">Filed under:</span>
+          <span class="filed-value" id="cap-filed-value">Unfiled</span>
+          <a href="#" class="filed-action" id="cap-filed-action">[file]</a>
+        </div>
       </div>
       <div class="capture-controls">
         <div class="timer" id="meetingTimer">00:00:00</div>
@@ -2578,6 +2760,15 @@
       <div class="closed-banner-msg">
         <strong>Meeting committed to Chain of Custody.</strong>
         Captures are now structurally immutable per Iron Rule 42.
+      </div>
+      <!-- CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4: Filed-under
+           affordance in closed-banner (Q-INV-1 Option C). Workstream
+           reassignment is mutable post-seal per F-P3-6 navigational
+           classification (second data point). -->
+      <div class="closed-banner-filed" id="closed-filed">
+        <span class="filed-label">Filed under:</span>
+        <span class="filed-value" id="closed-filed-value">Unfiled</span>
+        <a href="#" class="filed-action" id="closed-filed-action">[file]</a>
       </div>
       <button class="btn btn-ghost" data-target-surface="document">View in Living Document</button>
       <button class="btn btn-ghost" data-target-surface="minutes">Minutes archive</button>
@@ -2858,6 +3049,45 @@
     </div>
   </section>
 
+  <!-- ── Surface: Manage Workstreams (CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1) ── -->
+  <!-- Toggled by the chrome link "Manage workstreams"; not a daily-use
+       surface so it's not in the surface-switch tab bar (Q-INV-2 Option B). -->
+  <section class="surface" id="surface-workstreams">
+    <header class="capture-header">
+      <div>
+        <h1 class="meeting-title">Manage workstreams</h1>
+        <div class="meeting-meta">
+          <span id="ws-meta-text">Operator-defined organizing buckets above meetings. Two-level nesting (top-level + sub-workstream).</span>
+        </div>
+      </div>
+      <div class="capture-controls">
+        <label class="ws-archived-toggle">
+          <input type="checkbox" id="ws-show-archived"> Show archived
+        </label>
+        <button class="btn btn-prominent" id="ws-new-btn">+ New workstream</button>
+      </div>
+    </header>
+
+    <div class="ws-body">
+      <div class="ws-empty" id="ws-empty" style="display:none">
+        No workstreams yet. Create one to start organizing meetings.
+      </div>
+      <table class="ws-table" id="ws-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Level</th>
+            <th>Parent</th>
+            <th>Created</th>
+            <th class="ws-meetings-col">Filed</th>
+            <th class="ws-actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="ws-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- ── Re-render confirm modal ─────────────────────────────── -->
   <div class="modal-backdrop" id="rerenderConfirmModal">
     <div class="modal">
@@ -2958,6 +3188,44 @@
     </div>
   </div>
 
+  <!-- ── Create / rename workstream modal (CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1) ── -->
+  <div class="modal-backdrop" id="wsCreateModal">
+    <div class="modal">
+      <h3 id="wsCreateModalTitle">New workstream</h3>
+      <label for="wsCreateName">Name</label>
+      <input type="text" id="wsCreateName" placeholder="e.g., Endoscope replacement project" maxlength="120">
+      <label for="wsCreateDescription">Description <span class="dissent-optional">optional</span></label>
+      <textarea id="wsCreateDescription" class="dissent-textarea" rows="2"
+                placeholder="Brief description of this organizing bucket"></textarea>
+      <label for="wsCreateParent">Parent <span class="dissent-optional">optional · leave empty for top-level</span></label>
+      <select id="wsCreateParent" class="capture-date-input">
+        <option value="">— top-level (no parent) —</option>
+      </select>
+      <div class="modal-helper">Two-level nesting only: a sub-workstream cannot itself contain sub-workstreams.</div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"  id="wsCreateCancel">Cancel</button>
+        <button class="btn btn-signal" id="wsCreateConfirm">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── File-meeting-to-workstream modal (CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1) ── -->
+  <div class="modal-backdrop" id="wsFileModal">
+    <div class="modal">
+      <h3 id="wsFileModalTitle">File meeting under workstream</h3>
+      <p id="wsFileModalTarget" class="dissent-modal-target"></p>
+      <label for="wsFileSelect">Workstream</label>
+      <select id="wsFileSelect" class="capture-date-input">
+        <option value="">— Unfiled (parking lot) —</option>
+      </select>
+      <div class="modal-helper">Workstream filing is mutable regardless of meeting seal state. The substrate of decisions, actions, and edges remains immutable per Iron Rule 42.</div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"  id="wsFileCancel">Cancel</button>
+        <button class="btn btn-signal" id="wsFileConfirm">File</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Async PDF toast (CMD-A3 element preserved; CMD-A7 makes content live) ── -->
   <div class="toast" id="pdfToast" role="status">
     <div class="toast-msg">
@@ -2982,11 +3250,12 @@
 <script>
   (function() {
     const SURFACE_LABELS = {
-      capture:  'Live Capture',
-      document: 'Living Document',
-      ledger:   'Decision Ledger',
-      digest:   'Digest & Send',
-      minutes:  'Minutes',
+      capture:     'Live Capture',
+      document:    'Living Document',
+      ledger:      'Decision Ledger',
+      digest:      'Digest & Send',
+      minutes:     'Minutes',
+      workstreams: 'Manage Workstreams',
     };
     function _setBrandMeta(surfaceKey) {
       var el = document.getElementById('brandMeta');
@@ -3026,6 +3295,7 @@
     load('/js/accord-ledger.js');
     load('/js/accord-digest.js');
     load('/js/accord-minutes.js');
+    load('/js/accord-workstreams.js');
   })();
 </script>
 
