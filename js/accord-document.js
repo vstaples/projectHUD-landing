@@ -554,6 +554,20 @@
       if (dis) {
         out.push(`<span class="doc-edge-chip has-dissent" title="View dissent details on Decision Ledger">⚑ ${dis} dissent${dis === 1 ? '' : 's'}</span>`);
       }
+
+      // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: effective_date chip
+      // for decisions. Display-only.
+      if (node.effective_date) {
+        const fmt = new Date(node.effective_date + 'T00:00:00').toLocaleDateString([], { year:'numeric', month:'short', day:'numeric' });
+        const basis = node.effective_date_basis ? ` · ${esc(node.effective_date_basis)}` : '';
+        out.push(`<span class="doc-edge-chip date-chip" title="Effective date">◷ effective ${esc(fmt)}${basis}</span>`);
+      }
+    }
+
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: due_date chip for actions
+    if (node.tag === 'action' && node.due_date) {
+      const fmt = new Date(node.due_date + 'T00:00:00').toLocaleDateString([], { year:'numeric', month:'short', day:'numeric' });
+      out.push(`<span class="doc-edge-chip date-chip" title="Due date">◷ due ${esc(fmt)}</span>`);
     }
 
     // Question target-side: "answered by" link (most-recent answers/closes)

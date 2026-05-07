@@ -264,6 +264,23 @@
       alert('No thread bound to this meeting yet; commit aborted.');
       return;
     }
+
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: route decision/action
+    // commits through the date-capture modal. Other tags commit directly.
+    if (tag === 'decision' || tag === 'action') {
+      _openCaptureDateModal(tag, text, (dateExtras) => _doCommit(tag, text, dateExtras));
+      return;
+    }
+    return _doCommit(tag, text, null);
+  }
+
+  // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: extracted commit-write
+  // path so the date modal can call back with optional date extras.
+  // dateExtras: { effective_date, due_date, effective_date_basis } | null
+  async function _doCommit(tag, text, dateExtras) {
+    const m = Accord.state.meeting;
+    const me = Accord.state.me;
+    const thread = Accord.state.thread;
     const row = {
       firm_id:        me.firm_id,
       thread_id:      thread.thread_id,
@@ -274,6 +291,11 @@
       body:           text.length > 280 ? text : null,
       created_by:     me.id,
     };
+    if (dateExtras) {
+      if (dateExtras.effective_date)       row.effective_date = dateExtras.effective_date;
+      if (dateExtras.due_date)             row.due_date = dateExtras.due_date;
+      if (dateExtras.effective_date_basis) row.effective_date_basis = dateExtras.effective_date_basis;
+    }
     try {
       const created = await API.post('accord_nodes', row);
       const node = Array.isArray(created) ? created[0] : created;
@@ -291,10 +313,110 @@
         created_by: node.created_by,
         created_at: node.created_at,
       });
+      // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: emit CoC event on
+      // initial date set (capture-time path). Per F-P3-9: writer stores
+      // event_type without 'accord.' prefix.
+      if (dateExtras) {
+        try {
+          if (dateExtras.effective_date && window.CoC?.write) {
+            await window.CoC.write('accord.node.effective_date_changed', node.node_id, {
+              entityType: 'accord_node',
+              meta: {
+                tag,
+                seq_id:                node.seq_id || null,
+                effective_date:        dateExtras.effective_date,
+                effective_date_basis:  dateExtras.effective_date_basis || null,
+                from_value:            null,  // initial set
+              },
+            });
+          }
+          if (dateExtras.due_date && window.CoC?.write) {
+            await window.CoC.write('accord.node.due_date_changed', node.node_id, {
+              entityType: 'accord_node',
+              meta: {
+                tag,
+                seq_id:     node.seq_id || null,
+                due_date:   dateExtras.due_date,
+                from_value: null,  // initial set
+              },
+            });
+          }
+        } catch (e) {
+          console.warn('[Accord-capture] CoC.write date event best-effort failure', e);
+        }
+      }
     } catch (e) {
       console.error('[Accord] commit failed', e);
       alert('Capture failed: ' + (e?.message || e));
     }
+  }
+
+  // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: open the date-capture
+  // modal. Skip = commit without date; Confirm = commit with date fields.
+  // Cancel-via-backdrop/Esc = abort commit entirely (operator can re-attempt).
+  let _captureDateCb = null;
+  function _openCaptureDateModal(tag, text, onProceed) {
+    const modal = $('captureDateModal');
+    if (!modal) {
+      // No modal in DOM: degrade silently to direct commit
+      onProceed(null);
+      return;
+    }
+    _captureDateCb = onProceed;
+    const isDecision = (tag === 'decision');
+    $('captureDateTitle').textContent = isDecision
+      ? 'Set effective date'
+      : 'Set due date';
+    $('captureDateLabel').innerHTML = isDecision
+      ? 'Effective date <span class="dissent-optional">optional</span>'
+      : 'Due date <span class="dissent-optional">optional</span>';
+    $('captureDateModalTarget').textContent =
+      `${tag.toUpperCase()} · ${text.slice(0, 140)}${text.length > 140 ? '…' : ''}`;
+    $('captureDateBasisRow').style.display = isDecision ? '' : 'none';
+    $('captureDateInput').value = '';
+    $('captureDateBasis').value = '';
+    modal.dataset.tag = tag;
+    modal.classList.add('visible');
+    setTimeout(() => $('captureDateInput').focus(), 30);
+  }
+
+  function _closeCaptureDateModal() {
+    const modal = $('captureDateModal');
+    if (modal) {
+      modal.classList.remove('visible');
+      delete modal.dataset.tag;
+    }
+    _captureDateCb = null;
+  }
+
+  function _captureDateSkip() {
+    const cb = _captureDateCb;
+    _closeCaptureDateModal();
+    if (cb) cb(null);  // commit with no date fields
+  }
+
+  function _captureDateConfirm() {
+    const modal = $('captureDateModal');
+    const tag = modal?.dataset?.tag;
+    const dateVal = ($('captureDateInput').value || '').trim();
+    if (!dateVal) {
+      // No date entered → treat as Skip (operator clicked Confirm but
+      // never typed a date; safest interpretation is no-op rather than
+      // alert, matching the Skip action).
+      _captureDateSkip();
+      return;
+    }
+    const extras = {};
+    if (tag === 'decision') {
+      extras.effective_date = dateVal;
+      const basis = ($('captureDateBasis').value || '').trim();
+      if (basis) extras.effective_date_basis = basis;
+    } else if (tag === 'action') {
+      extras.due_date = dateVal;
+    }
+    const cb = _captureDateCb;
+    _closeCaptureDateModal();
+    if (cb) cb(extras);
   }
 
   // ── Stream render ────────────────────────────────────────────
@@ -380,7 +502,29 @@
     _wireComposer();
     _wireStreamTabs();
     _wireChat();
+    _wireCaptureDateModal();
     console.log('[Accord] capture surface ready');
+  }
+
+  // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: date-capture modal wire-up.
+  function _wireCaptureDateModal() {
+    const modal   = $('captureDateModal');
+    const skipBtn = $('captureDateSkip');
+    const okBtn   = $('captureDateConfirm');
+    if (!modal) return;
+    if (skipBtn) skipBtn.addEventListener('click', () => _captureDateSkip());
+    if (okBtn)   okBtn.addEventListener('click',   () => _captureDateConfirm());
+    // Backdrop click = abort (matches dissent modal pattern)
+    modal.addEventListener('click', (ev) => {
+      if (ev.target === modal) {
+        _closeCaptureDateModal();
+      }
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && modal.classList.contains('visible')) {
+        _closeCaptureDateModal();
+      }
+    });
   }
 
   if (document.readyState === 'loading') {

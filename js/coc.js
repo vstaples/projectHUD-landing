@@ -222,6 +222,11 @@
     // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3 — dissent substrate
     'accord.dissent.recorded':    { glyph: '⚑', stepName: 'Dissent recorded',       severity: 'info', color: '#b58a76' },
     'accord.dissent.archived':    { glyph: '⊘', stepName: 'Dissent archived',       severity: 'info', color: 'rgba(255,255,255,.4)' },
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4 — date fields
+    // Per F-P3-9: writer normalizes the 'accord.' prefix; stored event_type
+    // values will be 'node.effective_date_changed' / 'node.due_date_changed'.
+    'accord.node.effective_date_changed': { glyph: '◷', stepName: 'Effective date changed', severity: 'info', color: '#7d9a8c' },
+    'accord.node.due_date_changed':       { glyph: '◷', stepName: 'Due date changed',       severity: 'info', color: '#7d9a8c' },
     'risk.registered':            { glyph: '⚠', stepName: 'Risk registered',       severity: 'warn', color: '#EF9F27' },
 
     // ── PIPELINE / CRM ────────────────────────────────────────────────────────

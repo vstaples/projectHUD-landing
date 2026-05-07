@@ -800,6 +800,61 @@
   margin-left: 6px;
 }
 
+/* Capture-time date modal (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4).
+   Reuses canonical .modal-backdrop / .modal pattern; adds date input
+   styling to match existing modal text input pattern. */
+#accord-app .capture-date-input {
+  width: 100%;
+  background: var(--canvas);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-primary);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  margin-bottom: 8px;
+}
+#accord-app select.capture-date-input {
+  appearance: none;
+  cursor: pointer;
+}
+#accord-app input[type="date"].capture-date-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
+}
+
+/* Detail-section date display in Decision Ledger detail panel
+   (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4). */
+#accord-app .detail-date-row {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 12px;
+  margin-top: 4px;
+}
+#accord-app .detail-date-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  min-width: 110px;
+}
+#accord-app .detail-date-value {
+  color: var(--ink-primary);
+  font-weight: 500;
+}
+#accord-app .detail-date-basis {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-style: italic;
+}
+#accord-app .detail-date-empty {
+  color: var(--ink-faint);
+  font-style: italic;
+  font-size: 12px;
+}
+
 /* Decision-row dissent badge (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3).
    Appears alongside other .decision-badge entries on dissented decisions
    in Decision Ledger and as inline marker in Living Document. */
@@ -1167,6 +1222,12 @@
   color: #b58a76;
   border-color: rgba(181, 138, 118, 0.45);
   background: rgba(181, 138, 118, 0.08);
+  cursor: default;
+}
+#accord-app .doc-edge-chip.date-chip {
+  color: #7d9a8c;
+  border-color: rgba(125, 154, 140, 0.4);
+  background: rgba(125, 154, 140, 0.06);
   cursor: default;
 }
 
@@ -2846,6 +2907,34 @@
       <div class="modal-actions">
         <button class="btn btn-ghost"  id="dissentCancel">Cancel</button>
         <button class="btn btn-signal" id="dissentConfirm">Register dissent</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Capture-time date modal (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4) ── -->
+  <!-- Opens when operator commits a Decision (effective_date) or Action
+       (due_date). Skip = commit without date; Confirm = commit with date. -->
+  <div class="modal-backdrop" id="captureDateModal">
+    <div class="modal">
+      <h3 id="captureDateTitle">Set date</h3>
+      <p id="captureDateModalTarget" class="dissent-modal-target"></p>
+      <label for="captureDateInput" id="captureDateLabel">Date <span class="dissent-optional">optional</span></label>
+      <input type="date" id="captureDateInput" class="capture-date-input">
+      <!-- Basis row appears only for Decision commits -->
+      <div id="captureDateBasisRow" style="display:none">
+        <label for="captureDateBasis">Basis <span class="dissent-optional">optional</span></label>
+        <select id="captureDateBasis" class="capture-date-input">
+          <option value="">— select —</option>
+          <option value="declared">declared (operator chose at declaration)</option>
+          <option value="committed">committed (date the decision was sealed)</option>
+          <option value="reviewed">reviewed (later review confirmed/changed it)</option>
+          <option value="imported">imported (came from an external source)</option>
+        </select>
+      </div>
+      <div class="modal-helper">Dates are mutable until the meeting is sealed; immutable thereafter (IR42).</div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"  id="captureDateSkip">Skip (commit without date)</button>
+        <button class="btn btn-signal" id="captureDateConfirm">Commit with date</button>
       </div>
     </div>
   </div>

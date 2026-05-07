@@ -497,6 +497,7 @@
           ${meeting ? ` · in <a data-nav-meeting="${meeting.meeting_id}" data-nav-thread="${thread?.thread_id || ''}">${esc(meeting.title || '(meeting)')}</a>, ${esc(sealedFmt)}` : ''}
           ${thread  ? `<br>thread: <a data-nav-thread="${thread.thread_id}">${esc(thread.title || '(thread)')}</a>` : ''}
         </div>
+        ${_renderDecisionDates(d)}
       </div>
 
       <div class="detail-section">
@@ -552,6 +553,33 @@
     if (dBtn) {
       dBtn.addEventListener('click', () => _openDissentModal(d));
     }
+  }
+
+  // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: render the effective_date
+  // row in the Decision detail panel. Display-only for now; capture-time
+  // setting is the operator path per Q-P4-1 Option C. Post-seal mutation
+  // is blocked by Migration 8 trigger; pre-seal mutation will land in a
+  // follow-up CMD if operator-driven date correction proves necessary.
+  function _renderDecisionDates(d) {
+    if (!d.effective_date && !d.effective_date_basis) {
+      return `
+        <div class="detail-date-row">
+          <span class="detail-date-label">effective date</span>
+          <span class="detail-date-empty">not set</span>
+        </div>`;
+    }
+    const dateFmt = d.effective_date
+      ? new Date(d.effective_date + 'T00:00:00').toLocaleDateString([], { year:'numeric', month:'short', day:'numeric' })
+      : '';
+    const basis = d.effective_date_basis
+      ? `<span class="detail-date-basis">(${esc(d.effective_date_basis)})</span>`
+      : '';
+    return `
+      <div class="detail-date-row">
+        <span class="detail-date-label">effective date</span>
+        <span class="detail-date-value">${esc(dateFmt)}</span>
+        ${basis}
+      </div>`;
   }
 
   function _renderBeliefHistory(d, derived) {
