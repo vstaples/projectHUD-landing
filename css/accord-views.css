@@ -1,0 +1,322 @@
+/* ============================================================
+   accord-views.css
+   CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 4a
+
+   Workstream-level + meeting-level center-pane views.
+   Strict navigational per IR70 boundary (no activity intelligence
+   on workstream-level surface).
+
+   Style tokens: Accord editorial-amber palette only (Phase 2 IR64;
+   no Compass cyan creep).
+   All declared font sizes ≥ 11px.
+   ============================================================ */
+
+/* ── View host wrapper (created by accord-transitions.js) ──── */
+#accord-app .ac-view-host {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: var(--canvas-deep);
+}
+
+/* ── View shell (workstream + meeting share most layout) ──── */
+#accord-app .ac-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+#accord-app .ac-view-header {
+  flex-shrink: 0;
+  padding: 22px 32px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--canvas);
+}
+#accord-app .ac-view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 32px 40px;
+}
+
+/* ── Breadcrumb ─────────────────────────────────────────────── */
+#accord-app .ac-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+#accord-app .ac-bc-crumb {
+  color: var(--ink-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 120ms;
+}
+#accord-app .ac-bc-crumb:hover {
+  color: var(--signal);
+}
+#accord-app .ac-bc-sep {
+  color: var(--ink-ghost);
+}
+#accord-app .ac-bc-current {
+  color: var(--signal);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── View title ─────────────────────────────────────────────── */
+#accord-app .ac-view-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.2;
+  color: var(--ink-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+#accord-app .ac-view-desc {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-muted);
+  margin: 8px 0 0;
+  max-width: 720px;
+}
+
+/* ── Sections ───────────────────────────────────────────────── */
+#accord-app .ac-view-section {
+  margin-bottom: 28px;
+}
+#accord-app .ac-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .ac-section-head h2 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+#accord-app .ac-btn-primary,
+#accord-app .ac-btn-secondary {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+#accord-app .ac-btn-primary {
+  background: var(--signal-soft);
+  border: 1px solid var(--signal-dim);
+  color: var(--signal);
+}
+#accord-app .ac-btn-primary:hover {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--canvas-deep);
+}
+#accord-app .ac-btn-secondary {
+  background: none;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-muted);
+}
+#accord-app .ac-btn-secondary:hover {
+  border-color: var(--signal-dim);
+  color: var(--signal);
+}
+
+/* ── Lists (sub-workstreams, meetings) ─────────────────────── */
+#accord-app .ac-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#accord-app .ac-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--ink-body);
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  transition: background 120ms, border-color 120ms;
+}
+#accord-app .ac-list-row:hover {
+  background: var(--signal-soft);
+  border-color: var(--signal-dim);
+}
+#accord-app .ac-list-row:focus-visible {
+  outline: 1px solid var(--signal);
+  outline-offset: 1px;
+}
+#accord-app .ac-list-row-label {
+  flex: 1;
+  font-weight: 500;
+  color: var(--ink-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#accord-app .ac-list-row-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+}
+
+#accord-app .ac-list-empty {
+  padding: 18px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-faint);
+}
+
+/* ── Meeting state dots (shared with rails / tree) ─────────── */
+#accord-app .ac-list-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+#accord-app .ac-list-dot-sealed   { background: var(--ink-faint); }
+#accord-app .ac-list-dot-running  { background: var(--signal); animation: ac-pulse 1.6s ease-in-out infinite; }
+#accord-app .ac-list-dot-closed   { background: var(--ink-muted); }
+#accord-app .ac-list-dot-draft    { background: transparent; border: 1px solid var(--ink-ghost); }
+
+/* ── Meeting view: tab bar ──────────────────────────────────── */
+#accord-app .ac-meeting-tabs-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+#accord-app .ac-meeting-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 22px;
+  flex-shrink: 0;
+}
+#accord-app .ac-mtg-tab {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  padding: 10px 14px;
+  cursor: pointer;
+  position: relative;
+  transition: color 120ms;
+}
+#accord-app .ac-mtg-tab:hover {
+  color: var(--ink-primary);
+}
+#accord-app .ac-mtg-tab.active {
+  color: var(--signal);
+}
+#accord-app .ac-mtg-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--signal);
+}
+
+#accord-app .ac-meeting-tab-body {
+  flex: 1;
+  min-height: 0;
+}
+#accord-app .ac-meeting-tab-stub {
+  padding: 24px 0;
+  max-width: 640px;
+}
+#accord-app .ac-meeting-tab-stub p {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-muted);
+  margin: 0 0 14px;
+}
+#accord-app .ac-meeting-tab-stub strong {
+  color: var(--ink-primary);
+}
+
+/* ── Empty fallback (workstream/meeting not found) ─────────── */
+#accord-app .ac-view-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+#accord-app .ac-view-empty h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  color: var(--ink-primary);
+  margin: 0 0 8px;
+}
+#accord-app .ac-view-empty p {
+  font-size: 13px;
+  color: var(--ink-muted);
+  margin: 0;
+}
+#accord-app .ac-view-empty a {
+  color: var(--signal);
+  text-decoration: none;
+}
+#accord-app .ac-view-empty a:hover {
+  text-decoration: underline;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  #accord-app .ac-list-row,
+  #accord-app .ac-bc-crumb,
+  #accord-app .ac-mtg-tab,
+  #accord-app .ac-btn-primary,
+  #accord-app .ac-btn-secondary {
+    transition: none;
+  }
+  #accord-app .ac-list-dot-running {
+    animation: none;
+  }
+}
+
+/* ── Narrow viewport ────────────────────────────────────────── */
+@media (max-width: 1080px) {
+  #accord-app .ac-view-header { padding: 18px 22px 14px; }
+  #accord-app .ac-view-body   { padding: 18px 22px 30px; }
+  #accord-app .ac-view-title  { font-size: 24px; }
+}

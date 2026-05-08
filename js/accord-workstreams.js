@@ -266,6 +266,13 @@
             });
           }
         } catch (e) { console.warn('[Accord-workstreams] CoC.write best-effort failure', e); }
+
+        // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4a — reactive refresh hook
+        try {
+          window.dispatchEvent(new CustomEvent('accord:workstream-renamed', {
+            detail: { workstream_id: local.renameTargetId, from_name: oldName, to_name: name },
+          }));
+        } catch (e) {}
       } catch (e) {
         console.error('[Accord-workstreams] rename failed', e);
         alert('Rename failed: ' + (e?.message || e));
@@ -302,6 +309,18 @@
           });
         }
       } catch (e) { console.warn('[Accord-workstreams] CoC.write best-effort failure', e); }
+
+      // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4a — Phase 3 carry-forward.
+      // Reactive refresh hook for accord-rails / accord-constellation.
+      try {
+        window.dispatchEvent(new CustomEvent('accord:workstream-created', {
+          detail: {
+            workstream_id: created?.workstream_id,
+            parent_workstream_id: parentId,
+            name,
+          },
+        }));
+      } catch (e) {}
     }
 
     _closeCreateModal();
@@ -390,6 +409,15 @@
       console.warn('[Accord-workstreams] CoC.write best-effort failure', e);
     }
 
+    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4a — reactive refresh hook.
+    // Single archived event covers parent + cascaded subs; rails refresh
+    // walks the substrate again rather than enumerating cascaded ids.
+    try {
+      window.dispatchEvent(new CustomEvent('accord:workstream-archived', {
+        detail: { workstream_id: workstreamId },
+      }));
+    } catch (e) {}
+
     await _refresh();
   }
 
@@ -422,6 +450,13 @@
         });
       }
     } catch (e) { console.warn('[Accord-workstreams] CoC.write best-effort failure', e); }
+
+    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4a — reactive refresh hook
+    try {
+      window.dispatchEvent(new CustomEvent('accord:workstream-restored', {
+        detail: { workstream_id: workstreamId, name: w.name },
+      }));
+    } catch (e) {}
 
     await _refresh();
   }
@@ -532,6 +567,23 @@
         });
       }
     } catch (e) { console.warn('[Accord-workstreams] CoC.write best-effort failure', e); }
+
+    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4a — Phase 3 carry-forward.
+    // Three distinct events so accord-rails can tailor refreshes (parking
+    // lot only / tree only / both).
+    let eventName;
+    if (typeKey === 'accord.meeting.placed')         eventName = 'accord:meeting-filed';
+    else if (typeKey === 'accord.meeting.unplaced')  eventName = 'accord:meeting-unfiled';
+    else                                             eventName = 'accord:meeting-refiled';
+    try {
+      window.dispatchEvent(new CustomEvent(eventName, {
+        detail: {
+          meeting_id: meetingId,
+          from_workstream_id: oldWorkstreamId,
+          to_workstream_id:   newWorkstreamId,
+        },
+      }));
+    } catch (e) {}
 
     // Update local meeting state if it was the active meeting
     if (m && m.meeting_id === meetingId) {

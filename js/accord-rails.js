@@ -275,6 +275,14 @@
     const body = $('ac-tree-body');
     if (!body) return;
 
+    // Make all rows focusable for keyboard navigation
+    body.querySelectorAll('.ac-tree-row').forEach(row => {
+      if (!row.hasAttribute('tabindex')) row.setAttribute('tabindex', '-1');
+    });
+    // First visible row is the initial tab stop
+    const first = body.querySelector('.ac-tree-row');
+    if (first) first.setAttribute('tabindex', '0');
+
     // Chevron + workstream/sub click → toggle expand AND set level
     body.querySelectorAll('.ac-tree-row[data-toggle]').forEach(row => {
       row.addEventListener('click', (ev) => {
@@ -325,6 +333,129 @@
     local.treeExpanded[wsId] = !isOpen;
     _persistWrite('accord-tree-expanded', JSON.stringify(local.treeExpanded));
     row.querySelector('.ac-tree-chevron')?.classList.toggle('open', !isOpen);
+  }
+
+  // ── Tree search (Phase 4a — mirrors my-meetings.html _mtgSearch) ──
+  // Text-match on workstream name + meeting title. Hide non-matching
+  // .ac-tree-meeting rows. Keep .ac-tree-ws / .ac-tree-sub rows visible
+  // when any descendant matches; hide them when nothing inside matches.
+  function _runTreeSearch(rawQuery) {
+    const body = $('ac-tree-body');
+    if (!body) return;
+    const q = (rawQuery || '').trim().toLowerCase();
+
+    // No query: restore all rows + their persisted expand states
+    if (!q) {
+      body.querySelectorAll('.ac-tree-row, .ac-tree-children, .ac-tree-leaf-empty').forEach(el => {
+        el.style.display = '';
+      });
+      // Re-apply persisted collapse states for chevrons
+      body.querySelectorAll('.ac-tree-children').forEach(child => {
+        // Find owning row (nearest preceding sibling .ac-tree-row[data-toggle])
+        const id = child.id;
+        const wsId = id.replace(/^ac-tree-children-/, '');
+        const expanded = local.treeExpanded[wsId] !== false;
+        child.style.display = expanded ? '' : 'none';
+      });
+      return;
+    }
+
+    // With a query: build per-ws "any descendant matched" set, then apply
+    const matchedTops = new Set();
+    const matchedSubs = new Set();
+    const matchedMtgs = new Set();
+
+    // Meetings
+    local.meetings.forEach(m => {
+      const hay = (m.title || '').toLowerCase();
+      if (!hay.includes(q)) return;
+      matchedMtgs.add(m.meeting_id);
+      // Walk up to owning ws and (if sub) parent top
+      const owningWs = m.workstream_id;
+      const ws = local.workstreams.find(w => w.workstream_id === owningWs);
+      if (!ws) return;
+      if (ws.parent_workstream_id) {
+        matchedSubs.add(ws.workstream_id);
+        matchedTops.add(ws.parent_workstream_id);
+      } else {
+        matchedTops.add(ws.workstream_id);
+      }
+    });
+
+    // Workstream names
+    local.workstreams.forEach(w => {
+      if (!(w.name || '').toLowerCase().includes(q)) return;
+      if (w.parent_workstream_id) {
+        matchedSubs.add(w.workstream_id);
+        matchedTops.add(w.parent_workstream_id);
+      } else {
+        matchedTops.add(w.workstream_id);
+      }
+    });
+
+    // Apply visibility — meeting rows: shown if matched
+    body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(row => {
+      row.style.display = matchedMtgs.has(row.dataset.mtgId) ? '' : 'none';
+    });
+    // Sub rows: shown if matchedSubs OR if their name matches OR if any of
+    // their meetings match (already in matchedSubs by walk-up above)
+    body.querySelectorAll('.ac-tree-sub[data-ws-id]').forEach(row => {
+      const wsId = row.dataset.wsId;
+      const visible = matchedSubs.has(wsId);
+      row.style.display = visible ? '' : 'none';
+      // Force-expand if visible so descendants show
+      const child = document.getElementById(`ac-tree-children-${wsId}`);
+      if (child) child.style.display = visible ? '' : 'none';
+    });
+    // Top-level rows: same logic
+    body.querySelectorAll('.ac-tree-ws[data-ws-id]').forEach(row => {
+      const wsId = row.dataset.wsId;
+      const visible = matchedTops.has(wsId);
+      row.style.display = visible ? '' : 'none';
+      const child = document.getElementById(`ac-tree-children-${wsId}`);
+      if (child) child.style.display = visible ? '' : 'none';
+    });
+    // Leaf-empty placeholders hide under search (nothing meaningful to show)
+    body.querySelectorAll('.ac-tree-leaf-empty').forEach(el => {
+      el.style.display = 'none';
+    });
+  }
+
+  // ── Tree keyboard navigation (Phase 4a — left rail only) ──
+  // Arrow keys cycle through visible rows; ENTER descends.
+  // Constellation node arrow-cycle is Phase 4b (paired with drag-drop a11y).
+  function _wireTreeKeyboard() {
+    const search = $('ac-tree-search');
+    const scroll = $('ac-tree-scroll');
+    if (!scroll) return;
+
+    scroll.addEventListener('keydown', (ev) => {
+      if (!['ArrowDown','ArrowUp','Enter','Home','End'].includes(ev.key)) return;
+      const rows = Array.from(scroll.querySelectorAll('.ac-tree-row'))
+        .filter(r => r.offsetParent !== null);   // visible only
+      if (!rows.length) return;
+      const focused = document.activeElement?.closest('.ac-tree-row');
+      let idx = focused ? rows.indexOf(focused) : -1;
+
+      if (ev.key === 'ArrowDown') { idx = Math.min(rows.length - 1, idx + 1); ev.preventDefault(); }
+      else if (ev.key === 'ArrowUp') { idx = Math.max(0, idx - 1); ev.preventDefault(); }
+      else if (ev.key === 'Home') { idx = 0; ev.preventDefault(); }
+      else if (ev.key === 'End') { idx = rows.length - 1; ev.preventDefault(); }
+      else if (ev.key === 'Enter') {
+        if (focused) { focused.click(); ev.preventDefault(); }
+        return;
+      }
+
+      const target = rows[idx];
+      if (target) {
+        target.setAttribute('tabindex', '0');
+        target.focus();
+      }
+    });
+
+    // Make rows focusable on render — set the first one as initial tab stop
+    const first = scroll.querySelector('.ac-tree-row');
+    if (first && !first.hasAttribute('tabindex')) first.setAttribute('tabindex', '0');
   }
 
   // ── Parking lot ─────────────────────────────────────────────
@@ -439,6 +570,34 @@
     $('ac-tree-new-btn')?.addEventListener('click', () => {
       window.AccordWorkstreams?.openCreate?.();
     });
+
+    // Phase 4a — tree search (debounced) + keyboard navigation
+    const search = $('ac-tree-search');
+    if (search) {
+      let _searchTimer = null;
+      search.addEventListener('input', (ev) => {
+        clearTimeout(_searchTimer);
+        const q = ev.target.value;
+        _searchTimer = setTimeout(() => _runTreeSearch(q), 80);
+      });
+      search.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape') {
+          search.value = '';
+          _runTreeSearch('');
+          search.blur();
+        }
+        if (ev.key === 'ArrowDown') {
+          // Drop focus into the tree on first ArrowDown from search
+          const first = $('ac-tree-scroll')?.querySelector('.ac-tree-row');
+          if (first) {
+            first.setAttribute('tabindex', '0');
+            first.focus();
+            ev.preventDefault();
+          }
+        }
+      });
+    }
+    _wireTreeKeyboard();
   }
 
   function _applyRailCollapse(side, collapsed) {

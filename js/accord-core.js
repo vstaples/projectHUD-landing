@@ -664,15 +664,15 @@ const Accord = (() => {
   }
 
   // ── ESC ascend (Phase 3 stub; Phase 4 wires dissolve transitions) ──
-  // Scoped: suppressed when an input/textarea is focused or any modal
-  // is open. Phase 4 may layer additional suppression for in-flight
-  // transitions; Phase 3 just ascends one level per ESC press.
+  // Scoped: suppressed when an input/textarea is focused, any modal
+  // is open, in legacy view, or a transition is in flight (Phase 4a).
   document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Escape') return;
     const t = ev.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     if (document.querySelector('.modal-backdrop.active, [class*="modal"][style*="block"]')) return;
     if (state.viewMode !== 'new') return;
+    if (window.AccordTransitions?.isInFlight?.()) return;
     ascendLevel();
   });
 
