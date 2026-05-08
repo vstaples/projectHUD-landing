@@ -765,11 +765,13 @@
       _openCreateModal('create');
     },
 
-    // Rename — set the rename target then open the modal in 'rename' mode
+    // Rename — set the rename target then open the modal in 'rename' mode.
+    // Pass the id through to _openCreateModal explicitly; relying on the
+    // local-state assignment alone is fragile because _openCreateModal
+    // overwrites local.renameTargetId from its own argument.
     openRename(workstreamId) {
       if (!workstreamId) return;
-      local.renameTargetId = workstreamId;
-      _openCreateModal('rename');
+      _openCreateModal('rename', workstreamId);
     },
 
     // Archive — calls the existing archive flow (includes its own confirm prompt)

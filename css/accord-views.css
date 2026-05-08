@@ -64,6 +64,15 @@
 #accord-app .ac-bc-crumb:hover {
   color: var(--signal);
 }
+/* Static crumb (e.g., "Parking lot" — not navigable since parking-lot
+   isn't a level we can ascend back to from a meeting view). */
+#accord-app .ac-bc-crumb-static {
+  color: var(--ink-faint);
+  cursor: default;
+}
+#accord-app .ac-bc-crumb-static:hover {
+  color: var(--ink-faint);
+}
 #accord-app .ac-bc-sep {
   color: var(--ink-ghost);
 }

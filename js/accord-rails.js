@@ -556,15 +556,31 @@
     });
     _updateSortBtnLabel();
 
-    // Legacy view toggle (in topnav)
-    $('legacyViewToggle')?.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      const cur = window.Accord?.state?.viewMode || 'new';
-      const next = cur === 'new' ? 'legacy' : 'new';
-      if (window.Accord?.setViewMode) window.Accord.setViewMode(next);
-      _updateLegacyToggleLabel(next);
-    });
+    // Legacy view toggle (in topnav). Listener is bound idempotently —
+    // we mark the element so re-running _wireChrome (e.g. after a
+    // late-arriving init) doesn't double-bind. Logs if the button is
+    // absent so a missing chrome anchor surfaces in the console rather
+    // than silently no-op-ing (Phase 4a operator-found bug).
+    const lvBtn = $('legacyViewToggle');
+    if (!lvBtn) {
+      console.warn('[Accord-rails] #legacyViewToggle not found at chrome wire — view-mode toggle will be inert until DOM lands');
+    } else if (!lvBtn.dataset.acBound) {
+      lvBtn.dataset.acBound = '1';
+      lvBtn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const cur = window.Accord?.state?.viewMode || 'new';
+        const next = cur === 'new' ? 'legacy' : 'new';
+        if (window.Accord?.setViewMode) window.Accord.setViewMode(next);
+        _updateLegacyToggleLabel(next);
+      });
+    }
     _updateLegacyToggleLabel(window.Accord?.state?.viewMode || 'new');
+
+    // Mirror updates from any other path that flips view mode (e.g. the
+    // meeting-view "Open in Legacy view" CTA in accord-views.js)
+    window.addEventListener('accord:view-mode-changed', (ev) => {
+      _updateLegacyToggleLabel(ev.detail?.viewMode || 'new');
+    });
 
     // New-meeting / new-workstream affordances inside the rails
     $('ac-tree-new-btn')?.addEventListener('click', () => {
@@ -622,7 +638,13 @@
   function _updateLegacyToggleLabel(mode) {
     const btn = $('legacyViewToggle');
     if (!btn) return;
-    btn.textContent = mode === 'new' ? 'Legacy view' : 'New view';
+    // Action-labeled with explicit verb — avoids "New view" being read as
+    // a state label when on legacy. Reported by operator after Phase 4a
+    // first-look; symptom was perceived dead-end on legacy.
+    btn.textContent = mode === 'new' ? '← Switch to legacy view' : '← Back to new view';
+    btn.setAttribute('title', mode === 'new'
+      ? 'Switch to the original five-tab layout'
+      : 'Return to the three-pane constellation view');
   }
 
   // ── Constellation mount ─────────────────────────────────────
@@ -673,12 +695,25 @@
       }
     });
 
-    // Listen for substrate changes from accord-workstreams.js (CoC events
-    // ripple through here too — best-effort refresh)
-    ['accord:workstream-created', 'accord:workstream-archived',
-     'accord:workstream-renamed', 'accord:meeting-filed',
-     'accord:meeting-unfiled'].forEach(eventName => {
-      window.addEventListener(eventName, () => refresh());
+    // Listen for substrate changes — refresh both rails AND the
+    // constellation so newly-created top-level workstreams appear,
+    // renamed/archived/restored ones update visually, and meeting
+    // file/unfile/refile flows propagate to the constellation's
+    // activity-weight composite.
+    const _refreshAll = () => {
+      refresh();
+      if (window.AccordConstellation?.refresh) {
+        try { window.AccordConstellation.refresh(); } catch (e) {}
+      }
+    };
+    ['accord:workstream-created',
+     'accord:workstream-renamed',
+     'accord:workstream-archived',
+     'accord:workstream-restored',
+     'accord:meeting-filed',
+     'accord:meeting-unfiled',
+     'accord:meeting-refiled'].forEach(eventName => {
+      window.addEventListener(eventName, _refreshAll);
     });
   }
 

@@ -299,6 +299,13 @@
       html += `
             <span class="ac-bc-sep" aria-hidden="true">›</span>
             <a href="#" class="ac-bc-crumb" data-ascend-to="workstream" data-ws-id="${esc(ws.workstream_id)}">${esc(ws.name)}</a>`;
+    } else {
+      // Parking-lot meeting: no workstream context. Render an explicit
+      // "Parking lot" crumb so the breadcrumb chain doesn't jump straight
+      // from Constellation to the meeting title (operator-found UX gap).
+      html += `
+            <span class="ac-bc-sep" aria-hidden="true">›</span>
+            <span class="ac-bc-crumb ac-bc-crumb-static">Parking lot</span>`;
     }
     html += `
             <span class="ac-bc-sep" aria-hidden="true">›</span>
