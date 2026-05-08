@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accord — Meeting Setup v3.5</title>
+<style>
+  :root {
+    --bg-deep: #0a0e14;
+    --bg-pane: #11161e;
+    --bg-elevated: #161c26;
+    --bg-tile: #1a212c;
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-mid: rgba(255, 255, 255, 0.12);
+    --border-active: rgba(94, 234, 212, 0.4);
+    --text-primary: #e8edf2;
+    --text-secondary: #8a95a5;
+    --text-tertiary: #5a6678;
+    --text-faint: #3a4456;
+    --accent-cyan: #5eead4;
+    --accent-cyan-dim: rgba(94, 234, 212, 0.15);
+    --accent-amber: #fbbf77;
+    --accent-amber-dim: rgba(251, 191, 119, 0.18);
+    --accent-rose: #fb7185;
+    --accent-rose-dim: rgba(251, 113, 133, 0.18);
+    --accent-violet: #a78bfa;
+    --accent-violet-dim: rgba(167, 139, 250, 0.18);
+    --accent-green: #4ade80;
+    --accent-green-dim: rgba(74, 222, 128, 0.18);
+    --accent-yellow: #facc15;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", Menlo, monospace;
+    --font-serif: "Lora", "Charter", "Georgia", serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.5;
+    height: 100vh;
+    min-width: 1200px;
+    min-height: 720px;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: grid;
+    grid-template-rows: 50px auto 1fr 102px 54px;
+    grid-template-areas: "chrome" "header" "columns" "filmstrip" "footer";
+    height: 100vh;
+  }
+  .chrome { grid-area: chrome; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; padding: 0 22px; gap: 18px; background: rgba(10, 14, 20, 0.85); backdrop-filter: blur(20px); }
+  .chrome-brand { font-family: var(--font-serif); font-size: 20px; font-weight: 500; }
+  .chrome-context { display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
+  .crumb { color: var(--text-tertiary); cursor: pointer; }
+  .crumb:hover { color: var(--text-secondary); }
+  .crumb-sep { color: var(--text-faint); }
+  .crumb-current { color: var(--text-primary); font-weight: 500; }
+  .chrome-spacer { flex: 1; }
+  .ctx-toggle { display: flex; background: var(--bg-pane); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 2px; }
+  .ctx-tab { padding: 5px 11px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.3px; text-transform: uppercase; color: var(--text-tertiary); cursor: pointer; border-radius: 4px; }
+  .ctx-tab:hover { color: var(--text-secondary); }
+  .ctx-tab.active { color: var(--accent-cyan); background: var(--accent-cyan-dim); }
+
+  .header { grid-area: header; padding: 16px 28px 14px 28px; border-bottom: 1px solid var(--border-subtle); background: rgba(17, 22, 30, 0.4); display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: start; }
+  .meeting-title { font-family: var(--font-serif); font-size: 25px; color: var(--text-primary); font-weight: 500; cursor: text; border: 1px solid transparent; padding: 3px 8px; margin-left: -8px; border-radius: 6px; outline: none; margin-bottom: 5px; }
+  .meeting-title:hover, .meeting-title:focus { border-color: var(--border-mid); background: var(--bg-pane); }
+  .commitment-label { font-family: var(--font-mono); font-size: 8.5px; color: var(--accent-cyan); letter-spacing: 1.6px; text-transform: uppercase; margin-bottom: 3px; display: block; }
+  .commitment { font-family: var(--font-serif); font-size: 13.5px; color: var(--text-secondary); font-style: italic; line-height: 1.5; padding-left: 11px; border-left: 2px solid var(--accent-cyan-dim); cursor: text; max-width: 660px; outline: none; }
+  .commitment:hover, .commitment:focus { border-left-color: var(--accent-cyan); }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+  .header-meta-row { display: flex; gap: 16px; font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); align-items: center; }
+  .header-meta-row .label { color: var(--text-tertiary); font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; margin-right: 4px; }
+  .header-meta-row .accent { color: var(--accent-cyan); }
+  .pulse-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-amber); animation: pulse 2s ease-in-out infinite; display: inline-block; margin-right: 5px; }
+
+  .columns { grid-area: columns; display: grid; grid-template-columns: 360px 1fr 380px; overflow: hidden; min-height: 0; }
+  .col { overflow-y: auto; padding: 16px 18px 22px 18px; scrollbar-width: thin; scrollbar-color: var(--border-mid) transparent; }
+  .col::-webkit-scrollbar { width: 5px; }
+  .col::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 3px; }
+  .col-briefing { background: rgba(17, 22, 30, 0.4); border-right: 1px solid var(--border-subtle); }
+  .col-composition { padding: 16px 22px 22px 22px; }
+  .col-anticipation { background: rgba(17, 22, 30, 0.4); border-left: 1px solid var(--border-subtle); }
+  .col-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .col-title { font-family: var(--font-serif); font-size: 16px; color: var(--text-primary); font-weight: 500; }
+  .col-subtitle { font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); letter-spacing: 1.4px; text-transform: uppercase; }
+
+  .block { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle); }
+  .block:last-child { border-bottom: none; padding-bottom: 0; }
+  .block-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); letter-spacing: 1.4px; text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: baseline; }
+  .block-count { color: var(--accent-cyan); font-weight: 600; }
+
+  .synthesis { background: var(--bg-tile); border: 1px solid var(--border-subtle); border-left: 3px solid var(--accent-cyan); border-radius: 0 7px 7px 0; padding: 11px 13px; font-family: var(--font-serif); font-size: 12.5px; color: var(--text-secondary); font-style: italic; line-height: 1.6; }
+
+  .last-summary-card { background: var(--bg-tile); border: 1px solid var(--border-subtle); border-radius: 7px; padding: 10px 12px; }
+  .last-summary-meta { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary); margin-bottom: 4px; }
+  .last-summary { font-size: 12px; color: var(--text-secondary); line-height: 1.5; font-style: italic; margin-bottom: 5px; }
+  .summary-link { font-family: var(--font-mono); font-size: 9.5px; color: var(--accent-cyan); cursor: pointer; }
+  .summary-link:hover { text-decoration: underline; }
+
+  .prior-action { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border-subtle); font-size: 12px; }
+  .prior-action:last-child { border-bottom: none; }
+  .action-status-icon { width: 14px; height: 14px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .action-status-icon.complete { background: var(--accent-green-dim); color: var(--accent-green); }
+  .action-status-icon.in-progress { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+  .action-status-icon.overdue { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .action-status-icon.pending { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .action-content { flex: 1; min-width: 0; }
+  .action-text { color: var(--text-primary); font-size: 11.5px; line-height: 1.4; margin-bottom: 1px; }
+  .action-text.complete { color: var(--text-tertiary); text-decoration: line-through; }
+  .action-meta { font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); display: flex; gap: 7px; flex-wrap: wrap; }
+  .action-meta .substrate-id { color: var(--accent-cyan); }
+  .action-meta .owner { color: var(--text-secondary); }
+  .action-meta .overdue { color: var(--accent-rose); }
+  .action-meta .due-soon { color: var(--accent-amber); }
+
+  .prior-decision { background: var(--bg-tile); border-left: 2px solid var(--accent-cyan); border-radius: 0 5px 5px 0; padding: 7px 10px; margin-bottom: 5px; }
+  .decision-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
+  .decision-id { font-family: var(--font-mono); font-size: 9.5px; color: var(--accent-cyan); }
+  .decision-state { font-family: var(--font-mono); font-size: 7.5px; padding: 1.5px 5px; border-radius: 3px; letter-spacing: 0.7px; text-transform: uppercase; }
+  .decision-state.sealed { background: var(--accent-green-dim); color: var(--accent-green); }
+  .decision-state.awaiting { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .decision-state.dissented { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .decision-text { font-size: 11.5px; color: var(--text-primary); line-height: 1.4; }
+
+  .annotation-card { background: var(--bg-tile); border-left: 2px solid var(--accent-violet); padding: 7px 10px; margin-bottom: 5px; border-radius: 0 5px 5px 0; }
+  .annotation-meta { font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); margin-bottom: 3px; }
+  .annotation-meta .author { color: var(--accent-violet); }
+  .annotation-text { font-size: 11.5px; color: var(--text-secondary); font-style: italic; line-height: 1.4; }
+
+  .momentum-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 5px; }
+  .momentum-cell { background: var(--bg-tile); border: 1px solid var(--border-subtle); border-radius: 5px; padding: 7px 4px; text-align: center; }
+  .momentum-num { font-family: var(--font-serif); font-size: 17px; color: var(--text-primary); }
+  .momentum-num.positive { color: var(--accent-green); }
+  .momentum-num.warning { color: var(--accent-amber); }
+  .momentum-num.negative { color: var(--accent-rose); }
+  .momentum-label { font-family: var(--font-mono); font-size: 7.5px; color: var(--text-tertiary); letter-spacing: 0.8px; text-transform: uppercase; margin-top: 2px; }
+
+  .prep-prompt { background: var(--accent-amber-dim); border: 1px solid rgba(251, 191, 119, 0.3); border-radius: 7px; padding: 9px 12px; margin-bottom: 12px; font-size: 11.5px; color: var(--accent-amber); display: flex; align-items: flex-start; gap: 9px; line-height: 1.4; }
+  .prep-prompt-icon { flex-shrink: 0; margin-top: 1px; font-size: 13px; }
+  .prep-prompt strong { color: var(--text-primary); font-weight: 600; }
+  .prep-prompt-action { margin-left: auto; font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--accent-amber); cursor: pointer; white-space: nowrap; padding-left: 8px; border-left: 1px solid rgba(251, 191, 119, 0.3); align-self: center; }
+
+  .agenda-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 11px; }
+  .agenda-item { background: var(--bg-pane); border: 1px solid var(--border-subtle); border-radius: 7px; overflow: hidden; }
+  .agenda-item.from-carry { border-left: 3px solid var(--accent-cyan); }
+  .agenda-row { display: flex; align-items: center; padding: 9px 12px; gap: 10px; }
+  .agenda-handle { color: var(--text-faint); font-size: 12px; cursor: grab; user-select: none; }
+  .agenda-text { flex: 1; font-size: 12.5px; color: var(--text-primary); }
+  .nra-pill { font-family: var(--font-mono); font-size: 8px; letter-spacing: 1.2px; text-transform: uppercase; padding: 3px 7px; border-radius: 3px; }
+  .nra-pill.decision { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+  .nra-pill.action { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .nra-pill.risk { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .nra-pill.question { background: var(--accent-violet-dim); color: var(--accent-violet); }
+  .agenda-remove { color: var(--text-faint); cursor: pointer; font-size: 14px; user-select: none; }
+  .agenda-remove:hover { color: var(--accent-rose); }
+  .agenda-meta { padding: 0 12px 7px 12px; font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .agenda-meta .substrate-id { color: var(--accent-cyan); }
+  .timing-predict { background: var(--accent-amber-dim); color: var(--accent-amber); padding: 1px 5px; border-radius: 3px; font-size: 8.5px; }
+
+  .add-agenda { background: transparent; border: 1px dashed var(--border-mid); border-radius: 7px; padding: 9px 12px; cursor: text; color: var(--text-tertiary); font-size: 12.5px; font-style: italic; }
+  .add-agenda:hover { border-color: var(--border-active); color: var(--text-secondary); }
+
+  .ref-strip { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
+  .ref-cards { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .ref-card { background: var(--bg-tile); border: 1px solid var(--border-subtle); border-radius: 5px; padding: 6px 9px; display: flex; align-items: center; gap: 7px; font-size: 11px; cursor: pointer; }
+  .ref-card:hover { border-color: var(--border-mid); }
+  .ref-icon { width: 16px; height: 16px; background: var(--bg-elevated); border-radius: 3px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 8px; color: var(--accent-cyan); }
+  .ref-icon.pdf { color: var(--accent-rose); }
+  .ref-icon.xlsx { color: var(--accent-green); }
+  .ref-icon.zip { color: var(--accent-amber); }
+  .ref-name { color: var(--text-secondary); font-family: var(--font-mono); font-size: 10px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ref-prune { color: var(--text-faint); cursor: pointer; }
+  .ref-prune:hover { color: var(--accent-rose); }
+  .ref-add { background: transparent; border: 1px dashed var(--border-mid); border-radius: 5px; padding: 6px 10px; color: var(--text-tertiary); font-size: 10px; font-family: var(--font-mono); cursor: pointer; }
+  .ref-add:hover { border-color: var(--border-active); color: var(--accent-cyan); }
+
+  .ant-attendee { background: var(--bg-tile); border: 1px solid var(--border-subtle); border-radius: 7px; padding: 10px 11px; margin-bottom: 6px; }
+  .ant-attendee-header { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; flex-wrap: wrap; }
+  .conn-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; cursor: pointer; transition: transform .15s; }
+  .conn-dot:hover { transform: scale(1.25); }
+  .conn-dot.not-connected { background: transparent; border: 2px solid var(--text-tertiary); box-shadow: 0 0 8px rgba(138, 149, 165, 0.4); animation: connGlow 2.5s ease-in-out infinite; }
+  .conn-dot.on-time { background: var(--accent-green); border: 2px solid var(--accent-green); box-shadow: 0 0 10px rgba(74, 222, 128, 0.6); }
+  .conn-dot.late { background: var(--accent-yellow); border: 2px solid var(--accent-yellow); box-shadow: 0 0 10px rgba(250, 204, 21, 0.6); }
+  .ant-avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--bg-elevated); display: flex; align-items: center; justify-content: center; font-size: 9.5px; color: var(--text-secondary); font-weight: 600; flex-shrink: 0; }
+  .ant-avatar.you { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+  .ant-name-block { flex: 1; min-width: 0; }
+  .ant-name { font-size: 12.5px; color: var(--text-primary); font-weight: 500; }
+  .ant-role { font-family: var(--font-mono); font-size: 8.5px; color: var(--text-tertiary); letter-spacing: 0.5px; }
+  .temp-badge { font-family: var(--font-mono); font-size: 8px; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.7px; text-transform: uppercase; font-weight: 600; }
+  .temp-badge.engaged { background: var(--accent-green-dim); color: var(--accent-green); }
+  .temp-badge.dissent-simmering { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .temp-badge.overdue-pressure { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .temp-badge.quiet-disengaged { background: rgba(255,255,255,0.05); color: var(--text-tertiary); }
+  .ant-stake { font-size: 11px; color: var(--text-secondary); line-height: 1.5; padding-left: 22px; margin-top: 2px; }
+  .urgency-math { display: block; margin-top: 5px; padding: 5px 8px; background: rgba(251, 113, 133, 0.08); border-left: 2px solid var(--accent-rose); font-family: var(--font-mono); font-size: 10px; color: var(--accent-rose); border-radius: 0 4px 4px 0; line-height: 1.4; }
+  .urgency-math.amber { background: rgba(251, 191, 119, 0.08); border-left-color: var(--accent-amber); color: var(--accent-amber); }
+  .pattern-tag { display: inline-block; font-family: var(--font-mono); font-size: 9px; color: var(--accent-violet); margin-top: 4px; }
+  .pattern-tag::before { content: "▸ pattern: "; color: var(--text-tertiary); }
+  .ant-block { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
+  .ant-info-row { display: flex; align-items: flex-start; gap: 9px; padding: 7px 0; font-size: 11.5px; color: var(--text-secondary); line-height: 1.5; }
+  .ant-info-icon { width: 14px; height: 14px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; flex-shrink: 0; margin-top: 1px; }
+  .ant-info-icon.cross { background: var(--accent-violet-dim); color: var(--accent-violet); }
+  .ant-info-icon.risk { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .ant-info-row strong { color: var(--text-primary); font-weight: 600; }
+
+  .filmstrip { grid-area: filmstrip; background: rgba(13, 18, 24, 0.95); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); padding: 9px 22px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .filmstrip-header { display: flex; align-items: baseline; justify-content: space-between; }
+  .strip-label { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary); letter-spacing: 1.4px; text-transform: uppercase; }
+  .strip-controls { display: flex; gap: 12px; font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); }
+  .strip-control { cursor: pointer; }
+  .strip-control:hover { color: var(--accent-cyan); }
+  .strip-control.active { color: var(--accent-cyan); }
+  .strip-frames { display: flex; gap: 5px; overflow-x: auto; flex: 1; scrollbar-width: thin; scrollbar-color: var(--border-mid) transparent; }
+  .strip-frames::-webkit-scrollbar { height: 4px; }
+  .strip-frames::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+  .strip-frame { flex-shrink: 0; width: 88px; height: 56px; background: var(--bg-pane); border: 1px solid var(--border-subtle); border-radius: 4px; cursor: pointer; position: relative; transition: border-color .2s, transform .2s; overflow: hidden; }
+  .strip-frame:hover { border-color: var(--border-active); transform: translateY(-2px); }
+  .strip-frame.current { border-color: var(--accent-cyan); box-shadow: 0 0 10px rgba(94,234,212,0.4); }
+  .strip-frame.future { border-style: dashed; background: transparent; }
+  .strip-frame-thumb { position: absolute; inset: 0; opacity: 0.5; }
+  .strip-frame-thumb.f1 { background: linear-gradient(135deg, #1a3a4a 0%, #0d2030 100%); }
+  .strip-frame-thumb.f2 { background: linear-gradient(135deg, #2a3a4a 0%, #1d2030 100%); }
+  .strip-frame-thumb.f3 { background: linear-gradient(135deg, #1a3a3a 0%, #0d3020 100%); }
+  .strip-frame-thumb.f4 { background: linear-gradient(135deg, #1a3a4a 30%, #2d1030 100%); }
+  .strip-frame-thumb.f5 { background: linear-gradient(135deg, #2a3a5a 0%, #0d2040 100%); }
+  .strip-frame-thumb.f6 { background: linear-gradient(135deg, #1a4a4a 0%, #0d2030 100%); }
+  .strip-frame-thumb.f7 { background: linear-gradient(135deg, #1a3a4a 50%, #3d1020 100%); }
+  .strip-frame-thumb.f8 { background: linear-gradient(135deg, #1a3a4a 70%, #1d2030 100%); }
+  .strip-frame-thumb.f9 { background: linear-gradient(135deg, #2a3a3a 0%, #1d3030 100%); }
+  .strip-frame-thumb.f10 { background: linear-gradient(135deg, #1a4a5a 0%, #0d2040 100%); }
+  .strip-frame-thumb.f11 { background: linear-gradient(135deg, #1a3a4a 60%, #2d2030 100%); }
+  .strip-frame-thumb.f12 { background: linear-gradient(135deg, #1a3a4a 0%, #0d2030 100%); }
+  .strip-frame.current .strip-frame-thumb { opacity: 0.75; }
+  .strip-frame-meta { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(180deg, transparent, rgba(10,14,20,0.92)); padding: 9px 4px 3px 4px; font-family: var(--font-mono); font-size: 7.5px; line-height: 1.3; }
+  .strip-frame-date { color: var(--text-primary); font-weight: 600; }
+  .strip-frame-counts { color: var(--text-tertiary); }
+  .strip-frame-marker { position: absolute; top: 3px; right: 3px; width: 5px; height: 5px; border-radius: 50%; }
+  .strip-frame-marker.dissent { background: var(--accent-rose); }
+  .strip-frame-marker.decision { background: var(--accent-cyan); }
+
+  .footer { grid-area: footer; background: rgba(10, 14, 20, 0.92); backdrop-filter: blur(20px); padding: 10px 22px; display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center; }
+  .verdict-pill { display: flex; align-items: center; gap: 7px; background: var(--accent-amber-dim); border: 1px solid rgba(251, 191, 119, 0.3); border-radius: 16px; padding: 5px 13px; font-family: var(--font-mono); font-size: 10.5px; color: var(--accent-amber); letter-spacing: 1px; text-transform: uppercase; font-weight: 600; white-space: nowrap; }
+  .verdict-pill.go { background: var(--accent-green-dim); border-color: rgba(74, 222, 128, 0.3); color: var(--accent-green); }
+  .footer-mid { display: flex; align-items: center; gap: 14px; overflow: hidden; }
+  .budget-label { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary); letter-spacing: 1px; text-transform: uppercase; flex-shrink: 0; }
+  .budget-bar { width: 200px; height: 7px; background: var(--bg-tile); border-radius: 4px; position: relative; overflow: hidden; flex-shrink: 0; }
+  .budget-fill { position: absolute; top: 0; left: 0; bottom: 0; background: linear-gradient(90deg, var(--accent-cyan) 0%, var(--accent-amber) 75%, var(--accent-rose) 95%); border-radius: 4px; }
+  .budget-stats { font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary); flex-shrink: 0; }
+  .budget-stats .used { color: var(--accent-amber); font-weight: 600; }
+  .budget-stats .slack { color: var(--accent-cyan); }
+  .conflict-item { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--text-secondary); white-space: nowrap; }
+  .conflict-icon { width: 13px; height: 13px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; flex-shrink: 0; background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .commit-actions { display: flex; gap: 8px; }
+  .btn { border: none; padding: 8px 16px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all .2s; font-weight: 500; font-family: inherit; white-space: nowrap; }
+  .btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-mid); }
+  .btn-secondary:hover { color: var(--text-primary); border-color: var(--border-active); }
+  .btn-primary { background: var(--accent-cyan); color: var(--bg-deep); font-weight: 600; letter-spacing: 0.3px; padding: 8px 18px; }
+  .btn-primary:hover { background: #7dffe6; box-shadow: 0 0 24px rgba(94, 234, 212, 0.4); }
+
+  .conn-legend { position: absolute; background: rgba(10,14,20,0.96); border: 1px solid var(--border-mid); border-radius: 6px; padding: 10px 12px; font-size: 11px; color: var(--text-secondary); z-index: 50; backdrop-filter: blur(12px); line-height: 1.7; box-shadow: 0 8px 24px rgba(0,0,0,0.5); width: 220px; display: none; }
+  .conn-legend.visible { display: block; }
+  .conn-legend .dot-row { display: flex; align-items: center; gap: 8px; }
+  .conn-legend .legend-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .conn-legend .legend-dot.empty { background: transparent; border: 2px solid var(--text-tertiary); box-shadow: 0 0 6px rgba(138,149,165,0.4); }
+  .conn-legend .legend-dot.green { background: var(--accent-green); box-shadow: 0 0 6px rgba(74,222,128,0.5); }
+  .conn-legend .legend-dot.yellow { background: var(--accent-yellow); box-shadow: 0 0 6px rgba(250,204,21,0.5); }
+
+  @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.85); } }
+  @keyframes connGlow { 0%,100% { box-shadow:0 0 6px rgba(138,149,165,0.4); } 50% { box-shadow:0 0 14px rgba(138,149,165,0.8); } }
+
+  .commit-overlay { position: fixed; inset: 0; background: var(--bg-deep); z-index: 1000; pointer-events: none; opacity: 0; transition: opacity .4s; display: flex; align-items: center; justify-content: center; }
+  .commit-overlay.active { opacity: 1; pointer-events: all; }
+  .commit-swirl { width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, var(--accent-cyan) 0%, transparent 70%); opacity: 0; transform: scale(0); transition: opacity .3s, transform 1s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .commit-overlay.active .commit-swirl { opacity: 1; transform: scale(5); }
+  .commit-msg { position: absolute; bottom: 40%; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 11px; letter-spacing: 3px; color: var(--accent-cyan); text-transform: uppercase; opacity: 0; transition: opacity .4s .3s; }
+  .commit-overlay.active .commit-msg { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="chrome">
+  <div class="chrome-brand">Accord</div>
+  <div class="chrome-context">
+    <span class="crumb">Constellation</span>
+    <span class="crumb-sep">›</span>
+    <span class="crumb">Endoscope Replacement</span>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">New Meeting</span>
+  </div>
+  <div class="chrome-spacer"></div>
+  <div class="ctx-toggle">
+    <div class="ctx-tab active">Follow-up</div>
+    <div class="ctx-tab">First-ever</div>
+  </div>
+</div>
+
+<div class="header">
+  <div>
+    <div class="meeting-title" contenteditable="true">Endoscope Replacement — Phase 2 Review</div>
+    <span class="commitment-label">Intended outcome</span>
+    <div class="commitment" contenteditable="true">Resolve Tom's dissent on supplier exclusivity. Seal Sarah's belief on optical array. Defer FDA timing unless Amara has a read.</div>
+  </div>
+  <div class="header-right">
+    <div class="header-meta-row"><span><span class="label">When</span> Today · <span class="accent">14:00 — 15:00</span></span></div>
+    <div class="header-meta-row"><span><span class="label">Where</span> Video · Vaughn's room</span></div>
+    <div class="header-meta-row"><span><span class="label">Workstream</span> 13th meeting · last met 6d ago</span></div>
+    <div class="header-meta-row" style="color: var(--accent-amber);"><span><span class="pulse-dot"></span>Starts in 23 min</span></div>
+  </div>
+</div>
+
+<div class="columns">
+
+  <div class="col col-briefing">
+    <div class="col-header">
+      <div class="col-title">Briefing</div>
+      <div class="col-subtitle">what came before</div>
+    </div>
+
+    <div class="block">
+      <div class="synthesis">A 13th meeting in a 14-month workstream. Substrate momentum is positive but Tom's silence is structural — if you don't close DS-005 this session, his pattern says public dissent inside two weeks.</div>
+    </div>
+
+    <div class="block">
+      <div class="block-label">Last meeting · May 1</div>
+      <div class="last-summary-card">
+        <div class="last-summary-meta">M-2026-05-01 · sealed · 4 dec · 6 act · 1 dis · 2 risks</div>
+        <div class="last-summary">"Phase 1 closed clean. Sterilization tray protocol approved with one dissent from Tom on supplier exclusivity. Sarah owes belief on optical array. Risk flagged on FDA submission timing."</div>
+        <div class="summary-link">Read full minutes ↗</div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-label"><span>Prior actions · live status</span><span class="block-count">6 tracked</span></div>
+      <div class="prior-action"><div class="action-status-icon complete">✓</div><div class="action-content"><div class="action-text complete">Sterilization tray spec drafted</div><div class="action-meta"><span class="substrate-id">AX-088</span> <span class="owner">Amara</span> <span>completed 5/3</span></div></div></div>
+      <div class="prior-action"><div class="action-status-icon overdue">!</div><div class="action-content"><div class="action-text">Owner-side cost analysis · cleaner platform B</div><div class="action-meta"><span class="substrate-id">AX-091</span> <span class="owner">Marcus</span> <span class="overdue">overdue 2d</span></div></div></div>
+      <div class="prior-action"><div class="action-status-icon in-progress">→</div><div class="action-content"><div class="action-text">Engineering questionnaire · sterilization compat</div><div class="action-meta"><span class="substrate-id">AX-093</span> <span class="owner">Tom</span> <span class="due-soon">due Wed</span></div></div></div>
+      <div class="prior-action"><div class="action-status-icon complete">✓</div><div class="action-content"><div class="action-text complete">Schedule risk-review with Quality</div><div class="action-meta"><span class="substrate-id">AX-094</span> <span class="owner">Marcus</span> <span>completed 5/4</span></div></div></div>
+      <div class="prior-action"><div class="action-status-icon pending">○</div><div class="action-content"><div class="action-text">Confirm Q3 regulatory submission window</div><div class="action-meta"><span class="substrate-id">AX-095</span> <span class="owner">Amara</span> <span>due 5/15</span></div></div></div>
+      <div class="prior-action"><div class="action-status-icon in-progress">→</div><div class="action-content"><div class="action-text">EMI test protocol authoring</div><div class="action-meta"><span class="substrate-id">AX-096</span> <span class="owner">Marcus</span> <span>due 5/12</span></div></div></div>
+    </div>
+
+    <div class="block">
+      <div class="block-label"><span>Prior decisions</span><span class="block-count">4 sealed</span></div>
+      <div class="prior-decision"><div class="decision-header"><span class="decision-id">DC-117</span><span class="decision-state awaiting">Awaiting belief 3 of 5</span></div><div class="decision-text">Adopt Olympus optical array for Phase 1 build</div></div>
+      <div class="prior-decision"><div class="decision-header"><span class="decision-id">DC-114</span><span class="decision-state dissented">Dissent · DS-005</span></div><div class="decision-text">Sole-source supplier exclusivity for fiber optic</div></div>
+      <div class="prior-decision"><div class="decision-header"><span class="decision-id">DC-115</span><span class="decision-state sealed">Sealed</span></div><div class="decision-text">Sterilization tray validation protocol approved</div></div>
+    </div>
+
+    <div class="block">
+      <div class="block-label"><span>Annotations on prior minutes</span><span class="block-count">3</span></div>
+      <div class="annotation-card"><div class="annotation-meta"><span class="author">Tom</span> · May 4 · on DS-005</div><div class="annotation-text">"My dissent isn't about Olympus — it's about being locked in before sterilization is proven."</div></div>
+      <div class="annotation-card"><div class="annotation-meta"><span class="author">Sarah</span> · May 6 · on AX-091</div><div class="annotation-text">"Marcus, can we sync on this before Wednesday?"</div></div>
+      <div class="annotation-card"><div class="annotation-meta"><span class="author">Amara</span> · May 5 · on RX-014</div><div class="annotation-text">"FDA contact says window may extend by 2 weeks if we file by 5/20."</div></div>
+    </div>
+
+    <div class="block">
+      <div class="block-label">Substrate momentum · since May 1</div>
+      <div class="momentum-row">
+        <div class="momentum-cell"><div class="momentum-num positive">2</div><div class="momentum-label">closed</div></div>
+        <div class="momentum-cell"><div class="momentum-num warning">1</div><div class="momentum-label">new dissent</div></div>
+        <div class="momentum-cell"><div class="momentum-num">3</div><div class="momentum-label">comments</div></div>
+        <div class="momentum-cell"><div class="momentum-num negative">1</div><div class="momentum-label">overdue</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col col-composition">
+    <div class="col-header">
+      <div class="col-title">Agenda</div>
+      <div class="col-subtitle">3 threads · 2 carried · 1 fresh · est 47m</div>
+    </div>
+
+    <div class="prep-prompt">
+      <span class="prep-prompt-icon">▸</span>
+      <span><strong>You haven't queried Tom's dissent on DS-005.</strong> He'll be in the room. Pattern says his silence breaks at day 14 — he's at day 22.</span>
+      <span class="prep-prompt-action">Pull as thread →</span>
+    </div>
+
+    <div class="agenda-list">
+      <div class="agenda-item from-carry">
+        <div class="agenda-row">
+          <span class="agenda-handle">⋮⋮</span>
+          <div class="agenda-text">Resolve Tom's dissent on supplier exclusivity</div>
+          <span class="nra-pill decision">Decide</span>
+          <span class="agenda-remove">×</span>
+        </div>
+        <div class="agenda-meta">
+          <span>↳ carried · refs <span class="substrate-id">DS-005 · DC-114</span></span>
+          <span class="timing-predict">~12m · Tom typically +4</span>
+        </div>
+      </div>
+      <div class="agenda-item from-carry">
+        <div class="agenda-row">
+          <span class="agenda-handle">⋮⋮</span>
+          <div class="agenda-text">Sarah's belief declaration on optical array</div>
+          <span class="nra-pill decision">Decide</span>
+          <span class="agenda-remove">×</span>
+        </div>
+        <div class="agenda-meta">
+          <span>↳ carried · awaiting belief from <span style="color:var(--accent-amber)">Sarah</span></span>
+          <span class="timing-predict">~8m</span>
+        </div>
+      </div>
+      <div class="agenda-item">
+        <div class="agenda-row">
+          <span class="agenda-handle">⋮⋮</span>
+          <div class="agenda-text">Phase 2 prototype timeline & vendor coordination</div>
+          <span class="nra-pill action">Assign</span>
+          <span class="agenda-remove">×</span>
+        </div>
+        <div class="agenda-meta"><span class="timing-predict">~15m</span></div>
+      </div>
+    </div>
+
+    <div class="add-agenda">+ Add agenda item · Accord will infer the NRA shape</div>
+
+    <div class="ref-strip">
+      <div class="block-label"><span>Carried references</span><span class="col-subtitle" style="font-size:8.5px;">canvas + docs</span></div>
+      <div class="ref-cards">
+        <div class="ref-card"><div class="ref-icon">IMG</div><div class="ref-name">PCB-Layout-Rev3.png</div><span class="ref-prune">×</span></div>
+        <div class="ref-card"><div class="ref-icon pdf">PDF</div><div class="ref-name">thermal_sim_apr27.pdf</div><span class="ref-prune">×</span></div>
+        <div class="ref-card"><div class="ref-icon xlsx">XLS</div><div class="ref-name">BOM_revised.xlsx</div><span class="ref-prune">×</span></div>
+        <div class="ref-card"><div class="ref-icon zip">ZIP</div><div class="ref-name">Flexscope_v3.zip</div><span class="ref-prune">×</span></div>
+        <button class="ref-add">+ attach</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="col col-anticipation">
+    <div class="col-header">
+      <div class="col-title">Anticipation</div>
+      <div class="col-subtitle">5 attendees · 2 connected</div>
+    </div>
+
+    <div class="block-label" style="margin-bottom:9px; align-items:center;">
+      <span>Per attendee</span>
+      <span style="font-family: var(--font-mono); font-size: 9px; cursor:pointer; color:var(--accent-cyan); letter-spacing: 1.2px; text-transform: uppercase;" id="legendBtn">○ legend</span>
+    </div>
+
+    <div class="ant-attendee">
+      <div class="ant-attendee-header">
+        <div class="conn-dot on-time" data-state="on-time"></div>
+        <div class="ant-avatar you">VS</div>
+        <div class="ant-name-block"><div class="ant-name">Vaughn Staples</div><div class="ant-role">YOU · OPERATOR</div></div>
+      </div>
+    </div>
+
+    <div class="ant-attendee">
+      <div class="ant-attendee-header">
+        <div class="conn-dot on-time" data-state="on-time"></div>
+        <div class="ant-avatar">SC</div>
+        <div class="ant-name-block"><div class="ant-name">Sarah Chen</div><div class="ant-role">ENGINEERING LEAD</div></div>
+        <span class="temp-badge engaged">Engaged · steady</span>
+      </div>
+      <div class="ant-stake">
+        Owes belief on DC-117 (12d). Will likely be asked. Owns 5/12 actions in this workstream.
+        <span class="pattern-tag">declares belief within 24h of being asked directly</span>
+      </div>
+    </div>
+
+    <div class="ant-attendee">
+      <div class="ant-attendee-header">
+        <div class="conn-dot not-connected" data-state="not-connected"></div>
+        <div class="ant-avatar">TL</div>
+        <div class="ant-name-block"><div class="ant-name">Tom Liu</div><div class="ant-role">SUPPLIER OPS</div></div>
+        <span class="temp-badge dissent-simmering">Dissent simmering</span>
+      </div>
+      <div class="ant-stake">
+        Hasn't responded to invite. DS-005 unacknowledged 22 days.
+        <span class="urgency-math">mean silence-before-public-dissent: 14d · currently 22d · move now</span>
+      </div>
+    </div>
+
+    <div class="ant-attendee">
+      <div class="ant-attendee-header">
+        <div class="conn-dot late" data-state="late"></div>
+        <div class="ant-avatar">MR</div>
+        <div class="ant-name-block"><div class="ant-name">Marcus Reed</div><div class="ant-role">SPEC AUTHOR</div></div>
+        <span class="temp-badge overdue-pressure">Overdue · pressure</span>
+      </div>
+      <div class="ant-stake">
+        3 open actions, 1 overdue. Defensive on Phase 2 timeline.
+        <span class="pattern-tag">2 slips per 30d on cost-analysis tasks</span>
+      </div>
+    </div>
+
+    <div class="ant-attendee">
+      <div class="ant-attendee-header">
+        <div class="conn-dot not-connected" data-state="not-connected"></div>
+        <div class="ant-avatar">AO</div>
+        <div class="ant-name-block"><div class="ant-name">Amara Okafor</div><div class="ant-role">REGULATORY</div></div>
+        <span class="temp-badge quiet-disengaged">Quiet · re-onboard</span>
+      </div>
+      <div class="ant-stake">
+        Off-substrate 14d. Missed last 2 meetings.
+        <span class="urgency-math amber">brief her in 90s before QX-007 surfaces, or defer</span>
+      </div>
+    </div>
+
+    <div class="ant-block">
+      <div class="block-label">Cross-workstream</div>
+      <div class="ant-info-row"><div class="ant-info-icon cross">↗</div><div>DC-117 referenced from <strong>Camera CPU Redesign</strong>. Decisions here may affect that program.</div></div>
+    </div>
+
+    <div class="ant-block">
+      <div class="block-label">Risk surface</div>
+      <div class="ant-info-row"><div class="ant-info-icon risk">▲</div><div>FDA 510(k) window: <strong>23 days</strong>. RX-014 unmitigated. Phase 2 review pending.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="filmstrip">
+  <div class="filmstrip-header">
+    <div class="strip-label">Workstream Timeline · 12 prior meetings · click any frame to scrub</div>
+    <div class="strip-controls">
+      <span class="strip-control">⏮ first</span>
+      <span class="strip-control">▶ play history</span>
+      <span class="strip-control active">⊙ today</span>
+      <span class="strip-control">⏭ next</span>
+    </div>
+  </div>
+  <div class="strip-frames">
+    <div class="strip-frame"><div class="strip-frame-thumb f1"></div><div class="strip-frame-meta"><div class="strip-frame-date">Jan 8</div><div class="strip-frame-counts">Kickoff</div></div></div>
+    <div class="strip-frame"><div class="strip-frame-thumb f2"></div><div class="strip-frame-meta"><div class="strip-frame-date">Jan 22</div><div class="strip-frame-counts">P0</div></div></div>
+    <div class="strip-frame"><div class="strip-frame-thumb f3"></div><div class="strip-frame-meta"><div class="strip-frame-date">Feb 5</div><div class="strip-frame-counts">Spec</div></div></div>
+    <div class="strip-frame"><div class="strip-frame-thumb f4"></div><div class="strip-frame-marker dissent"></div><div class="strip-frame-meta"><div class="strip-frame-date">Feb 19</div><div class="strip-frame-counts">DS-001</div></div></div>
+    <div class="strip-frame"><div class="strip-frame-thumb f5"></div><div class="strip-frame-meta"><div class="strip-frame-date">Mar 5</div><div class="strip-frame-counts">Vendor</div></div></div>
+    <div class="strip-frame"><div class="strip-frame-thumb f6"></div><div class="strip-frame-marker decision"></div><div class="strip-frame-meta"><div class="strip-frame-date">Mar 19</div><div class="strip-frame-counts">P1 entry</div></div></div>
+    <div class="strip-frame"><div class="strip-frame-thumb f7"></div><div class="strip-frame-marker dissent"></div><div class="strip-frame-meta"><div class="strip-frame-date">Apr 2</div><div class="strip-frame-counts">DS-005</div></div></div>
+    <div class="strip-frame"><div class="strip-frame-thumb f8"></div><div class="strip-frame-meta"><div class="strip-frame-date">Apr 15</div><div class="strip-frame-counts">Optical</div></div></div>
+    <div class="strip-frame"><div class="strip-frame-thumb f9"></div><div class="strip-frame-meta"><div class="strip-frame-date">Apr 22</div><div class="strip-frame-counts">DC-117</div></div></div>
+    <div class="strip-frame"><div class="strip-frame-thumb f10"></div><div class="strip-frame-meta"><div class="strip-frame-date">Apr 29</div><div class="strip-frame-counts">Eng rev</div></div></div>
+    <div class="strip-frame"><div class="strip-frame-thumb f11"></div><div class="strip-frame-marker decision"></div><div class="strip-frame-meta"><div class="strip-frame-date">May 1</div><div class="strip-frame-counts">P1 close</div></div></div>
+    <div class="strip-frame current"><div class="strip-frame-thumb f12"></div><div class="strip-frame-meta"><div class="strip-frame-date" style="color:var(--accent-cyan);">Today</div><div class="strip-frame-counts">P2 setup</div></div></div>
+    <div class="strip-frame future"><div class="strip-frame-meta"><div class="strip-frame-date" style="color:var(--text-faint);">May 22</div><div class="strip-frame-counts" style="color:var(--text-faint);">P2 rev</div></div></div>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="verdict-pill">GO with caveats</div>
+  <div class="footer-mid">
+    <span class="budget-label">Time budget</span>
+    <div class="budget-bar"><div class="budget-fill" style="width: 78%;"></div></div>
+    <span class="budget-stats"><span class="used">47m used</span> · <span class="slack">13m slack</span></span>
+    <div class="conflict-item"><div class="conflict-icon">!</div>Tom unconnected · pattern says he runs late</div>
+    <div class="conflict-item"><div class="conflict-icon">!</div>Amara off-substrate 14d</div>
+  </div>
+  <div class="commit-actions">
+    <button class="btn btn-secondary">Save & invite</button>
+    <button class="btn btn-primary" id="beginBtn">Begin Meeting →</button>
+  </div>
+</div>
+
+<div class="conn-legend" id="connLegend" style="top: 220px; right: 410px;">
+  <div style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 8px;">Connection state</div>
+  <div class="dot-row"><div class="legend-dot empty"></div>Not connected (glowing)</div>
+  <div class="dot-row"><div class="legend-dot green"></div>On time</div>
+  <div class="dot-row"><div class="legend-dot yellow"></div>Late · permanent</div>
+  <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle); font-size: 10px; color: var(--text-tertiary); line-height: 1.5;">Click a not-connected dot during the meeting to "click them in" if they connect late.</div>
+</div>
+
+<div class="commit-overlay" id="commitOverlay">
+  <div class="commit-swirl"></div>
+  <div class="commit-msg">Instantiating substrate · meeting beginning</div>
+</div>
+
+<script>
+  document.getElementById('legendBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    document.getElementById('connLegend').classList.toggle('visible');
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#connLegend') && !e.target.closest('#legendBtn')) {
+      document.getElementById('connLegend').classList.remove('visible');
+    }
+  });
+
+  document.querySelectorAll('.conn-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      const state = dot.dataset.state;
+      if (state === 'not-connected') {
+        dot.classList.remove('not-connected');
+        dot.classList.add('on-time');
+        dot.dataset.state = 'on-time';
+      } else if (state === 'on-time') {
+        dot.classList.remove('on-time');
+        dot.classList.add('late');
+        dot.dataset.state = 'late';
+      } else {
+        dot.classList.remove('late');
+        dot.classList.add('not-connected');
+        dot.dataset.state = 'not-connected';
+      }
+    });
+  });
+
+  document.getElementById('beginBtn').addEventListener('click', () => {
+    document.getElementById('commitOverlay').classList.add('active');
+    setTimeout(() => {
+      alert('Meeting workspace would now be live.');
+      document.getElementById('commitOverlay').classList.remove('active');
+    }, 1500);
+  });
+</script>
+
+</body>
+</html>

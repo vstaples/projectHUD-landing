@@ -1,0 +1,283 @@
+/* ============================================================
+   accord-constellation.css
+   CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 2
+
+   Scoped under #accord-app .ac-stage. Uses Accord palette tokens
+   (Style Doctrine v1.7 §3.5) — warm editorial amber, NOT the
+   cyan/teal scaffolding §3.1 originally suggested. See Phase 1
+   D6 / IR64 finding: Accord's design language is editorial-amber.
+
+   All declared font sizes ≥ 11px (operator standing rule).
+   No measurements; declarations only (IR45).
+   ============================================================ */
+
+/* ── Stage container ───────────────────────────────────────── */
+#accord-app .ac-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+  background: var(--canvas-deep);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── SVG canvas ────────────────────────────────────────────── */
+#accord-app .ac-svg {
+  width: 100%;
+  height: 100%;
+  max-width: 920px;
+  max-height: 920px;
+  display: block;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Decorative ring guides (very subtle) ─────────────────── */
+#accord-app .ac-ring-guide {
+  fill: none;
+  stroke: var(--rule);
+  stroke-width: 1;
+  stroke-dasharray: 2 6;
+  pointer-events: none;
+}
+
+/* ── Node group ────────────────────────────────────────────── */
+#accord-app .ac-node {
+  cursor: pointer;
+  outline: none;
+  transition: transform 180ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+#accord-app .ac-node:hover,
+#accord-app .ac-node:focus-visible {
+  transform: scale(1.06);
+}
+#accord-app .ac-node:focus-visible .ac-node-rim {
+  stroke: var(--ink-primary);
+  stroke-width: 1.5;
+}
+
+/* Glow halo behind node — amber, opacity is set inline per-weight */
+#accord-app .ac-node-glow {
+  fill: var(--signal);
+  filter: blur(14px);
+  pointer-events: none;
+  transition: opacity 180ms ease-out;
+}
+#accord-app .ac-node:hover .ac-node-glow {
+  opacity: 0.85 !important;
+}
+
+/* Node body — saturated amber on canvas-elev base */
+#accord-app .ac-node-body {
+  fill: var(--canvas-elev);
+  stroke: var(--signal);
+  stroke-width: 1.25;
+  transition: fill 180ms ease-out;
+}
+#accord-app .ac-node:hover .ac-node-body {
+  fill: var(--canvas-hover);
+}
+
+/* Inner rim — thin amber ring for definition */
+#accord-app .ac-node-rim {
+  fill: none;
+  stroke: var(--signal-dim);
+  stroke-width: 0.75;
+  pointer-events: none;
+}
+
+/* Label — Fraunces serif, parchment ink */
+#accord-app .ac-node-label {
+  font-family: 'Fraunces', serif;
+  font-size: 14px;
+  font-weight: 500;
+  fill: var(--ink-primary);
+  pointer-events: none;
+}
+
+/* Sub-count chip — mono, faint */
+#accord-app .ac-node-subchip {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 400;
+  fill: var(--ink-faint);
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+  pointer-events: none;
+}
+
+/* ── Tooltip (HTML overlay, not SVG) ──────────────────────── */
+#accord-app .ac-tooltip {
+  position: absolute;
+  z-index: 30;
+  pointer-events: none;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 10px 12px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-body);
+}
+#accord-app .ac-tt-name {
+  font-family: 'Fraunces', serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-primary);
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .ac-tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 3px;
+}
+#accord-app .ac-tt-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+#accord-app .ac-tt-val {
+  font-size: 12px;
+  color: var(--ink-body);
+  text-align: right;
+}
+
+/* ── Context menu ─────────────────────────────────────────── */
+#accord-app .ac-context-menu {
+  position: absolute;
+  z-index: 40;
+  min-width: 200px;
+  padding: 4px 0;
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+#accord-app .ac-menu-header {
+  padding: 8px 12px 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 4px;
+}
+#accord-app .ac-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink-body);
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+#accord-app .ac-menu-item:hover:not(.ac-menu-item-disabled) {
+  background: var(--canvas-hover);
+  color: var(--ink-primary);
+}
+#accord-app .ac-menu-item:focus-visible {
+  outline: 1px solid var(--signal-dim);
+  outline-offset: -2px;
+}
+#accord-app .ac-menu-item-disabled {
+  color: var(--ink-ghost);
+  cursor: not-allowed;
+}
+
+/* ── Empty state ──────────────────────────────────────────── */
+#accord-app .ac-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 40px;
+}
+#accord-app .ac-empty-inner {
+  max-width: 420px;
+  text-align: center;
+}
+#accord-app .ac-empty-glyph {
+  font-size: 48px;
+  color: var(--signal-dim);
+  margin-bottom: 18px;
+  line-height: 1;
+}
+#accord-app .ac-empty-headline {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--ink-primary);
+  margin: 0 0 10px;
+}
+#accord-app .ac-empty-sub {
+  font-size: 13px;
+  color: var(--ink-muted);
+  line-height: 1.6;
+  margin: 0 0 22px;
+}
+#accord-app .ac-empty-cta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-primary);
+  background: var(--canvas-raised);
+  border: 1px solid var(--signal-dim);
+  padding: 10px 18px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
+}
+#accord-app .ac-empty-cta:hover {
+  background: var(--signal-soft);
+  border-color: var(--signal);
+  color: var(--ink-primary);
+}
+#accord-app .ac-empty-cta:focus-visible {
+  outline: 1px solid var(--signal);
+  outline-offset: 2px;
+}
+
+/* ── Reduced motion ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  #accord-app .ac-node,
+  #accord-app .ac-node-glow,
+  #accord-app .ac-node-body,
+  #accord-app .ac-empty-cta,
+  #accord-app .ac-menu-item {
+    transition: none;
+  }
+  #accord-app .ac-node:hover,
+  #accord-app .ac-node:focus-visible {
+    transform: none;
+  }
+}
+
+/* ── Responsive: narrow viewports ─────────────────────────── */
+@media (max-width: 640px) {
+  #accord-app .ac-tooltip { min-width: 180px; max-width: 240px; }
+  #accord-app .ac-node-label { font-size: 13px; }
+  #accord-app .ac-empty-headline { font-size: 19px; }
+}

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accord Constellation — Preview (Phase 2)</title>
+
+<!-- Editorial fonts (Style Doctrine v1.7 §2) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!--
+  Phase 2 preview harness for accord-constellation.js.
+
+  PURPOSE: standalone testing of the constellation render — not a
+  shipped surface. Phase 3 integrates the module into accord.html
+  proper. This page exists so the operator can verify the radial
+  layout, glow, tooltip, context menu, and empty-state behavior in
+  isolation before the three-pane layout lands.
+
+  REQUIRES at runtime:
+    /js/api.js          (window.API)
+    /js/auth.js         (window.Auth — for token)
+    /js/accord-constellation.js
+    /css/accord-constellation.css
+
+  Adjust the script/link paths below if your dev server roots
+  differently. The page expects the same Supabase env that the
+  rest of ProjectHUD uses.
+-->
+
+<link rel="stylesheet" href="/css/accord-constellation.css">
+
+<style>
+  /* Minimal Accord token shim — must mirror accord.html :root scope */
+  #accord-app {
+    --canvas-deep:   #1a1814;
+    --canvas:        #211e19;
+    --canvas-raised: #2a2620;
+    --canvas-elev:   #332e26;
+    --canvas-hover:  #3d372d;
+    --ink-primary:   #f4ede0;
+    --ink-body:      #d6cdb8;
+    --ink-muted:     #b3a78f;
+    --ink-faint:     #908572;
+    --ink-ghost:     #5a5347;
+    --signal:        #d4a04a;
+    --signal-soft:   rgba(212, 160, 74, 0.15);
+    --signal-dim:    rgba(212, 160, 74, 0.4);
+    --rule:          rgba(244, 237, 224, 0.06);
+    --rule-strong:   rgba(244, 237, 224, 0.12);
+    background: var(--canvas-deep);
+    color: var(--ink-body);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 13px;
+  }
+
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { background: #0e0c09; color: #d6cdb8; }
+
+  #accord-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  #preview-header {
+    flex-shrink: 0;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--canvas);
+  }
+  #preview-header h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink-primary);
+    margin: 0;
+  }
+  #preview-header .ph-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  #preview-controls {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+  }
+  #preview-controls button {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: var(--canvas-raised);
+    color: var(--ink-body);
+    border: 1px solid var(--rule-strong);
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  #preview-controls button:hover {
+    background: var(--canvas-hover);
+    color: var(--ink-primary);
+    border-color: var(--signal-dim);
+  }
+
+  #preview-stage {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
+
+  #preview-eventlog {
+    flex-shrink: 0;
+    max-height: 140px;
+    overflow-y: auto;
+    padding: 10px 22px;
+    border-top: 1px solid var(--rule);
+    background: var(--canvas);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-muted);
+    line-height: 1.7;
+  }
+  #preview-eventlog .ev-time { color: var(--ink-faint); }
+  #preview-eventlog .ev-name { color: var(--signal); }
+  #preview-eventlog .ev-detail { color: var(--ink-body); }
+</style>
+</head>
+<body>
+
+<div id="accord-app">
+
+  <header id="preview-header">
+    <h1>Accord Constellation</h1>
+    <span class="ph-meta">Preview · Phase 2</span>
+    <div id="preview-controls">
+      <button type="button" data-action="refresh">Refresh</button>
+      <button type="button" data-action="toggle-empty">Force empty state</button>
+    </div>
+  </header>
+
+  <div id="preview-stage"></div>
+
+  <div id="preview-eventlog">
+    <div><span class="ev-time">[init]</span> Awaiting data load…</div>
+  </div>
+
+</div>
+
+<!-- ProjectHUD shared (paths assume standard dev server roots) -->
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/accord-constellation.js"></script>
+
+<script>
+(async function () {
+  const stage = document.getElementById('preview-stage');
+  const log   = document.getElementById('preview-eventlog');
+
+  function logEvent(name, detail) {
+    const t = new Date().toLocaleTimeString();
+    const row = document.createElement('div');
+    row.innerHTML = `<span class="ev-time">[${t}]</span> ` +
+                    `<span class="ev-name">${name}</span> ` +
+                    `<span class="ev-detail">${JSON.stringify(detail || {})}</span>`;
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  ['accord:constellation-node-click',
+   'accord:constellation-action',
+   'accord:constellation-create-workstream'].forEach(name => {
+    window.addEventListener(name, (ev) => logEvent(name, ev.detail));
+  });
+
+  if (!window.AccordConstellation) {
+    log.innerHTML = '<div style="color:#a86f5e">[error] window.AccordConstellation not loaded — check /js/accord-constellation.js path.</div>';
+    return;
+  }
+  if (!window.API) {
+    log.innerHTML = '<div style="color:#a86f5e">[error] window.API not loaded — check /js/api.js path. Constellation cannot fetch substrate.</div>';
+    return;
+  }
+
+  // Initialize
+  try {
+    await window.AccordConstellation.init(stage);
+    logEvent('preview', { msg: 'init complete', tune: window.AccordConstellation.getTune() });
+  } catch (e) {
+    logEvent('preview-error', { msg: String(e) });
+  }
+
+  // Controls
+  document.querySelector('[data-action="refresh"]').addEventListener('click', async () => {
+    await window.AccordConstellation.refresh();
+    logEvent('preview', { msg: 'refresh complete' });
+  });
+
+  let _emptyForced = false;
+  document.querySelector('[data-action="toggle-empty"]').addEventListener('click', async () => {
+    _emptyForced = !_emptyForced;
+    if (_emptyForced) {
+      // Override init to ignore real data — simulate empty
+      const orig = window.AccordConstellation;
+      stage.innerHTML = '';
+      // Re-call with a fake refresh that wipes workstreams
+      const fakeStage = document.createElement('div');
+      fakeStage.style.cssText = 'width:100%;height:100%;position:relative';
+      stage.appendChild(fakeStage);
+      // Use the empty-state DOM directly — module's _renderEmpty isn't public,
+      // so ask the module to refresh after we monkey-patch API.get for one call.
+      const realGet = window.API.get;
+      window.API.get = async (p) => {
+        if (p.startsWith('workstreams')) return [];
+        return [];
+      };
+      await window.AccordConstellation.init(fakeStage);
+      window.API.get = realGet;
+      logEvent('preview', { msg: 'forced empty state' });
+    } else {
+      await window.AccordConstellation.init(stage);
+      logEvent('preview', { msg: 'restored real data' });
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

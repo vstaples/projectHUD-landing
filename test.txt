@@ -1,0 +1,219 @@
+-- §A1.1 — Resolve actual table names (PostgREST aliases vs real names)
+| table_schema | table_name                     |
+| ------------ | ------------------------------ |
+| public       | accord_belief_adjustments      |
+| public       | accord_meetings                |
+| public       | accord_nodes                   |
+| public       | accord_threads                 |
+| public       | resource_allocations           |
+| public       | resource_calendars             |
+| public       | resource_domain_experience     |
+| public       | resource_profiles              |
+| public       | resource_request_heartbeat     |
+| public       | resource_request_notifications |
+| public       | resource_requests              |
+| public       | resource_scorecards            |
+| public       | resource_skills                |
+| public       | resources                      |
+| public       | task_resource_assignments      |
+| public       | workstreams                    |
+
+-- §A1.2 — Column inventory for the four core tables (adjust names if §A1.1 surfaces different)
+| table_schema | table_name      | column_name          | data_type                | is_nullable | column_default    |
+| ------------ | --------------- | -------------------- | ------------------------ | ----------- | ----------------- |
+| public       | accord_meetings | meeting_id           | uuid                     | NO          | gen_random_uuid() |
+| public       | accord_meetings | firm_id              | uuid                     | NO          | null              |
+| public       | accord_meetings | project_id           | uuid                     | YES         | null              |
+| public       | accord_meetings | title                | text                     | NO          | null              |
+| public       | accord_meetings | organizer_id         | uuid                     | NO          | null              |
+| public       | accord_meetings | scheduled_for        | timestamp with time zone | YES         | null              |
+| public       | accord_meetings | duration_minutes     | integer                  | YES         | null              |
+| public       | accord_meetings | state                | text                     | NO          | 'idle'::text      |
+| public       | accord_meetings | started_at           | timestamp with time zone | YES         | null              |
+| public       | accord_meetings | ended_at             | timestamp with time zone | YES         | null              |
+| public       | accord_meetings | sealed_at            | timestamp with time zone | YES         | null              |
+| public       | accord_meetings | merkle_root          | text                     | YES         | null              |
+| public       | accord_meetings | agenda_locked        | boolean                  | NO          | false             |
+| public       | accord_meetings | created_at           | timestamp with time zone | NO          | now()             |
+| public       | accord_meetings | workstream_id        | uuid                     | YES         | null              |
+| public       | workstreams     | workstream_id        | uuid                     | NO          | gen_random_uuid() |
+| public       | workstreams     | firm_id              | uuid                     | NO          | null              |
+| public       | workstreams     | parent_workstream_id | uuid                     | YES         | null              |
+| public       | workstreams     | name                 | text                     | NO          | null              |
+| public       | workstreams     | description          | text                     | YES         | null              |
+| public       | workstreams     | state                | text                     | NO          | 'active'::text    |
+| public       | workstreams     | created_by           | uuid                     | NO          | null              |
+| public       | workstreams     | created_at           | timestamp with time zone | NO          | now()             |
+| public       | workstreams     | archived_at          | timestamp with time zone | YES         | null              |
+| public       | workstreams     | archived_by          | uuid                     | YES         | null              |
+
+-- §A1.3 — Views (regular + materialized) touching workstreams or meetings
+| schema | name                       | kind | definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------ | -------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| public | meeting_attendees_resolved | view |  SELECT ma.id,
+    ma.meeting_id,
+    ma.attendance_status,
+    ma.is_required,
+    ma.notified_at,
+        CASE
+            WHEN ma.user_id IS NOT NULL THEN 'user'::text
+            WHEN ma.stakeholder_id IS NOT NULL THEN 'stakeholder'::text
+            ELSE 'external_contact'::text
+        END AS attendee_type,
+    COALESCE(u.name, (s.first_name || ' '::text) || s.last_name, (ec.first_name || ' '::text) || ec.last_name) AS full_name,
+    COALESCE(u.email, s.email, ec.email) AS email,
+    COALESCE(u.title, s.title, ec.title) AS title,
+    COALESCE(s.company_name, ec.company_name) AS company_name,
+    ma.user_id,
+    ma.stakeholder_id,
+    ma.external_contact_id
+   FROM meeting_attendees ma
+     LEFT JOIN users u ON ma.user_id = u.id
+     LEFT JOIN stakeholders s ON ma.stakeholder_id = s.id
+     LEFT JOIN external_contacts ec ON ma.external_contact_id = ec.id; |
+| public | v_meeting_agenda_items     | view |  SELECT id,
+    meeting_id,
+    title,
+    description,
+    sequence_order AS sort_order,
+    notes_captured AS notes,
+    include_in_minutes,
+    presenter_id,
+    duration_minutes,
+    is_flagged,
+    created_at
+   FROM meeting_agenda_items a;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| public | v_meetings                 | view |  SELECT m.id,
+    m.firm_id,
+    m.title,
+    m.scheduled_date AS meeting_date,
+    m.scheduled_duration_minutes AS duration_minutes,
+    m.location AS location_or_link,
+    m.meeting_type,
+    m.status,
+    m.organizer_id,
+    m.project_id,
+    m.prospect_id,
+    m.prior_meeting_id AS parent_meeting_id,
+    m.purpose,
+    m.outcome,
+    m.work_stream,
+    m.client_id,
+    p.name AS project_name,
+    p.client_id AS project_client_id
+   FROM meetings m
+     LEFT JOIN projects p ON p.id = m.project_id;                                                                                                                                                                                                                                                                                                                                                                                |
+
+-- §A1.4 — Indexes (esp. parking-lot index: organizer_id + workstream_id IS NULL)
+| schemaname | tablename       | indexname                                  | indexdef                                                                                                                                                                            |
+| ---------- | --------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| public     | accord_meetings | accord_meetings_pkey                       | CREATE UNIQUE INDEX accord_meetings_pkey ON public.accord_meetings USING btree (meeting_id)                                                                                         |
+| public     | accord_meetings | idx_accord_meetings_firm_project_scheduled | CREATE INDEX idx_accord_meetings_firm_project_scheduled ON public.accord_meetings USING btree (firm_id, project_id, scheduled_for DESC)                                             |
+| public     | accord_meetings | idx_accord_meetings_firm_state_running     | CREATE INDEX idx_accord_meetings_firm_state_running ON public.accord_meetings USING btree (firm_id, state) WHERE (state = 'running'::text)                                          |
+| public     | accord_meetings | idx_accord_meetings_parking_lot            | CREATE INDEX idx_accord_meetings_parking_lot ON public.accord_meetings USING btree (firm_id, organizer_id) WHERE (workstream_id IS NULL)                                            |
+| public     | accord_meetings | idx_accord_meetings_workstream             | CREATE INDEX idx_accord_meetings_workstream ON public.accord_meetings USING btree (workstream_id) WHERE (workstream_id IS NOT NULL)                                                 |
+| public     | workstreams     | idx_workstreams_firm_state                 | CREATE INDEX idx_workstreams_firm_state ON public.workstreams USING btree (firm_id, state)                                                                                          |
+| public     | workstreams     | idx_workstreams_firm_top_level_name        | CREATE UNIQUE INDEX idx_workstreams_firm_top_level_name ON public.workstreams USING btree (firm_id, name) WHERE ((state = 'active'::text) AND (parent_workstream_id IS NULL))       |
+| public     | workstreams     | idx_workstreams_parent                     | CREATE INDEX idx_workstreams_parent ON public.workstreams USING btree (parent_workstream_id) WHERE (parent_workstream_id IS NOT NULL)                                               |
+| public     | workstreams     | idx_workstreams_sub_name                   | CREATE UNIQUE INDEX idx_workstreams_sub_name ON public.workstreams USING btree (parent_workstream_id, name) WHERE ((state = 'active'::text) AND (parent_workstream_id IS NOT NULL)) |
+| public     | workstreams     | workstreams_pkey                           | CREATE UNIQUE INDEX workstreams_pkey ON public.workstreams USING btree (workstream_id)                                                                                              |
+
+-- §A1.5 — Triggers (two-level nesting, archive cascade, parking-lot, CoC)
+| schema | table           | trigger_name                             | event_manipulation | action_timing | action_statement                                            |
+| ------ | --------------- | ---------------------------------------- | ------------------ | ------------- | ----------------------------------------------------------- |
+| public | accord_edges    | accord_edges_dissents_from_invariants    | INSERT             | BEFORE        | EXECUTE FUNCTION enforce_dissents_from_invariants()         |
+| public | accord_edges    | accord_edges_dissents_from_invariants    | UPDATE             | BEFORE        | EXECUTE FUNCTION enforce_dissents_from_invariants()         |
+| public | accord_meetings | accord_meeting_seal_trg                  | UPDATE             | BEFORE        | EXECUTE FUNCTION accord_meeting_seal_fn()                   |
+| public | accord_nodes    | accord_nodes_date_immutability_post_seal | UPDATE             | BEFORE        | EXECUTE FUNCTION enforce_node_date_immutability_post_seal() |
+| public | accord_nodes    | accord_nodes_seq_alloc                   | INSERT             | BEFORE        | EXECUTE FUNCTION allocate_node_seq()                        |
+| public | accord_nodes    | accord_nodes_seq_immutability            | UPDATE             | BEFORE        | EXECUTE FUNCTION enforce_node_seq_immutability()            |
+| public | workstreams     | workstreams_archive_cascade              | UPDATE             | AFTER         | EXECUTE FUNCTION cascade_workstream_archive()               |
+| public | workstreams     | workstreams_two_level_max                | INSERT             | BEFORE        | EXECUTE FUNCTION enforce_workstream_two_level_max()         |
+| public | workstreams     | workstreams_two_level_max                | UPDATE             | BEFORE        | EXECUTE FUNCTION enforce_workstream_two_level_max()         |
+
+-- §A1.6 — Functions referenced (my_firm_id, current_user resolvers, CoC writer, etc.)
+| schema | name                             | args                                                                                                                                                                           | lang    | security_definer |
+| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- | ---------------- |
+| public | accord_compute_adjustment_hash   | p_adjustment_id uuid, p_target_node_id uuid, p_delta integer, p_rationale text, p_declared_at timestamp with time zone, p_declared_by uuid                                     | sql     | false            |
+| public | accord_compute_edge_hash         | p_edge_id uuid, p_from_node_id uuid, p_to_node_id uuid, p_to_external_ref text, p_edge_type text, p_rationale text, p_declared_at timestamp with time zone, p_declared_by uuid | sql     | false            |
+| public | accord_compute_node_hash         | p_prev_node_hash text, p_node_id uuid, p_tag text, p_summary text, p_body text, p_created_at timestamp with time zone, p_created_by uuid                                       | sql     | false            |
+| public | accord_meeting_seal_fn           |                                                                                                                                                                                | plpgsql | true             |
+| public | accord_user_to_resource          | p_user_id uuid                                                                                                                                                                 | sql     | false            |
+| public | cascade_workstream_archive       |                                                                                                                                                                                | plpgsql | false            |
+| public | current_firm_id                  |                                                                                                                                                                                | sql     | true             |
+| public | enforce_workstream_two_level_max |                                                                                                                                                                                | plpgsql | false            |
+| public | my_firm_id                       |                                                                                                                                                                                | sql     | true             |
+
+-- §A1.7 — Approximate row counts (feasibility for query-time activity-weight)
+| schemaname | relname                   | approx_rows |
+| ---------- | ------------------------- | ----------- |
+| public     | accord_agenda_items       | 8           |
+| public     | accord_belief_adjustments | 4           |
+| public     | accord_edges              | 5           |
+| public     | accord_external_links     | 0           |
+| public     | accord_meetings           | 36          |
+| public     | accord_minutes_renders    | 32          |
+| public     | accord_nodes              | 47          |
+| public     | accord_threads            | 36          |
+| public     | workstreams               | 2           |
+
+-- §A1.8 — Check constraints on workstream archival consistency
+| table           | conname                          | definition                                                                                                                                                                           |
+| --------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| accord_meetings | accord_meetings_state_check      | CHECK ((state = ANY (ARRAY['idle'::text, 'running'::text, 'closed'::text])))                                                                                                         |
+| workstreams     | workstreams_state_check          | CHECK ((state = ANY (ARRAY['active'::text, 'archived'::text])))                                                                                                                      |
+| workstreams     | workstreams_archived_consistency | CHECK ((((state = 'archived'::text) AND (archived_at IS NOT NULL) AND (archived_by IS NOT NULL)) OR ((state = 'active'::text) AND (archived_at IS NULL) AND (archived_by IS NULL)))) |
+
+-- ═══════════════════════════════════════════════════════════════════
+-- §A7 — RLS policy gap audit
+-- ═══════════════════════════════════════════════════════════════════
+
+-- §A7.1 — RLS enabled on each table?
+| schema | table                     | rls_enabled | force_rls |
+| ------ | ------------------------- | ----------- | --------- |
+| public | accord_agenda_items       | true        | false     |
+| public | accord_belief_adjustments | true        | false     |
+| public | accord_edges              | true        | false     |
+| public | accord_external_links     | true        | false     |
+| public | accord_meetings           | true        | false     |
+| public | accord_minutes_renders    | true        | false     |
+| public | accord_nodes              | true        | false     |
+| public | accord_threads            | true        | false     |
+| public | workstreams               | true        | false     |
+
+-- §A7.2 — Full policy text for each table (per-policy USING + WITH CHECK)
+| schemaname | tablename                 | policyname                       | cmd    | permissive | roles    | using_expr                                                                         | with_check                                                                             |
+| ---------- | ------------------------- | -------------------------------- | ------ | ---------- | -------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| public     | accord_agenda_items       | accord_agenda_items_delete       | DELETE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (sealed_at IS NULL))                                 | null                                                                                   |
+| public     | accord_agenda_items       | accord_agenda_items_insert       | INSERT | PERMISSIVE | {public} | null                                                                               | (firm_id = my_firm_id())                                                               |
+| public     | accord_agenda_items       | accord_agenda_items_select       | SELECT | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | null                                                                                   |
+| public     | accord_agenda_items       | accord_agenda_items_update       | UPDATE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (sealed_at IS NULL))                                 | ((firm_id = my_firm_id()) AND (sealed_at IS NULL))                                     |
+| public     | accord_belief_adjustments | accord_belief_adjustments_delete | DELETE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (declared_by = auth.uid()) AND (sealed_at IS NULL))  | null                                                                                   |
+| public     | accord_belief_adjustments | accord_belief_adjustments_insert | INSERT | PERMISSIVE | {public} | null                                                                               | ((firm_id = my_firm_id()) AND (declared_by = auth.uid()))                              |
+| public     | accord_belief_adjustments | accord_belief_adjustments_select | SELECT | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | null                                                                                   |
+| public     | accord_belief_adjustments | accord_belief_adjustments_update | UPDATE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (declared_by = auth.uid()) AND (sealed_at IS NULL))  | ((firm_id = my_firm_id()) AND (declared_by = auth.uid()) AND (sealed_at IS NULL))      |
+| public     | accord_edges              | accord_edges_delete              | DELETE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (declared_by = auth.uid()) AND (sealed_at IS NULL))  | null                                                                                   |
+| public     | accord_edges              | accord_edges_insert              | INSERT | PERMISSIVE | {public} | null                                                                               | ((firm_id = my_firm_id()) AND (declared_by = auth.uid()))                              |
+| public     | accord_edges              | accord_edges_select              | SELECT | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | null                                                                                   |
+| public     | accord_edges              | accord_edges_update              | UPDATE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (declared_by = auth.uid()) AND (sealed_at IS NULL))  | ((firm_id = my_firm_id()) AND (declared_by = auth.uid()) AND (sealed_at IS NULL))      |
+| public     | accord_external_links     | accord_external_links_insert     | INSERT | PERMISSIVE | {public} | null                                                                               | ((firm_id = my_firm_id()) AND (created_by = auth.uid()))                               |
+| public     | accord_external_links     | accord_external_links_select     | SELECT | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | null                                                                                   |
+| public     | accord_meetings           | accord_meetings_delete           | DELETE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (organizer_id = auth.uid()) AND (sealed_at IS NULL)) | null                                                                                   |
+| public     | accord_meetings           | accord_meetings_insert           | INSERT | PERMISSIVE | {public} | null                                                                               | ((firm_id = my_firm_id()) AND (organizer_id = auth.uid()))                             |
+| public     | accord_meetings           | accord_meetings_select           | SELECT | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | null                                                                                   |
+| public     | accord_meetings           | accord_meetings_update           | UPDATE | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | (firm_id = my_firm_id())                                                               |
+| public     | accord_minutes_renders    | accord_minutes_renders_insert    | INSERT | PERMISSIVE | {public} | null                                                                               | ((firm_id = my_firm_id()) AND (rendered_by = auth.uid()))                              |
+| public     | accord_minutes_renders    | accord_minutes_renders_select    | SELECT | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | null                                                                                   |
+| public     | accord_minutes_renders    | accord_minutes_renders_update    | UPDATE | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | null                                                                                   |
+| public     | accord_nodes              | accord_nodes_delete              | DELETE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (created_by = auth.uid()) AND (sealed_at IS NULL))   | null                                                                                   |
+| public     | accord_nodes              | accord_nodes_insert              | INSERT | PERMISSIVE | {public} | null                                                                               | ((firm_id = my_firm_id()) AND (created_by = auth.uid()))                               |
+| public     | accord_nodes              | accord_nodes_select              | SELECT | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | null                                                                                   |
+| public     | accord_nodes              | accord_nodes_update              | UPDATE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (created_by = auth.uid()) AND (sealed_at IS NULL))   | ((firm_id = my_firm_id()) AND (created_by = auth.uid()) AND (sealed_at IS NULL))       |
+| public     | accord_threads            | accord_threads_delete            | DELETE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (created_by = auth.uid()))                           | null                                                                                   |
+| public     | accord_threads            | accord_threads_insert            | INSERT | PERMISSIVE | {public} | null                                                                               | ((firm_id = my_firm_id()) AND (created_by = auth.uid()))                               |
+| public     | accord_threads            | accord_threads_select            | SELECT | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | null                                                                                   |
+| public     | accord_threads            | accord_threads_update            | UPDATE | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | (firm_id = my_firm_id())                                                               |
+| public     | workstreams               | workstreams_insert               | INSERT | PERMISSIVE | {public} | null                                                                               | (firm_id = my_firm_id())                                                               |
+| public     | workstreams               | workstreams_select               | SELECT | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | null                                                                                   |
+| public     | workstreams               | workstreams_update_active        | UPDATE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (state = 'active'::text))                            | ((firm_id = my_firm_id()) AND (state = ANY (ARRAY['active'::text, 'archived'::text]))) |
+| public     | workstreams               | workstreams_update_restore       | UPDATE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (state = 'archived'::text))                          | ((firm_id = my_firm_id()) AND (state = 'active'::text))                                |
