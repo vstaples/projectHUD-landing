@@ -263,18 +263,58 @@
       });
     });
 
-    // + New meeting — defers to the legacy create-meeting flow.
-    // Accord.createMeeting (accord-core export) creates a meeting in the
-    // operator's firm without a workstream binding; we follow up with a
-    // PATCH to set workstream_id, then descend.
-    host.querySelector('[data-action="new-meeting"]')?.addEventListener('click', async () => {
+    // + New meeting — opens the legacy #newMeetingModal to collect
+    // title and thread, then creates the meeting in the operator's
+    // firm, PATCHes workstream_id to bind it under this workstream,
+    // emits the filed event, and descends to the new meeting.
+    host.querySelector('[data-action="new-meeting"]')?.addEventListener('click', () => {
+      _openNewMeetingForWorkstream(workstreamId);
+    });
+  }
+
+  // Phase 5 fix: open #newMeetingModal with a one-shot submit handler
+  // that creates + files in this workstream. The legacy modal already
+  // wires its own submit/cancel — we set them fresh each open so the
+  // workstream context binds correctly without leaking listeners.
+  // Pattern note: cloneNode-replace + state mutation must operate on
+  // the new node throughout (Phase 4b D1 lesson).
+  function _openNewMeetingForWorkstream(workstreamId) {
+    const modal       = document.getElementById('newMeetingModal');
+    const titleInput  = document.getElementById('nmTitle');
+    const threadInput = document.getElementById('nmThreadTitle');
+    const okBtn       = document.getElementById('nmCreate');
+    const cancelBtn   = document.getElementById('nmCancel');
+    if (!modal || !titleInput || !threadInput || !okBtn || !cancelBtn) {
+      console.error('[Accord-views] #newMeetingModal anchors missing — falling back to direct create');
+      _createMeetingDirect(workstreamId);
+      return;
+    }
+
+    // Clone-replace buttons FIRST, then wire fresh handlers
+    const newOk = okBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOk, okBtn);
+    const newCancel = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+    titleInput.value = '';
+    threadInput.value = '';
+    modal.classList.add('visible');
+    setTimeout(() => titleInput.focus(), 30);
+
+    const close = () => modal.classList.remove('visible');
+
+    newOk.addEventListener('click', async () => {
+      const title  = titleInput.value.trim();
+      const thread = threadInput.value.trim();
+      if (!title) { titleInput.focus(); return; }
+      newOk.disabled = true;
+      newOk.textContent = 'Creating…';
       try {
-        const m = await window.Accord?.createMeeting?.();
-        if (!m?.meeting_id) return;
+        const m = await window.Accord?.createMeeting?.(title, thread || title);
+        if (!m?.meeting_id) { close(); return; }
         await API.patch(`accord_meetings?meeting_id=eq.${m.meeting_id}`, {
           workstream_id: workstreamId,
         });
-        // Emit filed event so rails refresh
         window.dispatchEvent(new CustomEvent('accord:meeting-filed', {
           detail: {
             meeting_id: m.meeting_id,
@@ -282,12 +322,39 @@
             to_workstream_id: workstreamId,
           },
         }));
+        close();
         window.Accord?.setLevel?.('meeting', { meetingId: m.meeting_id, workstreamId });
       } catch (e) {
         console.error('[Accord-views] new meeting flow failed', e);
         alert('Could not create meeting: ' + (e?.message || e));
+      } finally {
+        newOk.disabled = false;
+        newOk.textContent = 'Create meeting';
       }
     });
+    newCancel.addEventListener('click', close);
+  }
+
+  // Last-resort fallback if the modal is missing (shouldn't happen):
+  // create with a placeholder title so the operator can rename later.
+  async function _createMeetingDirect(workstreamId) {
+    try {
+      const m = await window.Accord?.createMeeting?.('Untitled meeting');
+      if (!m?.meeting_id) return;
+      await API.patch(`accord_meetings?meeting_id=eq.${m.meeting_id}`, {
+        workstream_id: workstreamId,
+      });
+      window.dispatchEvent(new CustomEvent('accord:meeting-filed', {
+        detail: {
+          meeting_id: m.meeting_id,
+          from_workstream_id: null,
+          to_workstream_id: workstreamId,
+        },
+      }));
+      window.Accord?.setLevel?.('meeting', { meetingId: m.meeting_id, workstreamId });
+    } catch (e) {
+      console.error('[Accord-views] direct create failed', e);
+    }
   }
 
   // ────────────────────────────────────────────────────────────
