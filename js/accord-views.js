@@ -104,7 +104,13 @@
     html += `
             <span class="ac-bc-current">${esc(ws.name)}</span>
           </nav>
-          <h1 class="ac-view-title">${esc(ws.name)}</h1>
+          <div class="ac-view-title-row">
+            <h1 class="ac-view-title">${esc(ws.name)}</h1>
+            <div class="ac-view-actions">
+              <button type="button" class="ac-btn-secondary" data-action="ws-rename"  data-ws-id="${esc(workstreamId)}">Rename</button>
+              <button type="button" class="ac-btn-secondary" data-action="ws-archive" data-ws-id="${esc(workstreamId)}">Archive</button>
+            </div>
+          </div>
           ${ws.description ? `<p class="ac-view-desc">${esc(ws.description)}</p>` : ''}
         </header>
 
@@ -125,9 +131,13 @@
         subs.forEach(s => {
           const subMtgCount = cache.filedMtgs.filter(m => m.workstream_id === s.workstream_id).length;
           html += `
-            <li class="ac-list-row" data-ws-id="${esc(s.workstream_id)}" tabindex="0" role="button">
+            <li class="ac-list-row ac-sub-row" data-ws-id="${esc(s.workstream_id)}" tabindex="0" role="button">
               <span class="ac-list-row-label">${esc(s.name)}</span>
               <span class="ac-list-row-meta">${subMtgCount} meeting${subMtgCount === 1 ? '' : 's'}</span>
+              <span class="ac-list-row-actions">
+                <button type="button" class="ac-row-action" data-action="sub-rename"  data-ws-id="${esc(s.workstream_id)}" title="Rename">rename</button>
+                <button type="button" class="ac-row-action" data-action="sub-archive" data-ws-id="${esc(s.workstream_id)}" title="Archive">archive</button>
+              </span>
             </li>`;
         });
         html += `</ul>`;
@@ -188,11 +198,18 @@
       });
     });
 
-    // Sub-workstream click → descend
+    // Sub-workstream click → descend.
+    // BUT: if the click target is one of the row-action buttons
+    // (rename/archive), don't descend — the action button has its own
+    // handler. Same guard applies to keyboard activation.
     host.querySelectorAll('.ac-sub-list .ac-list-row[data-ws-id]').forEach(row => {
       const handler = () => window.Accord?.setLevel?.('workstream', { workstreamId: row.dataset.wsId });
-      row.addEventListener('click', handler);
+      row.addEventListener('click', (ev) => {
+        if (ev.target.closest('.ac-row-action')) return;
+        handler();
+      });
       row.addEventListener('keydown', (ev) => {
+        if (ev.target.closest('.ac-row-action')) return;
         if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); handler(); }
       });
     });
@@ -214,6 +231,31 @@
     // (Phase 4a operator-found UX defect).
     host.querySelector('[data-action="new-sub"]')?.addEventListener('click', () => {
       window.AccordWorkstreams?.openCreate?.(workstreamId);
+    });
+
+    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b: header rename/archive
+    // for the current workstream itself
+    host.querySelector('[data-action="ws-rename"]')?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      window.AccordWorkstreams?.openRename?.(workstreamId);
+    });
+    host.querySelector('[data-action="ws-archive"]')?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      window.AccordWorkstreams?.openArchiveConfirm?.(workstreamId);
+    });
+
+    // Phase 4b: per-sub-row hover-revealed rename/archive actions
+    host.querySelectorAll('[data-action="sub-rename"]').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        window.AccordWorkstreams?.openRename?.(btn.dataset.wsId);
+      });
+    });
+    host.querySelectorAll('[data-action="sub-archive"]').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        window.AccordWorkstreams?.openArchiveConfirm?.(btn.dataset.wsId);
+      });
     });
 
     // + New meeting — defers to the legacy create-meeting flow.

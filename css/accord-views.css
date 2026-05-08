@@ -94,6 +94,20 @@
   margin: 0;
   letter-spacing: -0.01em;
 }
+
+/* CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b: header action group beside title */
+#accord-app .ac-view-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+#accord-app .ac-view-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
 #accord-app .ac-view-desc {
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
   font-size: 13px;
@@ -315,7 +329,8 @@
   #accord-app .ac-bc-crumb,
   #accord-app .ac-mtg-tab,
   #accord-app .ac-btn-primary,
-  #accord-app .ac-btn-secondary {
+  #accord-app .ac-btn-secondary,
+  #accord-app .ac-row-action {
     transition: none;
   }
   #accord-app .ac-list-dot-running {
@@ -328,4 +343,231 @@
   #accord-app .ac-view-header { padding: 18px 22px 14px; }
   #accord-app .ac-view-body   { padding: 18px 22px 30px; }
   #accord-app .ac-view-title  { font-size: 24px; }
+}
+
+/* ============================================================
+   CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b additions
+   Sub-row hover-actions, drop-target visual feedback, modal
+   styles for archive-confirm + drag-drop disambiguation.
+   ============================================================ */
+
+/* Sub-list row: hover-revealed actions (mirrors parking-lot
+   "file…" pattern from rails). */
+#accord-app .ac-sub-row {
+  position: relative;
+}
+#accord-app .ac-list-row-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+#accord-app .ac-sub-row:hover .ac-list-row-actions,
+#accord-app .ac-sub-row:focus-within .ac-list-row-actions {
+  opacity: 1;
+}
+#accord-app .ac-row-action {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  background: none;
+  border: 1px solid var(--rule);
+  color: var(--ink-faint);
+  padding: 2px 7px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+#accord-app .ac-row-action:hover {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+}
+
+/* Archive-confirm modal — reuses .modal-backdrop / .modal from
+   hud.css; we only style the summary block. */
+#accord-app .ac-archive-summary {
+  margin: 8px 0 12px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-body);
+  max-height: 320px;
+  overflow-y: auto;
+}
+#accord-app .ac-archive-loading {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-faint);
+  margin: 0;
+}
+#accord-app .ac-archive-section {
+  margin-bottom: 14px;
+}
+#accord-app .ac-archive-section-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+#accord-app .ac-archive-list {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+#accord-app .ac-archive-list-tight { margin-top: 4px; }
+#accord-app .ac-archive-list li {
+  padding: 3px 0 3px 12px;
+  border-left: 2px solid var(--rule);
+  margin-bottom: 2px;
+  font-size: 12px;
+}
+#accord-app .ac-archive-list-name {
+  color: var(--ink-primary);
+  font-weight: 500;
+}
+#accord-app .ac-archive-list-meta {
+  color: var(--ink-faint);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+}
+#accord-app .ac-archive-count-only {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+#accord-app .ac-archive-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+  font-style: italic;
+}
+#accord-app .ac-archive-footnote {
+  margin: 14px 0 0;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ink-ghost);
+  border-top: 1px solid var(--rule);
+  padding-top: 8px;
+}
+
+/* Drag-drop disambiguation modal */
+#accord-app .ac-dnd-subtitle {
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin: 4px 0 12px;
+}
+#accord-app .ac-dnd-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+#accord-app .ac-dnd-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+#accord-app .ac-dnd-choice:hover {
+  background: var(--signal-soft);
+  border-color: var(--signal-dim);
+}
+#accord-app .ac-dnd-choice input[type="radio"] {
+  flex-shrink: 0;
+  accent-color: var(--signal);
+}
+#accord-app .ac-dnd-choice-label {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--ink-body);
+}
+#accord-app .ac-dnd-choice-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-left: 4px;
+}
+
+/* Drop-target visual feedback (applies to constellation node, tree
+   row, workstream-view body when a drag is over them). */
+#accord-app .ac-dnd-droppable-active {
+  outline: 2px dashed var(--signal);
+  outline-offset: 2px;
+  background: var(--signal-soft) !important;
+}
+#accord-app .ac-node.ac-dnd-droppable-active .ac-node-body {
+  fill: var(--signal-soft);
+  stroke: var(--signal);
+  stroke-width: 2;
+}
+#accord-app .ac-node.ac-dnd-droppable-active .ac-node-glow {
+  opacity: 0.95 !important;
+}
+
+/* Parking-lot row dragging visual */
+#accord-app .ac-parking-row-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+/* Tree right-click context menu (positioned absolutely inside body) */
+.ac-tree-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 200px;
+  padding: 4px 0;
+  background: var(--canvas-raised, #2a2620);
+  border: 1px solid var(--rule-strong, rgba(244, 237, 224, 0.12));
+  border-radius: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+.ac-tree-menu-header {
+  padding: 8px 12px 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint, #908572);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--rule, rgba(244, 237, 224, 0.06));
+  margin-bottom: 4px;
+}
+.ac-tree-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink-body, #d6cdb8);
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.ac-tree-menu-item:hover {
+  background: var(--canvas-hover, #3d372d);
+  color: var(--ink-primary, #f4ede0);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  #accord-app .ac-list-row-actions,
+  #accord-app .ac-row-action,
+  #accord-app .ac-dnd-choice,
+  #accord-app .ac-dnd-droppable-active,
+  .ac-tree-menu-item {
+    transition: none;
+  }
 }

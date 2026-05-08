@@ -179,7 +179,7 @@
         const action = a.dataset.wsAction;
         const id = a.dataset.wsId;
         if (action === 'rename')   _openCreateModal('rename', id);
-        if (action === 'archive')  _archiveWorkstream(id);
+        if (action === 'archive')  _openArchiveConfirm(id);
         if (action === 'restore')  _restoreWorkstream(id);
       });
     });
@@ -346,17 +346,172 @@
   }
 
   // ── Archive / restore ───────────────────────────────────────
-  async function _archiveWorkstream(workstreamId) {
+  //
+  // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b — Q4 source-of-truth.
+  // The archive flow split into two functions:
+  //   _openArchiveConfirm(id)  — UI flow: gathers cascade data,
+  //                              renders mid-detail modal, awaits
+  //                              operator confirm/cancel, calls
+  //                              _executeArchive on confirm.
+  //   _executeArchive(id)       — pure execute: PATCH + CoC writes
+  //                              + CustomEvent dispatch.
+  //
+  // The former bare-confirm() `_archiveWorkstream` is GONE — not
+  // wrapped, not aliased. Public API exposes openArchiveConfirm
+  // (see exports block at file end).
+
+  // Phase 4b helper: build cascade summary for the confirmation modal.
+  // Returns { subs: [{name, meetingCount}], directMeetings: [{title}],
+  //           directMeetingTotal, allMeetingTotal }.
+  async function _gatherArchiveImpact(workstreamId) {
+    const result = {
+      subs: [],
+      directMeetings: [],
+      directMeetingTotal: 0,
+      allMeetingTotal: 0,
+    };
+    try {
+      // Direct meetings (with title for ≤10 enumeration path)
+      const directMtgs = await API.get(
+        `accord_meetings?workstream_id=eq.${workstreamId}&select=meeting_id,title`
+      );
+      result.directMeetings = (directMtgs || []).map(m => ({
+        meeting_id: m.meeting_id,
+        title: m.title || '(untitled)',
+      }));
+      result.directMeetingTotal = result.directMeetings.length;
+
+      // Sub-workstreams + per-sub meeting count
+      const subs = await API.get(
+        `workstreams?parent_workstream_id=eq.${workstreamId}&state=eq.active&select=workstream_id,name`
+      );
+      for (const sub of (subs || [])) {
+        const mtgs = await API.get(
+          `accord_meetings?workstream_id=eq.${sub.workstream_id}&select=meeting_id`
+        );
+        result.subs.push({
+          workstream_id: sub.workstream_id,
+          name: sub.name,
+          meetingCount: (mtgs || []).length,
+        });
+      }
+      result.allMeetingTotal = result.directMeetingTotal +
+        result.subs.reduce((acc, s) => acc + s.meetingCount, 0);
+    } catch (e) {
+      console.warn('[Accord-workstreams] _gatherArchiveImpact partial failure', e);
+    }
+    return result;
+  }
+
+  // Phase 4b: open the archive confirmation modal. Single entry-point
+  // for archive flow across all four affordance surfaces (constellation
+  // right-click, tree right-click, workstream-view header, sub-list
+  // hover-buttons).
+  async function _openArchiveConfirm(workstreamId) {
     const w = local.workstreams.find(x => x.workstream_id === workstreamId);
     if (!w) return;
-    const filedCount = local.meetingCounts[workstreamId] || 0;
-    const subCount = local.workstreams.filter(x => x.parent_workstream_id === workstreamId && x.state === 'active').length;
-    const warning = (filedCount + subCount > 0)
-      ? `\n\nThis will:\n` +
-        (filedCount > 0 ? `• Return ${filedCount} filed meeting${filedCount === 1 ? '' : 's'} to the parking lot\n` : '') +
-        (subCount > 0   ? `• Cascade-archive ${subCount} sub-workstream${subCount === 1 ? '' : 's'}\n` : '')
-      : '';
-    if (!confirm(`Archive "${w.name}"?${warning}\n\nArchived workstreams can be restored.`)) return;
+
+    const modal   = $('acArchiveConfirmModal');
+    const titleEl = $('acArchiveModalTitle');
+    const sumEl   = $('acArchiveModalSummary');
+    const okBtn   = $('acArchiveConfirm');
+    const cancelBtn = $('acArchiveCancel');
+    if (!modal || !titleEl || !sumEl || !okBtn || !cancelBtn) {
+      console.error('[Accord-workstreams] archive-confirm modal anchors missing');
+      return;
+    }
+
+    // Show modal in loading state immediately so the operator sees
+    // visual response while we fetch impact
+    titleEl.textContent = `Archive "${w.name}"?`;
+    sumEl.innerHTML = '<p class="ac-archive-loading">Calculating impact…</p>';
+    okBtn.disabled = true;
+    modal.classList.add('visible');
+
+    // Gather impact
+    const impact = await _gatherArchiveImpact(workstreamId);
+    sumEl.innerHTML = _renderArchiveSummary(w, impact);
+    okBtn.disabled = false;
+
+    // Wire OK / Cancel idempotently — replaceWith clones drop prior listeners
+    const newOk = okBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOk, okBtn);
+    const newCancel = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+    const close = () => modal.classList.remove('visible');
+
+    newOk.addEventListener('click', async () => {
+      newOk.disabled = true;
+      newOk.textContent = 'Archiving…';
+      try {
+        await _executeArchive(workstreamId);
+      } finally {
+        newOk.textContent = 'Archive';
+        close();
+      }
+    });
+    newCancel.addEventListener('click', close);
+  }
+
+  // Render the mid-detail summary per Q2 disposition:
+  //   sub-workstreams: enumerate names always
+  //   meetings: enumerate titles when total ≤ 10; count-only when > 10
+  function _renderArchiveSummary(w, impact) {
+    const parts = [];
+
+    // Subs section
+    if (impact.subs.length > 0) {
+      parts.push(`<div class="ac-archive-section">
+        <div class="ac-archive-section-label">Cascading sub-workstreams (${impact.subs.length})</div>
+        <ul class="ac-archive-list">
+          ${impact.subs.map(s => `
+            <li><span class="ac-archive-list-name">${esc(s.name)}</span>` +
+            (s.meetingCount > 0
+              ? ` <span class="ac-archive-list-meta">(${s.meetingCount} meeting${s.meetingCount === 1 ? '' : 's'})</span>`
+              : '') +
+            `</li>`).join('')}
+        </ul>
+      </div>`);
+    }
+
+    // Meetings section
+    if (impact.allMeetingTotal > 0) {
+      const heading = `<div class="ac-archive-section-label">Meetings returning to parking lot (${impact.allMeetingTotal})</div>`;
+      if (impact.allMeetingTotal <= 10) {
+        // Enumerated path: show direct + sub meetings (we have direct titles;
+        // sub meetings are count-only because we only fetched meeting_ids for them)
+        const directList = impact.directMeetings.length > 0
+          ? `<ul class="ac-archive-list">${impact.directMeetings.map(m => `<li><span class="ac-archive-list-name">${esc(m.title)}</span></li>`).join('')}</ul>`
+          : '';
+        // For meetings under cascading subs, we have counts only — name them by sub
+        const subContrib = impact.subs.filter(s => s.meetingCount > 0).map(s =>
+          `<li><span class="ac-archive-list-meta">${s.meetingCount} under "${esc(s.name)}"</span></li>`
+        ).join('');
+        const subList = subContrib ? `<ul class="ac-archive-list ac-archive-list-tight">${subContrib}</ul>` : '';
+        parts.push(`<div class="ac-archive-section">${heading}${directList}${subList}</div>`);
+      } else {
+        // Count-only path
+        parts.push(`<div class="ac-archive-section">${heading}
+          <p class="ac-archive-count-only">${impact.allMeetingTotal} meetings will return to the parking lot. (Count exceeds enumeration threshold.)</p>
+        </div>`);
+      }
+    }
+
+    if (!parts.length) {
+      parts.push(`<p class="ac-archive-empty">No sub-workstreams or filed meetings will be affected.</p>`);
+    }
+
+    parts.push(`<p class="ac-archive-footnote">Archived workstreams can be restored from the legacy management surface.</p>`);
+
+    return parts.join('');
+  }
+
+  // Pure execute — no UI. Caller (openArchiveConfirm or any future
+  // programmatic path) is responsible for confirming intent first.
+  async function _executeArchive(workstreamId) {
+    const w = local.workstreams.find(x => x.workstream_id === workstreamId);
+    if (!w) return;
 
     const myResourceId = await _resolveMyResourceId();
     if (!myResourceId) {
@@ -372,10 +527,8 @@
     let affectedMeetings = [];
     let affectedSubs = [];
     try {
-      // Meetings directly under this workstream
       const directMtgs = await API.get(`accord_meetings?workstream_id=eq.${workstreamId}&select=meeting_id`);
       affectedMeetings = (directMtgs || []).map(m => ({ meeting_id: m.meeting_id, from: workstreamId }));
-      // Sub-workstreams about to cascade-archive + their meetings
       const subs = await API.get(`workstreams?parent_workstream_id=eq.${workstreamId}&state=eq.active&select=workstream_id,name`);
       affectedSubs = subs || [];
       for (const sub of affectedSubs) {
@@ -399,8 +552,7 @@
       return;
     }
 
-    // Emit CoC events: archive of this workstream, archive of each cascaded
-    // sub, unplace of each affected meeting (one event per meeting per brief §4.3).
+    // Emit CoC events
     try {
       if (window.CoC?.write) {
         await window.CoC.write('accord.workstream.archived', workstreamId, {
@@ -427,9 +579,7 @@
       console.warn('[Accord-workstreams] CoC.write best-effort failure', e);
     }
 
-    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4a — reactive refresh hook.
-    // Single archived event covers parent + cascaded subs; rails refresh
-    // walks the substrate again rather than enumerating cascaded ids.
+    // Reactive refresh hook
     try {
       window.dispatchEvent(new CustomEvent('accord:workstream-archived', {
         detail: { workstream_id: workstreamId },
@@ -795,13 +945,19 @@
       _openCreateModal('rename', workstreamId);
     },
 
-    // Archive — calls the existing archive flow (includes its own confirm prompt)
-    archiveWorkstream(workstreamId) {
+    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b — Q4 source-of-truth.
+    // Archive flow is gated through the rich confirmation modal. The
+    // bare-confirm `archiveWorkstream` of Phase 3 is GONE — not aliased,
+    // not wrapped. Any caller that wants to archive MUST go through
+    // openArchiveConfirm so the operator always sees cascade impact.
+    openArchiveConfirm(workstreamId) {
       if (!workstreamId) return;
-      return _archiveWorkstream(workstreamId);
+      return _openArchiveConfirm(workstreamId);
     },
 
-    // Restore — calls the existing restore flow (includes its own confirm)
+    // Restore — management-surface only per Q3 disposition. Public API
+    // exposes it for that surface; new view (constellation/tree/
+    // workstream-view) does NOT call it.
     restoreWorkstream(workstreamId) {
       if (!workstreamId) return;
       return _restoreWorkstream(workstreamId);

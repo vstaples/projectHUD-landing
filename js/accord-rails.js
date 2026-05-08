@@ -309,6 +309,16 @@
           }
         }
       });
+
+      // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b: right-click context
+      // menu on tree workstream + sub-workstream rows. Mirrors the
+      // constellation right-click pattern. Long-press fallback for
+      // touch is handled by accord-dnd.js's pointer-events.
+      row.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        _showTreeContextMenu(row, ev.clientX, ev.clientY);
+      });
     });
 
     // Meeting leaf click → set level=meeting + workstreamId from parent context
@@ -333,6 +343,66 @@
     local.treeExpanded[wsId] = !isOpen;
     _persistWrite('accord-tree-expanded', JSON.stringify(local.treeExpanded));
     row.querySelector('.ac-tree-chevron')?.classList.toggle('open', !isOpen);
+  }
+
+  // ── Tree context menu (Phase 4b) ────────────────────────────
+  // Reused element: one menu instance per tree, repositioned per click.
+  // Auto-dismisses on outside click or Escape.
+  let _treeMenu = null;
+  function _ensureTreeMenu() {
+    if (_treeMenu) return _treeMenu;
+    _treeMenu = document.createElement('div');
+    _treeMenu.className = 'ac-tree-menu';
+    _treeMenu.style.display = 'none';
+    document.body.appendChild(_treeMenu);
+    document.addEventListener('click', (ev) => {
+      if (_treeMenu.style.display !== 'none' && !_treeMenu.contains(ev.target)) {
+        _hideTreeMenu();
+      }
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && _treeMenu.style.display !== 'none') {
+        _hideTreeMenu();
+      }
+    });
+    return _treeMenu;
+  }
+  function _hideTreeMenu() {
+    if (_treeMenu) _treeMenu.style.display = 'none';
+  }
+  function _showTreeContextMenu(row, clientX, clientY) {
+    const menu = _ensureTreeMenu();
+    const wsId = row.dataset.wsId;
+    if (!wsId) return;
+    const ws = local.workstreams.find(w => w.workstream_id === wsId);
+    const wsName = ws?.name || '(unknown)';
+
+    menu.innerHTML = `
+      <div class="ac-tree-menu-header">${esc(wsName)}</div>
+      <button type="button" class="ac-tree-menu-item" data-action="rename">Rename…</button>
+      <button type="button" class="ac-tree-menu-item" data-action="archive">Archive…</button>
+    `;
+    menu.style.display = 'block';
+    // Position — clamp inside viewport
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const mw = menu.offsetWidth || 200;
+    const mh = menu.offsetHeight || 90;
+    menu.style.left = Math.max(4, Math.min(clientX, vw - mw - 4)) + 'px';
+    menu.style.top  = Math.max(4, Math.min(clientY, vh - mh - 4)) + 'px';
+
+    menu.querySelectorAll('[data-action]').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const action = btn.dataset.action;
+        _hideTreeMenu();
+        if (action === 'rename') {
+          window.AccordWorkstreams?.openRename?.(wsId);
+        } else if (action === 'archive') {
+          window.AccordWorkstreams?.openArchiveConfirm?.(wsId);
+        }
+      });
+    });
   }
 
   // ── Tree search (Phase 4a — mirrors my-meetings.html _mtgSearch) ──
@@ -673,7 +743,7 @@
       if (!action || !workstream_id || !window.AccordWorkstreams) return;
       switch (action) {
         case 'rename':    window.AccordWorkstreams.openRename(workstream_id); break;
-        case 'archive':   window.AccordWorkstreams.archiveWorkstream(workstream_id); break;
+        case 'archive':   window.AccordWorkstreams.openArchiveConfirm(workstream_id); break;
         case 'view-subs': window.AccordWorkstreams.viewSubs(workstream_id); break;
       }
     });

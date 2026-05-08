@@ -3159,6 +3159,37 @@
     </div>
   </div>
 
+  <!-- ── CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b: Archive confirm modal ──
+       Mid-detail: enumerated sub-names + meeting count when ≤10;
+       count-only when >10. Replaces former bare confirm() in
+       archive flow per Q4 source-of-truth constraint. -->
+  <div class="modal-backdrop" id="acArchiveConfirmModal">
+    <div class="modal">
+      <h3 id="acArchiveModalTitle">Archive workstream?</h3>
+      <div id="acArchiveModalSummary" class="ac-archive-summary"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"  id="acArchiveCancel">Cancel</button>
+        <button class="btn btn-signal" id="acArchiveConfirm">Archive</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b: Drag-drop disambiguation modal ──
+       Fires when a parking-lot meeting is dropped on a workstream
+       that has sub-workstreams. Operator picks the parent or one
+       of the subs as the file destination. -->
+  <div class="modal-backdrop" id="acDndDisambigModal">
+    <div class="modal">
+      <h3 id="acDndModalTitle">File this meeting under…</h3>
+      <p id="acDndModalSubtitle" class="ac-dnd-subtitle"></p>
+      <div id="acDndModalChoices" class="ac-dnd-choices" role="radiogroup" aria-label="File destination"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"  id="acDndCancel">Cancel</button>
+        <button class="btn btn-signal" id="acDndConfirm" disabled>File here</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── New-meeting modal ──────────────────────────────────── -->
   <div class="modal-backdrop" id="newMeetingModal">
     <div class="modal">
@@ -3355,11 +3386,12 @@
     load('/js/accord-digest.js');
     load('/js/accord-minutes.js');
     load('/js/accord-workstreams.js');
-    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 2 + Phase 3 + Phase 4a
+    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 2 + Phase 3 + Phase 4a + Phase 4b
     load('/js/accord-constellation.js');
     load('/js/accord-views.js');
     load('/js/accord-transitions.js');
     load('/js/accord-rails.js');
+    load('/js/accord-dnd.js');
   })();
 </script>
 
