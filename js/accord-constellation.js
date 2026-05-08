@@ -125,11 +125,15 @@
     state.meetingsByTop  = {};
     state.openNodesByTop = {};
 
-    await Promise.all([
-      _loadWorkstreams(),
-      _loadMeetingRollup(),
-      _loadOpenNodeRollup(),
-    ]);
+    // Dependency chain: meetings rollup reads parentTopMap (built by
+    // _loadWorkstreams); nodes rollup reads meetingsByTop (built by
+    // _loadMeetingRollup). Parallel Promise.all caused intermittent
+    // empty rollups on fast meeting fetches — operator-found Phase 4b
+    // defect (Control Adapter showed 0 total despite 3 filed meetings).
+    // Serialize the chain.
+    await _loadWorkstreams();
+    await _loadMeetingRollup();
+    await _loadOpenNodeRollup();
   }
 
   async function _loadWorkstreams() {
