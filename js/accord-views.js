@@ -377,11 +377,34 @@
     });
   }
 
-  // ── Substrate event invalidation ────────────────────────────
+  // ── Substrate event invalidation + reactive re-render ──────
+  // Cache is always invalidated. Additionally, if the operator is
+  // currently viewing a workstream- or meeting-level surface and the
+  // event affects what's on screen, re-render in place so the view
+  // doesn't show stale state until the operator navigates away.
+  // (Phase 4a operator-found defect: created sub-workstreams appeared
+  // in left rail but not in workstream-view sub-list until reload.)
+  function _reactiveRerender() {
+    const lvl = window.Accord?.state?.level;
+    const ctx = window.Accord?.state?.levelContext || {};
+    // Find a host: accord-transitions.js mounts views into .ac-view-host
+    const host = document.querySelector('.ac-view-host');
+    if (!host || host.style.display === 'none') return;
+
+    if (lvl === 'workstream' && ctx.workstreamId) {
+      renderWorkstreamView(host, ctx.workstreamId);
+    } else if (lvl === 'meeting' && ctx.meetingId) {
+      renderMeetingView(host, ctx.meetingId, ctx.workstreamId);
+    }
+  }
+
   ['accord:meeting-filed', 'accord:meeting-unfiled', 'accord:meeting-refiled',
    'accord:workstream-created', 'accord:workstream-renamed',
    'accord:workstream-archived', 'accord:workstream-restored'].forEach(name => {
-    window.addEventListener(name, _invalidate);
+    window.addEventListener(name, () => {
+      _invalidate();
+      _reactiveRerender();
+    });
   });
 
   // ── Expose ──────────────────────────────────────────────────
