@@ -186,7 +186,14 @@
   }
 
   // ── Create / rename modal ───────────────────────────────────
-  function _openCreateModal(mode, renameTargetId) {
+  // Signature: _openCreateModal(mode, renameTargetId?, parentPresetId?)
+  //   mode:            'create' | 'rename'
+  //   renameTargetId:  workstream id to rename (rename mode only)
+  //   parentPresetId:  workstream id to pre-select as parent (create
+  //                    mode only). Used by workstream-view's
+  //                    "+ New sub-workstream" affordance to bypass
+  //                    operator-error of leaving the parent unset.
+  function _openCreateModal(mode, renameTargetId, parentPresetId) {
     const modal = $('wsCreateModal');
     if (!modal) return;
     local.createMode = mode || 'create';
@@ -213,11 +220,22 @@
       parentSelect.disabled = true;
       confirmBtn.textContent = 'Rename';
     } else {
-      title.textContent = 'New workstream';
+      // Create mode. If a parent is pre-selected, signal the sub-creation
+      // intent in the title and pre-fill the dropdown. Phase 4a operator
+      // bug: bare "+ New workstream" copy was indistinguishable between
+      // top-level vs sub creation contexts.
+      const presetParent = parentPresetId
+        ? tops.find(w => w.workstream_id === parentPresetId)
+        : null;
+      if (presetParent) {
+        title.textContent = `New sub-workstream under ${presetParent.name}`;
+      } else {
+        title.textContent = 'New workstream';
+      }
       nameInput.value = '';
       descInput.value = '';
-      parentSelect.value = '';
-      parentSelect.disabled = false;
+      parentSelect.value = parentPresetId || '';
+      parentSelect.disabled = false;   // operator may still override the preset
       confirmBtn.textContent = 'Create';
     }
     modal.classList.add('visible');
@@ -760,9 +778,12 @@
     refresh: _refresh,
     openFileModal: _openFileModal,
 
-    // Create — opens the create-modal in 'create' mode
-    openCreate() {
-      _openCreateModal('create');
+    // Create — opens the create-modal in 'create' mode. Optional
+    // parentWorkstreamId pre-selects the parent dropdown so callers
+    // (e.g. workstream-view's "+ New sub-workstream" button) don't
+    // require the operator to remember to pick the parent manually.
+    openCreate(parentWorkstreamId) {
+      _openCreateModal('create', null, parentWorkstreamId || null);
     },
 
     // Rename — set the rename target then open the modal in 'rename' mode.

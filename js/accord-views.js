@@ -209,12 +209,11 @@
       });
     });
 
-    // + New sub-workstream — opens existing create modal with parent preset
+    // + New sub-workstream — pre-selects the current workstream as
+    // parent so the operator doesn't have to remember to pick it
+    // (Phase 4a operator-found UX defect).
     host.querySelector('[data-action="new-sub"]')?.addEventListener('click', () => {
-      // The existing AccordWorkstreams.openCreate doesn't take a parent
-      // hint; in this Phase 4a, opening the modal lets the operator pick.
-      // Phase 4b or a follow-on may pass through an explicit parent preset.
-      window.AccordWorkstreams?.openCreate?.();
+      window.AccordWorkstreams?.openCreate?.(workstreamId);
     });
 
     // + New meeting — defers to the legacy create-meeting flow.
