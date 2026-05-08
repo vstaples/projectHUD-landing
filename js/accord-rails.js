@@ -1,751 +1,547 @@
-/* ============================================================
- * accord-workstreams.js
- * CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 · Phase 4
- *
- * Workstream management surface + Filed-under affordances
- * for both running-meeting header (Q-INV-1 Option C) and
- * post-seal closed-banner.
- *
- * Module organization rationale: introduced as a new file
- * (mirrors per-surface convention: accord-capture, -document,
- * -ledger, -digest, -minutes). Workstreams is its own surface
- * (the management page) plus cross-surface Filed-under
- * affordances; bundling into accord-core would bloat the
- * cross-surface hub.
- *
- * F-pattern integrations:
- *   F-P3-2: SECURITY INVOKER triggers (Migration 9) read
- *           workstreams under caller RLS scope; this module
- *           never bypasses RLS.
- *   F-P3-6: navigational-classification IR42 pattern. Workstream
- *           reassignment on sealed meetings is permitted by
- *           absence of trigger blocks (Migration 10). UI here
- *           presents the affordance in both running and closed
- *           banner contexts.
- *   F-P3-9 / F-P4-1: CoC.write() uses prefixed event keys
- *           ('accord.workstream.created', etc.); writer
- *           normalizes the 'accord.' prefix for storage.
- *   IR58 amended: actor_resource_id resolved by defensive
- *           layer; no per-call resolution required.
- * ============================================================ */
+// ============================================================
+// ProjectHUD — accord-rails.js
+// CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 3
+//
+// Three-pane layout orchestrator:
+//   • Left rail — hierarchical workstream tree (workstream →
+//     sub-workstream → meeting). Adapts my-meetings.html Knowledge
+//     Tree patterns: chevron expand/collapse, .active highlight,
+//     state-indicator dots. Three levels (Compass is four — we
+//     drop the topmost client level per Phase 3 commission §3
+//     deliverable 4 mapping).
+//   • Right rail — parking-lot pane of unfiled meetings (firm-shared
+//     per Phase 1 Decision 1; firm_id = my_firm_id() via RLS;
+//     workstream_id IS NULL filter). Sortable, collapsible.
+//   • Center pane — hosts the Phase 2 constellation when level =
+//     'constellation'. Workstream-level + meeting-level views are
+//     Phase 4 work.
+//   • Legacy view toggle — flips between the new three-pane chrome
+//     and the original five-tab surface-switch layout. Rollback
+//     safety net for the Phase 4-5 transition window. Removed Phase 5.
+//
+// Persistence (sessionStorage + localStorage two-tier — Compass
+// convention adopted Phase 1 §3):
+//   accord-leftrail-collapsed   'true' | 'false'
+//   accord-rightrail-collapsed  'true' | 'false'
+//   accord-parking-sort         'date' | 'alpha'
+//   accord-tree-expanded        JSON map { workstreamId: bool }
+//   accord-view-mode            'new' | 'legacy' (managed by accord-core)
+//
+// Listens for four CustomEvents from accord-constellation.js and
+// routes them to AccordWorkstreams' expanded public API:
+//   accord:constellation-node-click       → setLevel('workstream')
+//   accord:constellation-action           → rename/archive/view-subs
+//   accord:constellation-create-workstream→ AccordWorkstreams.openCreate
+//
+// IR45: visual tokens declared via CSS, not measured.
+// IR65 does NOT fire (client-side rendering only).
+// ============================================================
 
-(function() {
+(function () {
   'use strict';
 
-  const $ = (id) => document.getElementById(id);
-  const esc = (s) => String(s || '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const API = window.API;
+  const $   = id => document.getElementById(id);
 
   // ── Local state ─────────────────────────────────────────────
   const local = {
-    workstreams:    [],   // all (active + archived) for this firm
-    showArchived:   false,
-    meetingCounts:  {},   // { workstream_id: count }
-    // Modal mode-state
-    createMode:     'create',  // 'create' | 'rename'
-    renameTargetId: null,
-    fileTargetMeetingId: null,
+    workstreams:    [],   // active top + sub for tree (state=active)
+    meetings:       [],   // filed meetings only (workstream_id NOT NULL)
+    parkingLot:     [],   // unfiled meetings (workstream_id IS NULL)
+    treeExpanded:   {},   // { workstreamId: true } — persisted
+    parkingSort:    'date',
+    initialized:    false,
   };
 
-  // ── Resource resolver (mirrors accord-ledger / accord-digest pattern) ──
-  let _myResourceId = null;
-  async function _resolveMyResourceId() {
-    if (_myResourceId) return _myResourceId;
-    if (window._myResource?.id) {
-      _myResourceId = window._myResource.id;
-      return _myResourceId;
-    }
-    const me = window.Accord?.state?.me;
-    if (!me?.id) return null;
-    try {
-      const result = await API.post('rpc/accord_user_to_resource', { p_user_id: me.id });
-      const rid = (typeof result === 'string') ? result :
-                  (Array.isArray(result) && result.length) ? (result[0]?.accord_user_to_resource ?? result[0]) :
-                  result;
-      _myResourceId = rid || null;
-    } catch (e) {
-      try {
-        const rows = await API.get(`resources?user_id=eq.${me.id}&select=id&limit=1`);
-        _myResourceId = rows?.[0]?.id || null;
-      } catch (e2) {
-        console.warn('[Accord-workstreams] resource_id resolution failed', e2);
-      }
-    }
-    return _myResourceId;
+  // ── HTML escape ─────────────────────────────────────────────
+  function esc(s) {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // ── Data loaders ────────────────────────────────────────────
+  // ── Persistence helpers (two-tier; mirrors accord-core convention)
+  function _persistRead(key, fallback) {
+    try {
+      const s = sessionStorage.getItem(key);
+      if (s !== null) return s;
+      const l = localStorage.getItem(key);
+      if (l !== null) return l;
+    } catch (e) {}
+    return fallback;
+  }
+  function _persistWrite(key, value) {
+    try { sessionStorage.setItem(key, value); } catch (e) {}
+    try { localStorage.setItem(key, value); } catch (e) {}
+  }
+
+  // ── Date format ─────────────────────────────────────────────
+  function _shortDate(iso) {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch (e) { return '—'; }
+  }
+
+  // ── Boot sequence ───────────────────────────────────────────
+  async function _init() {
+    if (local.initialized) return;
+    local.initialized = true;
+
+    // Hydrate persisted preferences
+    try {
+      const expRaw = _persistRead('accord-tree-expanded', '{}');
+      local.treeExpanded = JSON.parse(expRaw || '{}');
+    } catch (e) { local.treeExpanded = {}; }
+    local.parkingSort = _persistRead('accord-parking-sort', 'date');
+
+    // Wire chrome (toggles, sort buttons, collapse buttons)
+    _wireChrome();
+
+    // Initial collapse state from persistence
+    _applyRailCollapse('left',  _persistRead('accord-leftrail-collapsed',  'false') === 'true');
+    _applyRailCollapse('right', _persistRead('accord-rightrail-collapsed', 'false') === 'true');
+
+    // Listen for constellation events + workstream substrate changes
+    _wireEventBus();
+
+    // First load
+    await refresh();
+
+    // Mount the constellation if center pane host is ready and we're
+    // in 'new' view mode. Constellation is owned by accord-constellation.js;
+    // we just call init(host).
+    _ensureConstellationMounted();
+
+    console.log('[Accord-rails] three-pane orchestrator ready');
+  }
+
+  // ── Data load ───────────────────────────────────────────────
+  async function refresh() {
+    await Promise.all([_loadWorkstreams(), _loadMeetings()]);
+    _renderTree();
+    _renderParkingLot();
+  }
+
   async function _loadWorkstreams() {
     try {
-      const rows = await API.get('workstreams?select=*&order=parent_workstream_id.asc.nullsfirst,name.asc');
+      const rows = await API.get(
+        'workstreams?state=eq.active&select=workstream_id,parent_workstream_id,name,created_at&order=name.asc'
+      );
       local.workstreams = Array.isArray(rows) ? rows : [];
     } catch (e) {
-      console.error('[Accord-workstreams] load failed', e);
+      console.error('[Accord-rails] workstream load failed', e);
       local.workstreams = [];
     }
   }
 
-  async function _loadMeetingCounts() {
-    // Counts of meetings filed under each workstream (firm-scoped via RLS)
-    local.meetingCounts = {};
+  async function _loadMeetings() {
+    // Two queries: filed (for tree) + parking-lot (for right rail)
     try {
-      const rows = await API.get('accord_meetings?workstream_id=not.is.null&select=workstream_id');
-      (rows || []).forEach(r => {
-        if (!local.meetingCounts[r.workstream_id]) local.meetingCounts[r.workstream_id] = 0;
-        local.meetingCounts[r.workstream_id] += 1;
-      });
+      const filed = await API.get(
+        'accord_meetings?workstream_id=not.is.null' +
+        '&select=meeting_id,title,workstream_id,scheduled_for,created_at,sealed_at,state' +
+        '&order=scheduled_for.desc.nullslast,created_at.desc'
+      );
+      local.meetings = Array.isArray(filed) ? filed : [];
     } catch (e) {
-      console.warn('[Accord-workstreams] meeting count load failed', e);
+      console.warn('[Accord-rails] filed-meetings load failed', e);
+      local.meetings = [];
+    }
+    try {
+      const unfiled = await API.get(
+        'accord_meetings?workstream_id=is.null' +
+        '&select=meeting_id,title,scheduled_for,created_at,sealed_at,state'
+      );
+      local.parkingLot = Array.isArray(unfiled) ? unfiled : [];
+    } catch (e) {
+      console.warn('[Accord-rails] parking-lot load failed', e);
+      local.parkingLot = [];
     }
   }
 
-  // ── Management surface render ───────────────────────────────
-  function _renderSurface() {
-    const tbody = $('ws-tbody');
-    const empty = $('ws-empty');
-    const table = $('ws-table');
-    if (!tbody || !empty || !table) return;
+  // ── Tree render (3-level: ws → sub → meeting) ───────────────
+  function _renderTree() {
+    const body = $('ac-tree-body');
+    if (!body) return;
 
-    const visible = local.workstreams.filter(w =>
-      local.showArchived ? true : w.state === 'active'
-    );
-
-    if (visible.length === 0) {
-      table.style.display = 'none';
-      empty.style.display = 'block';
+    if (!local.workstreams.length) {
+      body.innerHTML = '<div class="ac-tree-empty">No workstreams yet.<br>Create one to organize meetings.</div>';
       return;
     }
-    table.style.display = '';
-    empty.style.display = 'none';
 
-    // Two-pass render: top-level first, then their sub-workstreams
-    const topLevels = visible.filter(w => !w.parent_workstream_id);
+    // Build hierarchy
+    const tops = local.workstreams.filter(w => !w.parent_workstream_id);
     const subsByParent = {};
-    visible.filter(w => w.parent_workstream_id).forEach(w => {
+    local.workstreams.filter(w => w.parent_workstream_id).forEach(w => {
       if (!subsByParent[w.parent_workstream_id]) subsByParent[w.parent_workstream_id] = [];
       subsByParent[w.parent_workstream_id].push(w);
     });
-
-    const rows = [];
-    topLevels.forEach(top => {
-      rows.push(_renderRow(top, false));
-      (subsByParent[top.workstream_id] || []).forEach(sub => {
-        rows.push(_renderRow(sub, true));
-      });
+    const meetingsByWs = {};
+    local.meetings.forEach(m => {
+      if (!meetingsByWs[m.workstream_id]) meetingsByWs[m.workstream_id] = [];
+      meetingsByWs[m.workstream_id].push(m);
     });
 
-    tbody.innerHTML = rows.join('');
-    _wireRowActions();
+    const lvl = window.Accord?.state?.level     || 'constellation';
+    const ctx = window.Accord?.state?.levelContext || {};
+
+    let html = '';
+    tops.forEach(top => {
+      html += _renderTopWs(top, subsByParent[top.workstream_id] || [], meetingsByWs, lvl, ctx);
+    });
+
+    body.innerHTML = html;
+    _wireTreeHandlers();
   }
 
-  function _renderRow(w, isSub) {
-    const archived = w.state === 'archived';
-    const cls = archived ? 'ws-row-archived' : '';
-    const nameCls = isSub ? 'ws-name ws-sub-name' : 'ws-name';
-    const level = isSub ? 'sub-workstream' : 'top-level';
-    const parentName = isSub
-      ? esc((local.workstreams.find(x => x.workstream_id === w.parent_workstream_id) || {}).name || '—')
-      : '—';
-    const created = w.created_at
-      ? new Date(w.created_at).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })
-      : '—';
-    const filedCount = local.meetingCounts[w.workstream_id] || 0;
+  function _renderTopWs(ws, subs, meetingsByWs, lvl, ctx) {
+    const expanded = local.treeExpanded[ws.workstream_id] !== false;  // default open
+    const ownMeetings = meetingsByWs[ws.workstream_id] || [];
+    const subMeetingCount = subs.reduce((acc, s) => acc + (meetingsByWs[s.workstream_id] || []).length, 0);
+    const totalMeetings = ownMeetings.length + subMeetingCount;
+    const isActive = lvl === 'workstream' && ctx.workstreamId === ws.workstream_id;
 
-    let actions = '';
-    if (archived) {
-      actions = `<a href="#" class="ws-row-action" data-ws-action="restore" data-ws-id="${esc(w.workstream_id)}">restore</a>`;
-    } else {
-      actions = `
-        <a href="#" class="ws-row-action" data-ws-action="rename"  data-ws-id="${esc(w.workstream_id)}">rename</a>
-        <a href="#" class="ws-row-action ws-action-archive" data-ws-action="archive" data-ws-id="${esc(w.workstream_id)}">archive</a>`;
+    let inner = '';
+
+    // Sub-workstreams
+    subs.forEach(sub => {
+      inner += _renderSubWs(sub, meetingsByWs[sub.workstream_id] || [], lvl, ctx);
+    });
+
+    // Direct meetings (not under a sub)
+    ownMeetings.forEach(m => {
+      inner += _renderMeeting(m, lvl, ctx);
+    });
+
+    if (!subs.length && !ownMeetings.length) {
+      inner += '<div class="ac-tree-leaf-empty">No meetings filed yet.</div>';
     }
 
     return `
-      <tr class="${cls}" data-ws-id="${esc(w.workstream_id)}">
-        <td class="${nameCls}">${esc(w.name)}${archived ? ' <span style="color:var(--ink-faint);font-size:11px;font-style:italic">(archived)</span>' : ''}</td>
-        <td><span class="ws-level-pill">${esc(level)}</span></td>
-        <td>${parentName}</td>
-        <td>${esc(created)}</td>
-        <td class="ws-meetings-col">${filedCount}</td>
-        <td class="ws-actions-col">${actions}</td>
-      </tr>`;
+      <div class="ac-tree-row ac-tree-ws${isActive ? ' active' : ''}" data-toggle="ac-tree-children-${esc(ws.workstream_id)}" data-ws-id="${esc(ws.workstream_id)}">
+        ${_chevronSvg(expanded)}
+        <span class="ac-tree-label">${esc(ws.name)}</span>
+        ${totalMeetings > 0 ? `<span class="ac-tree-badge">${totalMeetings}</span>` : ''}
+      </div>
+      <div class="ac-tree-children" id="ac-tree-children-${esc(ws.workstream_id)}"${expanded ? '' : ' style="display:none"'}>
+        ${inner}
+      </div>`;
   }
 
-  function _wireRowActions() {
-    document.querySelectorAll('#ws-tbody [data-ws-action]').forEach(a => {
-      a.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        const action = a.dataset.wsAction;
-        const id = a.dataset.wsId;
-        if (action === 'rename')   _openCreateModal('rename', id);
-        if (action === 'archive')  _archiveWorkstream(id);
-        if (action === 'restore')  _restoreWorkstream(id);
-      });
-    });
+  function _renderSubWs(ws, meetings, lvl, ctx) {
+    const expanded = local.treeExpanded[ws.workstream_id] !== false;
+    const isActive = lvl === 'workstream' && ctx.workstreamId === ws.workstream_id;
+    let inner = '';
+    meetings.forEach(m => { inner += _renderMeeting(m, lvl, ctx); });
+    if (!meetings.length) {
+      inner += '<div class="ac-tree-leaf-empty ac-tree-leaf-empty-deep">No meetings.</div>';
+    }
+    return `
+      <div class="ac-tree-row ac-tree-sub${isActive ? ' active' : ''}" data-toggle="ac-tree-children-${esc(ws.workstream_id)}" data-ws-id="${esc(ws.workstream_id)}">
+        ${_chevronSvg(expanded)}
+        <span class="ac-tree-label">${esc(ws.name)}</span>
+        ${meetings.length > 0 ? `<span class="ac-tree-badge">${meetings.length}</span>` : ''}
+      </div>
+      <div class="ac-tree-children" id="ac-tree-children-${esc(ws.workstream_id)}"${expanded ? '' : ' style="display:none"'}>
+        ${inner}
+      </div>`;
   }
 
-  // ── Create / rename modal ───────────────────────────────────
-  function _openCreateModal(mode, renameTargetId) {
-    const modal = $('wsCreateModal');
-    if (!modal) return;
-    local.createMode = mode || 'create';
-    local.renameTargetId = renameTargetId || null;
-
-    const title = $('wsCreateModalTitle');
-    const nameInput = $('wsCreateName');
-    const descInput = $('wsCreateDescription');
-    const parentSelect = $('wsCreateParent');
-    const confirmBtn = $('wsCreateConfirm');
-
-    // Populate parent options (top-level active workstreams only)
-    const tops = local.workstreams.filter(w => !w.parent_workstream_id && w.state === 'active');
-    parentSelect.innerHTML = '<option value="">— top-level (no parent) —</option>' +
-      tops.map(w => `<option value="${esc(w.workstream_id)}">${esc(w.name)}</option>`).join('');
-
-    if (mode === 'rename') {
-      const w = local.workstreams.find(x => x.workstream_id === renameTargetId);
-      title.textContent = `Rename: ${w ? w.name : '—'}`;
-      nameInput.value = w ? w.name : '';
-      descInput.value = w ? (w.description || '') : '';
-      // Disable parent change in rename (re-parenting is structural, not in MIN scope)
-      parentSelect.value = w ? (w.parent_workstream_id || '') : '';
-      parentSelect.disabled = true;
-      confirmBtn.textContent = 'Rename';
-    } else {
-      title.textContent = 'New workstream';
-      nameInput.value = '';
-      descInput.value = '';
-      parentSelect.value = '';
-      parentSelect.disabled = false;
-      confirmBtn.textContent = 'Create';
-    }
-    modal.classList.add('visible');
-    setTimeout(() => nameInput.focus(), 30);
+  function _renderMeeting(m, lvl, ctx) {
+    const isActive = lvl === 'meeting' && ctx.meetingId === m.meeting_id;
+    const dot =
+      m.sealed_at         ? 'sealed'   :
+      m.state === 'running' ? 'running'  :
+      m.state === 'closed'  ? 'closed'   :
+                              'draft';
+    const dateStr = m.scheduled_for ? _shortDate(m.scheduled_for) : _shortDate(m.created_at);
+    return `
+      <div class="ac-tree-row ac-tree-meeting${isActive ? ' active' : ''}" data-mtg-id="${esc(m.meeting_id)}">
+        <span class="ac-tree-dot ac-tree-dot-${dot}" aria-hidden="true"></span>
+        <span class="ac-tree-label">${esc(m.title || '(untitled)')}</span>
+        <span class="ac-tree-meta">${esc(dateStr)}</span>
+      </div>`;
   }
 
-  function _closeCreateModal() {
-    const modal = $('wsCreateModal');
-    if (modal) modal.classList.remove('visible');
-    local.createMode = 'create';
-    local.renameTargetId = null;
+  function _chevronSvg(open) {
+    return `<svg class="ac-tree-chevron${open ? ' open' : ''}" viewBox="0 0 10 10" aria-hidden="true">
+      <path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+    </svg>`;
   }
 
-  async function _submitCreateOrRename() {
-    const name = ($('wsCreateName').value || '').trim();
-    const description = ($('wsCreateDescription').value || '').trim();
-    const parentId = ($('wsCreateParent').value || '').trim() || null;
+  function _wireTreeHandlers() {
+    const body = $('ac-tree-body');
+    if (!body) return;
 
-    if (!name) { alert('Name is required.'); return; }
+    // Chevron + workstream/sub click → toggle expand AND set level
+    body.querySelectorAll('.ac-tree-row[data-toggle]').forEach(row => {
+      row.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const wsId = row.dataset.wsId;
+        const targetId = row.dataset.toggle;
+        const target = document.getElementById(targetId);
 
-    const me = window.Accord?.state?.me;
-    if (!me?.firm_id || !me.id) {
-      alert('Identity not resolved; cannot create workstream.');
-      return;
-    }
-    const myResourceId = await _resolveMyResourceId();
-    if (!myResourceId) {
-      alert('Could not resolve your resource identity (required for workstream attribution).');
-      return;
-    }
+        // If chevron-only click intent (clicking the chevron itself) → toggle
+        // expand without changing level. Click on label → set level + leave
+        // expand state alone unless collapsed.
+        const clickedChevron = ev.target.closest('.ac-tree-chevron');
 
-    if (local.createMode === 'rename' && local.renameTargetId) {
-      // Rename path
-      const oldName = (local.workstreams.find(x => x.workstream_id === local.renameTargetId) || {}).name || '';
-      try {
-        await API.patch(`workstreams?workstream_id=eq.${local.renameTargetId}`, {
-          name,
-          description: description || null,
-        });
-        try {
-          if (window.CoC?.write) {
-            await window.CoC.write('accord.workstream.renamed', local.renameTargetId, {
-              entityType: 'workstream',
-              notes: `Renamed: "${oldName}" → "${name}"`,
-              meta: { from_name: oldName, to_name: name },
-            });
-          }
-        } catch (e) { console.warn('[Accord-workstreams] CoC.write best-effort failure', e); }
-      } catch (e) {
-        console.error('[Accord-workstreams] rename failed', e);
-        alert('Rename failed: ' + (e?.message || e));
-        return;
-      }
-    } else {
-      // Create path
-      const row = {
-        firm_id:              me.firm_id,
-        parent_workstream_id: parentId,
-        name,
-        description:          description || null,
-        created_by:           myResourceId,
-      };
-      let created;
-      try {
-        const out = await API.post('workstreams', row);
-        created = Array.isArray(out) ? out[0] : out;
-      } catch (e) {
-        console.error('[Accord-workstreams] create failed', e);
-        alert('Create failed: ' + (e?.message || e));
-        return;
-      }
-      try {
-        if (window.CoC?.write && created?.workstream_id) {
-          await window.CoC.write('accord.workstream.created', created.workstream_id, {
-            entityType: 'workstream',
-            notes: `Created workstream: "${name}"${parentId ? ' (sub)' : ' (top-level)'}`,
-            meta: {
-              name,
-              parent_workstream_id: parentId,
-              level: parentId ? 'sub-workstream' : 'top-level',
-            },
-          });
-        }
-      } catch (e) { console.warn('[Accord-workstreams] CoC.write best-effort failure', e); }
-    }
-
-    _closeCreateModal();
-    await _refresh();
-  }
-
-  // ── Archive / restore ───────────────────────────────────────
-  async function _archiveWorkstream(workstreamId) {
-    const w = local.workstreams.find(x => x.workstream_id === workstreamId);
-    if (!w) return;
-    const filedCount = local.meetingCounts[workstreamId] || 0;
-    const subCount = local.workstreams.filter(x => x.parent_workstream_id === workstreamId && x.state === 'active').length;
-    const warning = (filedCount + subCount > 0)
-      ? `\n\nThis will:\n` +
-        (filedCount > 0 ? `• Return ${filedCount} filed meeting${filedCount === 1 ? '' : 's'} to the parking lot\n` : '') +
-        (subCount > 0   ? `• Cascade-archive ${subCount} sub-workstream${subCount === 1 ? '' : 's'}\n` : '')
-      : '';
-    if (!confirm(`Archive "${w.name}"?${warning}\n\nArchived workstreams can be restored.`)) return;
-
-    const myResourceId = await _resolveMyResourceId();
-    if (!myResourceId) {
-      alert('Could not resolve your resource identity.');
-      return;
-    }
-
-    // Identify meetings that will be unplaced by the cascade trigger.
-    // Per brief §4.3 architect note: CoC events for unplacement emit
-    // from the writer-side (here), not from the trigger. We capture the
-    // affected meeting IDs BEFORE the archive so we can emit one
-    // accord.meeting.unplaced event per meeting after the cascade fires.
-    let affectedMeetings = [];
-    let affectedSubs = [];
-    try {
-      // Meetings directly under this workstream
-      const directMtgs = await API.get(`accord_meetings?workstream_id=eq.${workstreamId}&select=meeting_id`);
-      affectedMeetings = (directMtgs || []).map(m => ({ meeting_id: m.meeting_id, from: workstreamId }));
-      // Sub-workstreams about to cascade-archive + their meetings
-      const subs = await API.get(`workstreams?parent_workstream_id=eq.${workstreamId}&state=eq.active&select=workstream_id,name`);
-      affectedSubs = subs || [];
-      for (const sub of affectedSubs) {
-        const subMtgs = await API.get(`accord_meetings?workstream_id=eq.${sub.workstream_id}&select=meeting_id`);
-        (subMtgs || []).forEach(m => affectedMeetings.push({ meeting_id: m.meeting_id, from: sub.workstream_id }));
-      }
-    } catch (e) {
-      console.warn('[Accord-workstreams] could not enumerate affected meetings', e);
-    }
-
-    const archivedAt = new Date().toISOString();
-    try {
-      await API.patch(`workstreams?workstream_id=eq.${workstreamId}`, {
-        state:       'archived',
-        archived_at: archivedAt,
-        archived_by: myResourceId,
-      });
-    } catch (e) {
-      console.error('[Accord-workstreams] archive failed', e);
-      alert('Archive failed: ' + (e?.message || e));
-      return;
-    }
-
-    // Emit CoC events: archive of this workstream, archive of each cascaded
-    // sub, unplace of each affected meeting (one event per meeting per brief §4.3).
-    try {
-      if (window.CoC?.write) {
-        await window.CoC.write('accord.workstream.archived', workstreamId, {
-          entityType: 'workstream',
-          notes: `Archived workstream: "${w.name}"`,
-          meta: { name: w.name, cascaded_subs: affectedSubs.length, affected_meetings: affectedMeetings.length },
-        });
-        for (const sub of affectedSubs) {
-          await window.CoC.write('accord.workstream.archived', sub.workstream_id, {
-            entityType: 'workstream',
-            notes: `Cascade-archived sub-workstream: "${sub.name}"`,
-            meta: { name: sub.name, cascaded_from: workstreamId },
-          });
-        }
-        for (const am of affectedMeetings) {
-          await window.CoC.write('accord.meeting.unplaced', am.meeting_id, {
-            entityType: 'accord_meeting',
-            notes: `Returned to parking lot via workstream archive cascade`,
-            meta: { from_workstream_id: am.from, reason: 'archive_cascade' },
-          });
-        }
-      }
-    } catch (e) {
-      console.warn('[Accord-workstreams] CoC.write best-effort failure', e);
-    }
-
-    await _refresh();
-  }
-
-  async function _restoreWorkstream(workstreamId) {
-    const w = local.workstreams.find(x => x.workstream_id === workstreamId);
-    if (!w) return;
-    if (!confirm(`Restore "${w.name}" to active state?\n\nNote: this does NOT restore cascade-archived sub-workstreams or refile meetings (those moved to the parking lot).`)) return;
-
-    try {
-      // Q-INV-3 Option A: state-aware UPDATE RLS policy permits this transition.
-      // Must also clear archived_at and archived_by per the table-level
-      // workstreams_archived_consistency check constraint.
-      await API.patch(`workstreams?workstream_id=eq.${workstreamId}`, {
-        state:       'active',
-        archived_at: null,
-        archived_by: null,
-      });
-    } catch (e) {
-      console.error('[Accord-workstreams] restore failed', e);
-      alert('Restore failed: ' + (e?.message || e));
-      return;
-    }
-
-    try {
-      if (window.CoC?.write) {
-        await window.CoC.write('accord.workstream.restored', workstreamId, {
-          entityType: 'workstream',
-          notes: `Restored workstream: "${w.name}"`,
-          meta: { name: w.name },
-        });
-      }
-    } catch (e) { console.warn('[Accord-workstreams] CoC.write best-effort failure', e); }
-
-    await _refresh();
-  }
-
-  // ── File-meeting modal ──────────────────────────────────────
-  function _openFileModal(meetingId) {
-    const modal = $('wsFileModal');
-    if (!modal) return;
-    const m = window.Accord?.state?.meeting;
-    if (!m || m.meeting_id !== meetingId) {
-      // Allow filing any meeting whose ID is supplied; load minimal context
-    }
-    local.fileTargetMeetingId = meetingId;
-
-    const target = $('wsFileModalTarget');
-    if (target) {
-      target.textContent = m
-        ? `${(m.title || 'Untitled meeting').slice(0, 80)}${m.sealed_at ? ' · sealed' : ' · running'}`
-        : `Meeting ${meetingId.slice(0, 8)}…`;
-    }
-
-    // Populate selector: top-level workstreams + sub-workstreams (visually nested)
-    const select = $('wsFileSelect');
-    const tops = local.workstreams.filter(w => !w.parent_workstream_id && w.state === 'active');
-    const subsByParent = {};
-    local.workstreams.filter(w => w.parent_workstream_id && w.state === 'active').forEach(w => {
-      if (!subsByParent[w.parent_workstream_id]) subsByParent[w.parent_workstream_id] = [];
-      subsByParent[w.parent_workstream_id].push(w);
-    });
-    let opts = '<option value="">— Unfiled (parking lot) —</option>';
-    tops.forEach(top => {
-      opts += `<option value="${esc(top.workstream_id)}">${esc(top.name)}</option>`;
-      (subsByParent[top.workstream_id] || []).forEach(sub => {
-        opts += `<option value="${esc(sub.workstream_id)}">↳ ${esc(top.name)} / ${esc(sub.name)}</option>`;
-      });
-    });
-    select.innerHTML = opts;
-
-    // Preselect current value if known
-    if (m && m.workstream_id) select.value = m.workstream_id;
-    else select.value = '';
-
-    modal.classList.add('visible');
-    setTimeout(() => select.focus(), 30);
-  }
-
-  function _closeFileModal() {
-    const modal = $('wsFileModal');
-    if (modal) modal.classList.remove('visible');
-    local.fileTargetMeetingId = null;
-  }
-
-  async function _submitFile() {
-    const meetingId = local.fileTargetMeetingId;
-    if (!meetingId) { _closeFileModal(); return; }
-    const newWorkstreamId = ($('wsFileSelect').value || '').trim() || null;
-
-    // Find current value (prefer state.meeting if it matches; else fetch)
-    let oldWorkstreamId = null;
-    const m = window.Accord?.state?.meeting;
-    if (m && m.meeting_id === meetingId) {
-      oldWorkstreamId = m.workstream_id || null;
-    } else {
-      try {
-        const rows = await API.get(`accord_meetings?meeting_id=eq.${meetingId}&select=workstream_id`);
-        oldWorkstreamId = rows?.[0]?.workstream_id || null;
-      } catch (e) { /* tolerate */ }
-    }
-
-    if (oldWorkstreamId === newWorkstreamId) {
-      _closeFileModal();
-      return;
-    }
-
-    try {
-      await API.patch(`accord_meetings?meeting_id=eq.${meetingId}`, {
-        workstream_id: newWorkstreamId,
-      });
-    } catch (e) {
-      console.error('[Accord-workstreams] file failed', e);
-      alert('File failed: ' + (e?.message || e));
-      return;
-    }
-
-    // Determine which CoC event applies (placed / unplaced / refiled)
-    let typeKey, notes;
-    if (oldWorkstreamId === null && newWorkstreamId !== null) {
-      typeKey = 'accord.meeting.placed';
-      notes = 'Meeting filed under workstream';
-    } else if (oldWorkstreamId !== null && newWorkstreamId === null) {
-      typeKey = 'accord.meeting.unplaced';
-      notes = 'Meeting returned to parking lot';
-    } else {
-      typeKey = 'accord.meeting.refiled';
-      notes = 'Meeting refiled to a different workstream';
-    }
-
-    try {
-      if (window.CoC?.write) {
-        await window.CoC.write(typeKey, meetingId, {
-          entityType: 'accord_meeting',
-          notes,
-          meta: {
-            from_workstream_id: oldWorkstreamId,
-            to_workstream_id:   newWorkstreamId,
-            sealed_at:          m?.sealed_at || null,
-          },
-        });
-      }
-    } catch (e) { console.warn('[Accord-workstreams] CoC.write best-effort failure', e); }
-
-    // Update local meeting state if it was the active meeting
-    if (m && m.meeting_id === meetingId) {
-      m.workstream_id = newWorkstreamId;
-      _refreshFiledAffordances();
-    }
-
-    _closeFileModal();
-    // Refresh management surface counts (best-effort)
-    if (document.getElementById('surface-workstreams')?.classList.contains('active')) {
-      await _refresh();
-    }
-  }
-
-  // ── Filed-under affordances (running header + closed banner) ──
-  function _refreshFiledAffordances() {
-    const m = window.Accord?.state?.me ? window.Accord.state.meeting : null;
-    const capFiled = $('cap-filed');
-    const closedFiledRow = $('closed-filed');
-    const capValue = $('cap-filed-value');
-    const closedValue = $('closed-filed-value');
-    const capAction = $('cap-filed-action');
-    const closedAction = $('closed-filed-action');
-
-    if (!m) {
-      // No meeting loaded — hide running header affordance
-      if (capFiled) capFiled.style.display = 'none';
-      return;
-    }
-
-    // Render label + state on running header
-    if (capFiled) {
-      capFiled.style.display = '';
-      const valEl = capValue;
-      const acEl = capAction;
-      if (m.workstream_id) {
-        const w = local.workstreams.find(x => x.workstream_id === m.workstream_id);
-        const top = w && w.parent_workstream_id
-          ? local.workstreams.find(x => x.workstream_id === w.parent_workstream_id)
-          : null;
-        const label = w
-          ? (top ? `${top.name} / ${w.name}` : w.name)
-          : '(unknown workstream)';
-        if (valEl) { valEl.textContent = label; valEl.classList.remove('unfiled'); }
-        if (acEl) acEl.textContent = '[change]';
-      } else {
-        if (valEl) { valEl.textContent = 'Unfiled'; valEl.classList.add('unfiled'); }
-        if (acEl) acEl.textContent = '[file]';
-      }
-    }
-
-    // Closed-banner affordance: same logic, only visible when banner is shown
-    if (closedFiledRow) {
-      if (m.workstream_id) {
-        const w = local.workstreams.find(x => x.workstream_id === m.workstream_id);
-        const top = w && w.parent_workstream_id
-          ? local.workstreams.find(x => x.workstream_id === w.parent_workstream_id)
-          : null;
-        const label = w
-          ? (top ? `${top.name} / ${w.name}` : w.name)
-          : '(unknown workstream)';
-        if (closedValue) { closedValue.textContent = label; closedValue.classList.remove('unfiled'); }
-        if (closedAction) closedAction.textContent = '[change]';
-      } else {
-        if (closedValue) { closedValue.textContent = 'Unfiled'; closedValue.classList.add('unfiled'); }
-        if (closedAction) closedAction.textContent = '[file]';
-      }
-    }
-  }
-
-  // ── Refresh ─────────────────────────────────────────────────
-  async function _refresh() {
-    await _loadWorkstreams();
-    await _loadMeetingCounts();
-    _renderSurface();
-    _refreshFiledAffordances();
-  }
-
-  // ── Wire-up (one-time) ──────────────────────────────────────
-  function _wireUI() {
-    // Chrome link → switch to workstreams surface + refresh
-    const chrome = $('manageWorkstreamsLink');
-    if (chrome) {
-      chrome.addEventListener('click', async (ev) => {
-        ev.preventDefault();
-        if (window.Accord?.switchSurface) {
-          window.Accord.switchSurface('workstreams');
+        if (clickedChevron) {
+          _toggleExpand(wsId, target, row);
         } else {
-          // Fallback: directly toggle the surface
-          document.querySelectorAll('#accord-app .surface').forEach(s => s.classList.remove('active'));
-          $('surface-workstreams')?.classList.add('active');
-          window.dispatchEvent(new CustomEvent('accord:surface-changed', { detail: { surface: 'workstreams' } }));
+          // Set workstream level
+          if (window.Accord?.setLevel) {
+            window.Accord.setLevel('workstream', { workstreamId: wsId });
+          }
+          // Auto-expand if currently collapsed
+          if (target && target.style.display === 'none') {
+            _toggleExpand(wsId, target, row);
+          }
         }
-        chrome.classList.add('active');
-        await _refresh();
       });
+    });
+
+    // Meeting leaf click → set level=meeting + workstreamId from parent context
+    body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(row => {
+      row.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const mtgId = row.dataset.mtgId;
+        // Find owning workstream from the meeting record
+        const m = local.meetings.find(x => x.meeting_id === mtgId);
+        const wsId = m ? m.workstream_id : null;
+        if (window.Accord?.setLevel) {
+          window.Accord.setLevel('meeting', { meetingId: mtgId, workstreamId: wsId });
+        }
+      });
+    });
+  }
+
+  function _toggleExpand(wsId, target, row) {
+    if (!target) return;
+    const isOpen = target.style.display !== 'none';
+    target.style.display = isOpen ? 'none' : '';
+    local.treeExpanded[wsId] = !isOpen;
+    _persistWrite('accord-tree-expanded', JSON.stringify(local.treeExpanded));
+    row.querySelector('.ac-tree-chevron')?.classList.toggle('open', !isOpen);
+  }
+
+  // ── Parking lot ─────────────────────────────────────────────
+  function _renderParkingLot() {
+    const body = $('ac-parking-body');
+    if (!body) return;
+
+    if (!local.parkingLot.length) {
+      body.innerHTML = '<div class="ac-parking-empty">All meetings filed.</div>';
+      return;
     }
 
-    // Top-nav surface change deactivates chrome-link active state
-    window.addEventListener('accord:surface-changed', (ev) => {
-      const surf = ev?.detail?.surface;
-      if (surf !== 'workstreams' && chrome) chrome.classList.remove('active');
+    const sorted = _sortParking(local.parkingLot.slice(), local.parkingSort);
+
+    let html = '';
+    sorted.forEach(m => {
+      const dot =
+        m.sealed_at         ? 'sealed'   :
+        m.state === 'running' ? 'running'  :
+        m.state === 'closed'  ? 'closed'   :
+                                'draft';
+      const dateStr = m.scheduled_for ? _shortDate(m.scheduled_for) : _shortDate(m.created_at);
+      html += `
+        <div class="ac-parking-row" draggable="true" data-mtg-id="${esc(m.meeting_id)}" data-mtg-title="${esc(m.title || '')}">
+          <span class="ac-parking-dot ac-parking-dot-${dot}" aria-hidden="true"></span>
+          <span class="ac-parking-row-title">${esc(m.title || '(untitled)')}</span>
+          <span class="ac-parking-row-date">${esc(dateStr)}</span>
+          <button type="button" class="ac-parking-row-file" data-mtg-id="${esc(m.meeting_id)}" title="File this meeting">file…</button>
+        </div>`;
     });
+    body.innerHTML = html;
 
-    // New-workstream button on management surface
-    $('ws-new-btn')?.addEventListener('click', () => _openCreateModal('create'));
-
-    // Show-archived toggle
-    $('ws-show-archived')?.addEventListener('change', (ev) => {
-      local.showArchived = !!ev.target.checked;
-      _renderSurface();
-    });
-
-    // Create / rename modal handlers
-    $('wsCreateCancel')?.addEventListener('click', () => _closeCreateModal());
-    $('wsCreateConfirm')?.addEventListener('click', () => _submitCreateOrRename());
-    const cm = $('wsCreateModal');
-    cm?.addEventListener('click', (ev) => { if (ev.target === cm) _closeCreateModal(); });
-
-    // File modal handlers
-    $('wsFileCancel')?.addEventListener('click', () => _closeFileModal());
-    $('wsFileConfirm')?.addEventListener('click', () => _submitFile());
-    const fm = $('wsFileModal');
-    fm?.addEventListener('click', (ev) => { if (ev.target === fm) _closeFileModal(); });
-
-    // Esc closes whichever modal is open
-    document.addEventListener('keydown', (ev) => {
-      if (ev.key !== 'Escape') return;
-      if (cm && cm.classList.contains('visible')) _closeCreateModal();
-      if (fm && fm.classList.contains('visible')) _closeFileModal();
-    });
-
-    // Filed-under action affordances (running + closed-banner)
-    $('cap-filed-action')?.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      const m = window.Accord?.state?.meeting;
-      if (m?.meeting_id) _openFileModal(m.meeting_id);
-    });
-    $('closed-filed-action')?.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      const m = window.Accord?.state?.meeting;
-      if (m?.meeting_id) _openFileModal(m.meeting_id);
-    });
-
-    // Listen for meeting-loaded events to refresh Filed-under affordances
-    window.addEventListener('accord:meeting-loaded', () => _refreshFiledAffordances());
-    window.addEventListener('accord:meeting-sealed', () => _refreshFiledAffordances());
+    _wireParkingHandlers();
   }
 
-  // ── Init ────────────────────────────────────────────────────
-  async function _init() {
-    _wireUI();
-    // Load workstreams once at startup so Filed-under labels can resolve
-    // immediately when a meeting loads. Cheap; firm-scoped via RLS.
-    await _refresh();
-    console.log('[Accord] workstreams surface ready');
+  function _sortParking(rows, mode) {
+    if (mode === 'alpha') {
+      return rows.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    }
+    // date desc — prefer scheduled_for, fall back to created_at
+    return rows.sort((a, b) => {
+      const at = a.scheduled_for || a.created_at || '';
+      const bt = b.scheduled_for || b.created_at || '';
+      return bt.localeCompare(at);
+    });
   }
 
+  function _wireParkingHandlers() {
+    const body = $('ac-parking-body');
+    if (!body) return;
+
+    // Click row → set level=meeting (Phase 4 wires meeting-level view;
+    // Phase 3 just records intent so accord-core's listeners can react)
+    body.querySelectorAll('.ac-parking-row').forEach(row => {
+      row.addEventListener('click', (ev) => {
+        // Don't trigger when "file…" button clicked
+        if (ev.target.closest('.ac-parking-row-file')) return;
+        const mtgId = row.dataset.mtgId;
+        if (window.Accord?.setLevel) {
+          window.Accord.setLevel('meeting', { meetingId: mtgId, workstreamId: null });
+        }
+      });
+    });
+
+    // File button → existing AccordWorkstreams.openFileModal
+    body.querySelectorAll('.ac-parking-row-file').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const mtgId = btn.dataset.mtgId;
+        if (window.AccordWorkstreams?.openFileModal) {
+          window.AccordWorkstreams.openFileModal(mtgId);
+        }
+      });
+    });
+
+    // Phase 4 will wire dragstart/drop on these rows; Phase 3 just sets
+    // draggable=true so the affordance is discoverable.
+  }
+
+  // ── Chrome wiring (rail collapse, sort toggle, view mode) ──
+  function _wireChrome() {
+    // Left-rail collapse button
+    $('ac-leftrail-collapse')?.addEventListener('click', () => {
+      const next = !$('ac-rail-left')?.classList.contains('collapsed');
+      _applyRailCollapse('left', next);
+    });
+    // Right-rail collapse button
+    $('ac-rightrail-collapse')?.addEventListener('click', () => {
+      const next = !$('ac-rail-right')?.classList.contains('collapsed');
+      _applyRailCollapse('right', next);
+    });
+    // Parking sort toggle
+    $('ac-parking-sort-btn')?.addEventListener('click', () => {
+      local.parkingSort = local.parkingSort === 'date' ? 'alpha' : 'date';
+      _persistWrite('accord-parking-sort', local.parkingSort);
+      _updateSortBtnLabel();
+      _renderParkingLot();
+    });
+    _updateSortBtnLabel();
+
+    // Legacy view toggle (in topnav)
+    $('legacyViewToggle')?.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const cur = window.Accord?.state?.viewMode || 'new';
+      const next = cur === 'new' ? 'legacy' : 'new';
+      if (window.Accord?.setViewMode) window.Accord.setViewMode(next);
+      _updateLegacyToggleLabel(next);
+    });
+    _updateLegacyToggleLabel(window.Accord?.state?.viewMode || 'new');
+
+    // New-meeting / new-workstream affordances inside the rails
+    $('ac-tree-new-btn')?.addEventListener('click', () => {
+      window.AccordWorkstreams?.openCreate?.();
+    });
+  }
+
+  function _applyRailCollapse(side, collapsed) {
+    const railId = side === 'left' ? 'ac-rail-left' : 'ac-rail-right';
+    const btnId  = side === 'left' ? 'ac-leftrail-collapse' : 'ac-rightrail-collapse';
+    const rail   = $(railId);
+    const btn    = $(btnId);
+    if (!rail) return;
+    rail.classList.toggle('collapsed', collapsed);
+    btn?.setAttribute('aria-expanded', String(!collapsed));
+    btn?.setAttribute('title', collapsed ? 'Expand' : 'Collapse');
+    _persistWrite(`accord-${side === 'left' ? 'leftrail' : 'rightrail'}-collapsed`, String(collapsed));
+  }
+
+  function _updateSortBtnLabel() {
+    const btn = $('ac-parking-sort-btn');
+    if (!btn) return;
+    btn.textContent = local.parkingSort === 'date' ? 'a–z' : 'date';
+    btn.setAttribute('title', `Sort by ${local.parkingSort === 'date' ? 'name' : 'date'}`);
+  }
+
+  function _updateLegacyToggleLabel(mode) {
+    const btn = $('legacyViewToggle');
+    if (!btn) return;
+    btn.textContent = mode === 'new' ? 'Legacy view' : 'New view';
+  }
+
+  // ── Constellation mount ─────────────────────────────────────
+  function _ensureConstellationMounted() {
+    const host = $('ac-constellation-host');
+    if (!host) return;
+    if (!window.AccordConstellation?.init) {
+      console.warn('[Accord-rails] AccordConstellation not loaded; skipping mount');
+      return;
+    }
+    window.AccordConstellation.init(host);
+  }
+
+  // ── Event bus ───────────────────────────────────────────────
+  function _wireEventBus() {
+    // Constellation node click → workstream level
+    window.addEventListener('accord:constellation-node-click', (ev) => {
+      const wsId = ev.detail?.workstream_id;
+      if (!wsId) return;
+      window.Accord?.setLevel?.('workstream', { workstreamId: wsId });
+    });
+
+    // Constellation context menu actions
+    window.addEventListener('accord:constellation-action', (ev) => {
+      const { action, workstream_id } = ev.detail || {};
+      if (!action || !workstream_id || !window.AccordWorkstreams) return;
+      switch (action) {
+        case 'rename':    window.AccordWorkstreams.openRename(workstream_id); break;
+        case 'archive':   window.AccordWorkstreams.archiveWorkstream(workstream_id); break;
+        case 'view-subs': window.AccordWorkstreams.viewSubs(workstream_id); break;
+      }
+    });
+
+    // Constellation empty-state CTA → open create modal
+    window.addEventListener('accord:constellation-create-workstream', () => {
+      window.AccordWorkstreams?.openCreate?.();
+    });
+
+    // Level-changed → refresh tree highlight (without re-fetching)
+    window.addEventListener('accord:level-changed', () => {
+      _renderTree();
+    });
+
+    // View-mode-changed → ensure constellation is rendered when entering new view
+    window.addEventListener('accord:view-mode-changed', (ev) => {
+      if (ev.detail?.viewMode === 'new') {
+        _ensureConstellationMounted();
+      }
+    });
+
+    // Listen for substrate changes from accord-workstreams.js (CoC events
+    // ripple through here too — best-effort refresh)
+    ['accord:workstream-created', 'accord:workstream-archived',
+     'accord:workstream-renamed', 'accord:meeting-filed',
+     'accord:meeting-unfiled'].forEach(eventName => {
+      window.addEventListener(eventName, () => refresh());
+    });
+  }
+
+  // ── Boot ────────────────────────────────────────────────────
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', _init);
   } else {
     _init();
   }
 
-  // Expose minimal API for cross-module use (Accord-core fires meeting-loaded;
-  // this module reacts via the event; no direct API needed yet).
-  //
-  // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3: expanded public API to
-  // receive the four constellation/rails CustomEvents (per Phase 2
-  // Decision 1 — expose existing internals, no new behavior). Coding
-  // agents wiring these handlers can call the public methods directly
-  // without reaching into module-private functions.
-  window.AccordWorkstreams = {
-    refresh: _refresh,
-    openFileModal: _openFileModal,
-
-    // Create — opens the create-modal in 'create' mode
-    openCreate() {
-      _openCreateModal('create');
+  // ── Expose ──────────────────────────────────────────────────
+  window.AccordRails = {
+    refresh,
+    setParkingSort(mode) {
+      if (mode !== 'date' && mode !== 'alpha') return;
+      local.parkingSort = mode;
+      _persistWrite('accord-parking-sort', mode);
+      _updateSortBtnLabel();
+      _renderParkingLot();
     },
-
-    // Rename — set the rename target then open the modal in 'rename' mode
-    openRename(workstreamId) {
-      if (!workstreamId) return;
-      local.renameTargetId = workstreamId;
-      _openCreateModal('rename');
-    },
-
-    // Archive — calls the existing archive flow (includes its own confirm prompt)
-    archiveWorkstream(workstreamId) {
-      if (!workstreamId) return;
-      return _archiveWorkstream(workstreamId);
-    },
-
-    // Restore — calls the existing restore flow (includes its own confirm)
-    restoreWorkstream(workstreamId) {
-      if (!workstreamId) return;
-      return _restoreWorkstream(workstreamId);
-    },
-
-    // View subs — Phase 3 minimum: switch to the manage-workstreams surface
-    // so the operator can see the parent + its sub-workstreams in the table.
-    // Phase 4 may replace this with a workstream-level center-pane view.
-    viewSubs(workstreamId) {
-      if (window.Accord?.switchSurface) {
-        window.Accord.switchSurface('workstreams');
-      }
-      // Best-effort scroll-into-view of the parent row after surface activates
-      setTimeout(() => {
-        const row = document.querySelector(`#ws-tbody tr[data-ws-id="${workstreamId}"]`);
-        row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        row?.classList.add('ws-row-flash');
-        setTimeout(() => row?.classList.remove('ws-row-flash'), 1400);
-      }, 60);
+    collapseRail(side, collapsed) {
+      _applyRailCollapse(side, !!collapsed);
     },
   };
 })();
