@@ -76,7 +76,7 @@ Each top-level workstream is one constellation node. Sub-workstreams are NOT nod
 Node visual properties:
 - **Size:** proportional to "activity weight" (more on this in §3.3)
 - **Glow intensity:** proportional to recency of last meeting + open-commitment density
-- **Color:** state-based — active workstreams cyan/teal; archived workstreams muted gray (in outer ring or filtered out)
+- **Color:** state-based — active workstreams render in Accord palette (editorial-amber `--signal` per Style Doctrine v1.7); archived workstreams muted gray (in outer ring or filtered out). Phase 2 IR64 correction: scaffolding originally said "cyan/teal" — that was Compass palette borrowed inadvertently. Accord uses its own tokens.
 - **Position:** see §3.2 layout strategy
 - **Label:** workstream name beneath node
 
@@ -105,6 +105,13 @@ Three approaches deliberated; architect-lean noted:
 **Architect-lean A** (concentric by recency). Simple algorithm; meaningful information; no substrate additions. Empty constellations (new operators with zero workstreams) show "+ Create your first workstream" prompt in the center.
 
 **Open Q-CE-4:** if A, what's the recency threshold for inner-vs-outer ring? Architect-lean: meetings in last 14 days = inner; 14-60 days = middle; 60+ days OR no meetings ever = outer. Empirically tunable.
+
+**Phase 2 IR64 refinement (codified in `accord-constellation.js`):** brand-new workstreams (zero meetings, recent `created_at`) override to **middle** ring, not outer. Rationale: a fresh workstream is unstarted, not dormant. Outer ring is reserved for genuinely dormant workstreams (no meetings AND old `created_at`). Three states differentiated:
+- Active (recent meetings) → inner
+- Brand-new (no meetings, recent `created_at` ≤ 60d) → middle
+- Aging/dormant (no meetings, old `created_at`, OR last meeting > 60d) → outer
+
+**Phase 2 IR64 refinement (days-since-last-touch source):** `accord_meetings.scheduled_for` preferred (operator-declared meeting time); falls back to `created_at` when `scheduled_for` IS NULL. Codified in implementation; informative for Phase 4 timeline-anchored work.
 
 ### §3.3 Activity weight computation
 

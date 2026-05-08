@@ -30,7 +30,71 @@ const Accord = (() => {
     channel:       null,    // Supabase realtime channel
     realtimeClient: null,
     surface:       'capture',
+
+    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3:
+    // Three-pane navigation level state. Phase 4 wires actual descent;
+    // Phase 3 maintains state + persistence so the left rail's active
+    // highlight tracks operator position.
+    level:         'constellation',  // 'constellation' | 'workstream' | 'meeting'
+    levelContext:  {},               // { workstreamId?, meetingId? }
+    viewMode:      'new',            // 'new' | 'legacy' (Legacy view toggle; Phase 5 removes legacy)
   };
+
+  // ── Persistence helpers (cross-module convention from Compass) ────
+  // sessionStorage + localStorage two-tier: session takes precedence
+  // for tab-scoped continuity, localStorage is the long-term fallback.
+  function _persistRead(key, fallback) {
+    try {
+      const s = sessionStorage.getItem(key);
+      if (s !== null) return s;
+      const l = localStorage.getItem(key);
+      if (l !== null) return l;
+    } catch (e) { /* private mode / quota — ignore */ }
+    return fallback;
+  }
+  function _persistWrite(key, value) {
+    try { sessionStorage.setItem(key, value); } catch (e) {}
+    try { localStorage.setItem(key, value); } catch (e) {}
+  }
+
+  // Hydrate persisted state at module-load (synchronous; values exist
+  // before _init() runs)
+  state.level     = _persistRead('accord-level', 'constellation');
+  state.viewMode  = _persistRead('accord-view-mode', 'new');
+  try {
+    const ctxRaw = _persistRead('accord-level-context', '{}');
+    state.levelContext = JSON.parse(ctxRaw || '{}');
+  } catch (e) { state.levelContext = {}; }
+
+  // ── Level setters (consumed by accord-rails.js) ──────────────────
+  function setLevel(nextLevel, ctx) {
+    if (nextLevel !== 'constellation' && nextLevel !== 'workstream' && nextLevel !== 'meeting') return;
+    state.level        = nextLevel;
+    state.levelContext = ctx || {};
+    _persistWrite('accord-level', state.level);
+    _persistWrite('accord-level-context', JSON.stringify(state.levelContext));
+    window.dispatchEvent(new CustomEvent('accord:level-changed', {
+      detail: { level: state.level, context: state.levelContext },
+    }));
+  }
+  function ascendLevel() {
+    if (state.level === 'meeting') {
+      const ws = state.levelContext.workstreamId;
+      setLevel('workstream', ws ? { workstreamId: ws } : {});
+    } else if (state.level === 'workstream') {
+      setLevel('constellation', {});
+    }
+    // 'constellation' is top — ESC at top is a no-op
+  }
+  function setViewMode(mode) {
+    if (mode !== 'new' && mode !== 'legacy') return;
+    state.viewMode = mode;
+    _persistWrite('accord-view-mode', mode);
+    document.getElementById('accord-app')?.setAttribute('data-view-mode', mode);
+    window.dispatchEvent(new CustomEvent('accord:view-mode-changed', {
+      detail: { viewMode: mode },
+    }));
+  }
 
   // ── DOM refs ──────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
@@ -599,6 +663,31 @@ const Accord = (() => {
     _init();
   }
 
+  // ── ESC ascend (Phase 3 stub; Phase 4 wires dissolve transitions) ──
+  // Scoped: suppressed when an input/textarea is focused or any modal
+  // is open. Phase 4 may layer additional suppression for in-flight
+  // transitions; Phase 3 just ascends one level per ESC press.
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape') return;
+    const t = ev.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (document.querySelector('.modal-backdrop.active, [class*="modal"][style*="block"]')) return;
+    if (state.viewMode !== 'new') return;
+    ascendLevel();
+  });
+
+  // Apply view-mode attribute on the chrome at first paint so CSS
+  // can scope rule selectors
+  function _applyViewModeAttr() {
+    const root = document.getElementById('accord-app');
+    if (root) root.setAttribute('data-view-mode', state.viewMode);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _applyViewModeAttr);
+  } else {
+    _applyViewModeAttr();
+  }
+
   return {
     state,
     switchSurface,
@@ -608,6 +697,11 @@ const Accord = (() => {
     endMeeting,
     broadcast,
     _esc,
+
+    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3 — level state surface
+    setLevel,
+    ascendLevel,
+    setViewMode,
   };
 })();
 

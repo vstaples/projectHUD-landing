@@ -11,6 +11,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
+<!-- CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 2 + Phase 3 stylesheets -->
+<link rel="stylesheet" href="/css/accord-constellation.css">
+<link rel="stylesheet" href="/css/accord-rails.css">
 <style>
 /* ============================================================
    Accord — Live Capture surface (CMD-A3)
@@ -2700,7 +2703,7 @@
 </head>
 
 <body>
-<div id="accord-app">
+<div id="accord-app" data-view-mode="new">
 
   <!-- ── Top nav ──────────────────────────────────────────────── -->
   <nav class="topnav">
@@ -2716,6 +2719,13 @@
     <a href="#" class="chrome-link" id="manageWorkstreamsLink"
        title="Manage workstream organizing buckets">Manage workstreams</a>
 
+    <!-- CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3: Legacy view toggle.
+         Flips the body between the new three-pane chrome and the
+         original five-tab surface-switch layout. Removed at Phase 5
+         closure once the new view is the only top-level entry. -->
+    <a href="#" class="chrome-link" id="legacyViewToggle"
+       title="Toggle between new three-pane view and legacy five-tab layout">Legacy view</a>
+
     <div class="surface-switch" role="tablist">
       <button data-surface="capture"  class="active">Live Capture</button>
       <button data-surface="document">Living Document</button>
@@ -2724,6 +2734,52 @@
       <button data-surface="minutes">Minutes</button>
     </div>
   </nav>
+
+  <!-- ── CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3: Three-pane shell ──
+       Visible when data-view-mode="new". Hidden when "legacy".
+       Center pane hosts the Phase 2 constellation; workstream-level
+       and meeting-level views land in Phase 4. -->
+  <div class="ac-three-pane">
+
+    <aside class="ac-rail-left" id="ac-rail-left">
+      <div class="ac-rail-header">
+        <div class="ac-rail-title">Workstreams</div>
+        <button type="button" class="ac-rail-collapse" id="ac-leftrail-collapse"
+                aria-expanded="true" title="Collapse">‹</button>
+      </div>
+      <input id="ac-tree-search" class="ac-tree-search" type="text"
+             placeholder="Search workstreams, meetings…" style="margin:0 14px 0;width:calc(100% - 28px)">
+      <button id="ac-tree-new-btn" class="ac-tree-new-btn"
+              style="margin:7px 14px 0;width:calc(100% - 28px)">+ New workstream</button>
+      <div class="ac-tree-scroll">
+        <div id="ac-tree-body"></div>
+      </div>
+    </aside>
+
+    <main class="ac-center">
+      <!-- Phase 2 constellation host. accord-rails.js calls
+           AccordConstellation.init(this) on first mount. -->
+      <div class="ac-stage" id="ac-constellation-host"></div>
+    </main>
+
+    <aside class="ac-rail-right" id="ac-rail-right">
+      <div class="ac-rail-header">
+        <div class="ac-rail-title">Parking lot</div>
+        <button type="button" class="ac-parking-sort-btn" id="ac-parking-sort-btn"
+                title="Sort by name">a–z</button>
+        <button type="button" class="ac-rail-collapse" id="ac-rightrail-collapse"
+                aria-expanded="true" title="Collapse">›</button>
+      </div>
+      <div class="ac-parking-body" id="ac-parking-body"></div>
+    </aside>
+
+  </div>
+
+  <!-- ── Legacy view: original surface containers, kept verbatim ──
+       Visible when data-view-mode="legacy". The legacy switchSurface()
+       chrome continues to operate on these unchanged. Phase 5 removes
+       the entire .ac-legacy-surfaces wrapper. -->
+  <div class="ac-legacy-surfaces">
 
   <!-- ── Surface: Live Capture ───────────────────────────────── -->
   <section class="surface surface-capture active" id="surface-capture">
@@ -3088,6 +3144,8 @@
     </div>
   </section>
 
+  </div><!-- / .ac-legacy-surfaces -->
+
   <!-- ── Re-render confirm modal ─────────────────────────────── -->
   <div class="modal-backdrop" id="rerenderConfirmModal">
     <div class="modal">
@@ -3296,6 +3354,9 @@
     load('/js/accord-digest.js');
     load('/js/accord-minutes.js');
     load('/js/accord-workstreams.js');
+    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 2 + Phase 3
+    load('/js/accord-constellation.js');
+    load('/js/accord-rails.js');
   })();
 </script>
 
