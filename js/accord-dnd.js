@@ -198,20 +198,25 @@
         </label>`;
     });
     choicesEl.innerHTML = html;
-    okBtn.disabled = true;
 
-    // Wire radios
-    choicesEl.querySelectorAll('input[type="radio"]').forEach(r => {
-      r.addEventListener('change', () => {
-        okBtn.disabled = !choicesEl.querySelector('input[type="radio"]:checked');
-      });
-    });
-
-    // Re-bind buttons idempotently
+    // Re-bind buttons idempotently FIRST. The previous ordering
+    // (radios first, then clone) attached radio change-handlers to
+    // the OLD button which then got replaced by a clone — leaving
+    // the visible button frozen-disabled (operator-found Phase 4b
+    // defect). Clone first, then wire radios against the new node.
     const newOk = okBtn.cloneNode(true);
     okBtn.parentNode.replaceChild(newOk, okBtn);
     const newCancel = cancelBtn.cloneNode(true);
     cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+    newOk.disabled = true;
+
+    // Wire radios against the live button
+    choicesEl.querySelectorAll('input[type="radio"]').forEach(r => {
+      r.addEventListener('change', () => {
+        newOk.disabled = !choicesEl.querySelector('input[type="radio"]:checked');
+      });
+    });
 
     const close = () => modal.classList.remove('visible');
 

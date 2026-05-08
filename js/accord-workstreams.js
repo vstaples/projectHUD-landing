@@ -421,23 +421,27 @@
       return;
     }
 
-    // Show modal in loading state immediately so the operator sees
-    // visual response while we fetch impact
-    titleEl.textContent = `Archive "${w.name}"?`;
-    sumEl.innerHTML = '<p class="ac-archive-loading">Calculating impact…</p>';
-    okBtn.disabled = true;
-    modal.classList.add('visible');
-
-    // Gather impact
-    const impact = await _gatherArchiveImpact(workstreamId);
-    sumEl.innerHTML = _renderArchiveSummary(w, impact);
-    okBtn.disabled = false;
-
-    // Wire OK / Cancel idempotently — replaceWith clones drop prior listeners
+    // Wire OK / Cancel idempotently — clone-replace drops prior listeners.
+    // Pattern note (Phase 4b operator-found defect, dnd disambig modal):
+    // when both setting disabled state AND wiring listeners on the same
+    // button, clone FIRST and operate on the new node throughout. Setting
+    // state on the OLD node before cloning is a footgun if any listener
+    // (radio change, etc.) closes over the OLD reference — those mutations
+    // target a detached element after replaceChild.
     const newOk = okBtn.cloneNode(true);
     okBtn.parentNode.replaceChild(newOk, okBtn);
     const newCancel = cancelBtn.cloneNode(true);
     cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+    // Show modal in loading state, gather impact, then enable confirm
+    titleEl.textContent = `Archive "${w.name}"?`;
+    sumEl.innerHTML = '<p class="ac-archive-loading">Calculating impact…</p>';
+    newOk.disabled = true;
+    modal.classList.add('visible');
+
+    const impact = await _gatherArchiveImpact(workstreamId);
+    sumEl.innerHTML = _renderArchiveSummary(w, impact);
+    newOk.disabled = false;
 
     const close = () => modal.classList.remove('visible');
 
