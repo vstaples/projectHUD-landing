@@ -1,0 +1,74 @@
+SQL #1:
+
+| column_name             | data_type                | is_nullable | column_default    |
+| ----------------------- | ------------------------ | ----------- | ----------------- |
+| nra_id                  | uuid                     | NO          | gen_random_uuid() |
+| node_id                 | uuid                     | NO          | null              |
+| firm_id                 | uuid                     | NO          | null              |
+| state                   | text                     | NO          | null              |
+| nra_type                | text                     | YES         | null              |
+| due_date                | date                     | YES         | null              |
+| description             | text                     | YES         | null              |
+| owner_resource_id       | uuid                     | YES         | null              |
+| owner_event_type        | text                     | YES         | null              |
+| owner_is_operator       | boolean                  | NO          | false             |
+| trigger_kind            | text                     | YES         | null              |
+| trigger_target_id       | uuid                     | YES         | null              |
+| resolution_candidate_at | timestamp with time zone | YES         | null              |
+| waived_at               | timestamp with time zone | YES         | null              |
+| waived_reason           | text                     | YES         | null              |
+| deferred_at             | timestamp with time zone | YES         | null              |
+| resolved_at             | timestamp with time zone | YES         | null              |
+| resolved_by_resource_id | uuid                     | YES         | null              |
+| resolved_mechanism      | text                     | YES         | null              |
+| resolved_event_id       | uuid                     | YES         | null              |
+| superseded_at           | timestamp with time zone | YES         | null              |
+| superseded_by_id        | uuid                     | YES         | null              |
+| created_at              | timestamp with time zone | NO          | now()             |
+| created_by_user_id      | uuid                     | NO          | null              |
+
+SQL #2:
+
+| conname                              | pg_get_constraintdef                                                                                                                                                                                |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| accord_nras_declared_has_core        | CHECK (((state <> 'declared'::text) OR ((nra_type IS NOT NULL) AND (due_date IS NOT NULL) AND (description IS NOT NULL))))                                                                          |
+| accord_nras_declared_has_owner       | CHECK (((state <> 'declared'::text) OR (owner_resource_id IS NOT NULL) OR (owner_event_type IS NOT NULL) OR (owner_is_operator = true)))                                                            |
+| accord_nras_deferred_consistency     | CHECK (((state <> 'deferred'::text) OR (deferred_at IS NOT NULL)))                                                                                                                                  |
+| accord_nras_resolved_consistency     | CHECK (((state <> 'resolved'::text) OR ((resolved_at IS NOT NULL) AND (resolved_by_resource_id IS NOT NULL) AND (resolved_mechanism IS NOT NULL))))                                                 |
+| accord_nras_resolved_mechanism_check | CHECK (((resolved_mechanism IS NULL) OR (resolved_mechanism = ANY (ARRAY['manual'::text, 'meeting_scheduled'::text, 'meeting_sealed'::text, 'action_resolved'::text, 'decision_resolved'::text])))) |
+| accord_nras_state_check              | CHECK ((state = ANY (ARRAY['declared'::text, 'waived'::text, 'deferred'::text, 'resolved'::text, 'superseded'::text])))                                                                             |
+| accord_nras_superseded_consistency   | CHECK (((state <> 'superseded'::text) OR ((superseded_at IS NOT NULL) AND (superseded_by_id IS NOT NULL))))                                                                                         |
+| accord_nras_trigger_kind_check       | CHECK (((trigger_kind IS NULL) OR (trigger_kind = ANY (ARRAY['meeting_scheduled_in_workstream'::text, 'meeting_sealed_in_workstream'::text, 'action_resolved'::text, 'decision_resolved'::text])))) |
+| accord_nras_type_check               | CHECK (((nra_type IS NULL) OR (nra_type = ANY (ARRAY['pending_external'::text, 'pending_internal'::text]))))                                                                                        |
+| accord_nras_waived_consistency       | CHECK (((state <> 'waived'::text) OR ((waived_at IS NOT NULL) AND (waived_reason IS NOT NULL))))                                                                                                    |
+
+SQL #3:
+
+| indexname                     | indexdef                                                                                                                                                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| accord_nras_pkey              | CREATE UNIQUE INDEX accord_nras_pkey ON public.accord_nras USING btree (nra_id)                                                                                                                                        |
+| nras_due_date_idx             | CREATE INDEX nras_due_date_idx ON public.accord_nras USING btree (due_date) WHERE (state = 'declared'::text)                                                                                                           |
+| nras_firm_id_state_idx        | CREATE INDEX nras_firm_id_state_idx ON public.accord_nras USING btree (firm_id, state)                                                                                                                                 |
+| nras_node_id_idx              | CREATE INDEX nras_node_id_idx ON public.accord_nras USING btree (node_id)                                                                                                                                              |
+| nras_owner_resource_idx       | CREATE INDEX nras_owner_resource_idx ON public.accord_nras USING btree (owner_resource_id) WHERE (state = 'declared'::text)                                                                                            |
+| nras_resolution_candidate_idx | CREATE INDEX nras_resolution_candidate_idx ON public.accord_nras USING btree (firm_id, resolution_candidate_at) WHERE ((state = 'declared'::text) AND (resolution_candidate_at IS NOT NULL) AND (resolved_at IS NULL)) |
+| nras_trigger_kind_idx         | CREATE INDEX nras_trigger_kind_idx ON public.accord_nras USING btree (trigger_kind, trigger_target_id) WHERE ((state = 'declared'::text) AND (trigger_kind IS NOT NULL))                                               |
+
+SQL #4:  Success. No rows returned
+
+SQL #5:
+
+| policyname                         | cmd    | qual                                                                                                            | with_check                                                                                                                                                                                                                                          |
+| ---------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| accord_nras_insert                 | INSERT | null                                                                                                            | ((firm_id = my_firm_id()) AND (created_by_user_id = auth.uid()))                                                                                                                                                                                    |
+| accord_nras_select                 | SELECT | (firm_id = my_firm_id())                                                                                        | null                                                                                                                                                                                                                                                |
+| nras_update_declared_to_deferred   | UPDATE | ((firm_id = my_firm_id()) AND (state = 'declared'::text) AND (superseded_at IS NULL))                           | ((firm_id = my_firm_id()) AND (state = 'deferred'::text) AND (deferred_at IS NOT NULL))                                                                                                                                                             |
+| nras_update_declared_to_resolved   | UPDATE | ((firm_id = my_firm_id()) AND (state = 'declared'::text) AND (resolved_at IS NULL) AND (superseded_at IS NULL)) | ((firm_id = my_firm_id()) AND (state = 'resolved'::text) AND (resolved_at IS NOT NULL) AND (resolved_by_resource_id IS NOT NULL) AND (resolved_mechanism IS NOT NULL))                                                                              |
+| nras_update_declared_to_superseded | UPDATE | ((firm_id = my_firm_id()) AND (state = 'declared'::text) AND (superseded_at IS NULL))                           | ((firm_id = my_firm_id()) AND (state = 'superseded'::text) AND (superseded_at IS NOT NULL) AND (superseded_by_id IS NOT NULL))                                                                                                                      |
+| nras_update_deferred_to_declared   | UPDATE | ((firm_id = my_firm_id()) AND (state = 'deferred'::text) AND (superseded_at IS NULL))                           | ((firm_id = my_firm_id()) AND (state = 'declared'::text) AND (nra_type IS NOT NULL) AND (due_date IS NOT NULL) AND (description IS NOT NULL) AND ((owner_resource_id IS NOT NULL) OR (owner_event_type IS NOT NULL) OR (owner_is_operator = true))) |
+| nras_update_resolution_candidate   | UPDATE | ((firm_id = my_firm_id()) AND (state = 'declared'::text) AND (resolved_at IS NULL) AND (superseded_at IS NULL)) | ((firm_id = my_firm_id()) AND (state = 'declared'::text) AND (resolution_candidate_at IS NOT NULL) AND (resolved_at IS NULL))                                                                                                                       |
+
+SQL #6:
+
+
+

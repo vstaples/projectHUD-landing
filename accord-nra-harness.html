@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NRA Surface — Phase 2 visual approval harness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Subset of accord.html palette — mirrors lines 25-56 verbatim.
+   This harness is a reference render only; production styles live
+   in accord-nra.css and consume tokens from accord.html.          */
+:root {
+  --canvas-deep:   #1a1816;
+  --canvas:        #211e1a;
+  --canvas-raised: #2a2622;
+  --canvas-elev:   #34302a;
+
+  --ink-primary:   #f4ede0;
+  --ink-body:      #d6cdb8;
+  --ink-muted:     #b3a78f;
+  --ink-faint:     #908572;
+  --ink-ghost:     #5a5347;
+
+  --signal:        #d4a04a;
+  --signal-soft:   rgba(212, 160, 74, 0.15);
+  --signal-dim:    rgba(212, 160, 74, 0.4);
+
+  --tag-note:      #8ba89a;
+  --tag-decision:  #c9956a;
+  --tag-action:    #b07c8a;
+  --tag-risk:      #a86f5e;
+  --tag-question:  #7b8fa8;
+
+  --rule:          rgba(244, 237, 224, 0.06);
+  --rule-strong:   rgba(244, 237, 224, 0.12);
+}
+
+* { box-sizing: border-box; }
+html, body {
+  background: var(--canvas-deep);
+  color: var(--ink-body);
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+#accord-app {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+#accord-app h1 {
+  font-family: 'Fraunces', serif;
+  color: var(--ink-primary);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+#accord-app h2 {
+  font-family: 'Fraunces', serif;
+  color: var(--ink-primary);
+  font-weight: 500;
+  font-size: 18px;
+  margin-top: 32px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 6px;
+}
+#accord-app .meta {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 24px;
+}
+
+.harness-row {
+  display: grid;
+  grid-template-columns: 220px 1fr 60px;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule);
+}
+.harness-row:last-child { border-bottom: none; }
+.harness-row .variant-label {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-faint);
+}
+.harness-row .variant-render {
+  font-size: 12px;
+  color: var(--ink-body);
+}
+.harness-row .variant-action {
+  font-size: 11px;
+  color: var(--ink-ghost);
+  text-align: right;
+}
+
+.harness-mock-node {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--canvas);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--ink-body);
+}
+.harness-mock-node .seq {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--ink-muted);
+}
+
+button.harness-btn {
+  background: var(--canvas-elev);
+  border: 1px solid var(--rule);
+  color: var(--ink-primary);
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  margin: 4px 6px 4px 0;
+  font-family: inherit;
+}
+button.harness-btn:hover {
+  border-color: var(--rule-strong);
+}
+button.btn { /* match accord.html .btn */
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-body);
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+button.btn-ghost { color: var(--ink-muted); }
+button.btn-signal {
+  border-color: var(--signal-dim);
+  background: var(--signal-soft);
+  color: var(--signal);
+}
+
+/* Modal harness: simplified backdrop */
+#accord-app .modal-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  align-items: center; justify-content: center;
+}
+#accord-app .modal-backdrop.visible { display: flex; }
+#accord-app .modal {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  padding: 24px;
+  max-width: 480px;
+  width: calc(100% - 48px);
+  color: var(--ink-body);
+}
+#accord-app .modal h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--ink-primary);
+  margin-bottom: 12px;
+}
+#accord-app .modal p { font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+#accord-app .modal label {
+  display: block;
+  font: 500 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin: 12px 0 4px;
+}
+#accord-app .modal input[type=text],
+#accord-app .modal input[type=datetime-local] {
+  width: 100%;
+  background: var(--canvas);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink-primary);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+#accord-app .modal-actions {
+  display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px;
+}
+</style>
+<link rel="stylesheet" href="accord-nra.css">
+</head>
+<body>
+
+<div id="accord-app">
+  <h1>NRA Surface — Phase 2 visual approval harness</h1>
+  <div class="meta">CMD-ACCORD-NRA-SURFACE-1 · Phase 2 · architect close-out reference</div>
+
+  <h2>Badge variants</h2>
+
+  <div class="harness-row">
+    <div class="variant-label">declared (operator)</div>
+    <div class="variant-render" id="b1"></div>
+    <div class="variant-action">edit→</div>
+  </div>
+  <div class="harness-row">
+    <div class="variant-label">declared (event-anchored)</div>
+    <div class="variant-render" id="b2"></div>
+    <div class="variant-action">edit→</div>
+  </div>
+  <div class="harness-row">
+    <div class="variant-label">declared (external)</div>
+    <div class="variant-render" id="b3"></div>
+    <div class="variant-action">edit→</div>
+  </div>
+  <div class="harness-row">
+    <div class="variant-label">resolution candidate</div>
+    <div class="variant-render" id="b4"></div>
+    <div class="variant-action">edit→</div>
+  </div>
+  <div class="harness-row">
+    <div class="variant-label">waived</div>
+    <div class="variant-render" id="b5"></div>
+    <div class="variant-action">edit→</div>
+  </div>
+  <div class="harness-row">
+    <div class="variant-label">deferred (≤30d)</div>
+    <div class="variant-render" id="b6"></div>
+    <div class="variant-action">edit→</div>
+  </div>
+  <div class="harness-row">
+    <div class="variant-label">deferred (31-60d)</div>
+    <div class="variant-render" id="b7"></div>
+    <div class="variant-action">edit→</div>
+  </div>
+  <div class="harness-row">
+    <div class="variant-label">deferred (60d+)</div>
+    <div class="variant-render" id="b8"></div>
+    <div class="variant-action">edit→</div>
+  </div>
+  <div class="harness-row">
+    <div class="variant-label">history-only</div>
+    <div class="variant-render" id="b9"></div>
+    <div class="variant-action">history→</div>
+  </div>
+  <div class="harness-row">
+    <div class="variant-label">grandfathered (no NRA)</div>
+    <div class="variant-render" id="b10"></div>
+    <div class="variant-action">declare→</div>
+  </div>
+
+  <h2>Mock node-row context (preview)</h2>
+  <div class="harness-mock-node">
+    <span class="seq">DC-007</span>
+    <span>Adopt Acme as primary heatsink supplier</span>
+    <span id="b-mock-context"></span>
+  </div>
+
+  <h2>Modal — interactive preview</h2>
+  <p style="font-size:12px;color:var(--ink-muted)">
+    Click each button to render the modal. Submit will fail (no API/auth in harness); cancel/ESC dismiss only.
+  </p>
+  <button class="harness-btn" id="open-declare">Declare NRA modal</button>
+  <button class="harness-btn" id="open-waive">Waive NRA modal</button>
+  <button class="harness-btn" id="open-defer">Defer NRA modal</button>
+  <button class="harness-btn" id="open-update">Update NRA modal</button>
+
+  <h2>History panel — interactive preview</h2>
+  <button class="harness-btn" id="open-history">Open history panel</button>
+
+  <!-- Modal anchor (matches accord.html convention) -->
+  <div class="modal-backdrop" id="accord-nra-modal-backdrop">
+    <div class="modal"></div>
+  </div>
+
+  <!-- History panel anchor -->
+  <div id="accord-nra-history-panel">
+    <div class="accord-nra-panel-head">
+      <h3>NRA history</h3>
+      <button class="accord-nra-panel-close" type="button">×</button>
+    </div>
+    <div class="accord-nra-panel-body"></div>
+  </div>
+</div>
+
+<!-- Stub the API helper for harness — module loads but RPC fails gracefully -->
+<script>
+window.API = {
+  get:   () => Promise.resolve([]),
+  post:  () => Promise.reject(new Error('Harness has no backend')),
+  patch: () => Promise.reject(new Error('Harness has no backend')),
+  rpc:   () => Promise.reject(new Error('Harness has no backend')),
+};
+</script>
+
+<script src="accord-nra.js"></script>
+
+<script>
+// ── Render badge variants ────────────────────────────────
+const mockNode = { node_id: 'aaaaaaaa-1111-2222-3333-444444444444', firm_id: 'aaaaaaaa-0001-0001-0001-000000000001' };
+
+const today = new Date();
+const isoIn = (days) => new Date(today.getTime() + days * 86400000).toISOString().slice(0, 10);
+const isoAgo = (days) => new Date(today.getTime() - days * 86400000).toISOString();
+
+const variants = [
+  ['b1', { state:'declared', nra_id:'1', owner_is_operator:true, nra_type:'pending_internal',
+            description:'Confirm BOM with team by EOM', due_date: isoIn(7) }],
+  ['b2', { state:'declared', nra_id:'2', owner_event_type:'next_phase_review',
+            nra_type:'pending_internal', description:'Review at next gate', due_date: isoIn(14) }],
+  ['b3', { state:'declared', nra_id:'3', owner_resource_id:'r-acme',
+            nra_type:'pending_external', description:'Acme to confirm pricing',
+            due_date: isoIn(21) }],
+  ['b4', { state:'declared', nra_id:'4', owner_event_type:'next_status_sync',
+            nra_type:'pending_internal', description:'',
+            due_date: isoIn(3), resolution_candidate_at: new Date().toISOString() }],
+  ['b5', { state:'waived', nra_id:'5', waived_at: isoAgo(10),
+            waived_reason:'Reference-only; superseded by DC-014' }],
+  ['b6', { state:'deferred', nra_id:'6', deferred_at: isoAgo(15) }],
+  ['b7', { state:'deferred', nra_id:'7', deferred_at: isoAgo(45) }],
+  ['b8', { state:'deferred', nra_id:'8', deferred_at: isoAgo(75) }],
+];
+
+variants.forEach(([id, nra]) => {
+  document.getElementById(id).innerHTML = AccordNRA.Badge.render(mockNode, nra);
+});
+
+document.getElementById('b9').innerHTML  = AccordNRA.Badge.render(mockNode, null, 4);
+document.getElementById('b10').innerHTML = AccordNRA.Badge.render(mockNode, null, 0);
+
+// Mock node-row preview: an "in-context" badge next to a node summary
+document.getElementById('b-mock-context').innerHTML = AccordNRA.Badge.render(mockNode, variants[0][1]);
+
+// ── Modal preview wiring ─────────────────────────────────
+document.getElementById('open-declare').addEventListener('click', () => {
+  AccordNRA.Modal.open(mockNode, 'declare');
+});
+document.getElementById('open-waive').addEventListener('click', () => {
+  AccordNRA.Modal.open(mockNode, 'waive');
+});
+document.getElementById('open-defer').addEventListener('click', () => {
+  AccordNRA.Modal.open(mockNode, 'defer');
+});
+document.getElementById('open-update').addEventListener('click', () => {
+  AccordNRA.Modal.open(mockNode, 'update', {
+    nra_id:            'mock-nra-1',
+    nra_type:          'pending_internal',
+    due_date:          isoIn(10),
+    description:       'Existing NRA — confirm with vendor',
+    owner_event_type:  'next_phase_review',
+    owner_is_operator: false,
+    trigger_kind:      'meeting_scheduled_in_workstream',
+  });
+});
+
+// ── History panel preview ────────────────────────────────
+document.getElementById('open-history').addEventListener('click', () => {
+  AccordNRA.HistoryPanel.open(mockNode.node_id, [
+    { state:'resolved', nra_id:'h1', resolved_at: isoAgo(2),
+      resolved_mechanism:'meeting_scheduled', owner_is_operator:true,
+      description:'Confirm BOM final spec' },
+    { state:'declared', nra_id:'h2', created_at: isoAgo(5),
+      due_date: isoAgo(2), owner_is_operator:true,
+      description:'Confirm BOM final spec' },
+    { state:'superseded', nra_id:'h3', superseded_at: isoAgo(5),
+      created_at: isoAgo(20), owner_event_type:'next_phase_review',
+      description:'Original phase-review NRA, superseded after vendor change' },
+    { state:'declared', nra_id:'h4', created_at: isoAgo(20),
+      due_date: isoAgo(7), owner_event_type:'next_phase_review',
+      description:'Original phase-review NRA, superseded after vendor change' },
+  ]);
+});
+</script>
+
+</body>
+</html>

@@ -64,6 +64,23 @@ const API = (() => {
   const patch  = (path, body)   => query(path, { method: 'PATCH', body });
   const del    = (path)         => query(path, { method: 'DELETE' });
 
+  // ── CMD-ACCORD-NRA-SURFACE-1 Phase 2: PostgREST RPC ────────
+  // Calls a SECURITY INVOKER substrate helper function via PostgREST RPC
+  // endpoint: POST /rest/v1/rpc/<functionName>. Body is a JSON object whose
+  // keys match the function's parameter names (without the `p_` prefix
+  // convention; PostgREST maps directly).
+  //
+  // Mirrors the existing query() auth + error path: bearer-token auth,
+  // 401-retry, throws on non-2xx with parsed error body. Substrate helpers
+  // RAISE EXCEPTION as P0001 on validation failure; these surface as
+  // 4xx responses with error text accessible via the thrown Error message.
+  //
+  // Per Phase 1 disposition (Option 1): preserves substrate helper
+  // atomicity (especially supersede_nra) instead of bypassing helpers
+  // via direct PATCH paths.
+  const rpc = (functionName, body) =>
+    query(`rpc/${functionName}`, { method: 'POST', body: body || {} });
+
   // ── EDGE FUNCTION: resolve-uri (CMD-A2) ────────────────────
   // Resolves a cross-module URI (accord://, compass://, aegis://)
   // to a rendered card structure. Always returns a response object;
@@ -192,6 +209,7 @@ const API = (() => {
 
   return {
     get, post, patch, del,
+    rpc,                                 // CMD-ACCORD-NRA-SURFACE-1 Phase 2 PostgREST RPC
     resolveURI,                          // CMD-A2 cross-module URI resolver
     invokeEdgeFunction,                  // CMD-A7 generic Edge Function invoker
     getFirms, getInternalFirm,
