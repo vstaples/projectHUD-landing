@@ -31,13 +31,12 @@ const Accord = (() => {
     realtimeClient: null,
     surface:       'capture',
 
-    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3:
-    // Three-pane navigation level state. Phase 4 wires actual descent;
-    // Phase 3 maintains state + persistence so the left rail's active
-    // highlight tracks operator position.
+    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3 + 5:
+    // Three-pane navigation level state. Phase 5 closure removed
+    // viewMode (legacy toggle gone) — only `level` + `levelContext`
+    // remain.
     level:         'constellation',  // 'constellation' | 'workstream' | 'meeting'
     levelContext:  {},               // { workstreamId?, meetingId? }
-    viewMode:      'new',            // 'new' | 'legacy' (Legacy view toggle; Phase 5 removes legacy)
   };
 
   // ── Persistence helpers (cross-module convention from Compass) ────
@@ -60,7 +59,6 @@ const Accord = (() => {
   // Hydrate persisted state at module-load (synchronous; values exist
   // before _init() runs)
   state.level     = _persistRead('accord-level', 'constellation');
-  state.viewMode  = _persistRead('accord-view-mode', 'new');
   try {
     const ctxRaw = _persistRead('accord-level-context', '{}');
     state.levelContext = JSON.parse(ctxRaw || '{}');
@@ -85,15 +83,6 @@ const Accord = (() => {
       setLevel('constellation', {});
     }
     // 'constellation' is top — ESC at top is a no-op
-  }
-  function setViewMode(mode) {
-    if (mode !== 'new' && mode !== 'legacy') return;
-    state.viewMode = mode;
-    _persistWrite('accord-view-mode', mode);
-    document.getElementById('accord-app')?.setAttribute('data-view-mode', mode);
-    window.dispatchEvent(new CustomEvent('accord:view-mode-changed', {
-      detail: { viewMode: mode },
-    }));
   }
 
   // ── DOM refs ──────────────────────────────────────────────────
@@ -663,30 +652,20 @@ const Accord = (() => {
     _init();
   }
 
-  // ── ESC ascend (Phase 3 stub; Phase 4 wires dissolve transitions) ──
+  // ── ESC ascend ─────────────────────────────────────────────────
   // Scoped: suppressed when an input/textarea is focused, any modal
-  // is open, in legacy view, or a transition is in flight (Phase 4a).
+  // is open, or a transition is in flight.
   document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Escape') return;
     const t = ev.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     if (document.querySelector('.modal-backdrop.active, [class*="modal"][style*="block"]')) return;
-    if (state.viewMode !== 'new') return;
     if (window.AccordTransitions?.isInFlight?.()) return;
     ascendLevel();
   });
 
-  // Apply view-mode attribute on the chrome at first paint so CSS
-  // can scope rule selectors
-  function _applyViewModeAttr() {
-    const root = document.getElementById('accord-app');
-    if (root) root.setAttribute('data-view-mode', state.viewMode);
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', _applyViewModeAttr);
-  } else {
-    _applyViewModeAttr();
-  }
+  // Phase 5: data-view-mode attribute removed from chrome — no-op.
+  // Removed: _applyViewModeAttr() from Phase 3.
 
   return {
     state,
@@ -701,7 +680,6 @@ const Accord = (() => {
     // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3 — level state surface
     setLevel,
     ascendLevel,
-    setViewMode,
   };
 })();
 

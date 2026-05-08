@@ -836,15 +836,31 @@
 
   // ── Wire-up (one-time) ──────────────────────────────────────
   function _wireUI() {
-    // Chrome link → switch to workstreams surface + refresh
+    // Chrome link → standalone management surface. Phase 5: surface
+    // host is gated to meeting context by default; for the Manage
+    // Workstreams chrome link we mount it as a body-overlay so the
+    // operator can manage workstreams from any level. ESC handler
+    // (level-state ascend) is unaffected because the host's overlay
+    // mode does not change the level.
     const chrome = $('manageWorkstreamsLink');
     if (chrome) {
       chrome.addEventListener('click', async (ev) => {
         ev.preventDefault();
+        const surfHost = $('ac-meeting-surface-host');
+        if (surfHost) {
+          // Promote to overlay (top of #accord-app stack) and show
+          surfHost.classList.add('active', 'ac-surface-overlay');
+          // Ensure it's a direct child of #accord-app so it overlays
+          // the three-pane shell; if it's currently parked inside a
+          // meeting tab body or document.body, move it into the app
+          const appRoot = $('accord-app');
+          if (appRoot && surfHost.parentElement !== appRoot) {
+            appRoot.appendChild(surfHost);
+          }
+        }
         if (window.Accord?.switchSurface) {
           window.Accord.switchSurface('workstreams');
         } else {
-          // Fallback: directly toggle the surface
           document.querySelectorAll('#accord-app .surface').forEach(s => s.classList.remove('active'));
           $('surface-workstreams')?.classList.add('active');
           window.dispatchEvent(new CustomEvent('accord:surface-changed', { detail: { surface: 'workstreams' } }));
@@ -854,11 +870,28 @@
       });
     }
 
-    // Top-nav surface change deactivates chrome-link active state
+    // Top-nav surface change deactivates chrome-link active state.
+    // Also: any non-workstreams surface activation drops the overlay.
     window.addEventListener('accord:surface-changed', (ev) => {
       const surf = ev?.detail?.surface;
       if (surf !== 'workstreams' && chrome) chrome.classList.remove('active');
+      if (surf !== 'workstreams') {
+        $('ac-meeting-surface-host')?.classList.remove('ac-surface-overlay');
+      }
     });
+
+    // ESC at constellation level closes the management overlay.
+    // Level-state ascend already handles ESC for non-overlay cases;
+    // this handler short-circuits for the overlay scenario.
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape') return;
+      const surfHost = $('ac-meeting-surface-host');
+      if (surfHost?.classList.contains('ac-surface-overlay')) {
+        surfHost.classList.remove('ac-surface-overlay', 'active');
+        chrome?.classList.remove('active');
+        ev.stopImmediatePropagation();   // suppress accord-core's ascend
+      }
+    }, true);  // capture phase
 
     // New-workstream button on management surface
     $('ws-new-btn')?.addEventListener('click', () => _openCreateModal('create'));

@@ -74,6 +74,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;   /* CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 5: anchor for .ac-surface-overlay */
 }
 
 #accord-app * { box-sizing: border-box; }
@@ -2704,7 +2705,7 @@
 </head>
 
 <body>
-<div id="accord-app" data-view-mode="new">
+<div id="accord-app">
 
   <!-- ── Top nav ──────────────────────────────────────────────── -->
   <nav class="topnav">
@@ -2720,26 +2721,12 @@
     <a href="#" class="chrome-link" id="manageWorkstreamsLink"
        title="Manage workstream organizing buckets">Manage workstreams</a>
 
-    <!-- CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3: Legacy view toggle.
-         Flips the body between the new three-pane chrome and the
-         original five-tab surface-switch layout. Removed at Phase 5
-         closure once the new view is the only top-level entry. -->
-    <a href="#" class="chrome-link" id="legacyViewToggle"
-       title="Toggle between new three-pane view and legacy five-tab layout">Legacy view</a>
-
-    <div class="surface-switch" role="tablist">
-      <button data-surface="capture"  class="active">Live Capture</button>
-      <button data-surface="document">Living Document</button>
-      <button data-surface="ledger">Decision Ledger</button>
-      <button data-surface="digest">Digest &amp; Send</button>
-      <button data-surface="minutes">Minutes</button>
-    </div>
+    <!-- CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 5: top-level tab bar
+         + Legacy view toggle REMOVED at closure. Surfaces are
+         meeting-scoped and accessible only via meeting-view tabs. -->
   </nav>
 
-  <!-- ── CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3: Three-pane shell ──
-       Visible when data-view-mode="new". Hidden when "legacy".
-       Center pane hosts the Phase 2 constellation; workstream-level
-       and meeting-level views land in Phase 4. -->
+  <!-- ── CMD-ACCORD-CONSTELLATION-ENTRY-1 three-pane shell ── -->
   <div class="ac-three-pane">
 
     <aside class="ac-rail-left" id="ac-rail-left">
@@ -2776,11 +2763,16 @@
 
   </div>
 
-  <!-- ── Legacy view: original surface containers, kept verbatim ──
-       Visible when data-view-mode="legacy". The legacy switchSurface()
-       chrome continues to operate on these unchanged. Phase 5 removes
-       the entire .ac-legacy-surfaces wrapper. -->
-  <div class="ac-legacy-surfaces">
+  <!-- ── CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 5: Meeting-scoped surface host ──
+       The five surface sections (Capture / Document / Ledger / Digest / Minutes)
+       live here. accord-views.js mounts this host into the meeting-view
+       tab body via DOM-relocation when the operator descends to meeting
+       level; the surface modules unchanged still target their existing
+       hardcoded element IDs. Manage Workstreams (chrome-link target)
+       coexists in the same host but is shown only when its surface is
+       activated. Display is `none` by default; meeting-view tab clicks
+       activate one .surface and toggle the host's visibility. -->
+  <div class="ac-meeting-surface-host" id="ac-meeting-surface-host">
 
   <!-- ── Surface: Live Capture ───────────────────────────────── -->
   <section class="surface surface-capture active" id="surface-capture">
@@ -3145,7 +3137,7 @@
     </div>
   </section>
 
-  </div><!-- / .ac-legacy-surfaces -->
+  </div><!-- / .ac-meeting-surface-host -->
 
   <!-- ── Re-render confirm modal ─────────────────────────────── -->
   <div class="modal-backdrop" id="rerenderConfirmModal">

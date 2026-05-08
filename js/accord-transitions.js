@@ -115,6 +115,12 @@
     if (!state.viewHost || !state.constellationHost) return;
     const reduced = _prefersReducedMotion();
 
+    // Phase 5: detach surface host before unmounting view so meeting
+    // tab content doesn't disappear into a destroyed parent.
+    if (typeof window._accordDetachSurfaceHost === 'function') {
+      window._accordDetachSurfaceHost();
+    }
+
     // Fade out current view, fade in constellation
     if (state.viewHost.style.display !== 'none') {
       if (reduced) {

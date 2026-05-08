@@ -68,6 +68,11 @@
     if (!host) return;
     await _loadIfNeeded();
 
+    // Phase 5: ensure surface host is detached from any prior meeting
+    // tab body. Park it on document.body (hidden by default CSS) so
+    // re-mounts find it without DOM lookups failing.
+    _detachSurfaceHost();
+
     const ws = cache.workstreams.find(w => w.workstream_id === workstreamId);
     if (!ws) {
       host.innerHTML = `
@@ -366,24 +371,29 @@
             <button type="button" class="ac-mtg-tab"        data-mtg-tab="digest"   role="tab">Digest &amp; Send</button>
             <button type="button" class="ac-mtg-tab"        data-mtg-tab="minutes"  role="tab">Minutes</button>
           </div>
-          <div class="ac-meeting-tab-body" id="ac-meeting-tab-body">
-            <div class="ac-meeting-tab-stub">
-              <p>Meeting-level surfaces inherit the existing legacy renderings. Switch to <strong>Legacy view</strong> from the topnav for full Live Capture, Living Document, Ledger, Digest, or Minutes interaction. Phase 5 inlines those renderings here.</p>
-              <button type="button" class="ac-btn-secondary" data-action="open-legacy">Open in Legacy view</button>
-            </div>
-          </div>
+          <div class="ac-meeting-tab-body" id="ac-meeting-tab-body"></div>
         </div>
       </div>`;
 
     host.innerHTML = html;
     _wireMeetingView(host, meeting);
 
-    // Load the meeting into accord-core state so legacy surfaces can
-    // render it when the operator switches modes
+    // Load the meeting into accord-core state so the surface modules
+    // pick it up via accord:meeting-loaded
     if (window.Accord?.loadMeeting && meeting.meeting_id) {
       try { await window.Accord.loadMeeting(meeting.meeting_id); }
       catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure', e); }
     }
+
+    // Phase 5: relocate the meeting-surface host into the tab body.
+    // The five existing surface sections (#surface-capture etc.) live
+    // there and target their hardcoded element IDs unchanged. We just
+    // move the host node; the surface modules' addEventListener
+    // bindings are preserved (DOM-tree relocation does not detach
+    // listeners).
+    _mountSurfaceHostInTabBody();
+    // Activate default tab (capture) on first mount of a meeting view
+    _activateMeetingTab(host, 'capture');
   }
 
   function _wireMeetingView(host, meeting) {
@@ -399,24 +409,60 @@
       });
     });
 
-    // Tab buttons — Phase 4a stub. Each tab body shows the same stub copy
-    // until Phase 5 inlines per-surface renderings.
+    // Tab buttons — Phase 5: each tab activates its inlined surface
+    // via the relocated #ac-meeting-surface-host. Surface modules
+    // listen for accord:surface-changed and re-render against the
+    // currently-loaded meeting; we dispatch that event so existing
+    // modules trigger correctly.
     host.querySelectorAll('.ac-mtg-tab[data-mtg-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
-        host.querySelectorAll('.ac-mtg-tab').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        // Body content unchanged this phase — Phase 5 swaps per-tab content
+        _activateMeetingTab(host, btn.dataset.mtgTab);
       });
     });
+  }
 
-    host.querySelector('[data-action="open-legacy"]')?.addEventListener('click', () => {
-      // Switch to legacy view, then activate the matching surface
-      const activeTab = host.querySelector('.ac-mtg-tab.active')?.dataset.mtgTab || 'capture';
-      window.Accord?.setViewMode?.('legacy');
-      setTimeout(() => {
-        window.Accord?.switchSurface?.(activeTab);
-      }, 50);
+  // Phase 5: relocate #ac-meeting-surface-host into the meeting-view
+  // tab body. Idempotent — safe to call on every meeting render.
+  function _mountSurfaceHostInTabBody() {
+    const tabBody = document.getElementById('ac-meeting-tab-body');
+    const surfHost = document.getElementById('ac-meeting-surface-host');
+    if (!tabBody || !surfHost) return;
+    if (surfHost.parentElement !== tabBody) {
+      tabBody.appendChild(surfHost);          // appendChild moves the node
+    }
+    surfHost.classList.add('active');         // host visible (CSS gates display)
+  }
+
+  // Phase 5: park the surface host back at document.body (hidden by
+  // default CSS) so meeting-view re-mounts find it intact. Called when
+  // the operator ascends out of meeting view.
+  function _detachSurfaceHost() {
+    const surfHost = document.getElementById('ac-meeting-surface-host');
+    if (!surfHost) return;
+    surfHost.classList.remove('active');
+    if (surfHost.parentElement !== document.body) {
+      document.body.appendChild(surfHost);
+    }
+  }
+  // Expose for accord-transitions.js to call on the constellation path
+  window._accordDetachSurfaceHost = _detachSurfaceHost;
+
+  // Phase 5: activate one meeting-scoped surface tab. Mirrors the
+  // legacy switchSurface() semantics on the .surface elements inside
+  // the relocated host, plus drives the existing accord:surface-changed
+  // event chain so capture/document/ledger/digest/minutes modules
+  // react.
+  function _activateMeetingTab(host, surfaceName) {
+    if (!surfaceName) return;
+    // Tab visual state
+    host.querySelectorAll('.ac-mtg-tab').forEach(b => {
+      b.classList.toggle('active', b.dataset.mtgTab === surfaceName);
     });
+    // Surface module hand-off — drive Accord.switchSurface so it owns
+    // the .surface.active toggling and dispatches accord:surface-changed
+    if (window.Accord?.switchSurface) {
+      window.Accord.switchSurface(surfaceName);
+    }
   }
 
   // ── Substrate event invalidation + reactive re-render ──────

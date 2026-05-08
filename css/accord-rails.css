@@ -17,21 +17,37 @@
    All declared font sizes ≥ 11px (operator standing rule).
    ============================================================ */
 
-/* ── View-mode swap ─────────────────────────────────────────── */
-/* Legacy mode shows the original .surface-switch + stacked .surface
-   sections. New mode shows the three-pane shell + hides the legacy
-   tab bar. Both DOMs coexist; data-view-mode flips visibility. */
+/* ── Meeting-surface host (Phase 5) ──────────────────────────
+   The five surface sections coexist in this host. accord-views.js
+   relocates the host into the meeting-view tab body when the
+   operator descends; default display none keeps surfaces hidden
+   when not in meeting context. .surface.active inside the host
+   shows the active tab's content (existing legacy semantics
+   preserved unchanged for the surface modules). */
 
-#accord-app[data-view-mode="new"] .surface-switch,
-#accord-app[data-view-mode="new"] .ac-legacy-surfaces,
-#accord-app[data-view-mode="new"] #manageWorkstreamsLink {
-  display: none !important;
+#accord-app .ac-meeting-surface-host {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  flex-direction: column;
 }
-#accord-app[data-view-mode="legacy"] .ac-three-pane {
-  display: none !important;
+#accord-app .ac-meeting-surface-host.active {
+  display: flex;
 }
-#accord-app[data-view-mode="legacy"] .ac-legacy-surfaces {
-  display: contents;
+/* Manage workstreams overlay (Phase 5): direct child of #accord-app,
+   full-bleed over the three-pane shell. Drops back to nested state
+   on any non-workstreams surface activation or ESC. */
+#accord-app .ac-meeting-surface-host.ac-surface-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: var(--canvas-deep);
+}
+/* Manage workstreams: chrome-link still activates it via Accord.switchSurface;
+   it shows as a full-pane overlay regardless of meeting context. */
+#accord-app .ac-meeting-surface-host #surface-workstreams.active {
+  display: flex;
 }
 
 /* ── Three-pane shell ───────────────────────────────────────── */
