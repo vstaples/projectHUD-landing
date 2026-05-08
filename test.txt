@@ -217,3 +217,355 @@
 | public     | workstreams               | workstreams_select               | SELECT | PERMISSIVE | {public} | (firm_id = my_firm_id())                                                           | null                                                                                   |
 | public     | workstreams               | workstreams_update_active        | UPDATE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (state = 'active'::text))                            | ((firm_id = my_firm_id()) AND (state = ANY (ARRAY['active'::text, 'archived'::text]))) |
 | public     | workstreams               | workstreams_update_restore       | UPDATE | PERMISSIVE | {public} | ((firm_id = my_firm_id()) AND (state = 'archived'::text))                          | ((firm_id = my_firm_id()) AND (state = 'active'::text))                                |
+
+-- A.6: accord_nodes tag taxonomy (artifact-type verification)
+
+| constraint_name                              | table_name   | definition                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| accord_nodes_agenda_item_id_fkey             | accord_nodes | FOREIGN KEY (agenda_item_id) REFERENCES accord_agenda_items(agenda_item_id)                                                                                                                                                                                                                                     |
+| accord_nodes_created_by_fkey                 | accord_nodes | FOREIGN KEY (created_by) REFERENCES users(id)                                                                                                                                                                                                                                                                   |
+| accord_nodes_date_field_scope_check          | accord_nodes | CHECK ((((effective_date IS NULL) OR (tag = 'decision'::text)) AND ((due_date IS NULL) OR (tag = 'action'::text)) AND ((effective_date_basis IS NULL) OR (effective_date IS NOT NULL))))                                                                                                                        |
+| accord_nodes_declared_addresses_need_check   | accord_nodes | CHECK (((declared_addresses_need >= 0) AND (declared_addresses_need <= 100)))                                                                                                                                                                                                                                   |
+| accord_nodes_declared_belief_at_commit_check | accord_nodes | CHECK (((declared_belief_at_commit >= 0) AND (declared_belief_at_commit <= 100)))                                                                                                                                                                                                                               |
+| accord_nodes_dissent_fields_check            | accord_nodes | CHECK ((((tag = 'dissent'::text) AND (dissented_by IS NOT NULL) AND (dissent_rationale IS NOT NULL) AND (dissent_recorded_at IS NOT NULL)) OR ((tag <> 'dissent'::text) AND (dissented_by IS NULL) AND (dissent_rationale IS NULL) AND (dissent_predicted_outcome IS NULL) AND (dissent_recorded_at IS NULL)))) |
+| accord_nodes_dissented_by_fkey               | accord_nodes | FOREIGN KEY (dissented_by) REFERENCES resources(id)                                                                                                                                                                                                                                                             |
+| accord_nodes_effective_date_basis_check      | accord_nodes | CHECK (((effective_date_basis IS NULL) OR (effective_date_basis = ANY (ARRAY['committed'::text, 'declared'::text, 'reviewed'::text, 'imported'::text]))))                                                                                                                                                       |
+| accord_nodes_meeting_id_fkey                 | accord_nodes | FOREIGN KEY (meeting_id) REFERENCES accord_meetings(meeting_id)                                                                                                                                                                                                                                                 |
+| accord_nodes_pkey                            | accord_nodes | PRIMARY KEY (node_id)                                                                                                                                                                                                                                                                                           |
+| accord_nodes_status_check                    | accord_nodes | CHECK ((status = ANY (ARRAY['fresh'::text, 'inherited'::text, 'committed'::text, 'archived'::text, 'superseded'::text])))                                                                                                                                                                                       |
+| accord_nodes_tag_check                       | accord_nodes | CHECK ((tag = ANY (ARRAY['note'::text, 'decision'::text, 'action'::text, 'risk'::text, 'question'::text, 'dissent'::text])))                                                                                                                                                                                    |
+| accord_nodes_thread_id_fkey                  | accord_nodes | FOREIGN KEY (thread_id) REFERENCES accord_threads(thread_id)                                                                                                                                                                                                                                                    |
+
+-- A.7: trigger function bodies (closest analog for NRA trigger adoption)
+
+| routine_name                     | external_language | security_type | full_definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------- | ----------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| accord_meeting_seal_fn           | PLPGSQL           | DEFINER       | CREATE OR REPLACE FUNCTION public.accord_meeting_seal_fn()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $function$
+DECLARE
+  v_now              timestamptz := now();
+  v_node_count       int := 0;
+  v_edge_count       int := 0;
+  v_adjustment_count int := 0;
+  v_merkle_root      text;
+  v_prev_event_root  text;
+  v_node             record;
+  v_running_prev     text := NULL;
+  v_actor_resource   uuid;     -- resolved resources.id for organizer; may be NULL
+BEGIN
+  -- ── Reject conditions ──────────────────────────────────────────────────
+  IF NEW.state = 'closed' AND OLD.state IS DISTINCT FROM 'running' THEN
+    RAISE EXCEPTION 'Invalid state transition: closed only reachable from running';
+  END IF;
+
+  IF NEW.state = 'running' AND OLD.state = 'closed' THEN
+    RAISE EXCEPTION 'Meeting is closed; reopening is not supported';
+  END IF;
+
+  IF NOT (OLD.state = 'running' AND NEW.state = 'closed') THEN
+    RETURN NEW;
+  END IF;
+
+  -- ── Stamp the meeting itself ──────────────────────────────────────────
+  NEW.ended_at  := COALESCE(NEW.ended_at, v_now);
+  NEW.sealed_at := v_now;
+
+  -- ── Resolve organizer (users.id) → resources.id ───────────────────────
+  -- coc_events.actor_resource_id FKs to resources(id). Some organizers may
+  -- not have a resource row (system users, removed staff). Return NULL in
+  -- that case rather than failing the seal.
+  SELECT r.id
+    INTO v_actor_resource
+    FROM resources r
+   WHERE r.user_id = NEW.organizer_id
+   LIMIT 1;
+
+  -- ── Seal nodes; chain prev_node_hash ───────────────────────────────────
+  FOR v_node IN
+    SELECT *
+      FROM accord_nodes
+     WHERE meeting_id = NEW.meeting_id
+       AND sealed_at IS NULL
+     ORDER BY created_at, node_id
+  LOOP
+    UPDATE accord_nodes
+       SET sealed_at      = v_now,
+           status         = 'committed',
+           prev_node_hash = v_running_prev,
+           node_hash      = accord_compute_node_hash(
+                              v_running_prev,
+                              v_node.node_id,
+                              v_node.tag,
+                              v_node.summary,
+                              v_node.body,
+                              v_node.created_at,
+                              v_node.created_by
+                            )
+     WHERE node_id = v_node.node_id
+       AND sealed_at IS NULL
+     RETURNING node_hash INTO v_running_prev;
+
+    v_node_count := v_node_count + 1;
+  END LOOP;
+
+  -- ── Seal edges ────────────────────────────────────────────────────────
+  WITH sealed AS (
+    UPDATE accord_edges e
+       SET sealed_at = v_now,
+           edge_hash = accord_compute_edge_hash(
+                         e.edge_id,
+                         e.from_node_id,
+                         e.to_node_id,
+                         e.to_external_ref,
+                         e.edge_type,
+                         e.rationale,
+                         e.declared_at,
+                         e.declared_by
+                       )
+      FROM accord_nodes n
+     WHERE e.from_node_id = n.node_id
+       AND n.meeting_id = NEW.meeting_id
+       AND e.sealed_at IS NULL
+     RETURNING e.edge_id
+  )
+  SELECT count(*) INTO v_edge_count FROM sealed;
+
+  -- ── Seal belief adjustments (CMD-A1.6 — firm-scoped, was meeting-scoped) ─
+  -- Per CMD-A1.6 §4.1: broaden seal to all unsealed adjustments in the
+  -- closing meeting's firm. The accord_belief_adjustments.firm_id column
+  -- has been present since the original substrate (CMD-A1 §3.7) and is
+  -- already the basis for this table's RLS isolation.
+  WITH sealed AS (
+    UPDATE accord_belief_adjustments a
+       SET sealed_at       = v_now,
+           adjustment_hash = accord_compute_adjustment_hash(
+                               a.adjustment_id,
+                               a.target_node_id,
+                               a.delta,
+                               a.rationale,
+                               a.declared_at,
+                               a.declared_by
+                             )
+     WHERE a.firm_id   = NEW.firm_id
+       AND a.sealed_at IS NULL
+     RETURNING a.adjustment_id
+  )
+  SELECT count(*) INTO v_adjustment_count FROM sealed;
+
+  -- ── Seal agenda items ─────────────────────────────────────────────────
+  UPDATE accord_agenda_items
+     SET sealed_at = v_now
+   WHERE meeting_id = NEW.meeting_id
+     AND sealed_at IS NULL;
+
+  -- ── Compute Merkle root ───────────────────────────────────────────────
+  -- Per CMD-A1.6 §4.2 (revised): the adjustment-list ARRAY broadens to
+  -- match the seal scope. The `sealed_at = v_now` predicate scopes to
+  -- "adjustments sealed by THIS trigger fire" (the seal CTE above wrote
+  -- v_now into every sealed row). This keeps the integrity contract:
+  -- every hash the Merkle root commits to was sealed by this trigger fire.
+  SELECT encode(
+           extensions.digest(
+             array_to_string(
+               ARRAY(
+                 SELECT node_hash
+                   FROM accord_nodes
+                  WHERE meeting_id = NEW.meeting_id
+                  ORDER BY created_at, node_id
+               )
+               ||
+               ARRAY(
+                 SELECT e.edge_hash
+                   FROM accord_edges e
+                   JOIN accord_nodes n ON e.from_node_id = n.node_id
+                  WHERE n.meeting_id = NEW.meeting_id
+                  ORDER BY e.declared_at, e.edge_id
+               )
+               ||
+               ARRAY(
+                 SELECT a.adjustment_hash
+                   FROM accord_belief_adjustments a
+                  WHERE a.firm_id   = NEW.firm_id
+                    AND a.sealed_at = v_now
+                  ORDER BY a.declared_at, a.adjustment_id
+               ),
+               '|'
+             ),
+             'sha256'
+           ),
+           'hex'
+         )
+    INTO v_merkle_root;
+
+  NEW.merkle_root := v_merkle_root;
+
+  -- ── prev_hash for the CoC event ───────────────────────────────────────
+  SELECT merkle_root
+    INTO v_prev_event_root
+    FROM coc_events
+   WHERE firm_id    = NEW.firm_id
+     AND event_class = 'accord'
+     AND event_type  = 'meeting.ended'
+     AND merkle_root IS NOT NULL
+   ORDER BY occurred_at DESC, created_at DESC
+   LIMIT 1;
+
+  -- ── Write the sealing CoC event ───────────────────────────────────────
+  INSERT INTO coc_events (
+    id,
+    firm_id,
+    event_class,
+    event_type,
+    step_name,
+    event_notes,
+    severity,
+    entity_type,
+    entity_id,
+    actor_resource_id,
+    actor_name,
+    actor_role,
+    metadata,
+    occurred_at,
+    created_at,
+    updated_at,
+    prev_hash,
+    merkle_root
+  )
+  VALUES (
+    gen_random_uuid(),
+    NEW.firm_id,
+    'accord',
+    'meeting.ended',
+    'Meeting sealed',
+    'Meeting sealed: ' || NEW.title,
+    'info',
+    'accord_meeting',
+    NEW.meeting_id,
+    v_actor_resource,                                  -- resolved or NULL
+    NULL,
+    NULL,
+    jsonb_build_object(
+      'before_state', jsonb_build_object('state', 'running'),
+      'after_state',  jsonb_build_object(
+        'state',            'closed',
+        'sealed_at',        NEW.sealed_at,
+        'merkle_root',      NEW.merkle_root,
+        'node_count',       v_node_count,
+        'edge_count',       v_edge_count,
+        'adjustment_count', v_adjustment_count
+      )
+    ),
+    v_now,
+    v_now,
+    v_now,
+    v_prev_event_root,
+    NEW.merkle_root
+  );
+
+  RETURN NEW;
+END;
+$function$
+ |
+| allocate_node_seq                | PLPGSQL           | DEFINER       | CREATE OR REPLACE FUNCTION public.allocate_node_seq()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_prefix char(2);
+  v_next   integer;
+BEGIN
+  -- Look up prefix for this tag value
+  SELECT prefix INTO v_prefix
+    FROM node_class_seq_prefixes
+   WHERE tag = NEW.tag;
+
+  IF v_prefix IS NULL THEN
+    RAISE EXCEPTION
+      'allocate_node_seq: no prefix registered for tag=% — register one in node_class_seq_prefixes before inserting nodes of this class',
+      NEW.tag;
+  END IF;
+
+  -- Acquire transaction-scoped advisory lock keyed by (firm_id, prefix).
+  -- Per Q1 (architect-leans Option B). Race-safe across concurrent
+  -- INSERTs within the same firm+class; cross-firm and cross-class
+  -- INSERTs proceed in parallel without contention. Lock auto-releases
+  -- at COMMIT/ROLLBACK; no manual unlock required.
+  PERFORM pg_advisory_xact_lock(
+    hashtext(NEW.firm_id::text || ':' || v_prefix)
+  );
+
+  -- Compute next sequential number within (firm, class)
+  SELECT COALESCE(MAX(seq_number), 0) + 1 INTO v_next
+    FROM accord_nodes
+   WHERE firm_id = NEW.firm_id
+     AND seq_class = v_prefix;
+
+  NEW.seq_class  := v_prefix;
+  NEW.seq_number := v_next;
+  -- seq_id auto-populates via GENERATED ALWAYS expression
+
+  RETURN NEW;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| cascade_workstream_archive       | PLPGSQL           | INVOKER       | CREATE OR REPLACE FUNCTION public.cascade_workstream_archive()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  -- Only on archive transition
+  IF NEW.state = 'archived' AND OLD.state = 'active' THEN
+
+    -- Return meetings filed under this workstream to parking lot
+    UPDATE accord_meetings
+       SET workstream_id = NULL
+     WHERE workstream_id = NEW.workstream_id;
+
+    -- Cascade-archive sub-workstreams. Each sub-row UPDATE
+    -- re-fires this trigger; that fire clears its own meetings.
+    UPDATE workstreams
+       SET state = 'archived',
+           archived_at = NEW.archived_at,
+           archived_by = NEW.archived_by
+     WHERE parent_workstream_id = NEW.workstream_id
+       AND state = 'active';
+
+  END IF;
+  RETURN NEW;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| enforce_workstream_two_level_max | PLPGSQL           | INVOKER       | CREATE OR REPLACE FUNCTION public.enforce_workstream_two_level_max()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  v_grandparent_id uuid;
+BEGIN
+  -- Top-level workstream: no nesting violation possible
+  IF NEW.parent_workstream_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Sub-workstream: verify parent is itself top-level
+  -- (i.e. parent's parent_workstream_id IS NULL)
+  SELECT parent_workstream_id INTO v_grandparent_id
+    FROM workstreams
+   WHERE workstream_id = NEW.parent_workstream_id;
+
+  IF v_grandparent_id IS NOT NULL THEN
+    RAISE EXCEPTION
+      'workstream nesting limit: parent_workstream_id % is itself a sub-workstream; max 2 levels (top-level + sub-workstream) supported',
+      NEW.parent_workstream_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$function$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
