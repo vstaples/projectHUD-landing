@@ -442,6 +442,7 @@ body.accord-setup-fullpage .ac-view-host { width: 100%; height: 100%; }
 
 /* Running-meeting tab panes — body prefix required            */
 /* (panes are outside #accord-app; y > 945px in document)     */
+body.accord-setup-fullpage .ac-meeting-surface-host,
 body.accord-setup-fullpage .agenda-rail,
 body.accord-setup-fullpage .meta-pane,
 body.accord-setup-fullpage .thread-rail,
