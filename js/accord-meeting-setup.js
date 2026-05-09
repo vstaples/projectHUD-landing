@@ -95,6 +95,8 @@
 
     // ── CMD-ACCORD-SETUP-LAYOUT-1: layout teardown ─────────────
     // Undo full-page mechanism (regression-critical — smoke test 7).
+    var appRoot = document.getElementById('accord-app');
+    if (appRoot) appRoot.classList.remove(FULLPAGE_CLS);
     document.body.classList.remove(FULLPAGE_CLS);
     // Drop in-flight column-drag listeners.
     if (_colDrag.active) {
@@ -1242,13 +1244,14 @@
     window._accordDetachSurfaceHost = _detachHandler;
 
     // ── CMD-ACCORD-SETUP-LAYOUT-1: full-page host mechanism (§3, Option A)
-    // Class applied to document.body — the reliable ancestor of both the
-    // structural rails (.ac-rail-left / .ac-rail-right inside #accord-app)
-    // AND the running-meeting tab panes (agenda-rail, meta-pane, etc.) which
-    // live OUTSIDE #accord-app at y > 945px in the document.
-    // Diagnostic finding (CMD-ACCORD-SETUP-HEADER-1 smoke): #accord-app ends
-    // at y:945; panes start at y:1001 — #accord-app selector missed them.
-    // teardown() removes the class — smoke test 7.
+    // Class applied to BOTH #accord-app AND document.body:
+    //   #accord-app — specificity (1,2,0) beats existing rail CSS
+    //                 which uses #accord-app as ancestor (1,1,0+).
+    //   document.body — reaches running-meeting panes (agenda-rail etc.)
+    //                   which live OUTSIDE #accord-app at y > 945px.
+    // teardown() removes from both — smoke test 7.
+    var appRoot = document.getElementById('accord-app');
+    if (appRoot) appRoot.classList.add(FULLPAGE_CLS);
     document.body.classList.add(FULLPAGE_CLS);
 
     host.innerHTML = _buildHTML(meeting, workstreamId);
