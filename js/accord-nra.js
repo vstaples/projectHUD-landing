@@ -377,9 +377,21 @@
           const orig = confirmBtn.textContent;
           confirmBtn.textContent = 'Working…';
           try {
+            // Map trigger_kind → resolved_mechanism per substrate CHECK
+            // constraint accord_nras_resolved_mechanism_check (allowed
+            // values: manual, meeting_scheduled, meeting_sealed,
+            // action_resolved, decision_resolved). Trigger kinds like
+            // 'meeting_scheduled_in_workstream' map to 'meeting_scheduled'.
+            const tk = currentNRA.trigger_kind || '';
+            const mechanism =
+              tk === 'meeting_scheduled_in_workstream' ? 'meeting_scheduled' :
+              tk === 'meeting_sealed_in_workstream'    ? 'meeting_sealed' :
+              tk === 'action_resolved'                 ? 'action_resolved' :
+              tk === 'decision_resolved'               ? 'decision_resolved' :
+                                                         'manual';
             const result = await API.rpc('resolve_nra', {
               p_nra_id:           currentNRA.nra_id,
-              p_mechanism:        currentNRA.trigger_kind || 'manual',
+              p_mechanism:        mechanism,
               p_resolved_event_id: null,
             });
             const row = Array.isArray(result) ? result[0] : result;
@@ -387,7 +399,7 @@
               node_id:            node.node_id,
               nra_id:             row?.nra_id || currentNRA.nra_id,
               firm_id:            node.firm_id || currentNRA.firm_id,
-              resolved_mechanism: currentNRA.trigger_kind || 'manual',
+              resolved_mechanism: mechanism,
             });
             close();
           } catch (e) {
