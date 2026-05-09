@@ -421,3 +421,20 @@
   font-size: 11px;
   color: var(--ink-faint);
 }
+
+.ac-agenda-del {
+  background: none;
+  border: none;
+  color: var(--ink-ghost);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+
+.ac-agenda-del:hover {
+  color: var(--ink-primary);
+  background: var(--canvas-raised);
+}

@@ -189,6 +189,8 @@
               (isFirst ? ' disabled' : '') + '>\u25b2</button>' +
             '<button class="ac-agenda-down" data-action="down" title="Move down"' +
               (isLast ? ' disabled' : '') + '>\u25bc</button>' +
+            '<button class="ac-agenda-del" data-action="del" title="Remove">' +
+              '\u00d7</button>' +
           '</span>' +
         '</li>'
       );
@@ -229,6 +231,18 @@
       var itemId = row.dataset.itemId;
       var dir = btn.dataset.action;
       _reorderItem(itemId, dir, items, meeting, workstreamId);
+    });
+
+    // Delete button
+    area.addEventListener('click', function (ev) {
+      var btn = ev.target.closest('[data-action="del"]');
+      if (!btn) return;
+      var row = btn.closest('.ac-agenda-item');
+      if (!row) return;
+      var itemId = row.dataset.itemId;
+      API.del('accord_agenda_items?agenda_item_id=eq.' + itemId)
+        .then(function () { return _refreshAgenda(meeting, workstreamId); })
+        .catch(function (e) { console.error('[AccordMeetingSetup] delete failed', e); });
     });
 
     // Inline title edit — click to activate
