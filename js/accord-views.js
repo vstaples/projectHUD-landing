@@ -366,7 +366,7 @@
     // Fetch meeting basics
     let meeting = null;
     try {
-      const rows = await API.get(`accord_meetings?meeting_id=eq.${meetingId}&select=meeting_id,title,workstream_id,scheduled_for,created_at,sealed_at,state,organizer_id,briefing_text,duration_minutes`);
+      const rows = await API.get(`accord_meetings?meeting_id=eq.${meetingId}&select=meeting_id,title,workstream_id,scheduled_for,created_at,sealed_at,state,organizer_id,briefing_text,duration_minutes,stakes,location`);
       meeting = rows?.[0] || null;
     } catch (e) {
       console.warn('[Accord-views] meeting load failed', e);

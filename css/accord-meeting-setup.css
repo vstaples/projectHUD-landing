@@ -100,12 +100,150 @@
   padding: 12px 16px;
 }
 
-/* Header zone — placeholder this CMD; CMD-ACCORD-SETUP-HEADER-1
-   replaces internals. Zone itself only carries a separator. */
+/* Header zone — CMD-ACCORD-SETUP-HEADER-1 §7 ─────────────── */
+
+/* §7.1 — Two-column layout: left (title + stakes) / right (toggle + meta) */
 .ac-setup-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  align-items: start;
+  padding: 16px 28px 14px 28px;
   border-bottom: 1px solid var(--ac-border-subtle);
-  background: var(--ac-bg-pane);
+  background: rgba(17, 22, 30, 0.4);
 }
+.ac-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.ac-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* §7.2 — Meeting title */
+.ac-header-title {
+  font-family: var(--ac-font-serif);
+  font-size: 25px;
+  font-weight: 500;
+  color: var(--ac-text-primary);
+  cursor: text;
+  border: 1px solid transparent;
+  padding: 3px 8px;
+  margin-left: -8px;
+  border-radius: 6px;
+  outline: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-header-title:hover,
+.ac-header-title:focus {
+  border-color: var(--ac-border-mid);
+  background: var(--ac-bg-pane);
+  white-space: normal;
+  overflow: visible;
+}
+
+/* §7.3 — Stakes */
+.ac-header-stakes-block { display: flex; flex-direction: column; gap: 3px; }
+.ac-header-stakes-label {
+  font-family: var(--ac-font-mono);
+  font-size: 8.5px;
+  color: var(--ac-cyan);
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+.ac-header-stakes {
+  font-family: var(--ac-font-serif);
+  font-size: 13.5px;
+  color: var(--ac-text-secondary);
+  font-style: italic;
+  line-height: 1.5;
+  padding-left: 11px;
+  border-left: 2px solid var(--ac-cyan-dim);
+  cursor: text;
+  outline: none;
+  max-width: 660px;
+}
+.ac-header-stakes:hover,
+.ac-header-stakes:focus { border-left-color: var(--ac-cyan); }
+
+/* Placeholder via CSS ::before — no innerHTML manipulation */
+.ac-header-stakes.ac-placeholder::before,
+.ac-meta-editable.ac-placeholder::before {
+  content: attr(data-placeholder);
+  color: var(--ac-text-faint);
+  font-style: italic;
+  pointer-events: none;
+}
+.ac-header-stakes.ac-placeholder::before { display: block; }
+
+/* §7.4 — FOLLOW-UP / FIRST-EVER mode toggle */
+.ac-header-mode-toggle {
+  display: flex;
+  background: var(--ac-bg-pane);
+  border: 1px solid var(--ac-border-subtle);
+  border-radius: 6px;
+  padding: 2px;
+}
+.ac-mode-tab {
+  padding: 5px 11px;
+  font-family: var(--ac-font-mono);
+  font-size: 9px;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: var(--ac-text-tertiary);
+  cursor: default;
+  border-radius: 4px;
+  user-select: none;
+}
+.ac-mode-tab.active {
+  color: var(--ac-cyan);
+  background: var(--ac-cyan-dim);
+}
+
+/* §7.5 — Schedule meta rows */
+.ac-header-meta { display: flex; flex-direction: column; gap: 5px; }
+.ac-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--ac-font-mono);
+  font-size: 11px;
+  color: var(--ac-text-secondary);
+}
+.ac-meta-label {
+  color: var(--ac-text-tertiary);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.ac-meta-editable { cursor: text; outline: none; min-width: 120px; }
+.ac-meta-editable:focus { color: var(--ac-text-primary); }
+
+/* STARTS IN countdown row */
+.ac-meta-starts { color: var(--ac-amber); }
+.ac-meta-starts--imminent { color: var(--ac-rose); }
+.ac-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ac-amber);
+  animation: ac-pulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes ac-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1);    }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+
 
 /* §5 — Three-column grid inside .ac-setup-columns */
 .ac-setup-columns {

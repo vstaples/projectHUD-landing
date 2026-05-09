@@ -59,6 +59,11 @@
   var LS_KEY_FILM  = 'accord-setup-filmstrip-h';
   var FULLPAGE_CLS = 'accord-setup-fullpage';
 
+  // ── CMD-ACCORD-SETUP-HEADER-1: header state ───────────────────
+  // One debounce timer per editable field, keyed by column name.
+  var _headerSaveTimers = {};
+  var _countdownTimer   = null;
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() { teardown(); }
 
@@ -80,6 +85,13 @@
     // Remove filmstrip click listener -- Phase 6
     var strip = document.querySelector('.ac-setup-filmstrip');
     if (strip) strip.removeEventListener('click', _onFilmCardClick);
+
+    // ── CMD-ACCORD-SETUP-HEADER-1: header teardown (§6.1) ──────
+    Object.keys(_headerSaveTimers).forEach(function(k) {
+      if (_headerSaveTimers[k]) clearTimeout(_headerSaveTimers[k]);
+    });
+    _headerSaveTimers = {};
+    _stopCountdown();
 
     // ── CMD-ACCORD-SETUP-LAYOUT-1: layout teardown ─────────────
     // Undo full-page mechanism (regression-critical — smoke test 7).
@@ -162,9 +174,56 @@
     return (
       '<div class="ac-setup-shell" data-mode="prep" data-meeting-id="' + meetingId + '">' +
 
-        // Zone 1: Header (auto height)
+        // Zone 1: Header (auto height) — CMD-ACCORD-SETUP-HEADER-1
         '<div class="ac-setup-header">' +
-          '<div class="ac-zone-placeholder">Header \u00b7 coming soon</div>' +
+
+          '<div class="ac-header-left">' +
+            '<div class="ac-header-title"' +
+                ' contenteditable="true"' +
+                ' spellcheck="false"' +
+                ' data-field="title"' +
+                ' id="ac-meeting-title"></div>' +
+            '<div class="ac-header-stakes-block">' +
+              '<span class="ac-header-stakes-label">STAKES</span>' +
+              '<div class="ac-header-stakes"' +
+                  ' contenteditable="true"' +
+                  ' spellcheck="false"' +
+                  ' data-field="stakes"' +
+                  ' id="ac-meeting-stakes"' +
+                  ' data-placeholder="What is at risk in this meeting\u2026"></div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="ac-header-right">' +
+            '<div class="ac-header-mode-toggle">' +
+              '<span class="ac-mode-tab" id="ac-mode-followup">FOLLOW-UP</span>' +
+              '<span class="ac-mode-tab" id="ac-mode-firstever">FIRST-EVER</span>' +
+            '</div>' +
+            '<div class="ac-header-meta">' +
+              '<div class="ac-meta-row">' +
+                '<span class="ac-meta-label">WHEN</span>' +
+                '<span class="ac-meta-value" id="ac-meta-when">\u2014</span>' +
+              '</div>' +
+              '<div class="ac-meta-row">' +
+                '<span class="ac-meta-label">WHERE</span>' +
+                '<span class="ac-meta-value ac-meta-editable"' +
+                     ' contenteditable="true"' +
+                     ' spellcheck="false"' +
+                     ' data-field="location"' +
+                     ' id="ac-meta-where"' +
+                     ' data-placeholder="Add location\u2026"></span>' +
+              '</div>' +
+              '<div class="ac-meta-row">' +
+                '<span class="ac-meta-label">WORKSTREAM</span>' +
+                '<span class="ac-meta-value" id="ac-meta-workstream">\u2014</span>' +
+              '</div>' +
+              '<div class="ac-meta-row" id="ac-meta-starts-row" style="display:none;">' +
+                '<span class="ac-pulse-dot"></span>' +
+                '<span class="ac-meta-value ac-meta-starts" id="ac-meta-starts">\u2014</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
         '</div>' +
 
         // Zone 2: Columns (1fr)
@@ -754,6 +813,252 @@
   }
 
   // ══════════════════════════════════════════════════════════════
+  // HEADER — CMD-ACCORD-SETUP-HEADER-1
+  // §5 render functions + §6 edit wiring + §5.6 countdown.
+  // ══════════════════════════════════════════════════════════════
+
+  function _renderHeader(meeting, workstreamId) {
+    _paintTitle(meeting);
+    _paintStakes(meeting);
+    _paintMeta(meeting, workstreamId);
+    _paintModeToggle(meeting, workstreamId);
+    _wireHeaderEdits(meeting);
+    _startCountdown(meeting);
+  }
+
+  // §5.1 — Title
+  function _paintTitle(meeting) {
+    var el = document.getElementById('ac-meeting-title');
+    if (!el) return;
+    el.textContent = meeting.title || '';
+  }
+
+  // §5.2 — Stakes
+  function _paintStakes(meeting) {
+    var el = document.getElementById('ac-meeting-stakes');
+    if (!el) return;
+    if (meeting.stakes) {
+      el.textContent = meeting.stakes;
+      el.classList.remove('ac-placeholder');
+    } else {
+      el.textContent = '';
+      el.classList.add('ac-placeholder');
+    }
+  }
+
+  // §5.3 — Meta rows: WHEN + WHERE + WORKSTREAM (async)
+  function _paintMeta(meeting, workstreamId) {
+    var whenEl = document.getElementById('ac-meta-when');
+    if (whenEl) {
+      whenEl.textContent = _fmtWhen(meeting.scheduled_for, meeting.duration_minutes);
+    }
+
+    var whereEl = document.getElementById('ac-meta-where');
+    if (whereEl) {
+      if (meeting.location) {
+        whereEl.textContent = meeting.location;
+        whereEl.classList.remove('ac-placeholder');
+      } else {
+        whereEl.textContent = '';
+        whereEl.classList.add('ac-placeholder');
+      }
+    }
+
+    _paintWorkstreamMeta(workstreamId, meeting.meeting_id);
+  }
+
+  function _fmtWhen(scheduledFor, durationMinutes) {
+    if (!scheduledFor) return '\u2014';
+    var d    = new Date(scheduledFor);
+    var opts = { weekday: 'short', month: 'short', day: 'numeric' };
+    var date      = d.toLocaleDateString(undefined, opts);
+    var startTime = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    if (!durationMinutes) return date + ' \u00b7 ' + startTime;
+    var end     = new Date(d.getTime() + durationMinutes * 60000);
+    var endTime = end.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    return date + ' \u00b7 ' + startTime + ' \u2014 ' + endTime;
+  }
+
+  // §5.4 — WORKSTREAM meta (async two-pass: initial '—', then populated)
+  function _paintWorkstreamMeta(workstreamId, currentMeetingId) {
+    var el = document.getElementById('ac-meta-workstream');
+    if (!el) return;
+    if (!workstreamId) { el.textContent = 'No workstream'; return; }
+
+    Promise.all([
+      API.get('workstreams?workstream_id=eq.' + workstreamId + '&select=name&limit=1'),
+      API.get(
+        'accord_meetings?workstream_id=eq.' + workstreamId +
+        '&meeting_id=neq.' + currentMeetingId +
+        '&state=in.(closed,sealed)' +
+        '&select=meeting_id,sealed_at,scheduled_for' +
+        '&order=scheduled_for.desc.nullslast,created_at.desc' +
+        '&limit=1'
+      )
+    ]).then(function(results) {
+      var ws      = results[0] && results[0][0];
+      var lastMtg = results[1] && results[1][0];
+      var elNow   = document.getElementById('ac-meta-workstream'); // IR71: re-query after async
+      if (!elNow) return;
+      var name    = ws ? ws.name : 'Unknown workstream';
+      var lastStr = '';
+      if (lastMtg) {
+        var lastDate = new Date(lastMtg.sealed_at || lastMtg.scheduled_for);
+        var daysAgo  = Math.round((Date.now() - lastDate.getTime()) / 86400000);
+        lastStr = ' \u00b7 last met ' + daysAgo + 'd ago';
+      } else {
+        lastStr = ' \u00b7 first meeting';
+      }
+      elNow.textContent = name + lastStr;
+    }).catch(function() {
+      var elNow = document.getElementById('ac-meta-workstream');
+      if (elNow) elNow.textContent = '\u2014';
+    });
+  }
+
+  // §5.5 — FOLLOW-UP / FIRST-EVER toggle (async, derived — not operator-settable)
+  function _paintModeToggle(meeting, workstreamId) {
+    var fuEl = document.getElementById('ac-mode-followup');
+    var feEl = document.getElementById('ac-mode-firstever');
+    if (!fuEl || !feEl) return;
+
+    if (!workstreamId) {
+      // Parking-lot meeting: always FIRST-EVER
+      fuEl.classList.remove('active');
+      feEl.classList.add('active');
+      return;
+    }
+
+    API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&meeting_id=neq.' + meeting.meeting_id +
+      '&state=in.(closed,sealed)' +
+      '&select=meeting_id&limit=1'
+    ).then(function(rows) {
+      // IR71: re-query elements after async (teardown may have fired)
+      var fuNow = document.getElementById('ac-mode-followup');
+      var feNow = document.getElementById('ac-mode-firstever');
+      if (!fuNow || !feNow) return;
+      var isFollowUp = rows && rows.length > 0;
+      fuNow.classList.toggle('active', isFollowUp);
+      feNow.classList.toggle('active', !isFollowUp);
+    }).catch(function() {
+      var fuNow = document.getElementById('ac-mode-followup');
+      var feNow = document.getElementById('ac-mode-firstever');
+      if (fuNow) fuNow.classList.remove('active');
+      if (feNow) feNow.classList.remove('active');
+    });
+  }
+
+  // §5.6 — STARTS IN countdown (shown only within 24h of scheduled_for)
+  function _startCountdown(meeting) {
+    _stopCountdown();
+    if (!meeting.scheduled_for) return;
+
+    function _tick() {
+      var row = document.getElementById('ac-meta-starts-row');
+      var el  = document.getElementById('ac-meta-starts');
+      if (!row || !el) { _stopCountdown(); return; }
+
+      var now    = Date.now();
+      var target = new Date(meeting.scheduled_for).getTime();
+      var diffMs = target - now;
+
+      if (diffMs < 0 || diffMs > 86400000) {
+        row.style.display = 'none';
+        return;
+      }
+
+      row.style.display = '';
+      var diffMin = Math.round(diffMs / 60000);
+      if (diffMin < 1) {
+        el.textContent = 'Starting now';
+      } else if (diffMin < 60) {
+        el.textContent = 'Starts in ' + diffMin + 'min';
+      } else {
+        var h = Math.floor(diffMin / 60);
+        var m = diffMin % 60;
+        el.textContent = 'Starts in ' + h + 'h' + (m ? ' ' + m + 'min' : '');
+      }
+
+      // 5-minute warning: rose colour (adds imminent class)
+      el.classList.toggle('ac-meta-starts--imminent', diffMin <= 5);
+    }
+
+    _tick();
+    _countdownTimer = setInterval(_tick, 30000);
+  }
+
+  function _stopCountdown() {
+    if (_countdownTimer) { clearInterval(_countdownTimer); _countdownTimer = null; }
+  }
+
+  // §6 — Edit wiring: title, stakes, location
+  // One 800ms debounce timer per field, keyed by column name.
+  // Immediate PATCH on blur cancels the debounce — blur is the
+  // save signal; debounce exists only to reduce mid-type traffic.
+  // IR71: `el` captured in forEach closure at wire time — synchronous
+  // so no async mutation risk; blur fires before any DOM wipe.
+  function _wireHeaderEdits(meeting) {
+    var fields = [
+      { id: 'ac-meeting-title',  col: 'title',    singleLine: true  },
+      { id: 'ac-meeting-stakes', col: 'stakes',   singleLine: false },
+      { id: 'ac-meta-where',     col: 'location', singleLine: false }
+    ];
+
+    fields.forEach(function(f) {
+      var el = document.getElementById(f.id);
+      if (!el) return;
+
+      el.addEventListener('input', function() {
+        var val = el.textContent.trim();
+
+        // Placeholder toggle (stakes + where have data-placeholder)
+        if (el.dataset.placeholder) {
+          el.classList.toggle('ac-placeholder', !val);
+        }
+
+        // Debounce PATCH
+        if (_headerSaveTimers[f.col]) clearTimeout(_headerSaveTimers[f.col]);
+        _headerSaveTimers[f.col] = setTimeout(function() {
+          _headerSaveTimers[f.col] = null;
+          var body = {};
+          body[f.col] = val || null;
+          API.patch('accord_meetings?meeting_id=eq.' + meeting.meeting_id, body)
+            .catch(function(e) {
+              console.error('[AccordMeetingSetup] header PATCH failed (' + f.col + ')', e);
+            });
+        }, 800);
+      });
+
+      // Title is single-line: Enter blurs instead of inserting <br>
+      if (f.singleLine) {
+        el.addEventListener('keydown', function(ev) {
+          if (ev.key === 'Enter') {
+            ev.preventDefault();
+            el.blur();
+          }
+        });
+      }
+
+      // Blur: immediate PATCH, cancel debounce
+      el.addEventListener('blur', function() {
+        if (_headerSaveTimers[f.col]) {
+          clearTimeout(_headerSaveTimers[f.col]);
+          _headerSaveTimers[f.col] = null;
+        }
+        var val = el.textContent.trim();
+        var body = {};
+        body[f.col] = val || null;
+        API.patch('accord_meetings?meeting_id=eq.' + meeting.meeting_id, body)
+          .catch(function(e) {
+            console.error('[AccordMeetingSetup] header blur PATCH failed (' + f.col + ')', e);
+          });
+      });
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════
   // LAYOUT — CMD-ACCORD-SETUP-LAYOUT-1
   // Column resize, filmstrip resize, Cmd+I stub.
   // IR71: drag state holds primitives only; DOM is re-queried in
@@ -954,6 +1259,9 @@
     _wireColumnHandles();
     _wireFilmstripHandle();
     document.addEventListener('keydown', _onIntelKey);
+
+    // ── CMD-ACCORD-SETUP-HEADER-1: header render ──────────────
+    _renderHeader(meeting, workstreamId);
 
     // Breadcrumb async resolve — also caches _workstreamName for briefing
     // CMD-ACCORD-SETUP-LAYOUT-1: breadcrumb element no longer in shell;
