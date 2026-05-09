@@ -1,3401 +1,610 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Accord — Live Capture</title>
-<link rel="stylesheet" href="/css/hud.css">
-
-<!-- Editorial fonts (per Style Doctrine v1.7 §2 + prototype v3b-4) -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-
-<!-- CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 2 + Phase 3 + Phase 4a stylesheets -->
-<link rel="stylesheet" href="/css/accord-constellation.css">
-<link rel="stylesheet" href="/css/accord-rails.css">
-<link rel="stylesheet" href="/css/accord-views.css">
-<!-- CMD-ACCORD-NRA-SURFACE-1 Phase 2 -->
-<link rel="stylesheet" href="/css/accord-nra.css">
-<!-- CMD-ACCORD-MEETING-SETUP-1 Phase 2 -->
-<link rel="stylesheet" href="/css/accord-meeting-setup.css">
-<style>
-/* ============================================================
-   Accord — Live Capture surface (CMD-A3)
-   Scoped under #accord-app. Tokens follow prototype v3b-4 +
-   Style Doctrine v1.7 (§3.5 surface tiers, §7 glyphs, §6 markup).
-   No hex literals in JS-rendered DOM (per v1.7 §6.2).
-   All font sizes ≥ 11px (operator standing rule).
-   ============================================================ */
-
-#accord-app {
-  /* Canvas — warm slate palette from prototype v3b-4 */
-  --canvas-deep:   #1a1814;
-  --canvas:        #211e19;
-  --canvas-raised: #2a2620;
-  --canvas-elev:   #332e26;
-  --canvas-hover:  #3d372d;
-
-  /* Text — warm parchment hierarchy */
-  --ink-primary:   #f4ede0;
-  --ink-body:      #d6cdb8;
-  --ink-muted:     #b3a78f;
-  --ink-faint:     #908572;
-  --ink-ghost:     #5a5347;
-
-  /* Signal — muted amber, used sparingly */
-  --signal:        #d4a04a;
-  --signal-soft:   rgba(212, 160, 74, 0.15);
-  --signal-dim:    rgba(212, 160, 74, 0.4);
-
-  /* Tag colors — desaturated per IR45 (declared not measured) */
-  --tag-note:      #8ba89a;
-  --tag-decision:  #c9956a;
-  --tag-action:    #b07c8a;
-  --tag-risk:      #a86f5e;
-  --tag-question:  #7b8fa8;
-
-  /* Borders */
-  --rule:          rgba(244, 237, 224, 0.06);
-  --rule-strong:   rgba(244, 237, 224, 0.12);
-
-  --rail-w: 320px;
-  --meta-w: 320px;
-
-  background: var(--canvas-deep);
-  color: var(--ink-body);
-  font-family: 'IBM Plex Sans', system-ui, sans-serif;
-  font-size: 13px;
-  line-height: 1.55;
-  /* CMD-A4-POLISH-1: was `min-height: 100vh`. With min-height, inner flex
-     children could grow beyond the viewport, making the page itself
-     scrollable and disabling the rail/spine `overflow-y: auto` containers
-     (they never engage their own scroll because their parent grew to fit
-     content). Capping at exact viewport height forces all five surfaces'
-     three-region grids (rail · center · panel) to constrain inner content
-     to their own bounds, activating each region's own scroll. */
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;   /* CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 5: anchor for .ac-surface-overlay */
-}
-
-#accord-app * { box-sizing: border-box; }
-
-/* ── Top nav ─────────────────────────────────────────────── */
-#accord-app .topnav {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 16px 32px;
-  border-bottom: 1px solid var(--rule);
-  background: var(--canvas-deep);
-}
-#accord-app .brand {
-  font-family: 'Fraunces', serif;
-  font-weight: 600;
-  font-size: 22px;
-  letter-spacing: -0.02em;
-  color: var(--ink-primary);
-}
-#accord-app .brand-meta {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  color: var(--ink-faint);
-  letter-spacing: 0.04em;
-  margin-left: 8px;
-}
-#accord-app .surface-switch {
-  display: flex;
-  gap: 4px;
-  margin-left: auto;
-}
-
-/* ============================================================
-   CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4 — chrome additions
-   ============================================================ */
-
-/* Q-INV-2 Option B: small chrome link to Manage Workstreams.
-   Sits between LIVE CONNECT and surface-switch. Mono treatment
-   matching surface-switch button typography but lower-weight
-   to signal admin-functional rather than daily-use. */
-#accord-app .chrome-link {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  color: var(--ink-faint);
-  text-decoration: none;
-  border-bottom: 1px dashed transparent;
-  padding-bottom: 1px;
-  cursor: pointer;
-  transition: color 0.12s, border-color 0.12s;
-}
-#accord-app .chrome-link:hover {
-  color: var(--ink-muted);
-  border-bottom-color: var(--rule);
-}
-#accord-app .chrome-link.active {
-  color: var(--ink-primary);
-  border-bottom-color: var(--ink-primary);
-}
-
-/* Q-INV-1 Option C: Filed-under row in running-meeting header
-   AND post-seal closed-banner. Mono label, summary value,
-   inline action affordance. */
-#accord-app .meeting-filed,
-#accord-app .closed-banner-filed {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-  font-size: 12px;
-  margin-top: 6px;
-}
-#accord-app .closed-banner-filed {
-  margin-top: 0;
-  margin-right: auto;
-  margin-left: 16px;
-}
-#accord-app .filed-label {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--ink-faint);
-  text-transform: uppercase;
-}
-#accord-app .filed-value {
-  color: var(--ink-primary);
-  font-weight: 500;
-}
-#accord-app .filed-value.unfiled {
-  color: var(--ink-faint);
-  font-style: italic;
-}
-#accord-app .filed-action {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  color: var(--ink-muted);
-  text-decoration: none;
-  cursor: pointer;
-}
-#accord-app .filed-action:hover {
-  color: var(--ink-primary);
-  text-decoration: underline;
-}
-
-/* Workstream management surface */
-#accord-app #surface-workstreams { padding: 0; }
-#accord-app .ws-archived-toggle {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--ink-muted);
-  margin-right: 16px;
-  cursor: pointer;
-  user-select: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-#accord-app .ws-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px 32px;
-}
-#accord-app .ws-empty {
-  font-style: italic;
-  color: var(--ink-faint);
-  font-size: 14px;
-  padding: 32px 0;
-  text-align: center;
-}
-#accord-app .ws-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-#accord-app .ws-table thead th {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  text-align: left;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--rule);
-  font-weight: 500;
-}
-#accord-app .ws-table tbody tr {
-  border-bottom: 1px solid var(--rule);
-}
-#accord-app .ws-table tbody tr.ws-row-archived {
-  opacity: 0.5;
-}
-#accord-app .ws-table tbody td {
-  padding: 12px;
-  vertical-align: top;
-  color: var(--ink-primary);
-}
-#accord-app .ws-table .ws-name {
-  font-weight: 500;
-}
-#accord-app .ws-table .ws-name.ws-sub-name {
-  padding-left: 18px;
-  position: relative;
-}
-#accord-app .ws-table .ws-name.ws-sub-name::before {
-  content: '↳';
-  position: absolute;
-  left: 0;
-  color: var(--ink-faint);
-}
-#accord-app .ws-table .ws-level-pill {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-  padding: 2px 8px;
-  border: 1px solid var(--rule);
-  border-radius: 10px;
-  display: inline-block;
-}
-#accord-app .ws-table .ws-meetings-col,
-#accord-app .ws-table .ws-actions-col {
-  text-align: right;
-  width: 120px;
-}
-#accord-app .ws-row-action {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  color: var(--ink-muted);
-  text-decoration: none;
-  margin-left: 10px;
-  cursor: pointer;
-}
-#accord-app .ws-row-action:hover {
-  color: var(--ink-primary);
-  text-decoration: underline;
-}
-#accord-app .ws-row-action.ws-action-archive { color: #b58a76; }
-#accord-app .ws-row-action.ws-action-archive:hover { color: #d6a594; }
-
-#accord-app .surface-switch button {
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-muted);
-  font: 500 12px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 8px 14px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: color 120ms, border-color 120ms, background 120ms;
-}
-#accord-app .surface-switch button:hover {
-  color: var(--ink-primary);
-  border-color: var(--rule-strong);
-}
-#accord-app .surface-switch button.active {
-  color: var(--signal);
-  border-color: var(--signal-dim);
-  background: var(--signal-soft);
-}
-#accord-app .live-connect {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-muted);
-  padding: 6px 12px;
-  border-radius: 4px;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-#accord-app .live-connect.connected {
-  color: var(--signal);
-  border-color: var(--signal-dim);
-}
-#accord-app .lc-pulse {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--ink-faint);
-}
-#accord-app .live-connect.connected .lc-pulse {
-  background: var(--signal);
-  animation: lc-pulse 1.6s ease-in-out infinite;
-}
-@keyframes lc-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.4; }
-}
-
-/* ── Surface containers ─────────────────────────────────── */
-#accord-app .surface { display: none; flex: 1; flex-direction: column; overflow: hidden; }
-#accord-app .surface.active { display: flex; }
-
-#accord-app .placeholder-surface {
-  flex: 1;
-  display: flex; align-items: center; justify-content: center;
-  flex-direction: column; gap: 12px;
-  color: var(--ink-faint);
-  text-align: center;
-  padding: 48px;
-}
-#accord-app .placeholder-surface h2 {
-  font-family: 'Fraunces', serif;
-  font-weight: 600;
-  font-size: 22px;
-  color: var(--ink-muted);
-}
-#accord-app .placeholder-surface p {
-  font-size: 13px;
-  max-width: 420px;
-  line-height: 1.5;
-}
-
-/* ── Capture header ─────────────────────────────────────── */
-#accord-app .capture-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 24px 32px 18px;
-  gap: 24px;
-  border-bottom: 1px solid var(--rule);
-}
-#accord-app .meeting-title {
-  font-family: 'Fraunces', serif;
-  font-weight: 600;
-  font-size: 28px;
-  letter-spacing: -0.01em;
-  color: var(--ink-primary);
-  margin-bottom: 6px;
-}
-#accord-app .meeting-organizer {
-  font-size: 12px;
-  color: var(--ink-muted);
-  margin-bottom: 8px;
-}
-#accord-app .meeting-organizer .organizer-label {
-  color: var(--ink-faint);
-  margin-right: 4px;
-}
-#accord-app .meeting-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-family: 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  letter-spacing: 0.04em;
-  flex-wrap: wrap;
-}
-#accord-app .meeting-meta > span:not(.live-pulse) + span::before {
-  content: '·';
-  margin-right: 8px;
-  color: var(--ink-ghost);
-}
-#accord-app .live-pulse {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--ink-ghost);
-  display: inline-block;
-}
-#accord-app .live-pulse.running {
-  background: var(--signal);
-  animation: lc-pulse 1.6s ease-in-out infinite;
-}
-
-#accord-app .capture-controls {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-#accord-app .timer {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 18px;
-  font-weight: 500;
-  color: var(--ink-muted);
-  letter-spacing: 0.04em;
-  min-width: 110px;
-  text-align: right;
-}
-#accord-app .timer.ended { color: var(--signal); font-size: 13px; }
-
-#accord-app .btn {
-  font: 500 12px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 9px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background 120ms, color 120ms, border-color 120ms;
-}
-#accord-app .btn-signal {
-  background: var(--signal);
-  color: var(--canvas-deep);
-}
-#accord-app .btn-signal:hover { background: #e0b35d; }
-#accord-app .btn-end {
-  background: transparent;
-  border-color: var(--tag-risk);
-  color: var(--tag-risk);
-}
-#accord-app .btn-end:hover { background: rgba(168, 111, 94, 0.1); }
-#accord-app .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
-#accord-app .btn-ghost {
-  background: transparent;
-  border-color: var(--rule);
-  color: var(--ink-muted);
-}
-#accord-app .btn-ghost:hover { color: var(--ink-primary); border-color: var(--rule-strong); }
-
-/* Empty-state "+ New meeting" emphasis — when no meeting is loaded the
-   start button is disabled, so NEW MEETING is the primary affordance.  */
-#accord-app .btn-prominent {
-  background: transparent;
-  border-color: var(--signal);
-  color: var(--signal);
-}
-#accord-app .btn-prominent:hover {
-  background: var(--signal-soft);
-  color: var(--ink-primary);
-}
-
-/* ── Closed-meeting banner ──────────────────────────────── */
-#accord-app .closed-banner {
-  display: none;
-  background: var(--signal-soft);
-  border-bottom: 1px solid var(--signal-dim);
-  padding: 12px 32px;
-  font-size: 12px;
-  color: var(--ink-body);
-  align-items: center;
-  gap: 16px;
-}
-#accord-app .closed-banner.visible { display: flex; }
-#accord-app .closed-banner-msg { flex: 1; }
-#accord-app .closed-banner-msg strong { color: var(--ink-primary); font-weight: 600; }
-
-/* ── Capture body 3-column ─────────────────────────────── */
-#accord-app .capture-body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: var(--rail-w) 1fr var(--meta-w);
-  gap: 0;
-  overflow: hidden;
-}
-
-/* Agenda rail */
-#accord-app .agenda-rail {
-  border-right: 1px solid var(--rule);
-  padding: 18px 18px 24px;
-  overflow-y: auto;
-  background: var(--canvas-deep);
-}
-#accord-app .rail-section-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-bottom: 14px;
-}
-#accord-app .rail-section-label .count { font-size: 11px; color: var(--ink-ghost); text-transform: none; letter-spacing: 0.02em; }
-
-#accord-app .rail-actions {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-#accord-app .rail-actions .btn {
-  flex: 1;
-  padding: 6px 8px;
-  font-size: 11px;
-}
-
-#accord-app .agenda-toggle {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 10px;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-#accord-app .agenda-toggle button {
-  flex: 1;
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-faint);
-  padding: 6px 8px;
-  border-radius: 3px;
-  cursor: pointer;
-}
-#accord-app .agenda-toggle button.active { color: var(--signal); border-color: var(--signal-dim); }
-
-#accord-app .agenda-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  margin-bottom: 4px;
-}
-#accord-app .agenda-item:hover { background: var(--canvas-raised); }
-#accord-app .agenda-item.active {
-  background: var(--canvas-raised);
-  border-color: var(--signal-dim);
-}
-#accord-app .agenda-pos {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  min-width: 18px;
-  margin-top: 1px;
-}
-#accord-app .agenda-title {
-  flex: 1;
-  font-size: 13px;
-  color: var(--ink-body);
-}
-#accord-app .agenda-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-}
-#accord-app .agenda-item:hover .agenda-actions { opacity: 1; }
-#accord-app .agenda-actions button {
-  background: transparent;
-  border: none;
-  color: var(--ink-faint);
-  font-size: 13px;
-  cursor: pointer;
-  padding: 0 4px;
-}
-#accord-app .agenda-actions button:hover { color: var(--ink-primary); }
-
-/* Capture pane */
-#accord-app .capture-pane {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--canvas);
-}
-#accord-app .context-strip {
-  padding: 14px 28px;
-  border-bottom: 1px solid var(--rule);
-  font-size: 12px;
-  color: var(--ink-muted);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-}
-#accord-app .context-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-}
-#accord-app .context-target {
-  color: var(--ink-primary);
-  font-weight: 500;
-  font-size: 13px;
-}
-#accord-app .context-path { color: var(--ink-faint); font-size: 11px; }
-
-#accord-app .capture-input-wrap { padding: 16px 28px 0; }
-#accord-app .capture-input {
-  width: 100%;
-  min-height: 84px;
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  color: var(--ink-primary);
-  padding: 12px 14px;
-  font: 400 14px 'IBM Plex Sans', system-ui, sans-serif;
-  resize: vertical;
-}
-#accord-app .capture-input:focus { outline: none; border-color: var(--signal-dim); }
-#accord-app .capture-input::placeholder { color: var(--ink-faint); }
-#accord-app .capture-input[disabled] { opacity: 0.4; cursor: not-allowed; background: var(--canvas-deep); }
-
-#accord-app .tag-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px 28px 14px;
-  border-bottom: 1px solid var(--rule);
-}
-#accord-app .tag-row-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  margin-right: 4px;
-}
-#accord-app .tag-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  color: var(--ink-body);
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-}
-#accord-app .tag-btn:hover { background: var(--canvas-elev); }
-#accord-app .tag-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
-#accord-app .tag-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  display: inline-block;
-}
-#accord-app .tag-dot.note     { background: var(--tag-note);     }
-#accord-app .tag-dot.decision { background: var(--tag-decision); }
-#accord-app .tag-dot.action   { background: var(--tag-action);   }
-#accord-app .tag-dot.risk     { background: var(--tag-risk);     }
-#accord-app .tag-dot.question { background: var(--tag-question); }
-#accord-app .tag-key {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  margin-left: 2px;
-  border: 1px solid var(--rule-strong);
-  border-radius: 3px;
-  padding: 0 4px;
-}
-
-/* Stream */
-#accord-app .captures-stream {
-  flex: 1;
-  overflow-y: auto;
-  padding: 14px 28px 32px;
-}
-#accord-app .stream-tabs {
-  display: flex;
-  gap: 16px;
-  border-bottom: 1px solid var(--rule);
-  padding-bottom: 8px;
-  margin-bottom: 14px;
-}
-#accord-app .stream-tab {
-  background: none;
-  border: none;
-  color: var(--ink-muted);
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 4px 0;
-  cursor: pointer;
-  display: inline-flex; gap: 6px; align-items: center;
-}
-#accord-app .stream-tab.active { color: var(--signal); border-bottom: 2px solid var(--signal); margin-bottom: -10px; padding-bottom: 8px; }
-#accord-app .stream-tab-count {
-  font-size: 11px; color: var(--ink-faint);
-  background: var(--canvas-elev);
-  padding: 0 6px; border-radius: 8px;
-}
-
-#accord-app .capture-row {
-  display: flex;
-  gap: 12px;
-  padding: 10px 0 10px 4px;
-  border-bottom: 1px solid var(--rule);
-  font-size: 13px;
-}
-#accord-app .capture-row .cap-time {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  min-width: 60px;
-  padding-top: 2px;
-}
-#accord-app .capture-row .cap-tag {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
-  font-family: 'IBM Plex Mono', monospace;
-  color: var(--ink-muted);
-  min-width: 90px;
-  padding-top: 2px;
-}
-#accord-app .capture-row .cap-summary {
-  flex: 1;
-  color: var(--ink-body);
-  line-height: 1.5;
-}
-#accord-app .capture-row .cap-author {
-  font-size: 11px;
-  color: var(--ink-faint);
-  margin-top: 4px;
-}
-
-#accord-app .stream-empty {
-  font-size: 12px;
-  color: var(--ink-faint);
-  padding: 28px 0;
-  text-align: center;
-}
-
-/* Meta pane */
-#accord-app .meta-pane {
-  border-left: 1px solid var(--rule);
-  padding: 18px 18px 24px;
-  overflow-y: auto;
-  background: var(--canvas-deep);
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-#accord-app .meta-section-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  margin-bottom: 10px;
-}
-#accord-app .coverage-bar {
-  width: 100%; height: 6px;
-  background: var(--canvas-elev);
-  border-radius: 3px; overflow: hidden;
-  margin-bottom: 6px;
-}
-#accord-app .coverage-fill { height: 100%; background: var(--signal); transition: width 240ms; }
-#accord-app .coverage-text { font-size: 11px; color: var(--ink-muted); }
-
-/* Attendees */
-#accord-app .attendee-row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 0;
-  font-size: 12px;
-  color: var(--ink-body);
-}
-#accord-app .presence-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--ink-ghost);
-  flex-shrink: 0;
-}
-#accord-app .presence-dot.present  { background: #6ba88c; }       /* sage green per palette */
-#accord-app .presence-dot.unstable { background: var(--signal); animation: lc-pulse 1.4s ease-in-out infinite; }
-#accord-app .attendee-name { flex: 1; }
-#accord-app .attendee-self  { color: var(--ink-faint); font-size: 11px; }
-
-/* Chat */
-#accord-app .chat-stream {
-  max-height: 220px;
-  overflow-y: auto;
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  padding: 10px;
-  margin-bottom: 8px;
-  font-size: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-#accord-app .chat-stream:empty::after {
-  content: 'No chat messages yet.';
-  color: var(--ink-faint);
-  font-size: 11px;
-}
-#accord-app .chat-msg { display: flex; gap: 6px; align-items: baseline; }
-#accord-app .chat-msg .chat-author { font-size: 11px; color: var(--ink-muted); font-weight: 500; min-width: 60px; }
-#accord-app .chat-msg .chat-text { color: var(--ink-body); flex: 1; word-break: break-word; }
-#accord-app .chat-msg .chat-time { font: 500 11px 'IBM Plex Mono', monospace; color: var(--ink-ghost); }
-
-#accord-app .chat-input-row { display: flex; gap: 6px; }
-#accord-app .chat-input {
-  flex: 1;
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  color: var(--ink-primary);
-  padding: 6px 10px;
-  font-size: 12px;
-}
-#accord-app .chat-input:focus { outline: none; border-color: var(--signal-dim); }
-#accord-app .chat-send {
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-muted);
-  padding: 6px 12px;
-  border-radius: 4px;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-}
-#accord-app .chat-send:not([disabled]):hover { color: var(--signal); border-color: var(--signal-dim); }
-#accord-app .chat-send[disabled] { opacity: 0.4; cursor: not-allowed; }
-
-/* New-meeting modal + END modal */
-#accord-app .modal-backdrop {
-  display: none;
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.6);
-  z-index: 1000;
-  align-items: center; justify-content: center;
-}
-#accord-app .modal-backdrop.visible { display: flex; }
-#accord-app .modal {
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule-strong);
-  border-radius: 6px;
-  padding: 24px;
-  max-width: 480px;
-  width: calc(100% - 48px);
-  color: var(--ink-body);
-}
-#accord-app .modal h3 {
-  font-family: 'Fraunces', serif;
-  font-weight: 600;
-  font-size: 18px;
-  color: var(--ink-primary);
-  margin-bottom: 12px;
-}
-#accord-app .modal p { font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
-#accord-app .modal label {
-  display: block;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  margin: 12px 0 4px;
-}
-#accord-app .modal input[type=text],
-#accord-app .modal input[type=datetime-local] {
-  width: 100%;
-  background: var(--canvas);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  color: var(--ink-primary);
-  padding: 8px 10px;
-  font-size: 13px;
-  font-family: inherit;
-}
-#accord-app .modal-actions {
-  display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px;
-}
-
-/* Toast */
-#accord-app .toast {
-  position: fixed;
-  bottom: 24px; right: 24px;
-  background: var(--canvas-elev);
-  border: 1px solid var(--signal-dim);
-  border-left-width: 3px;
-  border-radius: 4px;
-  padding: 12px 16px;
-  font-size: 12px;
-  color: var(--ink-body);
-  z-index: 900;
-  display: none;
-  align-items: center;
-  gap: 16px;
-  max-width: 360px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-}
-#accord-app .toast.visible { display: flex; }
-#accord-app .toast-msg { flex: 1; }
-#accord-app .toast-msg strong { color: var(--ink-primary); font-weight: 600; }
-#accord-app .toast-close {
-  background: transparent;
-  border: none;
-  color: var(--ink-faint);
-  font-size: 18px; line-height: 1;
-  cursor: pointer;
-}
-
-/* ── Disabled / closed-state cosmetics ─────────────────── */
-#accord-app .surface-capture.meeting-closed .capture-input,
-#accord-app .surface-capture.meeting-closed .tag-btn,
-#accord-app .surface-capture.meeting-closed .chat-input,
-#accord-app .surface-capture.meeting-closed .chat-send {
-  pointer-events: none;
-  opacity: 0.4;
-}
-
-/* ============================================================
-   Living Document surface (CMD-A4)
-   Three-region: thread rail (left) · spine (center)
-   ============================================================ */
-
-#accord-app .modal-helper {
-  font-size: 11px;
-  color: var(--ink-muted);
-  font-style: italic;
-  margin-top: 4px;
-  line-height: 1.4;
-}
-
-/* CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3: dissent-modal additions.
-   Reuses canonical .modal-backdrop / .modal / .modal-actions pattern;
-   adds textarea + meta-label styling not present in modal scope. */
-#accord-app .modal textarea.dissent-textarea {
-  width: 100%;
-  background: var(--canvas);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  color: var(--ink-primary);
-  padding: 8px 10px;
-  font-size: 13px;
-  font-family: inherit;
-  line-height: 1.45;
-  resize: vertical;
-  margin-bottom: 4px;
-}
-#accord-app .modal .dissent-modal-target {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  color: var(--ink-faint);
-  margin-bottom: 14px;
-  padding: 6px 10px;
-  background: var(--canvas-deep);
-  border-left: 2px solid var(--signal-dim);
-  border-radius: 3px;
-  word-break: break-word;
-}
-#accord-app .modal .dissent-required {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--tag-risk);
-  text-transform: uppercase;
-  margin-left: 6px;
-}
-#accord-app .modal .dissent-optional {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  text-transform: uppercase;
-  margin-left: 6px;
-}
-
-/* Capture-time date modal (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4).
-   Reuses canonical .modal-backdrop / .modal pattern; adds date input
-   styling to match existing modal text input pattern. */
-#accord-app .capture-date-input {
-  width: 100%;
-  background: var(--canvas);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  color: var(--ink-primary);
-  padding: 8px 10px;
-  font-size: 13px;
-  font-family: inherit;
-  margin-bottom: 8px;
-}
-#accord-app select.capture-date-input {
-  appearance: none;
-  cursor: pointer;
-}
-#accord-app input[type="date"].capture-date-input::-webkit-calendar-picker-indicator {
-  filter: invert(0.85);
-  cursor: pointer;
-}
-
-/* Detail-section date display in Decision Ledger detail panel
-   (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4). */
-#accord-app .detail-date-row {
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
-  font-size: 12px;
-  margin-top: 4px;
-}
-#accord-app .detail-date-label {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  min-width: 110px;
-}
-#accord-app .detail-date-value {
-  color: var(--ink-primary);
-  font-weight: 500;
-}
-#accord-app .detail-date-basis {
-  color: var(--ink-muted);
-  font-size: 11px;
-  font-style: italic;
-}
-#accord-app .detail-date-empty {
-  color: var(--ink-faint);
-  font-style: italic;
-  font-size: 12px;
-}
-
-/* Decision-row dissent badge (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3).
-   Appears alongside other .decision-badge entries on dissented decisions
-   in Decision Ledger and as inline marker in Living Document. */
-#accord-app .decision-badge.has-dissent {
-  color: #b58a76;
-  border: 1px solid rgba(181, 138, 118, 0.45);
-  background: rgba(181, 138, 118, 0.08);
-}
-
-/* Dissent detail-section list (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3) */
-#accord-app .ledger-detail-action {
-  float: right;
-  background: transparent;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  color: var(--ink-primary);
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  padding: 3px 9px;
-  cursor: pointer;
-  text-transform: uppercase;
-}
-#accord-app .ledger-detail-action:hover {
-  border-color: #b58a76;
-  color: #b58a76;
-}
-#accord-app .dissent-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-#accord-app .dissent-entry {
-  border-left: 2px solid rgba(181, 138, 118, 0.55);
-  padding: 6px 10px;
-  background: rgba(181, 138, 118, 0.04);
-  border-radius: 0 3px 3px 0;
-}
-#accord-app .dissent-entry-head {
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-  margin-bottom: 4px;
-  font-size: 11px;
-}
-#accord-app .dissent-entry-who {
-  font-weight: 600;
-  color: var(--ink-primary);
-}
-#accord-app .dissent-entry-when {
-  color: var(--ink-faint);
-  font-family: 'IBM Plex Mono', monospace;
-}
-#accord-app .dissent-sealed-badge,
-#accord-app .dissent-draft-badge {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 1px 5px;
-  border-radius: 2px;
-}
-#accord-app .dissent-sealed-badge {
-  color: #1D9E75;
-  border: 1px solid rgba(29, 158, 117, 0.4);
-}
-#accord-app .dissent-draft-badge {
-  color: var(--ink-faint);
-  border: 1px solid var(--rule);
-}
-#accord-app .dissent-entry-rationale {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink-primary);
-  white-space: pre-wrap;
-}
-#accord-app .dissent-predicted {
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--ink-muted);
-  white-space: pre-wrap;
-}
-#accord-app .dissent-predicted-label {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-right: 6px;
-}
-
-#accord-app #surface-document.surface { padding: 0; }
-
-#accord-app .document-body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: var(--rail-w) 1fr;
-  overflow: hidden;
-}
-
-/* Thread rail */
-#accord-app .thread-rail {
-  border-right: 1px solid var(--rule);
-  padding: 18px 14px 24px;
-  overflow-y: auto;
-  background: var(--canvas-deep);
-}
-#accord-app .thread-rail .rail-section-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-bottom: 14px;
-}
-#accord-app .thread-rail .count {
-  font-size: 11px; color: var(--ink-ghost);
-  text-transform: none; letter-spacing: 0.02em;
-}
-
-#accord-app .thread-row {
-  padding: 10px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  margin-bottom: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-#accord-app .thread-row:hover { background: var(--canvas-raised); }
-#accord-app .thread-row.active {
-  background: var(--canvas-raised);
-  border-color: var(--signal-dim);
-}
-#accord-app .thread-row .thread-title {
-  font-size: 13px;
-  color: var(--ink-primary);
-  font-weight: 500;
-  line-height: 1.35;
-}
-#accord-app .thread-row .thread-meta {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  letter-spacing: 0.04em;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-#accord-app .thread-row .thread-meta .pill {
-  background: var(--canvas-elev);
-  padding: 0 6px;
-  border-radius: 8px;
-  color: var(--ink-muted);
-}
-#accord-app .thread-row .thread-meta .pill.warn  { color: var(--tag-risk); }
-#accord-app .thread-row .thread-meta .pill.signal { color: var(--signal); }
-
-/* Spine column */
-#accord-app .document-spine {
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  background: var(--canvas);
-  padding: 28px 36px 48px;
-}
-
-#accord-app .document-header {
-  border-bottom: 1px solid var(--rule);
-  padding-bottom: 14px;
-  margin-bottom: 14px;
-}
-#accord-app .document-title {
-  font-family: 'Fraunces', serif;
-  font-weight: 600;
-  font-size: 26px;
-  letter-spacing: -0.01em;
-  color: var(--ink-primary);
-  margin-bottom: 6px;
-  line-height: 1.2;
-}
-#accord-app .document-aggregate {
-  font-size: 12px;
-  color: var(--ink-muted);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: baseline;
-}
-#accord-app .document-aggregate .agg-segment {
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-#accord-app .document-aggregate .agg-segment:hover {
-  background: var(--canvas-raised);
-  color: var(--ink-primary);
-}
-#accord-app .document-aggregate .agg-sep {
-  color: var(--ink-ghost);
-  margin: 0 2px;
-}
-
-/* Filter chips */
-#accord-app .document-filters {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 18px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--rule);
-}
-#accord-app .document-filters .filter-group {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-#accord-app .document-filters .filter-group-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  margin-right: 6px;
-  min-width: 56px;
-}
-#accord-app .document-filters .filter-chip {
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-muted);
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: color 100ms, border-color 100ms, background 100ms;
-}
-#accord-app .document-filters .filter-chip:hover {
-  color: var(--ink-primary);
-  border-color: var(--rule-strong);
-}
-#accord-app .document-filters .filter-chip.active {
-  color: var(--signal);
-  border-color: var(--signal-dim);
-  background: var(--signal-soft);
-}
-
-/* Spine stream */
-#accord-app .document-stream { display: flex; flex-direction: column; }
-
-#accord-app .meeting-group { margin-bottom: 24px; }
-#accord-app .meeting-group-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 8px 0 6px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--rule);
-}
-#accord-app .meeting-group-title {
-  font-family: 'Fraunces', serif;
-  font-weight: 500;
-  font-size: 16px;
-  color: var(--ink-primary);
-}
-#accord-app .meeting-group-date {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  letter-spacing: 0.04em;
-}
-#accord-app .meeting-group-delta {
-  margin-left: 6px;
-  color: var(--signal);
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-}
-
-#accord-app .doc-node {
-  display: grid;
-  grid-template-columns: 100px 110px 1fr;
-  gap: 14px;
-  padding: 9px 0;
-  align-items: start;
-  border-bottom: 1px solid var(--rule);
-}
-#accord-app .doc-node .doc-time {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  padding-top: 2px;
-}
-#accord-app .doc-node .doc-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-muted);
-  padding-top: 2px;
-}
-#accord-app .doc-node .doc-content {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink-body);
-}
-#accord-app .doc-node .doc-summary {
-  display: block;
-  margin-bottom: 4px;
-}
-/* CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 5: seq_id prefix on inline
-   document references. Mono treatment matching Decision Ledger row prefix. */
-#accord-app .doc-node .doc-summary .doc-seq {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--ink-muted);
-  font-weight: 600;
-}
-#accord-app .doc-node .doc-byline {
-  font-size: 11px;
-  color: var(--ink-faint);
-  margin-top: 4px;
-}
-
-/* Edge-driven treatments */
-#accord-app .doc-node.is-superseded .doc-summary {
-  text-decoration: line-through;
-  color: var(--ink-faint);
-}
-#accord-app .doc-node.is-superseded .doc-content { opacity: 0.7; }
-#accord-app .doc-node.is-elevated .doc-summary {
-  color: var(--ink-primary);
-  font-weight: 500;
-}
-#accord-app .doc-node.is-elevated.tag-risk .doc-summary { color: var(--tag-risk); }
-#accord-app .doc-node.is-mitigated .doc-summary { color: var(--ink-muted); }
-#accord-app .doc-node.is-mitigated .doc-content { opacity: 0.85; }
-#accord-app .doc-node.is-answered .doc-tag::before {
-  content: '✓';
-  color: var(--tag-note);
-  margin-right: 4px;
-}
-#accord-app .doc-node.is-closed .doc-tag::before {
-  content: '✓';
-  color: var(--ink-muted);
-  margin-right: 4px;
-}
-
-#accord-app .doc-edge-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.04em;
-  color: var(--ink-muted);
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  padding: 2px 8px;
-  border-radius: 10px;
-  margin: 0 4px 4px 0;
-  cursor: pointer;
-}
-#accord-app .doc-edge-chip:hover {
-  color: var(--ink-primary);
-  border-color: var(--rule-strong);
-}
-#accord-app .doc-edge-chip.contradiction {
-  color: var(--tag-risk);
-  border-color: rgba(168, 111, 94, 0.3);
-}
-#accord-app .doc-edge-chip.aggregate { font-style: italic; }
-#accord-app .doc-edge-chip.has-dissent {
-  color: #b58a76;
-  border-color: rgba(181, 138, 118, 0.45);
-  background: rgba(181, 138, 118, 0.08);
-  cursor: default;
-}
-#accord-app .doc-edge-chip.date-chip {
-  color: #7d9a8c;
-  border-color: rgba(125, 154, 140, 0.4);
-  background: rgba(125, 154, 140, 0.06);
-  cursor: default;
-}
-
-#accord-app .doc-edge-row {
-  display: flex;
-  flex-wrap: wrap;
-  margin-top: 6px;
-  gap: 4px;
-}
-
-#accord-app .doc-cross-link {
-  color: var(--signal);
-  cursor: pointer;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.04em;
-  text-decoration: underline dotted;
-  text-underline-offset: 2px;
-}
-
-/* Empty states */
-#accord-app .doc-empty {
-  text-align: center;
-  padding: 56px 32px;
-  color: var(--ink-faint);
-  font-size: 13px;
-  line-height: 1.55;
-}
-#accord-app .doc-empty h3 {
-  font-family: 'Fraunces', serif;
-  font-weight: 500;
-  font-size: 18px;
-  color: var(--ink-muted);
-  margin-bottom: 8px;
-}
-
-/* ============================================================
-   Decision Ledger surface (CMD-A5)
-   Three-region: filter rail · decision list · detail panel
-   ============================================================ */
-
-#accord-app #surface-ledger.surface { padding: 0; }
-
-#accord-app .ledger-body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 260px 1fr 0;
-  overflow: hidden;
-  transition: grid-template-columns 200ms ease;
-}
-#accord-app .ledger-body.detail-open {
-  grid-template-columns: 260px 1fr 360px;
-}
-
-/* Filter rail */
-#accord-app .ledger-rail {
-  border-right: 1px solid var(--rule);
-  padding: 18px 14px 24px;
-  overflow-y: auto;
-  background: var(--canvas-deep);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-#accord-app .ledger-rail .rail-section-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
-#accord-app .ledger-refresh-btn {
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-muted);
-  width: 22px; height: 22px;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 13px; line-height: 1;
-}
-#accord-app .ledger-refresh-btn:hover {
-  color: var(--signal); border-color: var(--signal-dim);
-}
-
-#accord-app .ledger-search {
-  width: 100%;
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  color: var(--ink-primary);
-  padding: 7px 10px;
-  font-size: 12px;
-  font-family: inherit;
-}
-#accord-app .ledger-search:focus { outline: none; border-color: var(--signal-dim); }
-#accord-app .ledger-search::placeholder { color: var(--ink-faint); }
-
-#accord-app .ledger-rail .filter-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-#accord-app .ledger-rail .filter-group-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  width: 100%;
-  margin-bottom: 2px;
-}
-#accord-app .ledger-rail .filter-chip {
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-muted);
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: color 100ms, border-color 100ms, background 100ms;
-}
-#accord-app .ledger-rail .filter-chip:hover {
-  color: var(--ink-primary);
-  border-color: var(--rule-strong);
-}
-#accord-app .ledger-rail .filter-chip.active {
-  color: var(--signal);
-  border-color: var(--signal-dim);
-  background: var(--signal-soft);
-}
-#accord-app .ledger-rail .filter-chip.disabled {
-  cursor: default;
-  opacity: 0.7;
-}
-
-#accord-app .ledger-aggregate {
-  padding-top: 14px;
-  border-top: 1px solid var(--rule);
-  font-size: 11px;
-  color: var(--ink-faint);
-  line-height: 1.6;
-}
-#accord-app .ledger-aggregate .agg-line { display: block; }
-#accord-app .ledger-aggregate .agg-line.total {
-  color: var(--ink-primary);
-  font-weight: 500;
-  margin-bottom: 4px;
-  font-size: 12px;
-}
-
-/* Decision list */
-#accord-app .ledger-list-wrap {
-  overflow-y: auto;
-  background: var(--canvas);
-  padding: 24px 32px 48px;
-}
-#accord-app .ledger-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-#accord-app .decision-row {
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  padding: 14px 16px;
-  cursor: pointer;
-  transition: border-color 120ms, background 120ms;
-  position: relative;
-}
-#accord-app .decision-row:hover {
-  border-color: var(--rule-strong);
-  background: var(--canvas-elev);
-}
-#accord-app .decision-row.active {
-  border-color: var(--signal-dim);
-  background: var(--canvas-elev);
-}
-
-#accord-app .decision-row .decision-summary {
-  font-size: 14px;
-  color: var(--ink-primary);
-  line-height: 1.45;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-/* CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 5: seq_id prefix in row summary.
-   Mono treatment to set off the sequence identifier from the prose
-   summary; muted color so the summary itself stays the focal element. */
-#accord-app .decision-row .decision-summary .decision-seq {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  color: var(--ink-muted);
-  font-weight: 600;
-}
-#accord-app .decision-row.is-superseded .decision-summary {
-  text-decoration: line-through;
-  color: var(--ink-muted);
-}
-#accord-app .decision-row.is-contradicted {
-  border-left: 3px solid var(--tag-risk);
-}
-#accord-app .decision-row.has-counter-weight {
-  border-left: 3px solid var(--signal);
-}
-
-#accord-app .decision-row .decision-meta {
-  font-size: 11px;
-  color: var(--ink-faint);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: baseline;
-}
-#accord-app .decision-row .decision-meta .meta-byline {
-  color: var(--ink-muted);
-}
-#accord-app .decision-row .decision-meta .meta-crumb {
-  color: var(--ink-faint);
-  font-family: 'IBM Plex Mono', monospace;
-  letter-spacing: 0.04em;
-}
-#accord-app .decision-row .decision-meta .meta-crumb a {
-  color: var(--ink-muted);
-  cursor: pointer;
-  text-decoration: underline dotted;
-  text-underline-offset: 2px;
-}
-#accord-app .decision-row .decision-meta .meta-crumb a:hover {
-  color: var(--signal);
-}
-
-#accord-app .decision-row .decision-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-#accord-app .decision-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.04em;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: var(--canvas-elev);
-  border: 1px solid var(--rule);
-  color: var(--ink-muted);
-}
-#accord-app .decision-badge.superseded {
-  color: var(--ink-faint);
-  text-decoration: line-through;
-}
-#accord-app .decision-badge.contradicted {
-  color: var(--tag-risk);
-  border-color: rgba(168, 111, 94, 0.3);
-}
-#accord-app .decision-badge.supporting {
-  color: var(--tag-note);
-}
-#accord-app .decision-badge.counter {
-  color: var(--signal);
-}
-#accord-app .decision-badge.belief-high  { color: var(--tag-note); }
-#accord-app .decision-badge.belief-mixed { color: var(--signal); }
-#accord-app .decision-badge.belief-low   { color: var(--tag-risk); }
-#accord-app .decision-badge.belief-none  { color: var(--ink-faint); }
-
-/* Detail panel (right slide-in) */
-#accord-app .ledger-detail {
-  border-left: 1px solid var(--rule);
-  background: var(--canvas-deep);
-  overflow-y: auto;
-  display: none;
-  position: relative;
-}
-#accord-app .ledger-body.detail-open .ledger-detail { display: block; }
-
-#accord-app .ledger-detail-close {
-  position: absolute;
-  top: 14px; right: 14px;
-  background: transparent;
-  border: none;
-  color: var(--ink-faint);
-  font-size: 18px; line-height: 1;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 3px;
-}
-#accord-app .ledger-detail-close:hover {
-  color: var(--ink-primary); background: var(--canvas-raised);
-}
-
-#accord-app .ledger-detail-body {
-  padding: 22px 22px 32px;
-}
-#accord-app .ledger-detail-body .detail-section {
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid var(--rule);
-}
-#accord-app .ledger-detail-body .detail-section:first-child {
-  margin-top: 0; padding-top: 0; border-top: none;
-}
-#accord-app .ledger-detail-body .detail-section-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  margin-bottom: 8px;
-}
-#accord-app .ledger-detail-body .detail-summary {
-  font-family: 'Fraunces', serif;
-  font-weight: 500;
-  font-size: 17px;
-  color: var(--ink-primary);
-  line-height: 1.4;
-  margin-right: 36px;
-}
-#accord-app .ledger-detail-body .detail-crumb {
-  font-size: 11px;
-  color: var(--ink-faint);
-  font-family: 'IBM Plex Mono', monospace;
-  letter-spacing: 0.04em;
-  margin-top: 8px;
-}
-#accord-app .ledger-detail-body .detail-crumb a {
-  color: var(--ink-muted);
-  cursor: pointer;
-  text-decoration: underline dotted;
-  text-underline-offset: 2px;
-}
-#accord-app .ledger-detail-body .detail-crumb a:hover { color: var(--signal); }
-
-/* Belief history rows */
-#accord-app .belief-history-row {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--rule);
-  font-size: 12px;
-}
-#accord-app .belief-history-row:last-child { border-bottom: none; }
-#accord-app .belief-history-row .belief-line {
-  display: flex; gap: 8px; align-items: baseline;
-  flex-wrap: wrap;
-}
-#accord-app .belief-history-row .belief-level {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 1px 6px;
-  border-radius: 3px;
-  border: 1px solid;
-}
-#accord-app .belief-history-row .belief-level.high  { color: var(--tag-note); border-color: var(--tag-note); }
-#accord-app .belief-history-row .belief-level.mixed { color: var(--signal);   border-color: var(--signal-dim); }
-#accord-app .belief-history-row .belief-level.low   { color: var(--tag-risk); border-color: rgba(168, 111, 94, 0.4); }
-#accord-app .belief-history-row .belief-arrow {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 12px;
-  color: var(--ink-faint);
-}
-#accord-app .belief-history-row .belief-byline {
-  color: var(--ink-muted);
-}
-#accord-app .belief-history-row .belief-when {
-  color: var(--ink-faint);
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-}
-#accord-app .belief-history-row .belief-rationale {
-  margin-top: 4px;
-  color: var(--ink-body);
-  font-style: italic;
-  font-size: 12px;
-  line-height: 1.5;
-  padding-left: 10px;
-  border-left: 2px solid var(--rule);
-}
-#accord-app .belief-history-row.is-unsealed .belief-when::after {
-  content: '· unsealed';
-  margin-left: 6px;
-  color: var(--signal);
-  font-style: italic;
-}
-
-/* Evidence chain chips */
-#accord-app .evidence-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  color: var(--ink-body);
-  margin: 2px 4px 2px 0;
-  cursor: pointer;
-  text-decoration: none;
-}
-#accord-app .evidence-chip:hover {
-  border-color: var(--rule-strong);
-  color: var(--ink-primary);
-}
-#accord-app .evidence-chip .tag-dot { width: 7px; height: 7px; }
-#accord-app .evidence-chip .evidence-tag {
-  font: 500 10px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-right: 2px;
-}
-
-/* Adjustment composer */
-#accord-app .belief-composer {
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  padding: 14px;
-  margin-top: 4px;
-}
-#accord-app .belief-composer .composer-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  display: block;
-  margin-bottom: 6px;
-}
-#accord-app .belief-level-row {
-  display: flex; gap: 6px; margin-bottom: 12px;
-}
-#accord-app .belief-level-btn {
-  flex: 1;
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-muted);
-  padding: 7px 10px;
-  border-radius: 4px;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: color 100ms, border-color 100ms;
-}
-#accord-app .belief-level-btn:hover {
-  color: var(--ink-primary); border-color: var(--rule-strong);
-}
-#accord-app .belief-level-btn.selected.high {
-  color: var(--tag-note);
-  border-color: var(--tag-note);
-  background: rgba(139, 168, 154, 0.08);
-}
-#accord-app .belief-level-btn.selected.mixed {
-  color: var(--signal);
-  border-color: var(--signal-dim);
-  background: var(--signal-soft);
-}
-#accord-app .belief-level-btn.selected.low {
-  color: var(--tag-risk);
-  border-color: rgba(168, 111, 94, 0.4);
-  background: rgba(168, 111, 94, 0.08);
-}
-
-#accord-app .belief-rationale {
-  width: 100%;
-  background: var(--canvas);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  color: var(--ink-primary);
-  padding: 8px 10px;
-  font: 400 12px 'IBM Plex Sans', system-ui, sans-serif;
-  resize: vertical;
-  min-height: 56px;
-  margin-bottom: 10px;
-}
-#accord-app .belief-rationale:focus { outline: none; border-color: var(--signal-dim); }
-#accord-app .belief-rationale::placeholder { color: var(--ink-faint); }
-
-#accord-app .belief-declare-btn {
-  background: var(--signal);
-  color: var(--canvas-deep);
-  border: none;
-  padding: 9px 16px;
-  border-radius: 4px;
-  font: 500 12px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 120ms;
-}
-#accord-app .belief-declare-btn:hover { background: #e0b35d; }
-#accord-app .belief-declare-btn[disabled] {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* ============================================================
-   Digest & Send surface (CMD-A6)
-   Three-region: meeting rail · digest preview · recipient panel
-   ============================================================ */
-
-#accord-app #surface-digest.surface { padding: 0; }
-
-#accord-app .digest-body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 260px 1fr 0;
-  overflow: hidden;
-  transition: grid-template-columns 200ms ease;
-}
-#accord-app .digest-body.recipients-open {
-  grid-template-columns: 260px 1fr 340px;
-}
-
-/* Meeting rail (reuses ledger-rail visual register) */
-#accord-app .digest-rail {
-  border-right: 1px solid var(--rule);
-  padding: 18px 14px 24px;
-  overflow-y: auto;
-  background: var(--canvas-deep);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-#accord-app .digest-rail .rail-section-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
-#accord-app .digest-rail .filter-group {
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-}
-#accord-app .digest-rail .filter-group-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  width: 100%;
-  margin-bottom: 2px;
-}
-#accord-app .digest-rail .filter-chip {
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-muted);
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: color 100ms, border-color 100ms, background 100ms;
-}
-#accord-app .digest-rail .filter-chip:hover {
-  color: var(--ink-primary); border-color: var(--rule-strong);
-}
-#accord-app .digest-rail .filter-chip.active {
-  color: var(--signal); border-color: var(--signal-dim); background: var(--signal-soft);
-}
-
-#accord-app .digest-meeting-row {
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 5px;
-  padding: 10px 12px;
-  cursor: pointer;
-  margin-bottom: 6px;
-  transition: border-color 120ms, background 120ms;
-}
-#accord-app .digest-meeting-row:hover {
-  border-color: var(--rule-strong);
-  background: var(--canvas-elev);
-}
-#accord-app .digest-meeting-row.active {
-  border-color: var(--signal-dim);
-  background: var(--canvas-elev);
-}
-#accord-app .digest-meeting-row .meeting-title {
-  font-size: 13px;
-  color: var(--ink-primary);
-  font-weight: 500;
-  margin-bottom: 4px;
-  line-height: 1.35;
-}
-#accord-app .digest-meeting-row .meeting-meta {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  letter-spacing: 0.04em;
-}
-#accord-app .digest-meeting-row .meeting-status-pill {
-  display: inline-block;
-  font: 500 10px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 1px 6px;
-  border-radius: 8px;
-  margin-top: 4px;
-}
-#accord-app .digest-meeting-row .meeting-status-pill.ready {
-  color: var(--signal); border: 1px solid var(--signal-dim);
-}
-#accord-app .digest-meeting-row .meeting-status-pill.sent {
-  color: var(--tag-note); border: 1px solid var(--tag-note);
-}
-
-/* Digest preview */
-#accord-app .digest-preview-wrap {
-  overflow-y: auto;
-  background: var(--canvas);
-  padding: 24px 36px 48px;
-}
-#accord-app .digest-preview {
-  max-width: 760px;
-}
-
-#accord-app .digest-empty-cta {
-  display: flex; align-items: center; justify-content: center;
-  height: 100%;
-  color: var(--ink-faint);
-  font-size: 13px;
-  text-align: center;
-  padding: 56px 24px;
-}
-
-#accord-app .digest-header {
-  border-bottom: 1px solid var(--rule);
-  padding-bottom: 14px;
-  margin-bottom: 18px;
-}
-#accord-app .digest-title {
-  font-family: 'Fraunces', serif;
-  font-weight: 600;
-  font-size: 24px;
-  color: var(--ink-primary);
-  letter-spacing: -0.01em;
-  margin-bottom: 6px;
-  line-height: 1.2;
-}
-#accord-app .digest-meta {
-  font-size: 12px; color: var(--ink-muted);
-  display: flex; flex-wrap: wrap; gap: 10px;
-}
-#accord-app .digest-meta .meta-pill {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  background: var(--canvas-raised);
-  padding: 2px 8px;
-  border-radius: 8px;
-}
-
-#accord-app .digest-cta-row {
-  display: flex; gap: 10px; align-items: center;
-  margin-bottom: 22px;
-  padding: 12px 0;
-}
-#accord-app .digest-send-btn {
-  background: var(--signal);
-  color: var(--canvas-deep);
-  border: none;
-  padding: 9px 18px;
-  border-radius: 4px;
-  font: 500 12px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-#accord-app .digest-send-btn:hover { background: #e0b35d; }
-#accord-app .digest-send-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
-#accord-app .digest-send-status {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-muted);
-  letter-spacing: 0.04em;
-}
-#accord-app .digest-send-status.sent { color: var(--tag-note); }
-
-#accord-app .digest-section {
-  margin-bottom: 22px;
-  padding-top: 14px;
-  border-top: 1px solid var(--rule);
-}
-#accord-app .digest-section:first-of-type { border-top: none; padding-top: 0; }
-
-#accord-app .digest-section-header {
-  display: flex; align-items: baseline; gap: 8px;
-  margin-bottom: 10px;
-}
-#accord-app .digest-section-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-}
-#accord-app .digest-section-count {
-  font-size: 11px;
-  color: var(--ink-ghost);
-  font-family: 'IBM Plex Mono', monospace;
-}
-
-#accord-app .digest-item {
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 5px;
-  padding: 11px 14px;
-  margin-bottom: 8px;
-}
-#accord-app .digest-item .digest-summary {
-  font-size: 13px;
-  color: var(--ink-primary);
-  line-height: 1.45;
-  margin-bottom: 6px;
-}
-#accord-app .digest-item .digest-context {
-  font-size: 11px;
-  color: var(--ink-muted);
-  font-family: 'IBM Plex Mono', monospace;
-  letter-spacing: 0.04em;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: baseline;
-}
-#accord-app .digest-item .ctx-pill {
-  background: var(--canvas-elev);
-  padding: 1px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--rule);
-  color: var(--ink-muted);
-}
-#accord-app .digest-item .ctx-pill.signal { color: var(--signal); border-color: var(--signal-dim); }
-#accord-app .digest-item .ctx-pill.warn   { color: var(--tag-risk); border-color: rgba(168, 111, 94, 0.4); }
-#accord-app .digest-item .ctx-pill.note   { color: var(--tag-note); border-color: var(--tag-note); }
-
-/* Action placeholder card — Path B deferral */
-#accord-app .digest-action-placeholder {
-  background: rgba(212, 160, 74, 0.06);
-  border: 1px dashed var(--signal-dim);
-  border-radius: 5px;
-  padding: 11px 14px;
-  margin-bottom: 8px;
-}
-#accord-app .digest-action-placeholder .placeholder-tag {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--signal);
-  margin-bottom: 4px;
-}
-#accord-app .digest-action-placeholder .digest-summary {
-  font-size: 13px;
-  color: var(--ink-primary);
-  line-height: 1.45;
-  margin-bottom: 6px;
-}
-#accord-app .digest-action-placeholder .placeholder-deferral {
-  font-size: 11px;
-  color: var(--ink-faint);
-  font-style: italic;
-  margin-top: 4px;
-}
-
-/* Recipient panel (mirrors ledger-detail) */
-#accord-app .digest-recipients {
-  border-left: 1px solid var(--rule);
-  background: var(--canvas-deep);
-  overflow-y: auto;
-  display: none;
-  position: relative;
-}
-#accord-app .digest-body.recipients-open .digest-recipients { display: block; }
-
-#accord-app .digest-recipients-body {
-  padding: 22px 22px 32px;
-}
-#accord-app .recipient-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--canvas-raised);
-  margin-bottom: 6px;
-  cursor: pointer;
-}
-#accord-app .recipient-row:hover { border-color: var(--rule-strong); }
-#accord-app .recipient-row.active { border-color: var(--signal-dim); }
-#accord-app .recipient-row .recipient-checkbox {
-  width: 14px; height: 14px;
-  border: 1px solid var(--ink-muted);
-  border-radius: 2px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-#accord-app .recipient-row.selected .recipient-checkbox {
-  background: var(--signal);
-  border-color: var(--signal);
-  color: var(--canvas-deep);
-  font-size: 11px;
-  font-weight: 700;
-}
-#accord-app .recipient-row .recipient-name {
-  flex: 1;
-  font-size: 12px;
-  color: var(--ink-primary);
-}
-#accord-app .recipient-row .recipient-role {
-  font: 500 10px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink-faint);
-}
-#accord-app .recipient-slice {
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 5px;
-  padding: 12px 14px;
-  margin-top: 14px;
-}
-#accord-app .recipient-slice-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  margin-bottom: 6px;
-}
-#accord-app .recipient-slice-empty {
-  font-size: 12px;
-  color: var(--ink-faint);
-  font-style: italic;
-}
-#accord-app .recipient-slice .slice-item {
-  font-size: 12px;
-  color: var(--ink-body);
-  margin-bottom: 4px;
-  line-height: 1.45;
-}
-#accord-app .recipient-slice .slice-item .slice-tag {
-  font: 500 10px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink-faint);
-  margin-right: 6px;
-}
-
-/* Digest send confirm modal — reuses .modal-backdrop styles */
-#accord-app .digest-confirm-list {
-  font-size: 12px;
-  color: var(--ink-body);
-  margin: 8px 0 12px;
-}
-#accord-app .digest-confirm-list li {
-  padding: 2px 0;
-}
-
-/* ============================================================
-   Minutes surface (CMD-A7) + toast extensions
-   Three-region: meeting rail · render status · history panel
-   ============================================================ */
-
-#accord-app #surface-minutes.surface { padding: 0; }
-
-#accord-app .minutes-body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 280px 1fr 0;
-  overflow: hidden;
-  transition: grid-template-columns 200ms ease;
-}
-#accord-app .minutes-body.history-open {
-  grid-template-columns: 280px 1fr 380px;
-}
-
-/* Meeting rail (visual register matches digest-rail) */
-#accord-app .minutes-rail {
-  border-right: 1px solid var(--rule);
-  padding: 18px 14px 24px;
-  overflow-y: auto;
-  background: var(--canvas-deep);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-#accord-app .minutes-rail .rail-section-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
-#accord-app .minutes-rail .filter-group {
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-}
-#accord-app .minutes-rail .filter-group-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  width: 100%;
-  margin-bottom: 2px;
-}
-#accord-app .minutes-rail .filter-chip {
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-muted);
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  cursor: pointer;
-}
-#accord-app .minutes-rail .filter-chip:hover {
-  color: var(--ink-primary); border-color: var(--rule-strong);
-}
-#accord-app .minutes-rail .filter-chip.active {
-  color: var(--signal); border-color: var(--signal-dim); background: var(--signal-soft);
-}
-
-#accord-app .minutes-meeting-row {
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 5px;
-  padding: 10px 12px;
-  cursor: pointer;
-  margin-bottom: 6px;
-  transition: border-color 120ms, background 120ms;
-}
-#accord-app .minutes-meeting-row:hover {
-  border-color: var(--rule-strong);
-  background: var(--canvas-elev);
-}
-#accord-app .minutes-meeting-row.active {
-  border-color: var(--signal-dim);
-  background: var(--canvas-elev);
-}
-#accord-app .minutes-meeting-row .meeting-title {
-  font-size: 13px;
-  color: var(--ink-primary);
-  font-weight: 500;
-  margin-bottom: 4px;
-  line-height: 1.35;
-}
-#accord-app .minutes-meeting-row .meeting-meta {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  letter-spacing: 0.04em;
-}
-
-/* Render-status pill — IR51 class chosen at construction time */
-#accord-app .render-pill {
-  display: inline-block;
-  font: 500 10px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 1px 6px;
-  border-radius: 8px;
-  margin-top: 4px;
-}
-#accord-app .render-pill.pill-rendered {
-  /* CMD-MINUTES-UX-POLISH-1 §3.1: brighter accord-aesthetic green
-     (#94a78c, matching meeting-minutes-mockup.html palette) plus a
-     soft fill, mirroring the pill-rendering visual treatment. The
-     prior `var(--tag-note)` token was visually indistinguishable
-     from neutral tags. IR45-compliant: desaturated, declared not
-     measured. */
-  color: #94a78c;
-  border: 1px solid rgba(148, 167, 140, 0.45);
-  background: rgba(148, 167, 140, 0.12);
-}
-#accord-app .render-pill.pill-rendering {
-  color: var(--signal);
-  border: 1px solid var(--signal-dim);
-  background: var(--signal-soft);
-}
-#accord-app .render-pill.pill-failed {
-  color: var(--tag-risk);
-  border: 1px solid rgba(168, 111, 94, 0.4);
-}
-#accord-app .render-pill.pill-not-yet {
-  color: var(--ink-faint);
-  border: 1px solid var(--rule);
-}
-
-/* Render status (center column) */
-#accord-app .minutes-status-wrap {
-  overflow-y: auto;
-  background: var(--canvas);
-  padding: 24px 36px 48px;
-}
-#accord-app .minutes-status { max-width: 760px; }
-
-#accord-app .minutes-empty-cta {
-  display: flex; align-items: center; justify-content: center;
-  height: 100%;
-  color: var(--ink-faint);
-  font-size: 13px;
-  text-align: center;
-  padding: 56px 24px;
-}
-
-#accord-app .minutes-status-card {
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  padding: 24px 28px;
-}
-#accord-app .minutes-status-card h2 {
-  font-family: 'Fraunces', serif;
-  font-weight: 600;
-  font-size: 22px;
-  color: var(--ink-primary);
-  letter-spacing: -0.01em;
-  margin-bottom: 10px;
-  line-height: 1.25;
-}
-#accord-app .minutes-status-meta {
-  font-size: 12px; color: var(--ink-muted);
-  display: flex; flex-wrap: wrap; gap: 10px;
-  margin-bottom: 18px;
-}
-#accord-app .minutes-status-meta .meta-pill {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  background: var(--canvas-elev);
-  padding: 2px 8px;
-  border-radius: 8px;
-}
-#accord-app .minutes-cta-row {
-  display: flex; gap: 10px; align-items: center;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--rule);
-}
-#accord-app .minutes-action-btn {
-  background: var(--signal);
-  color: var(--canvas-deep);
-  border: none;
-  padding: 9px 18px;
-  border-radius: 4px;
-  font: 500 12px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
-}
-#accord-app .minutes-action-btn:hover { background: #e0b35d; }
-#accord-app .minutes-action-btn[disabled],
-#accord-app .minutes-action-btn.disabled {
-  opacity: 0.4; cursor: not-allowed;
-}
-#accord-app .minutes-action-btn.btn-ghost {
-  background: transparent;
-  color: var(--ink-muted);
-  border: 1px solid var(--rule);
-}
-#accord-app .minutes-action-btn.btn-ghost:hover {
-  color: var(--ink-primary); border-color: var(--rule-strong);
-  background: var(--canvas-elev);
-}
-
-#accord-app .minutes-current-fingerprint {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-faint);
-  word-break: break-all;
-  background: var(--canvas);
-  padding: 8px 10px;
-  border-radius: 4px;
-  border: 1px solid var(--rule);
-  margin-top: 10px;
-}
-
-/* Template picker (CMD-PROJECTION-ENGINE-1)
-   Rendered inside #minutesStatus by accord-minutes.js; classes
-   chosen at construction time (IR51). Visual register mirrors
-   the rail's .filter-chip vocabulary per IR64. */
-#accord-app .minutes-template-picker {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--rule);
-}
-#accord-app .minutes-template-picker .picker-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-bottom: 8px;
-}
-#accord-app .minutes-template-picker .picker-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-#accord-app .minutes-template-picker .picker-chip {
-  background: transparent;
-  color: var(--ink-muted);
-  border: 1px solid var(--rule);
-  padding: 7px 14px;
-  border-radius: 4px;
-  font: 500 12px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: color 120ms, border-color 120ms, background 120ms;
-}
-#accord-app .minutes-template-picker .picker-chip:hover {
-  color: var(--ink-primary);
-  border-color: var(--rule-strong);
-  background: var(--canvas-elev);
-}
-#accord-app .minutes-template-picker .picker-chip.active {
-  color: var(--signal);
-  border-color: var(--signal);
-  background: rgba(217, 154, 61, 0.08);
-}
-
-/* History panel (right slide-in) */
-#accord-app .minutes-history {
-  border-left: 1px solid var(--rule);
-  background: var(--canvas-deep);
-  overflow-y: auto;
-  display: none;
-  position: relative;
-}
-#accord-app .minutes-body.history-open .minutes-history { display: block; }
-
-#accord-app .minutes-history-body {
-  padding: 22px 22px 32px;
-}
-/* CMD-MINUTES-UX-POLISH-1 §3.4: sticky panel-level label.
-   Matches canonical surface-label typography (cf. .minutes-history-section-label):
-   IBM Plex Mono 11px 500, uppercase, 0.08em letter-spacing, ink-faint.
-   Sticky so it remains visible as render-history list scrolls; bottom
-   border separates it from the body content per accord's panel-header
-   convention. */
-#accord-app .minutes-history-header {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 14px 22px 12px;
-  background: var(--canvas-deep);
-  border-bottom: 1px solid var(--rule);
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-}
-#accord-app .minutes-history-section-label {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-  margin-bottom: 8px;
-}
-#accord-app .minutes-history-row {
-  background: var(--canvas-raised);
-  border: 1px solid var(--rule);
-  border-radius: 5px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-}
-#accord-app .minutes-history-row.current {
-  border-color: var(--signal-dim);
-}
-#accord-app .minutes-history-row .hist-when {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  color: var(--ink-primary);
-  letter-spacing: 0.04em;
-  margin-bottom: 3px;
-}
-#accord-app .minutes-history-row .hist-line {
-  font-size: 11px;
-  color: var(--ink-faint);
-  font-family: 'IBM Plex Mono', monospace;
-  letter-spacing: 0.04em;
-  word-break: break-all;
-  margin-bottom: 2px;
-}
-#accord-app .minutes-history-row .hist-line a {
-  color: var(--signal);
-  text-decoration: underline dotted;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-/* CMD-MINUTES-UX-POLISH-1 §3.3 — View PDF slide-in preview.
-   Mirrors accord's existing right-slide-in conventions (cf.
-   .minutes-history) but as a body-level overlay (above all
-   surface chrome) since it's modally focused on artifact review. */
-.minutes-pdf-preview {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  pointer-events: none;
-}
-.minutes-pdf-preview .minutes-pdf-preview-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(15, 12, 8, 0);
-  transition: background 0.18s ease-out;
-  pointer-events: none;
-}
-.minutes-pdf-preview.open .minutes-pdf-preview-backdrop {
-  background: rgba(15, 12, 8, 0.45);
-  pointer-events: auto;
-}
-.minutes-pdf-preview .minutes-pdf-preview-drawer {
-  position: absolute;
-  top: 0;
-  right: 0;
-  height: 100vh;
-  width: 50vw;
-  min-width: 480px;
-  max-width: 95vw;
-  background: var(--canvas-deep);
-  border-left: 1px solid var(--rule-strong);
-  display: flex;
-  flex-direction: column;
-  transform: translateX(100%);
-  transition: transform 0.22s ease-out;
-  pointer-events: auto;
-  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
-}
-.minutes-pdf-preview.open .minutes-pdf-preview-drawer {
-  transform: translateX(0);
-}
-.minutes-pdf-preview .minutes-pdf-preview-header {
-  flex-shrink: 0;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--rule);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--canvas-raised);
-}
-.minutes-pdf-preview .minutes-pdf-preview-title {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-faint);
-}
-.minutes-pdf-preview .minutes-pdf-preview-close {
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-body);
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  line-height: 1;
-}
-.minutes-pdf-preview .minutes-pdf-preview-close:hover {
-  border-color: var(--signal-dim);
-  color: var(--signal);
-}
-.minutes-pdf-preview .minutes-pdf-preview-frame {
-  flex: 1;
-  width: 100%;
-  border: 0;
-  background: #fff;
-}
-
-/* Toast extensions for CMD-A7 (download link, error variant) */
-#accord-app .toast-action {
-  font: 500 11px 'IBM Plex Mono', monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--signal);
-  text-decoration: underline dotted;
-  text-underline-offset: 3px;
-  margin-right: 12px;
-  cursor: pointer;
-}
-#accord-app .toast-action:hover { color: #e0b35d; }
-#accord-app .toast.error {
-  border-color: rgba(226, 75, 74, 0.4);
-}
-#accord-app .toast.error .toast-msg strong {
-  color: var(--tag-risk);
-}
-</style>
-</head>
-
-<body>
-<div id="accord-app">
-
-  <!-- ── Top nav ──────────────────────────────────────────────── -->
-  <nav class="topnav">
-    <div class="brand">Accord<span class="brand-meta" id="brandMeta">— loading —</span></div>
-
-    <button class="live-connect" id="liveConnectBtn" title="Subscribe to the meeting channel">
-      <span class="lc-pulse"></span>
-      <span class="lc-label">LIVE CONNECT</span>
-    </button>
-
-    <!-- CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4: small chrome link for
-         Manage Workstreams surface (Q-INV-2 Option B). -->
-    <a href="#" class="chrome-link" id="manageWorkstreamsLink"
-       title="Manage workstream organizing buckets">Manage workstreams</a>
-
-    <!-- CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 5: top-level tab bar
-         + Legacy view toggle REMOVED at closure. Surfaces are
-         meeting-scoped and accessible only via meeting-view tabs. -->
-  </nav>
-
-  <!-- ── CMD-ACCORD-CONSTELLATION-ENTRY-1 three-pane shell ── -->
-  <div class="ac-three-pane">
-
-    <aside class="ac-rail-left" id="ac-rail-left">
-      <div class="ac-rail-header">
-        <div class="ac-rail-title">Workstreams</div>
-        <button type="button" class="ac-rail-collapse" id="ac-leftrail-collapse"
-                aria-expanded="true" title="Collapse">‹</button>
-      </div>
-      <input id="ac-tree-search" class="ac-tree-search" type="text"
-             placeholder="Search workstreams, meetings…" style="margin:0 14px 0;width:calc(100% - 28px)">
-      <button id="ac-tree-new-btn" class="ac-tree-new-btn"
-              style="margin:7px 14px 0;width:calc(100% - 28px)">+ New workstream</button>
-      <div class="ac-tree-scroll">
-        <div id="ac-tree-body"></div>
-      </div>
-    </aside>
-
-    <main class="ac-center">
-      <!-- Phase 2 constellation host. accord-rails.js calls
-           AccordConstellation.init(this) on first mount. -->
-      <div class="ac-stage" id="ac-constellation-host"></div>
-    </main>
-
-    <aside class="ac-rail-right" id="ac-rail-right">
-      <div class="ac-rail-header">
-        <div class="ac-rail-title">Parking lot</div>
-        <button type="button" class="ac-parking-sort-btn" id="ac-parking-sort-btn"
-                title="Sort by name">a–z</button>
-        <button type="button" class="ac-rail-collapse" id="ac-rightrail-collapse"
-                aria-expanded="true" title="Collapse">›</button>
-      </div>
-      <div class="ac-parking-body" id="ac-parking-body"></div>
-    </aside>
-
-  </div>
-
-  <!-- ── CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 5: Meeting-scoped surface host ──
-       The five surface sections (Capture / Document / Ledger / Digest / Minutes)
-       live here. accord-views.js mounts this host into the meeting-view
-       tab body via DOM-relocation when the operator descends to meeting
-       level; the surface modules unchanged still target their existing
-       hardcoded element IDs. Manage Workstreams (chrome-link target)
-       coexists in the same host but is shown only when its surface is
-       activated. Display is `none` by default; meeting-view tab clicks
-       activate one .surface and toggle the host's visibility. -->
-  <div class="ac-meeting-surface-host" id="ac-meeting-surface-host">
-
-  <!-- CMD-ACCORD-NEWMEETING-ROUTING-FIX-1: static controls bar.
-       Wired once at init by accord-core.js; positioned by CSS into
-       ac-view-header when host is mounted in tab body. -->
-  <div class="ac-meeting-controls-bar" id="ac-meeting-controls-bar">
-    <div class="timer" id="meetingTimer">00:00:00</div>
-    <button class="btn btn-prominent" id="newMeetingBtn">+ New meeting</button>
-    <button class="btn btn-signal" id="meetingToggleBtn" disabled>Start meeting →</button>
-  </div>
-
-  <!-- ── Surface: Live Capture ───────────────────────────────── -->
-  <section class="surface surface-capture active" id="surface-capture">
-
-
-    <!-- Closed-meeting banner -->
-    <div class="closed-banner" id="closedBanner">
-      <div class="closed-banner-msg">
-        <strong>Meeting committed to Chain of Custody.</strong>
-        Captures are now structurally immutable per Iron Rule 42.
-      </div>
-      <!-- CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4: Filed-under
-           affordance in closed-banner (Q-INV-1 Option C). Workstream
-           reassignment is mutable post-seal per F-P3-6 navigational
-           classification (second data point). -->
-      <div class="closed-banner-filed" id="closed-filed">
-        <span class="filed-label">Filed under:</span>
-        <span class="filed-value" id="closed-filed-value">Unfiled</span>
-        <a href="#" class="filed-action" id="closed-filed-action">[file]</a>
-      </div>
-      <button class="btn btn-ghost" data-target-surface="document">View in Living Document</button>
-      <button class="btn btn-ghost" data-target-surface="minutes">Minutes archive</button>
-    </div>
-
-    <div class="capture-body">
-
-      <!-- Agenda rail -->
-      <aside class="agenda-rail">
-        <div class="rail-section-label">
-          <span>Agenda</span>
-          <span class="count" id="agendaCount">0 items</span>
-        </div>
-        <div class="agenda-toggle" role="group">
-          <button data-agenda-filter="active" class="active">Active</button>
-          <button data-agenda-filter="all">All</button>
-        </div>
-        <div class="rail-actions">
-          <button class="btn btn-ghost" id="newAgendaBtn">+ New item</button>
-        </div>
-        <div id="agendaList"></div>
-      </aside>
-
-      <!-- Capture pane -->
-      <div class="capture-pane">
-
-        <div class="context-strip">
-          <span class="context-label">Capturing under</span>
-          <span class="context-target" id="captureTarget">— pick an agenda item —</span>
-          <span class="context-path" id="capturePath"></span>
-        </div>
-
-        <div class="capture-input-wrap">
-          <textarea
-            class="capture-input"
-            id="captureInput"
-            placeholder="Type what's being said. Press a tag below (or N/D/A/R/Q) to commit."
-            disabled></textarea>
-        </div>
-
-        <div class="tag-row">
-          <span class="tag-row-label">Tag as</span>
-          <button class="tag-btn" data-tag="note"     disabled><span class="tag-dot note"></span>Note     <span class="tag-key">N</span></button>
-          <button class="tag-btn" data-tag="decision" disabled><span class="tag-dot decision"></span>Decision <span class="tag-key">D</span></button>
-          <button class="tag-btn" data-tag="action"   disabled><span class="tag-dot action"></span>Action   <span class="tag-key">A</span></button>
-          <button class="tag-btn" data-tag="risk"     disabled><span class="tag-dot risk"></span>Risk     <span class="tag-key">R</span></button>
-          <button class="tag-btn" data-tag="question" disabled><span class="tag-dot question"></span>Question <span class="tag-key">Q</span></button>
-        </div>
-
-        <div class="captures-stream">
-          <div class="stream-tabs">
-            <button class="stream-tab active" data-stream-tab="present">
-              <span>Captured this meeting</span>
-              <span class="stream-tab-count" id="streamCountPresent">0</span>
-            </button>
-            <button class="stream-tab" data-stream-tab="history">
-              <span>Thread history</span>
-              <span class="stream-tab-count" id="streamCountHistory">0</span>
-            </button>
+// ============================================================
+// ProjectHUD — accord-views.js
+// CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 4a
+//
+// Center-pane view rendering for two non-constellation levels:
+//   • workstream-level — STRICT NAVIGATIONAL per IR70 boundary
+//     (commission §2). Breadcrumb, sub-workstreams list, meetings
+//     list, +New Workstream (sub), +New Meeting. No activity
+//     intelligence, aggregated badges, or substrate prompts.
+//   • meeting-level — scaffolding only. Breadcrumb, meeting-scoped
+//     tab bar (Live Capture / Living Document / Decision Ledger /
+//     Digest & Send / Minutes). Each tab DOES NOT re-render the
+//     full surface; instead it loads the active meeting via
+//     Accord.loadMeeting() and switches to the legacy section
+//     embedded inside the meeting-view frame.
+//
+// Mount/unmount are coordinated by accord-transitions.js. This
+// module exposes pure render functions; transitions own the DOM
+// swap timing.
+//
+// Listens for: accord:level-changed, accord:meeting-filed/-unfiled/
+// -refiled, accord:workstream-renamed/-archived/-restored.
+// ============================================================
+
+(function () {
+  'use strict';
+
+  const API = window.API;
+  const $   = id => document.getElementById(id);
+
+  function esc(s) {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Cache for derived view data (cleared on substrate events) ──
+  const cache = {
+    workstreams: null,    // active rows
+    filedMtgs:   null,    // meetings with workstream_id NOT NULL
+  };
+
+  async function _loadIfNeeded() {
+    if (cache.workstreams && cache.filedMtgs) return;
+    try {
+      const [ws, mtgs] = await Promise.all([
+        API.get('workstreams?state=eq.active&select=workstream_id,parent_workstream_id,name,created_at&order=name.asc'),
+        API.get('accord_meetings?workstream_id=not.is.null&select=meeting_id,title,workstream_id,scheduled_for,created_at,sealed_at,state&order=scheduled_for.desc.nullslast,created_at.desc'),
+      ]);
+      cache.workstreams = Array.isArray(ws) ? ws : [];
+      cache.filedMtgs   = Array.isArray(mtgs) ? mtgs : [];
+    } catch (e) {
+      console.error('[Accord-views] data load failed', e);
+      cache.workstreams = cache.workstreams || [];
+      cache.filedMtgs   = cache.filedMtgs   || [];
+    }
+  }
+
+  function _invalidate() {
+    cache.workstreams = null;
+    cache.filedMtgs   = null;
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // WORKSTREAM-LEVEL VIEW
+  // ────────────────────────────────────────────────────────────
+  async function renderWorkstreamView(host, workstreamId) {
+    if (!host) return;
+    await _loadIfNeeded();
+
+    // Phase 5: ensure surface host is detached from any prior meeting
+    // tab body. Park it on document.body (hidden by default CSS) so
+    // re-mounts find it without DOM lookups failing.
+    _detachSurfaceHost();
+
+    const ws = cache.workstreams.find(w => w.workstream_id === workstreamId);
+    if (!ws) {
+      host.innerHTML = `
+        <div class="ac-view-empty">
+          <h3>Workstream not found</h3>
+          <p>It may have been archived. <a href="#" data-ascend>Return to constellation.</a></p>
+        </div>`;
+      host.querySelector('[data-ascend]')?.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        window.Accord?.setLevel?.('constellation', {});
+      });
+      return;
+    }
+
+    const isSub = !!ws.parent_workstream_id;
+    const parent = isSub
+      ? cache.workstreams.find(w => w.workstream_id === ws.parent_workstream_id)
+      : null;
+
+    const subs = cache.workstreams.filter(w => w.parent_workstream_id === workstreamId);
+    const directMeetings = cache.filedMtgs.filter(m => m.workstream_id === workstreamId);
+
+    let html = `
+      <div class="ac-view ac-view-workstream" data-ws-id="${esc(workstreamId)}">
+        <header class="ac-view-header">
+          <nav class="ac-breadcrumb" aria-label="Breadcrumb">
+            <a href="#" class="ac-bc-crumb" data-ascend-to="constellation">Constellation</a>
+            <span class="ac-bc-sep" aria-hidden="true">›</span>`;
+    if (isSub && parent) {
+      html += `
+            <a href="#" class="ac-bc-crumb" data-ascend-to="workstream" data-ws-id="${esc(parent.workstream_id)}">${esc(parent.name)}</a>
+            <span class="ac-bc-sep" aria-hidden="true">›</span>`;
+    }
+    html += `
+            <span class="ac-bc-current">${esc(ws.name)}</span>
+          </nav>
+          <div class="ac-view-title-row">
+            <h1 class="ac-view-title">${esc(ws.name)}</h1>
+            <div class="ac-view-actions">
+              <button type="button" class="ac-btn-secondary" data-action="ws-rename"  data-ws-id="${esc(workstreamId)}">Rename</button>
+              <button type="button" class="ac-btn-secondary" data-action="ws-archive" data-ws-id="${esc(workstreamId)}">Archive</button>
+            </div>
           </div>
-          <div id="captureStream"></div>
-          <div id="threadHistoryStream" style="display:none"></div>
-        </div>
-
-      </div>
-
-      <!-- Meta pane -->
-      <aside class="meta-pane">
-        <div>
-          <div class="meta-section-label">Coverage</div>
-          <div class="coverage-bar"><div class="coverage-fill" id="coverageFill" style="width:0%"></div></div>
-          <div class="coverage-text" id="coverageText">0 of 0 agenda items have entries</div>
-        </div>
-
-        <div>
-          <div class="meta-section-label">Attendees</div>
-          <div id="attendeesList"></div>
-        </div>
-
-        <div>
-          <div class="meta-section-label">Team chat</div>
-          <div class="chat-stream" id="chatStream"></div>
-          <div class="chat-input-row">
-            <input type="text" class="chat-input" id="chatInput"
-                   placeholder="Message the meeting…" autocomplete="off" disabled>
-            <button class="chat-send" id="chatSendBtn" disabled>Send</button>
-          </div>
-        </div>
-      </aside>
-
-    </div>
-  </section>
-
-  <!-- Placeholder surfaces -->
-  <section class="surface" id="surface-document">
-    <div class="document-body">
-
-      <!-- THREAD RAIL — left column -->
-      <aside class="thread-rail" id="docThreadRail">
-        <div class="rail-section-label">
-          <span>Threads</span>
-          <span class="count" id="docThreadCount">0</span>
-        </div>
-        <div id="docThreadList"></div>
-      </aside>
-
-      <!-- SPINE — center column -->
-      <div class="document-spine" id="docSpine">
-
-        <header class="document-header" id="docHeader" style="display:none">
-          <h1 class="document-title" id="docTitle"></h1>
-          <div class="document-aggregate" id="docAggregate"></div>
+          ${ws.description ? `<p class="ac-view-desc">${esc(ws.description)}</p>` : ''}
         </header>
 
-        <div class="document-filters" id="docFilters" style="display:none">
-          <div class="filter-group">
-            <span class="filter-group-label">Tag</span>
-            <button class="filter-chip active" data-filter-group="tag" data-filter-value="note">Note</button>
-            <button class="filter-chip active" data-filter-group="tag" data-filter-value="decision">Decision</button>
-            <button class="filter-chip active" data-filter-group="tag" data-filter-value="action">Action</button>
-            <button class="filter-chip active" data-filter-group="tag" data-filter-value="risk">Risk</button>
-            <button class="filter-chip active" data-filter-group="tag" data-filter-value="question">Question</button>
-          </div>
-          <div class="filter-group">
-            <span class="filter-group-label">Status</span>
-            <button class="filter-chip active" data-filter-group="status" data-filter-value="active">Active</button>
-            <button class="filter-chip active" data-filter-group="status" data-filter-value="superseded">Superseded</button>
-            <button class="filter-chip active" data-filter-group="status" data-filter-value="answered">Answered</button>
-            <button class="filter-chip active" data-filter-group="status" data-filter-value="closed">Closed</button>
-          </div>
-          <div class="filter-group">
-            <span class="filter-group-label">Edges</span>
-            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-supersession">Has supersession</button>
-            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-contradicting">Has contradicting evidence</button>
-            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-open-questions">Has open questions</button>
-            <button class="filter-chip" data-filter-group="edge" data-filter-value="has-unmitigated-risks">Has unmitigated risks</button>
-          </div>
-        </div>
+        <div class="ac-view-body">`;
 
-        <div class="document-stream" id="docStream"></div>
-
-      </div>
-
-    </div>
-  </section>
-  <section class="surface" id="surface-ledger">
-    <div class="ledger-body">
-
-      <!-- FILTER RAIL — left column -->
-      <aside class="ledger-rail" id="ledgerRail">
-        <div class="rail-section-label">
-          <span>Filters</span>
-          <button class="ledger-refresh-btn" id="ledgerRefreshBtn" title="Refresh from substrate">↻</button>
-        </div>
-
-        <div class="ledger-search-wrap">
-          <input type="text" class="ledger-search" id="ledgerSearch"
-                 placeholder="Search summaries…" autocomplete="off">
-        </div>
-
-        <div class="filter-group">
-          <span class="filter-group-label">Tag</span>
-          <button class="filter-chip active disabled" data-filter-group="tag" data-filter-value="decision" disabled>Decision</button>
-        </div>
-
-        <div class="filter-group">
-          <span class="filter-group-label">Status</span>
-          <button class="filter-chip active" data-filter-group="status" data-filter-value="active">Active</button>
-          <button class="filter-chip active" data-filter-group="status" data-filter-value="superseded">Superseded</button>
-          <button class="filter-chip active" data-filter-group="status" data-filter-value="contradicted">Contradicted</button>
-        </div>
-
-        <div class="filter-group">
-          <span class="filter-group-label">Belief</span>
-          <button class="filter-chip active" data-filter-group="belief" data-filter-value="high">High</button>
-          <button class="filter-chip active" data-filter-group="belief" data-filter-value="mixed">Mixed</button>
-          <button class="filter-chip active" data-filter-group="belief" data-filter-value="low">Low</button>
-          <button class="filter-chip active" data-filter-group="belief" data-filter-value="none-declared">None declared</button>
-        </div>
-
-        <div class="filter-group">
-          <span class="filter-group-label">Edges</span>
-          <button class="filter-chip" data-filter-group="edge" data-filter-value="has-supporting">Has supporting evidence</button>
-          <button class="filter-chip" data-filter-group="edge" data-filter-value="has-counter">Has counter-evidence</button>
-          <button class="filter-chip" data-filter-group="edge" data-filter-value="superseded">Superseded</button>
-          <button class="filter-chip" data-filter-group="edge" data-filter-value="contradicted">Contradicted</button>
-        </div>
-
-        <div class="ledger-aggregate" id="ledgerAggregate"></div>
-      </aside>
-
-      <!-- DECISION LIST — center column -->
-      <div class="ledger-list-wrap">
-        <div class="ledger-list" id="ledgerList"></div>
-      </div>
-
-      <!-- DETAIL PANEL — right column (collapsed by default) -->
-      <aside class="ledger-detail" id="ledgerDetail">
-        <button class="ledger-detail-close" id="ledgerDetailClose" title="Close detail panel">×</button>
-        <div class="ledger-detail-body" id="ledgerDetailBody"></div>
-      </aside>
-
-    </div>
-  </section>
-  <section class="surface" id="surface-digest">
-    <div class="digest-body">
-
-      <!-- MEETING RAIL — left column -->
-      <aside class="digest-rail" id="digestRail">
-        <div class="rail-section-label">
-          <span>Sealed meetings</span>
-          <button class="ledger-refresh-btn" id="digestRefreshBtn" title="Refresh from substrate">↻</button>
-        </div>
-
-        <div class="filter-group">
-          <span class="filter-group-label">Status</span>
-          <button class="filter-chip active" data-filter-group="status" data-filter-value="ready">Ready to send</button>
-          <button class="filter-chip active" data-filter-group="status" data-filter-value="sent">Sent</button>
-        </div>
-
-        <div id="digestMeetingList"></div>
-
-        <div class="ledger-aggregate" id="digestAggregate"></div>
-      </aside>
-
-      <!-- DIGEST PREVIEW — center column -->
-      <div class="digest-preview-wrap">
-        <div class="digest-preview" id="digestPreview"></div>
-      </div>
-
-      <!-- RECIPIENT PANEL — right column (collapsed by default) -->
-      <aside class="digest-recipients" id="digestRecipients">
-        <button class="ledger-detail-close" id="digestRecipientsClose" title="Close recipients">×</button>
-        <div class="digest-recipients-body" id="digestRecipientsBody"></div>
-      </aside>
-
-    </div>
-  </section>
-  <section class="surface" id="surface-minutes">
-    <div class="minutes-body">
-
-      <!-- MEETING RAIL — left column -->
-      <aside class="minutes-rail" id="minutesRail">
-        <div class="rail-section-label">
-          <span>Sealed meetings</span>
-          <button class="ledger-refresh-btn" id="minutesRefreshBtn" title="Refresh from substrate">↻</button>
-        </div>
-
-        <div class="filter-group">
-          <span class="filter-group-label">Status</span>
-          <button class="filter-chip active" data-filter-value="all">All</button>
-          <button class="filter-chip" data-filter-value="rendered">Rendered</button>
-          <button class="filter-chip" data-filter-value="not_yet">Not yet</button>
-          <button class="filter-chip" data-filter-value="failed">Failed</button>
-        </div>
-
-        <div id="minutesMeetingList"></div>
-
-        <div class="ledger-aggregate" id="minutesAggregate"></div>
-      </aside>
-
-      <!-- RENDER STATUS — center column -->
-      <div class="minutes-status-wrap">
-        <div class="minutes-status" id="minutesStatus"></div>
-      </div>
-
-      <!-- DOWNLOAD / HISTORY PANEL — right column (collapsed by default) -->
-      <aside class="minutes-history" id="minutesHistory">
-        <button class="ledger-detail-close" id="minutesHistoryClose" title="Close history">×</button>
-        <!-- CMD-MINUTES-UX-POLISH-1 §3.4: panel header "History" using
-             canonical surface-label typography (Plex Mono 11px, ink-faint,
-             uppercase, 0.08em letter-spacing — matches
-             .minutes-history-section-label). -->
-        <div class="minutes-history-header">History</div>
-        <div class="minutes-history-body" id="minutesHistoryBody"></div>
-      </aside>
-
-    </div>
-  </section>
-
-  <!-- ── Surface: Manage Workstreams (CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1) ── -->
-  <!-- Toggled by the chrome link "Manage workstreams"; not a daily-use
-       surface so it's not in the surface-switch tab bar (Q-INV-2 Option B). -->
-  <section class="surface" id="surface-workstreams">
-    <header class="capture-header">
-      <div>
-        <h1 class="meeting-title">Manage workstreams</h1>
-        <div class="meeting-meta">
-          <span id="ws-meta-text">Operator-defined organizing buckets above meetings. Two-level nesting (top-level + sub-workstream).</span>
-        </div>
-      </div>
-      <div class="capture-controls">
-        <label class="ws-archived-toggle">
-          <input type="checkbox" id="ws-show-archived"> Show archived
-        </label>
-        <button class="btn btn-prominent" id="ws-new-btn">+ New workstream</button>
-      </div>
-    </header>
-
-    <div class="ws-body">
-      <div class="ws-empty" id="ws-empty" style="display:none">
-        No workstreams yet. Create one to start organizing meetings.
-      </div>
-      <table class="ws-table" id="ws-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Level</th>
-            <th>Parent</th>
-            <th>Created</th>
-            <th class="ws-meetings-col">Filed</th>
-            <th class="ws-actions-col">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="ws-tbody"></tbody>
-      </table>
-    </div>
-  </section>
-
-  </div><!-- / .ac-meeting-surface-host -->
-
-  <!-- ── Re-render confirm modal ─────────────────────────────── -->
-  <div class="modal-backdrop" id="rerenderConfirmModal">
-    <div class="modal">
-      <h3>Re-render minutes?</h3>
-      <p id="rerenderModalSummary"></p>
-      <div class="modal-actions">
-        <button class="btn btn-ghost"  id="rerenderCancel">Cancel</button>
-        <button class="btn btn-signal" id="rerenderConfirm">Re-render</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b: Archive confirm modal ──
-       Mid-detail: enumerated sub-names + meeting count when ≤10;
-       count-only when >10. Replaces former bare confirm() in
-       archive flow per Q4 source-of-truth constraint. -->
-  <div class="modal-backdrop" id="acArchiveConfirmModal">
-    <div class="modal">
-      <h3 id="acArchiveModalTitle">Archive workstream?</h3>
-      <div id="acArchiveModalSummary" class="ac-archive-summary"></div>
-      <div class="modal-actions">
-        <button class="btn btn-ghost"  id="acArchiveCancel">Cancel</button>
-        <button class="btn btn-signal" id="acArchiveConfirm">Archive</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b: Drag-drop disambiguation modal ──
-       Fires when a parking-lot meeting is dropped on a workstream
-       that has sub-workstreams. Operator picks the parent or one
-       of the subs as the file destination. -->
-  <div class="modal-backdrop" id="acDndDisambigModal">
-    <div class="modal">
-      <h3 id="acDndModalTitle">File this meeting under…</h3>
-      <p id="acDndModalSubtitle" class="ac-dnd-subtitle"></p>
-      <div id="acDndModalChoices" class="ac-dnd-choices" role="radiogroup" aria-label="File destination"></div>
-      <div class="modal-actions">
-        <button class="btn btn-ghost"  id="acDndCancel">Cancel</button>
-        <button class="btn btn-signal" id="acDndConfirm" disabled>File here</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── New-meeting modal ──────────────────────────────────── -->
-  <div class="modal-backdrop" id="newMeetingModal">
-    <div class="modal">
-      <h3>New meeting</h3>
-      <p>A new meeting will be created in the <code>idle</code> state and you'll become the organizer. Add agenda items pre-meeting; click Start meeting to enter the running state.</p>
-      <label for="nmTitle">Title</label>
-      <input type="text" id="nmTitle" placeholder="Meeting title">
-      <label for="nmThreadTitle">Thread (will be created if new)</label>
-      <input type="text" id="nmThreadTitle" placeholder="Thread title (e.g., 'Heatsink redesign')">
-      <div class="modal-helper">Threads span meetings; add agenda items below after creating.</div>
-      <div class="modal-actions">
-        <button class="btn btn-ghost"  id="nmCancel">Cancel</button>
-        <button class="btn btn-signal" id="nmCreate">Create meeting</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── End-meeting confirm modal ─────────────────────────── -->
-  <div class="modal-backdrop" id="endMeetingModal">
-    <div class="modal">
-      <h3>End meeting?</h3>
-      <p>Once committed, captured items become permanent evidence per Chain of Custody. This cannot be undone.</p>
-      <div class="modal-actions">
-        <button class="btn btn-ghost" id="emCancel">Cancel</button>
-        <button class="btn btn-end"   id="emConfirm">Confirm</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Digest send confirm modal ─────────────────────────── -->
-  <div class="modal-backdrop" id="digestSendModal">
-    <div class="modal">
-      <h3>Send digest?</h3>
-      <p id="digestSendModalSummary"></p>
-      <div class="modal-actions">
-        <button class="btn btn-ghost"   id="digestSendCancel">Cancel</button>
-        <button class="btn btn-signal"  id="digestSendConfirm">Send</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Register-dissent modal (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 3) ── -->
-  <div class="modal-backdrop" id="dissentModal">
-    <div class="modal">
-      <h3>Register dissent</h3>
-      <p id="dissentModalTarget" class="dissent-modal-target"></p>
-      <label for="dissentRationale">Rationale <span class="dissent-required">required</span></label>
-      <textarea id="dissentRationale" class="dissent-textarea" rows="4"
-                placeholder="Why do you dissent from this decision?"></textarea>
-      <label for="dissentPredicted">Predicted alternative outcome <span class="dissent-optional">optional</span></label>
-      <textarea id="dissentPredicted" class="dissent-textarea" rows="3"
-                placeholder="What outcome do you predict if the dissent had carried?"></textarea>
-      <div class="modal-helper">Dissent is a permanent substrate record. It does not modify the ratified decision; it preserves the rejected alternative for retrospective review.</div>
-      <div class="modal-actions">
-        <button class="btn btn-ghost"  id="dissentCancel">Cancel</button>
-        <button class="btn btn-signal" id="dissentConfirm">Register dissent</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Capture-time date modal (CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4) ── -->
-  <!-- Opens when operator commits a Decision (effective_date) or Action
-       (due_date). Skip = commit without date; Confirm = commit with date. -->
-  <div class="modal-backdrop" id="captureDateModal">
-    <div class="modal">
-      <h3 id="captureDateTitle">Set date</h3>
-      <p id="captureDateModalTarget" class="dissent-modal-target"></p>
-      <label for="captureDateInput" id="captureDateLabel">Date <span class="dissent-optional">optional</span></label>
-      <input type="date" id="captureDateInput" class="capture-date-input">
-      <!-- Basis row appears only for Decision commits -->
-      <div id="captureDateBasisRow" style="display:none">
-        <label for="captureDateBasis">Basis <span class="dissent-optional">optional</span></label>
-        <select id="captureDateBasis" class="capture-date-input">
-          <option value="">— select —</option>
-          <option value="declared">declared (operator chose at declaration)</option>
-          <option value="committed">committed (date the decision was sealed)</option>
-          <option value="reviewed">reviewed (later review confirmed/changed it)</option>
-          <option value="imported">imported (came from an external source)</option>
-        </select>
-      </div>
-      <div class="modal-helper">Dates are mutable until the meeting is sealed; immutable thereafter (IR42).</div>
-      <div class="modal-actions">
-        <button class="btn btn-ghost"  id="captureDateSkip">Skip (commit without date)</button>
-        <button class="btn btn-signal" id="captureDateConfirm">Commit with date</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── NRA modal anchor (CMD-ACCORD-NRA-SURFACE-1 Phase 2) ─── -->
-  <!-- Backdrop + empty modal shell. Body content rendered by
-       AccordNRA.Modal.open(node, mode, currentNRA?, options?). The
-       shell is cloned via IR71 clone-replace pattern on each open. -->
-  <div class="modal-backdrop" id="accord-nra-modal-backdrop">
-    <div class="modal"></div>
-  </div>
-
-  <!-- ── NRA history panel anchor (CMD-ACCORD-NRA-SURFACE-1 Phase 2) ─── -->
-  <!-- Right-side slide-in panel for NRA timeline view. Body rendered
-       by AccordNRA.HistoryPanel.open(nodeId, history). -->
-  <div id="accord-nra-history-panel">
-    <div class="accord-nra-panel-head">
-      <h3>NRA history</h3>
-      <button class="accord-nra-panel-close" type="button" aria-label="Close">×</button>
-    </div>
-    <div class="accord-nra-panel-body"></div>
-  </div>
-
-  <!-- ── Create / rename workstream modal (CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1) ── -->
-  <div class="modal-backdrop" id="wsCreateModal">
-    <div class="modal">
-      <h3 id="wsCreateModalTitle">New workstream</h3>
-      <label for="wsCreateName">Name</label>
-      <input type="text" id="wsCreateName" placeholder="e.g., Endoscope replacement project" maxlength="120">
-      <label for="wsCreateDescription">Description <span class="dissent-optional">optional</span></label>
-      <textarea id="wsCreateDescription" class="dissent-textarea" rows="2"
-                placeholder="Brief description of this organizing bucket"></textarea>
-      <label for="wsCreateParent">Parent <span class="dissent-optional">optional · leave empty for top-level</span></label>
-      <select id="wsCreateParent" class="capture-date-input">
-        <option value="">— top-level (no parent) —</option>
-      </select>
-      <div class="modal-helper">Two-level nesting only: a sub-workstream cannot itself contain sub-workstreams.</div>
-      <div class="modal-actions">
-        <button class="btn btn-ghost"  id="wsCreateCancel">Cancel</button>
-        <button class="btn btn-signal" id="wsCreateConfirm">Create</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── File-meeting-to-workstream modal (CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1) ── -->
-  <div class="modal-backdrop" id="wsFileModal">
-    <div class="modal">
-      <h3 id="wsFileModalTitle">File meeting under workstream</h3>
-      <p id="wsFileModalTarget" class="dissent-modal-target"></p>
-      <label for="wsFileSelect">Workstream</label>
-      <select id="wsFileSelect" class="capture-date-input">
-        <option value="">— Unfiled (parking lot) —</option>
-      </select>
-      <div class="modal-helper">Workstream filing is mutable regardless of meeting seal state. The substrate of decisions, actions, and edges remains immutable per Iron Rule 42.</div>
-      <div class="modal-actions">
-        <button class="btn btn-ghost"  id="wsFileCancel">Cancel</button>
-        <button class="btn btn-signal" id="wsFileConfirm">File</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Async PDF toast (CMD-A3 element preserved; CMD-A7 makes content live) ── -->
-  <div class="toast" id="pdfToast" role="status">
-    <div class="toast-msg">
-      <strong>Minutes record published.</strong>
-    </div>
-    <a class="toast-action" id="toastDownload" target="_blank" rel="noopener" style="display:none">Download PDF</a>
-    <button class="toast-close" id="toastClose" aria-label="Dismiss">×</button>
-  </div>
-
-</div>
-
-<!-- ── Standard scripts (per compass.html / cadence.html convention) ── -->
-<script src="/js/config.js"></script>
-<script src="/js/auth.js"></script>
-<script src="/js/api.js"></script>
-<script src="/js/coc.js"></script>
-<script src="/js/ui.js"></script>
-<script src="/js/notif.js"></script>
-<script src="/js/version.js?v=seed"></script>
-
-<!-- ── Brand-meta dynamic label (CMD-A5 §8 polish) ── -->
-<script>
-  (function() {
-    const SURFACE_LABELS = {
-      capture:     'Live Capture',
-      document:    'Living Document',
-      ledger:      'Decision Ledger',
-      digest:      'Digest & Send',
-      minutes:     'Minutes',
-      workstreams: 'Manage Workstreams',
-    };
-    function _setBrandMeta(surfaceKey) {
-      var el = document.getElementById('brandMeta');
-      if (!el) return;
-      var ver = window._PROJECTHUD_VERSION || '';
-      var label = SURFACE_LABELS[surfaceKey] || 'Live Capture';
-      var ver_short = ver.replace(/^v\d+-/, '');
-      el.textContent = ver_short + ' · ' + label;
+    // Sub-workstreams section (only at top-level)
+    if (!isSub) {
+      html += `
+        <section class="ac-view-section">
+          <header class="ac-section-head">
+            <h2>Sub-workstreams</h2>
+            <button type="button" class="ac-btn-secondary" data-action="new-sub" data-ws-id="${esc(workstreamId)}">+ New sub-workstream</button>
+          </header>`;
+      if (!subs.length) {
+        html += `<div class="ac-list-empty">No sub-workstreams.</div>`;
+      } else {
+        html += `<ul class="ac-list ac-sub-list">`;
+        subs.forEach(s => {
+          const subMtgCount = cache.filedMtgs.filter(m => m.workstream_id === s.workstream_id).length;
+          html += `
+            <li class="ac-list-row ac-sub-row" data-ws-id="${esc(s.workstream_id)}" tabindex="0" role="button">
+              <span class="ac-list-row-label">${esc(s.name)}</span>
+              <span class="ac-list-row-meta">${subMtgCount} meeting${subMtgCount === 1 ? '' : 's'}</span>
+              <span class="ac-list-row-actions">
+                <button type="button" class="ac-row-action" data-action="sub-rename"  data-ws-id="${esc(s.workstream_id)}" title="Rename">rename</button>
+                <button type="button" class="ac-row-action" data-action="sub-archive" data-ws-id="${esc(s.workstream_id)}" title="Archive">archive</button>
+              </span>
+            </li>`;
+        });
+        html += `</ul>`;
+      }
+      html += `</section>`;
     }
-    // Initial
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function() { _setBrandMeta('capture'); });
+
+    // Meetings section
+    html += `
+      <section class="ac-view-section">
+        <header class="ac-section-head">
+          <h2>${isSub ? 'Meetings' : 'Direct meetings'}</h2>
+          <button type="button" class="ac-btn-primary" data-action="new-meeting" data-ws-id="${esc(workstreamId)}">+ New meeting</button>
+        </header>`;
+    if (!directMeetings.length) {
+      html += `<div class="ac-list-empty">${isSub ? 'No meetings filed yet.' : 'No meetings filed directly under this workstream.'}</div>`;
     } else {
-      _setBrandMeta('capture');
+      html += `<ul class="ac-list ac-meeting-list">`;
+      directMeetings.forEach(m => {
+        const dot =
+          m.sealed_at         ? 'sealed'   :
+          m.state === 'running' ? 'running'  :
+          m.state === 'closed'  ? 'closed'   :
+                                  'draft';
+        const dateStr = m.scheduled_for
+          ? new Date(m.scheduled_for).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })
+          : '—';
+        html += `
+          <li class="ac-list-row ac-meeting-row" data-mtg-id="${esc(m.meeting_id)}" tabindex="0" role="button">
+            <span class="ac-list-dot ac-list-dot-${dot}" aria-hidden="true"></span>
+            <span class="ac-list-row-label">${esc(m.title || '(untitled)')}</span>
+            <span class="ac-list-row-meta">${esc(dateStr)}</span>
+          </li>`;
+      });
+      html += `</ul>`;
     }
-    // Track surface changes
-    window.addEventListener('accord:surface-changed', function(ev) {
-      _setBrandMeta(ev.detail && ev.detail.surface);
+    html += `</section>`;
+
+    html += `
+        </div>
+      </div>`;
+
+    host.innerHTML = html;
+    _wireWorkstreamView(host, workstreamId);
+  }
+
+  function _wireWorkstreamView(host, workstreamId) {
+    // Breadcrumb crumbs
+    host.querySelectorAll('[data-ascend-to]').forEach(el => {
+      el.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const to = el.dataset.ascendTo;
+        if (to === 'constellation') {
+          window.Accord?.setLevel?.('constellation', {});
+        } else if (to === 'workstream') {
+          window.Accord?.setLevel?.('workstream', { workstreamId: el.dataset.wsId });
+        }
+      });
     });
-  })();
-</script>
 
-<!-- ── Versioned shared loaders (matches compass.html pattern) ── -->
-<script>
-  (function() {
-    var v = window._PROJECTHUD_VERSION;
-    function load(src) {
-      var s = document.createElement('script');
-      s.src = src + '?v=' + v;
-      document.head.appendChild(s);
+    // Sub-workstream click → descend.
+    // BUT: if the click target is one of the row-action buttons
+    // (rename/archive), don't descend — the action button has its own
+    // handler. Same guard applies to keyboard activation.
+    host.querySelectorAll('.ac-sub-list .ac-list-row[data-ws-id]').forEach(row => {
+      const handler = () => window.Accord?.setLevel?.('workstream', { workstreamId: row.dataset.wsId });
+      row.addEventListener('click', (ev) => {
+        if (ev.target.closest('.ac-row-action')) return;
+        handler();
+      });
+      row.addEventListener('keydown', (ev) => {
+        if (ev.target.closest('.ac-row-action')) return;
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); handler(); }
+      });
+    });
+
+    // Meeting click → descend to meeting level
+    host.querySelectorAll('.ac-meeting-list .ac-meeting-row[data-mtg-id]').forEach(row => {
+      const handler = () => window.Accord?.setLevel?.('meeting', {
+        meetingId: row.dataset.mtgId,
+        workstreamId,
+      });
+      row.addEventListener('click', handler);
+      row.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); handler(); }
+      });
+    });
+
+    // + New sub-workstream — pre-selects the current workstream as
+    // parent so the operator doesn't have to remember to pick it
+    // (Phase 4a operator-found UX defect).
+    host.querySelector('[data-action="new-sub"]')?.addEventListener('click', () => {
+      window.AccordWorkstreams?.openCreate?.(workstreamId);
+    });
+
+    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b: header rename/archive
+    // for the current workstream itself
+    host.querySelector('[data-action="ws-rename"]')?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      window.AccordWorkstreams?.openRename?.(workstreamId);
+    });
+    host.querySelector('[data-action="ws-archive"]')?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      window.AccordWorkstreams?.openArchiveConfirm?.(workstreamId);
+    });
+
+    // Phase 4b: per-sub-row hover-revealed rename/archive actions
+    host.querySelectorAll('[data-action="sub-rename"]').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        window.AccordWorkstreams?.openRename?.(btn.dataset.wsId);
+      });
+    });
+    host.querySelectorAll('[data-action="sub-archive"]').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        window.AccordWorkstreams?.openArchiveConfirm?.(btn.dataset.wsId);
+      });
+    });
+
+    // + New meeting — opens the legacy #newMeetingModal to collect
+    // title and thread, then creates the meeting in the operator's
+    // firm, PATCHes workstream_id to bind it under this workstream,
+    // emits the filed event, and descends to the new meeting.
+    host.querySelector('[data-action="new-meeting"]')?.addEventListener('click', () => {
+      _openNewMeetingForWorkstream(workstreamId);
+    });
+  }
+
+  // Phase 5 fix: open #newMeetingModal with a one-shot submit handler
+  // that creates + files in this workstream. The legacy modal already
+  // wires its own submit/cancel — we set them fresh each open so the
+  // workstream context binds correctly without leaking listeners.
+  // Pattern note: cloneNode-replace + state mutation must operate on
+  // the new node throughout (Phase 4b D1 lesson).
+  function _openNewMeetingForWorkstream(workstreamId) {
+    const modal       = document.getElementById('newMeetingModal');
+    const titleInput  = document.getElementById('nmTitle');
+    const threadInput = document.getElementById('nmThreadTitle');
+    const okBtn       = document.getElementById('nmCreate');
+    const cancelBtn   = document.getElementById('nmCancel');
+    if (!modal || !titleInput || !threadInput || !okBtn || !cancelBtn) {
+      console.error('[Accord-views] #newMeetingModal anchors missing — falling back to direct create');
+      _createMeetingDirect(workstreamId);
+      return;
     }
-    load('/js/sidebar.js');
-    load('/js/cmd-center.js');
-    load('/js/accord-core.js');
-    // CMD-ACCORD-NRA-SURFACE-1 Phase 2
-    load('/js/accord-nra.js');
-    load('/js/accord-capture.js');
-    load('/js/accord-document.js');
-    load('/js/accord-ledger.js');
-    load('/js/accord-digest.js');
-    load('/js/accord-minutes.js');
-    load('/js/accord-workstreams.js');
-    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 2 + Phase 3 + Phase 4a + Phase 4b
-    load('/js/accord-constellation.js');
-    load('/js/accord-views.js');
-    load('/js/accord-transitions.js');
-    load('/js/accord-rails.js');
-    load('/js/accord-dnd.js');
-    // CMD-ACCORD-MEETING-SETUP-1 Phase 2
-    load('/js/accord-meeting-setup.js');
-  })();
-</script>
 
-</body>
-</html>
+    // Clone-replace buttons FIRST, then wire fresh handlers
+    const newOk = okBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOk, okBtn);
+    const newCancel = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+    titleInput.value = '';
+    threadInput.value = '';
+    modal.classList.add('visible');
+    setTimeout(() => titleInput.focus(), 30);
+
+    const close = () => modal.classList.remove('visible');
+
+    newOk.addEventListener('click', async () => {
+      const title  = titleInput.value.trim();
+      const thread = threadInput.value.trim();
+      if (!title) { titleInput.focus(); return; }
+      newOk.disabled = true;
+      newOk.textContent = 'Creating…';
+      try {
+        const m = await window.Accord?.createMeeting?.(title, thread || title);
+        if (!m?.meeting_id) { close(); return; }
+        await API.patch(`accord_meetings?meeting_id=eq.${m.meeting_id}`, {
+          workstream_id: workstreamId,
+        });
+        window.dispatchEvent(new CustomEvent('accord:meeting-filed', {
+          detail: {
+            meeting_id: m.meeting_id,
+            from_workstream_id: null,
+            to_workstream_id: workstreamId,
+          },
+        }));
+        close();
+        window.Accord?.setLevel?.('meeting', { meetingId: m.meeting_id, workstreamId });
+      } catch (e) {
+        console.error('[Accord-views] new meeting flow failed', e);
+        alert('Could not create meeting: ' + (e?.message || e));
+      } finally {
+        newOk.disabled = false;
+        newOk.textContent = 'Create meeting';
+      }
+    });
+    newCancel.addEventListener('click', close);
+  }
+
+  // Last-resort fallback if the modal is missing (shouldn't happen):
+  // create with a placeholder title so the operator can rename later.
+  async function _createMeetingDirect(workstreamId) {
+    try {
+      const m = await window.Accord?.createMeeting?.('Untitled meeting');
+      if (!m?.meeting_id) return;
+      await API.patch(`accord_meetings?meeting_id=eq.${m.meeting_id}`, {
+        workstream_id: workstreamId,
+      });
+      window.dispatchEvent(new CustomEvent('accord:meeting-filed', {
+        detail: {
+          meeting_id: m.meeting_id,
+          from_workstream_id: null,
+          to_workstream_id: workstreamId,
+        },
+      }));
+      window.Accord?.setLevel?.('meeting', { meetingId: m.meeting_id, workstreamId });
+    } catch (e) {
+      console.error('[Accord-views] direct create failed', e);
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // MEETING-LEVEL VIEW (scaffolding)
+  // ────────────────────────────────────────────────────────────
+  async function renderMeetingView(host, meetingId, workstreamId) {
+    if (!host) return;
+
+    // Fetch meeting basics
+    let meeting = null;
+    try {
+      const rows = await API.get(`accord_meetings?meeting_id=eq.${meetingId}&select=meeting_id,title,workstream_id,scheduled_for,created_at,sealed_at,state,organizer_id`);
+      meeting = rows?.[0] || null;
+    } catch (e) {
+      console.warn('[Accord-views] meeting load failed', e);
+    }
+
+    if (!meeting) {
+      host.innerHTML = `
+        <div class="ac-view-empty">
+          <h3>Meeting not found</h3>
+          <p><a href="#" data-ascend>Return to constellation.</a></p>
+        </div>`;
+      host.querySelector('[data-ascend]')?.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        window.Accord?.setLevel?.('constellation', {});
+      });
+      return;
+    }
+
+    // CMD-ACCORD-MEETING-SETUP-1 Phase 2: state-gated render swap.
+    // idle → Meeting Setup shell (accord-meeting-setup.js)
+    // running / closed / sealed → existing 5-tab shell (unchanged)
+    if (meeting.state === 'idle') {
+      // Populate Accord.state.meeting so startMeeting() has a target.
+      // Best-effort: mirrors the loadMeeting call in the 5-tab path below.
+      if (window.Accord && window.Accord.loadMeeting && meeting.meeting_id) {
+        try { await window.Accord.loadMeeting(meeting.meeting_id); }
+        catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure (setup)', e); }
+      }
+      if (window.AccordMeetingSetup && window.AccordMeetingSetup.render) {
+        window.AccordMeetingSetup.render(host, meeting, workstreamId);
+      }
+      return;
+    }
+
+    await _loadIfNeeded();
+    const owningWsId = workstreamId || meeting.workstream_id;
+    const ws = owningWsId ? cache.workstreams.find(w => w.workstream_id === owningWsId) : null;
+    const parent = ws && ws.parent_workstream_id
+      ? cache.workstreams.find(w => w.workstream_id === ws.parent_workstream_id)
+      : null;
+
+    const dot =
+      meeting.sealed_at        ? 'sealed'  :
+      meeting.state === 'running' ? 'running' :
+      meeting.state === 'closed'  ? 'closed'  :
+                                    'draft';
+
+    let html = `
+      <div class="ac-view ac-view-meeting" data-mtg-id="${esc(meetingId)}">
+        <header class="ac-view-header">
+          <nav class="ac-breadcrumb" aria-label="Breadcrumb">
+            <a href="#" class="ac-bc-crumb" data-ascend-to="constellation">Constellation</a>`;
+    if (parent) {
+      html += `
+            <span class="ac-bc-sep" aria-hidden="true">›</span>
+            <a href="#" class="ac-bc-crumb" data-ascend-to="workstream" data-ws-id="${esc(parent.workstream_id)}">${esc(parent.name)}</a>`;
+    }
+    if (ws) {
+      html += `
+            <span class="ac-bc-sep" aria-hidden="true">›</span>
+            <a href="#" class="ac-bc-crumb" data-ascend-to="workstream" data-ws-id="${esc(ws.workstream_id)}">${esc(ws.name)}</a>`;
+    } else {
+      // Parking-lot meeting: no workstream context. Render an explicit
+      // "Parking lot" crumb so the breadcrumb chain doesn't jump straight
+      // from Constellation to the meeting title (operator-found UX gap).
+      html += `
+            <span class="ac-bc-sep" aria-hidden="true">›</span>
+            <span class="ac-bc-crumb ac-bc-crumb-static">Parking lot</span>`;
+    }
+    html += `
+            <span class="ac-bc-sep" aria-hidden="true">›</span>
+            <span class="ac-bc-current">
+              <span class="ac-list-dot ac-list-dot-${dot}" aria-hidden="true"></span>
+              ${esc(meeting.title || '(untitled)')}
+            </span>
+          </nav>
+          <h1 class="ac-view-title">${esc(meeting.title || '(untitled)')}</h1>
+          <div class="meeting-organizer" id="cap-organizer" style="display:none">
+            <span class="organizer-label">Organized by</span>
+            <span class="organizer-name" id="cap-organizer-name"></span>
+          </div>
+          <div class="meeting-meta" id="cap-meta">
+            <span class="live-pulse" id="cap-pulse" title="Meeting status"></span>
+            <span id="cap-meta-text"></span>
+          </div>
+          <div class="meeting-filed" id="cap-filed" style="display:none">
+            <span class="filed-label">Filed under:</span>
+            <span class="filed-value" id="cap-filed-value">Unfiled</span>
+            <a href="#" class="filed-action" id="cap-filed-action">[file]</a>
+          </div>
+        </header>
+
+        <div class="ac-view-body ac-meeting-tabs-shell">
+          <div class="ac-meeting-tabs" role="tablist">
+            <button type="button" class="ac-mtg-tab active" data-mtg-tab="capture"  role="tab">Live Capture</button>
+            <button type="button" class="ac-mtg-tab"        data-mtg-tab="document" role="tab">Living Document</button>
+            <button type="button" class="ac-mtg-tab"        data-mtg-tab="ledger"   role="tab">Decision Ledger</button>
+            <button type="button" class="ac-mtg-tab"        data-mtg-tab="digest"   role="tab">Digest &amp; Send</button>
+            <button type="button" class="ac-mtg-tab"        data-mtg-tab="minutes"  role="tab">Minutes</button>
+          </div>
+          <div class="ac-meeting-tab-body" id="ac-meeting-tab-body"></div>
+        </div>
+      </div>`;
+
+    // CMD-ACCORD-LEDGER-NAV-FIX-1 Phase 2: detach #ac-meeting-surface-host
+    // back to document.body BEFORE host.innerHTML = html. If a prior
+    // meeting-view render left the surface host nested inside this
+    // viewHost, the innerHTML overwrite below would destroy it (and
+    // children including #cap-title), causing _setMeetingHeader to
+    // throw on the subsequent loadMeeting call. Detaching first parks
+    // the host safely at body; _mountSurfaceHostInTabBody() re-mounts
+    // after the new tab-body container is in place.
+    _detachSurfaceHost();
+
+    host.innerHTML = html;
+    _wireMeetingView(host, meeting);
+
+    // Load the meeting into accord-core state so the surface modules
+    // pick it up via accord:meeting-loaded
+    if (window.Accord?.loadMeeting && meeting.meeting_id) {
+      try { await window.Accord.loadMeeting(meeting.meeting_id); }
+      catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure', e); }
+    }
+
+    // Phase 5: relocate the meeting-surface host into the tab body.
+    // The five existing surface sections (#surface-capture etc.) live
+    // there and target their hardcoded element IDs unchanged. We just
+    // move the host node; the surface modules' addEventListener
+    // bindings are preserved (DOM-tree relocation does not detach
+    // listeners).
+    _mountSurfaceHostInTabBody();
+    // Activate default tab (capture) on first mount of a meeting view
+    _activateMeetingTab(host, 'capture');
+  }
+
+  function _wireMeetingView(host, meeting) {
+    host.querySelectorAll('[data-ascend-to]').forEach(el => {
+      el.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const to = el.dataset.ascendTo;
+        if (to === 'constellation') {
+          window.Accord?.setLevel?.('constellation', {});
+        } else if (to === 'workstream') {
+          window.Accord?.setLevel?.('workstream', { workstreamId: el.dataset.wsId });
+        }
+      });
+    });
+
+    // Tab buttons — Phase 5: each tab activates its inlined surface
+    // via the relocated #ac-meeting-surface-host. Surface modules
+    // listen for accord:surface-changed and re-render against the
+    // currently-loaded meeting; we dispatch that event so existing
+    // modules trigger correctly.
+    host.querySelectorAll('.ac-mtg-tab[data-mtg-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _activateMeetingTab(host, btn.dataset.mtgTab);
+      });
+    });
+  }
+
+  // Phase 5: relocate #ac-meeting-surface-host into the meeting-view
+  // tab body. Idempotent — safe to call on every meeting render.
+  function _mountSurfaceHostInTabBody() {
+    const tabBody = document.getElementById('ac-meeting-tab-body');
+    const surfHost = document.getElementById('ac-meeting-surface-host');
+    if (!tabBody || !surfHost) return;
+    if (surfHost.parentElement !== tabBody) {
+      tabBody.appendChild(surfHost);          // appendChild moves the node
+    }
+    surfHost.classList.add('active');         // host visible (CSS gates display)
+  }
+
+  // Phase 5: park the surface host back at document.body (hidden by
+  // default CSS) so meeting-view re-mounts find it intact. Called when
+  // the operator ascends out of meeting view.
+  function _detachSurfaceHost() {
+    const surfHost = document.getElementById('ac-meeting-surface-host');
+    if (!surfHost) return;
+    surfHost.classList.remove('active');
+    if (surfHost.parentElement !== document.body) {
+      document.body.appendChild(surfHost);
+    }
+  }
+  // Expose for accord-transitions.js to call on the constellation path
+  window._accordDetachSurfaceHost = _detachSurfaceHost;
+
+  // Phase 5: activate one meeting-scoped surface tab. Mirrors the
+  // legacy switchSurface() semantics on the .surface elements inside
+  // the relocated host, plus drives the existing accord:surface-changed
+  // event chain so capture/document/ledger/digest/minutes modules
+  // react.
+  function _activateMeetingTab(host, surfaceName) {
+    if (!surfaceName) return;
+    // Tab visual state
+    host.querySelectorAll('.ac-mtg-tab').forEach(b => {
+      b.classList.toggle('active', b.dataset.mtgTab === surfaceName);
+    });
+    // Surface module hand-off — drive Accord.switchSurface so it owns
+    // the .surface.active toggling and dispatches accord:surface-changed
+    if (window.Accord?.switchSurface) {
+      window.Accord.switchSurface(surfaceName);
+    }
+  }
+
+  // ── Substrate event invalidation + reactive re-render ──────
+  // Cache is always invalidated. Additionally, if the operator is
+  // currently viewing a workstream- or meeting-level surface and the
+  // event affects what's on screen, re-render in place so the view
+  // doesn't show stale state until the operator navigates away.
+  // (Phase 4a operator-found defect: created sub-workstreams appeared
+  // in left rail but not in workstream-view sub-list until reload.)
+  function _reactiveRerender() {
+    const lvl = window.Accord?.state?.level;
+    const ctx = window.Accord?.state?.levelContext || {};
+    // Find a host: accord-transitions.js mounts views into .ac-view-host
+    const host = document.querySelector('.ac-view-host');
+    if (!host || host.style.display === 'none') return;
+
+    if (lvl === 'workstream' && ctx.workstreamId) {
+      renderWorkstreamView(host, ctx.workstreamId);
+    } else if (lvl === 'meeting' && ctx.meetingId) {
+      renderMeetingView(host, ctx.meetingId, ctx.workstreamId);
+    }
+  }
+
+  ['accord:meeting-filed', 'accord:meeting-unfiled', 'accord:meeting-refiled',
+   'accord:workstream-created', 'accord:workstream-renamed',
+   'accord:workstream-archived', 'accord:workstream-restored'].forEach(name => {
+    window.addEventListener(name, () => {
+      _invalidate();
+      _reactiveRerender();
+    });
+  });
+
+  // ── Expose ──────────────────────────────────────────────────
+  window.AccordViews = {
+    renderWorkstreamView,
+    renderMeetingView,
+    invalidate: _invalidate,
+  };
+})();
