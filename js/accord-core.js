@@ -218,7 +218,11 @@ const Accord = (() => {
 
       // Stash thread reference for the loader
       state.thread = thread;
-      await loadMeeting(meeting.meeting_id);
+      // CMD-ACCORD-NEWMEETING-ROUTING-FIX-1: route through setLevel so
+      // accord-transitions.js fires, tears down any active surface, and
+      // mounts the new meeting's Setup shell cleanly.
+      // Top-level new-meeting is always parking-lot (no workstream).
+      setLevel('meeting', { meetingId: meeting.meeting_id, workstreamId: null });
       // Persist meeting id in URL so refresh keeps the same meeting
       const url = new URL(window.location);
       url.searchParams.set('meeting', meeting.meeting_id);
