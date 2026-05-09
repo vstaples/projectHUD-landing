@@ -1,705 +1,642 @@
 // ============================================================
-// ProjectHUD — accord-core.js
-// CMD-A3 · Accord shell, tab routing, meeting lifecycle, presence.
+// ProjectHUD — accord-capture.js
+// CMD-A3 · Live Capture surface — agenda + composer + stream + chat
 //
-// Responsibilities:
-//   - Tab routing for the five-tab top nav
-//   - Active meeting state (idle | running | closed)
-//   - Timer
-//   - Presence subscription via Aegis (CMDCenter.onAppEvent + sessions())
-//   - Realtime channel subscription (accord:meeting:{meeting_id})
-//     via a meeting-scoped Supabase client
-//   - Window-global API exposed as window.Accord for accord-capture.js
-//
-// Iron Rule 41 enforcement is at the surface level (composer is local;
-// only commit gestures broadcast). Iron Rule 42 enforcement happens at
-// the DB via the seal trigger; this surface reflects the closed-state
-// transformation but doesn't enforce immutability itself.
+// Iron Rule 41 — composer is local; only commit gestures broadcast.
+// Iron Rule 42 — post-seal mutations rejected at the DB; UI reflects
+//   the closed-state via the .meeting-closed class set by accord-core.
 // ============================================================
 
-const Accord = (() => {
+(() => {
   'use strict';
 
-  // ── Module state ──────────────────────────────────────────────
-  const state = {
-    meeting:       null,    // { id, title, state, organizer_id, started_at, ended_at, sealed_at, ... }
-    thread:        null,    // current thread (one per meeting v0.1)
-    organizerName: null,
-    me:            null,    // { id, name, firm_id }
-    timerInterval: null,
-    channel:       null,    // Supabase realtime channel
-    realtimeClient: null,
-    surface:       'capture',
+  const $ = id => document.getElementById(id);
+  const esc = s => Accord._esc(s);
 
-    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3 + 5:
-    // Three-pane navigation level state. Phase 5 closure removed
-    // viewMode (legacy toggle gone) — only `level` + `levelContext`
-    // remain.
-    level:         'constellation',  // 'constellation' | 'workstream' | 'meeting'
-    levelContext:  {},               // { workstreamId?, meetingId? }
+  // ── Local state ───────────────────────────────────────────────
+  const local = {
+    agendaItems:  [],
+    activeAgenda: null,
+    captureNodes: [],   // current meeting
+    historyNodes: [],   // thread history (across meetings)
+    chatMessages: [],
+    streamTab:    'present',
+    agendaFilter: 'active',
   };
 
-  // ── Persistence helpers (cross-module convention from Compass) ────
-  // sessionStorage + localStorage two-tier: session takes precedence
-  // for tab-scoped continuity, localStorage is the long-term fallback.
-  function _persistRead(key, fallback) {
-    try {
-      const s = sessionStorage.getItem(key);
-      if (s !== null) return s;
-      const l = localStorage.getItem(key);
-      if (l !== null) return l;
-    } catch (e) { /* private mode / quota — ignore */ }
-    return fallback;
-  }
-  function _persistWrite(key, value) {
-    try { sessionStorage.setItem(key, value); } catch (e) {}
-    try { localStorage.setItem(key, value); } catch (e) {}
-  }
+  // ── Lifecycle hookup ─────────────────────────────────────────
+  window.addEventListener('accord:meeting-loaded', async (ev) => {
+    const { meeting, thread } = ev.detail;
+    await _loadAll(meeting, thread);
+  });
 
-  // Hydrate persisted state at module-load (synchronous; values exist
-  // before _init() runs)
-  state.level     = _persistRead('accord-level', 'constellation');
-  try {
-    const ctxRaw = _persistRead('accord-level-context', '{}');
-    state.levelContext = JSON.parse(ctxRaw || '{}');
-  } catch (e) { state.levelContext = {}; }
+  window.addEventListener('accord:meeting-sealed', async (ev) => {
+    // After seal, refresh nodes so sealed_at lands locally
+    const m = ev.detail.meeting;
+    await _loadCaptureNodes(m.meeting_id);
+    await _loadThreadHistory(Accord.state.thread?.thread_id);
+    _renderStream();
+  });
 
-  // ── Level setters (consumed by accord-rails.js) ──────────────────
-  function setLevel(nextLevel, ctx) {
-    if (nextLevel !== 'constellation' && nextLevel !== 'workstream' && nextLevel !== 'meeting') return;
-    state.level        = nextLevel;
-    state.levelContext = ctx || {};
-    _persistWrite('accord-level', state.level);
-    _persistWrite('accord-level-context', JSON.stringify(state.levelContext));
-    window.dispatchEvent(new CustomEvent('accord:level-changed', {
-      detail: { level: state.level, context: state.levelContext },
-    }));
-  }
-  function ascendLevel() {
-    if (state.level === 'meeting') {
-      const ws = state.levelContext.workstreamId;
-      setLevel('workstream', ws ? { workstreamId: ws } : {});
-    } else if (state.level === 'workstream') {
-      setLevel('constellation', {});
-    }
-    // 'constellation' is top — ESC at top is a no-op
-  }
-
-  // ── DOM refs ──────────────────────────────────────────────────
-  const $ = id => document.getElementById(id);
-
-  // ── Identity (mirrors compass.html pattern) ───────────────────
-  async function _resolveMe() {
-    try {
-      const token  = await Auth.getFreshToken().catch(() => Auth.getToken());
-      const claims = JSON.parse(atob(token.split('.')[1]));
-      const sub    = claims.sub;
-      const email  = claims.email || null;
-
-      const rows = await API.get(`users?id=eq.${sub}&select=id,name,email,firm_id`).catch(() => []);
-      const u    = rows && rows[0] || null;
-      state.me = {
-        id:      u?.id   || sub,
-        name:    u?.name || email || 'You',
-        email,
-        firm_id: u?.firm_id || window.FIRM_ID || null,
-      };
-      window.CURRENT_USER = state.me;
-      return state.me;
-    } catch (e) {
-      console.error('[Accord] identity resolution failed', e);
-      state.me = { id: null, name: 'Unknown', firm_id: null };
-      return state.me;
-    }
-  }
-
-  // ── Tab routing ───────────────────────────────────────────────
-  function _wireTopNav() {
-    document.querySelectorAll('#accord-app .surface-switch button').forEach(btn => {
-      btn.addEventListener('click', () => switchSurface(btn.dataset.surface));
-    });
-    // Closed-banner CTAs (route to placeholder surfaces)
-    document.querySelectorAll('#accord-app .closed-banner [data-target-surface]').forEach(btn => {
-      btn.addEventListener('click', () => switchSurface(btn.dataset.targetSurface));
-    });
-  }
-
-  function switchSurface(name) {
-    state.surface = name;
-    document.querySelectorAll('#accord-app .surface').forEach(s => s.classList.remove('active'));
-    document.querySelectorAll('#accord-app .surface-switch button').forEach(b => b.classList.remove('active'));
-    const surface = $('surface-' + name);
-    const btn     = document.querySelector(`#accord-app .surface-switch [data-surface="${name}"]`);
-    if (surface) surface.classList.add('active');
-    if (btn)     btn.classList.add('active');
-    // CMD-A4: notify other surface modules of the change so they can lazy-load.
-    window.dispatchEvent(new CustomEvent('accord:surface-changed', { detail: { surface: name } }));
-  }
-
-  // ── Meeting load / create ────────────────────────────────────
-  async function loadMeeting(meetingId) {
-    try {
-      const rows = await API.get(`accord_meetings?meeting_id=eq.${meetingId}&select=*`);
-      const m = rows && rows[0];
-      if (!m) {
-        console.warn('[Accord] meeting not found / inaccessible:', meetingId);
-        _setMeetingHeader(null);
-        return null;
-      }
-      state.meeting = m;
-
-      // Resolve organizer name
-      const oRows = await API.get(`users?id=eq.${m.organizer_id}&select=name`).catch(() => []);
-      state.organizerName = oRows?.[0]?.name || null;
-
-      // Resolve thread: prefer the thread linked via any existing node in this meeting;
-      // fall back to the most recent thread in the firm.
-      const linked = await API.get(
-        `accord_nodes?meeting_id=eq.${m.meeting_id}&select=thread_id&limit=1`
-      ).catch(() => []);
-      let thread = null;
-      if (linked && linked[0]?.thread_id) {
-        const tt = await API.get(
-          `accord_threads?thread_id=eq.${linked[0].thread_id}&select=*`
-        ).catch(() => []);
-        thread = tt?.[0] || null;
-      }
-      if (!thread) {
-        const tRows = await API.get(
-          `accord_threads?firm_id=eq.${m.firm_id}&select=*&order=created_at.desc&limit=1`
-        ).catch(() => []);
-        thread = tRows?.[0] || null;
-      }
-      state.thread = thread;
-
-      _setMeetingHeader(m);
-      _renderClosedBanner(m);
-      _refreshTimer();
-      _enableComposerForState();
-
-      // Subscribe to the meeting channel (idempotent)
-      await _subscribeMeetingChannel(m.meeting_id);
-
-      // Notify accord-capture.js to render its data
-      window.dispatchEvent(new CustomEvent('accord:meeting-loaded', { detail: { meeting: m, thread: state.thread } }));
-      return m;
-    } catch (e) {
-      console.error('[Accord] loadMeeting failed', e);
-      return null;
-    }
-  }
-
-  async function createMeeting(title, threadTitle) {
-    if (!state.me?.firm_id) {
-      alert('No firm context — cannot create meeting.');
-      return null;
-    }
-    try {
-      // 1. Create thread first
-      const threadRow = {
-        firm_id:    state.me.firm_id,
-        title:      threadTitle || title || 'Untitled thread',
-        created_by: state.me.id,
-      };
-      const tCreated = await API.post('accord_threads', threadRow);
-      const thread = Array.isArray(tCreated) ? tCreated[0] : tCreated;
-
-      // 2. Create meeting in idle state
-      // Note: accord_meetings has no scheduled_for NOT NULL; included only as informational
-      const meetingRow = {
-        firm_id:       state.me.firm_id,
-        title:         title || 'Untitled meeting',
-        organizer_id:  state.me.id,
-        state:         'idle',
-        scheduled_for: new Date().toISOString(),
-      };
-      const mCreated = await API.post('accord_meetings', meetingRow);
-      const meeting = Array.isArray(mCreated) ? mCreated[0] : mCreated;
-
-      // Stash thread reference for the loader
-      state.thread = thread;
-      // CMD-ACCORD-NEWMEETING-ROUTING-FIX-1: route through setLevel so
-      // accord-transitions.js fires, tears down any active surface, and
-      // mounts the new meeting's Setup shell cleanly.
-      // Top-level new-meeting is always parking-lot (no workstream).
-      setLevel('meeting', { meetingId: meeting.meeting_id, workstreamId: null });
-      // Persist meeting id in URL so refresh keeps the same meeting
-      const url = new URL(window.location);
-      url.searchParams.set('meeting', meeting.meeting_id);
-      window.history.replaceState(null, '', url);
-      return meeting;
-    } catch (e) {
-      console.error('[Accord] createMeeting failed', e);
-      alert('Failed to create meeting: ' + (e?.message || e));
-      return null;
-    }
-  }
-
-  // ── Lifecycle transitions ────────────────────────────────────
-  async function startMeeting() {
-    const m = state.meeting;
-    if (!m || m.state !== 'idle') return;
-    try {
-      const rows = await API.patch(`accord_meetings?meeting_id=eq.${m.meeting_id}`, {
-        state:      'running',
-        started_at: new Date().toISOString(),
+  // ── Realtime fan-in ──────────────────────────────────────────
+  window.addEventListener('accord:remote-node', (ev) => {
+    const p = ev.detail?.payload || ev.detail;
+    if (!p?.node_id) return;
+    // Append remote node if not already present
+    if (!local.captureNodes.find(n => n.node_id === p.node_id)) {
+      local.captureNodes.unshift({
+        node_id:    p.node_id,
+        thread_id:  p.thread_id,
+        meeting_id: p.meeting_id,
+        tag:        p.tag,
+        summary:    p.summary,
+        created_at: p.created_at,
+        created_by: p.created_by,
+        sealed_at:  null,
       });
-      const updated = rows?.[0] || m;
-      state.meeting = { ...m, ...updated };
-      _setMeetingHeader(state.meeting);
-      _refreshTimer();
-      _enableComposerForState();
-    } catch (e) {
-      console.error('[Accord] startMeeting failed', e);
-      alert('Failed to start meeting: ' + (e?.message || e));
+      _renderStream();
     }
+  });
+  window.addEventListener('accord:remote-chat', (ev) => {
+    const p = ev.detail?.payload || ev.detail;
+    if (!p) return;
+    local.chatMessages.push({
+      author: p.author_name || 'Unknown',
+      text:   p.text || '',
+      ts:     p.ts || Date.now(),
+      isMe:   false,
+    });
+    _renderChat();
+  });
+  window.addEventListener('accord:remote-agenda', async () => {
+    if (Accord.state.meeting) await _loadAgenda(Accord.state.meeting.meeting_id);
+  });
+
+  // ── Loaders ──────────────────────────────────────────────────
+  async function _loadAll(meeting, thread) {
+    if (!meeting) return;
+    await _loadAgenda(meeting.meeting_id);
+    await _loadCaptureNodes(meeting.meeting_id);
+    if (thread) await _loadThreadHistory(thread.thread_id);
+    _renderAgenda();
+    _renderStream();
+    _renderChat();
+    _updateContextStrip();
+    _updateCoverage();
   }
 
-  async function endMeeting() {
-    const m = state.meeting;
-    if (!m || m.state !== 'running') return;
+  async function _loadAgenda(meetingId) {
     try {
-      const rows = await API.patch(`accord_meetings?meeting_id=eq.${m.meeting_id}`, { state: 'closed' });
-      // The seal trigger populates ended_at, sealed_at, merkle_root server-side.
-      // Refetch to get the sealed values.
-      const fresh = await API.get(`accord_meetings?meeting_id=eq.${m.meeting_id}&select=*`).catch(() => []);
-      state.meeting = fresh?.[0] || (rows?.[0] || m);
-      _setMeetingHeader(state.meeting);
-      _renderClosedBanner(state.meeting);
-      _refreshTimer();
-      _enableComposerForState();
-
-      // CMD-A7: real PDF render trigger replaces CMD-A3's 6-second mock.
-      // The Minutes Edge Function runs async and broadcasts
-      // accord.minutes.rendered (or .render_failed) on the meeting channel
-      // when complete. Toast subscriber (wired below) shows the result.
-      _onMeetingEndSealed(state.meeting.meeting_id);
-
-      // Tell capture surface to refresh (sealed_at now populated on nodes)
-      window.dispatchEvent(new CustomEvent('accord:meeting-sealed', { detail: { meeting: state.meeting } }));
-    } catch (e) {
-      console.error('[Accord] endMeeting failed', e);
-      alert('Failed to end meeting: ' + (e?.message || e));
-    }
+      const rows = await API.get(
+        `accord_agenda_items?meeting_id=eq.${meetingId}&select=*&order=position.asc`
+      );
+      local.agendaItems = rows || [];
+      // Default active agenda = first non-archived item
+      if (!local.activeAgenda || !local.agendaItems.find(a => a.agenda_item_id === local.activeAgenda)) {
+        const first = local.agendaItems.find(a => a.status !== 'archived');
+        local.activeAgenda = first?.agenda_item_id || null;
+      }
+    } catch (e) { console.error('[Accord] agenda load failed', e); }
   }
 
-  // ── Header / banner / timer / composer-enable ────────────────
-  function _setMeetingHeader(m) {
-    if (!m) {
-      // cap-title removed from capture-header (now in ac-view-header).
-      if ($('cap-organizer')) $('cap-organizer').style.display = 'none';
-      if ($('cap-meta-text')) $('cap-meta-text').textContent = '';
-      if ($('cap-pulse')) $('cap-pulse').classList.remove('running');
-      $('meetingToggleBtn').disabled = true;
-      $('meetingToggleBtn').textContent = 'Start meeting →';
+  async function _loadCaptureNodes(meetingId) {
+    try {
+      const rows = await API.get(
+        `accord_nodes?meeting_id=eq.${meetingId}&select=*&order=created_at.desc`
+      );
+      local.captureNodes = rows || [];
+    } catch (e) { console.error('[Accord] nodes load failed', e); }
+  }
+
+  async function _loadThreadHistory(threadId) {
+    if (!threadId) { local.historyNodes = []; return; }
+    try {
+      const rows = await API.get(
+        `accord_nodes?thread_id=eq.${threadId}&select=*&order=created_at.desc`
+      );
+      local.historyNodes = rows || [];
+    } catch (e) { console.error('[Accord] history load failed', e); }
+  }
+
+  // ── Agenda render + interactions ─────────────────────────────
+  function _renderAgenda() {
+    const el = $('agendaList');
+    const filtered = local.agendaItems.filter(a =>
+      local.agendaFilter === 'all' ? true : a.status !== 'archived'
+    );
+    $('agendaCount').textContent = `${local.agendaItems.length} item${local.agendaItems.length === 1 ? '' : 's'}`;
+    if (!filtered.length) {
+      el.innerHTML = '<div style="color:var(--ink-faint);font-size:11px;padding:8px 4px">No agenda items yet. Use + New item.</div>';
       return;
     }
-
-    // cap-title lives in ac-view-header; ac-view-title set by renderMeetingView.
-    // Remaining elements (organizer, meta, pulse) now rendered inside ac-view-header;
-    // null-guard since they only exist after renderMeetingView has run.
-    var capOrg = $('cap-organizer');
-    var capOrgName = $('cap-organizer-name');
-    var capMetaText = $('cap-meta-text');
-    var pulse = $('cap-pulse');
-    if (capOrg) {
-      if (state.organizerName) {
-        capOrg.style.display = '';
-        if (capOrgName) capOrgName.textContent = state.organizerName;
-      } else {
-        capOrg.style.display = 'none';
-      }
-    }
-    if (capMetaText) {
-      const meta = [];
-      if (m.scheduled_for) meta.push(new Date(m.scheduled_for).toLocaleString());
-      meta.push('state: ' + m.state);
-      capMetaText.textContent = meta.join(' · ');
-    }
-    if (pulse) {
-      if (m.state === 'running') pulse.classList.add('running');
-      else pulse.classList.remove('running');
-    }
-
-    const toggle = $('meetingToggleBtn');
-    if (!toggle) return; // controls bar not yet relocated into view header
-    if (m.state === 'idle') {
-      toggle.disabled = false;
-      toggle.textContent = 'Start meeting →';
-      toggle.classList.add('btn-signal'); toggle.classList.remove('btn-end');
-    } else if (m.state === 'running') {
-      toggle.disabled = false;
-      toggle.textContent = 'End meeting';
-      toggle.classList.remove('btn-signal'); toggle.classList.add('btn-end');
-    } else {
-      toggle.disabled = true;
-      toggle.textContent = 'Closed';
-      toggle.classList.remove('btn-signal', 'btn-end');
-      toggle.classList.add('btn-ghost');
-    }
-  }
-
-  function _renderClosedBanner(m) {
-    const banner = $('closedBanner');
-    if (!banner) return;
-    if (m && m.state === 'closed') {
-      banner.classList.add('visible');
-      document.querySelector('.surface-capture')?.classList.add('meeting-closed');
-    } else {
-      banner.classList.remove('visible');
-      document.querySelector('.surface-capture')?.classList.remove('meeting-closed');
-    }
-  }
-
-  function _refreshTimer() {
-    if (state.timerInterval) {
-      clearInterval(state.timerInterval);
-      state.timerInterval = null;
-    }
-    const el = $('meetingTimer');
-    if (!el) return; // controls bar not yet relocated into view header
-    const m = state.meeting;
-    if (!m) { el.textContent = '00:00:00'; el.classList.remove('ended'); return; }
-    if (m.state === 'idle') { el.textContent = '00:00:00'; el.classList.remove('ended'); return; }
-    if (m.state === 'closed') {
-      // Frozen "ENDED · N MIN"
-      const start = m.started_at ? new Date(m.started_at).getTime() : null;
-      const end   = m.ended_at ? new Date(m.ended_at).getTime() : Date.now();
-      const mins  = start ? Math.max(0, Math.round((end - start) / 60000)) : 0;
-      el.textContent = `ENDED · ${mins} MIN`;
-      el.classList.add('ended');
-      return;
-    }
-    // running
-    el.classList.remove('ended');
-    const startTs = m.started_at ? new Date(m.started_at).getTime() : Date.now();
-    const tick = () => {
-      const ms = Date.now() - startTs;
-      const total = Math.max(0, Math.floor(ms / 1000));
-      const h = String(Math.floor(total / 3600)).padStart(2, '0');
-      const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
-      const ss = String(total % 60).padStart(2, '0');
-      el.textContent = `${h}:${mm}:${ss}`;
-    };
-    tick();
-    state.timerInterval = setInterval(tick, 1000);
-  }
-
-  function _enableComposerForState() {
-    const m = state.meeting;
-    const enabled = !!(m && m.state === 'running');
-    // Null-guard: these elements live inside #ac-meeting-surface-host which
-    // may be parked at body (not yet mounted in tab body) when loadMeeting
-    // fires from the Setup shell idle branch.
-    if ($('captureInput'))  $('captureInput').disabled  = !enabled;
-    document.querySelectorAll('.tag-btn').forEach(b => b.disabled = !enabled);
-    if ($('chatInput'))     $('chatInput').disabled     = !enabled;
-    if ($('chatSendBtn'))   $('chatSendBtn').disabled   = !enabled;
-  }
-
-  // ── Realtime channel for the meeting ─────────────────────────
-  // Per build brief §5: accord:meeting:{meeting_id}, Broadcast (not postgres_changes).
-  // Iron Rule 41: only commit-moment events broadcast; no keystrokes.
-  async function _subscribeMeetingChannel(meetingId) {
-    try {
-      // Wait for the supabase JS lib loaded by cmd-center.js (best-effort).
-      let attempts = 0;
-      while (!window.supabase && attempts < 40) {
-        await new Promise(r => setTimeout(r, 100));
-        attempts++;
-      }
-      if (!window.supabase) {
-        console.warn('[Accord] window.supabase not available; meeting channel disabled');
-        return;
-      }
-      // Reuse a dedicated client so we don't fight cmd-center's hud:{firm_id} channel.
-      if (!state.realtimeClient) {
-        const SUPA_URL = (window.PHUD && PHUD.SUPABASE_URL) || window.SUPABASE_URL;
-        const SUPA_KEY = (window.PHUD && PHUD.SUPABASE_KEY) || window.SUPABASE_KEY;
-        state.realtimeClient = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
-          realtime: { params: { eventsPerSecond: 10 } },
-        });
-        // Authorize realtime with the user's JWT so RLS / channel access apply
-        try {
-          const token = await Auth.getFreshToken().catch(() => Auth.getToken());
-          if (state.realtimeClient.realtime?.setAuth) state.realtimeClient.realtime.setAuth(token);
-        } catch (e) { /* non-fatal */ }
-      }
-      // Tear down any prior subscription
-      if (state.channel) {
-        try { await state.channel.unsubscribe(); } catch (e) {}
-        state.channel = null;
-      }
-      const channelName = 'accord:meeting:' + meetingId;
-      state.channel = state.realtimeClient.channel(channelName, {
-        config: { broadcast: { self: false, ack: false } }
-      });
-      state.channel
-        .on('broadcast', { event: 'accord.node.committed' },   payload => _onRemoteEvent('node', payload))
-        .on('broadcast', { event: 'accord.chat.posted' },      payload => _onRemoteEvent('chat', payload))
-        .on('broadcast', { event: 'accord.agenda.changed' },   payload => _onRemoteEvent('agenda', payload));
-      // CMD-A7: relay minutes-render broadcasts to the toast surface.
-      _wireMinutesEventsForChannel(state.channel);
-      state.channel
-        .subscribe(status => {
-          const lc = $('liveConnectBtn');
-          if (status === 'SUBSCRIBED') {
-            lc?.classList.add('connected');
-          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-            lc?.classList.remove('connected');
+    const sealed = !!Accord.state.meeting?.sealed_at;
+    el.innerHTML = filtered.map(a => `
+      <div class="agenda-item ${a.agenda_item_id === local.activeAgenda ? 'active' : ''}" data-agenda-id="${a.agenda_item_id}">
+        <span class="agenda-pos">${a.position}</span>
+        <span class="agenda-title">${esc(a.title)}</span>
+        <span class="agenda-actions">
+          ${sealed
+            ? `<button data-action="archive" title="Archive">⊘</button>`
+            : `<button data-action="delete"  title="Delete">×</button>`
           }
+        </span>
+      </div>
+    `).join('');
+    el.querySelectorAll('.agenda-item').forEach(node => {
+      const id = node.dataset.agendaId;
+      node.addEventListener('click', (ev) => {
+        if (ev.target.closest('button')) return;
+        local.activeAgenda = id;
+        _renderAgenda();
+        _updateContextStrip();
+      });
+      node.querySelector('button[data-action]')?.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const a = local.agendaItems.find(x => x.agenda_item_id === id);
+        if (!a) return;
+        const action = ev.currentTarget.dataset.action;
+        try {
+          if (action === 'delete') {
+            await API.del(`accord_agenda_items?agenda_item_id=eq.${id}`);
+          } else if (action === 'archive') {
+            await API.patch(`accord_agenda_items?agenda_item_id=eq.${id}`, { status: 'archived' });
+          }
+          await _loadAgenda(Accord.state.meeting.meeting_id);
+          _renderAgenda();
+          Accord.broadcast('accord.agenda.changed', { meeting_id: Accord.state.meeting.meeting_id });
+        } catch (e) { console.error('[Accord] agenda mutate failed', e); }
+      });
+    });
+  }
+
+  function _wireAgendaUI() {
+    document.querySelectorAll('#accord-app .agenda-toggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        local.agendaFilter = btn.dataset.agendaFilter;
+        document.querySelectorAll('#accord-app .agenda-toggle button').forEach(b => b.classList.toggle('active', b === btn));
+        _renderAgenda();
+      });
+    });
+
+    $('newAgendaBtn').addEventListener('click', async () => {
+      const m = Accord.state.meeting;
+      if (!m) { alert('Create a meeting first.'); return; }
+      if (m.state === 'closed') return;
+      const title = prompt('Agenda item title:');
+      if (!title || !title.trim()) return;
+      const nextPos = (local.agendaItems.length
+        ? Math.max(...local.agendaItems.map(a => a.position || 0)) : 0) + 1;
+      try {
+        await API.post('accord_agenda_items', {
+          firm_id:    m.firm_id,
+          meeting_id: m.meeting_id,
+          position:   nextPos,
+          title:      title.trim(),
         });
-    } catch (e) {
-      console.warn('[Accord] meeting channel subscribe failed', e);
-    }
-  }
-
-  function _onRemoteEvent(kind, env) {
-    const data = env?.payload || env;
-    // Drop events from this very session (defensive; broadcast.self=false should already filter)
-    if (data?.source_session && state.me && data.source_session === state.me.id) return;
-    // Re-emit on window so accord-capture.js handles per-kind UI updates
-    window.dispatchEvent(new CustomEvent('accord:remote-' + kind, { detail: data }));
-  }
-
-  // Public broadcast helper — used by accord-capture.js after a commit lands
-  function broadcast(event, payload) {
-    if (!state.channel) return Promise.resolve(false);
-    const env = {
-      protocol_version: 1,
-      event_id:         (window.crypto?.randomUUID?.() || ('id-' + Date.now())),
-      event_type:       event,
-      source_product:   'projecthud',
-      source_session:   state.me?.id || 'system',
-      ts:               Date.now(),
-      firm_id:          state.me?.firm_id || null,
-      payload,
-    };
-    return state.channel.send({ type: 'broadcast', event, payload: env });
-  }
-
-  // ── Aegis presence integration ──────────────────────────────
-  // Subscribe to the Aegis hud:{firm_id} session map. Render the local
-  // sessions list as attendees + presence dots.
-  function _wirePresence() {
-    function renderAttendees() {
-      const el = $('attendeesList');
-      if (!el) return;
-      const sessions = (window.CMDCenter && window.CMDCenter.sessions && window.CMDCenter.sessions()) || {};
-      const rows = [];
-      const myId = state.me?.id;
-      Object.keys(sessions).forEach(uid => {
-        const s = sessions[uid] || {};
-        const isMe = uid === myId;
-        const status = s.online === false ? 'offline' : (s.unstable ? 'unstable' : 'present');
-        const dotCls = status === 'present' ? 'present' : (status === 'unstable' ? 'unstable' : '');
-        rows.push(`
-          <div class="attendee-row">
-            <span class="presence-dot ${dotCls}"></span>
-            <span class="attendee-name">${_esc(s.name || 'Unknown')}</span>
-            ${isMe ? '<span class="attendee-self">you</span>' : ''}
-          </div>`);
-      });
-      el.innerHTML = rows.join('') ||
-        '<div class="attendee-row" style="color:var(--ink-faint);font-size:11px">No other sessions detected.</div>';
-    }
-    // Initial
-    renderAttendees();
-    // Re-render on Aegis events
-    if (window.CMDCenter && typeof window.CMDCenter.onAppEvent === 'function') {
-      window.CMDCenter.onAppEvent(() => renderAttendees());
-    }
-    // Cheap polling fallback (every 4s) in case onAppEvent doesn't fire on session change
-    setInterval(renderAttendees, 4000);
-  }
-
-  function _esc(s) {
-    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
-
-  // ── Toast / modals ──────────────────────────────────────────
-  // CMD-A7: toast supports kind ('success'|'error') and optional download URL.
-  // The pdfToast element from CMD-A3 is preserved; only the JS API changes.
-  function _showToast(opts) {
-    opts = opts || {};
-    const t = $('pdfToast');
-    if (!t) return;
-    const msgEl = t.querySelector('.toast-msg');
-    const dlEl  = $('toastDownload');
-    const kind  = opts.kind || 'success';
-    if (msgEl) {
-      const msg = _esc(opts.message || 'Minutes record published.');
-      msgEl.innerHTML = '<strong>' + msg + '</strong>';
-    }
-    if (dlEl) {
-      if (opts.downloadUrl) {
-        dlEl.href = opts.downloadUrl;
-        dlEl.style.display = '';
-      } else {
-        dlEl.removeAttribute('href');
-        dlEl.style.display = 'none';
+        await _loadAgenda(m.meeting_id);
+        _renderAgenda();
+        _updateCoverage();
+        Accord.broadcast('accord.agenda.changed', { meeting_id: m.meeting_id });
+      } catch (e) {
+        alert('Failed to add agenda item: ' + (e?.message || e));
       }
-    }
-    t.classList.toggle('error', kind === 'error');
-    t.classList.add('visible');
-  }
-  function _wireToast() {
-    $('toastClose')?.addEventListener('click', () => $('pdfToast')?.classList.remove('visible'));
+    });
   }
 
-  // ── CMD-A7: render trigger + event subscription ─────────────
-  // After meeting END seals, fire the render-minutes Edge Function
-  // asynchronously. The function broadcasts accord.minutes.rendered
-  // (or .render_failed) on the meeting channel; the subscription
-  // installed below in _subscribeMeetingChannel relays to the toast.
-  async function _onMeetingEndSealed(meetingId) {
-    if (!meetingId) return;
+  // ── Context strip ────────────────────────────────────────────
+  function _updateContextStrip() {
+    const a = local.agendaItems.find(x => x.agenda_item_id === local.activeAgenda);
+    if (a) {
+      $('captureTarget').textContent = a.title;
+      $('capturePath').textContent   = `Agenda ${a.position} · ${Accord.state.meeting?.title || ''}`;
+    } else {
+      $('captureTarget').textContent = '— pick an agenda item —';
+      $('capturePath').textContent   = '';
+    }
+  }
+
+  // ── Coverage meter ───────────────────────────────────────────
+  function _updateCoverage() {
+    const total = local.agendaItems.filter(a => a.status !== 'archived').length;
+    if (!total) {
+      $('coverageFill').style.width = '0%';
+      $('coverageText').textContent = '0 of 0 agenda items have entries';
+      return;
+    }
+    const covered = new Set(local.captureNodes.map(n => n.agenda_item_id).filter(Boolean));
+    const filled = local.agendaItems.filter(a => covered.has(a.agenda_item_id) && a.status !== 'archived').length;
+    const pct = Math.round((filled / total) * 100);
+    $('coverageFill').style.width = pct + '%';
+    $('coverageText').textContent = `${filled} of ${total} agenda items have entries`;
+  }
+
+  // ── Composer + tag bar (commit gesture) ──────────────────────
+  const TAG_KEYS = { n: 'note', d: 'decision', a: 'action', r: 'risk', q: 'question' };
+
+  function _wireComposer() {
+    document.querySelectorAll('#accord-app .tag-btn').forEach(btn => {
+      btn.addEventListener('click', () => _commit(btn.dataset.tag));
+    });
+    // Keyboard shortcuts (only when composer is focused)
+    $('captureInput').addEventListener('keydown', (ev) => {
+      if (!ev.metaKey && !ev.ctrlKey && !ev.altKey) {
+        // Letter shortcuts only on Shift+letter so as not to break typing
+        if (ev.shiftKey && TAG_KEYS[ev.key.toLowerCase()]) {
+          ev.preventDefault();
+          _commit(TAG_KEYS[ev.key.toLowerCase()]);
+        }
+      }
+    });
+  }
+
+  async function _commit(tag) {
+    const m = Accord.state.meeting;
+    if (!m || m.state !== 'running') return;
+    const text = $('captureInput').value.trim();
+    if (!text) { $('captureInput').focus(); return; }
+    const me = Accord.state.me;
+    if (!me?.id || !me.firm_id) {
+      alert('Identity not resolved; cannot commit.');
+      return;
+    }
+    const thread = Accord.state.thread;
+    if (!thread?.thread_id) {
+      alert('No thread bound to this meeting yet; commit aborted.');
+      return;
+    }
+
+    // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: route decision/action
+    // commits through the date-capture modal. Other tags commit directly.
+    // CMD-ACCORD-NRA-SURFACE-1 Phase 3: pre-commit atomic — open NRA
+    // modal before _doCommit fires. Modal cancel preserves operator
+    // text input (no node POST). Modal submit calls _doCommit then
+    // dispatches the NRA helper RPC + accord:nra-* CustomEvent.
+    if (tag === 'decision' || tag === 'action') {
+      _openCaptureDateModal(tag, text, (dateExtras) =>
+        _openNRAModalThenCommit(tag, text, dateExtras));
+      return;
+    }
+    return _openNRAModalThenCommit(tag, text, null);
+  }
+
+  // CMD-ACCORD-NRA-SURFACE-1 Phase 3: pre-commit atomic orchestrator.
+  // Opens the AccordNRA modal in declare-at-creation mode; on submit
+  // the callback calls _doCommit (creates node) and then dispatches
+  // the appropriate NRA helper RPC. CustomEvent is dispatched on RPC
+  // success. RPC failure falls through to non-blocking notification
+  // (operator can recover via Phase 4 grandfathered "+ Add NRA" badge).
+  // IR71 discipline: tag/text/dateExtras passed explicitly via closure
+  // arguments; modal-callback receives {action,payload} explicitly.
+  function _openNRAModalThenCommit(tag, text, dateExtras) {
+    if (!window.AccordNRA?.Modal?.open) {
+      console.warn('[Accord-capture] AccordNRA module not loaded; falling back to no-NRA commit');
+      return _doCommit(tag, text, dateExtras);
+    }
+    const me = Accord.state.me;
+    const nodeContext = { firm_id: me.firm_id, tag, text };
+    AccordNRA.Modal.open(nodeContext, 'declare-at-creation', null, {
+      onSubmit: async ({ action, payload }) => {
+        const node = await _doCommit(tag, text, dateExtras);
+        if (!node) {
+          throw new Error('Node creation failed; NRA not addressed.');
+        }
+        await _dispatchNRAForNewNode(node, action, payload);
+      },
+    });
+  }
+
+  // CMD-ACCORD-NRA-SURFACE-1 Phase 3: helper that calls the appropriate
+  // NRA RPC for a freshly-created node and dispatches the corresponding
+  // CustomEvent on success. RPC failure logs + console.warn but does
+  // NOT throw (orphan node is recoverable via Phase 4 display badge).
+  async function _dispatchNRAForNewNode(node, action, payload) {
     try {
-      // Fire-and-forget; the toast renders on the broadcast event,
-      // not on this Promise's resolution. We still await to surface
-      // immediate trigger errors (network, auth) for fail-fast UX.
-      await API.invokeEdgeFunction('render-minutes', { meeting_id: meetingId });
+      if (action === 'declare') {
+        const result = await API.rpc('declare_nra', {
+          p_node_id:           node.node_id,
+          p_nra_type:          payload.nra_type,
+          p_due_date:          payload.due_date,
+          p_description:       payload.description,
+          p_owner_resource_id: null,
+          p_owner_event_type:  payload.owner_event_type || null,
+          p_owner_is_operator: payload.owner_is_operator,
+          p_trigger_kind:      payload.trigger_kind || null,
+          p_trigger_target_id: payload.trigger_target_id || null,
+        });
+        const row = Array.isArray(result) ? result[0] : result;
+        AccordNRA.emit('nra-declared', {
+          node_id:  node.node_id,
+          nra_id:   row?.nra_id,
+          firm_id:  node.firm_id,
+          nra_type: payload.nra_type,
+          due_date: payload.due_date,
+        });
+      } else if (action === 'waive') {
+        const result = await API.rpc('waive_nra', {
+          p_node_id: node.node_id,
+          p_reason:  payload.reason,
+        });
+        const row = Array.isArray(result) ? result[0] : result;
+        AccordNRA.emit('nra-waived', {
+          node_id: node.node_id,
+          nra_id:  row?.nra_id,
+          firm_id: node.firm_id,
+        });
+      } else if (action === 'defer') {
+        const result = await API.rpc('defer_nra', { p_node_id: node.node_id });
+        const row = Array.isArray(result) ? result[0] : result;
+        AccordNRA.emit('nra-deferred', {
+          node_id: node.node_id,
+          nra_id:  row?.nra_id,
+          firm_id: node.firm_id,
+        });
+      }
     } catch (e) {
-      console.error('[Accord] render-minutes invoke failed', e);
-      _showToast({
-        kind:    'error',
-        message: 'Minutes render failed to start. Retry from the Minutes tab.',
-      });
+      // Non-blocking per architect disposition: log + console.warn.
+      // Operator recovers via Phase 4 grandfathered "+ Add NRA" badge
+      // when display surface renders this orphan node.
+      console.warn(
+        '[Accord-capture] NRA RPC failed for new node ' + node.node_id +
+        ' (action=' + action + '). Node was created; NRA not addressed. ' +
+        'Use the "+ Add NRA" affordance on the rendered node to recover.',
+        e
+      );
     }
   }
 
-  // Hook for the meeting-channel subscription to relay broadcast
-  // events to the toast. Called from _subscribeMeetingChannel below.
-  function _wireMinutesEventsForChannel(ch) {
-    if (!ch || typeof ch.on !== 'function') return;
-    ch.on('broadcast', { event: 'accord.minutes.rendered' }, (payload) => {
-      const p = payload?.payload || payload || {};
-      _showToast({
-        kind:        'success',
-        message:     'Minutes record published.',
-        downloadUrl: p.download_url || null,
+  // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: extracted commit-write
+  // path so the date modal can call back with optional date extras.
+  // dateExtras: { effective_date, due_date, effective_date_basis } | null
+  // CMD-ACCORD-NRA-SURFACE-1 Phase 3: returns the created node (or null
+  // on failure) so _openNRAModalThenCommit can dispatch NRA RPC after.
+  async function _doCommit(tag, text, dateExtras) {
+    const m = Accord.state.meeting;
+    const me = Accord.state.me;
+    const thread = Accord.state.thread;
+    const row = {
+      firm_id:        me.firm_id,
+      thread_id:      thread.thread_id,
+      meeting_id:     m.meeting_id,
+      agenda_item_id: local.activeAgenda || null,
+      tag,
+      summary:        text.slice(0, 280),
+      body:           text.length > 280 ? text : null,
+      created_by:     me.id,
+    };
+    if (dateExtras) {
+      if (dateExtras.effective_date)       row.effective_date = dateExtras.effective_date;
+      if (dateExtras.due_date)             row.due_date = dateExtras.due_date;
+      if (dateExtras.effective_date_basis) row.effective_date_basis = dateExtras.effective_date_basis;
+    }
+    try {
+      const created = await API.post('accord_nodes', row);
+      const node = Array.isArray(created) ? created[0] : created;
+      local.captureNodes.unshift(node);
+      $('captureInput').value = '';
+      _renderStream();
+      _updateCoverage();
+      // Realtime broadcast of the commit (Iron Rule 41 commit gesture only)
+      Accord.broadcast('accord.node.committed', {
+        node_id:    node.node_id,
+        thread_id:  node.thread_id,
+        meeting_id: node.meeting_id,
+        tag:        node.tag,
+        summary:    node.summary,
+        created_by: node.created_by,
+        created_at: node.created_at,
       });
-    });
-    ch.on('broadcast', { event: 'accord.minutes.render_failed' }, (payload) => {
-      const p = payload?.payload || payload || {};
-      _showToast({
-        kind:    'error',
-        message: 'Render failed' + (p.reason ? ': ' + p.reason : '.'),
-      });
-    });
-  }
-
-  function _wireNewMeetingModal() {
-    const modal  = $('newMeetingModal');
-    const open   = () => { $('nmTitle').value = ''; $('nmThreadTitle').value = ''; modal.classList.add('visible'); $('nmTitle').focus(); };
-    const close  = () => modal.classList.remove('visible');
-    $('newMeetingBtn').addEventListener('click', open);
-    $('nmCancel').addEventListener('click', close);
-    $('nmCreate').addEventListener('click', async () => {
-      const title  = $('nmTitle').value.trim();
-      const thread = $('nmThreadTitle').value.trim();
-      if (!title) { $('nmTitle').focus(); return; }
-      close();
-      await createMeeting(title, thread || title);
-    });
-  }
-
-  function _wireEndMeetingModal() {
-    const modal = $('endMeetingModal');
-    const close = () => modal.classList.remove('visible');
-    $('emCancel').addEventListener('click', close);
-    $('emConfirm').addEventListener('click', async () => {
-      close();
-      await endMeeting();
-    });
-  }
-
-  function _wireToggle() {
-    $('meetingToggleBtn').addEventListener('click', () => {
-      const m = state.meeting;
-      if (!m) return;
-      if (m.state === 'idle')   return startMeeting();
-      if (m.state === 'running') return $('endMeetingModal').classList.add('visible');
-    });
-  }
-
-  function _wireLiveConnect() {
-    $('liveConnectBtn').addEventListener('click', async () => {
-      if (!state.meeting) return;
-      if (state.channel) {
-        try { await state.channel.unsubscribe(); } catch (e) {}
-        state.channel = null;
-        $('liveConnectBtn').classList.remove('connected');
-      } else {
-        await _subscribeMeetingChannel(state.meeting.meeting_id);
+      // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: emit CoC event on
+      // initial date set (capture-time path). Per F-P3-9: writer stores
+      // event_type without 'accord.' prefix.
+      if (dateExtras) {
+        try {
+          if (dateExtras.effective_date && window.CoC?.write) {
+            await window.CoC.write('accord.node.effective_date_changed', node.node_id, {
+              entityType: 'accord_node',
+              meta: {
+                tag,
+                seq_id:                node.seq_id || null,
+                effective_date:        dateExtras.effective_date,
+                effective_date_basis:  dateExtras.effective_date_basis || null,
+                from_value:            null,  // initial set
+              },
+            });
+          }
+          if (dateExtras.due_date && window.CoC?.write) {
+            await window.CoC.write('accord.node.due_date_changed', node.node_id, {
+              entityType: 'accord_node',
+              meta: {
+                tag,
+                seq_id:     node.seq_id || null,
+                due_date:   dateExtras.due_date,
+                from_value: null,  // initial set
+              },
+            });
+          }
+        } catch (e) {
+          console.warn('[Accord-capture] CoC.write date event best-effort failure', e);
+        }
       }
+      return node;
+    } catch (e) {
+      console.error('[Accord] commit failed', e);
+      alert('Capture failed: ' + (e?.message || e));
+      return null;
+    }
+  }
+
+  // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: open the date-capture
+  // modal. Skip = commit without date; Confirm = commit with date fields.
+  // Cancel-via-backdrop/Esc = abort commit entirely (operator can re-attempt).
+  let _captureDateCb = null;
+  function _openCaptureDateModal(tag, text, onProceed) {
+    const modal = $('captureDateModal');
+    if (!modal) {
+      // No modal in DOM: degrade silently to direct commit
+      onProceed(null);
+      return;
+    }
+    _captureDateCb = onProceed;
+    const isDecision = (tag === 'decision');
+    $('captureDateTitle').textContent = isDecision
+      ? 'Set effective date'
+      : 'Set due date';
+    $('captureDateLabel').innerHTML = isDecision
+      ? 'Effective date <span class="dissent-optional">optional</span>'
+      : 'Due date <span class="dissent-optional">optional</span>';
+    $('captureDateModalTarget').textContent =
+      `${tag.toUpperCase()} · ${text.slice(0, 140)}${text.length > 140 ? '…' : ''}`;
+    $('captureDateBasisRow').style.display = isDecision ? '' : 'none';
+    $('captureDateInput').value = '';
+    $('captureDateBasis').value = '';
+    modal.dataset.tag = tag;
+    modal.classList.add('visible');
+    setTimeout(() => $('captureDateInput').focus(), 30);
+  }
+
+  function _closeCaptureDateModal() {
+    const modal = $('captureDateModal');
+    if (modal) {
+      modal.classList.remove('visible');
+      delete modal.dataset.tag;
+    }
+    _captureDateCb = null;
+  }
+
+  function _captureDateSkip() {
+    const cb = _captureDateCb;
+    _closeCaptureDateModal();
+    if (cb) cb(null);  // commit with no date fields
+  }
+
+  function _captureDateConfirm() {
+    const modal = $('captureDateModal');
+    const tag = modal?.dataset?.tag;
+    const dateVal = ($('captureDateInput').value || '').trim();
+    if (!dateVal) {
+      // No date entered → treat as Skip (operator clicked Confirm but
+      // never typed a date; safest interpretation is no-op rather than
+      // alert, matching the Skip action).
+      _captureDateSkip();
+      return;
+    }
+    const extras = {};
+    if (tag === 'decision') {
+      extras.effective_date = dateVal;
+      const basis = ($('captureDateBasis').value || '').trim();
+      if (basis) extras.effective_date_basis = basis;
+    } else if (tag === 'action') {
+      extras.due_date = dateVal;
+    }
+    const cb = _captureDateCb;
+    _closeCaptureDateModal();
+    if (cb) cb(extras);
+  }
+
+  // ── Stream render ────────────────────────────────────────────
+  function _wireStreamTabs() {
+    document.querySelectorAll('#accord-app .stream-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        local.streamTab = btn.dataset.streamTab;
+        document.querySelectorAll('#accord-app .stream-tab').forEach(b => b.classList.toggle('active', b === btn));
+        $('captureStream').style.display       = local.streamTab === 'present' ? '' : 'none';
+        $('threadHistoryStream').style.display = local.streamTab === 'history' ? '' : 'none';
+      });
     });
+  }
+
+  function _renderStream() {
+    $('streamCountPresent').textContent = String(local.captureNodes.length);
+    $('streamCountHistory').textContent = String(local.historyNodes.length);
+    $('captureStream').innerHTML       = _streamHtml(local.captureNodes);
+    $('threadHistoryStream').innerHTML = _streamHtml(local.historyNodes);
+
+    // CMD-ACCORD-NRA-SURFACE-1 Phase 4: paint NRA badges on each row.
+    // wireBadgesIn is idempotent for delegation listeners (gated on
+    // container._nraWired) and re-paints from substrate on every call.
+    if (window.AccordNRA?.wireBadgesIn) {
+      const lookup = (nodeId) => {
+        return local.captureNodes.find(n => n.node_id === nodeId)
+            || local.historyNodes.find(n => n.node_id === nodeId)
+            || { node_id: nodeId, firm_id: Accord.state.me?.firm_id };
+      };
+      window.AccordNRA.wireBadgesIn($('captureStream'),       lookup);
+      window.AccordNRA.wireBadgesIn($('threadHistoryStream'), lookup);
+    }
+  }
+
+  function _streamHtml(nodes) {
+    if (!nodes.length) return '<div class="stream-empty">No captures yet.</div>';
+    return nodes.map(n => {
+      const t = new Date(n.created_at);
+      const time = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const date = t.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      const tag = n.tag || 'note';
+      return `
+        <div class="capture-row" data-node-id="${n.node_id}">
+          <span class="cap-time">${date} ${time}</span>
+          <span class="cap-tag"><span class="tag-dot ${tag}"></span>${tag.toUpperCase()}</span>
+          <div>
+            <div class="cap-summary">${esc(n.summary || '')}</div>
+            <div class="cap-author">${n.sealed_at ? '· sealed' : '· draft'}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Chat ─────────────────────────────────────────────────────
+  function _wireChat() {
+    const send = async () => {
+      const m = Accord.state.meeting;
+      if (!m || m.state !== 'running') return;
+      const text = $('chatInput').value.trim();
+      if (!text) return;
+      const author = Accord.state.me?.name || 'You';
+      const ts = Date.now();
+      local.chatMessages.push({ author, text, ts, isMe: true });
+      $('chatInput').value = '';
+      _renderChat();
+      // Broadcast (chat is ephemeral for v0.1; not persisted)
+      Accord.broadcast('accord.chat.posted', {
+        author_name: author,
+        text,
+        ts,
+      });
+    };
+    $('chatSendBtn').addEventListener('click', send);
+    $('chatInput').addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(); }
+    });
+  }
+
+  function _renderChat() {
+    const el = $('chatStream');
+    el.innerHTML = local.chatMessages.map(m => {
+      const t = new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `
+        <div class="chat-msg">
+          <span class="chat-author">${esc(m.author)}</span>
+          <span class="chat-text">${esc(m.text)}</span>
+          <span class="chat-time">${t}</span>
+        </div>`;
+    }).join('');
+    el.scrollTop = el.scrollHeight;
   }
 
   // ── Init ────────────────────────────────────────────────────
-  async function _init() {
-    _wireTopNav();
-    _wireToggle();
-    _wireNewMeetingModal();
-    _wireEndMeetingModal();
-    _wireToast();
-    _wireLiveConnect();
-    _wirePresence();
-
-    await _resolveMe();
-
-    // If URL has ?meeting=<id>, load it; otherwise show empty state.
-    const params = new URLSearchParams(window.location.search);
-    const meetingId = params.get('meeting');
-    const validUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (meetingId && validUuid.test(meetingId)) {
-      await loadMeeting(meetingId);
-    } else if (meetingId) {
-      // Stale ?meeting=undefined or similar — clear it from the URL silently.
-      const url = new URL(window.location);
-      url.searchParams.delete('meeting');
-      window.history.replaceState(null, '', url);
-    }
-
-    console.log('[Accord] core ready · ' + (window._PROJECTHUD_VERSION || 'no-version'));
+  function _init() {
+    _wireAgendaUI();
+    _wireComposer();
+    _wireStreamTabs();
+    _wireChat();
+    _wireCaptureDateModal();
+    console.log('[Accord] capture surface ready');
   }
 
-  // Auto-init on DOM ready
+  // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: date-capture modal wire-up.
+  function _wireCaptureDateModal() {
+    const modal   = $('captureDateModal');
+    const skipBtn = $('captureDateSkip');
+    const okBtn   = $('captureDateConfirm');
+    if (!modal) return;
+    if (skipBtn) skipBtn.addEventListener('click', () => _captureDateSkip());
+    if (okBtn)   okBtn.addEventListener('click',   () => _captureDateConfirm());
+    // Backdrop click = abort (matches dissent modal pattern)
+    modal.addEventListener('click', (ev) => {
+      if (ev.target === modal) {
+        _closeCaptureDateModal();
+      }
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && modal.classList.contains('visible')) {
+        _closeCaptureDateModal();
+      }
+    });
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', _init);
   } else {
     _init();
   }
-
-  // ── ESC ascend ─────────────────────────────────────────────────
-  // Scoped: suppressed when an input/textarea is focused, any modal
-  // is open, or a transition is in flight.
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key !== 'Escape') return;
-    const t = ev.target;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-    if (document.querySelector('.modal-backdrop.active, [class*="modal"][style*="block"]')) return;
-    if (window.AccordTransitions?.isInFlight?.()) return;
-    ascendLevel();
-  });
-
-  // Phase 5: data-view-mode attribute removed from chrome — no-op.
-  // Removed: _applyViewModeAttr() from Phase 3.
-
-  return {
-    state,
-    switchSurface,
-    loadMeeting,
-    createMeeting,
-    startMeeting,
-    endMeeting,
-    broadcast,
-    _esc,
-
-    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 3 — level state surface
-    setLevel,
-    ascendLevel,
-  };
 })();
-
-window.Accord = Accord;
