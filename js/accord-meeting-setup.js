@@ -325,7 +325,9 @@
   function _addItem(input, items, meeting, workstreamId, firmId) {
     var title = input.value.trim();
     if (!title) return;
-    var nextPos = items.length + 1;
+    var _agendaArea = document.getElementById('ac-setup-agenda-area');
+    var _liveCount = _agendaArea ? _agendaArea.querySelectorAll('.ac-agenda-item').length : items.length;
+    var nextPos = _liveCount + 1;
     var useFirmId = firmId ||
       (window.Accord && window.Accord.state && window.Accord.state.meeting &&
        window.Accord.state.meeting.firm_id);
@@ -471,7 +473,9 @@
 
   // ── Agenda: pull node → insert ────────────────────────────────
   function _pullNode(nodeId, summary, items, meeting, workstreamId, firmId) {
-    var nextPos = items.length + 1;
+    var _agendaArea = document.getElementById('ac-setup-agenda-area');
+    var _liveCount = _agendaArea ? _agendaArea.querySelectorAll('.ac-agenda-item').length : items.length;
+    var nextPos = _liveCount + 1;
     var useFirmId = firmId ||
       (window.Accord && window.Accord.state && window.Accord.state.meeting &&
        window.Accord.state.meeting.firm_id);
