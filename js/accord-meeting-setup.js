@@ -751,13 +751,14 @@
   function _onNraEvent() {
     var area = document.querySelector('.ac-setup-anticipation-area');
     var list = area && area.querySelector('#ac-prior-actions-list');
-    if (!list || !window.AccordNRA) return;
-    var nodeIds = Array.from(list.querySelectorAll('[data-node-id]'))
-      .map(function(el) { return el.dataset.nodeId; });
-    if (!nodeIds.length) return;
-    AccordNRA.fetchBadgeData(nodeIds).then(function(lookup) {
-      AccordNRA.wireBadgesIn(list, lookup);
-    }).catch(function() {});
+    if (!list || !window.AccordNRA || !window.AccordNRA.wireBadgesIn) return;
+    var rows = Array.from(list.querySelectorAll('[data-node-id]'));
+    if (!rows.length) return;
+    var firmId = window.Accord && window.Accord.state && window.Accord.state.meeting
+      ? window.Accord.state.meeting.firm_id : null;
+    var lookup = function(nodeId) { return { node_id: nodeId, firm_id: firmId }; };
+    try { AccordNRA.wireBadgesIn(list, lookup); }
+    catch(e) { console.error('[AccordMeetingSetup] NRA event badge refresh failed', e); }
   }
 
   function _fetchResources() {
@@ -790,6 +791,7 @@
   }
 
   function _paintAnticipation(area, resources, actionNodes) {
+    if (_anticipationFetchAborted || !area || !area.parentNode) return;
     var resHTML = '<div class="ac-anticipation-section">' +
       '<div class="ac-anticipation-section-label">Expected Attendees</div>';
     if (!resources.length) {
@@ -828,16 +830,22 @@
 
     area.innerHTML = '<div class="ac-anticipation-host">' + resHTML + actHTML + '</div>';
 
-    if (actionNodes.length && window.AccordNRA) {
-      var nodeIds = actionNodes.map(function(n) { return n.node_id; });
-      AccordNRA.fetchBadgeData(nodeIds).then(function(lookup) {
-        var list = area.querySelector('#ac-prior-actions-list');
-        if (list && !_anticipationFetchAborted) {
-          AccordNRA.wireBadgesIn(list, lookup);
-        }
-      }).catch(function(e) {
-        console.error('[AccordMeetingSetup] NRA badge fetch failed', e);
-      });
+    if (actionNodes.length && window.AccordNRA && window.AccordNRA.wireBadgesIn) {
+      // wireBadgesIn expects a lookup function (nodeId) => nodeObject with firm_id.
+      // Build index from fetched action nodes; fall back stub with firm_id from state.
+      var nodeIndex = {};
+      var firmId = window.Accord && window.Accord.state && window.Accord.state.meeting
+        ? window.Accord.state.meeting.firm_id : null;
+      actionNodes.forEach(function(n) { nodeIndex[n.node_id] = n; });
+      var lookup = function(nodeId) {
+        return nodeIndex[nodeId] || { node_id: nodeId, firm_id: firmId };
+      };
+      if (_anticipationFetchAborted) return;
+      var list = area.querySelector('#ac-prior-actions-list');
+      if (list) {
+        try { AccordNRA.wireBadgesIn(list, lookup); }
+        catch(e) { console.error('[AccordMeetingSetup] NRA badge wiring failed', e); }
+      }
     }
   }
 
