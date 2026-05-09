@@ -894,13 +894,16 @@
   }
 
   function _buildCountSummary(counts) {
-    // Canonical tag order: Note, Decision, Action, Risk, Question
+    // Canonical tag order: Note, Decision, Action, Risk, Question, Dissent
+    // Platform-canonical display order for node tag summaries (Phase 6).
+    // Dissent uses 'Di' to avoid collision with Decision 'D'.
     var order = [
-      { tag: 'note',     abbr: 'N' },
-      { tag: 'decision', abbr: 'D' },
-      { tag: 'action',   abbr: 'A' },
-      { tag: 'risk',     abbr: 'R' },
-      { tag: 'question', abbr: 'Q' }
+      { tag: 'note',     abbr: 'N'  },
+      { tag: 'decision', abbr: 'D'  },
+      { tag: 'action',   abbr: 'A'  },
+      { tag: 'risk',     abbr: 'R'  },
+      { tag: 'question', abbr: 'Q'  },
+      { tag: 'dissent',  abbr: 'Di' }
     ];
     var parts = [];
     order.forEach(function(t) {
