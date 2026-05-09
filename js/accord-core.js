@@ -286,30 +286,40 @@ const Accord = (() => {
   // ── Header / banner / timer / composer-enable ────────────────
   function _setMeetingHeader(m) {
     if (!m) {
-      $('cap-title').textContent = 'No meeting loaded';
-      $('cap-organizer').style.display = 'none';
-      $('cap-meta-text').textContent   = 'Use NEW MEETING to begin.';
-      $('cap-pulse').classList.remove('running');
+      // cap-title removed from capture-header (now in ac-view-header).
+      if ($('cap-organizer')) $('cap-organizer').style.display = 'none';
+      if ($('cap-meta-text')) $('cap-meta-text').textContent = '';
+      if ($('cap-pulse')) $('cap-pulse').classList.remove('running');
       $('meetingToggleBtn').disabled = true;
       $('meetingToggleBtn').textContent = 'Start meeting →';
       return;
     }
 
-    $('cap-title').textContent = m.title || 'Untitled meeting';
-    if (state.organizerName) {
-      $('cap-organizer').style.display = '';
-      $('cap-organizer-name').textContent = state.organizerName;
-    } else {
-      $('cap-organizer').style.display = 'none';
+    // cap-title lives in ac-view-header; ac-view-title set by renderMeetingView.
+    // Remaining elements (organizer, meta, pulse) now rendered inside ac-view-header;
+    // null-guard since they only exist after renderMeetingView has run.
+    var capOrg = $('cap-organizer');
+    var capOrgName = $('cap-organizer-name');
+    var capMetaText = $('cap-meta-text');
+    var pulse = $('cap-pulse');
+    if (capOrg) {
+      if (state.organizerName) {
+        capOrg.style.display = '';
+        if (capOrgName) capOrgName.textContent = state.organizerName;
+      } else {
+        capOrg.style.display = 'none';
+      }
     }
-    const meta = [];
-    if (m.scheduled_for) meta.push(new Date(m.scheduled_for).toLocaleString());
-    meta.push('state: ' + m.state);
-    $('cap-meta-text').textContent = meta.join(' · ');
-
-    const pulse = $('cap-pulse');
-    if (m.state === 'running') pulse.classList.add('running');
-    else pulse.classList.remove('running');
+    if (capMetaText) {
+      const meta = [];
+      if (m.scheduled_for) meta.push(new Date(m.scheduled_for).toLocaleString());
+      meta.push('state: ' + m.state);
+      capMetaText.textContent = meta.join(' · ');
+    }
+    if (pulse) {
+      if (m.state === 'running') pulse.classList.add('running');
+      else pulse.classList.remove('running');
+    }
 
     const toggle = $('meetingToggleBtn');
     if (m.state === 'idle') {

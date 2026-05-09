@@ -444,6 +444,19 @@
             </span>
           </nav>
           <h1 class="ac-view-title">${esc(meeting.title || '(untitled)')}</h1>
+          <div class="meeting-organizer" id="cap-organizer" style="display:none">
+            <span class="organizer-label">Organized by</span>
+            <span class="organizer-name" id="cap-organizer-name"></span>
+          </div>
+          <div class="meeting-meta" id="cap-meta">
+            <span class="live-pulse" id="cap-pulse" title="Meeting status"></span>
+            <span id="cap-meta-text"></span>
+          </div>
+          <div class="meeting-filed" id="cap-filed" style="display:none">
+            <span class="filed-label">Filed under:</span>
+            <span class="filed-value" id="cap-filed-value">Unfiled</span>
+            <a href="#" class="filed-action" id="cap-filed-action">[file]</a>
+          </div>
         </header>
 
         <div class="ac-view-body ac-meeting-tabs-shell">
