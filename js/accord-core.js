@@ -373,7 +373,13 @@ const Accord = (() => {
     const m = state.meeting;
     const enabled = !!(m && m.state === 'running');
     $('captureInput').disabled = !enabled;
-    document.querySelectorAll('#accord-app .tag-btn').forEach(b => b.disabled = !enabled);
+    // CMD-ACCORD-CAPTURE-CONTROLS-FIX-1 Phase 2: broadened selector.
+    // Previously '#accord-app .tag-btn' missed tag buttons during the
+    // brief window when _detachSurfaceHost() parks #ac-meeting-surface-host
+    // at document.body (sibling of #accord-app, not descendant). The
+    // .tag-btn class is unique to capture surface; namespace scoping
+    // was incidental.
+    document.querySelectorAll('.tag-btn').forEach(b => b.disabled = !enabled);
     $('chatInput').disabled = !enabled;
     $('chatSendBtn').disabled = !enabled;
   }
