@@ -44,12 +44,16 @@
     if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
     _agendaFetchAborted        = true;
     _anticipationFetchAborted  = true;
+    _filmstripFetchAborted     = true;
     _currentMeetingId          = null;
     _workstreamName            = null;
     // Remove NRA event listeners -- Phase 5
     NRA_EVENTS.forEach(function(evt) {
       window.removeEventListener(evt, _onNraEvent);
     });
+    // Remove filmstrip click listener -- Phase 6
+    var strip = document.querySelector('.ac-setup-filmstrip');
+    if (strip) strip.removeEventListener('click', _onFilmCardClick);
   }
 
   // ── Briefing autosave ─────────────────────────────────────────
@@ -725,10 +729,11 @@
       });
     }
 
-    // Briefing + Agenda + Anticipation in parallel
+    // Briefing + Agenda + Anticipation + Filmstrip in parallel
     _renderBriefing(meeting, workstreamId);
     _renderAgenda(meeting, workstreamId);
     _renderAnticipation(meeting, workstreamId);
+    _renderFilmstrip(meeting, workstreamId);
 
     // NRA event listeners for live badge refresh -- Phase 5
     NRA_EVENTS.forEach(function(evt) {
@@ -872,6 +877,130 @@
         area.innerHTML = '<div class="ac-anticipation-error">Could not load anticipation data.</div>';
       }
     });
+  }
+
+
+  // ============================================================
+  // FILMSTRIP -- Phase 6
+  // ============================================================
+
+  var _filmstripFetchAborted = false;
+
+  function _fmtDate(s) {
+    if (!s) return '—';
+    try {
+      return new Date(s).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch(e) { return '—'; }
+  }
+
+  function _buildCountSummary(counts) {
+    // Canonical tag order: Note, Decision, Action, Risk, Question
+    var order = [
+      { tag: 'note',     abbr: 'N' },
+      { tag: 'decision', abbr: 'D' },
+      { tag: 'action',   abbr: 'A' },
+      { tag: 'risk',     abbr: 'R' },
+      { tag: 'question', abbr: 'Q' }
+    ];
+    var parts = [];
+    order.forEach(function(t) {
+      var c = counts[t.tag];
+      if (c) parts.push(c + t.abbr);
+    });
+    return parts.length ? parts.join(' � ') : 'No captures';
+  }
+
+  function _onFilmCardClick(ev) {
+    var card = ev.target.closest('.ac-film-card');
+    if (!card) return;
+    var meetingId    = card.dataset.meetingId;
+    var workstreamId = card.dataset.workstreamId || null;
+    if (!meetingId) return;
+    if (window.Accord && Accord.setLevel) {
+      Accord.setLevel('meeting', { meetingId: meetingId, workstreamId: workstreamId });
+    } else {
+      window.dispatchEvent(new CustomEvent('accord:level-changed', {
+        detail: { level: 'meeting', context: { meetingId: meetingId, workstreamId: workstreamId } }
+      }));
+    }
+  }
+
+  function _fetchPriorMeetings(currentMeetingId, workstreamId) {
+    return API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&meeting_id=neq.' + currentMeetingId +
+      '&state=in.(closed,sealed)' +
+      '&select=meeting_id,title,scheduled_for,sealed_at,state' +
+      '&order=scheduled_for.desc.nullslast,created_at.desc' +
+      '&limit=12'
+    ).then(function(rows) { return rows || []; });
+  }
+
+  function _fetchNodeCounts(meetings) {
+    if (!meetings.length) return Promise.resolve({});
+    var ids = meetings.map(function(m) { return m.meeting_id; }).join(',');
+    return API.get(
+      'accord_nodes?meeting_id=in.(' + ids + ')&select=meeting_id,tag'
+    ).then(function(nodes) {
+      var map = {};
+      meetings.forEach(function(m) { map[m.meeting_id] = {}; });
+      (nodes || []).forEach(function(n) {
+        if (!map[n.meeting_id]) map[n.meeting_id] = {};
+        map[n.meeting_id][n.tag] = (map[n.meeting_id][n.tag] || 0) + 1;
+      });
+      return map;
+    });
+  }
+
+  function _paintFilmstrip(strip, meetings, countMap, workstreamId) {
+    if (_filmstripFetchAborted || !strip || !strip.parentNode) return;
+    if (!meetings.length) {
+      strip.innerHTML = '<div class="ac-film-empty">No prior meetings in this workstream.</div>';
+      return;
+    }
+    var html = '<div class="ac-film-track">';
+    meetings.forEach(function(m) {
+      var counts  = countMap[m.meeting_id] || {};
+      var date    = _fmtDate(m.scheduled_for || m.sealed_at);
+      var summary = _buildCountSummary(counts);
+      html += (
+        '<div class="ac-film-card"' +
+          ' data-meeting-id="' + esc(m.meeting_id) + '"' +
+          ' data-workstream-id="' + esc(workstreamId) + '">' +
+          '<div class="ac-film-card-title">' + esc(m.title || '(untitled)') + '</div>' +
+          '<div class="ac-film-card-date">' + esc(date) + '</div>' +
+          '<div class="ac-film-card-summary">' + esc(summary) + '</div>' +
+        '</div>'
+      );
+    });
+    html += '</div>';
+    strip.innerHTML = html;
+    strip.addEventListener('click', _onFilmCardClick);
+  }
+
+  function _renderFilmstrip(meeting, workstreamId) {
+    _filmstripFetchAborted = false;
+    var strip = document.querySelector('.ac-setup-filmstrip');
+    if (!strip) return;
+    if (!workstreamId) {
+      strip.style.display = 'none';
+      return;
+    }
+    strip.innerHTML = '<div class="ac-film-loading">Loading\u2026</div>';
+    _fetchPriorMeetings(meeting.meeting_id, workstreamId)
+      .then(function(meetings) {
+        if (_filmstripFetchAborted) return;
+        return _fetchNodeCounts(meetings).then(function(countMap) {
+          if (_filmstripFetchAborted) return;
+          _paintFilmstrip(strip, meetings, countMap, workstreamId);
+        });
+      })
+      .catch(function(e) {
+        console.error('[AccordMeetingSetup] filmstrip fetch failed', e);
+        if (!_filmstripFetchAborted && strip && strip.parentNode) {
+          strip.innerHTML = '<div class="ac-film-error">Could not load prior meetings.</div>';
+        }
+      });
   }
 
   window.AccordMeetingSetup = { render: render, teardown: teardown };
