@@ -64,6 +64,10 @@
   var _headerSaveTimers = {};
   var _countdownTimer   = null;
 
+  // ── CMD-ACCORD-SETUP-OUTCOMES-1: outcomes state ───────────────
+  var _outcomesAborted  = false;
+  var _descPatchTimers  = {};   // keyed by outcome_id
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() { teardown(); }
 
@@ -92,6 +96,13 @@
     });
     _headerSaveTimers = {};
     _stopCountdown();
+
+    // ── CMD-ACCORD-SETUP-OUTCOMES-1: outcomes teardown ──────────
+    _outcomesAborted = true;
+    Object.keys(_descPatchTimers).forEach(function(k) {
+      if (_descPatchTimers[k]) clearTimeout(_descPatchTimers[k]);
+    });
+    _descPatchTimers = {};
 
     // ── CMD-ACCORD-SETUP-LAYOUT-1: layout teardown ─────────────
     // Undo full-page mechanism (regression-critical — smoke test 7).
@@ -1233,6 +1244,286 @@
   }
 
   // ══════════════════════════════════════════════════════════════
+  // OUTCOMES — CMD-ACCORD-SETUP-OUTCOMES-1
+  // §5 render + CRUD + wire. V1 resource columns: id (PK), name.
+  // Commission bug fix: _addOutcomeFormHtml submit/cancel buttons
+  // given data-action attrs (commission had id-only; delegation
+  // checks dataset.action so id-only buttons would never fire).
+  // ══════════════════════════════════════════════════════════════
+
+  // §5.1 — Entry point
+  function _renderOutcomes(meeting) {
+    var host = document.querySelector('.ac-col-tabbody[data-col="center"]');
+    if (!host) return;
+    // Prepend outcomes container above existing agenda placeholder
+    var existing = host.innerHTML;
+    host.innerHTML = '<div class="ac-outcomes-block" id="ac-outcomes-block"></div>' + existing;
+    _loadOutcomes(meeting);
+  }
+
+  // §5.2 — Load (fetch → resolve owner names → paint)
+  function _loadOutcomes(meeting) {
+    _outcomesAborted = false;
+    var block = document.getElementById('ac-outcomes-block');
+    if (!block) return;
+    block.innerHTML = '<div class="ac-outcomes-loading">Loading\u2026</div>';
+
+    API.get(
+      'accord_meeting_outcomes?meeting_id=eq.' + meeting.meeting_id +
+      '&order=position.asc,created_at.asc' +
+      '&select=*'
+    ).then(function(rows) {
+      if (_outcomesAborted) return;
+      _resolveOwnerNames(rows || [], function(resolved) {
+        if (_outcomesAborted) return;
+        var block = document.getElementById('ac-outcomes-block'); // IR71: re-query after async
+        if (!block) return;
+        _paintOutcomes(block, resolved, meeting);
+      });
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] outcomes fetch failed', e);
+      var block = document.getElementById('ac-outcomes-block');
+      if (block) block.innerHTML = '<div class="ac-outcomes-error">Could not load outcomes.</div>';
+    });
+  }
+
+  // §5.4 (support) — Resolve owner names via single follow-up fetch
+  // V1: resources PK = id, display name = name
+  function _resolveOwnerNames(outcomes, callback) {
+    var ids = outcomes
+      .filter(function(o) { return o.owner_resource_id; })
+      .map(function(o) { return o.owner_resource_id; });
+
+    if (!ids.length) { callback(outcomes); return; }
+
+    API.get(
+      'resources?id=in.(' + ids.join(',') + ')&select=id,name'
+    ).then(function(rows) {
+      var nameMap = {};
+      (rows || []).forEach(function(r) { nameMap[r.id] = r.name; });
+      outcomes.forEach(function(o) {
+        if (o.owner_resource_id) o._owner_name = nameMap[o.owner_resource_id] || null;
+      });
+      callback(outcomes);
+    }).catch(function() { callback(outcomes); });
+  }
+
+  // §5.3 — Paint
+  function _paintOutcomes(block, outcomes, meeting) {
+    var isRunning = meeting.state !== 'idle';
+    var html = '<div class="ac-outcomes-header">';
+    html += '<span class="ac-outcomes-label">INTENDED OUTCOMES</span>';
+    if (!isRunning) {
+      html += '<button class="ac-outcomes-add-btn" data-action="add-outcome">+ Add outcome</button>';
+    }
+    html += '</div>';
+    html += '<div class="ac-outcomes-list" id="ac-outcomes-list">';
+
+    if (!outcomes.length) {
+      html += '<div class="ac-outcomes-empty">No outcomes defined. Add one to set the meeting\'s intent.</div>';
+    } else {
+      outcomes.forEach(function(o) {
+        html += _outcomeRowHtml(o, isRunning);
+      });
+    }
+
+    html += '</div>';
+    if (!isRunning) {
+      html += _addOutcomeFormHtml();
+    }
+
+    block.innerHTML = html;
+    _wireOutcomeEvents(block, outcomes, meeting);
+  }
+
+  // §5.4 — Outcome row HTML
+  function _outcomeRowHtml(o, isRunning) {
+    var verbClass = 'ac-verb-' + esc(o.verb.toLowerCase());
+    var html = '<div class="ac-outcome-row" data-outcome-id="' + esc(o.outcome_id) + '">';
+    html += '<span class="ac-outcome-verb ' + verbClass + '">' + esc(o.verb) + '</span>';
+
+    if (isRunning) {
+      html += '<span class="ac-outcome-desc">' + esc(o.description) + '</span>';
+    } else {
+      html += '<span class="ac-outcome-desc ac-outcome-desc--editable"' +
+              ' contenteditable="true" spellcheck="false">' +
+              esc(o.description) + '</span>';
+    }
+
+    if (o.owner_resource_id && o._owner_name) {
+      html += '<span class="ac-outcome-owner">' + esc(o._owner_name) + '</span>';
+    }
+
+    if (o.condition) {
+      html += '<span class="ac-outcome-condition">if ' + esc(o.condition) + '</span>';
+    }
+
+    if (!isRunning) {
+      html += '<div class="ac-outcome-controls">';
+      html += '<button class="ac-outcome-btn" data-action="move-up" title="Move up">\u25b2</button>';
+      html += '<button class="ac-outcome-btn" data-action="move-down" title="Move down">\u25bc</button>';
+      html += '<button class="ac-outcome-btn ac-outcome-btn--delete" data-action="delete" title="Remove">\u00d7</button>';
+      html += '</div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  // §5.5 — Add-outcome form HTML
+  // Commission fix: data-action attrs added to submit/cancel buttons
+  // so click delegation (which checks dataset.action) can reach them.
+  function _addOutcomeFormHtml() {
+    return [
+      '<div class="ac-outcome-form" id="ac-outcome-form" style="display:none;">',
+        '<div class="ac-outcome-form-row">',
+          '<select class="ac-outcome-verb-select" id="ac-outcome-verb-select">',
+            '<option value="">Verb\u2026</option>',
+            '<option value="RESOLVE">RESOLVE</option>',
+            '<option value="SEAL">SEAL</option>',
+            '<option value="DECIDE">DECIDE</option>',
+            '<option value="ASSIGN">ASSIGN</option>',
+            '<option value="DEFER">DEFER</option>',
+            '<option value="INFORM">INFORM</option>',
+          '</select>',
+          '<input class="ac-outcome-desc-input" id="ac-outcome-desc-input"',
+                 ' type="text" placeholder="Describe the outcome\u2026" autocomplete="off">',
+        '</div>',
+        '<div class="ac-outcome-form-actions">',
+          '<button class="ac-outcome-form-submit btn btn-signal"',
+                  ' id="ac-outcome-submit"',
+                  ' data-action="ac-outcome-submit">Add</button>',
+          '<button class="ac-outcome-form-cancel btn btn-ghost"',
+                  ' id="ac-outcome-cancel"',
+                  ' data-action="ac-outcome-cancel">Cancel</button>',
+        '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  // §5.6 — Event wiring (single delegated listener on block)
+  function _wireOutcomeEvents(block, outcomes, meeting) {
+    block.addEventListener('click', function(ev) {
+      var target = ev.target;
+      var action = target.dataset.action ||
+                   (target.closest('[data-action]') && target.closest('[data-action]').dataset.action);
+      if (!action) return;
+
+      if (action === 'add-outcome')       { _showAddForm(block); return; }
+      if (action === 'ac-outcome-submit') { _submitOutcome(block, meeting); return; }
+      if (action === 'ac-outcome-cancel') { _hideAddForm(block); return; }
+
+      var row = target.closest('.ac-outcome-row');
+      if (!row) return;
+      var outcomeId = row.dataset.outcomeId;
+
+      if (action === 'delete')    { _deleteOutcome(outcomeId, meeting); return; }
+      if (action === 'move-up')   { _moveOutcome(outcomeId, -1, outcomes, meeting); return; }
+      if (action === 'move-down') { _moveOutcome(outcomeId,  1, outcomes, meeting); return; }
+    });
+
+    // Description inline edit — debounced PATCH on input
+    block.addEventListener('input', function(ev) {
+      var desc = ev.target.closest('.ac-outcome-desc--editable');
+      if (!desc) return;
+      var row = desc.closest('.ac-outcome-row');
+      if (!row) return;
+      _debouncedDescPatch(row.dataset.outcomeId, desc.textContent.trim(), meeting);
+    });
+  }
+
+  // §5.7 — CRUD
+
+  function _submitOutcome(block, meeting) {
+    var verbEl  = document.getElementById('ac-outcome-verb-select');
+    var descEl  = document.getElementById('ac-outcome-desc-input');
+    var verb    = verbEl  ? verbEl.value          : '';
+    var desc    = descEl  ? descEl.value.trim()   : '';
+    if (!verb || !desc) return;
+
+    var list = block.querySelector('#ac-outcomes-list');
+    var pos  = list ? list.querySelectorAll('.ac-outcome-row').length : 0;
+
+    API.post('accord_meeting_outcomes', {
+      firm_id:     meeting.firm_id,
+      meeting_id:  meeting.meeting_id,
+      verb:        verb,
+      description: desc,
+      position:    pos,
+      status:      'open'
+    }).then(function() {
+      _hideAddForm(block);
+      _loadOutcomes(meeting);
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] add outcome failed', e);
+    });
+  }
+
+  function _deleteOutcome(outcomeId, meeting) {
+    API.del('accord_meeting_outcomes?outcome_id=eq.' + outcomeId)
+      .then(function() { _loadOutcomes(meeting); })
+      .catch(function(e) {
+        console.error('[AccordMeetingSetup] delete outcome failed', e);
+      });
+  }
+
+  // Sequential PATCHes per IR (shared-state write antipattern with Promise.all)
+  function _moveOutcome(outcomeId, direction, outcomes, meeting) {
+    var idx = -1;
+    for (var i = 0; i < outcomes.length; i++) {
+      if (outcomes[i].outcome_id === outcomeId) { idx = i; break; }
+    }
+    if (idx === -1) return;
+    var swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= outcomes.length) return;
+
+    var a = outcomes[idx];
+    var b = outcomes[swapIdx];
+
+    API.patch('accord_meeting_outcomes?outcome_id=eq.' + a.outcome_id, { position: b.position })
+      .then(function() {
+        return API.patch('accord_meeting_outcomes?outcome_id=eq.' + b.outcome_id, { position: a.position });
+      })
+      .then(function() { _loadOutcomes(meeting); })
+      .catch(function(e) {
+        console.error('[AccordMeetingSetup] reorder outcome failed', e);
+        _loadOutcomes(meeting);   // restore consistent state
+      });
+  }
+
+  function _debouncedDescPatch(outcomeId, desc, meeting) {
+    if (_descPatchTimers[outcomeId]) clearTimeout(_descPatchTimers[outcomeId]);
+    _descPatchTimers[outcomeId] = setTimeout(function() {
+      _descPatchTimers[outcomeId] = null;
+      API.patch('accord_meeting_outcomes?outcome_id=eq.' + outcomeId, { description: desc })
+        .catch(function(e) {
+          console.error('[AccordMeetingSetup] desc patch failed', e);
+        });
+    }, 800);
+  }
+
+  // §5.8 — Show / hide add form
+  function _showAddForm(block) {
+    var form = block.querySelector('#ac-outcome-form');
+    var btn  = block.querySelector('[data-action="add-outcome"]');
+    if (form) form.style.display = '';
+    if (btn)  btn.style.display  = 'none';
+    var input = block.querySelector('#ac-outcome-desc-input');
+    if (input) input.focus();
+  }
+
+  function _hideAddForm(block) {
+    var form  = block.querySelector('#ac-outcome-form');
+    var btn   = block.querySelector('[data-action="add-outcome"]');
+    var verb  = block.querySelector('#ac-outcome-verb-select');
+    var input = block.querySelector('#ac-outcome-desc-input');
+    if (form)  form.style.display  = 'none';
+    if (btn)   btn.style.display   = '';
+    if (verb)  verb.value          = '';
+    if (input) input.value         = '';
+  }
+
+  // ══════════════════════════════════════════════════════════════
   // RENDER ENTRY POINT
   // ══════════════════════════════════════════════════════════════
 
@@ -1265,6 +1556,9 @@
 
     // ── CMD-ACCORD-SETUP-HEADER-1: header render ──────────────
     _renderHeader(meeting, workstreamId);
+
+    // ── CMD-ACCORD-SETUP-OUTCOMES-1: outcomes render ──────────
+    _renderOutcomes(meeting);
 
     // Breadcrumb async resolve — also caches _workstreamName for briefing
     // CMD-ACCORD-SETUP-LAYOUT-1: breadcrumb element no longer in shell;

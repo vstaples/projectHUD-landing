@@ -454,6 +454,171 @@ body.accord-setup-fullpage .minutes-rail,
 body.accord-setup-fullpage .minutes-history { display: none !important; }
 
 /* ──────────────────────────────────────────────────────────── */
+/* CMD-ACCORD-SETUP-OUTCOMES-1 — Outcomes block styles §7       */
+/* All tokens --ac-* only; scoped to .ac-setup-shell            */
+/* ──────────────────────────────────────────────────────────── */
+
+/* Outcomes block */
+.ac-outcomes-block {
+  padding: 14px 18px 10px 18px;
+  border-bottom: 1px solid var(--ac-border-subtle);
+}
+.ac-outcomes-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.ac-outcomes-label {
+  font-family: var(--ac-font-mono);
+  font-size: 9px;
+  color: var(--ac-text-tertiary);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.ac-outcomes-add-btn {
+  font-family: var(--ac-font-mono);
+  font-size: 9px;
+  color: var(--ac-cyan);
+  background: none;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.8px;
+  padding: 0;
+}
+.ac-outcomes-add-btn:hover { text-decoration: underline; }
+.ac-outcomes-empty {
+  font-size: 12px;
+  color: var(--ac-text-tertiary);
+  font-style: italic;
+  padding: 6px 0;
+}
+.ac-outcomes-loading,
+.ac-outcomes-error {
+  font-size: 11px;
+  color: var(--ac-text-faint);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* Outcome row */
+.ac-outcome-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--ac-border-subtle);
+}
+.ac-outcome-row:last-child { border-bottom: none; }
+
+/* Verb chip */
+.ac-outcome-verb {
+  font-family: var(--ac-font-mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.ac-verb-resolve { background: var(--ac-rose-dim);   color: var(--ac-rose);   }
+.ac-verb-seal    { background: var(--ac-cyan-dim);   color: var(--ac-cyan);   }
+.ac-verb-decide  { background: var(--ac-cyan-dim);   color: var(--ac-cyan);   }
+.ac-verb-assign  { background: var(--ac-amber-dim);  color: var(--ac-amber);  }
+.ac-verb-defer   { background: var(--ac-violet-dim); color: var(--ac-violet); }
+.ac-verb-inform  { background: rgba(255,255,255,0.06); color: var(--ac-text-tertiary); }
+
+/* Description */
+.ac-outcome-desc {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--ac-text-primary);
+  line-height: 1.4;
+  min-width: 0;
+  outline: none;
+}
+.ac-outcome-desc--editable { cursor: text; }
+.ac-outcome-desc--editable:focus {
+  background: var(--ac-bg-pane);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin: -1px -4px;
+}
+
+/* Owner chip */
+.ac-outcome-owner {
+  font-family: var(--ac-font-mono);
+  font-size: 9px;
+  color: var(--ac-text-secondary);
+  background: var(--ac-bg-tile);
+  border: 1px solid var(--ac-border-subtle);
+  border-radius: 10px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Condition */
+.ac-outcome-condition {
+  font-family: var(--ac-font-mono);
+  font-size: 9px;
+  color: var(--ac-violet);
+  flex-shrink: 0;
+}
+
+/* Controls */
+.ac-outcome-controls {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.ac-outcome-btn {
+  font-size: 10px;
+  color: var(--ac-text-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.ac-outcome-btn:hover { color: var(--ac-text-secondary); background: var(--ac-bg-tile); }
+.ac-outcome-btn--delete:hover { color: var(--ac-rose); }
+
+/* Add-outcome form */
+.ac-outcome-form {
+  padding: 10px 0 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ac-outcome-form-row { display: flex; gap: 8px; align-items: center; }
+.ac-outcome-verb-select {
+  font-family: var(--ac-font-mono);
+  font-size: 10px;
+  background: var(--ac-bg-tile);
+  color: var(--ac-text-primary);
+  border: 1px solid var(--ac-border-mid);
+  border-radius: 4px;
+  padding: 5px 8px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.ac-outcome-desc-input {
+  flex: 1;
+  font-size: 12px;
+  background: var(--ac-bg-tile);
+  color: var(--ac-text-primary);
+  border: 1px solid var(--ac-border-mid);
+  border-radius: 4px;
+  padding: 5px 10px;
+  outline: none;
+}
+.ac-outcome-desc-input:focus { border-color: var(--ac-border-active); }
+.ac-outcome-form-actions { display: flex; gap: 8px; }
+
+/* ──────────────────────────────────────────────────────────── */
 /* CMD-ACCORD-MEETING-SETUP-1 (prior phases) — DEFERRED         */
 /* The rules below shipped in Phases 2-7. Their selectors do    */
 /* not match the new shell structure introduced above. They     */
