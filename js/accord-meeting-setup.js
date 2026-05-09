@@ -915,7 +915,9 @@
 
   // ── Intelligence Mode keystroke (Wave 2 stub per §8.2) ───────
   function _onIntelKey(ev) {
-    if ((ev.metaKey || ev.ctrlKey) && (ev.key === 'i' || ev.key === 'I')) {
+    // ev.key is case-sensitive: 'i' = Ctrl+I alone; 'I' = Ctrl+Shift+I.
+    // Guard !ev.shiftKey explicitly so Ctrl+Shift+I (DevTools) is never swallowed.
+    if ((ev.metaKey || ev.ctrlKey) && !ev.shiftKey && ev.key === 'i') {
       ev.preventDefault();
       var overlay = document.getElementById('ac-intel-overlay');
       if (!overlay) return;
