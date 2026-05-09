@@ -1,0 +1,194 @@
+/* ============================================================
+   accord-meeting-setup.css — Meeting Setup surface
+   CMD-ACCORD-MEETING-SETUP-1 Phase 2
+   Style Doctrine v1.8 §3.8 — Accord palette discipline.
+   All tokens are platform-shared surface/text tokens OR existing
+   Accord-established tokens. No Compass (cyan) tokens used.
+   ============================================================ */
+
+/* ── Shell container ──────────────────────────────────────── */
+.ac-setup-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface-page);         /* tier 0 — outermost canvas */
+  font-family: var(--font-ui);
+  overflow: hidden;
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+.ac-setup-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--surface-panel);        /* tier 1 — panel surface */
+}
+
+.ac-setup-breadcrumb {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.ac-setup-crumb-ws,
+.ac-setup-crumb-mtg {
+  color: var(--text-faint);
+}
+
+.ac-setup-crumb-mtg {
+  color: var(--text-muted);
+}
+
+.ac-setup-title {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+  line-height: 1.2;
+}
+
+.ac-setup-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+}
+
+.ac-setup-meta-date {
+  color: var(--text-faint);
+}
+
+.ac-setup-state-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--signal, #d4a04a);           /* Accord amber — editorial identity */
+  background: rgba(212, 160, 74, 0.10);
+  border: 1px solid rgba(212, 160, 74, 0.25);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+/* ── 3-column body ────────────────────────────────────────── */
+.ac-setup-body {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.ac-setup-col {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px;
+  overflow-y: auto;
+  background: var(--surface-panel);        /* tier 1 — column panels */
+  border-right: 1px solid var(--border);
+}
+
+.ac-setup-col:last-child {
+  border-right: none;
+}
+
+/* §4.2 D10 section-label — class already defined platform-wide.
+   .ac-setup-col-label uses it; no local redefinition needed.    */
+.ac-setup-col-label {
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+/* Briefing column */
+.ac-setup-briefing-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.ac-setup-briefing-text {
+  width: 100%;
+  flex: 1 1 0;
+  min-height: 120px;
+  resize: vertical;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-body);
+  background: var(--surface-content);     /* tier 2 — input within panel */
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  line-height: 1.5;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.ac-setup-briefing-text::placeholder {
+  color: var(--text-faint);
+}
+
+.ac-setup-briefing-text:focus {
+  border-color: var(--signal, #d4a04a);   /* Accord amber focus ring */
+}
+
+/* Agenda + Anticipation columns */
+.ac-setup-agenda-area,
+.ac-setup-anticipation-area {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Placeholder text (coming soon) */
+.ac-setup-placeholder {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* ── Filmstrip ────────────────────────────────────────────── */
+.ac-setup-filmstrip {
+  height: 72px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-content);     /* tier 2 — strip within shell */
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+/* ── Footer ───────────────────────────────────────────────── */
+.ac-setup-footer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-panel);       /* tier 1 — footer panel */
+  flex-shrink: 0;
+}
+
+.ac-setup-footer-left {
+  /* Phase 7: time budget gauge + connected-status warnings */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ac-setup-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

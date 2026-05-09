@@ -385,6 +385,16 @@
       return;
     }
 
+    // CMD-ACCORD-MEETING-SETUP-1 Phase 2: state-gated render swap.
+    // idle → Meeting Setup shell (accord-meeting-setup.js)
+    // running / closed / sealed → existing 5-tab shell (unchanged)
+    if (meeting.state === 'idle') {
+      if (window.AccordMeetingSetup && window.AccordMeetingSetup.render) {
+        window.AccordMeetingSetup.render(host, meeting, workstreamId);
+      }
+      return;
+    }
+
     await _loadIfNeeded();
     const owningWsId = workstreamId || meeting.workstream_id;
     const ws = owningWsId ? cache.workstreams.find(w => w.workstream_id === owningWsId) : null;
