@@ -1,9 +1,12 @@
 // ============================================================
 // accord-meeting-setup.js — Meeting Setup surface
-// CMD-ACCORD-MEETING-SETUP-1 Phase 2 + Phase 3
+// CMD-ACCORD-MEETING-SETUP-1 Phase 2 + Phase 3 + Phase 4
 //
-// Phase 2: shell chrome, briefing autosave, Begin Meeting.
+// Phase 2: shell chrome, Begin Meeting.
 // Phase 3: agenda render, add-item, reorder, pull-as-thread.
+// Phase 4: briefing two-state (mechanical default + override);
+//          agenda separator + typed pulled badges;
+//          pulled_from_tag on INSERT.
 //
 // Exposes: window.AccordMeetingSetup = { render, teardown }
 // ============================================================
@@ -25,9 +28,10 @@
   }
 
   // ── Module state ─────────────────────────────────────────────
-  var _saveTimer       = null;
-  var _currentMeetingId = null;
+  var _saveTimer          = null;   // covers all autosave paths
+  var _currentMeetingId   = null;
   var _agendaFetchAborted = false;
+  var _workstreamName     = null;   // cached for briefing default text
 
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() { teardown(); }
@@ -39,7 +43,8 @@
     }
     if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
     _agendaFetchAborted = true;
-    _currentMeetingId = null;
+    _currentMeetingId   = null;
+    _workstreamName     = null;
   }
 
   // ── Briefing autosave ─────────────────────────────────────────
@@ -81,7 +86,10 @@
     API.get('workstreams?workstream_id=eq.' + workstreamId + '&select=name&limit=1')
       .then(function (rows) {
         var name = rows && rows[0] && rows[0].name;
-        if (name) crumbEl.textContent = esc(name) + ' \u203a ';
+        if (name) {
+          _workstreamName = name;
+          crumbEl.textContent = esc(name) + ' \u203a ';
+        }
       })
       .catch(function () {});
   }
@@ -121,11 +129,8 @@
         '<div class="ac-setup-body">' +
           '<div class="ac-setup-col ac-setup-col--briefing">' +
             '<div class="ac-setup-col-label">Briefing</div>' +
-            '<div class="ac-setup-briefing-area">' +
-              '<textarea class="ac-setup-briefing-text" id="ac-setup-briefing-text" ' +
-                'placeholder="Add prep notes\u2026" aria-label="Meeting briefing">' +
-                esc(meeting.briefing_text || '') +
-              '</textarea>' +
+            '<div class="ac-setup-briefing-area" id="ac-setup-briefing-area">' +
+              '<div class="ac-agenda-loading">Loading\u2026</div>' +
             '</div>' +
           '</div>' +
           '<div class="ac-setup-col ac-setup-col--agenda">' +
@@ -154,7 +159,138 @@
     );
   }
 
-  // ── Agenda: fetch ─────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════
+  // BRIEFING COLUMN
+  // ══════════════════════════════════════════════════════════════
+
+  function _renderBriefing(meeting, workstreamId) {
+    var area = document.getElementById('ac-setup-briefing-area');
+    if (!area) return;
+    if (meeting.briefing_text != null) {
+      _paintBriefingEdit(area, meeting, workstreamId, null);
+    } else {
+      _paintBriefingDefault(area, meeting, workstreamId);
+    }
+  }
+
+  // ── State A: mechanical default ───────────────────────────────
+  function _paintBriefingDefault(area, meeting, workstreamId) {
+    area.innerHTML = '<div class="ac-setup-briefing-default">' +
+      '<div class="ac-setup-briefing-default-text ac-agenda-loading">Loading\u2026</div>' +
+      '<div class="ac-setup-briefing-default-actions">' +
+        '<button type="button" class="ac-setup-briefing-edit-btn">Edit briefing</button>' +
+      '</div>' +
+    '</div>';
+
+    var textEl = area.querySelector('.ac-setup-briefing-default-text');
+
+    if (!workstreamId) {
+      textEl.textContent = 'Standalone meeting \u2014 no workstream context.';
+      _wireEditBtn(area, meeting, workstreamId, textEl.textContent);
+      return;
+    }
+
+    // Parallel fetch: prior meetings + (if any) last meeting node counts
+    API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&meeting_id=neq.' + meeting.meeting_id +
+      '&state=in.(closed,sealed)' +
+      '&select=meeting_id,title,scheduled_for,sealed_at' +
+      '&order=scheduled_for.desc.nullslast,created_at.desc'
+    ).then(function (priorMeetings) {
+      priorMeetings = priorMeetings || [];
+      if (!priorMeetings.length) {
+        var txt = 'First meeting in this workstream. No prior context.';
+        textEl.textContent = txt;
+        _wireEditBtn(area, meeting, workstreamId, txt);
+        return;
+      }
+      var last = priorMeetings[0];
+      var n    = priorMeetings.length;
+      return API.get(
+        'accord_nodes?meeting_id=eq.' + last.meeting_id + '&select=tag'
+      ).then(function (nodes) {
+        nodes = nodes || [];
+        var counts = { decision: 0, action: 0, risk: 0 };
+        nodes.forEach(function (nd) {
+          if (counts[nd.tag] !== undefined) counts[nd.tag]++;
+        });
+        var dateStr = '';
+        if (last.scheduled_for) {
+          try {
+            dateStr = new Date(last.scheduled_for).toLocaleDateString([], {
+              month: 'short', day: 'numeric', year: 'numeric'
+            });
+          } catch (e) {}
+        }
+        var wsName = _workstreamName || 'this workstream';
+        var countParts = [];
+        if (counts.decision) countParts.push(counts.decision + ' decision' + (counts.decision > 1 ? 's' : ''));
+        if (counts.action)   countParts.push(counts.action   + ' action'   + (counts.action   > 1 ? 's' : ''));
+        if (counts.risk)     countParts.push(counts.risk     + ' risk'     + (counts.risk     > 1 ? 's' : ''));
+        var countStr = countParts.length ? countParts.join(', ') + ' captured.' : 'No decisions, actions, or risks captured.';
+        var txt = 'Meeting ' + (n + 1) + ' in ' + wsName + '.\n' +
+                  'Last meeting: ' + (last.title || 'Untitled') + (dateStr ? ' (' + dateStr + ')' : '') + '.\n' +
+                  countStr;
+        textEl.textContent = txt;
+        _wireEditBtn(area, meeting, workstreamId, txt);
+      });
+    }).catch(function (e) {
+      console.error('[AccordMeetingSetup] briefing default fetch failed', e);
+      textEl.textContent = 'Could not load prior context.';
+      _wireEditBtn(area, meeting, workstreamId, '');
+    });
+  }
+
+  function _wireEditBtn(area, meeting, workstreamId, mechanicalText) {
+    var btn = area.querySelector('.ac-setup-briefing-edit-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      _switchToEdit(area, meeting, workstreamId, mechanicalText);
+    });
+  }
+
+  // ── State B: override textarea ────────────────────────────────
+  function _paintBriefingEdit(area, meeting, workstreamId, seed) {
+    var val = (meeting.briefing_text != null) ? meeting.briefing_text : (seed || '');
+    area.innerHTML =
+      '<div class="ac-setup-briefing-edit">' +
+        '<textarea class="ac-setup-briefing-textarea" aria-label="Meeting briefing">' +
+          esc(val) +
+        '</textarea>' +
+        '<div class="ac-setup-briefing-edit-actions">' +
+          '<button type="button" class="ac-setup-briefing-reset-btn">Reset to default</button>' +
+        '</div>' +
+      '</div>';
+
+    var textarea = area.querySelector('.ac-setup-briefing-textarea');
+    _wireBriefingAutosave(textarea, meeting.meeting_id);
+
+    var resetBtn = area.querySelector('.ac-setup-briefing-reset-btn');
+    resetBtn.addEventListener('click', function () {
+      if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+      API.patch('accord_meetings?meeting_id=eq.' + meeting.meeting_id, {
+        briefing_text: null
+      }).then(function () {
+        meeting.briefing_text = null;
+        _paintBriefingDefault(area, meeting, workstreamId);
+      }).catch(function (e) {
+        console.error('[AccordMeetingSetup] reset briefing failed', e);
+      });
+    });
+
+    setTimeout(function () { if (textarea) textarea.focus(); }, 30);
+  }
+
+  function _switchToEdit(area, meeting, workstreamId, mechanicalText) {
+    if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+    _paintBriefingEdit(area, meeting, workstreamId, mechanicalText);
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // AGENDA COLUMN
+  // ══════════════════════════════════════════════════════════════
+
   function _fetchAgendaItems(meetingId) {
     return API.get(
       'accord_agenda_items?meeting_id=eq.' + meetingId +
@@ -162,42 +298,64 @@
     ).then(function (rows) { return rows || []; });
   }
 
-  // ── Agenda: paint ─────────────────────────────────────────────
+  // ── Pulled badge ──────────────────────────────────────────────
+  function _pulledBadge(item) {
+    if (!item.pulled_from_node_id) return '';
+    var tag   = item.pulled_from_tag || '';
+    var label = tag ? ('\u2190 ' + tag.toUpperCase()) : '\u2190 pulled';
+    var cls   = 'ac-agenda-pulled-badge' + (tag ? ' ac-agenda-pulled-' + tag.toLowerCase() : '');
+    return '<span class="' + esc(cls) + '">' + esc(label) + '</span>';
+  }
+
+  // ── Build item row HTML ───────────────────────────────────────
+  function _itemHTML(item, pos, isFirst, isLast) {
+    return (
+      '<li class="ac-agenda-item" data-item-id="' + esc(item.agenda_item_id) + '">' +
+        '<span class="ac-agenda-item-pos">' + pos + '</span>' +
+        '<span class="ac-agenda-item-title" data-orig="' + esc(item.title) + '">' +
+          esc(item.title) +
+        '</span>' +
+        _pulledBadge(item) +
+        '<span class="ac-agenda-item-controls">' +
+          '<button class="ac-agenda-up" data-action="up" title="Move up"' +
+            (isFirst ? ' disabled' : '') + '>\u25b2</button>' +
+          '<button class="ac-agenda-down" data-action="down" title="Move down"' +
+            (isLast ? ' disabled' : '') + '>\u25bc</button>' +
+          '<button class="ac-agenda-del" data-action="del" title="Remove">\u00d7</button>' +
+        '</span>' +
+      '</li>'
+    );
+  }
+
+  // ── Paint agenda ──────────────────────────────────────────────
   function _paintAgenda(area, items, meeting, workstreamId) {
     var firmId = (window.Accord && window.Accord.state && window.Accord.state.meeting)
-      ? window.Accord.state.meeting.firm_id
-      : null;
+      ? window.Accord.state.meeting.firm_id : null;
 
-    // Item list
+    var orgItems  = items.filter(function (i) { return !i.pulled_from_node_id; });
+    var pullItems = items.filter(function (i) { return !!i.pulled_from_node_id; });
+    var posCounter = 0;
+
     var listHTML = '<ul class="ac-agenda-list">';
-    for (var i = 0; i < items.length; i++) {
-      var item = items[i];
-      var isFirst = (i === 0);
-      var isLast  = (i === items.length - 1);
-      var pulledBadge = item.pulled_from_node_id
-        ? '<span class="ac-agenda-pulled-badge">\u2190 pulled</span>'
-        : '';
-      listHTML += (
-        '<li class="ac-agenda-item" data-item-id="' + esc(item.agenda_item_id) + '">' +
-          '<span class="ac-agenda-item-pos">' + (i + 1) + '</span>' +
-          '<span class="ac-agenda-item-title" data-orig="' + esc(item.title) + '">' +
-            esc(item.title) +
-          '</span>' +
-          pulledBadge +
-          '<span class="ac-agenda-item-controls">' +
-            '<button class="ac-agenda-up" data-action="up" title="Move up"' +
-              (isFirst ? ' disabled' : '') + '>\u25b2</button>' +
-            '<button class="ac-agenda-down" data-action="down" title="Move down"' +
-              (isLast ? ' disabled' : '') + '>\u25bc</button>' +
-            '<button class="ac-agenda-del" data-action="del" title="Remove">' +
-              '\u00d7</button>' +
-          '</span>' +
-        '</li>'
-      );
-    }
+    orgItems.forEach(function (item, i) {
+      posCounter++;
+      listHTML += _itemHTML(item, posCounter, i === 0, i === orgItems.length - 1);
+    });
     listHTML += '</ul>';
 
-    // Add-item row
+    if (orgItems.length && pullItems.length) {
+      listHTML += '<hr class="ac-agenda-section-divider">';
+    }
+
+    if (pullItems.length) {
+      listHTML += '<ul class="ac-agenda-list">';
+      pullItems.forEach(function (item, i) {
+        posCounter++;
+        listHTML += _itemHTML(item, posCounter, i === 0, i === pullItems.length - 1);
+      });
+      listHTML += '</ul>';
+    }
+
     var addRow = (
       '<div class="ac-agenda-add-row">' +
         '<input type="text" class="ac-agenda-add-input" placeholder="Add agenda item\u2026" ' +
@@ -205,8 +363,6 @@
         '<button type="button" class="ac-agenda-add-btn" title="Add">+</button>' +
       '</div>'
     );
-
-    // Pull-as-thread row (workstream meetings only)
     var pullRow = workstreamId
       ? '<div class="ac-agenda-pull-row">' +
           '<button type="button" class="ac-agenda-pull-btn">\u2190 Pull from prior meeting</button>' +
@@ -214,44 +370,38 @@
       : '';
 
     area.innerHTML = listHTML + addRow + pullRow;
-
-    // Wire event delegation
     _wireAgendaEvents(area, items, meeting, workstreamId, firmId);
   }
 
-  // ── Agenda: event delegation ──────────────────────────────────
+  // ── Agenda event delegation ───────────────────────────────────
   function _wireAgendaEvents(area, items, meeting, workstreamId, firmId) {
 
-    // Reorder buttons
+    // Reorder
     area.addEventListener('click', function (ev) {
       var btn = ev.target.closest('[data-action="up"],[data-action="down"]');
       if (!btn || btn.disabled) return;
       var row = btn.closest('.ac-agenda-item');
       if (!row) return;
-      var itemId = row.dataset.itemId;
-      var dir = btn.dataset.action;
-      _reorderItem(itemId, dir, items, meeting, workstreamId);
+      _reorderItem(row.dataset.itemId, btn.dataset.action, items, meeting, workstreamId);
     });
 
-    // Delete button
+    // Delete
     area.addEventListener('click', function (ev) {
       var btn = ev.target.closest('[data-action="del"]');
       if (!btn) return;
       var row = btn.closest('.ac-agenda-item');
       if (!row) return;
-      var itemId = row.dataset.itemId;
-      API.del('accord_agenda_items?agenda_item_id=eq.' + itemId)
+      API.del('accord_agenda_items?agenda_item_id=eq.' + row.dataset.itemId)
         .then(function () { return _refreshAgenda(meeting, workstreamId); })
         .catch(function (e) { console.error('[AccordMeetingSetup] delete failed', e); });
     });
 
-    // Inline title edit — click to activate
+    // Inline edit — click to activate
     area.addEventListener('click', function (ev) {
       var titleEl = ev.target.closest('.ac-agenda-item-title');
       if (!titleEl || titleEl.contentEditable === 'true') return;
       titleEl.contentEditable = 'true';
       titleEl.focus();
-      // Place cursor at end
       var range = document.createRange();
       range.selectNodeContents(titleEl);
       range.collapse(false);
@@ -259,44 +409,37 @@
       if (sel) { sel.removeAllRanges(); sel.addRange(range); }
     });
 
-    // Inline title edit — save on blur
+    // Inline edit — save on blur
     area.addEventListener('focusout', function (ev) {
       var titleEl = ev.target.closest('.ac-agenda-item-title');
       if (!titleEl || titleEl.contentEditable !== 'true') return;
       titleEl.contentEditable = 'false';
       var newVal = titleEl.textContent.trim();
       var orig   = titleEl.dataset.orig || '';
-      if (!newVal || newVal === orig) {
-        titleEl.textContent = orig;
-        return;
-      }
+      if (!newVal || newVal === orig) { titleEl.textContent = orig; return; }
       var row    = titleEl.closest('.ac-agenda-item');
       var itemId = row && row.dataset.itemId;
       if (!itemId) return;
       API.patch('accord_agenda_items?agenda_item_id=eq.' + itemId, { title: newVal })
-        .then(function () {
-          titleEl.dataset.orig = newVal;
-        })
+        .then(function () { titleEl.dataset.orig = newVal; })
         .catch(function (e) {
           console.error('[AccordMeetingSetup] title PATCH failed', e);
           titleEl.textContent = orig;
         });
     });
 
-    // Inline title edit — keyboard
+    // Inline edit — keyboard
     area.addEventListener('keydown', function (ev) {
       var titleEl = ev.target.closest('.ac-agenda-item-title');
       if (!titleEl || titleEl.contentEditable !== 'true') return;
-      if (ev.key === 'Enter') {
-        ev.preventDefault();
-        titleEl.blur();
-      } else if (ev.key === 'Escape') {
+      if (ev.key === 'Enter') { ev.preventDefault(); titleEl.blur(); }
+      else if (ev.key === 'Escape') {
         titleEl.textContent = titleEl.dataset.orig || '';
         titleEl.contentEditable = 'false';
       }
     });
 
-    // Add-item input — Enter key
+    // Add-item — Enter
     area.addEventListener('keydown', function (ev) {
       if (ev.key !== 'Enter') return;
       var input = ev.target.closest('.ac-agenda-add-input');
@@ -305,7 +448,7 @@
       _addItem(input, items, meeting, workstreamId, firmId);
     });
 
-    // Add-item button
+    // Add-item — button
     area.addEventListener('click', function (ev) {
       if (!ev.target.closest('.ac-agenda-add-btn')) return;
       var input = area.querySelector('.ac-agenda-add-input');
@@ -328,14 +471,12 @@
     area.addEventListener('click', function (ev) {
       var nodeRow = ev.target.closest('.ac-agenda-pull-node');
       if (!nodeRow) return;
-      var nodeId  = nodeRow.dataset.nodeId;
-      var summary = nodeRow.dataset.summary;
-      if (!nodeId) return;
-      _pullNode(nodeId, summary, items, meeting, workstreamId, firmId);
+      _pullNode(nodeRow.dataset.nodeId, nodeRow.dataset.summary,
+                nodeRow.dataset.tag, items, meeting, workstreamId, firmId);
     });
   }
 
-  // ── Agenda: add item ──────────────────────────────────────────
+  // ── Add item ──────────────────────────────────────────────────
   function _addItem(input, items, meeting, workstreamId, firmId) {
     var title = input.value.trim();
     if (!title) return;
@@ -363,39 +504,50 @@
     });
   }
 
-  // ── Agenda: reorder ───────────────────────────────────────────
+  // ── Reorder ───────────────────────────────────────────────────
   function _reorderItem(itemId, dir, items, meeting, workstreamId) {
-    var idx = -1;
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].agenda_item_id === itemId) { idx = i; break; }
+    // Reorder within group only — find item in its group
+    var orgItems  = items.filter(function (i) { return !i.pulled_from_node_id; });
+    var pullItems = items.filter(function (i) { return !!i.pulled_from_node_id; });
+    var group = null;
+    var idx   = -1;
+    for (var i = 0; i < orgItems.length; i++) {
+      if (orgItems[i].agenda_item_id === itemId) { group = orgItems; idx = i; break; }
     }
-    if (idx < 0) return;
+    if (idx < 0) {
+      for (var j = 0; j < pullItems.length; j++) {
+        if (pullItems[j].agenda_item_id === itemId) { group = pullItems; idx = j; break; }
+      }
+    }
+    if (!group || idx < 0) return;
     var swapIdx = dir === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= items.length) return;
+    if (swapIdx < 0 || swapIdx >= group.length) return;
 
-    var idA  = items[idx].agenda_item_id;
-    var posA = items[idx].position;
-    var idB  = items[swapIdx].agenda_item_id;
-    var posB = items[swapIdx].position;
+    var idA = group[idx].agenda_item_id,    posA = group[idx].position;
+    var idB = group[swapIdx].agenda_item_id, posB = group[swapIdx].position;
 
-    // Sequential PATCHes — not Promise.all (shared-state race antipattern)
     API.patch('accord_agenda_items?agenda_item_id=eq.' + idA, { position: posB })
       .then(function () {
         return API.patch('accord_agenda_items?agenda_item_id=eq.' + idB, { position: posA });
       })
-      .then(function () {
-        return _refreshAgenda(meeting, workstreamId);
-      })
+      .then(function () { return _refreshAgenda(meeting, workstreamId); })
       .catch(function (e) {
         console.error('[AccordMeetingSetup] reorder failed', e);
         _refreshAgenda(meeting, workstreamId);
       });
   }
 
-  // ── Agenda: pull picker ───────────────────────────────────────
+  // ── Pull picker ───────────────────────────────────────────────
   function _openPullPicker(area, items, meeting, workstreamId, firmId) {
     var pullRow = area.querySelector('.ac-agenda-pull-row');
     if (!pullRow) return;
+
+    // Build set of already-pulled node IDs to filter duplicates
+    var alreadyPulled = {};
+    items.forEach(function (i) {
+      if (i.pulled_from_node_id) alreadyPulled[i.pulled_from_node_id] = true;
+    });
+
     pullRow.innerHTML = '<div class="ac-agenda-pull-panel">' +
       '<div class="ac-agenda-pull-header">Pull from prior meeting ' +
         '<button type="button" class="ac-agenda-pull-close" title="Close">\u00d7</button>' +
@@ -414,10 +566,8 @@
       priorMeetings = priorMeetings || [];
       if (!priorMeetings.length) {
         var panel = pullRow.querySelector('.ac-agenda-pull-panel');
-        if (panel) {
-          panel.querySelector('.ac-agenda-pull-empty').textContent =
-            'No prior meetings in this workstream.';
-        }
+        if (panel) panel.querySelector('.ac-agenda-pull-empty').textContent =
+          'No prior meetings in this workstream.';
         return;
       }
       var priorIds = priorMeetings.map(function (m) { return m.meeting_id; });
@@ -431,17 +581,16 @@
         '&order=created_at.desc' +
         '&limit=30'
       ).then(function (nodes) {
-        nodes = nodes || [];
+        nodes = (nodes || []).filter(function (n) { return !alreadyPulled[n.node_id]; });
         var panel = pullRow.querySelector('.ac-agenda-pull-panel');
         if (!panel) return;
         if (!nodes.length) {
           panel.querySelector('.ac-agenda-pull-empty').textContent =
-            'No action, decision, or dissent nodes in prior meetings.';
+            'No unpulled action, decision, or dissent nodes in prior meetings.';
           return;
         }
         var listHTML = '';
-        for (var i = 0; i < nodes.length; i++) {
-          var n = nodes[i];
+        nodes.forEach(function (n) {
           var mtg = meetingMap[n.meeting_id] || {};
           var dateStr = '';
           if (mtg.scheduled_for) {
@@ -454,7 +603,8 @@
           listHTML += (
             '<div class="ac-agenda-pull-node" ' +
               'data-node-id="' + esc(n.node_id) + '" ' +
-              'data-summary="' + esc(n.summary) + '">' +
+              'data-summary="' + esc(n.summary) + '" ' +
+              'data-tag="' + esc(n.tag) + '">' +
               '<span class="ac-agenda-pull-tag" data-tag="' + esc(n.tag) + '">' +
                 esc(n.tag.toUpperCase()) +
               '</span>' +
@@ -464,7 +614,7 @@
               '</span>' +
             '</div>'
           );
-        }
+        });
         panel.querySelector('.ac-agenda-pull-empty').outerHTML = listHTML;
       });
     }).catch(function (e) {
@@ -484,8 +634,8 @@
     }
   }
 
-  // ── Agenda: pull node → insert ────────────────────────────────
-  function _pullNode(nodeId, summary, items, meeting, workstreamId, firmId) {
+  // ── Pull node → insert ────────────────────────────────────────
+  function _pullNode(nodeId, summary, tag, items, meeting, workstreamId, firmId) {
     var useFirmId = firmId ||
       (window.Accord && window.Accord.state && window.Accord.state.meeting &&
        window.Accord.state.meeting.firm_id);
@@ -493,12 +643,13 @@
     _closePullPicker(area, workstreamId);
     _fetchMaxPosition(meeting.meeting_id).then(function (maxPos) {
       return API.post('accord_agenda_items', {
-        firm_id:              useFirmId,
-        meeting_id:           meeting.meeting_id,
-        title:                summary,
-        position:             maxPos + 1,
-        status:               'pending',
-        pulled_from_node_id:  nodeId
+        firm_id:             useFirmId,
+        meeting_id:          meeting.meeting_id,
+        title:               summary,
+        position:            maxPos + 1,
+        status:              'pending',
+        pulled_from_node_id: nodeId,
+        pulled_from_tag:     tag || null
       });
     }).then(function () {
       return _refreshAgenda(meeting, workstreamId);
@@ -516,7 +667,7 @@
     });
   }
 
-  // ── Agenda: refresh (re-fetch + re-paint) ─────────────────────
+  // ── Agenda refresh / initial render ──────────────────────────
   function _refreshAgenda(meeting, workstreamId) {
     var area = document.getElementById('ac-setup-agenda-area');
     if (!area) return Promise.resolve();
@@ -528,7 +679,6 @@
     });
   }
 
-  // ── Agenda: initial render ────────────────────────────────────
   function _renderAgenda(meeting, workstreamId) {
     _agendaFetchAborted = false;
     var area = document.getElementById('ac-setup-agenda-area');
@@ -544,24 +694,23 @@
     });
   }
 
-  // ── render ────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════
+  // RENDER ENTRY POINT
+  // ══════════════════════════════════════════════════════════════
+
   function render(host, meeting, workstreamId) {
     if (!host) return;
     teardown();
-    _currentMeetingId = meeting.meeting_id;
+    _currentMeetingId   = meeting.meeting_id;
     _agendaFetchAborted = false;
     window._accordDetachSurfaceHost = _detachHandler;
 
     host.innerHTML = _buildHTML(meeting, workstreamId);
 
-    // Breadcrumb async resolve
+    // Breadcrumb async resolve — also caches _workstreamName for briefing
     if (workstreamId) {
       _resolveWorkstreamName(workstreamId, host.querySelector('#ac-setup-crumb-ws'));
     }
-
-    // Briefing autosave
-    var textarea = host.querySelector('#ac-setup-briefing-text');
-    if (textarea) _wireBriefingAutosave(textarea, meeting.meeting_id);
 
     // Begin Meeting
     var beginBtn = host.querySelector('#ac-setup-begin-btn');
@@ -571,7 +720,8 @@
       });
     }
 
-    // Agenda
+    // Briefing + Agenda in parallel
+    _renderBriefing(meeting, workstreamId);
     _renderAgenda(meeting, workstreamId);
   }
 

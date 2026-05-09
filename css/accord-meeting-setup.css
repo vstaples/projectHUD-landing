@@ -464,3 +464,92 @@
 .ac-view-header {
   position: relative;
 }
+
+/* ── Briefing column — Phase 4 ────────────────────────────── */
+
+.ac-setup-briefing-default {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+
+.ac-setup-briefing-default-text {
+  font-size: 13px;
+  color: var(--ink-body);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.ac-setup-briefing-default-actions {
+  margin-top: 12px;
+}
+
+.ac-setup-briefing-edit-btn,
+.ac-setup-briefing-reset-btn {
+  background: none;
+  border: none;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--ink-faint);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 2px;
+  transition: color 0.12s;
+}
+
+.ac-setup-briefing-edit-btn:hover,
+.ac-setup-briefing-reset-btn:hover {
+  color: var(--ink-muted);
+}
+
+.ac-setup-briefing-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.ac-setup-briefing-textarea {
+  width: 100%;
+  flex: 1 1 0;
+  min-height: 120px;
+  resize: vertical;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--ink-body);
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  padding: 8px 10px;
+  line-height: 1.5;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.ac-setup-briefing-textarea::placeholder { color: var(--ink-ghost); }
+.ac-setup-briefing-textarea:focus { border-color: var(--signal); }
+
+.ac-setup-briefing-edit-actions {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Agenda separator + typed badges — Phase 4 ─────────────── */
+
+.ac-agenda-section-divider {
+  border: none;
+  border-top: 1px solid var(--rule-strong);
+  margin: 10px 0;
+}
+
+/* Typed pulled badges — Accord tag palette tokens */
+.ac-agenda-pulled-badge    { font-size: 11px; color: var(--ink-faint); font-style: italic; flex-shrink: 0; white-space: nowrap; }
+.ac-agenda-pulled-decision { color: var(--tag-decision); font-style: normal; }
+.ac-agenda-pulled-action   { color: var(--tag-action);   font-style: normal; }
+.ac-agenda-pulled-risk     { color: var(--tag-risk);     font-style: normal; }
+.ac-agenda-pulled-note     { color: var(--tag-note);     font-style: normal; }
+.ac-agenda-pulled-dissent  { color: var(--ink-muted);    font-style: normal; }
