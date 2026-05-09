@@ -534,9 +534,17 @@
     const surfHost = document.getElementById('ac-meeting-surface-host');
     if (!tabBody || !surfHost) return;
     if (surfHost.parentElement !== tabBody) {
-      tabBody.appendChild(surfHost);          // appendChild moves the node
+      tabBody.appendChild(surfHost);
     }
-    surfHost.classList.add('active');         // host visible (CSS gates display)
+    surfHost.classList.add('active');
+    // CMD-ACCORD-NEWMEETING-ROUTING-FIX-1: relocate controls bar into
+    // ac-view-header so it sits in the same flex row as the meeting title.
+    const ctrlBar  = document.getElementById('ac-meeting-controls-bar');
+    const viewHdr  = document.querySelector('.ac-view-header');
+    if (ctrlBar && viewHdr && ctrlBar.parentElement !== viewHdr) {
+      viewHdr.appendChild(ctrlBar);
+    }
+    if (ctrlBar) ctrlBar.style.display = '';
   }
 
   // Phase 5: park the surface host back at document.body (hidden by
@@ -546,6 +554,12 @@
     const surfHost = document.getElementById('ac-meeting-surface-host');
     if (!surfHost) return;
     surfHost.classList.remove('active');
+    // Move controls bar back into surface host before parking.
+    const ctrlBar = document.getElementById('ac-meeting-controls-bar');
+    if (ctrlBar && ctrlBar.parentElement !== surfHost) {
+      surfHost.insertBefore(ctrlBar, surfHost.firstChild);
+    }
+    if (ctrlBar) ctrlBar.style.display = 'none';
     if (surfHost.parentElement !== document.body) {
       document.body.appendChild(surfHost);
     }
