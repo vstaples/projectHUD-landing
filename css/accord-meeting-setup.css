@@ -406,43 +406,51 @@
 /* hidden alongside the left rail for true full-page.           */
 /*                                                              */
 /* Full-page mechanism: Option A confirmed. Class toggled on    */
-/* the parent of .ac-center (#accord-app). CSS hides both       */
-/* .ac-rail-left and .ac-rail-right. Both rails reappear on     */
-/* teardown().                                                  */
+/* document.body (not #accord-app — see diagnostic below).      */
+/* Both rails reappear on teardown().                           */
 /*                                                              */
-/* Specificity note (smoke-test finding): the existing Accord   */
-/* rail CSS uses #accord-app as an ancestor giving specificity  */
-/* (1,1,0+); our original (0,2,0) rules were overridden.        */
-/* Prefixing with #accord-app raises our specificity to (1,2,0) */
-/* which beats the existing rules without !important.           */
-/*                                                              */
-/* Running-meeting pane suppression: agenda-rail, meta-pane,    */
-/* thread-rail, ledger-*, digest-*, minutes-* asides live in    */
-/* #accord-app outside .ac-center and bleed through on          */
-/* navigation from a running meeting to an idle meeting.        */
-/* Suppressed here; they restore when teardown() removes the    */
-/* fullpage class. Pre-existing accord-core.js teardown gap —   */
-/* not introduced by this CMD.                                  */
+/* Diagnostic findings (CMD-ACCORD-SETUP-HEADER-1 smoke tests): */
+/* (a) Specificity: #accord-app.accord-setup-fullpage (1,2,0)   */
+/*     beats existing rail rules ✓ confirmed.                   */
+/* (b) Center width: .ac-center has flex-grow:0; with rails     */
+/*     hidden it stayed at its natural 250px instead of         */
+/*     expanding. Fix: flex:1 1 auto on .ac-center.             */
+/* (c) Pane location: running-meeting tab panes (agenda-rail    */
+/*     etc.) are at y:1001 in the document; #accord-app ends    */
+/*     at y:945. Panes are OUTSIDE #accord-app — descendant     */
+/*     selector on #accord-app never matched them. Fix:         */
+/*     class applied to document.body; body-level selector      */
+/*     reaches both #accord-app children and external panes.    */
 /*                                                              */
 /* This block is the authoritative selector record for all      */
 /* future CMDs that interact with the rail layout.              */
 /* ──────────────────────────────────────────────────────────── */
 
-/* Structural rails */
-#accord-app.accord-setup-fullpage .ac-rail-left  { display: none; }
-#accord-app.accord-setup-fullpage .ac-rail-right  { display: none; }
-#accord-app.accord-setup-fullpage .ac-view-host   { width: 100%; height: 100%; }
+/* Structural rails — hidden during Setup */
+body.accord-setup-fullpage .ac-rail-left  { display: none; }
+body.accord-setup-fullpage .ac-rail-right { display: none; }
 
-/* Running-meeting tab panes — suppressed during Setup */
-#accord-app.accord-setup-fullpage .agenda-rail,
-#accord-app.accord-setup-fullpage .meta-pane,
-#accord-app.accord-setup-fullpage .thread-rail,
-#accord-app.accord-setup-fullpage .ledger-rail,
-#accord-app.accord-setup-fullpage .ledger-detail,
-#accord-app.accord-setup-fullpage .digest-rail,
-#accord-app.accord-setup-fullpage .digest-recipients,
-#accord-app.accord-setup-fullpage .minutes-rail,
-#accord-app.accord-setup-fullpage .minutes-history { display: none !important; }
+/* Center pane — must flex-grow to fill freed rail space */
+body.accord-setup-fullpage .ac-center {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* View host — fill the expanded center */
+body.accord-setup-fullpage .ac-view-host { width: 100%; height: 100%; }
+
+/* Running-meeting tab panes — live outside #accord-app in the  */
+/* document (y > 945px); suppressed during Setup so they don't  */
+/* appear when the operator scrolls or zooms out.               */
+body.accord-setup-fullpage .agenda-rail,
+body.accord-setup-fullpage .meta-pane,
+body.accord-setup-fullpage .thread-rail,
+body.accord-setup-fullpage .ledger-rail,
+body.accord-setup-fullpage .ledger-detail,
+body.accord-setup-fullpage .digest-rail,
+body.accord-setup-fullpage .digest-recipients,
+body.accord-setup-fullpage .minutes-rail,
+body.accord-setup-fullpage .minutes-history { display: none !important; }
 
 /* ──────────────────────────────────────────────────────────── */
 /* CMD-ACCORD-MEETING-SETUP-1 (prior phases) — DEFERRED         */
