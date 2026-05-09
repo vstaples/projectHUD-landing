@@ -386,16 +386,13 @@ const Accord = (() => {
   function _enableComposerForState() {
     const m = state.meeting;
     const enabled = !!(m && m.state === 'running');
-    $('captureInput').disabled = !enabled;
-    // CMD-ACCORD-CAPTURE-CONTROLS-FIX-1 Phase 2: broadened selector.
-    // Previously '#accord-app .tag-btn' missed tag buttons during the
-    // brief window when _detachSurfaceHost() parks #ac-meeting-surface-host
-    // at document.body (sibling of #accord-app, not descendant). The
-    // .tag-btn class is unique to capture surface; namespace scoping
-    // was incidental.
+    // Null-guard: these elements live inside #ac-meeting-surface-host which
+    // may be parked at body (not yet mounted in tab body) when loadMeeting
+    // fires from the Setup shell idle branch.
+    if ($('captureInput'))  $('captureInput').disabled  = !enabled;
     document.querySelectorAll('.tag-btn').forEach(b => b.disabled = !enabled);
-    $('chatInput').disabled = !enabled;
-    $('chatSendBtn').disabled = !enabled;
+    if ($('chatInput'))     $('chatInput').disabled     = !enabled;
+    if ($('chatSendBtn'))   $('chatSendBtn').disabled   = !enabled;
   }
 
   // ── Realtime channel for the meeting ─────────────────────────
