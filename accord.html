@@ -15,6 +15,8 @@
 <link rel="stylesheet" href="/css/accord-constellation.css">
 <link rel="stylesheet" href="/css/accord-rails.css">
 <link rel="stylesheet" href="/css/accord-views.css">
+<!-- CMD-ACCORD-NRA-SURFACE-1 Phase 2 -->
+<link rel="stylesheet" href="/css/accord-nra.css">
 <style>
 /* ============================================================
    Accord — Live Capture surface (CMD-A3)
@@ -3270,6 +3272,25 @@
     </div>
   </div>
 
+  <!-- ── NRA modal anchor (CMD-ACCORD-NRA-SURFACE-1 Phase 2) ─── -->
+  <!-- Backdrop + empty modal shell. Body content rendered by
+       AccordNRA.Modal.open(node, mode, currentNRA?, options?). The
+       shell is cloned via IR71 clone-replace pattern on each open. -->
+  <div class="modal-backdrop" id="accord-nra-modal-backdrop">
+    <div class="modal"></div>
+  </div>
+
+  <!-- ── NRA history panel anchor (CMD-ACCORD-NRA-SURFACE-1 Phase 2) ─── -->
+  <!-- Right-side slide-in panel for NRA timeline view. Body rendered
+       by AccordNRA.HistoryPanel.open(nodeId, history). -->
+  <div id="accord-nra-history-panel">
+    <div class="accord-nra-panel-head">
+      <h3>NRA history</h3>
+      <button class="accord-nra-panel-close" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="accord-nra-panel-body"></div>
+  </div>
+
   <!-- ── Create / rename workstream modal (CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1) ── -->
   <div class="modal-backdrop" id="wsCreateModal">
     <div class="modal">
@@ -3372,6 +3393,8 @@
     load('/js/sidebar.js');
     load('/js/cmd-center.js');
     load('/js/accord-core.js');
+    // CMD-ACCORD-NRA-SURFACE-1 Phase 2
+    load('/js/accord-nra.js');
     load('/js/accord-capture.js');
     load('/js/accord-document.js');
     load('/js/accord-ledger.js');
