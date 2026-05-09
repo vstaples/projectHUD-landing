@@ -442,6 +442,16 @@
         </div>
       </div>`;
 
+    // CMD-ACCORD-LEDGER-NAV-FIX-1 Phase 2: detach #ac-meeting-surface-host
+    // back to document.body BEFORE host.innerHTML = html. If a prior
+    // meeting-view render left the surface host nested inside this
+    // viewHost, the innerHTML overwrite below would destroy it (and
+    // children including #cap-title), causing _setMeetingHeader to
+    // throw on the subsequent loadMeeting call. Detaching first parks
+    // the host safely at body; _mountSurfaceHostInTabBody() re-mounts
+    // after the new tab-body container is in place.
+    _detachSurfaceHost();
+
     host.innerHTML = html;
     _wireMeetingView(host, meeting);
 
