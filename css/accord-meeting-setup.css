@@ -1,9 +1,9 @@
 /* ============================================================
    accord-meeting-setup.css — Meeting Setup surface
-   CMD-ACCORD-MEETING-SETUP-1 Phase 2
+   CMD-ACCORD-MEETING-SETUP-1 Phase 2 + Phase 3
    Style Doctrine v1.8 §3.8 — Accord palette discipline.
-   All tokens are platform-shared surface/text tokens OR existing
-   Accord-established tokens. No Compass (cyan) tokens used.
+   Live tokens: --canvas-*, --ink-*, --rule, --rule-strong,
+   --signal, --signal-soft, --signal-dim (defined on #accord-app).
    ============================================================ */
 
 /* ── Shell container ──────────────────────────────────────── */
@@ -11,42 +11,36 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--surface-page);         /* tier 0 — outermost canvas */
-  font-family: var(--font-ui);
+  background: var(--canvas-deep);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
   overflow: hidden;
 }
 
 /* ── Header ───────────────────────────────────────────────── */
 .ac-setup-header {
   padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--rule-strong);
   flex-shrink: 0;
-  background: var(--surface-panel);        /* tier 1 — panel surface */
+  background: var(--canvas);
 }
 
 .ac-setup-breadcrumb {
   font-size: 11px;
-  color: var(--text-faint);
+  color: var(--ink-faint);
   margin-bottom: 6px;
   display: flex;
   align-items: center;
-  gap: 0;
 }
 
-.ac-setup-crumb-ws,
-.ac-setup-crumb-mtg {
-  color: var(--text-faint);
-}
-
-.ac-setup-crumb-mtg {
-  color: var(--text-muted);
-}
+.ac-setup-crumb-ws { color: var(--ink-faint); }
+.ac-setup-crumb-mtg { color: var(--ink-muted); }
 
 .ac-setup-title {
-  font-family: var(--font-ui);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink-primary);
   margin: 0 0 6px;
   line-height: 1.2;
 }
@@ -58,18 +52,16 @@
   font-size: 11px;
 }
 
-.ac-setup-meta-date {
-  color: var(--text-faint);
-}
+.ac-setup-meta-date { color: var(--ink-faint); }
 
 .ac-setup-state-badge {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--signal, #d4a04a);           /* Accord amber — editorial identity */
-  background: rgba(212, 160, 74, 0.10);
-  border: 1px solid rgba(212, 160, 74, 0.25);
+  color: var(--signal);
+  background: var(--signal-soft);
+  border: 1px solid var(--signal-dim);
   border-radius: 4px;
   padding: 1px 6px;
 }
@@ -78,7 +70,6 @@
 .ac-setup-body {
   display: flex;
   flex-direction: row;
-  gap: 0;
   flex: 1 1 0;
   overflow: hidden;
   min-height: 0;
@@ -90,22 +81,23 @@
   flex-direction: column;
   padding: 14px 16px;
   overflow-y: auto;
-  background: var(--surface-panel);        /* tier 1 — column panels */
-  border-right: 1px solid var(--border);
+  background: var(--canvas);
+  border-right: 1px solid var(--rule-strong);
 }
 
-.ac-setup-col:last-child {
-  border-right: none;
-}
+.ac-setup-col:last-child { border-right: none; }
 
-/* §4.2 D10 section-label — class already defined platform-wide.
-   .ac-setup-col-label uses it; no local redefinition needed.    */
 .ac-setup-col-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
   margin-bottom: 10px;
   flex-shrink: 0;
 }
 
-/* Briefing column */
+/* Briefing */
 .ac-setup-briefing-area {
   display: flex;
   flex-direction: column;
@@ -118,12 +110,11 @@
   flex: 1 1 0;
   min-height: 120px;
   resize: vertical;
-  font-family: var(--font-ui);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
   font-size: 13px;
-  font-weight: 400;
-  color: var(--text-body);
-  background: var(--surface-content);     /* tier 2 — input within panel */
-  border: 1px solid var(--border);
+  color: var(--ink-body);
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule-strong);
   border-radius: 4px;
   padding: 8px 10px;
   line-height: 1.5;
@@ -132,35 +123,29 @@
   box-sizing: border-box;
 }
 
-.ac-setup-briefing-text::placeholder {
-  color: var(--text-faint);
-}
+.ac-setup-briefing-text::placeholder { color: var(--ink-ghost); }
+.ac-setup-briefing-text:focus { border-color: var(--signal); }
 
-.ac-setup-briefing-text:focus {
-  border-color: var(--signal, #d4a04a);   /* Accord amber focus ring */
-}
-
-/* Agenda + Anticipation columns */
+/* Agenda + Anticipation areas */
 .ac-setup-agenda-area,
 .ac-setup-anticipation-area {
   flex: 1 1 0;
   min-height: 0;
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
 }
 
-/* Placeholder text (coming soon) */
 .ac-setup-placeholder {
   font-size: 11px;
-  color: var(--text-faint);
+  color: var(--ink-faint);
   font-style: italic;
 }
 
 /* ── Filmstrip ────────────────────────────────────────────── */
 .ac-setup-filmstrip {
   height: 72px;
-  border-top: 1px solid var(--border);
-  background: var(--surface-content);     /* tier 2 — strip within shell */
+  border-top: 1px solid var(--rule-strong);
+  background: var(--canvas-raised);
   display: flex;
   align-items: center;
   padding: 0 16px;
@@ -171,17 +156,15 @@
 /* ── Footer ───────────────────────────────────────────────── */
 .ac-setup-footer {
   display: flex;
-  flex-direction: row;
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--surface-panel);       /* tier 1 — footer panel */
+  border-top: 1px solid var(--rule-strong);
+  background: var(--canvas);
   flex-shrink: 0;
 }
 
 .ac-setup-footer-left {
-  /* Phase 7: time budget gauge + connected-status warnings */
   display: flex;
   align-items: center;
   gap: 12px;
@@ -191,4 +174,250 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ── Agenda column (Phase 3) ──────────────────────────────── */
+
+.ac-agenda-loading,
+.ac-agenda-error {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+.ac-agenda-list {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.ac-agenda-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.ac-agenda-item:last-child { border-bottom: none; }
+
+.ac-agenda-item-pos {
+  font-size: 11px;
+  color: var(--ink-faint);
+  min-width: 16px;
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.ac-agenda-item-title {
+  flex: 1 1 0;
+  font-size: 13px;
+  color: var(--ink-body);
+  cursor: text;
+  min-width: 0;
+  word-break: break-word;
+  border-radius: 3px;
+  padding: 1px 3px;
+  outline: none;
+}
+
+.ac-agenda-item-title[contenteditable="true"] {
+  background: var(--canvas-raised);
+  border: 1px solid var(--signal);
+  color: var(--ink-primary);
+}
+
+.ac-agenda-item-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ac-agenda-up,
+.ac-agenda-down {
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1;
+  transition: color 0.12s, background 0.12s;
+}
+
+.ac-agenda-up:hover,
+.ac-agenda-down:hover {
+  color: var(--ink-primary);
+  background: var(--canvas-raised);
+}
+
+.ac-agenda-up:disabled,
+.ac-agenda-down:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.ac-agenda-up:disabled:hover,
+.ac-agenda-down:disabled:hover {
+  color: var(--ink-faint);
+  background: none;
+}
+
+.ac-agenda-pulled-badge {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-style: italic;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Add-item row */
+.ac-agenda-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  flex-shrink: 0;
+}
+
+.ac-agenda-add-input {
+  flex: 1 1 0;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--ink-body);
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  padding: 4px 8px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ac-agenda-add-input::placeholder { color: var(--ink-ghost); }
+.ac-agenda-add-input:focus { border-color: var(--signal); }
+
+.ac-agenda-add-btn {
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-muted);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+}
+
+.ac-agenda-add-btn:hover {
+  color: var(--ink-primary);
+  border-color: var(--signal);
+}
+
+/* Pull-as-thread */
+.ac-agenda-pull-row {
+  margin-top: 8px;
+  flex-shrink: 0;
+}
+
+.ac-agenda-pull-btn {
+  background: none;
+  border: none;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--ink-faint);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 2px;
+  transition: color 0.12s;
+}
+
+.ac-agenda-pull-btn:hover { color: var(--ink-muted); }
+
+.ac-agenda-pull-panel {
+  margin-top: 8px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  background: var(--canvas-raised);
+  max-height: 240px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.ac-agenda-pull-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  position: sticky;
+  top: 0;
+  background: var(--canvas-raised);
+}
+
+.ac-agenda-pull-close {
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.12s;
+}
+
+.ac-agenda-pull-close:hover { color: var(--ink-primary); }
+
+.ac-agenda-pull-empty {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-style: italic;
+  padding: 10px;
+}
+
+.ac-agenda-pull-node {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--rule);
+  transition: background 0.1s;
+}
+
+.ac-agenda-pull-node:last-child { border-bottom: none; }
+.ac-agenda-pull-node:hover { background: var(--canvas-elev); }
+
+.ac-agenda-pull-tag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.ac-agenda-pull-tag[data-tag="action"]   { color: var(--tag-action); }
+.ac-agenda-pull-tag[data-tag="decision"] { color: var(--tag-decision); }
+.ac-agenda-pull-tag[data-tag="dissent"]  { color: var(--ink-faint); }
+
+.ac-agenda-pull-text {
+  font-size: 12px;
+  color: var(--ink-body);
+  line-height: 1.4;
+}
+
+.ac-agenda-pull-meta {
+  font-size: 11px;
+  color: var(--ink-faint);
 }
