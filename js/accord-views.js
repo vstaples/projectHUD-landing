@@ -544,6 +544,17 @@
   // default CSS) so meeting-view re-mounts find it intact. Called when
   // the operator ascends out of meeting view.
   function _detachSurfaceHost() {
+    // Chain to any surface-module detach handler registered via
+    // window._accordDetachSurfaceHost (e.g. AccordMeetingSetup sets
+    // window._accordDetachSurfaceHost = _detachHandler in render()).
+    // Teardown() nulls the ref after firing so no recursion is possible.
+    // CMD-ACCORD-SETUP-HEADER-1: fixes smoke test 7 — fullpage classes
+    // were not removed on workstream-level navigation because renderWorkstreamView
+    // calls this local function directly, bypassing the window ref.
+    if (typeof window._accordDetachSurfaceHost === 'function' &&
+        window._accordDetachSurfaceHost !== _detachSurfaceHost) {
+      window._accordDetachSurfaceHost();
+    }
     const surfHost = document.getElementById('ac-meeting-surface-host');
     if (!surfHost) return;
     surfHost.classList.remove('active');
