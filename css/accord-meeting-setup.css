@@ -254,21 +254,30 @@
 
 /* ──────────────────────────────────────────────────────────── */
 /* §3 — Full-page host mechanism (Option A).                    */
-/* Class lives on #accord-app — the application root that       */
-/* ancestors the rails and .ac-view-host. V2 confirmed the      */
-/* workstreams rail class is .ac-rail-left (sibling of          */
-/* MAIN.ac-center, alongside aside.ac-rail-right which the      */
-/* commission does not direct us to hide). teardown() removes   */
-/* the class — smoke test 7 verifies.                           */
 /*                                                              */
-/* Surfaced for operator: spec §2.1 says "Setup shell owns its  */
-/* full content area from edge to edge"; if .ac-rail-right      */
-/* should also vanish during Setup, add a one-liner here.       */
-/* Commission §3 text-of-record specifies only the workstreams  */
-/* rail, so this CMD honors that.                               */
+/* IR64 V1 (authoritative): .ac-view-host is 819px wide with   */
+/* a 250px left offset. Parent is MAIN.ac-center.               */
+/* Layout host siblings: ASIDE.ac-rail-left · MAIN.ac-center   */
+/* · ASIDE.ac-rail-right.                                       */
+/*                                                              */
+/* IR64 V2 (authoritative): Commission selector guesses         */
+/* ('.ac-left-rail', '.ac-workstreams-rail', '#accord-          */
+/* workstreams', '[class*="workstream"][class*="rail"]') all     */
+/* returned undefined. Actual left rail: ASIDE.ac-rail-left.    */
+/* A right rail (ASIDE.ac-rail-right) also exists and must be   */
+/* hidden alongside the left rail for true full-page.           */
+/*                                                              */
+/* Full-page mechanism: Option A confirmed. Class toggled on    */
+/* the parent of .ac-center (#accord-app). CSS hides both       */
+/* .ac-rail-left and .ac-rail-right. Both rails reappear on     */
+/* teardown().                                                  */
+/*                                                              */
+/* This block is the authoritative selector record for all      */
+/* future CMDs that interact with the rail layout.              */
 /* ──────────────────────────────────────────────────────────── */
-.accord-setup-fullpage .ac-rail-left { display: none; }
-.accord-setup-fullpage .ac-view-host { width: 100%; height: 100%; }
+.accord-setup-fullpage .ac-rail-left  { display: none; }
+.accord-setup-fullpage .ac-rail-right { display: none; }
+.accord-setup-fullpage .ac-view-host  { width: 100%; height: 100%; }
 
 /* ──────────────────────────────────────────────────────────── */
 /* CMD-ACCORD-MEETING-SETUP-1 (prior phases) — DEFERRED         */
