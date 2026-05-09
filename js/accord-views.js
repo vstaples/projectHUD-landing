@@ -389,8 +389,10 @@
     // idle → Meeting Setup shell (accord-meeting-setup.js)
     // running / closed / sealed → existing 5-tab shell (unchanged)
     if (meeting.state === 'idle') {
+      // Detach surface host first so controls bar is rescued from any
+      // prior ac-view-header before AccordMeetingSetup.render() wipes host.innerHTML.
+      _detachSurfaceHost();
       // Populate Accord.state.meeting so startMeeting() has a target.
-      // Best-effort: mirrors the loadMeeting call in the 5-tab path below.
       if (window.Accord && window.Accord.loadMeeting && meeting.meeting_id) {
         try { await window.Accord.loadMeeting(meeting.meeting_id); }
         catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure (setup)', e); }
@@ -545,9 +547,15 @@
     const surfHost = document.getElementById('ac-meeting-surface-host');
     if (!surfHost) return;
     surfHost.classList.remove('active');
-    // Hide controls bar (now permanently at body level, not inside surfHost)
+    // Move controls bar back to body before host is re-rendered.
+    // If left inside ac-view-header, host.innerHTML = html will destroy it.
     const ctrlBar = document.getElementById('ac-meeting-controls-bar');
-    if (ctrlBar) ctrlBar.style.display = 'none';
+    if (ctrlBar) {
+      ctrlBar.style.display = 'none';
+      if (ctrlBar.parentElement !== document.body) {
+        document.body.appendChild(ctrlBar);
+      }
+    }
     if (surfHost.parentElement !== document.body) {
       document.body.appendChild(surfHost);
     }
