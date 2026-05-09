@@ -484,29 +484,13 @@
     host.innerHTML = html;
     _wireMeetingView(host, meeting);
 
-    // Load the meeting into accord-core state so the surface modules
-    // pick it up via accord:meeting-loaded
+    // Mount host BEFORE loadMeeting so DOM elements exist when meeting-loaded fires.
+    _mountSurfaceHostInTabBody();
+    _activateMeetingTab(host, 'capture');
     if (window.Accord?.loadMeeting && meeting.meeting_id) {
       try { await window.Accord.loadMeeting(meeting.meeting_id); }
       catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure', e); }
     }
-
-    // Phase 5: relocate the meeting-surface host into the tab body.
-    // The five existing surface sections (#surface-capture etc.) live
-    // there and target their hardcoded element IDs unchanged. We just
-    // move the host node; the surface modules' addEventListener
-    // bindings are preserved (DOM-tree relocation does not detach
-    // listeners).
-    _mountSurfaceHostInTabBody();
-    // Controls bar now relocated into ac-view-header; re-fire meeting-loaded
-    // so accord-core updates the toggle button state (was skipped pre-mount).
-    if (window.Accord?.state?.meeting) {
-      window.dispatchEvent(new CustomEvent('accord:meeting-loaded', {
-        detail: { meeting: window.Accord.state.meeting, thread: window.Accord.state.thread }
-      }));
-    }
-    // Activate default tab (capture) on first mount of a meeting view
-    _activateMeetingTab(host, 'capture');
   }
 
   function _wireMeetingView(host, meeting) {

@@ -357,6 +357,7 @@ const Accord = (() => {
       state.timerInterval = null;
     }
     const el = $('meetingTimer');
+    if (!el) return; // controls bar not yet relocated into view header
     const m = state.meeting;
     if (!m) { el.textContent = '00:00:00'; el.classList.remove('ended'); return; }
     if (m.state === 'idle') { el.textContent = '00:00:00'; el.classList.remove('ended'); return; }
