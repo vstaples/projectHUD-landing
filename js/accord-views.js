@@ -389,6 +389,12 @@
     // idle → Meeting Setup shell (accord-meeting-setup.js)
     // running / closed / sealed → existing 5-tab shell (unchanged)
     if (meeting.state === 'idle') {
+      // Populate Accord.state.meeting so startMeeting() has a target.
+      // Best-effort: mirrors the loadMeeting call in the 5-tab path below.
+      if (window.Accord && window.Accord.loadMeeting && meeting.meeting_id) {
+        try { await window.Accord.loadMeeting(meeting.meeting_id); }
+        catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure (setup)', e); }
+      }
       if (window.AccordMeetingSetup && window.AccordMeetingSetup.render) {
         window.AccordMeetingSetup.render(host, meeting, workstreamId);
       }
