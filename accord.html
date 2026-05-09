@@ -2778,15 +2778,6 @@
        activate one .surface and toggle the host's visibility. -->
   <div class="ac-meeting-surface-host" id="ac-meeting-surface-host">
 
-  <!-- CMD-ACCORD-NEWMEETING-ROUTING-FIX-1: static controls bar.
-       Wired once at init by accord-core.js; positioned by CSS into
-       ac-view-header when host is mounted in tab body. -->
-  <div class="ac-meeting-controls-bar" id="ac-meeting-controls-bar">
-    <div class="timer" id="meetingTimer">00:00:00</div>
-    <button class="btn btn-prominent" id="newMeetingBtn">+ New meeting</button>
-    <button class="btn btn-signal" id="meetingToggleBtn" disabled>Start meeting →</button>
-  </div>
-
   <!-- ── Surface: Live Capture ───────────────────────────────── -->
   <section class="surface surface-capture active" id="surface-capture">
 
@@ -3396,6 +3387,15 @@
     load('/js/accord-meeting-setup.js');
   })();
 </script>
+
+  <!-- CMD-ACCORD-NEWMEETING-ROUTING-FIX-1: static controls bar.
+       Permanently outside all relocatable containers. Moved into
+       .ac-view-header by _mountSurfaceHostInTabBody() at render time. -->
+  <div class="ac-meeting-controls-bar" id="ac-meeting-controls-bar" style="display:none">
+    <div class="timer" id="meetingTimer">00:00:00</div>
+    <button class="btn btn-prominent" id="newMeetingBtn">+ New meeting</button>
+    <button class="btn btn-signal" id="meetingToggleBtn" disabled>Start meeting →</button>
+  </div>
 
 </body>
 </html>

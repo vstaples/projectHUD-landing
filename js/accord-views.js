@@ -545,11 +545,8 @@
     const surfHost = document.getElementById('ac-meeting-surface-host');
     if (!surfHost) return;
     surfHost.classList.remove('active');
-    // Move controls bar back into surface host before parking.
+    // Hide controls bar (now permanently at body level, not inside surfHost)
     const ctrlBar = document.getElementById('ac-meeting-controls-bar');
-    if (ctrlBar && ctrlBar.parentElement !== surfHost) {
-      surfHost.insertBefore(ctrlBar, surfHost.firstChild);
-    }
     if (ctrlBar) ctrlBar.style.display = 'none';
     if (surfHost.parentElement !== document.body) {
       document.body.appendChild(surfHost);
