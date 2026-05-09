@@ -1,29 +1,288 @@
 /* ============================================================
    accord-meeting-setup.css — Meeting Setup surface
-   CMD-ACCORD-MEETING-SETUP-1 Phase 2 + Phase 3
-   Style Doctrine v1.8 §3.8 — Accord palette discipline.
-   Live tokens: --canvas-*, --ink-*, --rule, --rule-strong,
-   --signal, --signal-soft, --signal-dim (defined on #accord-app).
+
+   CMD-ACCORD-SETUP-LAYOUT-1 (current):
+   - 4-zone grid host (header/columns/filmstrip/footer)
+   - Three-column layout with drag-resize handles
+   - Filmstrip drag-resize (height-only)
+   - Mockup v5 token palette scoped to .ac-setup-shell (--ac-*)
+   - Full-page host class on #accord-app suppresses both rails
+
+   PRIOR (CMD-ACCORD-MEETING-SETUP-1 Phases 2-7):
+   - Style Doctrine v1.8 §3.8 — Accord palette discipline
+   - Header internals, briefing/agenda/anticipation panels, prior
+     meetings filmstrip, footer duration widget. All deferred to
+     successor wave CMDs which target the new structure; rules
+     below the new layout block are dormant in this CMD.
    ============================================================ */
 
-/* ── Shell container ──────────────────────────────────────── */
+/* ──────────────────────────────────────────────────────────── */
+/* CMD-ACCORD-SETUP-LAYOUT-1: layout shell and token palette    */
+/* ──────────────────────────────────────────────────────────── */
+
+/* §7 — Mockup v5 palette tokens, scoped to .ac-setup-shell.
+   Spec §12.3 + Style Doctrine v1.8 §3.8: Setup shell has its own
+   visual identity vs. the running-meeting (Accord production)
+   palette. --ac-* prefix is exclusive — no --signal, no --canvas-*. */
 .ac-setup-shell {
-  display: flex;
-  flex-direction: column;
+  /* Backgrounds */
+  --ac-bg-deep:       #0a0e14;
+  --ac-bg-pane:       #11161e;
+  --ac-bg-elevated:   #161c26;
+  --ac-bg-tile:       #1a212c;
+  /* Borders */
+  --ac-border-subtle: rgba(255, 255, 255, 0.06);
+  --ac-border-mid:    rgba(255, 255, 255, 0.12);
+  --ac-border-active: rgba(94, 234, 212, 0.4);
+  /* Text */
+  --ac-text-primary:   #e8edf2;
+  --ac-text-secondary: #8a95a5;
+  --ac-text-tertiary:  #5a6678;
+  --ac-text-faint:     #3a4456;
+  /* Accents */
+  --ac-cyan:       #5eead4;
+  --ac-cyan-dim:   rgba(94, 234, 212, 0.15);
+  --ac-amber:      #fbbf77;
+  --ac-amber-dim:  rgba(251, 191, 119, 0.18);
+  --ac-rose:       #fb7185;
+  --ac-rose-dim:   rgba(251, 113, 133, 0.18);
+  --ac-violet:     #a78bfa;
+  --ac-violet-dim: rgba(167, 139, 250, 0.18);
+  --ac-green:      #4ade80;
+  --ac-green-dim:  rgba(74, 222, 128, 0.18);
+  /* Typography */
+  --ac-font-sans:  -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  --ac-font-mono:  "SF Mono", "JetBrains Mono", "Fira Code", Menlo, monospace;
+  --ac-font-serif: "Lora", "Charter", "Georgia", serif;
+
+  /* §4 — 4-zone grid host */
+  display: grid;
+  grid-template-rows: auto 1fr 102px 54px;
+  grid-template-areas:
+    "header"
+    "columns"
+    "filmstrip"
+    "footer";
+  /* Width is set defensively because .ac-view-host (parent) is
+     display:flex and the flex-direction is not guaranteed —
+     V1 reported display:flex with no direction in the audit. */
+  width:  100%;
   height: 100%;
-  background: var(--canvas-deep);
-  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  min-height: 0;     /* allow grid children to shrink correctly */
+  background: var(--ac-bg-deep);
+  color: var(--ac-text-primary);
+  font-family: var(--ac-font-sans);
   font-size: 13px;
+  line-height: 1.5;
   overflow: hidden;
 }
 
-/* ── Header ───────────────────────────────────────────────── */
-.ac-setup-header {
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--rule-strong);
-  flex-shrink: 0;
-  background: var(--canvas);
+/* §4 — Zone placement */
+.ac-setup-header    { grid-area: header;    }
+.ac-setup-columns   { grid-area: columns;   min-height: 0; overflow: hidden; }
+.ac-setup-filmstrip { grid-area: filmstrip; }
+.ac-setup-footer    { grid-area: footer;    }
+
+/* Zone-level placeholders (header / filmstrip-content / footer this CMD).
+   Successor CMDs replace placeholder children with real content. */
+.ac-zone-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 40px;
+  font-family: var(--ac-font-mono);
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--ac-text-tertiary);
+  padding: 12px 16px;
 }
+
+/* Header zone — placeholder this CMD; CMD-ACCORD-SETUP-HEADER-1
+   replaces internals. Zone itself only carries a separator. */
+.ac-setup-header {
+  border-bottom: 1px solid var(--ac-border-subtle);
+  background: var(--ac-bg-pane);
+}
+
+/* §5 — Three-column grid inside .ac-setup-columns */
+.ac-setup-columns {
+  display: grid;
+  grid-template-columns: var(--col-left-w, 360px) 1fr var(--col-right-w, 380px);
+  grid-template-areas: "col-left col-center col-right";
+  height: 100%;
+  overflow: hidden;
+}
+.ac-setup-col-left {
+  grid-area: col-left;
+  position: relative;
+  overflow-y: auto;
+  border-right: 1px solid var(--ac-border-subtle);
+  background: var(--ac-bg-pane);
+  display: flex;
+  flex-direction: column;
+}
+.ac-setup-col-center {
+  grid-area: col-center;
+  position: relative;
+  overflow-y: auto;
+  background: var(--ac-bg-deep);
+  display: flex;
+  flex-direction: column;
+}
+.ac-setup-col-right {
+  grid-area: col-right;
+  position: relative;
+  overflow-y: auto;
+  border-left: 1px solid var(--ac-border-subtle);
+  background: var(--ac-bg-pane);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Wave 2 affordance hooks (§8.1): tab bar + tab body per column.
+   Empty containers; Wave 2 CMDs render content into tabbar/tabbody. */
+.ac-col-tabbar {
+  flex: 0 0 auto;
+  /* No height yet — Wave 2 CMDs set this when tab buttons render.
+     Empty bar is invisible by design. */
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid transparent;  /* becomes visible when populated */
+}
+.ac-col-tabbar:not(:empty) {
+  min-height: 32px;
+  border-bottom-color: var(--ac-border-subtle);
+}
+.ac-col-tabbody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* Column-level placeholder (briefing / agenda / attendees this CMD). */
+.ac-col-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100%;
+  padding: 24px 18px;
+  font-family: var(--ac-font-mono);
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--ac-text-tertiary);
+  text-align: center;
+}
+
+/* §5.1 — Drag handles. Sit on the right border of the left column
+   and the right border of the center column, 8px hit target with
+   visual feedback only on hover/drag. */
+.ac-col-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  right: -4px;        /* 4px overlap on each side of the column boundary */
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 120ms ease;
+}
+.ac-col-handle:hover,
+.ac-col-handle.dragging {
+  background: var(--ac-border-active);
+}
+
+/* §6 — Filmstrip zone with drag handle on the top border.
+   Height is controlled via grid-template-rows on .ac-setup-shell;
+   _setShellFilmstripRow() in JS updates the third row value. */
+.ac-setup-filmstrip {
+  position: relative;
+  background: var(--ac-bg-pane);
+  border-top:    1px solid var(--ac-border-subtle);
+  border-bottom: 1px solid var(--ac-border-subtle);
+  overflow: hidden;
+}
+.ac-filmstrip-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: row-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 120ms ease;
+}
+.ac-filmstrip-handle:hover,
+.ac-filmstrip-handle.dragging {
+  background: var(--ac-border-active);
+}
+.ac-filmstrip-content {
+  height: 100%;
+  overflow: hidden;
+  /* Placeholder content this CMD; FILMSTRIP-2 populates with frames. */
+}
+
+/* Footer zone — placeholder this CMD; VERDICT-1 replaces. */
+.ac-setup-footer {
+  border-top: 1px solid var(--ac-border-subtle);
+  background: var(--ac-bg-pane);
+  display: flex;
+  align-items: center;
+}
+
+/* §8.2 — Intelligence Mode overlay stub (outside grid, full viewport).
+   Wave 2 CMD-ACCORD-SETUP-INTELLIGENCE-1 populates content + reveals. */
+.ac-intel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(10, 14, 20, 0.92);
+  /* Wave 2 will manage display:none → flex transitions. */
+}
+
+/* §8.3 — Gathering-mode hook (data-mode="gathering" set by Wave 3). */
+.ac-setup-shell[data-mode="gathering"] .ac-col-placeholder {
+  /* Gathering-specific overrides land here in CMD-ACCORD-SETUP-GATHERING-1 */
+}
+
+/* ──────────────────────────────────────────────────────────── */
+/* §3 — Full-page host mechanism (Option A).                    */
+/* Class lives on #accord-app — the application root that       */
+/* ancestors the rails and .ac-view-host. V2 confirmed the      */
+/* workstreams rail class is .ac-rail-left (sibling of          */
+/* MAIN.ac-center, alongside aside.ac-rail-right which the      */
+/* commission does not direct us to hide). teardown() removes   */
+/* the class — smoke test 7 verifies.                           */
+/*                                                              */
+/* Surfaced for operator: spec §2.1 says "Setup shell owns its  */
+/* full content area from edge to edge"; if .ac-rail-right      */
+/* should also vanish during Setup, add a one-liner here.       */
+/* Commission §3 text-of-record specifies only the workstreams  */
+/* rail, so this CMD honors that.                               */
+/* ──────────────────────────────────────────────────────────── */
+.accord-setup-fullpage .ac-rail-left { display: none; }
+.accord-setup-fullpage .ac-view-host { width: 100%; height: 100%; }
+
+/* ──────────────────────────────────────────────────────────── */
+/* CMD-ACCORD-MEETING-SETUP-1 (prior phases) — DEFERRED         */
+/* The rules below shipped in Phases 2-7. Their selectors do    */
+/* not match the new shell structure introduced above. They     */
+/* remain in place because the JS module preserves              */
+/* _renderBriefing / _renderAgenda / _renderAnticipation /      */
+/* _renderFilmstrip / _renderFooterDuration as commented-out    */
+/* call sites; successor wave CMDs (HEADER-1, OUTCOMES-1,       */
+/* ATTENDEES-1, BRIEFING-TABS-1, FILMSTRIP-2, VERDICT-1) will   */
+/* reauthor whichever rules they need against the new --ac-*    */
+/* token palette. Until then these rules are dormant.           */
+/* ──────────────────────────────────────────────────────────── */
+
 
 .ac-setup-breadcrumb {
   font-size: 11px;
@@ -142,27 +401,18 @@
 }
 
 /* ── Filmstrip ────────────────────────────────────────────── */
-.ac-setup-filmstrip {
-  height: 72px;
-  border-top: 1px solid var(--rule-strong);
-  background: var(--canvas-raised);
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  overflow-x: auto;
-  flex-shrink: 0;
-}
+/* CMD-ACCORD-SETUP-LAYOUT-1: prior .ac-setup-filmstrip rule
+   (height:72px / flex / overflow-x:auto) removed — conflicted
+   with the new grid-area-controlled height. New rule lives in
+   the layout block at the top of this file. CMD-ACCORD-SETUP-
+   FILMSTRIP-2 will reauthor inner-frame styles. */
 
 /* ── Footer ───────────────────────────────────────────────── */
-.ac-setup-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  border-top: 1px solid var(--rule-strong);
-  background: var(--canvas);
-  flex-shrink: 0;
-}
+/* CMD-ACCORD-SETUP-LAYOUT-1: prior .ac-setup-footer rule
+   (flex / space-between / padding / border) removed —
+   conflicted with the new grid-area version. New rule lives
+   in the layout block at the top of this file.
+   CMD-ACCORD-SETUP-VERDICT-1 will reauthor footer internals. */
 
 .ac-setup-footer-left {
   display: flex;

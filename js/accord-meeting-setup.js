@@ -33,6 +33,32 @@
   var _agendaFetchAborted = false;
   var _workstreamName     = null;   // cached for briefing default text
 
+  // ── CMD-ACCORD-SETUP-LAYOUT-1: layout state ──────────────────
+  // Drag state holds primitives only — IR71 (no DOM refs in mutable state).
+  // DOM nodes are re-queried inside each handler.
+  var _colDrag = {
+    active:      false,
+    handle:      null,    // 'left' | 'right'
+    startX:      0,
+    startLeftW:  0,
+    startRightW: 0
+  };
+  var _filmDrag = {
+    active:  false,
+    startY:  0,
+    startH:  0
+  };
+  var COL_MIN_W    = 260;
+  var COL_MAX_W    = 600;
+  var FILM_MIN_H   = 48;
+  var FILM_MAX_H   = 350;
+  var FILM_DEFAULT = 102;
+  var FOOTER_H     = 54;
+  var LS_KEY_LEFT  = 'accord-setup-col-left-w';
+  var LS_KEY_RIGHT = 'accord-setup-col-right-w';
+  var LS_KEY_FILM  = 'accord-setup-filmstrip-h';
+  var FULLPAGE_CLS = 'accord-setup-fullpage';
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() { teardown(); }
 
@@ -54,6 +80,26 @@
     // Remove filmstrip click listener -- Phase 6
     var strip = document.querySelector('.ac-setup-filmstrip');
     if (strip) strip.removeEventListener('click', _onFilmCardClick);
+
+    // ── CMD-ACCORD-SETUP-LAYOUT-1: layout teardown ─────────────
+    // Undo full-page mechanism (regression-critical — smoke test 7).
+    var appRoot = document.getElementById('accord-app');
+    if (appRoot) appRoot.classList.remove(FULLPAGE_CLS);
+    // Drop in-flight column-drag listeners.
+    if (_colDrag.active) {
+      document.removeEventListener('mousemove', _onHandleMouseMove);
+      document.removeEventListener('mouseup',   _onHandleMouseUp);
+      _colDrag.active = false;
+    }
+    // Drop in-flight filmstrip-drag listeners.
+    if (_filmDrag.active) {
+      document.removeEventListener('mousemove', _onFilmHandleMouseMove);
+      document.removeEventListener('mouseup',   _onFilmHandleMouseUp);
+      _filmDrag.active = false;
+    }
+    // Remove Cmd+I / Ctrl+I listener (idempotent — removeEventListener
+    // is a no-op if the listener was never attached).
+    document.removeEventListener('keydown', _onIntelKey);
   }
 
   // ── Briefing autosave ─────────────────────────────────────────
@@ -104,67 +150,71 @@
   }
 
   // ── Shell HTML ────────────────────────────────────────────────
+  // CMD-ACCORD-SETUP-LAYOUT-1: 4-zone grid shell (§9 of commission).
+  // All zone content is placeholder; successor CMDs populate per the
+  // wave plan (Setup Shell Spec §14):
+  //   header    → CMD-ACCORD-SETUP-HEADER-1
+  //   columns   → CMD-ACCORD-SETUP-OUTCOMES-1, ATTENDEES-1, BRIEFING-TABS-1
+  //   filmstrip → CMD-ACCORD-SETUP-FILMSTRIP-2
+  //   footer    → CMD-ACCORD-SETUP-VERDICT-1
   function _buildHTML(meeting, workstreamId) {
-    var title = esc(meeting.title || '(untitled)');
-    var scheduledStr = '';
-    if (meeting.scheduled_for) {
-      try {
-        scheduledStr = new Date(meeting.scheduled_for).toLocaleDateString([], {
-          year: 'numeric', month: 'short', day: 'numeric',
-          hour: '2-digit', minute: '2-digit'
-        });
-      } catch (e) {}
-    }
-    var crumbWs = workstreamId
-      ? '<span class="ac-setup-crumb-ws" id="ac-setup-crumb-ws">\u2026 \u203a </span>'
-      : '<span class="ac-setup-crumb-ws">Accord \u203a </span>';
-    var filmstripHTML = workstreamId
-      ? '<div class="ac-setup-filmstrip"><span class="ac-setup-placeholder">(coming soon)</span></div>'
-      : '';
-
+    var meetingId = esc(meeting && meeting.meeting_id ? meeting.meeting_id : '');
     return (
-      '<div class="ac-setup-shell">' +
-        '<header class="ac-setup-header">' +
-          '<nav class="ac-setup-breadcrumb">' +
-            crumbWs +
-            '<span class="ac-setup-crumb-mtg">' + title + '</span>' +
-          '</nav>' +
-          '<h2 class="ac-setup-title">' + title + '</h2>' +
-          '<div class="ac-setup-meta">' +
-            (scheduledStr ? '<span class="ac-setup-meta-date">' + esc(scheduledStr) + '</span>' : '') +
-            '<span class="ac-setup-state-badge">Draft</span>' +
+      '<div class="ac-setup-shell" data-mode="prep" data-meeting-id="' + meetingId + '">' +
+
+        // Zone 1: Header (auto height)
+        '<div class="ac-setup-header">' +
+          '<div class="ac-zone-placeholder">Header \u00b7 coming soon</div>' +
+        '</div>' +
+
+        // Zone 2: Columns (1fr)
+        '<div class="ac-setup-columns">' +
+
+          // Left column
+          '<div class="ac-setup-col-left">' +
+            '<div class="ac-col-tabbar" data-col="left"></div>' +
+            '<div class="ac-col-tabbody" data-col="left">' +
+              '<div class="ac-col-placeholder">Briefing \u00b7 coming soon</div>' +
+            '</div>' +
+            '<div class="ac-col-handle ac-col-handle--left" data-handle="left"></div>' +
           '</div>' +
-        '</header>' +
-        '<div class="ac-setup-body">' +
-          '<div class="ac-setup-col ac-setup-col--briefing">' +
-            '<div class="ac-setup-col-label">Briefing</div>' +
-            '<div class="ac-setup-briefing-area" id="ac-setup-briefing-area">' +
-              '<div class="ac-agenda-loading">Loading\u2026</div>' +
+
+          // Center column
+          '<div class="ac-setup-col-center">' +
+            '<div class="ac-col-tabbar" data-col="center"></div>' +
+            '<div class="ac-col-tabbody" data-col="center">' +
+              '<div class="ac-col-placeholder">Agenda \u00b7 coming soon</div>' +
+            '</div>' +
+            '<div class="ac-col-handle ac-col-handle--right" data-handle="right"></div>' +
+          '</div>' +
+
+          // Right column
+          '<div class="ac-setup-col-right">' +
+            '<div class="ac-col-tabbar" data-col="right"></div>' +
+            '<div class="ac-col-tabbody" data-col="right">' +
+              '<div class="ac-col-placeholder">Attendees \u00b7 coming soon</div>' +
             '</div>' +
           '</div>' +
-          '<div class="ac-setup-col ac-setup-col--agenda">' +
-            '<div class="ac-setup-col-label">Agenda</div>' +
-            '<div class="ac-setup-agenda-area" id="ac-setup-agenda-area">' +
-              '<div class="ac-agenda-loading">Loading\u2026</div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="ac-setup-col ac-setup-col--anticipation">' +
-            '<div class="ac-setup-col-label">Anticipation</div>' +
-            '<div class="ac-setup-anticipation-area">' +
-              '<span class="ac-setup-placeholder">(coming soon)</span>' +
-            '</div>' +
+
+        '</div>' +
+
+        // Zone 3: Filmstrip (102px default, drag-resizable)
+        '<div class="ac-setup-filmstrip">' +
+          '<div class="ac-filmstrip-handle"></div>' +
+          '<div class="ac-filmstrip-content">' +
+            '<div class="ac-zone-placeholder">Workstream timeline \u00b7 coming soon</div>' +
           '</div>' +
         '</div>' +
-        filmstripHTML +
-        '<footer class="ac-setup-footer">' +
-          '<div class="ac-setup-footer-left"></div>' +
-          '<div class="ac-setup-footer-right">' +
-            '<button type="button" class="btn btn-signal ac-setup-begin" id="ac-setup-begin-btn">' +
-              'Begin Meeting \u2192' +
-            '</button>' +
-          '</div>' +
-        '</footer>' +
-      '</div>'
+
+        // Zone 4: Footer (54px)
+        '<div class="ac-setup-footer">' +
+          '<div class="ac-zone-placeholder">Footer \u00b7 coming soon</div>' +
+        '</div>' +
+
+      '</div>' +
+
+      // Intelligence Mode overlay — outside grid, full viewport (§8.2)
+      '<div class="ac-intel-overlay" id="ac-intel-overlay" style="display:none;"></div>'
     );
   }
 
@@ -704,6 +754,177 @@
   }
 
   // ══════════════════════════════════════════════════════════════
+  // LAYOUT — CMD-ACCORD-SETUP-LAYOUT-1
+  // Column resize, filmstrip resize, Cmd+I stub.
+  // IR71: drag state holds primitives only; DOM is re-queried in
+  // every handler so that an in-flight teardown + re-render does
+  // not strand listeners pointing at detached nodes.
+  // ══════════════════════════════════════════════════════════════
+
+  // ── Column width init from localStorage ──────────────────────
+  function _initColWidths() {
+    var cols = document.querySelector('.ac-setup-columns');
+    if (!cols) return;
+    try {
+      var lw = localStorage.getItem(LS_KEY_LEFT);
+      var rw = localStorage.getItem(LS_KEY_RIGHT);
+      if (lw) {
+        var lwn = parseInt(lw, 10);
+        if (lwn >= COL_MIN_W && lwn <= COL_MAX_W) {
+          cols.style.setProperty('--col-left-w', lwn + 'px');
+        }
+      }
+      if (rw) {
+        var rwn = parseInt(rw, 10);
+        if (rwn >= COL_MIN_W && rwn <= COL_MAX_W) {
+          cols.style.setProperty('--col-right-w', rwn + 'px');
+        }
+      }
+    } catch (e) {}
+  }
+
+  // ── Column drag handlers ─────────────────────────────────────
+  function _wireColumnHandles() {
+    var handles = document.querySelectorAll('.ac-col-handle');
+    for (var i = 0; i < handles.length; i++) {
+      handles[i].addEventListener('mousedown', _onHandleMouseDown);
+    }
+  }
+
+  function _onHandleMouseDown(ev) {
+    var handle = ev.currentTarget;
+    var cols = document.querySelector('.ac-setup-columns');
+    if (!cols) return;
+    var cs = getComputedStyle(cols);
+    _colDrag.active      = true;
+    _colDrag.handle      = handle.dataset.handle;
+    _colDrag.startX      = ev.clientX;
+    _colDrag.startLeftW  = parseInt(cs.getPropertyValue('--col-left-w'),  10) || 360;
+    _colDrag.startRightW = parseInt(cs.getPropertyValue('--col-right-w'), 10) || 380;
+    handle.classList.add('dragging');
+    document.addEventListener('mousemove', _onHandleMouseMove);
+    document.addEventListener('mouseup',   _onHandleMouseUp);
+    ev.preventDefault();
+  }
+
+  function _onHandleMouseMove(ev) {
+    if (!_colDrag.active) return;
+    var dx = ev.clientX - _colDrag.startX;
+    var cols = document.querySelector('.ac-setup-columns');
+    if (!cols) return;
+    var newW;
+    if (_colDrag.handle === 'left') {
+      newW = Math.max(COL_MIN_W, Math.min(COL_MAX_W, _colDrag.startLeftW + dx));
+      cols.style.setProperty('--col-left-w', newW + 'px');
+    } else {
+      // 'right' handle is on the right border of the center column.
+      // Dragging it right (positive dx) shrinks the right column.
+      newW = Math.max(COL_MIN_W, Math.min(COL_MAX_W, _colDrag.startRightW - dx));
+      cols.style.setProperty('--col-right-w', newW + 'px');
+    }
+  }
+
+  function _onHandleMouseUp(ev) {
+    if (!_colDrag.active) return;
+    _colDrag.active = false;
+    var dragging = document.querySelectorAll('.ac-col-handle.dragging');
+    for (var i = 0; i < dragging.length; i++) {
+      dragging[i].classList.remove('dragging');
+    }
+    document.removeEventListener('mousemove', _onHandleMouseMove);
+    document.removeEventListener('mouseup',   _onHandleMouseUp);
+    // Persist
+    var cols = document.querySelector('.ac-setup-columns');
+    if (cols) {
+      var cs = getComputedStyle(cols);
+      try {
+        var lw = (cs.getPropertyValue('--col-left-w')  || '').trim();
+        var rw = (cs.getPropertyValue('--col-right-w') || '').trim();
+        if (lw) localStorage.setItem(LS_KEY_LEFT,  lw);
+        if (rw) localStorage.setItem(LS_KEY_RIGHT, rw);
+      } catch (e) {}
+    }
+  }
+
+  // ── Filmstrip height init from localStorage ──────────────────
+  function _initFilmstripHeight() {
+    var shell = document.querySelector('.ac-setup-shell');
+    if (!shell) return;
+    try {
+      var hRaw = localStorage.getItem(LS_KEY_FILM);
+      if (!hRaw) return;
+      var h = parseInt(hRaw, 10);
+      if (!h || h < FILM_MIN_H) h = FILM_MIN_H;
+      if (h > FILM_MAX_H) h = FILM_MAX_H;
+      _setShellFilmstripRow(shell, h);
+    } catch (e) {}
+  }
+
+  function _setShellFilmstripRow(shell, h) {
+    // Header is auto, columns is 1fr, filmstrip is the variable, footer is 54px.
+    shell.style.gridTemplateRows = 'auto 1fr ' + h + 'px ' + FOOTER_H + 'px';
+  }
+
+  // ── Filmstrip drag handlers ──────────────────────────────────
+  function _wireFilmstripHandle() {
+    var handle = document.querySelector('.ac-filmstrip-handle');
+    if (!handle) return;
+    handle.addEventListener('mousedown', _onFilmHandleMouseDown);
+  }
+
+  function _onFilmHandleMouseDown(ev) {
+    var handle = ev.currentTarget;
+    var strip  = document.querySelector('.ac-setup-filmstrip');
+    if (!strip) return;
+    _filmDrag.active = true;
+    _filmDrag.startY = ev.clientY;
+    _filmDrag.startH = strip.offsetHeight || FILM_DEFAULT;
+    handle.classList.add('dragging');
+    document.addEventListener('mousemove', _onFilmHandleMouseMove);
+    document.addEventListener('mouseup',   _onFilmHandleMouseUp);
+    ev.preventDefault();
+  }
+
+  function _onFilmHandleMouseMove(ev) {
+    if (!_filmDrag.active) return;
+    var shell = document.querySelector('.ac-setup-shell');
+    if (!shell) return;
+    // Drag handle is on the TOP edge of the filmstrip — pulling the cursor
+    // up (negative dy) should grow the filmstrip.
+    var dy   = ev.clientY - _filmDrag.startY;
+    var newH = Math.max(FILM_MIN_H, Math.min(FILM_MAX_H, _filmDrag.startH - dy));
+    _setShellFilmstripRow(shell, newH);
+  }
+
+  function _onFilmHandleMouseUp(ev) {
+    if (!_filmDrag.active) return;
+    _filmDrag.active = false;
+    var dragging = document.querySelectorAll('.ac-filmstrip-handle.dragging');
+    for (var i = 0; i < dragging.length; i++) {
+      dragging[i].classList.remove('dragging');
+    }
+    document.removeEventListener('mousemove', _onFilmHandleMouseMove);
+    document.removeEventListener('mouseup',   _onFilmHandleMouseUp);
+    // Persist final height
+    var strip = document.querySelector('.ac-setup-filmstrip');
+    if (strip) {
+      try { localStorage.setItem(LS_KEY_FILM, String(strip.offsetHeight)); }
+      catch (e) {}
+    }
+  }
+
+  // ── Intelligence Mode keystroke (Wave 2 stub per §8.2) ───────
+  function _onIntelKey(ev) {
+    if ((ev.metaKey || ev.ctrlKey) && (ev.key === 'i' || ev.key === 'I')) {
+      ev.preventDefault();
+      var overlay = document.getElementById('ac-intel-overlay');
+      if (!overlay) return;
+      // Wave 2 (CMD-ACCORD-SETUP-INTELLIGENCE-1) replaces this stub.
+      console.log('[AccordMeetingSetup] Intelligence Mode: not yet implemented');
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
   // RENDER ENTRY POINT
   // ══════════════════════════════════════════════════════════════
 
@@ -714,32 +935,61 @@
     _agendaFetchAborted = false;
     window._accordDetachSurfaceHost = _detachHandler;
 
+    // ── CMD-ACCORD-SETUP-LAYOUT-1: full-page host mechanism (§3, Option A)
+    // Toggle class on #accord-app — the application root that ancestors
+    // both rails (.ac-rail-left / .ac-rail-right) and .ac-view-host.
+    // Note: commission §3 says "hud-shell content host"; V3 confirmed
+    // hud-shell.js does not manage .ac-view-host. The actual scope target
+    // is the Accord app root. teardown() removes the class — smoke test 7.
+    var appRoot = document.getElementById('accord-app');
+    if (appRoot) appRoot.classList.add(FULLPAGE_CLS);
+
     host.innerHTML = _buildHTML(meeting, workstreamId);
 
+    // ── CMD-ACCORD-SETUP-LAYOUT-1: layout init + listeners ────
+    _initColWidths();
+    _initFilmstripHeight();
+    _wireColumnHandles();
+    _wireFilmstripHandle();
+    document.addEventListener('keydown', _onIntelKey);
+
     // Breadcrumb async resolve — also caches _workstreamName for briefing
-    if (workstreamId) {
-      _resolveWorkstreamName(workstreamId, host.querySelector('#ac-setup-crumb-ws'));
-    }
+    // CMD-ACCORD-SETUP-LAYOUT-1: breadcrumb element no longer in shell;
+    // the header CMD will reintroduce a breadcrumb host. _workstreamName
+    // caching no longer fires this CMD.
+    // if (workstreamId) {
+    //   _resolveWorkstreamName(workstreamId, host.querySelector('#ac-setup-crumb-ws'));
+    // }
 
     // Begin Meeting
-    var beginBtn = host.querySelector('#ac-setup-begin-btn');
-    if (beginBtn) {
-      beginBtn.addEventListener('click', function () {
-        _beginMeeting(meeting, workstreamId, beginBtn);
-      });
-    }
+    // CMD-ACCORD-SETUP-LAYOUT-1: deferred to CMD-ACCORD-SETUP-VERDICT-1
+    // var beginBtn = host.querySelector('#ac-setup-begin-btn');
+    // if (beginBtn) {
+    //   beginBtn.addEventListener('click', function () {
+    //     _beginMeeting(meeting, workstreamId, beginBtn);
+    //   });
+    // }
 
     // Briefing + Agenda + Anticipation + Filmstrip + Footer duration in parallel
-    _renderBriefing(meeting, workstreamId);
-    _renderAgenda(meeting, workstreamId);
-    _renderAnticipation(meeting, workstreamId);
-    _renderFilmstrip(meeting, workstreamId);
-    _renderFooterDuration(meeting);
+    // CMD-ACCORD-SETUP-LAYOUT-1: deferred to CMD-ACCORD-SETUP-BRIEFING-TABS-1
+    // _renderBriefing(meeting, workstreamId);
+    // CMD-ACCORD-SETUP-LAYOUT-1: deferred to CMD-ACCORD-SETUP-OUTCOMES-1
+    // _renderAgenda(meeting, workstreamId);
+    // CMD-ACCORD-SETUP-LAYOUT-1: deferred to CMD-ACCORD-SETUP-ATTENDEES-1
+    // _renderAnticipation(meeting, workstreamId);
+    // CMD-ACCORD-SETUP-LAYOUT-1: deferred to CMD-ACCORD-SETUP-FILMSTRIP-2
+    // _renderFilmstrip(meeting, workstreamId);
+    // CMD-ACCORD-SETUP-LAYOUT-1: deferred to CMD-ACCORD-SETUP-VERDICT-1
+    // _renderFooterDuration(meeting);
 
     // NRA event listeners for live badge refresh -- Phase 5
-    NRA_EVENTS.forEach(function(evt) {
-      window.addEventListener(evt, _onNraEvent);
-    });
+    // CMD-ACCORD-SETUP-LAYOUT-1: paired with _renderAnticipation deferral.
+    // Listeners target .ac-setup-anticipation-area which this CMD does not
+    // render; revive when CMD-ACCORD-SETUP-ATTENDEES-1 ships the right column.
+    // teardown()'s removeEventListener calls remain (idempotent and safe).
+    // NRA_EVENTS.forEach(function(evt) {
+    //   window.addEventListener(evt, _onNraEvent);
+    // });
   }
 
   // ── Expose ────────────────────────────────────────────────────
