@@ -211,6 +211,39 @@
       `;
     }
 
+    // Phase 5: waived-block, rendered inside 'update' mode when
+    // currentNRA.state === 'waived'. Substrate makes waived terminal —
+    // no UPDATE RLS path from waived to any other state (IR73 §3 of
+    // CMD-ACCORD-NRA-SUBSTRATE-1). Operator disposition: surface a
+    // block with a "declare a new NRA on this node" affordance that
+    // closes this modal and reopens it in 'declare' mode on the same
+    // node. Substrate response to declare_nra over a current waived
+    // row is empirical and surfaceable as a Phase 5 finding.
+    function _waivedRegionHtml(currentNRA) {
+      const waivedAt = currentNRA?.waived_at ? fmtDate(currentNRA.waived_at) : '';
+      const reason   = currentNRA?.waived_reason || '';
+      return `
+        <div class="nra-waived-region" id="nra-waived-region">
+          <div class="nra-waived-banner">
+            <span class="nra-waived-glyph">⊘</span>
+            <div class="nra-waived-text">
+              <div class="nra-waived-title">This NRA is waived</div>
+              <div class="nra-waived-body">
+                Waived NRAs are kept as a guardrail record
+                ${waivedAt ? `(waived ${esc(waivedAt)})` : ''}
+                and aren't editable.
+                ${reason ? `<div class="nra-waived-reason">Reason: ${esc(reason)}</div>` : ''}
+                To resume forward-motion tracking on this node, declare a new NRA.
+              </div>
+            </div>
+          </div>
+          <div class="nra-waived-actions">
+            <button type="button" class="btn btn-signal" id="nra-declare-new-from-waived">Declare a new NRA on this node</button>
+          </div>
+        </div>
+      `;
+    }
+
     // Phase 4: candidate-confirmation region, rendered inside 'update'
     // mode when currentNRA.resolution_candidate_at IS NOT NULL.
     function _candidateRegionHtml(currentNRA) {
@@ -296,6 +329,17 @@
         ? 'Update the next required action for this artifact. The current NRA is preserved as history.'
         : 'Declare the next required action that moves this artifact forward.';
 
+      // Phase 5: waived-block replaces the entire form body when current
+      // NRA is waived (terminal substrate state). No standard fields
+      // rendered; modal-actions hidden in open(); affordance routes to
+      // a fresh 'declare' modal on the same node.
+      if (isUpdate && currentNRA?.state === 'waived') {
+        return `
+          <h3>${esc(titleText)}</h3>
+          ${_waivedRegionHtml(currentNRA)}
+        `;
+      }
+
       // Phase 4: candidate region rendered ABOVE the supersede form
       // when current NRA is flagged as a resolution candidate.
       const candidateRegion = (isUpdate && currentNRA?.resolution_candidate_at)
@@ -338,9 +382,12 @@
                              'Declare NRA';
 
       const isCandidateUpdate = mode === 'update' && currentNRA?.resolution_candidate_at;
+      const isWaivedUpdate    = mode === 'update' && currentNRA?.state === 'waived';
+      const actionsHidden     = isCandidateUpdate || isWaivedUpdate;
+      const actionsId         = isCandidateUpdate ? ' id="nra-update-actions"' : '';
 
       modal.innerHTML = _formHtml(mode, node, currentNRA) + `
-        <div class="modal-actions"${isCandidateUpdate ? ' id="nra-update-actions" style="display:none"' : ''}>
+        <div class="modal-actions"${actionsId}${actionsHidden ? ' style="display:none"' : ''}>
           <button class="btn btn-ghost"  id="nra-cancel">Cancel</button>
           <button class="btn btn-signal" id="nra-submit">${esc(submitLabel)}</button>
         </div>
@@ -421,6 +468,20 @@
           if (acts) acts.style.display = '';
           // Wire owner toggle now that the form is visible
           _wireOwnerToggle(modal);
+        });
+      }
+
+      // Phase 5: waived-region affordance — close current modal,
+      // reopen in 'declare' mode on the same node. Substrate response
+      // to declare_nra over a current waived row is empirical
+      // (declare_nra may insert; substrate may reject — surfaceable
+      // either way). IR71-safe: handler captures `node` in closure;
+      // close() runs synchronously before open() repaints.
+      const declareNewBtn = modal.querySelector('#nra-declare-new-from-waived');
+      if (declareNewBtn) {
+        declareNewBtn.addEventListener('click', () => {
+          close();
+          open(node, 'declare');
         });
       }
 
@@ -533,6 +594,53 @@
 
       if (mode === 'update') {
         if (!currentNRA?.nra_id) throw new Error('Update mode requires currentNRA.nra_id');
+
+        // CMD-ACCORD-NRA-SURFACE-1 Phase 5 patch: state-aware update
+        // dispatch. supersede_nra requires current NRA in state='declared'.
+        // Other states route to substrate-appropriate paths.
+        if (currentNRA.state === 'waived') {
+          // Defensive: in Phase 5, _formHtml renders a waived-block
+          // (no fields, no submit) when state='waived'. _submit should
+          // not be reached for this state under normal flow. If it is,
+          // surface as internal error rather than substrate call.
+          throw new Error(
+            'internal: waived state should not reach _submit (waived-block ' +
+            'renders without a submit form). Dispatch path mis-routed.'
+          );
+        }
+
+        if (currentNRA.state === 'deferred') {
+          // Direct PATCH matching nras_update_deferred_to_declared RLS:
+          // state='declared' + nra_type/due_date/description NOT NULL +
+          // at least one owner.
+          const patchResult = await API.patch(
+            `accord_nras?nra_id=eq.${currentNRA.nra_id}`,
+            {
+              state:              'declared',
+              nra_type:           formData.nra_type,
+              due_date:           formData.due_date,
+              description:        formData.description,
+              owner_resource_id:  null,
+              owner_event_type:   formData.owner_event_type || null,
+              owner_is_operator:  formData.owner_is_operator,
+              trigger_kind:       formData.trigger_kind || null,
+              trigger_target_id:  formData.trigger_target_id || null,
+              deferred_at:        null,
+            }
+          );
+          const row = Array.isArray(patchResult) ? patchResult[0] : patchResult;
+          // Emit nra-declared (state transitioned deferred → declared)
+          emit('nra-declared', {
+            node_id:  node.node_id,
+            nra_id:   row?.nra_id || currentNRA.nra_id,
+            firm_id:  node.firm_id,
+            nra_type: formData.nra_type,
+            due_date: formData.due_date,
+          });
+          return row;
+        }
+
+        // state === 'declared' — standard supersession path
         const result = await API.rpc('supersede_nra', {
           p_old_nra_id:   currentNRA.nra_id,
           p_new_nra_data: {
