@@ -1,41 +1,32 @@
 // ============================================================
 // accord-nra.js — NRA (Next Required Action) Surface components
-// CMD-ACCORD-NRA-SURFACE-1 Phase 2
+// CMD-ACCORD-NRA-SURFACE-1 Phase 2 + Phase 3
+//
+// Phase 3 addition: 'declare-at-creation' modal mode for pre-commit
+// atomic capture flow. New 4th argument `options.onSubmit` allows
+// caller to handle the substrate write itself (instead of the modal
+// invoking API.rpc internally). Used when node does not yet exist
+// at modal-open time.
+//
+// Also exports window.AccordNRA.emit() so surface code can dispatch
+// CustomEvents using the same path the modal uses internally.
 //
 // Exposes window.AccordNRA = {
-//   Modal:        { open(node, mode, currentNRA?) , close() }
-//   Badge:        { render(node, currentNRA, history?) → htmlString }
+//   Modal:        { open(node, mode, currentNRA?, options?) , close() }
+//   Badge:        { render(node, currentNRA, history?) → htmlString,
+//                   wireClickHandlers(container, lookup) }
 //   HistoryPanel: { open(nodeId, history), close() }
-//   Events:       6 CustomEvent kinds dispatched on window
+//   emit:         (kind, detail) → dispatch accord:<kind> CustomEvent
 // }
 //
-// Substrate API consumed via API.rpc():
-//   declare_nra, waive_nra, defer_nra, resolve_nra, supersede_nra
-// Plus direct PATCH on accord_nras for declared↔deferred transitions
-// (via existing F-P4-9/IR73 RLS UPDATE policies).
-//
-// CustomEvents dispatched (window-level, NOT realtime broadcast):
-//   accord:nra-declared
-//   accord:nra-waived
-//   accord:nra-deferred
-//   accord:nra-resolved
-//   accord:nra-superseded
-//   accord:nra-candidate-flagged   (dispatched by surface code on Phase 4
-//                                   trigger detection; this module emits
-//                                   on operator-driven candidate confirm)
-//
-// Style Doctrine v1.8 §3.8: Accord palette tokens only (matched in
-// accord-nra.css). No Compass/Cadence/Pipeline borrowing.
-//
-// IR71 vigilance (state-mutation-before-invalidation): modal lifecycle
-// uses clone-replace pattern to wipe stale listeners. Pass NRA data
-// explicitly via arguments; do not rely on enclosing-scope state.
+// IR71 vigilance: clone-replace-before-listener-bind in modal lifecycle.
+// Pass NRA data and callbacks explicitly via arguments; no enclosing-
+// scope state mutations carry through modal lifecycle.
 // ============================================================
 
 (function () {
   'use strict';
 
-  // ── Owner-event-type vocabulary (substrate v1) ─────────────
   const OWNER_EVENT_TYPES = [
     { value: 'next_phase_review',         label: 'Next phase review' },
     { value: 'next_status_sync',          label: 'Next status sync' },
@@ -44,24 +35,18 @@
     { value: 'next_regulatory_milestone', label: 'Next regulatory milestone' },
   ];
 
-  // ── Trigger-kind vocabulary (substrate v1, surface-relevant) ─
   const TRIGGER_KINDS = [
     { value: '',                                  label: '— None —' },
     { value: 'meeting_scheduled_in_workstream',   label: 'Any meeting scheduled in this workstream' },
     { value: 'meeting_sealed_in_workstream',      label: 'Any meeting sealed in this workstream' },
-    // action_resolved / decision_resolved are forward-flag values per
-    // CMD-ACCORD-NODE-RESOLUTION-SUBSTRATE-1 (queued); not surfaced in v1
   ];
 
-  // ── HTML escape helper ─────────────────────────────────────
   function esc(s) {
     if (s == null) return '';
     return String(s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
-
-  // ── Date helpers ───────────────────────────────────────────
   function fmtDate(iso) {
     if (!iso) return '';
     const d = new Date(iso);
@@ -78,7 +63,6 @@
     return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
   }
 
-  // ── Dispatch CustomEvent to window ─────────────────────────
   function emit(kind, detail) {
     try {
       window.dispatchEvent(new CustomEvent('accord:' + kind, { detail }));
@@ -88,13 +72,11 @@
   }
 
   // ════════════════════════════════════════════════════════════
-  // MODAL — declare / waive / defer / update
+  // MODAL
   // ════════════════════════════════════════════════════════════
   const Modal = (function () {
     const BACKDROP_ID = 'accord-nra-modal-backdrop';
 
-    // Returns the live backdrop element; clones it (IR71) before each open
-    // so prior listeners are wiped clean. Caller binds fresh listeners.
     function _replaceBackdrop() {
       const old = document.getElementById(BACKDROP_ID);
       if (!old) {
@@ -106,41 +88,13 @@
       return fresh;
     }
 
-    function _formHtml(mode, node, currentNRA) {
-      const isUpdate = mode === 'update';
-      const seed = isUpdate ? (currentNRA || {}) : {};
-
-      if (mode === 'waive') {
-        return `
-          <h3>Waive NRA</h3>
-          <p>This artifact is a guardrail; no forward motion required. Provide a brief reason that captures why future review isn't needed.</p>
-          <label for="nra-waiver-reason">Waiver reason</label>
-          <textarea id="nra-waiver-reason" rows="3"
-            placeholder="e.g., Reference decision; superseded by DC-014; standing record."
-          ></textarea>
-        `;
-      }
-
-      if (mode === 'defer') {
-        return `
-          <h3>Defer NRA</h3>
-          <p>OK to defer? You'll be reminded periodically. Forward-motion intent is recorded as deferred — operator picks up later.</p>
-        `;
-      }
-
-      // declare or update — same field set
-      const titleText = isUpdate ? 'Update NRA' : 'Declare NRA';
-      const introText = isUpdate
-        ? 'Update the next required action for this artifact. The current NRA is preserved as history.'
-        : 'Declare the next required action that moves this artifact forward.';
-
+    function _declareFieldsHtml(seed) {
       const ownerEventOptions = OWNER_EVENT_TYPES.map(o =>
         `<option value="${esc(o.value)}"${seed.owner_event_type === o.value ? ' selected' : ''}>${esc(o.label)}</option>`
       ).join('');
       const triggerKindOptions = TRIGGER_KINDS.map(t =>
         `<option value="${esc(t.value)}"${seed.trigger_kind === t.value ? ' selected' : ''}>${esc(t.label)}</option>`
       ).join('');
-
       const dueValue   = seed.due_date ? esc(seed.due_date) : '';
       const descValue  = seed.description ? esc(seed.description) : '';
       const typeChecked = (val) => seed.nra_type === val ? ' checked' : '';
@@ -148,11 +102,7 @@
                         : seed.owner_event_type   ? 'event'
                         : seed.owner_is_operator  ? 'operator'
                         : 'operator';
-
       return `
-        <h3>${esc(titleText)}</h3>
-        <p>${esc(introText)}</p>
-
         <label>NRA type</label>
         <div class="nra-radio-group">
           <label class="nra-radio">
@@ -197,12 +147,106 @@
       `;
     }
 
-    function open(node, mode, currentNRA) {
-      // mode: 'declare' | 'waive' | 'defer' | 'update'
-      // node: { node_id, firm_id, ... }
-      // currentNRA (update mode only): existing accord_nras row
-      if (!node || !node.node_id) {
+    function _waiveFieldsHtml() {
+      return `
+        <label for="nra-waiver-reason">Waiver reason</label>
+        <textarea id="nra-waiver-reason" rows="3"
+          placeholder="e.g., Reference decision; superseded by DC-014; standing record."
+        ></textarea>
+      `;
+    }
+
+    function _deferFieldsHtml() {
+      return `
+        <p style="font-size:13px;color:var(--ink-body);margin-top:8px;">
+          OK to defer? You'll be reminded periodically. Forward-motion intent is recorded as deferred — pick up later.
+        </p>
+      `;
+    }
+
+    function _formHtml(mode, node, currentNRA) {
+      const isUpdate = mode === 'update';
+      const seed = isUpdate ? (currentNRA || {}) : {};
+
+      // Phase 3: pre-commit atomic mode — action selector + dynamic field pane
+      if (mode === 'declare-at-creation') {
+        const tag  = (node && node.tag)  ? node.tag  : 'item';
+        const text = (node && node.text) ? node.text : '';
+        const ctxPreview = text
+          ? `<div class="nra-creation-context">
+               <span class="nra-creation-tag">${esc(tag.toUpperCase())}</span>
+               <span class="nra-creation-text">${esc(text.slice(0, 200))}${text.length > 200 ? '…' : ''}</span>
+             </div>`
+          : '';
+        return `
+          <h3>Address NRA for this ${esc(tag)}</h3>
+          ${ctxPreview}
+          <p>Before committing, decide how to address the next required action.</p>
+          <label>Action</label>
+          <div class="nra-radio-group">
+            <label class="nra-radio">
+              <input type="radio" name="nra-action" value="declare" checked>
+              <span>Declare — there's a forward action</span>
+            </label>
+            <label class="nra-radio">
+              <input type="radio" name="nra-action" value="waive">
+              <span>Waive — guardrail; no forward action needed</span>
+            </label>
+            <label class="nra-radio">
+              <input type="radio" name="nra-action" value="defer">
+              <span>Defer — pick up later</span>
+            </label>
+          </div>
+          <div id="nra-action-pane">
+            ${_declareFieldsHtml({})}
+          </div>
+        `;
+      }
+
+      if (mode === 'waive') {
+        return `
+          <h3>Waive NRA</h3>
+          <p>This artifact is a guardrail; no forward motion required. Provide a brief reason that captures why future review isn't needed.</p>
+          ${_waiveFieldsHtml()}
+        `;
+      }
+
+      if (mode === 'defer') {
+        return `
+          <h3>Defer NRA</h3>
+          ${_deferFieldsHtml()}
+        `;
+      }
+
+      const titleText = isUpdate ? 'Update NRA' : 'Declare NRA';
+      const introText = isUpdate
+        ? 'Update the next required action for this artifact. The current NRA is preserved as history.'
+        : 'Declare the next required action that moves this artifact forward.';
+      return `
+        <h3>${esc(titleText)}</h3>
+        <p>${esc(introText)}</p>
+        ${_declareFieldsHtml(seed)}
+      `;
+    }
+
+    function open(node, mode, currentNRA, options) {
+      // mode: 'declare' | 'waive' | 'defer' | 'update' | 'declare-at-creation'
+      // node: { node_id, firm_id, ... } OR pre-creation context
+      //       { firm_id, tag, text } for declare-at-creation mode
+      // currentNRA (update mode): existing accord_nras row
+      // options: { onSubmit?: async ({action, payload}) => void }
+      //          When provided AND mode === 'declare-at-creation', the
+      //          modal calls onSubmit({action, payload}) on submit
+      //          instead of invoking RPC. Caller handles substrate
+      //          write themselves.
+      options = options || {};
+
+      if (!node) {
         console.error('[AccordNRA] Modal.open: missing node argument');
+        return;
+      }
+      if (mode !== 'declare-at-creation' && !node.node_id) {
+        console.error('[AccordNRA] Modal.open: node.node_id required for mode', mode);
         return;
       }
 
@@ -210,21 +254,22 @@
       if (!backdrop) return;
 
       const modal = backdrop.querySelector('.modal');
+      const submitLabel =
+        mode === 'declare-at-creation' ? 'Commit + address NRA' :
+        mode === 'waive'   ? 'Waive' :
+        mode === 'defer'   ? 'Defer' :
+        mode === 'update'  ? 'Update NRA' :
+                             'Declare NRA';
+
       modal.innerHTML = _formHtml(mode, node, currentNRA) + `
         <div class="modal-actions">
           <button class="btn btn-ghost"  id="nra-cancel">Cancel</button>
-          <button class="btn btn-signal" id="nra-submit">${
-            mode === 'waive'  ? 'Waive' :
-            mode === 'defer'  ? 'Defer' :
-            mode === 'update' ? 'Update NRA' :
-                                'Declare NRA'
-          }</button>
+          <button class="btn btn-signal" id="nra-submit">${esc(submitLabel)}</button>
         </div>
       `;
 
       backdrop.classList.add('visible');
 
-      // Bind listeners on the cloned backdrop only — IR71 discipline
       const cancelBtn = modal.querySelector('#nra-cancel');
       const submitBtn = modal.querySelector('#nra-submit');
 
@@ -241,14 +286,32 @@
       };
       window.addEventListener('keydown', escHandler);
 
-      // Owner-kind radios enable/disable the event-type select
-      if (mode === 'declare' || mode === 'update') {
-        const eventSelect = modal.querySelector('#nra-owner-event-type');
-        modal.querySelectorAll('input[name="nra-owner-kind"]').forEach(r => {
+      // Owner-kind dynamic enable/disable for declare/update/declare-at-creation
+      function _wireOwnerToggle(scope) {
+        const eventSelect = scope.querySelector('#nra-owner-event-type');
+        if (!eventSelect) return;
+        scope.querySelectorAll('input[name="nra-owner-kind"]').forEach(r => {
           r.addEventListener('change', () => {
-            const kind = modal.querySelector('input[name="nra-owner-kind"]:checked')?.value;
+            const kind = scope.querySelector('input[name="nra-owner-kind"]:checked')?.value;
             eventSelect.disabled = (kind !== 'event');
             if (kind !== 'event') eventSelect.value = '';
+          });
+        });
+      }
+      if (mode === 'declare' || mode === 'update' || mode === 'declare-at-creation') {
+        _wireOwnerToggle(modal);
+      }
+
+      // Phase 3: declare-at-creation action-toggle — swap pane on radio change
+      if (mode === 'declare-at-creation') {
+        const pane = modal.querySelector('#nra-action-pane');
+        modal.querySelectorAll('input[name="nra-action"]').forEach(r => {
+          r.addEventListener('change', () => {
+            const action = modal.querySelector('input[name="nra-action"]:checked')?.value;
+            if (action === 'waive')      pane.innerHTML = _waiveFieldsHtml();
+            else if (action === 'defer') pane.innerHTML = _deferFieldsHtml();
+            else                         pane.innerHTML = _declareFieldsHtml({});
+            if (action === 'declare') _wireOwnerToggle(pane);
           });
         });
       }
@@ -258,7 +321,7 @@
         const origText = submitBtn.textContent;
         submitBtn.textContent = 'Working…';
         try {
-          await _submit(mode, node, currentNRA, modal);
+          await _submit(mode, node, currentNRA, modal, options);
           close();
         } catch (e) {
           console.error('[AccordNRA] submit failed', e);
@@ -273,11 +336,36 @@
       const backdrop = document.getElementById(BACKDROP_ID);
       if (backdrop) {
         backdrop.classList.remove('visible');
-        backdrop.querySelector('.modal').innerHTML = '';
+        const m = backdrop.querySelector('.modal');
+        if (m) m.innerHTML = '';
       }
     }
 
-    async function _submit(mode, node, currentNRA, modal) {
+    async function _submit(mode, node, currentNRA, modal, options) {
+      // Phase 3: declare-at-creation mode — caller handles RPC
+      if (mode === 'declare-at-creation') {
+        if (typeof options.onSubmit !== 'function') {
+          throw new Error('declare-at-creation mode requires options.onSubmit');
+        }
+        const action = modal.querySelector('input[name="nra-action"]:checked')?.value;
+        let payload;
+        if (action === 'declare') {
+          payload = _readDeclareForm(modal);
+          _validateDeclareForm(payload);
+        } else if (action === 'waive') {
+          const reason = modal.querySelector('#nra-waiver-reason')?.value.trim() || '';
+          if (!reason) throw new Error('Waiver reason is required');
+          payload = { reason };
+        } else if (action === 'defer') {
+          payload = {};
+        } else {
+          throw new Error('Action selection missing');
+        }
+        await options.onSubmit({ action, payload });
+        return;
+      }
+
+      // Phase 2 modes — modal owns RPC
       if (mode === 'waive') {
         const reason = modal.querySelector('#nra-waiver-reason').value.trim();
         if (!reason) throw new Error('Waiver reason is required');
@@ -297,9 +385,8 @@
         return row;
       }
 
-      // declare or update
-      const formData = _readForm(modal);
-      _validateForm(formData);
+      const formData = _readDeclareForm(modal);
+      _validateDeclareForm(formData);
 
       if (mode === 'update') {
         if (!currentNRA?.nra_id) throw new Error('Update mode requires currentNRA.nra_id');
@@ -309,7 +396,7 @@
             nra_type:           formData.nra_type,
             due_date:           formData.due_date,
             description:        formData.description,
-            owner_resource_id:  null, // v1: surface limits owner to operator OR event-type
+            owner_resource_id:  null,
             owner_event_type:   formData.owner_event_type || null,
             owner_is_operator:  formData.owner_is_operator,
             trigger_kind:       formData.trigger_kind || null,
@@ -350,29 +437,23 @@
       return row;
     }
 
-    function _readForm(modal) {
+    function _readDeclareForm(modal) {
       const nra_type    = modal.querySelector('input[name="nra-type"]:checked')?.value || null;
-      const due_date    = modal.querySelector('#nra-due-date').value || null;
-      const description = modal.querySelector('#nra-description').value.trim();
+      const due_date    = modal.querySelector('#nra-due-date')?.value || null;
+      const description = modal.querySelector('#nra-description')?.value.trim() || '';
       const ownerKind   = modal.querySelector('input[name="nra-owner-kind"]:checked')?.value;
       const owner_event_type = ownerKind === 'event'
-        ? (modal.querySelector('#nra-owner-event-type').value || null)
+        ? (modal.querySelector('#nra-owner-event-type')?.value || null)
         : null;
       const owner_is_operator = ownerKind === 'operator';
-      const trigger_kind = modal.querySelector('#nra-trigger-kind').value || null;
-
+      const trigger_kind = modal.querySelector('#nra-trigger-kind')?.value || null;
       return {
-        nra_type,
-        due_date,
-        description,
-        owner_event_type,
-        owner_is_operator,
-        trigger_kind,
-        trigger_target_id: null, // v1: not surfaced; substrate accepts NULL
+        nra_type, due_date, description, owner_event_type, owner_is_operator,
+        trigger_kind, trigger_target_id: null,
       };
     }
 
-    function _validateForm(d) {
+    function _validateDeclareForm(d) {
       if (!d.nra_type)        throw new Error('NRA type is required');
       if (!d.due_date)        throw new Error('Due date is required');
       if (!d.description)     throw new Error('Description is required');
@@ -385,38 +466,27 @@
   })();
 
   // ════════════════════════════════════════════════════════════
-  // BADGE — render inline next to nodes
+  // BADGE
   // ════════════════════════════════════════════════════════════
   const Badge = (function () {
 
     function render(node, currentNRA, historyCount) {
-      // Returns HTML string. Caller is responsible for click-handler wiring
-      // via event delegation or by re-binding after innerHTML; module also
-      // exposes wireClickHandlers() helper for delegation.
-
       if (!currentNRA) {
         if (historyCount && historyCount > 0) {
           return _renderHistoryOnly(node, historyCount);
         }
         return _renderGrandfathered(node);
       }
-
       switch (currentNRA.state) {
         case 'declared':
           if (currentNRA.resolution_candidate_at) {
             return _renderCandidate(node, currentNRA);
           }
           return _renderDeclared(node, currentNRA);
-        case 'waived':
-          return _renderWaived(node, currentNRA);
-        case 'deferred':
-          return _renderDeferred(node, currentNRA);
-        case 'resolved':
-          // resolved current NRA shouldn't appear in accord_nras_current,
-          // but defensive render
-          return _renderHistoryOnly(node, historyCount || 1);
-        default:
-          return '';
+        case 'waived':   return _renderWaived(node, currentNRA);
+        case 'deferred': return _renderDeferred(node, currentNRA);
+        case 'resolved': return _renderHistoryOnly(node, historyCount || 1);
+        default: return '';
       }
     }
 
@@ -484,9 +554,6 @@
       return 'External';
     }
 
-    // Click delegation helper — wire once on a container. Container's
-    // descendants with data-nra-action are dispatched to Modal.open or
-    // HistoryPanel.open. Caller provides node-lookup function.
     function wireClickHandlers(container, lookupNodeAndNRA) {
       if (!container || container._nraWired) return;
       container._nraWired = true;
@@ -524,7 +591,7 @@
   })();
 
   // ════════════════════════════════════════════════════════════
-  // HISTORY PANEL — right-side timeline of NRAs on a node
+  // HISTORY PANEL
   // ════════════════════════════════════════════════════════════
   const HistoryPanel = (function () {
     const PANEL_ID = 'accord-nra-history-panel';
@@ -538,7 +605,6 @@
       panel.querySelector('.accord-nra-panel-body').innerHTML = _renderTimeline(history);
       panel.classList.add('visible');
 
-      // Wire close handlers (clone-replace for IR71)
       const old = panel.querySelector('.accord-nra-panel-close');
       const fresh = old.cloneNode(true);
       old.parentNode.replaceChild(fresh, old);
@@ -614,7 +680,8 @@
     HistoryPanel,
     OWNER_EVENT_TYPES,
     TRIGGER_KINDS,
+    emit,
   };
 
-  console.log('[AccordNRA] CMD-ACCORD-NRA-SURFACE-1 Phase 2 loaded');
+  console.log('[AccordNRA] CMD-ACCORD-NRA-SURFACE-1 Phase 3 loaded');
 })();

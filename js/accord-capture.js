@@ -267,16 +267,108 @@
 
     // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: route decision/action
     // commits through the date-capture modal. Other tags commit directly.
+    // CMD-ACCORD-NRA-SURFACE-1 Phase 3: pre-commit atomic — open NRA
+    // modal before _doCommit fires. Modal cancel preserves operator
+    // text input (no node POST). Modal submit calls _doCommit then
+    // dispatches the NRA helper RPC + accord:nra-* CustomEvent.
     if (tag === 'decision' || tag === 'action') {
-      _openCaptureDateModal(tag, text, (dateExtras) => _doCommit(tag, text, dateExtras));
+      _openCaptureDateModal(tag, text, (dateExtras) =>
+        _openNRAModalThenCommit(tag, text, dateExtras));
       return;
     }
-    return _doCommit(tag, text, null);
+    return _openNRAModalThenCommit(tag, text, null);
+  }
+
+  // CMD-ACCORD-NRA-SURFACE-1 Phase 3: pre-commit atomic orchestrator.
+  // Opens the AccordNRA modal in declare-at-creation mode; on submit
+  // the callback calls _doCommit (creates node) and then dispatches
+  // the appropriate NRA helper RPC. CustomEvent is dispatched on RPC
+  // success. RPC failure falls through to non-blocking notification
+  // (operator can recover via Phase 4 grandfathered "+ Add NRA" badge).
+  // IR71 discipline: tag/text/dateExtras passed explicitly via closure
+  // arguments; modal-callback receives {action,payload} explicitly.
+  function _openNRAModalThenCommit(tag, text, dateExtras) {
+    if (!window.AccordNRA?.Modal?.open) {
+      console.warn('[Accord-capture] AccordNRA module not loaded; falling back to no-NRA commit');
+      return _doCommit(tag, text, dateExtras);
+    }
+    const me = Accord.state.me;
+    const nodeContext = { firm_id: me.firm_id, tag, text };
+    AccordNRA.Modal.open(nodeContext, 'declare-at-creation', null, {
+      onSubmit: async ({ action, payload }) => {
+        const node = await _doCommit(tag, text, dateExtras);
+        if (!node) {
+          throw new Error('Node creation failed; NRA not addressed.');
+        }
+        await _dispatchNRAForNewNode(node, action, payload);
+      },
+    });
+  }
+
+  // CMD-ACCORD-NRA-SURFACE-1 Phase 3: helper that calls the appropriate
+  // NRA RPC for a freshly-created node and dispatches the corresponding
+  // CustomEvent on success. RPC failure logs + console.warn but does
+  // NOT throw (orphan node is recoverable via Phase 4 display badge).
+  async function _dispatchNRAForNewNode(node, action, payload) {
+    try {
+      if (action === 'declare') {
+        const result = await API.rpc('declare_nra', {
+          p_node_id:           node.node_id,
+          p_nra_type:          payload.nra_type,
+          p_due_date:          payload.due_date,
+          p_description:       payload.description,
+          p_owner_resource_id: null,
+          p_owner_event_type:  payload.owner_event_type || null,
+          p_owner_is_operator: payload.owner_is_operator,
+          p_trigger_kind:      payload.trigger_kind || null,
+          p_trigger_target_id: payload.trigger_target_id || null,
+        });
+        const row = Array.isArray(result) ? result[0] : result;
+        AccordNRA.emit('nra-declared', {
+          node_id:  node.node_id,
+          nra_id:   row?.nra_id,
+          firm_id:  node.firm_id,
+          nra_type: payload.nra_type,
+          due_date: payload.due_date,
+        });
+      } else if (action === 'waive') {
+        const result = await API.rpc('waive_nra', {
+          p_node_id: node.node_id,
+          p_reason:  payload.reason,
+        });
+        const row = Array.isArray(result) ? result[0] : result;
+        AccordNRA.emit('nra-waived', {
+          node_id: node.node_id,
+          nra_id:  row?.nra_id,
+          firm_id: node.firm_id,
+        });
+      } else if (action === 'defer') {
+        const result = await API.rpc('defer_nra', { p_node_id: node.node_id });
+        const row = Array.isArray(result) ? result[0] : result;
+        AccordNRA.emit('nra-deferred', {
+          node_id: node.node_id,
+          nra_id:  row?.nra_id,
+          firm_id: node.firm_id,
+        });
+      }
+    } catch (e) {
+      // Non-blocking per architect disposition: log + console.warn.
+      // Operator recovers via Phase 4 grandfathered "+ Add NRA" badge
+      // when display surface renders this orphan node.
+      console.warn(
+        '[Accord-capture] NRA RPC failed for new node ' + node.node_id +
+        ' (action=' + action + '). Node was created; NRA not addressed. ' +
+        'Use the "+ Add NRA" affordance on the rendered node to recover.',
+        e
+      );
+    }
   }
 
   // CMD-SUBSTRATE-COUNTERFACTUAL-MIN Phase 4: extracted commit-write
   // path so the date modal can call back with optional date extras.
   // dateExtras: { effective_date, due_date, effective_date_basis } | null
+  // CMD-ACCORD-NRA-SURFACE-1 Phase 3: returns the created node (or null
+  // on failure) so _openNRAModalThenCommit can dispatch NRA RPC after.
   async function _doCommit(tag, text, dateExtras) {
     const m = Accord.state.meeting;
     const me = Accord.state.me;
@@ -345,9 +437,11 @@
           console.warn('[Accord-capture] CoC.write date event best-effort failure', e);
         }
       }
+      return node;
     } catch (e) {
       console.error('[Accord] commit failed', e);
       alert('Capture failed: ' + (e?.message || e));
+      return null;
     }
   }
 

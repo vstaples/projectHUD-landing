@@ -91,6 +91,31 @@
   font-style: italic;
 }
 
+/* Phase 3: declare-at-creation context preview */
+#accord-app .modal .nra-creation-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--canvas);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  margin: 4px 0 12px;
+}
+#accord-app .modal .nra-creation-tag {
+  font: 600 11px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  flex: 0 0 auto;
+}
+#accord-app .modal .nra-creation-text {
+  font-size: 13px;
+  color: var(--ink-body);
+  flex: 1;
+  min-width: 0;
+}
+
 /* ── Badges ──────────────────────────────────────────────── */
 /* Restrained design: 11px, monochrome with subtle tint. Glanceable
    not loud. Click to edit (or open history / declare for variants). */

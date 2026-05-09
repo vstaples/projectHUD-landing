@@ -903,6 +903,41 @@
       return;
     }
 
+    // CMD-ACCORD-NRA-SURFACE-1 Phase 3: pre-commit atomic.
+    // Close dissent modal; open NRA modal in declare-at-creation mode.
+    // On NRA submit, perform all dissent writes (node + edge + CoC) and
+    // then dispatch the NRA helper RPC + accord:nra-* CustomEvent.
+    // On NRA cancel, no dissent writes occur — operator can re-trigger.
+    if (!window.AccordNRA?.Modal?.open) {
+      console.warn('[Accord-ledger] AccordNRA module not loaded; falling back to no-NRA dissent commit');
+      return _commitDissentWithoutNRA({ targetNodeId, rationale, predicted, me, myResourceId, target });
+    }
+
+    _closeDissentModal();
+    AccordNRA.Modal.open(
+      { firm_id: me.firm_id, tag: 'dissent', text: rationale },
+      'declare-at-creation',
+      null,
+      {
+        onSubmit: async ({ action, payload }) => {
+          const dissentNode = await _commitDissentWithoutNRA({
+            targetNodeId, rationale, predicted, me, myResourceId, target
+          });
+          if (!dissentNode) {
+            throw new Error('Dissent registration failed; NRA not addressed.');
+          }
+          await _dispatchNRAForDissent(dissentNode, action, payload);
+        },
+      }
+    );
+  }
+
+  // CMD-ACCORD-NRA-SURFACE-1 Phase 3: extracted dissent-write path so the
+  // NRA modal callback can chain after node/edge/CoC creation. Returns
+  // the dissent node row on success, null on failure (caller handles).
+  async function _commitDissentWithoutNRA(ctx) {
+    const { targetNodeId, rationale, predicted, me, myResourceId, target } = ctx;
+
     // Step 1: insert dissent node (tag=dissent + dissent_* typed columns).
     // The seq_alloc trigger assigns DS-NNN automatically; the dissent_fields_check
     // constraint enforces dissented_by + rationale + recorded_at presence.
@@ -925,7 +960,7 @@
     } catch (e) {
       console.error('[Accord-ledger] dissent node insert failed', e);
       alert('Dissent registration failed: ' + (e?.message || e));
-      return;
+      return null;
     }
 
     // Step 2: insert dissents_from edge (dissent → decision).
@@ -945,9 +980,8 @@
       console.error('[Accord-ledger] dissents_from edge insert failed', e);
       alert('Dissent edge insert failed: ' + (e?.message || e) +
             '\n(The dissent node was created but is not linked. Refresh and re-register.)');
-      _closeDissentModal();
       await _refresh();
-      return;
+      return null;
     }
 
     // Step 3: CoC.write for accord.dissent.recorded (uses IR58-amended writer;
@@ -969,9 +1003,65 @@
       console.warn('[Accord-ledger] CoC.write best-effort failure', e);
     }
 
-    _closeDissentModal();
     await _refresh();
     _toast('Dissent registered.');
+    return dissentNode;
+  }
+
+  // CMD-ACCORD-NRA-SURFACE-1 Phase 3: helper that calls the appropriate
+  // NRA RPC for a freshly-created dissent node and dispatches the
+  // corresponding CustomEvent on success. RPC failure logs + console.warn
+  // but does NOT throw (orphan node recoverable via Phase 4 display badge).
+  async function _dispatchNRAForDissent(node, action, payload) {
+    try {
+      if (action === 'declare') {
+        const result = await API.rpc('declare_nra', {
+          p_node_id:           node.node_id,
+          p_nra_type:          payload.nra_type,
+          p_due_date:          payload.due_date,
+          p_description:       payload.description,
+          p_owner_resource_id: null,
+          p_owner_event_type:  payload.owner_event_type || null,
+          p_owner_is_operator: payload.owner_is_operator,
+          p_trigger_kind:      payload.trigger_kind || null,
+          p_trigger_target_id: payload.trigger_target_id || null,
+        });
+        const row = Array.isArray(result) ? result[0] : result;
+        AccordNRA.emit('nra-declared', {
+          node_id:  node.node_id,
+          nra_id:   row?.nra_id,
+          firm_id:  node.firm_id,
+          nra_type: payload.nra_type,
+          due_date: payload.due_date,
+        });
+      } else if (action === 'waive') {
+        const result = await API.rpc('waive_nra', {
+          p_node_id: node.node_id,
+          p_reason:  payload.reason,
+        });
+        const row = Array.isArray(result) ? result[0] : result;
+        AccordNRA.emit('nra-waived', {
+          node_id: node.node_id,
+          nra_id:  row?.nra_id,
+          firm_id: node.firm_id,
+        });
+      } else if (action === 'defer') {
+        const result = await API.rpc('defer_nra', { p_node_id: node.node_id });
+        const row = Array.isArray(result) ? result[0] : result;
+        AccordNRA.emit('nra-deferred', {
+          node_id: node.node_id,
+          nra_id:  row?.nra_id,
+          firm_id: node.firm_id,
+        });
+      }
+    } catch (e) {
+      console.warn(
+        '[Accord-ledger] NRA RPC failed for dissent node ' + node.node_id +
+        ' (action=' + action + '). Dissent was registered; NRA not addressed. ' +
+        'Use the "+ Add NRA" affordance on the rendered dissent node to recover.',
+        e
+      );
+    }
   }
 
   function _toast(msg) {
