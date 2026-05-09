@@ -431,8 +431,11 @@
 #accord-app.accord-setup-fullpage .ac-rail-left  { display: none; }
 #accord-app.accord-setup-fullpage .ac-rail-right { display: none; }
 
-/* Center expansion — body prefix sufficient */
-body.accord-setup-fullpage .ac-center    { flex: 1 1 auto; min-width: 0; }
+/* Center expansion — #accord-app prefix required; existing Accord   */
+/* rule uses #accord-app ancestor (1,1,0+); body-level (0,2,0) loses */
+#accord-app.accord-setup-fullpage .ac-center { flex: 1 1 auto; min-width: 0; }
+
+/* View host — body prefix sufficient; resolves to 100% of expanded center */
 body.accord-setup-fullpage .ac-view-host { width: 100%; height: 100%; }
 
 /* Running-meeting tab panes — body prefix required            */
