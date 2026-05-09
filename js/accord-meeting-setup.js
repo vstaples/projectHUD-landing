@@ -42,9 +42,14 @@
       window._accordDetachSurfaceHost = null;
     }
     if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
-    _agendaFetchAborted = true;
-    _currentMeetingId   = null;
-    _workstreamName     = null;
+    _agendaFetchAborted        = true;
+    _anticipationFetchAborted  = true;
+    _currentMeetingId          = null;
+    _workstreamName            = null;
+    // Remove NRA event listeners -- Phase 5
+    NRA_EVENTS.forEach(function(evt) {
+      window.removeEventListener(evt, _onNraEvent);
+    });
   }
 
   // ── Briefing autosave ─────────────────────────────────────────
@@ -720,12 +725,147 @@
       });
     }
 
-    // Briefing + Agenda in parallel
+    // Briefing + Agenda + Anticipation in parallel
     _renderBriefing(meeting, workstreamId);
     _renderAgenda(meeting, workstreamId);
+    _renderAnticipation(meeting, workstreamId);
+
+    // NRA event listeners for live badge refresh -- Phase 5
+    NRA_EVENTS.forEach(function(evt) {
+      window.addEventListener(evt, _onNraEvent);
+    });
   }
 
   // ── Expose ────────────────────────────────────────────────────
+
+  // ============================================================
+  // ANTICIPATION COLUMN -- Phase 5
+  // ============================================================
+
+  var _anticipationFetchAborted = false;
+  var NRA_EVENTS = [
+    'accord:nra-declared', 'accord:nra-superseded',
+    'accord:nra-resolved', 'accord:nra-deferred', 'accord:nra-waived'
+  ];
+
+  function _onNraEvent() {
+    var area = document.querySelector('.ac-setup-anticipation-area');
+    var list = area && area.querySelector('#ac-prior-actions-list');
+    if (!list || !window.AccordNRA) return;
+    var nodeIds = Array.from(list.querySelectorAll('[data-node-id]'))
+      .map(function(el) { return el.dataset.nodeId; });
+    if (!nodeIds.length) return;
+    AccordNRA.fetchBadgeData(nodeIds).then(function(lookup) {
+      AccordNRA.wireBadgesIn(list, lookup);
+    }).catch(function() {});
+  }
+
+  function _fetchResources() {
+    return API.get(
+      'resources?is_active=eq.true' +
+      '&select=id,name,title' +
+      '&order=title.asc,name.asc'
+    ).then(function(rows) { return rows || []; });
+  }
+
+  function _fetchPriorActions(currentMeetingId, workstreamId) {
+    return API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&meeting_id=neq.' + currentMeetingId +
+      '&state=in.(closed,sealed)' +
+      '&select=meeting_id' +
+      '&order=scheduled_for.desc.nullslast,created_at.desc' +
+      '&limit=10'
+    ).then(function(meetings) {
+      if (!meetings || !meetings.length) return [];
+      var ids = meetings.map(function(m) { return m.meeting_id; }).join(',');
+      return API.get(
+        'accord_nodes?meeting_id=in.(' + ids + ')' +
+        '&tag=eq.action' +
+        '&select=node_id,summary,meeting_id,created_at' +
+        '&order=created_at.desc' +
+        '&limit=20'
+      ).then(function(nodes) { return nodes || []; });
+    });
+  }
+
+  function _paintAnticipation(area, resources, actionNodes) {
+    var resHTML = '<div class="ac-anticipation-section">' +
+      '<div class="ac-anticipation-section-label">Expected Attendees</div>';
+    if (!resources.length) {
+      resHTML += '<div class="ac-anticipation-empty">No attendees on record.</div>';
+    } else {
+      resHTML += '<div class="ac-anticipation-resources-list">';
+      resources.forEach(function(r) {
+        resHTML += (
+          '<div class="ac-anticipation-resource">' +
+            '<span class="ac-anticipation-resource-name">' + esc(r.name) + '</span>' +
+            (r.title ? '<span class="ac-anticipation-resource-role">' + esc(r.title) + '</span>' : '') +
+          '</div>'
+        );
+      });
+      resHTML += '</div>';
+    }
+    resHTML += '</div>';
+
+    var actHTML = '<div class="ac-anticipation-section">' +
+      '<div class="ac-anticipation-section-label">Prior Actions</div>';
+    if (!actionNodes.length) {
+      actHTML += '<div class="ac-anticipation-empty">No prior actions in this workstream.</div>';
+    } else {
+      actHTML += '<div class="ac-anticipation-actions-list" id="ac-prior-actions-list">';
+      actionNodes.forEach(function(n) {
+        actHTML += (
+          '<div class="ac-anticipation-action" data-node-id="' + esc(n.node_id) + '">' +
+            '<span class="ac-anticipation-action-summary">' + esc(truncate(n.summary, 100)) + '</span>' +
+            '<span class="ac-nra-badge-slot"></span>' +
+          '</div>'
+        );
+      });
+      actHTML += '</div>';
+    }
+    actHTML += '</div>';
+
+    area.innerHTML = '<div class="ac-anticipation-host">' + resHTML + actHTML + '</div>';
+
+    if (actionNodes.length && window.AccordNRA) {
+      var nodeIds = actionNodes.map(function(n) { return n.node_id; });
+      AccordNRA.fetchBadgeData(nodeIds).then(function(lookup) {
+        var list = area.querySelector('#ac-prior-actions-list');
+        if (list && !_anticipationFetchAborted) {
+          AccordNRA.wireBadgesIn(list, lookup);
+        }
+      }).catch(function(e) {
+        console.error('[AccordMeetingSetup] NRA badge fetch failed', e);
+      });
+    }
+  }
+
+  function _renderAnticipation(meeting, workstreamId) {
+    _anticipationFetchAborted = false;
+    var area = document.querySelector('.ac-setup-anticipation-area');
+    if (!area) return;
+    area.innerHTML = '<div class="ac-anticipation-loading">Loading\u2026</div>';
+
+    if (!workstreamId) {
+      area.innerHTML = '<div class="ac-anticipation-empty">No workstream context.</div>';
+      return;
+    }
+
+    Promise.all([
+      _fetchResources(),
+      _fetchPriorActions(meeting.meeting_id, workstreamId)
+    ]).then(function(results) {
+      if (_anticipationFetchAborted) return;
+      _paintAnticipation(area, results[0], results[1]);
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] anticipation fetch failed', e);
+      if (!_anticipationFetchAborted) {
+        area.innerHTML = '<div class="ac-anticipation-error">Could not load anticipation data.</div>';
+      }
+    });
+  }
+
   window.AccordMeetingSetup = { render: render, teardown: teardown };
 
 })();
