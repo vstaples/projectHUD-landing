@@ -711,3 +711,46 @@
   font-style: italic;
   padding: 4px 0;
 }
+
+/* ── Footer duration widget -- Phase 7 ───────────────────── */
+
+.ac-footer-duration {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ac-footer-duration-value {
+  font-size: 13px;
+  color: var(--ink-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ac-footer-duration-set,
+.ac-footer-duration-edit,
+.ac-footer-duration-clear {
+  font-size: 12px;
+  padding: 2px 6px;
+}
+
+.ac-footer-duration-input {
+  width: 72px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--ink-body);
+  background: var(--canvas-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  padding: 3px 6px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ac-footer-duration-input:focus {
+  border-color: var(--signal);
+}
+
+.ac-footer-duration--editing .ac-footer-duration-save {
+  font-size: 12px;
+  padding: 2px 8px;
+}

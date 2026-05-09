@@ -729,11 +729,12 @@
       });
     }
 
-    // Briefing + Agenda + Anticipation + Filmstrip in parallel
+    // Briefing + Agenda + Anticipation + Filmstrip + Footer duration in parallel
     _renderBriefing(meeting, workstreamId);
     _renderAgenda(meeting, workstreamId);
     _renderAnticipation(meeting, workstreamId);
     _renderFilmstrip(meeting, workstreamId);
+    _renderFooterDuration(meeting);
 
     // NRA event listeners for live badge refresh -- Phase 5
     NRA_EVENTS.forEach(function(evt) {
@@ -1004,6 +1005,85 @@
           strip.innerHTML = '<div class="ac-film-error">Could not load prior meetings.</div>';
         }
       });
+  }
+
+
+  // ============================================================
+  // FOOTER DURATION WIDGET -- Phase 7
+  // ============================================================
+
+  function _saveDuration(footerLeft, meeting, val) {
+    API.patch(
+      'accord_meetings?meeting_id=eq.' + meeting.meeting_id,
+      { duration_minutes: val }
+    ).then(function() {
+      meeting.duration_minutes = val;
+      _paintDuration(footerLeft, meeting);
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] duration save failed', e);
+      _paintDuration(footerLeft, meeting);
+    });
+  }
+
+  function _openDurationInput(footerLeft, meeting, currentVal) {
+    footerLeft.innerHTML =
+      '<div class="ac-footer-duration ac-footer-duration--editing">' +
+        '<input class="ac-footer-duration-input" type="number" min="1" max="480" ' +
+          'placeholder="minutes"' +
+          (currentVal != null ? ' value="' + esc(String(currentVal)) + '"' : '') +
+          '>' +
+        '<button class="btn btn-signal ac-footer-duration-save">Set</button>' +
+        '<button class="btn btn-ghost ac-footer-duration-cancel">Cancel</button>' +
+      '</div>';
+
+    var input     = footerLeft.querySelector('.ac-footer-duration-input');
+    var saveBtn   = footerLeft.querySelector('.ac-footer-duration-save');
+    var cancelBtn = footerLeft.querySelector('.ac-footer-duration-cancel');
+
+    input.focus();
+    if (currentVal != null) input.select();
+
+    function _doSave() {
+      var val = parseInt(input.value, 10);
+      if (!val || val < 1) { _paintDuration(footerLeft, meeting); return; }
+      _saveDuration(footerLeft, meeting, val);
+    }
+
+    input.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); _doSave(); }
+      if (ev.key === 'Escape') { _paintDuration(footerLeft, meeting); }
+    });
+    saveBtn.addEventListener('click', _doSave);
+    cancelBtn.addEventListener('click', function() { _paintDuration(footerLeft, meeting); });
+  }
+
+  function _paintDuration(footerLeft, meeting) {
+    var d = meeting.duration_minutes;
+    if (d == null) {
+      footerLeft.innerHTML =
+        '<div class="ac-footer-duration">' +
+          '<button class="btn btn-ghost ac-footer-duration-set">Set duration</button>' +
+        '</div>';
+      footerLeft.querySelector('.ac-footer-duration-set')
+        .addEventListener('click', function() { _openDurationInput(footerLeft, meeting, null); });
+    } else {
+      footerLeft.innerHTML =
+        '<div class="ac-footer-duration">' +
+          '<span class="ac-footer-duration-value">' + esc(d + 'm') + '</span>' +
+          '<button class="btn btn-ghost ac-footer-duration-edit" title="Edit">\u270e</button>' +
+          '<button class="btn btn-ghost ac-footer-duration-clear" title="Clear">\u00d7</button>' +
+        '</div>';
+      footerLeft.querySelector('.ac-footer-duration-edit')
+        .addEventListener('click', function() { _openDurationInput(footerLeft, meeting, d); });
+      footerLeft.querySelector('.ac-footer-duration-clear')
+        .addEventListener('click', function() { _saveDuration(footerLeft, meeting, null); });
+    }
+  }
+
+  function _renderFooterDuration(meeting) {
+    var footerLeft = document.querySelector('.ac-setup-footer-left');
+    if (!footerLeft) return;
+    _paintDuration(footerLeft, meeting);
   }
 
   window.AccordMeetingSetup = { render: render, teardown: teardown };
