@@ -322,6 +322,7 @@ const Accord = (() => {
     }
 
     const toggle = $('meetingToggleBtn');
+    if (!toggle) return; // controls bar not yet relocated into view header
     if (m.state === 'idle') {
       toggle.disabled = false;
       toggle.textContent = 'Start meeting →';

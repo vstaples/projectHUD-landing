@@ -498,6 +498,13 @@
     // bindings are preserved (DOM-tree relocation does not detach
     // listeners).
     _mountSurfaceHostInTabBody();
+    // Controls bar now relocated into ac-view-header; re-fire meeting-loaded
+    // so accord-core updates the toggle button state (was skipped pre-mount).
+    if (window.Accord?.state?.meeting) {
+      window.dispatchEvent(new CustomEvent('accord:meeting-loaded', {
+        detail: { meeting: window.Accord.state.meeting, thread: window.Accord.state.thread }
+      }));
+    }
     // Activate default tab (capture) on first mount of a meeting view
     _activateMeetingTab(host, 'capture');
   }
