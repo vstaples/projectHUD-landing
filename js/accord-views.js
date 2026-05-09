@@ -443,7 +443,14 @@
               ${esc(meeting.title || '(untitled)')}
             </span>
           </nav>
-          <h1 class="ac-view-title">${esc(meeting.title || '(untitled)')}</h1>
+          <div class="ac-view-header-row">
+            <h1 class="ac-view-title">${esc(meeting.title || '(untitled)')}</h1>
+            <div class="ac-view-header-controls">
+              <div class="timer" id="meetingTimer">00:00:00</div>
+              <button class="btn btn-prominent" id="newMeetingBtn">+ New meeting</button>
+              <button class="btn btn-signal" id="meetingToggleBtn" disabled>Start meeting →</button>
+            </div>
+          </div>
           <div class="meeting-organizer" id="cap-organizer" style="display:none">
             <span class="organizer-label">Organized by</span>
             <span class="organizer-name" id="cap-organizer-name"></span>

@@ -438,3 +438,20 @@
   color: var(--ink-primary);
   background: var(--canvas-raised);
 }
+
+/* ── ac-view-header meeting title row with controls ──────────
+   CMD-ACCORD-NEWMEETING-ROUTING-FIX-1: timer + buttons moved
+   from capture-header into ac-view-header.                  */
+.ac-view-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ac-view-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
