@@ -299,6 +299,14 @@
         }
       });
     });
+
+    // CMD-ACCORD-NRA-SURFACE-1 Phase 4: paint NRA badges next to each
+    // sealed node. Idempotent — re-painting on each spine render is OK.
+    if (window.AccordNRA?.wireBadgesIn) {
+      const lookup = (nodeId) => local.nodeIndex[nodeId]
+        || { node_id: nodeId, firm_id: Accord.state?.me?.firm_id };
+      window.AccordNRA.wireBadgesIn($('docStream'), lookup);
+    }
   }
 
   function _renderEmptySpine(kind) {

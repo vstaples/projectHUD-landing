@@ -1,27 +1,30 @@
 // ============================================================
 // accord-nra.js — NRA (Next Required Action) Surface components
-// CMD-ACCORD-NRA-SURFACE-1 Phase 2 + Phase 3
+// CMD-ACCORD-NRA-SURFACE-1 Phase 2 + Phase 3 + Phase 4
 //
-// Phase 3 addition: 'declare-at-creation' modal mode for pre-commit
-// atomic capture flow. New 4th argument `options.onSubmit` allows
-// caller to handle the substrate write itself (instead of the modal
-// invoking API.rpc internally). Used when node does not yet exist
-// at modal-open time.
-//
-// Also exports window.AccordNRA.emit() so surface code can dispatch
-// CustomEvents using the same path the modal uses internally.
+// Phase 4 additions:
+//   - Modal 'update' mode renders a candidate-confirmation region
+//     ABOVE the supersede form when currentNRA.resolution_candidate_at
+//     IS NOT NULL. Two buttons: "Confirm resolved" → resolve_nra RPC,
+//     "Update instead" → collapses region, reveals supersede form.
+//     No "Not yet" button per RLS gap (Phase 4 RLS halt §3 / Option B).
+//   - AccordNRA.fetchBadgeData(nodeIds) — batched GET of current NRA
+//     + history count for many nodes at once. N+1 avoided per
+//     Phase 4 commission §2 D2 architect-lean.
+//   - AccordNRA.wireBadgesIn(container, getNodeById) — surface helper
+//     that paints badges next to data-node-id elements and wires
+//     click handlers for edit/history/add affordances. Listens to
+//     accord:nra-* CustomEvents and refreshes affected badge cells
+//     in-place (event delegation; IR71-safe).
 //
 // Exposes window.AccordNRA = {
-//   Modal:        { open(node, mode, currentNRA?, options?) , close() }
-//   Badge:        { render(node, currentNRA, history?) → htmlString,
-//                   wireClickHandlers(container, lookup) }
+//   Modal:        { open(node, mode, currentNRA?, options?), close() }
+//   Badge:        { render, wireClickHandlers }
 //   HistoryPanel: { open(nodeId, history), close() }
-//   emit:         (kind, detail) → dispatch accord:<kind> CustomEvent
+//   fetchBadgeData(nodeIds)         → Map<nodeId, {current, historyCount}>
+//   wireBadgesIn(container, getNode)→ install + return refresh()
+//   emit:         (kind, detail) → dispatch accord:<kind>
 // }
-//
-// IR71 vigilance: clone-replace-before-listener-bind in modal lifecycle.
-// Pass NRA data and callbacks explicitly via arguments; no enclosing-
-// scope state mutations carry through modal lifecycle.
 // ============================================================
 
 (function () {
@@ -69,6 +72,50 @@
     } catch (e) {
       console.warn('[AccordNRA] CustomEvent dispatch failed', kind, e);
     }
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // BATCHED FETCH — Phase 4
+  // ════════════════════════════════════════════════════════════
+  // Returns Map<nodeId, {current, historyCount}>. Two PostgREST GETs
+  // total regardless of nodeIds.length: one against accord_nras_current,
+  // one against accord_nras for history-count rollup. nodeIds expected
+  // to be unique; caller dedupes if needed. Empty input returns empty Map.
+  async function fetchBadgeData(nodeIds) {
+    const out = new Map();
+    const ids = Array.isArray(nodeIds) ? nodeIds.filter(Boolean) : [];
+    if (!ids.length) return out;
+
+    const idList = ids.join(',');
+
+    // Initialize all entries with default empty state
+    ids.forEach(id => out.set(id, { current: null, historyCount: 0 }));
+
+    try {
+      const [currents, all] = await Promise.all([
+        API.get(`accord_nras_current?node_id=in.(${idList})&select=*`).catch(() => []),
+        API.get(`accord_nras?node_id=in.(${idList})&select=node_id`).catch(() => []),
+      ]);
+
+      (currents || []).forEach(row => {
+        const e = out.get(row.node_id);
+        if (e) e.current = row;
+      });
+
+      (all || []).forEach(row => {
+        const e = out.get(row.node_id);
+        if (e) e.historyCount = (e.historyCount || 0) + 1;
+      });
+    } catch (e) {
+      console.warn('[AccordNRA] fetchBadgeData failed', e);
+    }
+    return out;
+  }
+
+  // Single-node helper for click handler use (history view, edit lookup)
+  async function fetchOneBadgeData(nodeId) {
+    const m = await fetchBadgeData([nodeId]);
+    return m.get(nodeId) || { current: null, historyCount: 0 };
   }
 
   // ════════════════════════════════════════════════════════════
@@ -164,11 +211,38 @@
       `;
     }
 
+    // Phase 4: candidate-confirmation region, rendered inside 'update'
+    // mode when currentNRA.resolution_candidate_at IS NOT NULL.
+    function _candidateRegionHtml(currentNRA) {
+      const flaggedAt = currentNRA?.resolution_candidate_at
+        ? fmtDate(currentNRA.resolution_candidate_at)
+        : '';
+      return `
+        <div class="nra-candidate-region" id="nra-candidate-region">
+          <div class="nra-candidate-banner">
+            <span class="nra-candidate-glyph">✓?</span>
+            <div class="nra-candidate-text">
+              <div class="nra-candidate-title">System detected a resolution candidate</div>
+              <div class="nra-candidate-body">
+                A substrate event matching this NRA's trigger condition fired
+                ${flaggedAt ? `on ${esc(flaggedAt)}` : ''}.
+                Confirm whether the action is now resolved — or update the NRA to
+                reflect the current state.
+              </div>
+            </div>
+          </div>
+          <div class="nra-candidate-actions">
+            <button type="button" class="btn btn-signal"  id="nra-confirm-resolved">Confirm resolved</button>
+            <button type="button" class="btn"             id="nra-update-instead">Update instead</button>
+          </div>
+        </div>
+      `;
+    }
+
     function _formHtml(mode, node, currentNRA) {
       const isUpdate = mode === 'update';
       const seed = isUpdate ? (currentNRA || {}) : {};
 
-      // Phase 3: pre-commit atomic mode — action selector + dynamic field pane
       if (mode === 'declare-at-creation') {
         const tag  = (node && node.tag)  ? node.tag  : 'item';
         const text = (node && node.text) ? node.text : '';
@@ -197,9 +271,7 @@
               <span>Defer — pick up later</span>
             </label>
           </div>
-          <div id="nra-action-pane">
-            ${_declareFieldsHtml({})}
-          </div>
+          <div id="nra-action-pane">${_declareFieldsHtml({})}</div>
         `;
       }
 
@@ -218,27 +290,31 @@
         `;
       }
 
+      // declare or update
       const titleText = isUpdate ? 'Update NRA' : 'Declare NRA';
       const introText = isUpdate
         ? 'Update the next required action for this artifact. The current NRA is preserved as history.'
         : 'Declare the next required action that moves this artifact forward.';
+
+      // Phase 4: candidate region rendered ABOVE the supersede form
+      // when current NRA is flagged as a resolution candidate.
+      const candidateRegion = (isUpdate && currentNRA?.resolution_candidate_at)
+        ? _candidateRegionHtml(currentNRA)
+        : '';
+      const updateFormHidden = candidateRegion ? ' style="display:none"' : '';
+      const updateFormId = candidateRegion ? 'nra-update-form' : '';
+
       return `
         <h3>${esc(titleText)}</h3>
-        <p>${esc(introText)}</p>
-        ${_declareFieldsHtml(seed)}
+        ${candidateRegion}
+        <div${candidateRegion ? ` id="${updateFormId}"` : ''}${updateFormHidden}>
+          <p>${esc(introText)}</p>
+          ${_declareFieldsHtml(seed)}
+        </div>
       `;
     }
 
     function open(node, mode, currentNRA, options) {
-      // mode: 'declare' | 'waive' | 'defer' | 'update' | 'declare-at-creation'
-      // node: { node_id, firm_id, ... } OR pre-creation context
-      //       { firm_id, tag, text } for declare-at-creation mode
-      // currentNRA (update mode): existing accord_nras row
-      // options: { onSubmit?: async ({action, payload}) => void }
-      //          When provided AND mode === 'declare-at-creation', the
-      //          modal calls onSubmit({action, payload}) on submit
-      //          instead of invoking RPC. Caller handles substrate
-      //          write themselves.
       options = options || {};
 
       if (!node) {
@@ -261,8 +337,10 @@
         mode === 'update'  ? 'Update NRA' :
                              'Declare NRA';
 
+      const isCandidateUpdate = mode === 'update' && currentNRA?.resolution_candidate_at;
+
       modal.innerHTML = _formHtml(mode, node, currentNRA) + `
-        <div class="modal-actions">
+        <div class="modal-actions"${isCandidateUpdate ? ' id="nra-update-actions" style="display:none"' : ''}>
           <button class="btn btn-ghost"  id="nra-cancel">Cancel</button>
           <button class="btn btn-signal" id="nra-submit">${esc(submitLabel)}</button>
         </div>
@@ -270,11 +348,7 @@
 
       backdrop.classList.add('visible');
 
-      const cancelBtn = modal.querySelector('#nra-cancel');
-      const submitBtn = modal.querySelector('#nra-submit');
-
       const closeHandler = () => close();
-      cancelBtn.addEventListener('click', closeHandler);
       backdrop.addEventListener('click', (ev) => {
         if (ev.target === backdrop) closeHandler();
       });
@@ -286,10 +360,64 @@
       };
       window.addEventListener('keydown', escHandler);
 
+      // Standard Cancel button (also wired when candidate region is present
+      // — Cancel is in the same modal-actions block which is hidden until
+      // "Update instead" is clicked. For candidate-mode Cancel-equivalent,
+      // ESC + click-outside provide dismissal.)
+      const cancelBtn = modal.querySelector('#nra-cancel');
+      if (cancelBtn) cancelBtn.addEventListener('click', closeHandler);
+
+      // Phase 4: candidate-region wiring
+      const confirmBtn = modal.querySelector('#nra-confirm-resolved');
+      const updateInsteadBtn = modal.querySelector('#nra-update-instead');
+      if (confirmBtn && currentNRA) {
+        confirmBtn.addEventListener('click', async () => {
+          confirmBtn.disabled = true;
+          updateInsteadBtn.disabled = true;
+          const orig = confirmBtn.textContent;
+          confirmBtn.textContent = 'Working…';
+          try {
+            const result = await API.rpc('resolve_nra', {
+              p_nra_id:           currentNRA.nra_id,
+              p_mechanism:        currentNRA.trigger_kind || 'manual',
+              p_resolved_event_id: null,
+            });
+            const row = Array.isArray(result) ? result[0] : result;
+            emit('nra-resolved', {
+              node_id:            node.node_id,
+              nra_id:             row?.nra_id || currentNRA.nra_id,
+              firm_id:            node.firm_id || currentNRA.firm_id,
+              resolved_mechanism: currentNRA.trigger_kind || 'manual',
+            });
+            close();
+          } catch (e) {
+            console.error('[AccordNRA] resolve_nra failed', e);
+            alert('Could not confirm resolved: ' + (e?.message || e));
+            confirmBtn.disabled = false;
+            updateInsteadBtn.disabled = false;
+            confirmBtn.textContent = orig;
+          }
+        });
+      }
+      if (updateInsteadBtn) {
+        updateInsteadBtn.addEventListener('click', () => {
+          const region = modal.querySelector('#nra-candidate-region');
+          const form   = modal.querySelector('#nra-update-form');
+          const acts   = modal.querySelector('#nra-update-actions');
+          if (region) region.style.display = 'none';
+          if (form) form.style.display = '';
+          if (acts) acts.style.display = '';
+          // Wire owner toggle now that the form is visible
+          _wireOwnerToggle(modal);
+        });
+      }
+
       // Owner-kind dynamic enable/disable for declare/update/declare-at-creation
       function _wireOwnerToggle(scope) {
         const eventSelect = scope.querySelector('#nra-owner-event-type');
         if (!eventSelect) return;
+        if (eventSelect._wired) return;
+        eventSelect._wired = true;
         scope.querySelectorAll('input[name="nra-owner-kind"]').forEach(r => {
           r.addEventListener('change', () => {
             const kind = scope.querySelector('input[name="nra-owner-kind"]:checked')?.value;
@@ -298,11 +426,10 @@
           });
         });
       }
-      if (mode === 'declare' || mode === 'update' || mode === 'declare-at-creation') {
+      if (mode === 'declare' || (mode === 'update' && !isCandidateUpdate) || mode === 'declare-at-creation') {
         _wireOwnerToggle(modal);
       }
 
-      // Phase 3: declare-at-creation action-toggle — swap pane on radio change
       if (mode === 'declare-at-creation') {
         const pane = modal.querySelector('#nra-action-pane');
         modal.querySelectorAll('input[name="nra-action"]').forEach(r => {
@@ -311,25 +438,32 @@
             if (action === 'waive')      pane.innerHTML = _waiveFieldsHtml();
             else if (action === 'defer') pane.innerHTML = _deferFieldsHtml();
             else                         pane.innerHTML = _declareFieldsHtml({});
-            if (action === 'declare') _wireOwnerToggle(pane);
+            if (action === 'declare') {
+              const select = pane.querySelector('#nra-owner-event-type');
+              if (select) select._wired = false;
+              _wireOwnerToggle(pane);
+            }
           });
         });
       }
 
-      submitBtn.addEventListener('click', async () => {
-        submitBtn.disabled = true;
-        const origText = submitBtn.textContent;
-        submitBtn.textContent = 'Working…';
-        try {
-          await _submit(mode, node, currentNRA, modal, options);
-          close();
-        } catch (e) {
-          console.error('[AccordNRA] submit failed', e);
-          alert('NRA action failed: ' + (e?.message || e));
-          submitBtn.disabled = false;
-          submitBtn.textContent = origText;
-        }
-      });
+      const submitBtn = modal.querySelector('#nra-submit');
+      if (submitBtn) {
+        submitBtn.addEventListener('click', async () => {
+          submitBtn.disabled = true;
+          const origText = submitBtn.textContent;
+          submitBtn.textContent = 'Working…';
+          try {
+            await _submit(mode, node, currentNRA, modal, options);
+            close();
+          } catch (e) {
+            console.error('[AccordNRA] submit failed', e);
+            alert('NRA action failed: ' + (e?.message || e));
+            submitBtn.disabled = false;
+            submitBtn.textContent = origText;
+          }
+        });
+      }
     }
 
     function close() {
@@ -342,7 +476,6 @@
     }
 
     async function _submit(mode, node, currentNRA, modal, options) {
-      // Phase 3: declare-at-creation mode — caller handles RPC
       if (mode === 'declare-at-creation') {
         if (typeof options.onSubmit !== 'function') {
           throw new Error('declare-at-creation mode requires options.onSubmit');
@@ -365,13 +498,11 @@
         return;
       }
 
-      // Phase 2 modes — modal owns RPC
       if (mode === 'waive') {
         const reason = modal.querySelector('#nra-waiver-reason').value.trim();
         if (!reason) throw new Error('Waiver reason is required');
         const result = await API.rpc('waive_nra', {
-          p_node_id: node.node_id,
-          p_reason:  reason,
+          p_node_id: node.node_id, p_reason: reason,
         });
         const row = Array.isArray(result) ? result[0] : result;
         emit('nra-waived', { node_id: node.node_id, nra_id: row?.nra_id, firm_id: node.firm_id });
@@ -414,7 +545,6 @@
         return row;
       }
 
-      // declare
       const result = await API.rpc('declare_nra', {
         p_node_id:           node.node_id,
         p_nra_type:          formData.nra_type,
@@ -501,7 +631,6 @@
                 data-nra-id="${esc(nra.nra_id)}"
                 title="${esc(nra.description || '')}">→ ${esc(ownerLabel)} · ${esc(fmtDateShort(nra.due_date))}</span>`;
     }
-
     function _renderCandidate(node, nra) {
       const ownerLabel = _ownerLabel(nra);
       return `<span class="accord-nra-badge accord-nra-candidate"
@@ -510,7 +639,6 @@
                 data-nra-id="${esc(nra.nra_id)}"
                 title="System detected a substrate event that may have satisfied this NRA. Click to confirm or correct.">✓? ${esc(ownerLabel)} · candidate</span>`;
     }
-
     function _renderWaived(node, nra) {
       return `<span class="accord-nra-badge accord-nra-waived"
                 data-nra-action="edit"
@@ -518,7 +646,6 @@
                 data-nra-id="${esc(nra.nra_id)}"
                 title="${esc(nra.waived_reason || 'Waived')}">⊘ guardrail</span>`;
     }
-
     function _renderDeferred(node, nra) {
       const days = daysSince(nra.deferred_at);
       const ageClass = days > 60 ? 'accord-nra-deferred-late'
@@ -530,21 +657,18 @@
                 data-nra-id="${esc(nra.nra_id)}"
                 title="Deferred ${days}d ago">⏸ deferred ${days}d</span>`;
     }
-
     function _renderHistoryOnly(node, count) {
       return `<span class="accord-nra-badge accord-nra-history"
                 data-nra-action="history"
                 data-node-id="${esc(node.node_id)}"
                 title="Click to view NRA history">✓ NRA history (${count})</span>`;
     }
-
     function _renderGrandfathered(node) {
       return `<span class="accord-nra-badge accord-nra-grandfathered"
                 data-nra-action="add"
                 data-node-id="${esc(node.node_id)}"
                 title="No NRA on record. Click to declare.">+ Add NRA</span>`;
     }
-
     function _ownerLabel(nra) {
       if (nra.owner_is_operator) return 'Me';
       if (nra.owner_event_type) {
@@ -560,6 +684,7 @@
       container.addEventListener('click', async (ev) => {
         const badge = ev.target.closest('.accord-nra-badge[data-nra-action]');
         if (!badge) return;
+        ev.stopPropagation();
         const action = badge.dataset.nraAction;
         const nodeId = badge.dataset.nodeId;
         const nraId  = badge.dataset.nraId;
@@ -618,26 +743,20 @@
       };
       window.addEventListener('keydown', escHandler);
     }
-
     function close() {
       const panel = document.getElementById(PANEL_ID);
       if (panel) panel.classList.remove('visible');
     }
-
     function _renderTimeline(history) {
       if (!history || !history.length) {
         return '<div class="accord-nra-empty">No NRA history.</div>';
       }
       return history.map(_renderRow).join('');
     }
-
     function _renderRow(nra) {
       const stateGlyph = {
-        declared:   '→',
-        waived:     '⊘',
-        deferred:   '⏸',
-        resolved:   '✓',
-        superseded: '⤴',
+        declared:   '→', waived: '⊘', deferred: '⏸',
+        resolved:   '✓', superseded: '⤴',
       }[nra.state] || '·';
       const stateLabel = nra.state.charAt(0).toUpperCase() + nra.state.slice(1);
       const date = nra.resolved_at  ? fmtDate(nra.resolved_at)
@@ -667,9 +786,101 @@
         </div>
       `;
     }
-
     return { open, close };
   })();
+
+  // ════════════════════════════════════════════════════════════
+  // SURFACE HELPER — wireBadgesIn
+  // ════════════════════════════════════════════════════════════
+  // Paints badges next to all elements matching `[data-node-id]` inside
+  // `container`. Each row's badge is appended into a child element with
+  // class `accord-nra-badge-slot` (auto-created if absent). Wires click
+  // handlers via Badge.wireClickHandlers (delegation; IR71-safe). Also
+  // installs accord:nra-* listeners so badge cells refresh on substrate
+  // mutations.
+  //
+  // Returns { refresh, refreshOne, dispose }.
+  //   refresh()        — re-fetch + re-paint all badges in the container
+  //   refreshOne(id)   — re-fetch + re-paint only the row matching node_id
+  //   dispose()        — remove window listeners
+  function wireBadgesIn(container, getNodeContext) {
+    if (!container) return { refresh: () => {}, refreshOne: () => {}, dispose: () => {} };
+
+    // Click handler delegation
+    Badge.wireClickHandlers(container, async (nodeId /*, nraId */) => {
+      const node = getNodeContext ? getNodeContext(nodeId) : { node_id: nodeId };
+      const data = await fetchOneBadgeData(nodeId);
+      return { node: node || { node_id: nodeId }, currentNRA: data.current, historyCount: data.historyCount };
+    });
+
+    async function _paintAll() {
+      const rows = container.querySelectorAll('[data-node-id]');
+      const ids = Array.from(new Set(
+        Array.from(rows).map(r => r.dataset.nodeId).filter(Boolean)
+      ));
+      if (!ids.length) return;
+      const data = await fetchBadgeData(ids);
+      rows.forEach(row => {
+        const id = row.dataset.nodeId;
+        const slot = _ensureSlot(row);
+        const ctx = data.get(id) || { current: null, historyCount: 0 };
+        const nodeForBadge = (getNodeContext ? getNodeContext(id) : null) || { node_id: id };
+        slot.innerHTML = Badge.render(nodeForBadge, ctx.current, ctx.historyCount);
+      });
+    }
+
+    async function _paintOne(nodeId) {
+      const rows = container.querySelectorAll(`[data-node-id="${cssEscape(nodeId)}"]`);
+      if (!rows.length) return;
+      const data = await fetchOneBadgeData(nodeId);
+      rows.forEach(row => {
+        const slot = _ensureSlot(row);
+        const nodeForBadge = (getNodeContext ? getNodeContext(nodeId) : null) || { node_id: nodeId };
+        slot.innerHTML = Badge.render(nodeForBadge, data.current, data.historyCount);
+      });
+    }
+
+    function _ensureSlot(row) {
+      let slot = row.querySelector(':scope > .accord-nra-badge-slot');
+      if (!slot) {
+        slot = document.createElement('span');
+        slot.className = 'accord-nra-badge-slot';
+        row.appendChild(slot);
+      }
+      return slot;
+    }
+
+    // CSS.escape polyfill-lite for attribute selector escaping
+    function cssEscape(s) {
+      if (window.CSS && CSS.escape) return CSS.escape(s);
+      return String(s).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+    }
+
+    const eventKinds = [
+      'accord:nra-declared',
+      'accord:nra-waived',
+      'accord:nra-deferred',
+      'accord:nra-resolved',
+      'accord:nra-superseded',
+      'accord:nra-candidate-flagged',
+    ];
+    const handler = async (ev) => {
+      const nodeId = ev?.detail?.node_id;
+      if (!nodeId) return;
+      try { await _paintOne(nodeId); }
+      catch (e) { console.warn('[AccordNRA] paintOne failed', e); }
+    };
+    eventKinds.forEach(k => window.addEventListener(k, handler));
+
+    function dispose() {
+      eventKinds.forEach(k => window.removeEventListener(k, handler));
+    }
+
+    // Kick off initial paint
+    _paintAll();
+
+    return { refresh: _paintAll, refreshOne: _paintOne, dispose };
+  }
 
   // ════════════════════════════════════════════════════════════
   // EXPORTS
@@ -680,8 +891,11 @@
     HistoryPanel,
     OWNER_EVENT_TYPES,
     TRIGGER_KINDS,
+    fetchBadgeData,
+    fetchOneBadgeData,
+    wireBadgesIn,
     emit,
   };
 
-  console.log('[AccordNRA] CMD-ACCORD-NRA-SURFACE-1 Phase 3 loaded');
+  console.log('[AccordNRA] CMD-ACCORD-NRA-SURFACE-1 Phase 4 loaded');
 })();

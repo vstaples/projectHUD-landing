@@ -530,6 +530,19 @@
     $('streamCountHistory').textContent = String(local.historyNodes.length);
     $('captureStream').innerHTML       = _streamHtml(local.captureNodes);
     $('threadHistoryStream').innerHTML = _streamHtml(local.historyNodes);
+
+    // CMD-ACCORD-NRA-SURFACE-1 Phase 4: paint NRA badges on each row.
+    // wireBadgesIn is idempotent for delegation listeners (gated on
+    // container._nraWired) and re-paints from substrate on every call.
+    if (window.AccordNRA?.wireBadgesIn) {
+      const lookup = (nodeId) => {
+        return local.captureNodes.find(n => n.node_id === nodeId)
+            || local.historyNodes.find(n => n.node_id === nodeId)
+            || { node_id: nodeId, firm_id: Accord.state.me?.firm_id };
+      };
+      window.AccordNRA.wireBadgesIn($('captureStream'),       lookup);
+      window.AccordNRA.wireBadgesIn($('threadHistoryStream'), lookup);
+    }
   }
 
   function _streamHtml(nodes) {

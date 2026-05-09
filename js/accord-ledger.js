@@ -352,9 +352,21 @@
       node.addEventListener('click', (ev) => {
         // Don't open detail if a meta-link was clicked (e.g., crumb to Living Document)
         if (ev.target.closest('a[data-nav]')) return;
+        // CMD-ACCORD-NRA-SURFACE-1 Phase 4: don't open detail if NRA
+        // badge was clicked (badge has its own click handler)
+        if (ev.target.closest('.accord-nra-badge')) return;
         _selectDecision(id);
       });
     });
+
+    // CMD-ACCORD-NRA-SURFACE-1 Phase 4: paint NRA badges on each
+    // decision row.
+    if (window.AccordNRA?.wireBadgesIn) {
+      const lookup = (nodeId) => local.nodeIndex[nodeId]
+        || local.decisions.find(d => d.node_id === nodeId)
+        || { node_id: nodeId, firm_id: Accord.state?.me?.firm_id };
+      window.AccordNRA.wireBadgesIn(el, lookup);
+    }
     // Crumb navigation (per §9.6)
     el.querySelectorAll('a[data-nav-thread]').forEach(a => {
       a.addEventListener('click', (ev) => {

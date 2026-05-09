@@ -317,3 +317,52 @@
 .accord-nra-state-waived     .accord-nra-history-glyph { color: var(--ink-faint); }
 .accord-nra-state-deferred   .accord-nra-history-glyph { color: var(--ink-muted); }
 .accord-nra-state-superseded .accord-nra-history-glyph { color: var(--tag-decision); }
+
+/* Phase 4: candidate-confirmation region (rendered above supersede form
+   in update mode when currentNRA.resolution_candidate_at is set) */
+#accord-app .modal .nra-candidate-region {
+  margin: 4px 0 12px;
+}
+#accord-app .modal .nra-candidate-banner {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(201, 149, 106, 0.10);
+  border: 1px solid rgba(201, 149, 106, 0.32);
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+#accord-app .modal .nra-candidate-glyph {
+  font: 600 18px 'IBM Plex Mono', monospace;
+  color: var(--tag-decision);
+  flex: 0 0 auto;
+  line-height: 1.4;
+}
+#accord-app .modal .nra-candidate-text {
+  flex: 1;
+  min-width: 0;
+}
+#accord-app .modal .nra-candidate-title {
+  font: 600 13px 'Inter', sans-serif;
+  color: var(--ink-primary);
+  margin-bottom: 4px;
+}
+#accord-app .modal .nra-candidate-body {
+  font-size: 12px;
+  color: var(--ink-body);
+  line-height: 1.5;
+}
+#accord-app .modal .nra-candidate-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Phase 4: badge slot — auto-created span next to data-node-id rows */
+.accord-nra-badge-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
