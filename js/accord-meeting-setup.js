@@ -325,20 +325,19 @@
   function _addItem(input, items, meeting, workstreamId, firmId) {
     var title = input.value.trim();
     if (!title) return;
-    var _agendaArea = document.getElementById('ac-setup-agenda-area');
-    var _liveCount = _agendaArea ? _agendaArea.querySelectorAll('.ac-agenda-item').length : items.length;
-    var nextPos = _liveCount + 1;
     var useFirmId = firmId ||
       (window.Accord && window.Accord.state && window.Accord.state.meeting &&
        window.Accord.state.meeting.firm_id);
     input.value = '';
     input.disabled = true;
-    API.post('accord_agenda_items', {
-      firm_id:    useFirmId,
-      meeting_id: meeting.meeting_id,
-      title:      title,
-      position:   nextPos,
-      status:     'pending'
+    _fetchMaxPosition(meeting.meeting_id).then(function (maxPos) {
+      return API.post('accord_agenda_items', {
+        firm_id:    useFirmId,
+        meeting_id: meeting.meeting_id,
+        title:      title,
+        position:   maxPos + 1,
+        status:     'pending'
+      });
     }).then(function () {
       return _refreshAgenda(meeting, workstreamId);
     }).catch(function (e) {
@@ -473,23 +472,33 @@
 
   // ── Agenda: pull node → insert ────────────────────────────────
   function _pullNode(nodeId, summary, items, meeting, workstreamId, firmId) {
-    var _agendaArea = document.getElementById('ac-setup-agenda-area');
-    var _liveCount = _agendaArea ? _agendaArea.querySelectorAll('.ac-agenda-item').length : items.length;
-    var nextPos = _liveCount + 1;
     var useFirmId = firmId ||
       (window.Accord && window.Accord.state && window.Accord.state.meeting &&
        window.Accord.state.meeting.firm_id);
-    API.post('accord_agenda_items', {
-      firm_id:              useFirmId,
-      meeting_id:           meeting.meeting_id,
-      title:                summary,
-      position:             nextPos,
-      status:               'pending',
-      pulled_from_node_id:  nodeId
+    var area = document.getElementById('ac-setup-agenda-area');
+    _closePullPicker(area, workstreamId);
+    _fetchMaxPosition(meeting.meeting_id).then(function (maxPos) {
+      return API.post('accord_agenda_items', {
+        firm_id:              useFirmId,
+        meeting_id:           meeting.meeting_id,
+        title:                summary,
+        position:             maxPos + 1,
+        status:               'pending',
+        pulled_from_node_id:  nodeId
+      });
     }).then(function () {
       return _refreshAgenda(meeting, workstreamId);
     }).catch(function (e) {
       console.error('[AccordMeetingSetup] pull node insert failed', e);
+    });
+  }
+
+  function _fetchMaxPosition(meetingId) {
+    return API.get(
+      'accord_agenda_items?meeting_id=eq.' + meetingId +
+      '&select=position&order=position.desc&limit=1'
+    ).then(function (rows) {
+      return (rows && rows[0] && rows[0].position) ? rows[0].position : 0;
     });
   }
 
