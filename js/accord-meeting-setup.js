@@ -117,6 +117,9 @@
   var _rightActiveTab    = 'attendees';
   var _actionItemsToken  = 0;
 
+  // ── CMD-ACCORD-SETUP-SLIDESHOW-1: rotation engine state ───────
+  var _slideshowEngines = { left: null, right: null };
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() {
     // Remove fullpage classes only when genuinely leaving Setup.
@@ -232,6 +235,9 @@
     // Remove Cmd+I / Ctrl+I listener (idempotent — removeEventListener
     // is a no-op if the listener was never attached).
     document.removeEventListener('keydown', _onIntelKey);
+
+    // ── CMD-ACCORD-SETUP-SLIDESHOW-1: rotation engine teardown ───
+    _destroySlideshow();
   }
 
   // ── Briefing autosave ─────────────────────────────────────────
@@ -2425,7 +2431,8 @@
   // §4 — Tab bar
   function _renderLeftTabBar(meeting) {
     var tabbar = document.querySelector('.ac-col-tabbar[data-col="left"]');
-    if (!tabbar) return;
+    if (!tabbar || tabbar.dataset.wired) return;
+    tabbar.dataset.wired = '1';
 
     var tabs = [
       { id: 'briefing',  label: 'Briefing'  },
@@ -2433,22 +2440,121 @@
       { id: 'risks',     label: 'Risks'     }
     ];
 
-    tabbar.innerHTML = tabs.map(function(t) {
-      var active = t.id === _leftActiveTab ? ' ac-tab--active' : '';
-      return '<button class="ac-tab' + active + '" data-action="left-tab" ' +
-             'data-tab="' + t.id + '">' + t.label + '</button>';
-    }).join('');
+    tabbar.innerHTML = [
+      '<div class="ac-tabs">',
+        tabs.map(function(t) {
+          var active = t.id === _leftActiveTab ? ' ac-tab--active' : '';
+          return '<button class="ac-tab' + active + '" data-action="left-tab" ' +
+                 'data-tab="' + t.id + '">' + t.label + '</button>';
+        }).join(''),
+      '</div>',
+      '<div class="ac-col-slideshow-controls" data-col="left">',
+        '<div class="ac-col-stepper" data-col="left" style="display:none"></div>',
+        '<div class="ac-rotation-toggle" data-col="left">',
+          '<button class="ac-toggle-btn" data-action="slideshow-policy"',
+                  ' data-col="left" data-val="auto">AUTO</button>',
+          '<button class="ac-toggle-btn ac-toggle-btn--active" data-action="slideshow-policy"',
+                  ' data-col="left" data-val="manual">MANUAL</button>',
+        '</div>',
+      '</div>',
+      '<div class="ac-rotation-progress ac-rotation-progress--frozen" data-col="left"></div>'
+    ].join('');
 
     tabbar.addEventListener('click', function(ev) {
-      var btn = ev.target.closest('[data-action="left-tab"]');
-      if (!btn) return;
-      var tab = btn.dataset.tab;
-      if (tab === _leftActiveTab) return;
-      _leftActiveTab = tab;
-      _activateLeftTab(tab, meeting);
-      tabbar.querySelectorAll('.ac-tab').forEach(function(b) {
-        b.classList.toggle('ac-tab--active', b.dataset.tab === tab);
-      });
+      var target = ev.target.closest('[data-action]');
+      var action = target && target.dataset.action;
+
+      // ── left-tab click ────────────────────────────────────────
+      if (action === 'left-tab') {
+        var tab = target.dataset.tab;
+        if (!tab || tab === _leftActiveTab) return;
+        _leftActiveTab = tab;
+        _activateLeftTab(tab, meeting);
+        tabbar.querySelectorAll('.ac-tabs .ac-tab').forEach(function(b) {
+          b.classList.toggle('ac-tab--active', b.dataset.tab === tab);
+        });
+        var le = _slideshowEngines['left'];
+        if (le && le.policy === 'auto') {
+          var ltabs = _getSlideshowTabs('left');
+          le.currentIdx = ltabs.indexOf(tab);
+          if (le.currentIdx < 0) le.currentIdx = 0;
+          _slideshowUpdateStepper('left', le.currentIdx);
+          _slideshowManualClick('left');
+        }
+        return;
+      }
+
+      // ── AUTO / MANUAL toggle ──────────────────────────────────
+      if (action === 'slideshow-policy') {
+        if (!target || target.dataset.col !== 'left') return;
+        var val = target.dataset.val;
+        var le2 = _slideshowEngines['left'];
+        if (!le2) return;
+        tabbar.querySelectorAll('.ac-toggle-btn').forEach(function(b) {
+          b.classList.toggle('ac-toggle-btn--active', b.dataset.val === val);
+        });
+        if (val === 'auto') {
+          le2.policy       = 'auto';
+          le2.initialDwell = true;
+          le2.elapsed      = 0;
+          le2.pauseUntil   = 0;
+          le2.paused       = false;
+          _slideshowSetProgress('left', 0);
+          _slideshowFreezeProgress('left', false);
+          var ptabs = _getSlideshowTabs('left');
+          var stepper = tabbar.querySelector('.ac-col-stepper');
+          if (stepper && ptabs.length > 1) {
+            _slideshowPaintStepper('left', le2.currentIdx);
+            stepper.style.display = '';
+          }
+        } else {
+          le2.policy       = 'manual';
+          le2.initialDwell = false;
+          le2.elapsed      = 0;
+          le2.pauseUntil   = 0;
+          le2.paused       = false;
+          _slideshowSetProgress('left', 0);
+          _slideshowFreezeProgress('left', true);
+          var stepperEl = tabbar.querySelector('.ac-col-stepper');
+          if (stepperEl) stepperEl.style.display = 'none';
+        }
+        return;
+      }
+
+      // ── stepper chevron click ─────────────────────────────────
+      if (action === 'slideshow-prev' || action === 'slideshow-next') {
+        if (!target || target.dataset.col !== 'left') return;
+        var le3 = _slideshowEngines['left'];
+        if (!le3) return;
+        var ctabs = _getSlideshowTabs('left');
+        if (ctabs.length <= 1) return;
+        var newIdx = action === 'slideshow-prev'
+          ? (le3.currentIdx - 1 + ctabs.length) % ctabs.length
+          : (le3.currentIdx + 1) % ctabs.length;
+        le3.currentIdx = newIdx;
+        _slideshowActivateTab('left', newIdx, meeting, null);
+        _slideshowUpdateStepper('left', newIdx);
+        _slideshowManualClick('left');
+        le3.elapsed = 0;
+        return;
+      }
+
+      // ── stepper dot click ─────────────────────────────────────
+      var dot = ev.target.closest('.ac-stepper-dot[data-col="left"]');
+      if (dot) {
+        var le4 = _slideshowEngines['left'];
+        if (!le4) return;
+        var dotIdx = parseInt(dot.dataset.idx, 10);
+        if (isNaN(dotIdx)) return;
+        var dtabs = _getSlideshowTabs('left');
+        if (dotIdx < 0 || dotIdx >= dtabs.length) return;
+        le4.currentIdx = dotIdx;
+        _slideshowActivateTab('left', dotIdx, meeting, null);
+        _slideshowUpdateStepper('left', dotIdx);
+        _slideshowManualClick('left');
+        le4.elapsed = 0;
+        return;
+      }
     });
   }
 
@@ -3902,22 +4008,76 @@
       { id: 'action-items', label: 'Action Items' }
     ];
 
-    tabbar.innerHTML = tabs.map(function(t) {
-      var active = t.id === _rightActiveTab ? ' ac-tab--active' : '';
-      return '<button class="ac-tab' + active + '" data-action="right-tab" ' +
-             'data-tab="' + t.id + '">' + t.label + '</button>';
-    }).join('');
+    tabbar.innerHTML = [
+      '<div class="ac-tabs">',
+        tabs.map(function(t) {
+          var active = t.id === _rightActiveTab ? ' ac-tab--active' : '';
+          return '<button class="ac-tab' + active + '" data-action="right-tab" ' +
+                 'data-tab="' + t.id + '">' + t.label + '</button>';
+        }).join(''),
+      '</div>',
+      '<div class="ac-col-stepper" data-col="right" style="display:none"></div>',
+      '<div class="ac-rotation-progress ac-rotation-progress--frozen" data-col="right"></div>'
+    ].join('');
 
     tabbar.addEventListener('click', function(ev) {
-      var btn = ev.target.closest('[data-action="right-tab"]');
-      if (!btn) return;
-      var tab = btn.dataset.tab;
-      if (tab === _rightActiveTab) return;
-      _rightActiveTab = tab;
-      tabbar.querySelectorAll('.ac-tab').forEach(function(b) {
-        b.classList.toggle('ac-tab--active', b.dataset.tab === tab);
-      });
-      _activateRightTab(tab, meeting, workstreamId);
+      var target = ev.target.closest('[data-action]');
+      var action = target && target.dataset.action;
+
+      // ── right-tab click ───────────────────────────────────────
+      if (action === 'right-tab') {
+        var tab = target.dataset.tab;
+        if (!tab || tab === _rightActiveTab) return;
+        _rightActiveTab = tab;
+        tabbar.querySelectorAll('.ac-tabs .ac-tab').forEach(function(b) {
+          b.classList.toggle('ac-tab--active', b.dataset.tab === tab);
+        });
+        _activateRightTab(tab, meeting, workstreamId);
+        var re = _slideshowEngines['right'];
+        if (re) {
+          var rtabs = _getSlideshowTabs('right');
+          re.currentIdx = rtabs.indexOf(tab);
+          if (re.currentIdx < 0) re.currentIdx = 0;
+          _slideshowUpdateStepper('right', re.currentIdx);
+          _slideshowManualClick('right');
+        }
+        return;
+      }
+
+      // ── stepper chevron click ─────────────────────────────────
+      if (action === 'slideshow-prev' || action === 'slideshow-next') {
+        if (!target || target.dataset.col !== 'right') return;
+        var re2 = _slideshowEngines['right'];
+        if (!re2) return;
+        var ctabs = _getSlideshowTabs('right');
+        if (ctabs.length <= 1) return;
+        var newIdx = action === 'slideshow-prev'
+          ? (re2.currentIdx - 1 + ctabs.length) % ctabs.length
+          : (re2.currentIdx + 1) % ctabs.length;
+        re2.currentIdx = newIdx;
+        _slideshowActivateTab('right', newIdx, meeting, workstreamId);
+        _slideshowUpdateStepper('right', newIdx);
+        _slideshowManualClick('right');
+        re2.elapsed = 0;
+        return;
+      }
+
+      // ── stepper dot click ─────────────────────────────────────
+      var dot = ev.target.closest('.ac-stepper-dot[data-col="right"]');
+      if (dot) {
+        var re3 = _slideshowEngines['right'];
+        if (!re3) return;
+        var dotIdx = parseInt(dot.dataset.idx, 10);
+        if (isNaN(dotIdx)) return;
+        var dtabs = _getSlideshowTabs('right');
+        if (dotIdx < 0 || dotIdx >= dtabs.length) return;
+        re3.currentIdx = dotIdx;
+        _slideshowActivateTab('right', dotIdx, meeting, workstreamId);
+        _slideshowUpdateStepper('right', dotIdx);
+        _slideshowManualClick('right');
+        re3.elapsed = 0;
+        return;
+      }
     });
   }
 
@@ -3932,6 +4092,225 @@
       _renderActionItems(meeting, workstreamId);
       return;
     }
+  }
+
+  // ============================================================
+  // CMD-ACCORD-SETUP-SLIDESHOW-1 — Per-column rotation engine
+  // Exposes: window.AccordSlideshow = { pause(colId), resume(colId) }
+  // ============================================================
+
+  // IR71: reads tab list from DOM at call-time — auto-picks up future tabs.
+  function _getSlideshowTabs(col) {
+    var tabbar = document.querySelector('.ac-col-tabbar[data-col="' + col + '"]');
+    if (!tabbar) return [];
+    var btns = tabbar.querySelectorAll('.ac-tabs .ac-tab');
+    return Array.prototype.slice.call(btns).map(function(b) { return b.dataset.tab; });
+  }
+
+  // Full stepper re-render (used when policy changes or engine inits).
+  function _slideshowPaintStepper(col, currentIdx) {
+    var stepper = document.querySelector('.ac-col-stepper[data-col="' + col + '"]');
+    if (!stepper) return;
+    var tabs = _getSlideshowTabs(col);
+    stepper.innerHTML = [
+      '<button class="ac-stepper-btn" data-action="slideshow-prev" data-col="' + col + '">\u2039</button>',
+      tabs.map(function(t, i) {
+        var cls = i === currentIdx ? ' ac-stepper-dot--active' : '';
+        return '<span class="ac-stepper-dot' + cls + '" data-col="' + col + '" data-idx="' + i + '"></span>';
+      }).join(''),
+      '<button class="ac-stepper-btn" data-action="slideshow-next" data-col="' + col + '">\u203a</button>'
+    ].join('');
+  }
+
+  // Toggle active dot class without re-rendering the whole stepper.
+  function _slideshowUpdateStepper(col, currentIdx) {
+    var stepper = document.querySelector('.ac-col-stepper[data-col="' + col + '"]');
+    if (!stepper) return;
+    stepper.querySelectorAll('.ac-stepper-dot').forEach(function(d, i) {
+      d.classList.toggle('ac-stepper-dot--active', i === currentIdx);
+    });
+  }
+
+  // Set progress bar fill via scaleX (0–1).
+  function _slideshowSetProgress(col, scaleX) {
+    var bar = document.querySelector('.ac-rotation-progress[data-col="' + col + '"]');
+    if (!bar) return;
+    bar.style.transform = 'scaleX(' + scaleX + ')';
+  }
+
+  // Show (frozen=false) or hide (frozen=true) the progress bar.
+  function _slideshowFreezeProgress(col, frozen) {
+    var bar = document.querySelector('.ac-rotation-progress[data-col="' + col + '"]');
+    if (!bar) return;
+    bar.classList.toggle('ac-rotation-progress--frozen', frozen);
+  }
+
+  // Call the same tab-switch path a user click would — no shadow render.
+  function _slideshowActivateTab(col, idx, meeting, workstreamId) {
+    var tabs = _getSlideshowTabs(col);
+    if (!tabs.length) return;
+    var tabId = tabs[idx];
+    if (!tabId) return;
+    var tabbar = document.querySelector('.ac-col-tabbar[data-col="' + col + '"]');
+    if (tabbar) {
+      tabbar.querySelectorAll('.ac-tabs .ac-tab').forEach(function(b) {
+        b.classList.toggle('ac-tab--active', b.dataset.tab === tabId);
+      });
+    }
+    if (col === 'left') {
+      _leftActiveTab = tabId;
+      _activateLeftTab(tabId, meeting);
+    } else {
+      _rightActiveTab = tabId;
+      _activateRightTab(tabId, meeting, workstreamId);
+    }
+  }
+
+  // Apply 60s manual-click pause (resets progress to 0).
+  function _slideshowManualClick(col) {
+    var e = _slideshowEngines[col];
+    if (!e || e.policy === 'manual') return;
+    if (e.graceTimer) { clearTimeout(e.graceTimer); e.graceTimer = null; }
+    e.paused     = false;
+    e.pauseUntil = Date.now() + 60000;
+    e.elapsed    = 0;
+    _slideshowSetProgress(col, 0);
+    _slideshowFreezeProgress(col, true);
+  }
+
+  // 50ms tick — drives progress drain and tab advance.
+  function _slideshowTick(col, meeting, workstreamId) {
+    var e = _slideshowEngines[col];
+    if (!e || e.policy === 'manual') return;
+    if (e.paused) return;
+    if (e.pauseUntil > Date.now()) return;
+
+    // Unfreeze progress bar if it was frozen by a now-expired 60s pause.
+    var bar = document.querySelector('.ac-rotation-progress[data-col="' + col + '"]');
+    if (bar && bar.classList.contains('ac-rotation-progress--frozen')) {
+      bar.classList.remove('ac-rotation-progress--frozen');
+    }
+
+    var threshold = e.initialDwell ? 5000 : 15000;
+    e.elapsed += 50;
+    _slideshowSetProgress(col, Math.min(e.elapsed / threshold, 1));
+
+    if (e.elapsed >= threshold) {
+      var tabs = _getSlideshowTabs(col);  // IR71: re-read at advance time
+      if (tabs.length > 1) {
+        e.currentIdx   = (e.currentIdx + 1) % tabs.length;
+        e.initialDwell = false;
+        _slideshowActivateTab(col, e.currentIdx, meeting, workstreamId);
+        _slideshowUpdateStepper(col, e.currentIdx);
+      }
+      e.elapsed = 0;
+      _slideshowSetProgress(col, 0);
+    }
+  }
+
+  function _initSlideshowCol(col, meeting, workstreamId) {
+    var engine = {
+      col:         col,
+      policy:      col === 'left' ? 'manual' : 'auto',
+      currentIdx:  0,
+      elapsed:     0,
+      initialDwell: false,
+      paused:      false,
+      pauseUntil:  0,
+      graceTimer:  null,
+      tickTimer:   null,
+      _hoverEnter: null,
+      _hoverLeave: null
+    };
+    _slideshowEngines[col] = engine;
+
+    if (col === 'right') {
+      var tabs = _getSlideshowTabs('right');
+      if (tabs.length > 1) {
+        _slideshowPaintStepper('right', 0);
+        var stepper = document.querySelector('.ac-col-stepper[data-col="right"]');
+        if (stepper) stepper.style.display = '';
+      }
+      _slideshowFreezeProgress('right', false);
+      _slideshowSetProgress('right', 0);
+
+      // Hover pause — target is full column container (Brief §2.3 + §8.2).
+      var container = document.querySelector('.ac-setup-col-right');
+      if (container) {
+        engine._hoverEnter = function() {
+          var e2 = _slideshowEngines['right'];
+          if (!e2) return;
+          if (e2.graceTimer) { clearTimeout(e2.graceTimer); e2.graceTimer = null; }
+          e2.paused = true;
+          _slideshowFreezeProgress('right', true);
+        };
+        engine._hoverLeave = function() {
+          var e2 = _slideshowEngines['right'];
+          if (!e2) return;
+          // 3s grace — re-enter resets timer (Brief §2.3).
+          e2.graceTimer = setTimeout(function() {
+            var e3 = _slideshowEngines['right'];
+            if (!e3) return;
+            e3.graceTimer = null;
+            e3.paused     = false;
+            // Resume progress only if not in a 60s click-pause.
+            if (!(e3.pauseUntil > Date.now())) {
+              _slideshowFreezeProgress('right', false);
+            }
+          }, 3000);
+        };
+        container.addEventListener('mouseenter', engine._hoverEnter);
+        container.addEventListener('mouseleave', engine._hoverLeave);
+      }
+    }
+
+    // Left column stays frozen in MANUAL; progress and stepper already
+    // rendered as frozen/hidden by _renderLeftTabBar.
+
+    engine.tickTimer = setInterval(function() {
+      _slideshowTick(col, meeting, workstreamId);
+    }, 50);
+  }
+
+  function _initSlideshow(meeting, workstreamId) {
+    _destroySlideshow();
+    _initSlideshowCol('left',  meeting, workstreamId);
+    _initSlideshowCol('right', meeting, workstreamId);
+    // C-12 hook contract: AccordSlideshow.pause/resume(colId).
+    window.AccordSlideshow = {
+      pause: function(colId) {
+        var e = _slideshowEngines[colId];
+        if (!e) return;
+        e.paused = true;
+        _slideshowFreezeProgress(colId, true);
+      },
+      resume: function(colId) {
+        var e = _slideshowEngines[colId];
+        if (!e) return;
+        e.paused = false;
+        if (e.policy !== 'manual' && !(e.pauseUntil > Date.now())) {
+          _slideshowFreezeProgress(colId, false);
+        }
+      }
+    };
+  }
+
+  function _destroySlideshow() {
+    ['left', 'right'].forEach(function(col) {
+      var e = _slideshowEngines[col];
+      if (!e) return;
+      if (e.tickTimer)  { clearInterval(e.tickTimer);  e.tickTimer  = null; }
+      if (e.graceTimer) { clearTimeout(e.graceTimer);  e.graceTimer = null; }
+      if (col === 'right' && e._hoverEnter) {
+        var container = document.querySelector('.ac-setup-col-right');
+        if (container) {
+          container.removeEventListener('mouseenter', e._hoverEnter);
+          container.removeEventListener('mouseleave', e._hoverLeave);
+        }
+      }
+      _slideshowEngines[col] = null;
+    });
+    if (window.AccordSlideshow) { window.AccordSlideshow = null; }
   }
 
   // §5 — Action items fetch
@@ -4505,6 +4884,9 @@
     if (_rightActiveTab === 'action-items') {
       _renderActionItems(meeting, workstreamId);
     }
+
+    // ── CMD-ACCORD-SETUP-SLIDESHOW-1: rotation engine init ───────
+    _initSlideshow(meeting, workstreamId);
 
     // Breadcrumb async resolve — also caches _workstreamName for briefing
     // CMD-ACCORD-SETUP-LAYOUT-1: breadcrumb element no longer in shell;

@@ -2264,3 +2264,84 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   font-size: 12px;
   padding: 2px 8px;
 }
+
+/* ──────────────────────────────────────────────────────────── */
+/* CMD-ACCORD-SETUP-SLIDESHOW-1 — Per-column rotation UI        */
+/* All tokens --ac-* only; scoped to .ac-setup-shell            */
+/* ──────────────────────────────────────────────────────────── */
+
+/* Rotating-column tabbars: space-between layout + position:relative
+   for the absolute-positioned progress bar.                     */
+.ac-col-tabbar[data-col="left"],
+.ac-col-tabbar[data-col="right"] {
+  position: relative;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Tab button group wrapper — left side of rotating tabbars */
+.ac-tabs {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+}
+
+/* Stepper wrapper for rotating columns (.ac-col-stepper scopes
+   left/right variant distinct from C-07's .ac-center-stepper)  */
+.ac-col-stepper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Right-side controls wrapper: stepper + toggle side-by-side   */
+.ac-col-slideshow-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* 1px progress drain line — absolute at bottom of tabbar header */
+.ac-rotation-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(94, 234, 212, 0.6); /* --ac-cyan at 60% opacity */
+  transform: scaleX(0);
+  transform-origin: left center;
+  pointer-events: none;
+}
+.ac-rotation-progress--frozen { display: none; }
+
+/* AUTO / MANUAL two-state pill */
+.ac-rotation-toggle {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--ac-border-mid);
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ac-toggle-btn {
+  font-family: var(--ac-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--ac-text-tertiary);
+  background: none;
+  border: none;
+  padding: 3px 6px;
+  cursor: pointer;
+  line-height: 1;
+  white-space: nowrap;
+}
+.ac-toggle-btn--active {
+  background: var(--ac-border-mid);
+  color: var(--ac-text-primary);
+}
+.ac-toggle-btn:hover:not(.ac-toggle-btn--active) {
+  color: var(--ac-text-secondary);
+}
