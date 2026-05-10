@@ -89,11 +89,15 @@
 
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() {
-    // Remove fullpage classes here (not in teardown) so they only disappear
-    // when genuinely leaving Setup for a non-idle surface.
-    var appRoot = document.getElementById('accord-app');
-    if (appRoot) appRoot.classList.remove(FULLPAGE_CLS);
-    document.body.classList.remove(FULLPAGE_CLS);
+    // Remove fullpage classes only when genuinely leaving Setup.
+    // During idle→idle navigation (e.g. filmstrip NEXT), accord-transitions
+    // sets window._setupPreserveFullpage = true before renderMeetingView runs,
+    // so the classes are preserved through the _detachSurfaceHost call.
+    if (!window._setupPreserveFullpage) {
+      var appRoot = document.getElementById('accord-app');
+      if (appRoot) appRoot.classList.remove(FULLPAGE_CLS);
+      document.body.classList.remove(FULLPAGE_CLS);
+    }
     teardown();
   }
 

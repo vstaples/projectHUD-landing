@@ -187,11 +187,17 @@
       const appEl = document.getElementById('accord-app');
       if (appEl) appEl.classList.add('accord-setup-fullpage');
       document.body.classList.add('accord-setup-fullpage');
+      // Preserve flag: tells _detachHandler not to remove fullpage classes
+      // during the renderMeetingView call below (idle→idle navigation).
+      window._setupPreserveFullpage = true;
     }
 
     if (window.AccordViews?.renderMeetingView) {
       await window.AccordViews.renderMeetingView(state.viewHost, meetingId, workstreamId);
     }
+
+    // Clear preserve flag after render completes
+    window._setupPreserveFullpage = false;
 
     if (state.constellationHost?.style.display !== 'none') {
       // Direct constellation → meeting (rare path; e.g. clicking a parking-lot
