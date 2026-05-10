@@ -74,6 +74,7 @@
 
   // ── CMD-ACCORD-SETUP-FILMSTRIP-2: filmstrip state ─────────────
   var _filmstripAborted    = false;
+  var _filmstripToken      = 0;     // incremented each render; callbacks capture & compare
   var _scrubState          = { active: false, meetingId: null };
   var _filmResizeObserver  = null;
   // Canonical tag order: N·D·A·R·Q·Di (locked MEETING-SETUP-1 Phase 6)
@@ -128,6 +129,7 @@
 
     // ── CMD-ACCORD-SETUP-FILMSTRIP-2: filmstrip teardown ────────
     _filmstripAborted = true;
+    _filmstripToken++;            // invalidates all in-flight filmstrip callbacks
     if (_filmResizeObserver) { _filmResizeObserver.disconnect(); _filmResizeObserver = null; }
     if (_scrubState.active) {
       _scrubState.active    = false;
@@ -1963,6 +1965,7 @@
   // §4 — Entry point
   function _renderFilmstrip(meeting, workstreamId) {
     _filmstripAborted = false;
+    var myToken = ++_filmstripToken;  // capture token for this render cycle
     var content = document.querySelector('.ac-filmstrip-content');
     if (!content) return;
     content.innerHTML = '<div class="ac-film-loading">Loading timeline\u2026</div>';
@@ -1974,9 +1977,9 @@
 
     _fetchFilmMeetings(meeting.meeting_id, workstreamId)
       .then(function(meetings) {
-        if (_filmstripAborted) return;
+        if (_filmstripToken !== myToken) return;  // stale render — abort
         return _fetchFilmNodeCounts(meetings).then(function(countMap) {
-          if (_filmstripAborted) return;
+          if (_filmstripToken !== myToken) return;  // stale render — abort
           var content = document.querySelector('.ac-filmstrip-content'); // IR71
           if (!content) return;
           _paintFilmstrip(content, meetings, countMap, meeting, workstreamId);
@@ -1985,6 +1988,7 @@
       })
       .catch(function(e) {
         console.error('[AccordMeetingSetup] filmstrip fetch failed', e);
+        if (_filmstripToken !== myToken) return;
         var content = document.querySelector('.ac-filmstrip-content');
         if (content) content.innerHTML = '<div class="ac-film-error">Could not load timeline.</div>';
       });
