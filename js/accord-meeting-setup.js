@@ -2944,15 +2944,17 @@
       _fetchAgendaItems(meeting.meeting_id),
       _fetchPrepPrompts(meeting, workstreamId)
     ]).then(function(results) {
-      console.log('[AGENDA] then fired token=', _agendaToken, 'mine=', myToken, 'connected=', agendaContainer.isConnected);
       if (_agendaToken !== myToken) return;
-      if (!agendaContainer.isConnected) return;
-      _paintAgenda(agendaContainer, results[0], results[1], meeting, workstreamId);
+      var liveContainer = document.getElementById('ac-agenda-container'); // IR71 re-query
+      console.log('[AGENDA] then fired token=', _agendaToken, 'mine=', myToken, 'connected=', liveContainer && liveContainer.isConnected);
+      if (!liveContainer || !liveContainer.isConnected) return;
+      _paintAgenda(liveContainer, results[0], results[1], meeting, workstreamId);
       console.log('[AGENDA] painted');
     }).catch(function(e) {
       console.error('[AccordMeetingSetup] agenda fetch failed', e);
-      if (agendaContainer.isConnected)
-        agendaContainer.innerHTML = '<div class="ac-agenda-error">Could not load agenda.</div>';
+      var liveContainer = document.getElementById('ac-agenda-container');
+      if (liveContainer && liveContainer.isConnected)
+        liveContainer.innerHTML = '<div class="ac-agenda-error">Could not load agenda.</div>';
     });
   }
 
