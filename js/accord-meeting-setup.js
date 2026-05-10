@@ -49,7 +49,7 @@
     startH:  0
   };
   var COL_MIN_W    = 260;
-  var COL_MAX_W    = 600;
+  var COL_MAX_W    = 1400;
   var FILM_MIN_H   = 48;
   var FILM_MAX_H   = 350;
   var FILM_DEFAULT = 102;
@@ -4320,10 +4320,19 @@
     });
 
     tabbody.addEventListener('dragover', function(ev) {
-      if (!ev.target.closest('.ac-kanban-track')) return;
+      if (!_dragAction) return;  // only intercept if dragging a card
       ev.preventDefault();
       ev.stopPropagation();
       ev.dataTransfer.dropEffect = 'move';
+
+      // Fix 3: auto-scroll kanban track when near edges
+      var track = tabbody.querySelector('.ac-kanban-track');
+      if (track) {
+        var rect = track.getBoundingClientRect();
+        if (ev.clientX > rect.right - 40) track.scrollLeft += 10;
+        if (ev.clientX < rect.left + 40)  track.scrollLeft -= 10;
+      }
+
       var col = ev.target.closest('.ac-kanban-cards') ||
                 (ev.target.closest('.ac-kanban-col') &&
                  ev.target.closest('.ac-kanban-col').querySelector('.ac-kanban-cards'));
