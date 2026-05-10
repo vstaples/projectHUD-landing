@@ -124,6 +124,13 @@
   var _percolateResourceId   = null;   // active filter; null = no filter
   var _percolateResourceName = null;   // display name for pill
 
+  // ── CMD-ACCORD-SETUP-GATHERING-1: gathering mode state (C-12) ─
+  var _gatheringMode     = false;      // is gathering mode currently active
+  var _gatheringTimer    = null;       // setInterval handle for scheduled_for polling
+  var _gatheringPrepView = false;      // is "Show prep view" currently on
+  var _connDotStates     = {};         // { [attendee_id]: 'none' | 'on-time' | 'late' }
+  var _fiveMinWarned     = false;      // has 5-min warning fired this session
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() {
     // Remove fullpage classes only when genuinely leaving Setup.
@@ -245,6 +252,16 @@
 
     // ── CMD-ACCORD-SETUP-PERCOLATE-1: percolate teardown ─────────
     _clearPercolate();
+
+    // ── CMD-ACCORD-SETUP-GATHERING-1 (C-12): teardown (§10) ──────
+    _stopGatheringTimer();
+    _gatheringMode     = false;
+    _gatheringPrepView = false;
+    _fiveMinWarned     = false;
+    _connDotStates     = {};
+    var fiveMinBanner = document.getElementById('ac-five-min-banner');
+    if (fiveMinBanner) fiveMinBanner.remove();
+    _exitGatheringMode();   // removes ac-gathering-active class + header chrome
   }
 
   // ── Briefing autosave ─────────────────────────────────────────
@@ -1825,9 +1842,10 @@
     }
 
     block.innerHTML = html;
-    _setGatheringMode(block, meeting);
     _wireAttendeeEvents(block, meeting);
     _wirePercolateOnAttendees(block);
+    _reapplyConnDotStates(block);                       // C-12: restore manual toggles after re-render
+    if (_gatheringMode) _applyGatheringToCards(true);   // C-12 §14: re-apply gathering after re-render
     if (_percolateResourceId) _applyPercolate();
   }
 
@@ -1841,8 +1859,11 @@
                esc(attendee.attendee_id) + '" ' +
                'data-resource-id="' + esc(attendee.resource_id) + '">';
 
-    // Connection dot (static; C-12 wires presence)
-    html += '<div class="ac-conn-dot ac-conn-dot--idle" title="Connection status"></div>';
+    // Connection dot (C-12 wires gathering-mode toggle)
+    html += '<div class="ac-conn-dot ac-conn-dot--none"' +
+            ' data-action="conn-dot-toggle"' +
+            ' data-attendee-id="' + esc(attendee.attendee_id) + '"' +
+            ' title="Click to mark connection status"></div>';
 
     // Avatar
     html += '<div class="ac-attendee-avatar' +
@@ -1945,6 +1966,21 @@
         _addAttendee(btn.dataset.resourceId, meeting);
         return;
       }
+
+      // C-12 §8.3 — Conn-dot cycle: none → on-time → late → none
+      if (action === 'conn-dot-toggle') {
+        var dot2 = target.closest('[data-action="conn-dot-toggle"]');
+        if (!dot2) return;
+        ev.stopImmediatePropagation();    // prevent percolate handler firing on same click
+        var aid     = dot2.dataset.attendeeId;
+        var states  = ['none', 'on-time', 'late'];
+        var current = _connDotStates[aid] || 'none';
+        var next    = states[(states.indexOf(current) + 1) % states.length];
+        _connDotStates[aid] = next;
+        dot2.className = 'ac-conn-dot ac-conn-dot--' + next +
+                         (_gatheringMode ? ' ac-conn-dot--gathering' : '');
+        return;
+      }
     });
   }
 
@@ -2031,15 +2067,205 @@
       });
   }
 
-  // §5.10 — Gathering mode data attribute (C-12 wires visual transition)
-  function _setGatheringMode(block, meeting) {
-    if (!meeting.scheduled_for) {
-      block.setAttribute('data-mode', 'prep');
+  // ══════════════════════════════════════════════════════════════
+  // CMD-ACCORD-SETUP-GATHERING-1 (C-12) — Gathering mode
+  // §5 detection · §6 enter/exit · §7 header · §8 cards · §9 5-min
+  // Architect amendments applied: header mounts to .ac-col-tabbar;
+  // column rail selector .ac-setup-col-right; conn-dot in-place mod
+  // (no second insert); replaces legacy _setGatheringMode (P1).
+  // ══════════════════════════════════════════════════════════════
+
+  // §5.1 — Timer start/stop
+  function _startGatheringTimer(meeting) {
+    _stopGatheringTimer();
+    if (!meeting || !meeting.scheduled_for) return;
+
+    _gatheringTimer = setInterval(function() {
+      _checkGatheringCondition(meeting);
+    }, 30000);  // poll every 30 seconds
+
+    // Also check immediately on mount
+    _checkGatheringCondition(meeting);
+  }
+
+  function _stopGatheringTimer() {
+    if (_gatheringTimer) {
+      clearInterval(_gatheringTimer);
+      _gatheringTimer = null;
+    }
+  }
+
+  // §5.2 — Condition check
+  function _checkGatheringCondition(meeting) {
+    if (meeting.state !== 'idle') {
+      // Meeting started — exit gathering mode if active
+      if (_gatheringMode) _exitGatheringMode();
+      _stopGatheringTimer();
       return;
     }
-    var diffMs = new Date(meeting.scheduled_for).getTime() - Date.now();
-    var isGathering = diffMs > 0 && diffMs < 15 * 60 * 1000;
-    block.setAttribute('data-mode', isGathering ? 'gathering' : 'prep');
+
+    if (!meeting.scheduled_for) return;
+
+    var now          = Date.now();
+    var scheduled    = new Date(meeting.scheduled_for).getTime();
+    var minutesUntil = (scheduled - now) / 60000;
+
+    if (minutesUntil <= 15 && minutesUntil > -5) {
+      // Within window: engage or maintain gathering mode
+      if (!_gatheringMode) _enterGatheringMode(meeting);
+
+      // 5-minute warning
+      if (minutesUntil <= 5 && minutesUntil > 0 && !_fiveMinWarned) {
+        _fiveMinWarned = true;
+        _showFiveMinWarning();
+      }
+    } else {
+      // Outside window: exit if active (operator rescheduled)
+      if (_gatheringMode) _exitGatheringMode();
+    }
+  }
+
+  // §6.1 — Enter
+  function _enterGatheringMode(meeting) {
+    _gatheringMode = true;
+    _paintGatheringHeader(true);
+    _applyGatheringToCards(true);
+    var rightCol = document.querySelector('.ac-setup-col-right');
+    if (rightCol) rightCol.classList.add('ac-gathering-active');
+  }
+
+  // §6.2 — Exit
+  function _exitGatheringMode() {
+    _gatheringMode     = false;
+    _gatheringPrepView = false;
+    _fiveMinWarned     = false;
+
+    _paintGatheringHeader(false);
+    _applyGatheringToCards(false);
+
+    var rightCol = document.querySelector('.ac-setup-col-right');
+    if (rightCol) rightCol.classList.remove('ac-gathering-active');
+  }
+
+  // §7 — Right column header transformation (architect amendment:
+  // header target is .ac-col-tabbar[data-col="right"]; label and
+  // toggle appended as additional flex children — no tabbar rebuild,
+  // no C-10 slideshow side effects)
+  function _paintGatheringHeader(active) {
+    var header = document.querySelector('.ac-col-tabbar[data-col="right"]');
+    if (!header) return;
+
+    // Remove any existing gathering chrome
+    var existing = header.querySelector('.ac-gathering-label');
+    if (existing) existing.remove();
+    var existingToggle = header.querySelector('.ac-gathering-prep-toggle');
+    if (existingToggle) existingToggle.remove();
+
+    if (!active) return;
+
+    // "GATHERING" label — margin-left: auto (in CSS) pushes it right
+    // of the slideshow stepper + rotation progress
+    var label = document.createElement('span');
+    label.className = 'ac-gathering-label';
+    label.textContent = 'GATHERING';
+    header.appendChild(label);
+
+    // "Show prep view" toggle — operator-private affordance
+    var toggle = document.createElement('button');
+    toggle.className = 'ac-gathering-prep-toggle';
+    toggle.dataset.action = 'gathering-prep-toggle';
+    toggle.textContent = _gatheringPrepView ? 'PREP VIEW \u2713' : 'SHOW PREP VIEW';
+    toggle.title = 'Private \u2014 not visible to attendees';
+    header.appendChild(toggle);
+
+    toggle.addEventListener('click', function() {
+      _gatheringPrepView = !_gatheringPrepView;
+      toggle.textContent = _gatheringPrepView ? 'PREP VIEW \u2713' : 'SHOW PREP VIEW';
+      _applyGatheringToCards(_gatheringMode);
+    });
+  }
+
+  // §8.1 — Apply/remove gathering state on attendee cards
+  // Architect amendment to V3 hide list: drop never-shipped
+  // [data-action="toggle-attendee-detail"] and .ac-attendee-detail;
+  // add .ac-attendee-stakes (always-rendered action-count line)
+  function _applyGatheringToCards(entering) {
+    var block = document.getElementById('ac-attendees-block');
+    if (!block) return;
+
+    var showIntel = entering ? _gatheringPrepView : true;
+
+    block.querySelectorAll('.ac-attendee-card').forEach(function(card) {
+      // Conn-dot: enlarge in gathering mode
+      var dot = card.querySelector('.ac-conn-dot');
+      if (dot) {
+        dot.classList.toggle('ac-conn-dot--gathering', entering);
+      }
+
+      // Intelligence elements: hide unless prep view is showing
+      var hideEls = card.querySelectorAll(
+        '.ac-attendee-badge, .ac-attendee-owed, ' +
+        '.ac-attendee-urgency, .ac-attendee-stakes'
+      );
+      hideEls.forEach(function(el) {
+        el.style.display = (entering && !showIntel) ? 'none' : '';
+      });
+    });
+  }
+
+  // Restore manually-toggled conn-dot states after attendee re-render.
+  // §14 discipline checklist: _connDotStates re-applied after re-render.
+  function _reapplyConnDotStates(block) {
+    if (!block) return;
+    block.querySelectorAll('.ac-conn-dot[data-attendee-id]').forEach(function(dot) {
+      var aid   = dot.dataset.attendeeId;
+      var state = _connDotStates[aid];
+      if (!state || state === 'none') return;  // default class already set
+      dot.className = 'ac-conn-dot ac-conn-dot--' + state +
+                      (_gatheringMode ? ' ac-conn-dot--gathering' : '');
+    });
+  }
+
+  // §9 — 5-minute warning: footer pulse + brief overlay banner
+  function _showFiveMinWarning() {
+    // Footer pulse
+    var footer = document.querySelector('.ac-setup-footer');
+    if (footer) {
+      footer.classList.add('ac-five-min-pulse');
+      setTimeout(function() {
+        footer.classList.remove('ac-five-min-pulse');
+      }, 4000);
+    }
+
+    // Banner overlay — auto-dismisses after 8 seconds
+    var shell = document.querySelector('.ac-setup-shell');
+    if (!shell) return;
+
+    // Idempotency guard: if banner already present, don't stack
+    var existing = document.getElementById('ac-five-min-banner');
+    if (existing) existing.remove();
+
+    var banner = document.createElement('div');
+    banner.id = 'ac-five-min-banner';
+    banner.className = 'ac-five-min-banner';
+    banner.innerHTML = '<span class="ac-five-min-glyph">\u23f1</span>' +
+                       '<span class="ac-five-min-text">5 minutes to start</span>' +
+                       '<button class="ac-five-min-dismiss" ' +
+                       'data-action="five-min-dismiss" title="Dismiss">\u2715</button>';
+    shell.appendChild(banner);
+
+    banner.querySelector('[data-action="five-min-dismiss"]')
+      .addEventListener('click', function() { banner.remove(); });
+
+    // Auto-dismiss
+    setTimeout(function() {
+      if (banner.parentNode) banner.remove();
+    }, 8000);
+
+    // Animate in
+    requestAnimationFrame(function() {
+      banner.classList.add('ac-five-min-banner--visible');
+    });
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -5132,6 +5358,11 @@
     _renderFilmstrip(meeting, workstreamId);
     // CMD-ACCORD-SETUP-LAYOUT-1: deferred to CMD-ACCORD-SETUP-VERDICT-1
     // _renderFooterDuration(meeting);
+
+    // ── CMD-ACCORD-SETUP-GATHERING-1 (C-12): start gathering timer ─
+    // Polls scheduled_for every 30s and engages gathering mode within
+    // the 15-min window; auto-exits when meeting transitions out of idle.
+    _startGatheringTimer(meeting);
 
     // NRA event listeners for live badge refresh -- Phase 5
     // CMD-ACCORD-SETUP-LAYOUT-1: paired with _renderAnticipation deferral.

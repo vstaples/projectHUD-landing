@@ -664,21 +664,40 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   flex-wrap: wrap;
 }
 
-/* Connection dot (static v1; C-12 wires presence) */
+/* Connection dot — CMD-ACCORD-SETUP-GATHERING-1 (C-12) §11 */
 .ac-conn-dot {
-  width: 12px; height: 12px;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: width 0.2s ease, height 0.2s ease, box-shadow 0.2s ease;
 }
-.ac-conn-dot--idle {
+.ac-conn-dot--none {
   background: transparent;
-  border: 2px solid var(--ac-text-tertiary);
-  box-shadow: 0 0 8px rgba(138,149,165,0.4);
-  animation: ac-conn-glow 2.5s ease-in-out infinite;
+  border: 2px solid var(--ac-border-mid);
+  box-shadow: 0 0 0 0 transparent;
+  /* Glowing outline — not connected */
+  animation: ac-conn-glow 2s ease-in-out infinite;
+}
+.ac-conn-dot--on-time {
+  background: var(--ac-green);
+  border: none;
+  animation: none;
+}
+.ac-conn-dot--late {
+  background: var(--ac-amber);
+  border: none;
+  animation: none;
+}
+.ac-conn-dot--gathering {
+  width: 16px;
+  height: 16px;
 }
 @keyframes ac-conn-glow {
-  0%,100% { box-shadow: 0 0 6px rgba(138,149,165,0.4); }
-  50%      { box-shadow: 0 0 14px rgba(138,149,165,0.8); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(90,102,120,0.4); }
+  50%      { box-shadow: 0 0 0 4px rgba(90,102,120,0); }
 }
 
 /* Avatar */
@@ -800,8 +819,11 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   padding: 4px 0;
 }
 
-/* Gathering mode hook (C-12 wires visual transition) */
-.ac-attendees-block[data-mode="gathering"] .ac-add-attendee-row { display: none; }
+/* Gathering mode — hide add-attendee row in gathering window
+   (C-12 absorbed prior _setGatheringMode scaffolding; selector
+   migrated from .ac-attendees-block[data-mode="gathering"] to
+   .ac-gathering-active on .ac-setup-col-right) */
+.ac-gathering-active .ac-add-attendee-row { display: none; }
 
 /* ──────────────────────────────────────────────────────────── */
 /* CMD-ACCORD-SETUP-FILMSTRIP-2 — Filmstrip + scrub styles §8   */
@@ -2406,3 +2428,97 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 
 /* Hidden owner anchor span inside .ac-agenda-item (C-11 D1) */
 .ac-percolate-owner { display: none; }
+
+/* ──────────────────────────────────────────────────────────── */
+/* CMD-ACCORD-SETUP-GATHERING-1 (C-12) — §11 visual layer       */
+/* Conn-dot rules above (replaced legacy --idle block).         */
+/* Architect amendment: gathering label uses margin-left: auto  */
+/* to push right of slideshow stepper + rotation progress in    */
+/* the existing .ac-col-tabbar[data-col="right"] flex row.      */
+/* ──────────────────────────────────────────────────────────── */
+
+/* Gathering active column — slightly tighter card padding */
+.ac-gathering-active .ac-attendee-card {
+  padding: 10px 12px;
+}
+
+/* Gathering header chrome (mounted in .ac-col-tabbar[data-col="right"]) */
+.ac-gathering-label {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--ac-font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  color: var(--ac-cyan);
+  text-transform: uppercase;
+  margin-left: auto;       /* pushes right of slideshow stepper + progress */
+  padding: 0 4px;
+}
+.ac-gathering-prep-toggle {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--ac-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.8px;
+  color: var(--ac-text-faint);
+  background: none;
+  border: 1px solid var(--ac-border-subtle);
+  border-radius: 3px;
+  padding: 2px 7px;
+  cursor: pointer;
+  margin-left: 6px;        /* small gap; label already pushed right */
+}
+.ac-gathering-prep-toggle:hover { color: var(--ac-text-tertiary); }
+
+/* 5-minute warning banner */
+.ac-five-min-banner {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-12px);
+  z-index: 8000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ac-bg-deep);
+  border: 1px solid var(--ac-border-mid);
+  border-top: 2px solid var(--ac-cyan);
+  border-radius: 6px;
+  padding: 10px 16px;
+  opacity: 0;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  pointer-events: none;
+}
+.ac-five-min-banner--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+.ac-five-min-glyph { font-size: 14px; }
+.ac-five-min-text {
+  font-family: var(--ac-font-mono);
+  font-size: 11px;
+  color: var(--ac-text-primary);
+  letter-spacing: 0.5px;
+}
+.ac-five-min-dismiss {
+  font-size: 11px;
+  color: var(--ac-text-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: 4px;
+}
+.ac-five-min-dismiss:hover { color: var(--ac-text-secondary); }
+
+/* Footer 5-min pulse */
+@keyframes ac-footer-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(94,234,212,0.4); }
+  50%  { box-shadow: 0 0 0 8px rgba(94,234,212,0); }
+  100% { box-shadow: 0 0 0 0 rgba(94,234,212,0); }
+}
+.ac-five-min-pulse {
+  animation: ac-footer-pulse 1s ease-out 3;
+}
