@@ -1014,7 +1014,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-scrub-node:last-child { border-bottom: none; }
 .ac-scrub-node-tag {
   font-family: var(--ac-font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   color: var(--ac-cyan);
   flex-shrink: 0;
   margin-top: 2px;
@@ -1025,7 +1025,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-scrub-node--risk     .ac-scrub-node-tag { color: var(--ac-rose);   }
 .ac-scrub-node--dissent  .ac-scrub-node-tag { color: var(--ac-rose);   }
 .ac-scrub-node--question .ac-scrub-node-tag { color: var(--ac-violet); }
-.ac-scrub-node--note     .ac-scrub-node-tag { color: var(--ac-text-tertiary); }
+.ac-scrub-node--note     .ac-scrub-node-tag { color: var(--ac-text-secondary); }
 .ac-scrub-node-summary {
   font-size: 12px;
   color: var(--ac-text-secondary);
@@ -2308,7 +2308,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   bottom: 0;
   left: 0;
   right: 0;
-  height: 1px;
+  height: 2px;
   background: rgba(251, 191, 36, 0.75); /* amber — distinct from cyan active-tab underline */
   transform: scaleX(0);
   transform-origin: left center;
