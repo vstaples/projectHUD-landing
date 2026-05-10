@@ -1965,9 +1965,10 @@
   // §4 — Entry point
   function _renderFilmstrip(meeting, workstreamId) {
     _filmstripAborted = false;
-    var myToken = ++_filmstripToken;  // capture token for this render cycle
+    var myToken = ++_filmstripToken;
+    console.log('[FILM] start token=', myToken, 'ws=', workstreamId);
     var content = document.querySelector('.ac-filmstrip-content');
-    if (!content) return;
+    if (!content) { console.log('[FILM] no content element'); return; }
     content.innerHTML = '<div class="ac-film-loading">Loading timeline\u2026</div>';
 
     if (!workstreamId) {
@@ -1977,12 +1978,15 @@
 
     _fetchFilmMeetings(meeting.meeting_id, workstreamId)
       .then(function(meetings) {
-        if (_filmstripToken !== myToken) return;  // stale render — abort
+        console.log('[FILM] meetings cb token=', _filmstripToken, 'mine=', myToken, 'ok=', _filmstripToken === myToken);
+        if (_filmstripToken !== myToken) return;
         return _fetchFilmNodeCounts(meetings).then(function(countMap) {
-          if (_filmstripToken !== myToken) return;  // stale render — abort
-          var content = document.querySelector('.ac-filmstrip-content'); // IR71
-          if (!content) return;
+          console.log('[FILM] counts cb token=', _filmstripToken, 'mine=', myToken, 'ok=', _filmstripToken === myToken);
+          if (_filmstripToken !== myToken) return;
+          var content = document.querySelector('.ac-filmstrip-content');
+          if (!content) { console.log('[FILM] content gone'); return; }
           _paintFilmstrip(content, meetings, countMap, meeting, workstreamId);
+          console.log('[FILM] painted!');
           _initFilmDensity();
         });
       })
