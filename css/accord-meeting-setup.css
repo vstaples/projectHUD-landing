@@ -1423,6 +1423,114 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-intel-notes-textarea::placeholder { color: var(--ac-text-faint); font-style: italic; }
 
 /* ──────────────────────────────────────────────────────────── */
+/* CMD-ACCORD-SETUP-ACTION-KANBAN-1 — Kanban + grid styles      */
+/* All tokens --ac-* only; scoped to .ac-setup-shell            */
+/* ──────────────────────────────────────────────────────────── */
+
+.ac-actions-loading, .ac-actions-empty, .ac-actions-error {
+  font-size: 12px; color: var(--ac-text-tertiary);
+  font-style: italic; padding: 16px 14px;
+}
+.ac-actions-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px 8px 14px; flex-shrink: 0;
+}
+.ac-view-toggle {
+  display: flex; background: var(--ac-bg-pane);
+  border: 1px solid var(--ac-border-subtle); border-radius: 5px;
+  padding: 2px; gap: 2px;
+}
+.ac-view-btn {
+  font-family: var(--ac-font-mono); font-size: 8.5px; letter-spacing: 1px;
+  color: var(--ac-text-tertiary); background: none; border: none;
+  padding: 4px 10px; cursor: pointer; border-radius: 3px;
+}
+.ac-view-btn.active { background: var(--ac-cyan-dim); color: var(--ac-cyan); }
+.ac-actions-count { font-family: var(--ac-font-mono); font-size: 9px; }
+
+/* Kanban track */
+.ac-kanban-track {
+  display: flex; gap: 8px; overflow-x: auto;
+  padding: 0 14px 12px 14px; flex: 1; align-items: flex-start;
+  scrollbar-width: thin; scrollbar-color: var(--ac-border-mid) transparent;
+}
+.ac-kanban-col { flex: 0 0 150px; display: flex; flex-direction: column; gap: 6px; }
+.ac-kanban-col--alert .ac-kanban-col-label { color: var(--ac-rose); }
+.ac-kanban-col--today .ac-kanban-col-label { color: var(--ac-cyan); }
+.ac-kanban-col-label {
+  font-family: var(--ac-font-mono); font-size: 8.5px;
+  color: var(--ac-text-tertiary); letter-spacing: 1px; text-transform: uppercase;
+  padding: 2px 0 4px 0; border-bottom: 1px solid var(--ac-border-subtle);
+  display: flex; align-items: center; gap: 5px;
+}
+.ac-kanban-count {
+  background: var(--ac-bg-tile); color: var(--ac-text-secondary);
+  border-radius: 8px; padding: 0 5px; font-size: 8px;
+}
+.ac-kanban-cards { display: flex; flex-direction: column; gap: 5px; min-height: 40px; }
+.ac-kanban-cards--drag-over { background: var(--ac-bg-tile); border-radius: 4px; }
+.ac-kanban-empty { font-size: 10px; color: var(--ac-text-faint); padding: 6px 0; }
+
+/* Action card */
+.ac-action-card {
+  background: var(--ac-bg-tile); border: 1px solid var(--ac-border-subtle);
+  border-radius: 5px; padding: 7px 9px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 3px; transition: border-color .15s;
+}
+.ac-action-card:hover { border-color: var(--ac-border-mid); }
+.ac-action-card.ac-card-dragging { opacity: 0.5; }
+.ac-action-seq { font-family: var(--ac-font-mono); font-size: 8.5px; color: var(--ac-amber); font-weight: 600; }
+.ac-action-summary { font-size: 11.5px; color: var(--ac-text-primary); line-height: 1.3; }
+.ac-action-owner   { font-size: 10px; color: var(--ac-text-tertiary); }
+.ac-action-slack   { font-family: var(--ac-font-mono); font-size: 9px; }
+.ac-slack--red  { color: var(--ac-rose); }
+.ac-slack--amber { color: var(--ac-amber); }
+.ac-slack--green { color: var(--ac-green); }
+.ac-slack--past { color: var(--ac-rose); font-weight: 600; }
+
+/* Grid view */
+.ac-grid-view { display: flex; flex-direction: column; overflow: auto; flex: 1; padding: 0 14px; }
+.ac-grid-header {
+  display: grid; grid-template-columns: 36px repeat(5, 1fr);
+  border-bottom: 1px solid var(--ac-border-subtle);
+  position: sticky; top: 0; background: var(--ac-bg-pane); z-index: 2;
+}
+.ac-grid-time-gutter {}
+.ac-grid-day-header {
+  font-family: var(--ac-font-mono); font-size: 8.5px;
+  color: var(--ac-text-tertiary); padding: 6px 4px; text-align: center;
+}
+.ac-grid-day-header--today { color: var(--ac-cyan); }
+.ac-grid-body { display: flex; flex-direction: column; }
+.ac-grid-row {
+  display: grid; grid-template-columns: 36px repeat(5, 1fr);
+  border-bottom: 1px solid var(--ac-border-subtle); min-height: 44px;
+}
+.ac-grid-time {
+  font-family: var(--ac-font-mono); font-size: 8px;
+  color: var(--ac-text-faint); padding: 4px 4px 0 0; text-align: right;
+}
+.ac-grid-cell { padding: 3px; }
+.ac-grid-action-card {
+  background: var(--ac-amber-dim); border: 1px solid rgba(251,191,119,0.2);
+  border-radius: 3px; padding: 3px 5px; font-size: 9.5px; color: var(--ac-amber);
+  cursor: pointer; margin-bottom: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ac-grid-action-card:hover { border-color: var(--ac-amber); }
+
+/* Cross-substrate highlight pulse */
+@keyframes ac-highlight-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(251,191,119,0.6); }
+  50%  { box-shadow: 0 0 0 6px rgba(251,191,119,0); }
+  100% { box-shadow: 0 0 0 0 rgba(251,191,119,0); }
+}
+.ac-highlight-pulse {
+  animation: ac-highlight-pulse 0.6s ease-out 2;
+  border-color: var(--ac-amber) !important;
+}
+
+/* ──────────────────────────────────────────────────────────── */
 /* CMD-ACCORD-MEETING-SETUP-1 (prior phases) — DEFERRED         */
 /* The rules below shipped in Phases 2-7. Their selectors do    */
 /* not match the new shell structure introduced above. They     */

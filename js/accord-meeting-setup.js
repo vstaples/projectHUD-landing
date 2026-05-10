@@ -111,6 +111,12 @@
   var _currentMeeting  = null;
   var _currentResourceId = null;
 
+  // ── CMD-ACCORD-SETUP-ACTION-KANBAN-1: action items state ──────
+  // _rightActiveTab persists across renders intentionally.
+  // Do NOT reset in teardown().
+  var _rightActiveTab    = 'attendees';
+  var _actionItemsToken  = 0;
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() {
     // Remove fullpage classes only when genuinely leaving Setup.
@@ -3876,6 +3882,483 @@
   }
 
   // ══════════════════════════════════════════════════════════════
+  // ACTION ITEMS KANBAN — CMD-ACCORD-SETUP-ACTION-KANBAN-1
+  // §4 right tab bar · §5 fetch · §6 kanban · §7 grid · §8 events
+  // §9 drag-to-reschedule
+  // V1: UPDATE RLS requires created_by = auth.uid() — PATCH only
+  //     works on own actions; others silently return 0 rows.
+  // V4: ISO week Monday-start via (day+6)%7 formula.
+  // CPM critical-path spine deferred — Track F prerequisite.
+  // ══════════════════════════════════════════════════════════════
+
+  // §4 — Right column tab bar
+  function _renderRightTabBar(meeting, workstreamId) {
+    var tabbar = document.querySelector('.ac-col-tabbar[data-col="right"]');
+    if (!tabbar || tabbar.dataset.wired) return;
+    tabbar.dataset.wired = '1';
+
+    var tabs = [
+      { id: 'attendees',    label: 'Attendees'    },
+      { id: 'action-items', label: 'Action Items' }
+    ];
+
+    tabbar.innerHTML = tabs.map(function(t) {
+      var active = t.id === _rightActiveTab ? ' ac-tab--active' : '';
+      return '<button class="ac-tab' + active + '" data-action="right-tab" ' +
+             'data-tab="' + t.id + '">' + t.label + '</button>';
+    }).join('');
+
+    tabbar.addEventListener('click', function(ev) {
+      var btn = ev.target.closest('[data-action="right-tab"]');
+      if (!btn) return;
+      var tab = btn.dataset.tab;
+      if (tab === _rightActiveTab) return;
+      _rightActiveTab = tab;
+      tabbar.querySelectorAll('.ac-tab').forEach(function(b) {
+        b.classList.toggle('ac-tab--active', b.dataset.tab === tab);
+      });
+      _activateRightTab(tab, meeting, workstreamId);
+    });
+  }
+
+  function _activateRightTab(tab, meeting, workstreamId) {
+    var tabbody = document.querySelector('.ac-col-tabbody[data-col="right"]');
+    if (!tabbody) return;
+    if (tab === 'attendees') {
+      _renderAttendees(meeting, workstreamId);
+      return;
+    }
+    if (tab === 'action-items') {
+      _renderActionItems(meeting, workstreamId);
+      return;
+    }
+  }
+
+  // §5 — Action items fetch
+  function _renderActionItems(meeting, workstreamId) {
+    var myToken = ++_actionItemsToken;
+    var tabbody = document.querySelector('.ac-col-tabbody[data-col="right"]');
+    if (!tabbody) return;
+    tabbody.innerHTML = '<div class="ac-actions-loading">Loading actions\u2026</div>';
+
+    if (!workstreamId) {
+      tabbody.innerHTML = '<div class="ac-actions-empty">No workstream context.</div>';
+      return;
+    }
+
+    _fetchWorkstreamActions(workstreamId, meeting.meeting_id)
+      .then(function(actions) {
+        if (_actionItemsToken !== myToken) return;
+        var liveBody = document.querySelector('.ac-col-tabbody[data-col="right"]');
+        if (!liveBody || !liveBody.isConnected) return;
+        _resolveActionOwners(actions).then(function(enriched) {
+          if (_actionItemsToken !== myToken) return;
+          var liveBody2 = document.querySelector('.ac-col-tabbody[data-col="right"]');
+          if (!liveBody2 || !liveBody2.isConnected) return;
+          _paintActionItems(liveBody2, enriched, meeting);
+        });
+      })
+      .catch(function(e) {
+        console.error('[AccordMeetingSetup] action items fetch failed', e);
+        var liveBody = document.querySelector('.ac-col-tabbody[data-col="right"]');
+        if (liveBody && liveBody.isConnected)
+          liveBody.innerHTML = '<div class="ac-actions-error">Could not load actions.</div>';
+      });
+  }
+
+  function _fetchWorkstreamActions(workstreamId, currentMeetingId) {
+    return API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&state=in.(closed,sealed,running,idle)' +
+      '&select=meeting_id&limit=50'
+    ).then(function(meetings) {
+      if (!meetings || !meetings.length) return [];
+      var ids = meetings.map(function(m) { return m.meeting_id; }).join(',');
+      return API.get(
+        'accord_nodes?meeting_id=in.(' + ids + ')' +
+        '&tag=eq.action' +
+        '&select=node_id,summary,seq_id,due_date,created_by,meeting_id,agenda_item_id' +
+        '&order=due_date.asc.nullslast,created_at.asc'
+      ).then(function(nodes) { return nodes || []; });
+    });
+  }
+
+  function _resolveActionOwners(actions) {
+    if (!actions.length) return Promise.resolve(actions);
+    var userIds = [];
+    actions.forEach(function(a) {
+      if (a.created_by && userIds.indexOf(a.created_by) === -1)
+        userIds.push(a.created_by);
+    });
+    if (!userIds.length) return Promise.resolve(actions);
+
+    return API.get(
+      'resources?user_id=in.(' + userIds.join(',') + ')&select=id,name,user_id'
+    ).then(function(resources) {
+      var map = {};
+      (resources || []).forEach(function(r) { map[r.user_id] = r; });
+      actions.forEach(function(a) {
+        var r = map[a.created_by];
+        a._owner_name        = r ? r.name : null;
+        a._owner_resource_id = r ? r.id   : null;
+      });
+      return actions;
+    }).catch(function() { return actions; });
+  }
+
+  // §6 — Week bounds and column assignment
+  function _getWeekBounds() {
+    var now    = new Date();
+    var day    = now.getDay();
+    var monday = new Date(now);
+    monday.setDate(now.getDate() - ((day + 6) % 7));
+    monday.setHours(0, 0, 0, 0);
+
+    var days = [];
+    for (var i = 0; i < 5; i++) {
+      var d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      days.push(d);
+    }
+
+    var nextMonday = new Date(monday);
+    nextMonday.setDate(monday.getDate() + 7);
+
+    return { monday: monday, days: days, nextMonday: nextMonday };
+  }
+
+  function _assignColumn(action, bounds) {
+    if (!action.due_date) return 'unscheduled';
+    var due = new Date(action.due_date);
+    due.setHours(0, 0, 0, 0);
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (due < today) return 'past-due';
+
+    for (var i = 0; i < bounds.days.length; i++) {
+      var d = new Date(bounds.days[i]);
+      d.setHours(0, 0, 0, 0);
+      if (due.getTime() === d.getTime()) return 'day-' + i;
+    }
+
+    if (due >= bounds.nextMonday) return 'next-week';
+    return 'unscheduled';
+  }
+
+  function _slackDays(action) {
+    if (!action.due_date) return null;
+    var due = new Date(action.due_date).getTime();
+    var now = Date.now();
+    return Math.floor((due - now) / 86400000);
+  }
+
+  function _fmtShort(date) {
+    return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
+  }
+
+  function _isSameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() &&
+           a.getMonth()    === b.getMonth()    &&
+           a.getDate()     === b.getDate();
+  }
+
+  // §6.3 — Paint kanban
+  function _paintActionItems(tabbody, actions, meeting) {
+    var bounds = _getWeekBounds();
+    var view   = 'kanban';
+
+    function _renderKanban() {
+      var buckets = {
+        'past-due':    [],
+        'day-0': [], 'day-1': [], 'day-2': [], 'day-3': [], 'day-4': [],
+        'next-week':   [],
+        'unscheduled': []
+      };
+      actions.forEach(function(a) {
+        var col = _assignColumn(a, bounds);
+        buckets[col].push(a);
+      });
+
+      var DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+      var html = '<div class="ac-actions-toolbar">';
+      html += '<div class="ac-view-toggle">';
+      html += '<button class="ac-view-btn' + (view === 'kanban' ? ' active' : '') +
+              '" data-action="actions-view" data-view="kanban">KANBAN</button>';
+      html += '<button class="ac-view-btn' + (view === 'grid' ? ' active' : '') +
+              '" data-action="actions-view" data-view="grid">GRID</button>';
+      html += '</div>';
+      html += '<span class="ac-actions-count ac-muted">' + actions.length + ' actions</span>';
+      html += '</div>';
+
+      html += '<div class="ac-kanban-track">';
+      html += _kanbanCol('PAST DUE', buckets['past-due'], 'past-due', true, false);
+
+      for (var i = 0; i < 5; i++) {
+        var dayLabel = DAY_NAMES[i] + ' ' + _fmtShort(bounds.days[i]);
+        var isToday  = _isSameDay(bounds.days[i], new Date());
+        html += _kanbanCol(dayLabel, buckets['day-' + i], 'day-' + i, false, isToday);
+      }
+
+      html += _kanbanCol('NEXT WEEK', buckets['next-week'], 'next-week', false, false);
+
+      if (buckets['unscheduled'].length) {
+        html += _kanbanCol('UNSCHEDULED', buckets['unscheduled'], 'unscheduled', false, false);
+      }
+
+      html += '</div>';
+      tabbody.innerHTML = html;
+      _wireActionEvents(tabbody, actions, meeting, bounds, view, _renderKanban, _renderGrid);
+      _initKanbanDrag(tabbody, actions, meeting, bounds);
+    }
+
+    function _renderGrid() {
+      _paintGridView(tabbody, actions, meeting, bounds, _renderKanban, _renderGrid);
+    }
+
+    _renderKanban();
+  }
+
+  function _kanbanCol(label, items, colId, isAlert, isToday) {
+    var colCls = 'ac-kanban-col';
+    if (isAlert && items.length) colCls += ' ac-kanban-col--alert';
+    if (isToday) colCls += ' ac-kanban-col--today';
+
+    var html = '<div class="' + colCls + '" data-col-id="' + colId + '">';
+    html += '<div class="ac-kanban-col-label">' + esc(label);
+    if (items.length) html += ' <span class="ac-kanban-count">' + items.length + '</span>';
+    html += '</div>';
+    html += '<div class="ac-kanban-cards" data-col-id="' + colId + '">';
+
+    if (!items.length) {
+      html += '<div class="ac-kanban-empty">\u2014</div>';
+    } else {
+      items.forEach(function(a) { html += _actionCardHtml(a); });
+    }
+
+    html += '</div></div>';
+    return html;
+  }
+
+  function _actionCardHtml(action) {
+    var slack    = _slackDays(action);
+    var isPast   = slack !== null && slack < 0;
+    var slackCls = isPast ? 'ac-slack--past'
+                 : slack === null ? ''
+                 : slack <= 1 ? 'ac-slack--red'
+                 : slack <= 5 ? 'ac-slack--amber'
+                 : 'ac-slack--green';
+
+    var html = '<div class="ac-action-card" ' +
+               'data-node-id="' + esc(action.node_id) + '" ' +
+               'data-agenda-item-id="' + esc(action.agenda_item_id || '') + '" ' +
+               'data-resource-id="' + esc(action._owner_resource_id || '') + '" ' +
+               'data-action="action-card-click">';
+
+    html += '<div class="ac-action-seq">' + esc(action.seq_id || 'AX') + '</div>';
+    html += '<div class="ac-action-summary">' +
+            esc((action.summary || '').slice(0, 80)) + '</div>';
+
+    if (action._owner_name) {
+      html += '<div class="ac-action-owner">' + esc(action._owner_name) + '</div>';
+    }
+
+    if (slack !== null) {
+      var slackText = isPast ? Math.abs(slack) + 'd overdue'
+                    : slack === 0 ? 'due today'
+                    : slack + 'd';
+      html += '<div class="ac-action-slack ' + slackCls + '">' + esc(slackText) + '</div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  // §7 — Grid view
+  function _paintGridView(tabbody, actions, meeting, bounds, onKanban, onGrid) {
+    var DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    var HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
+
+    var html = '<div class="ac-actions-toolbar">';
+    html += '<div class="ac-view-toggle">';
+    html += '<button class="ac-view-btn" data-action="actions-view" data-view="kanban">KANBAN</button>';
+    html += '<button class="ac-view-btn active" data-action="actions-view" data-view="grid">GRID</button>';
+    html += '</div>';
+    html += '<span class="ac-actions-count ac-muted">' + actions.length + ' actions</span>';
+    html += '</div>';
+
+    html += '<div class="ac-grid-view">';
+    html += '<div class="ac-grid-header">';
+    html += '<div class="ac-grid-time-gutter"></div>';
+    DAY_NAMES.forEach(function(name, i) {
+      var isToday = _isSameDay(bounds.days[i], new Date());
+      html += '<div class="ac-grid-day-header' + (isToday ? ' ac-grid-day-header--today' : '') + '">';
+      html += esc(name) + ' ' + esc(_fmtShort(bounds.days[i]));
+      html += '</div>';
+    });
+    html += '</div>';
+
+    html += '<div class="ac-grid-body">';
+    HOURS.forEach(function(h) {
+      html += '<div class="ac-grid-row">';
+      html += '<div class="ac-grid-time">' + h + ':00</div>';
+      DAY_NAMES.forEach(function(name, i) {
+        var dayActions = actions.filter(function(a) {
+          return a.due_date && _isSameDay(new Date(a.due_date), bounds.days[i]);
+        });
+        html += '<div class="ac-grid-cell" data-day-idx="' + i + '" data-hour="' + h + '">';
+        if (h === 8) {
+          dayActions.forEach(function(a) {
+            html += '<div class="ac-grid-action-card" ' +
+                    'data-node-id="' + esc(a.node_id) + '" ' +
+                    'data-agenda-item-id="' + esc(a.agenda_item_id || '') + '" ' +
+                    'data-resource-id="' + esc(a._owner_resource_id || '') + '" ' +
+                    'data-action="action-card-click">' +
+                    esc(a.seq_id || 'AX') + ' \u00b7 ' +
+                    esc((a.summary || '').slice(0, 40)) +
+                    '</div>';
+          });
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div></div>';
+
+    tabbody.innerHTML = html;
+    _wireActionEvents(tabbody, actions, meeting, bounds, 'grid', onKanban, onGrid);
+  }
+
+  // §8 — Event wiring
+  function _wireActionEvents(tabbody, actions, meeting, bounds, currentView, onKanban, onGrid) {
+    tabbody.addEventListener('click', function(ev) {
+      var action = ev.target.dataset.action ||
+                   (ev.target.closest('[data-action]') &&
+                    ev.target.closest('[data-action]').dataset.action);
+      if (!action) return;
+
+      if (action === 'actions-view') {
+        var btn  = ev.target.closest('[data-action="actions-view"]');
+        var view = btn && btn.dataset.view;
+        if (view === 'kanban' && currentView !== 'kanban') { onKanban(); return; }
+        if (view === 'grid'   && currentView !== 'grid')   { onGrid();   return; }
+        return;
+      }
+
+      if (action === 'action-card-click') {
+        var card = ev.target.closest('[data-action="action-card-click"]');
+        if (!card) return;
+        _onActionCardClick(card, meeting);
+        return;
+      }
+    });
+  }
+
+  function _onActionCardClick(card, meeting) {
+    var agendaItemId = card.dataset.agendaItemId;
+    var resourceId   = card.dataset.resourceId;
+
+    if (agendaItemId) {
+      document.querySelectorAll('.ac-agenda-item').forEach(function(el) {
+        el.classList.remove('ac-highlight-pulse');
+      });
+      var agendaRow = document.querySelector(
+        '.ac-agenda-item[data-item-id="' + agendaItemId + '"]'
+      );
+      if (agendaRow) {
+        agendaRow.classList.add('ac-highlight-pulse');
+        agendaRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        setTimeout(function() { agendaRow.classList.remove('ac-highlight-pulse'); }, 2000);
+      }
+    }
+
+    if (resourceId) {
+      document.querySelectorAll('.ac-attendee-card').forEach(function(el) {
+        el.classList.remove('ac-highlight-pulse');
+      });
+      var attCard = document.querySelector(
+        '.ac-attendee-card[data-resource-id="' + resourceId + '"]'
+      );
+      if (attCard) {
+        attCard.classList.add('ac-highlight-pulse');
+        setTimeout(function() { attCard.classList.remove('ac-highlight-pulse'); }, 2000);
+      }
+    }
+  }
+
+  // §9 — Drag-to-reschedule
+  function _initKanbanDrag(tabbody, actions, meeting, bounds) {
+    var _dragAction = null;
+
+    tabbody.addEventListener('dragstart', function(ev) {
+      var card = ev.target.closest('.ac-action-card');
+      if (!card) { ev.preventDefault(); return; }
+      _dragAction = card.dataset.nodeId;
+      card.classList.add('ac-card-dragging');
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', _dragAction);
+    });
+
+    tabbody.addEventListener('dragover', function(ev) {
+      var col = ev.target.closest('.ac-kanban-cards');
+      if (!col) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'move';
+      tabbody.querySelectorAll('.ac-kanban-cards--drag-over').forEach(function(el) {
+        el.classList.remove('ac-kanban-cards--drag-over');
+      });
+      col.classList.add('ac-kanban-cards--drag-over');
+    });
+
+    tabbody.addEventListener('drop', function(ev) {
+      ev.preventDefault();
+      var col = ev.target.closest('.ac-kanban-cards');
+      if (!col || !_dragAction) return;
+      var colId      = col.dataset.colId;
+      var newDueDate = _colIdToDate(colId, bounds);
+
+      tabbody.querySelectorAll('.ac-kanban-cards--drag-over').forEach(function(el) {
+        el.classList.remove('ac-kanban-cards--drag-over');
+      });
+
+      API.patch('accord_nodes?node_id=eq.' + _dragAction, { due_date: newDueDate })
+        .then(function() {
+          var a = actions.find(function(x) { return x.node_id === _dragAction; });
+          if (a) a.due_date = newDueDate;
+          var liveBody = document.querySelector('.ac-col-tabbody[data-col="right"]');
+          if (liveBody) _paintActionItems(liveBody, actions, meeting);
+        })
+        .catch(function(e) {
+          console.error('[AccordMeetingSetup] due_date patch failed', e);
+        });
+      _dragAction = null;
+    });
+
+    tabbody.addEventListener('dragend', function() {
+      tabbody.querySelectorAll('.ac-card-dragging, .ac-kanban-cards--drag-over')
+        .forEach(function(el) {
+          el.classList.remove('ac-card-dragging', 'ac-kanban-cards--drag-over');
+        });
+      _dragAction = null;
+    });
+
+    tabbody.querySelectorAll('.ac-action-card').forEach(function(card) {
+      card.setAttribute('draggable', 'true');
+    });
+  }
+
+  function _colIdToDate(colId, bounds) {
+    if (colId === 'past-due' || colId === 'unscheduled') return null;
+    if (colId === 'next-week') {
+      return new Date(bounds.nextMonday).toISOString().slice(0, 10);
+    }
+    var dayIdx = parseInt(colId.replace('day-', ''), 10);
+    if (isNaN(dayIdx)) return null;
+    return new Date(bounds.days[dayIdx]).toISOString().slice(0, 10);
+  }
+
+  // ══════════════════════════════════════════════════════════════
   // RENDER ENTRY POINT
   // ══════════════════════════════════════════════════════════════
 
@@ -3941,6 +4424,9 @@
 
     // ── CMD-ACCORD-SETUP-ATTENDEES-1: attendees render ────────
     _renderAttendees(meeting, workstreamId);
+
+    // ── CMD-ACCORD-SETUP-ACTION-KANBAN-1: right column tab bar
+    _renderRightTabBar(meeting, workstreamId);
 
     // Breadcrumb async resolve — also caches _workstreamName for briefing
     // CMD-ACCORD-SETUP-LAYOUT-1: breadcrumb element no longer in shell;
