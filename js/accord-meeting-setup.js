@@ -4303,21 +4303,25 @@
     });
 
     tabbody.addEventListener('dragover', function(ev) {
-      var col = ev.target.closest('.ac-kanban-cards');
-      if (!col) return;
+      if (!ev.target.closest('.ac-kanban-track')) return;
       ev.preventDefault();
       ev.stopPropagation();
       ev.dataTransfer.dropEffect = 'move';
+      var col = ev.target.closest('.ac-kanban-cards') ||
+                (ev.target.closest('.ac-kanban-col') &&
+                 ev.target.closest('.ac-kanban-col').querySelector('.ac-kanban-cards'));
       tabbody.querySelectorAll('.ac-kanban-cards--drag-over').forEach(function(el) {
         el.classList.remove('ac-kanban-cards--drag-over');
       });
-      col.classList.add('ac-kanban-cards--drag-over');
+      if (col) col.classList.add('ac-kanban-cards--drag-over');
     });
 
     tabbody.addEventListener('drop', function(ev) {
       ev.preventDefault();
       ev.stopPropagation();
-      var col = ev.target.closest('.ac-kanban-cards');
+      var col = ev.target.closest('.ac-kanban-cards') ||
+                (ev.target.closest('.ac-kanban-col') &&
+                 ev.target.closest('.ac-kanban-col').querySelector('.ac-kanban-cards'));
       if (!col || !_dragAction) return;
       var colId      = col.dataset.colId;
       var newDueDate = _colIdToDate(colId, bounds);
