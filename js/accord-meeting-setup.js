@@ -3924,13 +3924,49 @@
   function _activateRightTab(tab, meeting, workstreamId) {
     var tabbody = document.querySelector('.ac-col-tabbody[data-col="right"]');
     if (!tabbody) return;
+
     if (tab === 'attendees') {
+      // Revert right column width to saved value
+      _restoreRightColumnWidth();
       _renderAttendees(meeting, workstreamId);
       return;
     }
     if (tab === 'action-items') {
+      // Option A: expand right column to show full kanban week
+      _expandRightColumnForKanban();
       _renderActionItems(meeting, workstreamId);
       return;
+    }
+  }
+
+  function _expandRightColumnForKanban() {
+    // Target: 8 cols × 150px + 7 gaps × 8px + 28px padding ≈ 1284px
+    // Use CSS variable --col-right-w if available from C-01 drag-resize system
+    var shell = document.querySelector('.ac-setup-shell');
+    if (!shell) return;
+    // Save current width before overriding
+    var cols = shell.querySelector('.ac-setup-columns');
+    if (!cols) return;
+    var style = getComputedStyle(cols);
+    var savedW = cols.dataset.savedRightW || style.getPropertyValue('--col-right-w') || '';
+    if (!cols.dataset.savedRightW) cols.dataset.savedRightW = savedW;
+    // Expand: take remaining space after left and center columns
+    cols.style.setProperty('--col-right-w', 'calc(100% - var(--col-left-w, 200px) - var(--col-center-w, 400px))');
+  }
+
+  function _restoreRightColumnWidth() {
+    var shell = document.querySelector('.ac-setup-shell');
+    if (!shell) return;
+    var cols = shell.querySelector('.ac-setup-columns');
+    if (!cols) return;
+    var savedW = cols.dataset.savedRightW;
+    if (savedW !== undefined) {
+      if (savedW) {
+        cols.style.setProperty('--col-right-w', savedW);
+      } else {
+        cols.style.removeProperty('--col-right-w');
+      }
+      delete cols.dataset.savedRightW;
     }
   }
 
@@ -4321,6 +4357,7 @@
       if (!col || !_dragAction) return;
       var colId      = col.dataset.colId;
       var newDueDate = _colIdToDate(colId, bounds);
+      if (newDueDate === undefined) return;  // past-due drop is a no-op
 
       tabbody.querySelectorAll('.ac-kanban-cards--drag-over').forEach(function(el) {
         el.classList.remove('ac-kanban-cards--drag-over');
@@ -4348,17 +4385,18 @@
     });
 
     tabbody.querySelectorAll('.ac-action-card').forEach(function(card) {
-      if (card.dataset.sealed !== '1') card.setAttribute('draggable', 'true');
+      card.setAttribute('draggable', 'true');
     });
   }
 
   function _colIdToDate(colId, bounds) {
-    if (colId === 'past-due' || colId === 'unscheduled') return null;
+    if (colId === 'past-due') return undefined;  // no-op — cannot schedule in the past via drag
+    if (colId === 'unscheduled') return null;    // explicitly removes due date
     if (colId === 'next-week') {
       return new Date(bounds.nextMonday).toISOString().slice(0, 10);
     }
     var dayIdx = parseInt(colId.replace('day-', ''), 10);
-    if (isNaN(dayIdx)) return null;
+    if (isNaN(dayIdx)) return undefined;
     return new Date(bounds.days[dayIdx]).toISOString().slice(0, 10);
   }
 
