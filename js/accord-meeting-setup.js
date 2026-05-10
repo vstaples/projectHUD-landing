@@ -194,6 +194,7 @@
     _currentMeeting    = null;
     _currentResourceId = null;
     _intelOpen         = false;
+    _intelNoteSaving   = false;
     if (_intelNoteTimer) { clearTimeout(_intelNoteTimer); _intelNoteTimer = null; }
     var intelOverlay = document.getElementById('ac-intel-overlay');
     if (intelOverlay) {
@@ -3839,8 +3840,11 @@
     }
   }
 
+  var _intelNoteSaving = false;
+
   function _saveIntelNote(body) {
     if (!_currentMeeting || !_currentResourceId) return;
+    if (_intelNoteSaving) return;  // in-flight guard — prevents duplicate INSERTs
     var note = _intelData && _intelData.private_note;
 
     if (note && note.note_id) {
@@ -3851,6 +3855,7 @@
         console.error('[AccordMeetingSetup] intel note update failed', e);
       });
     } else {
+      _intelNoteSaving = true;
       API.post('accord_meeting_intel_notes', {
         firm_id:            _currentMeeting.firm_id,
         meeting_id:         _currentMeeting.meeting_id,
@@ -3858,11 +3863,13 @@
         body:               body,
         is_private:         true
       }).then(function(rows) {
+        _intelNoteSaving = false;
         var row = rows && rows[0];
         if (row && _intelData) {
           _intelData.private_note = { note_id: row.note_id, body: body };
         }
       }).catch(function(e) {
+        _intelNoteSaving = false;
         console.error('[AccordMeetingSetup] intel note insert failed', e);
       });
     }
