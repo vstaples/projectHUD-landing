@@ -4316,9 +4316,13 @@
       ev.stopPropagation();
       _dragAction = card.dataset.nodeId;
       card.classList.add('ac-card-dragging');
-      card.style.opacity = '0.01';  // hide card immediately — prevents visible snap-back
       ev.dataTransfer.effectAllowed = 'move';
       ev.dataTransfer.setData('text/plain', _dragAction);
+      // Use a 1x1 transparent GIF as drag image — this suppresses the browser's
+      // snap-back ghost animation entirely. The card itself stays visible in place.
+      var ghost = new Image();
+      ghost.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      ev.dataTransfer.setDragImage(ghost, 0, 0);
     });
 
     tabbody.addEventListener('dragover', function(ev) {
@@ -4359,17 +4363,24 @@
         el.classList.remove('ac-kanban-cards--drag-over');
       });
 
-      API.patch('accord_nodes?node_id=eq.' + _dragAction, { due_date: newDueDate })
-        .then(function() {
-          var a = actions.find(function(x) { return x.node_id === _dragAction; });
-          if (a) a.due_date = newDueDate;
-          var liveBody = document.querySelector('.ac-col-tabbody[data-col="right"]');
-          if (liveBody) _paintActionItems(liveBody, actions, meeting);
-        })
-        .catch(function(e) {
-          console.error('[AccordMeetingSetup] due_date patch failed', e);
-        });
+      // Optimistic update — repaint immediately so card appears in new column
+      // before the network round-trip completes. No visible snap-back.
+      var capturedAction = _dragAction;
       _dragAction = null;
+      var a = actions.find(function(x) { return x.node_id === capturedAction; });
+      if (a) a.due_date = newDueDate;
+      var liveBody = document.querySelector('.ac-col-tabbody[data-col="right"]');
+      if (liveBody) _paintActionItems(liveBody, actions, meeting);
+
+      // PATCH in background — revert on failure
+      API.patch('accord_nodes?node_id=eq.' + capturedAction, { due_date: newDueDate })
+        .catch(function(e) {
+          console.error('[AccordMeetingSetup] due_date patch failed — reverting', e);
+          // Revert local state and repaint
+          if (a) a.due_date = null;
+          var revertBody = document.querySelector('.ac-col-tabbody[data-col="right"]');
+          if (revertBody) _paintActionItems(revertBody, actions, meeting);
+        });
     });
 
     tabbody.addEventListener('dragend', function() {
