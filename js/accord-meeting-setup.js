@@ -2147,6 +2147,11 @@
     var todayCtrl = document.querySelector('[data-action="scrub-today"]');
     if (todayCtrl) todayCtrl.classList.remove('ac-film-ctrl--active');
 
+    // Only take over the center column when Minute Notes tab is active.
+    // When Agenda tab is active, scrub state is recorded but center is untouched.
+    // NOTE: we now always switch to minute-notes at end of this function,
+    // so this guard is no longer needed. Keep comment for history.
+
     var tabbody = document.querySelector('.ac-col-tabbody[data-col="center"]');
     if (!tabbody) return;
 
@@ -2189,6 +2194,13 @@
 
     _loadScrubNodes(meetingId, overlay);
     _wireScrubNav(overlay, meetings, currentMeeting, workstreamId);
+
+    // Switch tab bar to Minute Notes when scrub activates
+    _centerActiveTab = 'minute-notes';
+    _updateCenterTabBar(
+      document.querySelector('.ac-col-tabbar[data-col="center"]'),
+      'minute-notes'
+    );
   }
 
   function _deactivateScrub(currentMeeting) {
@@ -2212,6 +2224,13 @@
 
     var todayCtrl = document.querySelector('[data-action="scrub-today"]');
     if (todayCtrl) todayCtrl.classList.add('ac-film-ctrl--active');
+
+    // Switch tab bar back to Agenda when scrub deactivates
+    _centerActiveTab = 'agenda';
+    _updateCenterTabBar(
+      document.querySelector('.ac-col-tabbar[data-col="center"]'),
+      'agenda'
+    );
   }
 
   // §5.6 — Load scrub nodes
