@@ -3248,7 +3248,8 @@
   function _addAgendaItem(title, items, meeting, container, workstreamId) {
     if (container.dataset.submitting === '1') return;
     container.dataset.submitting = '1';
-    var nextPos = items.length;
+    var maxPos = items.reduce(function(m, i) { return Math.max(m, i.position); }, -1);
+    var nextPos = maxPos + 1;
     API.post('accord_agenda_items', {
       firm_id:    meeting.firm_id,
       meeting_id: meeting.meeting_id,
