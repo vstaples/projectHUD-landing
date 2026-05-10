@@ -4316,6 +4316,7 @@
       ev.stopPropagation();
       _dragAction = card.dataset.nodeId;
       card.classList.add('ac-card-dragging');
+      card.style.opacity = '0.01';  // hide card immediately — prevents visible snap-back
       ev.dataTransfer.effectAllowed = 'move';
       ev.dataTransfer.setData('text/plain', _dragAction);
     });
