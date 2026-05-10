@@ -2305,7 +2305,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 /* 1px progress drain line — absolute at bottom of tabbar header */
 .ac-rotation-progress {
   position: absolute;
-  bottom: 0;
+  bottom: -1px; /* overlaps the tabbar border-bottom so lines align */
   left: 0;
   right: 0;
   height: 2px;
