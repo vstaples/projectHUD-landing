@@ -2902,6 +2902,10 @@
       });
       var overlay = document.getElementById('ac-scrub-overlay');
       if (overlay) overlay.style.display = 'none';
+      // Re-render agenda container if it was destroyed by minute-notes branch
+      if (!document.getElementById('ac-agenda-container')) {
+        _renderAgendaContent(meeting, meeting.workstream_id);
+      }
       return;
     }
 
@@ -2913,10 +2917,20 @@
         });
         overlay2.style.display = '';
       } else {
-        tabbody.innerHTML =
-          '<div class="ac-minute-notes-prompt">' +
-          'Click a filmstrip frame to view prior meeting captures.' +
-          '</div>';
+        // Hide existing children — do NOT wipe innerHTML (preserves agenda container)
+        tabbody.querySelectorAll(':scope > *').forEach(function(el) {
+          el.style.display = 'none';
+        });
+        // Show or create the prompt
+        var prompt = document.getElementById('ac-minute-notes-prompt');
+        if (!prompt) {
+          prompt = document.createElement('div');
+          prompt.id = 'ac-minute-notes-prompt';
+          prompt.className = 'ac-minute-notes-prompt';
+          prompt.textContent = 'Click a filmstrip frame to view prior meeting captures.';
+          tabbody.appendChild(prompt);
+        }
+        prompt.style.display = '';
       }
       return;
     }
