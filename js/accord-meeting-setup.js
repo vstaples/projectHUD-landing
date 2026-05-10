@@ -2286,7 +2286,8 @@
         if (futureIdle.length && window.Accord && Accord.setLevel) {
           Accord.setLevel('meeting', {
             meetingId:    futureIdle[0].meeting_id,
-            workstreamId: workstreamId
+            workstreamId: workstreamId,
+            meetingState: 'idle'   // pre-signals transitions to apply fullpage before animation
           });
         }
       }
@@ -2616,58 +2617,6 @@
       return map;
     });
   }
-
-  function _paintFilmstripPhase6Legacy(strip, meetings, countMap, workstreamId) {
-    if (_filmstripFetchAborted || !strip || !strip.parentNode) return;
-    if (!meetings.length) {
-      strip.innerHTML = '<div class="ac-film-empty">No prior meetings in this workstream.</div>';
-      return;
-    }
-    var html = '<div class="ac-film-track">';
-    meetings.forEach(function(m) {
-      var counts  = countMap[m.meeting_id] || {};
-      var date    = _fmtDate(m.scheduled_for || m.sealed_at);
-      var summary = _buildCountSummary(counts);
-      html += (
-        '<div class="ac-film-card"' +
-          ' data-meeting-id="' + esc(m.meeting_id) + '"' +
-          ' data-workstream-id="' + esc(workstreamId) + '">' +
-          '<div class="ac-film-card-title">' + esc(m.title || '(untitled)') + '</div>' +
-          '<div class="ac-film-card-date">' + esc(date) + '</div>' +
-          '<div class="ac-film-card-summary">' + esc(summary) + '</div>' +
-        '</div>'
-      );
-    });
-    html += '</div>';
-    strip.innerHTML = html;
-    strip.addEventListener('click', _onFilmCardClick);
-  }
-
-  function _renderFilmstripPhase6Legacy(meeting, workstreamId) {
-    _filmstripFetchAborted = false;
-    var strip = document.querySelector('.ac-setup-filmstrip');
-    if (!strip) return;
-    if (!workstreamId) {
-      strip.style.display = 'none';
-      return;
-    }
-    strip.innerHTML = '<div class="ac-film-loading">Loading\u2026</div>';
-    _fetchPriorMeetings(meeting.meeting_id, workstreamId)
-      .then(function(meetings) {
-        if (_filmstripFetchAborted) return;
-        return _fetchNodeCounts(meetings).then(function(countMap) {
-          if (_filmstripFetchAborted) return;
-          _paintFilmstrip(strip, meetings, countMap, workstreamId);
-        });
-      })
-      .catch(function(e) {
-        console.error('[AccordMeetingSetup] filmstrip fetch failed', e);
-        if (!_filmstripFetchAborted && strip && strip.parentNode) {
-          strip.innerHTML = '<div class="ac-film-error">Could not load prior meetings.</div>';
-        }
-      });
-  }
-
 
   // ============================================================
   // FOOTER DURATION WIDGET -- Phase 7

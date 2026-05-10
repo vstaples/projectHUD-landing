@@ -102,7 +102,7 @@
       } else if (level === 'workstream') {
         await _transitionToWorkstreamView(context?.workstreamId);
       } else if (level === 'meeting') {
-        await _transitionToMeetingView(context?.meetingId, context?.workstreamId);
+        await _transitionToMeetingView(context?.meetingId, context?.workstreamId, context?.meetingState);
       }
     } catch (e) {
       console.error('[Accord-transitions] failed', e);
@@ -170,10 +170,24 @@
     }
   }
 
-  async function _transitionToMeetingView(meetingId, workstreamId) {
+  async function _transitionToMeetingView(meetingId, workstreamId, meetingState) {
     if (!meetingId || !state.viewHost) return;
     const reduced = _prefersReducedMotion();
     const sourceRect = state.lastSourceRect;
+
+    // Pre-apply fullpage classes before animation starts when the incoming
+    // meeting is idle (Setup shell). This prevents the rails from flashing
+    // into view during the transition. The classes are applied here rather
+    // than waiting for AccordMeetingSetup.render() so the rails are already
+    // hidden when the fade-out of the current surface begins.
+    // Approach: meetingState passed via setLevel context payload — no extra
+    // fetch required. Callers that know the meeting state (e.g. filmstrip
+    // NEXT handler) set context.meetingState = 'idle'.
+    if (meetingState === 'idle') {
+      const appEl = document.getElementById('accord-app');
+      if (appEl) appEl.classList.add('accord-setup-fullpage');
+      document.body.classList.add('accord-setup-fullpage');
+    }
 
     if (window.AccordViews?.renderMeetingView) {
       await window.AccordViews.renderMeetingView(state.viewHost, meetingId, workstreamId);
