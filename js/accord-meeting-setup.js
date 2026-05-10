@@ -4029,8 +4029,17 @@
 
   function _assignColumn(action, bounds) {
     if (!action.due_date) return 'unscheduled';
-    var due = new Date(action.due_date);
+    // Parse date components directly to avoid UTC/local timezone offset issues.
+    // '2026-05-08' must be treated as local May 8, not UTC midnight (which can
+    // shift to local May 7 in negative-offset timezones).
+    var parts = action.due_date.slice(0, 10).split('-');
+    var due = new Date(
+      parseInt(parts[0], 10),
+      parseInt(parts[1], 10) - 1,
+      parseInt(parts[2], 10)
+    );
     due.setHours(0, 0, 0, 0);
+
     var today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -4048,7 +4057,12 @@
 
   function _slackDays(action) {
     if (!action.due_date) return null;
-    var due = new Date(action.due_date).getTime();
+    var parts = action.due_date.slice(0, 10).split('-');
+    var due = new Date(
+      parseInt(parts[0], 10),
+      parseInt(parts[1], 10) - 1,
+      parseInt(parts[2], 10)
+    ).getTime();
     var now = Date.now();
     return Math.floor((due - now) / 86400000);
   }
@@ -4290,6 +4304,9 @@
 
   // §9 — Drag-to-reschedule
   function _initKanbanDrag(tabbody, actions, meeting, bounds) {
+    if (tabbody.dataset.dragWired) return;
+    tabbody.dataset.dragWired = '1';
+
     var _dragAction = null;
 
     tabbody.addEventListener('dragstart', function(ev) {
