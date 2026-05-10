@@ -1838,9 +1838,13 @@
     if (form) form.style.display = '';
     if (input) {
       input.focus();
-      input.addEventListener('input', function() {
-        _debouncedResourceSearch(input.value.trim(), block);
-      });
+      // Guard: only wire the input listener once per render cycle
+      if (!input.dataset.listenerBound) {
+        input.dataset.listenerBound = '1';
+        input.addEventListener('input', function() {
+          _debouncedResourceSearch(input.value.trim(), block);
+        });
+      }
     }
   }
 
