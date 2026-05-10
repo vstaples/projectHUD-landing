@@ -2617,7 +2617,7 @@
     });
   }
 
-  function _paintFilmstrip(strip, meetings, countMap, workstreamId) {
+  function _paintFilmstripPhase6Legacy(strip, meetings, countMap, workstreamId) {
     if (_filmstripFetchAborted || !strip || !strip.parentNode) return;
     if (!meetings.length) {
       strip.innerHTML = '<div class="ac-film-empty">No prior meetings in this workstream.</div>';
