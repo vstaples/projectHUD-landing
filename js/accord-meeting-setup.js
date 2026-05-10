@@ -2633,7 +2633,7 @@
     strip.addEventListener('click', _onFilmCardClick);
   }
 
-  function _renderFilmstrip(meeting, workstreamId) {
+  function _renderFilmstripPhase6Legacy(meeting, workstreamId) {
     _filmstripFetchAborted = false;
     var strip = document.querySelector('.ac-setup-filmstrip');
     if (!strip) return;
