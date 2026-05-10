@@ -4165,6 +4165,7 @@
                  : 'ac-slack--green';
 
     var html = '<div class="ac-action-card" ' +
+               'draggable="true" ' +
                'data-node-id="' + esc(action.node_id) + '" ' +
                'data-agenda-item-id="' + esc(action.agenda_item_id || '') + '" ' +
                'data-resource-id="' + esc(action._owner_resource_id || '') + '" ' +
@@ -4378,9 +4379,6 @@
       _dragAction = null;
     });
 
-    tabbody.querySelectorAll('.ac-action-card').forEach(function(card) {
-      card.setAttribute('draggable', 'true');
-    });
   }
 
   function _colIdToDate(colId, bounds) {
