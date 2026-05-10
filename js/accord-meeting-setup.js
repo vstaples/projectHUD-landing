@@ -87,6 +87,14 @@
     { tag: 'dissent',  abbr: 'Di' }
   ];
 
+  // ── CMD-ACCORD-SETUP-BRIEFING-TABS-1: tab state ───────────────
+  // _leftActiveTab persists across renders intentionally (smoke test 8).
+  // Do NOT reset in teardown().
+  var _leftActiveTab  = 'briefing';
+  var _briefingToken  = 0;
+  var _decisionsToken = 0;
+  var _risksToken     = 0;
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() {
     // Remove fullpage classes only when genuinely leaving Setup.
@@ -2335,6 +2343,469 @@
   }
 
   // ══════════════════════════════════════════════════════════════
+  // LEFT COLUMN TABS — CMD-ACCORD-SETUP-BRIEFING-TABS-1
+  // §4 tab bar · §5 dispatch · §6 briefing · §7 decisions · §8 risks
+  // V6: no project_id on workstreams — risks tab renders empty state.
+  // _leftActiveTab persists across renders (smoke test 8 — intentional).
+  // ══════════════════════════════════════════════════════════════
+
+  // §4 — Tab bar
+  function _renderLeftTabBar(meeting) {
+    var tabbar = document.querySelector('.ac-col-tabbar[data-col="left"]');
+    if (!tabbar) return;
+
+    var tabs = [
+      { id: 'briefing',  label: 'Briefing'  },
+      { id: 'decisions', label: 'Decisions' },
+      { id: 'risks',     label: 'Risks'     }
+    ];
+
+    tabbar.innerHTML = tabs.map(function(t) {
+      var active = t.id === _leftActiveTab ? ' ac-tab--active' : '';
+      return '<button class="ac-tab' + active + '" data-action="left-tab" ' +
+             'data-tab="' + t.id + '">' + t.label + '</button>';
+    }).join('');
+
+    tabbar.addEventListener('click', function(ev) {
+      var btn = ev.target.closest('[data-action="left-tab"]');
+      if (!btn) return;
+      var tab = btn.dataset.tab;
+      if (tab === _leftActiveTab) return;
+      _leftActiveTab = tab;
+      _activateLeftTab(tab, meeting);
+      tabbar.querySelectorAll('.ac-tab').forEach(function(b) {
+        b.classList.toggle('ac-tab--active', b.dataset.tab === tab);
+      });
+    });
+  }
+
+  // §5 — Tab activation dispatch
+  function _activateLeftTab(tab, meeting) {
+    var tabbody = document.querySelector('.ac-col-tabbody[data-col="left"]');
+    if (!tabbody) return;
+    tabbody.innerHTML = '<div class="ac-tab-loading">Loading\u2026</div>';
+
+    if (tab === 'briefing')  { _renderBriefingTab(tabbody, meeting);  return; }
+    if (tab === 'decisions') { _renderDecisionsTab(tabbody, meeting); return; }
+    if (tab === 'risks')     { _renderRisksTab(tabbody, meeting);     return; }
+  }
+
+  // §6 — Briefing tab
+
+  function _renderBriefingTab(tabbody, meeting) {
+    var myToken = ++_briefingToken;
+
+    if (!meeting.workstream_id) {
+      tabbody.innerHTML = '<div class="ac-briefing-wrap">' +
+        '<div class="ac-briefing-empty">No workstream \u2014 standalone meeting.</div>' +
+        '</div>';
+      return;
+    }
+
+    Promise.all([
+      _fetchPriorMeetingBrief(meeting.meeting_id, meeting.workstream_id),
+      _fetchPriorActionsSummary(meeting.meeting_id, meeting.workstream_id),
+      _fetchPriorDecisions(meeting.workstream_id),
+      _fetchAnnotations(meeting.workstream_id)
+    ]).then(function(results) {
+      if (_briefingToken !== myToken) return;
+      if (!tabbody.isConnected) return;
+      _paintBriefingTab(tabbody, meeting, results[0], results[1], results[2], results[3]);
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] briefing fetch failed', e);
+      if (tabbody.isConnected) {
+        tabbody.innerHTML = '<div class="ac-briefing-error">Could not load briefing.</div>';
+      }
+    });
+  }
+
+  function _fetchPriorMeetingBrief(currentMeetingId, workstreamId) {
+    return API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&meeting_id=neq.' + currentMeetingId +
+      '&state=in.(closed,sealed)' +
+      '&select=meeting_id,title,scheduled_for,sealed_at,briefing_text,state' +
+      '&order=scheduled_for.desc.nullslast,created_at.desc' +
+      '&limit=1'
+    ).then(function(rows) {
+      if (!rows || !rows.length) return null;
+      var m = rows[0];
+      return API.get(
+        'accord_nodes?meeting_id=eq.' + m.meeting_id +
+        '&select=tag'
+      ).then(function(nodes) {
+        m._nodeCounts = {};
+        (nodes || []).forEach(function(n) {
+          m._nodeCounts[n.tag] = (m._nodeCounts[n.tag] || 0) + 1;
+        });
+        return m;
+      });
+    }).catch(function() { return null; });
+  }
+
+  function _fetchPriorActionsSummary(currentMeetingId, workstreamId) {
+    return API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&meeting_id=neq.' + currentMeetingId +
+      '&state=in.(closed,sealed)' +
+      '&select=meeting_id&limit=20'
+    ).then(function(meetings) {
+      if (!meetings || !meetings.length) return { total: 0, overdue: 0, dueThisWeek: 0, nodes: [] };
+      var ids = meetings.map(function(m) { return m.meeting_id; }).join(',');
+      return API.get(
+        'accord_nodes?meeting_id=in.(' + ids + ')' +
+        '&tag=eq.action' +
+        '&select=node_id,summary,due_date,created_by,status,seq_id' +
+        '&order=due_date.asc.nullslast'
+      ).then(function(nodes) {
+        nodes = nodes || [];
+        var now = Date.now();
+        var weekMs = 7 * 24 * 60 * 60 * 1000;
+        var overdue = 0, dueThisWeek = 0;
+        nodes.forEach(function(n) {
+          if (!n.due_date) return;
+          var due = new Date(n.due_date).getTime();
+          if (due < now) overdue++;
+          else if (due < now + weekMs) dueThisWeek++;
+        });
+        return { total: nodes.length, overdue: overdue, dueThisWeek: dueThisWeek, nodes: nodes };
+      });
+    }).catch(function() { return { total: 0, overdue: 0, dueThisWeek: 0, nodes: [] }; });
+  }
+
+  function _fetchPriorDecisions(workstreamId) {
+    return API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&state=in.(closed,sealed)' +
+      '&select=meeting_id&limit=20'
+    ).then(function(meetings) {
+      if (!meetings || !meetings.length) return [];
+      var ids = meetings.map(function(m) { return m.meeting_id; }).join(',');
+      return API.get(
+        'accord_nodes?meeting_id=in.(' + ids + ')' +
+        '&tag=eq.decision' +
+        '&select=node_id,summary,seq_id,created_at,status' +
+        '&order=created_at.desc' +
+        '&limit=12'
+      ).then(function(nodes) { return nodes || []; });
+    }).catch(function() { return []; });
+  }
+
+  function _fetchAnnotations(workstreamId) {
+    return API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&state=in.(closed,sealed)' +
+      '&select=meeting_id&limit=20'
+    ).then(function(meetings) {
+      if (!meetings || !meetings.length) return [];
+      var mids = meetings.map(function(m) { return m.meeting_id; }).join(',');
+      return API.get(
+        'accord_nodes?meeting_id=in.(' + mids + ')' +
+        '&tag=eq.decision&select=node_id&limit=50'
+      ).then(function(decNodes) {
+        if (!decNodes || !decNodes.length) return [];
+        var nids = decNodes.map(function(n) { return n.node_id; }).join(',');
+        return API.get(
+          'accord_belief_adjustments?target_node_id=in.(' + nids + ')' +
+          '&select=adjustment_id,target_node_id,delta,rationale,declared_at,declared_by' +
+          '&order=declared_at.desc' +
+          '&limit=8'
+        ).then(function(rows) { return rows || []; });
+      });
+    }).catch(function() { return []; });
+  }
+
+  function _paintBriefingTab(tabbody, meeting, lastMtg, actionsSummary, decisions, annotations) {
+    var html = '<div class="ac-briefing-wrap">';
+
+    // Synthesis block
+    html += '<div class="ac-briefing-synthesis">';
+    html += '<div class="ac-briefing-synthesis-label">WHAT CAME BEFORE</div>';
+    if (meeting.briefing_text) {
+      html += '<div class="ac-briefing-synthesis-text">' + esc(meeting.briefing_text) + '</div>';
+    } else {
+      html += '<div class="ac-briefing-synthesis-placeholder">' +
+              'No briefing written yet. ' +
+              '<span class="ac-briefing-edit-link" data-action="focus-briefing">Write one \u2192</span>' +
+              '</div>';
+    }
+    html += '</div>';
+
+    // Last meeting block
+    if (lastMtg) {
+      html += '<div class="ac-briefing-last">';
+      html += '<div class="ac-briefing-section-label">LAST MEETING</div>';
+      html += '<div class="ac-briefing-last-meta">';
+      var dateStr = lastMtg.sealed_at || lastMtg.scheduled_for;
+      html += '<span class="ac-briefing-last-date">' +
+              esc(dateStr ? new Date(dateStr).toLocaleDateString(undefined,
+                { month: 'short', day: 'numeric' }) : '\u2014') + '</span>';
+      html += '<span class="ac-briefing-last-title">' + esc(lastMtg.title || '\u2014') + '</span>';
+      html += '</div>';
+      var counts = lastMtg._nodeCounts || {};
+      var countParts = [];
+      [['decision','D'],['action','A'],['dissent','Di'],['risk','R']].forEach(function(pair) {
+        var n = counts[pair[0]] || 0;
+        if (n) countParts.push(n + pair[1]);
+      });
+      if (countParts.length) {
+        html += '<div class="ac-briefing-last-counts">' + esc(countParts.join(' \u00b7 ')) + '</div>';
+      } else {
+        html += '<div class="ac-briefing-last-counts ac-muted">No captures</div>';
+      }
+      if (lastMtg.briefing_text) {
+        html += '<div class="ac-briefing-last-summary">' +
+                esc(lastMtg.briefing_text.slice(0, 200)) +
+                (lastMtg.briefing_text.length > 200 ? '\u2026' : '') + '</div>';
+      }
+      html += '<a class="ac-briefing-minutes-link" data-action="open-minutes" ' +
+              'data-meeting-id="' + esc(lastMtg.meeting_id) + '">' +
+              'Read full minutes \u2197</a>';
+      html += '</div>';
+    }
+
+    // Prior actions summary
+    html += '<div class="ac-briefing-actions">';
+    html += '<div class="ac-briefing-section-label">PRIOR ACTIONS</div>';
+    if (actionsSummary.total === 0) {
+      html += '<div class="ac-muted">No prior actions in this workstream.</div>';
+    } else {
+      var overdueCls = actionsSummary.overdue > 0 ? ' ac-briefing-actions-count--alert' : '';
+      html += '<div class="ac-briefing-actions-summary" data-action="toggle-actions-detail">';
+      html += '<span class="ac-briefing-actions-count' + overdueCls + '">' +
+              actionsSummary.total + ' tracked</span>';
+      if (actionsSummary.overdue > 0) {
+        html += '<span class="ac-briefing-actions-count ac-briefing-actions-count--alert"> \u00b7 ' +
+                actionsSummary.overdue + ' overdue</span>';
+      }
+      if (actionsSummary.dueThisWeek > 0) {
+        html += '<span class="ac-briefing-actions-count ac-muted"> \u00b7 ' +
+                actionsSummary.dueThisWeek + ' due this week</span>';
+      }
+      html += ' <span class="ac-briefing-actions-expand">\u25b8</span>';
+      html += '</div>';
+      html += '<div class="ac-briefing-actions-detail" id="ac-briefing-actions-detail" style="display:none;">';
+      actionsSummary.nodes.slice(0, 10).forEach(function(n) {
+        var overdue = n.due_date && new Date(n.due_date) < new Date();
+        html += '<div class="ac-briefing-action-row' + (overdue ? ' ac-briefing-action-row--overdue' : '') + '">';
+        html += '<span class="ac-briefing-action-seq">' + esc(n.seq_id || 'A') + '</span>';
+        html += '<span class="ac-briefing-action-summary">' +
+                esc((n.summary || '').slice(0, 80)) + '</span>';
+        if (n.due_date) {
+          html += '<span class="ac-briefing-action-due' + (overdue ? ' ac-overdue' : '') + '">' +
+                  esc(new Date(n.due_date).toLocaleDateString(undefined,
+                    { month: 'short', day: 'numeric' })) + '</span>';
+        }
+        html += '</div>';
+      });
+      if (actionsSummary.nodes.length > 10) {
+        html += '<div class="ac-muted ac-briefing-more">+' +
+                (actionsSummary.nodes.length - 10) + ' more</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Prior decisions block
+    html += '<div class="ac-briefing-decisions">';
+    html += '<div class="ac-briefing-section-label">PRIOR DECISIONS</div>';
+    if (!decisions.length) {
+      html += '<div class="ac-muted">No decisions captured yet.</div>';
+    } else {
+      decisions.slice(0, 8).forEach(function(d) {
+        html += '<div class="ac-briefing-decision-row">';
+        html += '<span class="ac-briefing-decision-seq">' + esc(d.seq_id || 'DC') + '</span>';
+        html += '<span class="ac-briefing-decision-text">' +
+                esc((d.summary || '').slice(0, 90)) + '</span>';
+        html += '</div>';
+      });
+      if (decisions.length > 8) {
+        html += '<div class="ac-muted ac-briefing-more">+' +
+                (decisions.length - 8) + ' more \u2014 see Decisions tab</div>';
+      }
+    }
+    html += '</div>';
+
+    // Annotations block
+    if (annotations.length) {
+      html += '<div class="ac-briefing-annotations">';
+      html += '<div class="ac-briefing-section-label">BELIEF ADJUSTMENTS</div>';
+      annotations.slice(0, 4).forEach(function(a) {
+        var delta = a.delta > 0 ? '+' + a.delta : String(a.delta);
+        var deltaCls = a.delta > 0 ? 'ac-delta--pos' : 'ac-delta--neg';
+        html += '<div class="ac-briefing-annotation-row">';
+        html += '<span class="ac-delta ' + deltaCls + '">' + esc(delta) + '</span>';
+        html += '<span class="ac-briefing-annotation-rationale">' +
+                esc((a.rationale || '').slice(0, 80)) + '</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    html += '</div>'; // .ac-briefing-wrap
+    tabbody.innerHTML = html;
+    _wireBriefingEvents(tabbody, meeting);
+  }
+
+  function _wireBriefingEvents(tabbody, meeting) {
+    tabbody.addEventListener('click', function(ev) {
+      var action = ev.target.dataset.action ||
+                   (ev.target.closest('[data-action]') &&
+                    ev.target.closest('[data-action]').dataset.action);
+      if (!action) return;
+
+      if (action === 'toggle-actions-detail') {
+        var detail = tabbody.querySelector('#ac-briefing-actions-detail');
+        var arrow  = tabbody.querySelector('.ac-briefing-actions-expand');
+        if (!detail) return;
+        var visible = detail.style.display !== 'none';
+        detail.style.display = visible ? 'none' : '';
+        if (arrow) arrow.textContent = visible ? '\u25b8' : '\u25be';
+        return;
+      }
+
+      if (action === 'open-minutes') {
+        var btn = ev.target.closest('[data-action="open-minutes"]');
+        if (!btn) return;
+        var mtgId = btn.dataset.meetingId;
+        if (window.Accord && Accord.setLevel) {
+          Accord.setLevel('meeting', {
+            meetingId:    mtgId,
+            workstreamId: meeting.workstream_id,
+            tab:          'minutes'
+          });
+        }
+        return;
+      }
+
+      if (action === 'focus-briefing') {
+        var stakes = document.getElementById('ac-meeting-stakes');
+        if (stakes) { stakes.focus(); stakes.scrollIntoView({ behavior: 'smooth' }); }
+        return;
+      }
+    });
+  }
+
+  // §7 — Decisions tab
+
+  function _renderDecisionsTab(tabbody, meeting) {
+    var myToken = ++_decisionsToken;
+
+    if (!meeting.workstream_id) {
+      tabbody.innerHTML = '<div class="ac-decisions-empty">No workstream context.</div>';
+      return;
+    }
+
+    API.get(
+      'accord_meetings?workstream_id=eq.' + meeting.workstream_id +
+      '&state=in.(closed,sealed,running,idle)' +
+      '&select=meeting_id&limit=50'
+    ).then(function(meetings) {
+      if (_decisionsToken !== myToken) return;
+      if (!meetings || !meetings.length) {
+        if (tabbody.isConnected) tabbody.innerHTML =
+          '<div class="ac-decisions-empty">No meetings in this workstream yet.</div>';
+        return;
+      }
+      var ids = meetings.map(function(m) { return m.meeting_id; }).join(',');
+      return API.get(
+        'accord_nodes?meeting_id=in.(' + ids + ')' +
+        '&tag=eq.decision' +
+        '&select=node_id,summary,seq_id,created_at,status,dissented_by' +
+        '&order=created_at.desc'
+      );
+    }).then(function(nodes) {
+      if (!nodes) return;
+      if (_decisionsToken !== myToken) return;
+      if (!tabbody.isConnected) return;
+      _paintDecisionsTab(tabbody, nodes, meeting);
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] decisions fetch failed', e);
+      if (tabbody.isConnected)
+        tabbody.innerHTML = '<div class="ac-decisions-error">Could not load decisions.</div>';
+    });
+  }
+
+  function _paintDecisionsTab(tabbody, nodes, meeting) {
+    var filters = ['all', 'sealed', 'dissented'];
+    var activeFilter = 'all';
+
+    function _renderFiltered(filter) {
+      var filtered = nodes.filter(function(n) {
+        if (filter === 'all')       return true;
+        if (filter === 'sealed')    return !n.dissented_by;
+        if (filter === 'dissented') return !!n.dissented_by;
+        return true;
+      });
+
+      var listHtml = filtered.length
+        ? filtered.map(function(n) {
+            var hasDissent = !!n.dissented_by;
+            var rowCls = 'ac-dec-row' + (hasDissent ? ' ac-dec-row--dissent' : '');
+            return '<div class="' + rowCls + '" data-node-id="' + esc(n.node_id) + '">' +
+              '<span class="ac-dec-seq">' + esc(n.seq_id || 'DC') + '</span>' +
+              '<span class="ac-dec-text">' + esc((n.summary || '').slice(0, 100)) + '</span>' +
+              (hasDissent ? '<span class="ac-dec-badge ac-dec-badge--dissent">DISSENT</span>' : '') +
+              '</div>';
+          }).join('')
+        : '<div class="ac-decisions-empty">No decisions match this filter.</div>';
+
+      var list = tabbody.querySelector('#ac-dec-list');
+      if (list) list.innerHTML = listHtml;
+    }
+
+    var filtersHtml = filters.map(function(f) {
+      return '<button class="ac-dec-filter' + (f === activeFilter ? ' active' : '') + '" ' +
+             'data-action="dec-filter" data-filter="' + f + '">' +
+             f.toUpperCase() + '</button>';
+    }).join('');
+
+    tabbody.innerHTML = [
+      '<div class="ac-decisions-wrap">',
+        '<div class="ac-dec-filters">', filtersHtml, '</div>',
+        '<div class="ac-dec-count">', nodes.length, ' decision' + (nodes.length !== 1 ? 's' : ''), '</div>',
+        '<div class="ac-dec-list" id="ac-dec-list"></div>',
+      '</div>'
+    ].join('');
+
+    _renderFiltered(activeFilter);
+
+    tabbody.addEventListener('click', function(ev) {
+      var btn = ev.target.closest('[data-action="dec-filter"]');
+      if (!btn) return;
+      activeFilter = btn.dataset.filter;
+      tabbody.querySelectorAll('.ac-dec-filter').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.filter === activeFilter);
+      });
+      _renderFiltered(activeFilter);
+    });
+  }
+
+  // §8 — Risks tab
+  // V6: no project_id on workstreams, no workstream_id on projects.
+  // Join path does not exist. Tab renders empty state for all workstreams
+  // until a future CMD establishes the FK. CPM surface also deferred.
+
+  function _renderRisksTab(tabbody, meeting) {
+    if (!meeting.workstream_id) {
+      tabbody.innerHTML = '<div class="ac-risks-empty">No workstream context.</div>';
+      return;
+    }
+    // V6: workstream→project join absent — render empty state
+    tabbody.innerHTML = [
+      '<div class="ac-risks-wrap">',
+        '<div class="ac-risks-header">',
+          '<span class="ac-risks-count">RISK REGISTER</span>',
+          '<span class="ac-risks-note ac-muted">CPM surface coming in Track F</span>',
+        '</div>',
+        '<div class="ac-risks-empty">',
+          'No project linked to this workstream. Risk register will appear here once a project is associated.',
+        '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  // ══════════════════════════════════════════════════════════════
   // RENDER ENTRY POINT
   // ══════════════════════════════════════════════════════════════
 
@@ -2367,6 +2838,10 @@
     _wireColumnHandles();
     _wireFilmstripHandle();
     document.addEventListener('keydown', _onIntelKey);
+
+    // ── CMD-ACCORD-SETUP-BRIEFING-TABS-1: left column tab bar ────
+    _renderLeftTabBar(meeting);
+    _activateLeftTab(_leftActiveTab, meeting);
 
     // ── CMD-ACCORD-SETUP-HEADER-1: header render ──────────────
     _renderHeader(meeting, workstreamId);
