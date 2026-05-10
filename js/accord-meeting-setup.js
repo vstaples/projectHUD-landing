@@ -103,6 +103,14 @@
   var _agendaTitleTimers  = {};
   var _agendaTimeTimers   = {};
 
+  // ── CMD-ACCORD-SETUP-INTELLIGENCE-1: intel state ──────────────
+  var _intelToken      = 0;
+  var _intelData       = null;
+  var _intelOpen       = false;
+  var _intelNoteTimer  = null;
+  var _currentMeeting  = null;
+  var _currentResourceId = null;
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() {
     // Remove fullpage classes only when genuinely leaving Setup.
@@ -180,6 +188,21 @@
       if (_agendaTimeTimers[k]) clearTimeout(_agendaTimeTimers[k]);
     });
     _agendaTimeTimers = {};
+
+    // ── CMD-ACCORD-SETUP-INTELLIGENCE-1: intel teardown ─────────
+    _intelData         = null;
+    _currentMeeting    = null;
+    _currentResourceId = null;
+    _intelOpen         = false;
+    if (_intelNoteTimer) { clearTimeout(_intelNoteTimer); _intelNoteTimer = null; }
+    var intelOverlay = document.getElementById('ac-intel-overlay');
+    if (intelOverlay) {
+      intelOverlay.style.display = 'none';
+      intelOverlay.classList.remove('ac-intel-overlay--visible');
+      intelOverlay.innerHTML = '';
+    }
+    var intelShell = document.querySelector('.ac-setup-shell');
+    if (intelShell) intelShell.classList.remove('ac-intel-dimmed');
 
     // ── CMD-ACCORD-SETUP-LAYOUT-1: layout teardown ─────────────
     // NOTE: fullpage classes (FULLPAGE_CLS) are NOT removed here.
@@ -1790,7 +1813,8 @@
     var statusBadge = _statusBadge(attendee);
 
     var html = '<div class="ac-attendee-card" data-attendee-id="' +
-               esc(attendee.attendee_id) + '">';
+               esc(attendee.attendee_id) + '" ' +
+               'data-resource-id="' + esc(attendee.resource_id) + '">';
 
     // Connection dot (static; C-12 wires presence)
     html += '<div class="ac-conn-dot ac-conn-dot--idle" title="Connection status"></div>';
@@ -3455,6 +3479,396 @@
   }
 
   // ══════════════════════════════════════════════════════════════
+  // INTELLIGENCE MODE — CMD-ACCORD-SETUP-INTELLIGENCE-1
+  // §4 derivation · §5 attendee enrichment · §6 overlay panel
+  // V2: declared_at absent — using created_at throughout.
+  // V3: action status = 'committed' only; overdue via due_date < now().
+  // ══════════════════════════════════════════════════════════════
+
+  // §4 — Intel derivation engine
+  function _deriveIntelData(meeting, workstreamId, callback) {
+    var myToken = ++_intelToken;
+
+    if (!workstreamId) {
+      callback({ attendees: [], hot_buttons: [], private_note: { note_id: null, body: '' } });
+      return;
+    }
+
+    API.get(
+      'accord_meeting_attendees?meeting_id=eq.' + meeting.meeting_id +
+      '&select=attendee_id,resource_id,role_in_meeting'
+    ).then(function(attendeeRows) {
+      if (_intelToken !== myToken) return;
+      attendeeRows = attendeeRows || [];
+      if (!attendeeRows.length) {
+        callback({ attendees: [], hot_buttons: [], private_note: { note_id: null, body: '' } });
+        return;
+      }
+
+      var resourceIds = attendeeRows.map(function(a) { return a.resource_id; }).join(',');
+
+      return API.get(
+        'accord_meetings?workstream_id=eq.' + workstreamId +
+        '&state=in.(closed,sealed,running)' +
+        '&select=meeting_id&limit=30'
+      ).then(function(priorMtgs) {
+        priorMtgs = priorMtgs || [];
+        if (!priorMtgs.length) {
+          return [
+            [],
+            [],
+            [],
+            [],
+            []
+          ];
+        }
+        var mids = priorMtgs.map(function(m) { return m.meeting_id; }).join(',');
+
+        return Promise.all([
+          API.get('resources?id=in.(' + resourceIds + ')&select=id,name,user_id'),
+          API.get(
+            'accord_nodes?meeting_id=in.(' + mids + ')&tag=eq.dissent' +
+            '&select=node_id,summary,seq_id,dissented_by,created_at,meeting_id'
+          ),
+          API.get(
+            'accord_nodes?meeting_id=in.(' + mids + ')&tag=eq.action' +
+            '&select=node_id,summary,seq_id,created_by,due_date,status'
+          ),
+          API.get(
+            'accord_nodes?meeting_id=in.(' + mids + ')&tag=eq.decision' +
+            '&select=node_id,seq_id,summary,created_by'
+          ),
+          API.get(
+            'accord_meeting_intel_notes?meeting_id=eq.' + meeting.meeting_id +
+            '&select=note_id,body&limit=1'
+          )
+        ]);
+      }).then(function(results) {
+        if (_intelToken !== myToken) return;
+        var resources = results[0] || [];
+        var dissents  = results[1] || [];
+        var actions   = results[2] || [];
+        var noteRows  = results[4] || [];
+
+        var userToResource = {};
+        resources.forEach(function(r) { if (r.user_id) userToResource[r.user_id] = r; });
+        var resourceMap = {};
+        resources.forEach(function(r) { resourceMap[r.id] = r; });
+
+        var now = Date.now();
+
+        var attendeeIntel = attendeeRows.map(function(a) {
+          var res    = resourceMap[a.resource_id] || {};
+          var userId = res.user_id;
+
+          var myDissents = dissents.filter(function(d) {
+            return d.dissented_by === userId;
+          }).map(function(d) {
+            var age = d.created_at
+              ? Math.round((now - new Date(d.created_at).getTime()) / 86400000)
+              : null;
+            return { seq_id: d.seq_id, summary: d.summary, age_days: age };
+          });
+
+          var myActions = actions.filter(function(n) { return n.created_by === userId; });
+          var myOverdue = myActions.filter(function(n) {
+            return n.due_date && new Date(n.due_date).getTime() < now;
+          });
+
+          var myNodes = dissents.concat(actions).filter(function(n) {
+            return n.created_by === userId || n.dissented_by === userId;
+          });
+
+          var statusTag, statusColor;
+          var hasActiveDissent = myDissents.some(function(d) { return d.age_days !== null; });
+          var oldestDissent    = myDissents.reduce(function(max, d) {
+            return (d.age_days || 0) > (max.age_days || 0) ? d : max;
+          }, { age_days: 0 });
+          var isOverdue = myOverdue.length > 0;
+
+          if (hasActiveDissent && oldestDissent.age_days >= 14) {
+            statusTag   = 'DISSENT \u00b7 SIMMERING';
+            statusColor = 'rose';
+          } else if (isOverdue && myOverdue.length >= 2) {
+            statusTag   = 'OVERDUE \u00b7 PRESSURE';
+            statusColor = 'amber';
+          } else if (myNodes.length === 0 && myActions.length === 0) {
+            statusTag   = 'QUIET \u00b7 RE-ONBOARD';
+            statusColor = 'muted';
+          } else {
+            statusTag   = 'ENGAGED \u00b7 STEADY';
+            statusColor = 'green';
+          }
+
+          var owedParts = [];
+          if (myActions.length) owedParts.push('Owns ' + myActions.length +
+            ' action' + (myActions.length !== 1 ? 's' : '') + ' in workstream');
+          if (myOverdue.length) owedParts.push(myOverdue.length + ' overdue');
+          var owedLine = owedParts.join('. ');
+
+          var urgencyLine = '';
+          if (hasActiveDissent && oldestDissent.age_days) {
+            urgencyLine = (oldestDissent.seq_id || 'Dissent') + ': ' +
+                          oldestDissent.age_days + 'd unresolved';
+            if (oldestDissent.age_days >= 20) urgencyLine += ' \u00b7 move now';
+          }
+
+          return {
+            resource_id:     a.resource_id,
+            name:            res.name || 'Unknown',
+            user_id:         userId || null,
+            role:            a.role_in_meeting,
+            status_tag:      statusTag,
+            status_color:    statusColor,
+            owed_line:       owedLine,
+            urgency_line:    urgencyLine,
+            open_actions:    myActions.length,
+            overdue_actions: myOverdue.length,
+            open_dissents:   myDissents
+          };
+        });
+
+        var hotButtons = [];
+        dissents.forEach(function(d) {
+          var age = d.created_at
+            ? Math.round((now - new Date(d.created_at).getTime()) / 86400000)
+            : 0;
+          if (age >= 14) {
+            hotButtons.push({
+              type:     'dissent',
+              text:     (d.seq_id || 'Dissent') + ' \u00b7 ' +
+                        (d.summary || '').slice(0, 60) + ' \u00b7 ' + age + 'd unresolved',
+              severity: age >= 20 ? 'high' : 'mid'
+            });
+          }
+        });
+
+        var privateNote = noteRows[0] || { note_id: null, body: '' };
+
+        callback({
+          attendees:    attendeeIntel,
+          hot_buttons:  hotButtons.slice(0, 5),
+          private_note: privateNote
+        });
+      });
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] intel derivation failed', e);
+      callback({ attendees: [], hot_buttons: [], private_note: { note_id: null, body: '' } });
+    });
+  }
+
+  // §5 — Attendee card enrichment
+  function _enrichAttendeeCards(block, intel) {
+    var intelMap = {};
+    intel.attendees.forEach(function(a) { intelMap[a.resource_id] = a; });
+
+    block.querySelectorAll('.ac-attendee-card').forEach(function(card) {
+      var resourceId = card.dataset.resourceId;
+      if (!resourceId) return;
+      var intelA = intelMap[resourceId];
+      if (!intelA) return;
+
+      // Replace rsvp status badge with behavioral badge
+      var existingBadge = card.querySelector('.ac-attendee-badge');
+      if (existingBadge) existingBadge.remove();
+
+      var badge = document.createElement('span');
+      badge.className = 'ac-attendee-badge ac-attendee-badge--behavioral ac-badge--' +
+                        intelA.status_color;
+      badge.textContent = intelA.status_tag;
+      card.appendChild(badge);
+
+      if (intelA.owed_line && !card.querySelector('.ac-attendee-owed')) {
+        var owedEl = document.createElement('div');
+        owedEl.className = 'ac-attendee-owed';
+        owedEl.textContent = intelA.owed_line;
+        card.appendChild(owedEl);
+      }
+
+      if (intelA.urgency_line && !card.querySelector('.ac-attendee-urgency')) {
+        var urgEl = document.createElement('div');
+        urgEl.className = 'ac-attendee-urgency';
+        urgEl.textContent = intelA.urgency_line;
+        card.appendChild(urgEl);
+      }
+    });
+  }
+
+  // §6 — Intelligence overlay
+  function _onIntelKey(ev) {
+    if ((ev.metaKey || ev.ctrlKey) && ev.key === 'i' && !ev.shiftKey) {
+      ev.preventDefault();
+      _toggleIntelOverlay();
+      return;
+    }
+    if (ev.ctrlKey && ev.shiftKey && ev.key === 'I') {
+      ev.preventDefault();
+      _toggleIntelOverlay();
+    }
+    if (ev.key === 'Escape') {
+      var overlay = document.getElementById('ac-intel-overlay');
+      if (overlay && overlay.style.display !== 'none') {
+        _closeIntelOverlay();
+      }
+    }
+  }
+
+  function _toggleIntelOverlay() {
+    _intelOpen ? _closeIntelOverlay() : _openIntelOverlay();
+  }
+
+  function _openIntelOverlay() {
+    var overlay = document.getElementById('ac-intel-overlay');
+    var shell   = document.querySelector('.ac-setup-shell');
+    if (!overlay || !shell) return;
+
+    _paintIntelOverlay(overlay, _intelData);
+    overlay.style.display = '';
+    shell.classList.add('ac-intel-dimmed');
+    _intelOpen = true;
+
+    requestAnimationFrame(function() {
+      overlay.classList.add('ac-intel-overlay--visible');
+    });
+  }
+
+  function _closeIntelOverlay() {
+    var overlay = document.getElementById('ac-intel-overlay');
+    var shell   = document.querySelector('.ac-setup-shell');
+    if (!overlay) return;
+
+    overlay.classList.remove('ac-intel-overlay--visible');
+    shell && shell.classList.remove('ac-intel-dimmed');
+    _intelOpen = false;
+
+    setTimeout(function() {
+      if (!_intelOpen) overlay.style.display = 'none';
+    }, 280);
+  }
+
+  function _paintIntelOverlay(overlay, intel) {
+    if (!intel) {
+      overlay.innerHTML = [
+        '<div class="ac-intel-panel">',
+          '<div class="ac-intel-hint">Esc or Cmd+I to close</div>',
+          '<div class="ac-intel-loading">Deriving intelligence\u2026</div>',
+          '<div class="ac-intel-watermark">PRIVATE VIEW</div>',
+        '</div>'
+      ].join('');
+      _wireIntelEvents(overlay);
+      return;
+    }
+
+    var html = '<div class="ac-intel-panel">';
+    html += '<div class="ac-intel-hint">Esc or Cmd+I to close \u00b7 Ctrl+Shift+I fallback</div>';
+    html += '<div class="ac-intel-watermark">PRIVATE VIEW</div>';
+
+    // Per-attendee section
+    html += '<div class="ac-intel-section">';
+    html += '<div class="ac-intel-section-label">PER ATTENDEE</div>';
+    if (!intel.attendees.length) {
+      html += '<div class="ac-intel-empty">No attendees in this meeting.</div>';
+    } else {
+      intel.attendees.forEach(function(a) {
+        html += '<div class="ac-intel-attendee">';
+        html += '<div class="ac-intel-att-header">';
+        html += '<span class="ac-intel-att-name">' + esc(a.name) + '</span>';
+        html += '<span class="ac-intel-badge ac-intel-badge--' + a.status_color + '">' +
+                esc(a.status_tag) + '</span>';
+        if (a.role === 'organizer') {
+          html += '<span class="ac-intel-att-role">ORGANIZER</span>';
+        }
+        html += '</div>';
+        if (a.owed_line) {
+          html += '<div class="ac-intel-att-owed">' + esc(a.owed_line) + '</div>';
+        }
+        if (a.urgency_line) {
+          html += '<div class="ac-intel-att-urgency">\u25b8 ' + esc(a.urgency_line) + '</div>';
+        }
+        a.open_dissents.forEach(function(d) {
+          html += '<div class="ac-intel-att-dissent">\u2298 ' +
+                  esc(d.seq_id || 'DS') + ' \u00b7 ' +
+                  esc((d.summary || '').slice(0, 60)) +
+                  (d.age_days ? ' \u00b7 ' + d.age_days + 'd' : '') +
+                  '</div>';
+        });
+        html += '</div>';
+      });
+    }
+    html += '</div>';
+
+    // Hot-buttons section
+    if (intel.hot_buttons.length) {
+      html += '<div class="ac-intel-section">';
+      html += '<div class="ac-intel-section-label">HOT-BUTTON ITEMS</div>';
+      intel.hot_buttons.forEach(function(hb) {
+        html += '<div class="ac-intel-hotbtn ac-intel-hotbtn--' + hb.severity + '">' +
+                '\u26a1 ' + esc(hb.text) + '</div>';
+      });
+      html += '</div>';
+    }
+
+    // Private notes section
+    html += '<div class="ac-intel-section ac-intel-section--notes">';
+    html += '<div class="ac-intel-section-label">PRIVATE NOTES ' +
+            '<span class="ac-intel-note-hint">\u2014 never shared</span></div>';
+    html += '<textarea class="ac-intel-notes-textarea" id="ac-intel-notes-textarea" ' +
+            'placeholder="Your private prep notes\u2026">' +
+            esc(intel.private_note.body || '') + '</textarea>';
+    html += '</div>';
+
+    html += '</div>';
+    overlay.innerHTML = html;
+    _wireIntelEvents(overlay);
+  }
+
+  function _wireIntelEvents(overlay) {
+    overlay.addEventListener('click', function(ev) {
+      if (ev.target === overlay) _closeIntelOverlay();
+    });
+
+    var textarea = overlay.querySelector('#ac-intel-notes-textarea');
+    if (textarea && !textarea.dataset.listenerBound) {
+      textarea.dataset.listenerBound = '1';
+      textarea.addEventListener('input', function() {
+        if (_intelNoteTimer) clearTimeout(_intelNoteTimer);
+        _intelNoteTimer = setTimeout(function() {
+          _saveIntelNote(textarea.value);
+        }, 800);
+      });
+    }
+  }
+
+  function _saveIntelNote(body) {
+    if (!_currentMeeting || !_currentResourceId) return;
+    var note = _intelData && _intelData.private_note;
+
+    if (note && note.note_id) {
+      API.patch(
+        'accord_meeting_intel_notes?note_id=eq.' + note.note_id,
+        { body: body, updated_at: new Date().toISOString() }
+      ).catch(function(e) {
+        console.error('[AccordMeetingSetup] intel note update failed', e);
+      });
+    } else {
+      API.post('accord_meeting_intel_notes', {
+        firm_id:            _currentMeeting.firm_id,
+        meeting_id:         _currentMeeting.meeting_id,
+        author_resource_id: _currentResourceId,
+        body:               body,
+        is_private:         true
+      }).then(function(rows) {
+        var row = rows && rows[0];
+        if (row && _intelData) {
+          _intelData.private_note = { note_id: row.note_id, body: body };
+        }
+      }).catch(function(e) {
+        console.error('[AccordMeetingSetup] intel note insert failed', e);
+      });
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
   // RENDER ENTRY POINT
   // ══════════════════════════════════════════════════════════════
 
@@ -3495,6 +3909,22 @@
     // ── CMD-ACCORD-SETUP-AGENDA-ENHANCED-1: center tab bar + agenda
     _renderCenterTabBar(meeting);
     _renderAgendaContent(meeting, workstreamId);
+
+    // ── CMD-ACCORD-SETUP-INTELLIGENCE-1: set current meeting + resolve resource ID
+    _currentMeeting    = meeting;
+    _currentResourceId = null;
+    API.get('resources?user_id=eq.' + _getCurrentUserId() + '&select=id&limit=1')
+      .then(function(rows) {
+        if (rows && rows[0]) _currentResourceId = rows[0].id;
+      });
+    _deriveIntelData(meeting, workstreamId, function(intel) {
+      _intelData = intel;
+      // Enrich attendee cards if already rendered
+      var block = document.getElementById('ac-attendees-block');
+      if (block && block.querySelectorAll('.ac-attendee-card').length > 0) {
+        _enrichAttendeeCards(block, intel);
+      }
+    });
 
     // ── CMD-ACCORD-SETUP-HEADER-1: header render ──────────────
     _renderHeader(meeting, workstreamId);
