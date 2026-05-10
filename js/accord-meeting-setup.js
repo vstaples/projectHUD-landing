@@ -95,6 +95,14 @@
   var _decisionsToken = 0;
   var _risksToken     = 0;
 
+  // ── CMD-ACCORD-SETUP-AGENDA-ENHANCED-1: center tab + agenda state
+  // _centerActiveTab persists across renders intentionally.
+  // Do NOT reset in teardown().
+  var _centerActiveTab    = 'agenda';
+  var _agendaToken        = 0;
+  var _agendaTitleTimers  = {};
+  var _agendaTimeTimers   = {};
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() {
     // Remove fullpage classes only when genuinely leaving Setup.
@@ -161,6 +169,17 @@
         });
       }
     }
+
+    // ── CMD-ACCORD-SETUP-AGENDA-ENHANCED-1: agenda teardown ─────
+    // _agendaToken auto-invalidates; _centerActiveTab persists intentionally
+    Object.keys(_agendaTitleTimers).forEach(function(k) {
+      if (_agendaTitleTimers[k]) clearTimeout(_agendaTitleTimers[k]);
+    });
+    _agendaTitleTimers = {};
+    Object.keys(_agendaTimeTimers).forEach(function(k) {
+      if (_agendaTimeTimers[k]) clearTimeout(_agendaTimeTimers[k]);
+    });
+    _agendaTimeTimers = {};
 
     // ── CMD-ACCORD-SETUP-LAYOUT-1: layout teardown ─────────────
     // NOTE: fullpage classes (FULLPAGE_CLS) are NOT removed here.
@@ -2806,6 +2825,532 @@
   }
 
   // ══════════════════════════════════════════════════════════════
+  // CENTER TAB BAR + AGENDA — CMD-ACCORD-SETUP-AGENDA-ENHANCED-1
+  // §5 center tab bar · §6 agenda render/paint/events/CRUD/drag
+  // V6: ref chips deferred — edge structure complex, low priority.
+  // _centerActiveTab persists across renders (intentional).
+  // ══════════════════════════════════════════════════════════════
+
+  // §5 — Center tab bar
+  function _renderCenterTabBar(meeting) {
+    var tabbar = document.querySelector('.ac-col-tabbar[data-col="center"]');
+    if (!tabbar) return;
+
+    var tabs = [
+      { id: 'agenda',       label: 'Agenda'       },
+      { id: 'minute-notes', label: 'Minute Notes' }
+    ];
+
+    tabbar.innerHTML = [
+      '<div class="ac-center-tabs">',
+        tabs.map(function(t) {
+          var active = t.id === _centerActiveTab ? ' ac-tab--active' : '';
+          return '<button class="ac-tab' + active + '" data-action="center-tab" ' +
+                 'data-tab="' + t.id + '">' + t.label + '</button>';
+        }).join(''),
+      '</div>',
+      '<div class="ac-center-stepper">',
+        '<button class="ac-stepper-btn" data-action="center-prev">\u2039</button>',
+        tabs.map(function(t) {
+          var filled = t.id === _centerActiveTab ? ' ac-stepper-dot--active' : '';
+          return '<span class="ac-stepper-dot' + filled + '" data-tab="' + t.id + '"></span>';
+        }).join(''),
+        '<button class="ac-stepper-btn" data-action="center-next">\u203a</button>',
+      '</div>'
+    ].join('');
+
+    tabbar.addEventListener('click', function(ev) {
+      var action = ev.target.dataset.action ||
+                   (ev.target.closest('[data-action]') &&
+                    ev.target.closest('[data-action]').dataset.action);
+      if (!action) return;
+
+      var tabId = null;
+      if (action === 'center-tab') {
+        tabId = ev.target.closest('[data-action]').dataset.tab;
+      } else if (action === 'center-prev' || action === 'center-next') {
+        var order = ['agenda', 'minute-notes'];
+        var idx = order.indexOf(_centerActiveTab);
+        tabId = action === 'center-prev'
+          ? order[Math.max(0, idx - 1)]
+          : order[Math.min(order.length - 1, idx + 1)];
+      }
+
+      if (!tabId || tabId === _centerActiveTab) return;
+      _centerActiveTab = tabId;
+      _updateCenterTabBar(tabbar, tabId);
+      _activateCenterTab(tabId, meeting);
+    });
+  }
+
+  function _updateCenterTabBar(tabbar, activeTab) {
+    tabbar.querySelectorAll('.ac-tab').forEach(function(b) {
+      b.classList.toggle('ac-tab--active', b.dataset.tab === activeTab);
+    });
+    tabbar.querySelectorAll('.ac-stepper-dot').forEach(function(d) {
+      d.classList.toggle('ac-stepper-dot--active', d.dataset.tab === activeTab);
+    });
+  }
+
+  function _activateCenterTab(tab, meeting) {
+    var tabbody = document.querySelector('.ac-col-tabbody[data-col="center"]');
+    if (!tabbody) return;
+
+    if (tab === 'agenda') {
+      tabbody.querySelectorAll(':scope > *').forEach(function(el) {
+        el.style.display = '';
+      });
+      var overlay = document.getElementById('ac-scrub-overlay');
+      if (overlay) overlay.style.display = 'none';
+      return;
+    }
+
+    if (tab === 'minute-notes') {
+      var overlay2 = document.getElementById('ac-scrub-overlay');
+      if (overlay2 && _scrubState && _scrubState.active) {
+        tabbody.querySelectorAll(':scope > *:not(#ac-scrub-overlay)').forEach(function(el) {
+          el.style.display = 'none';
+        });
+        overlay2.style.display = '';
+      } else {
+        tabbody.innerHTML =
+          '<div class="ac-minute-notes-prompt">' +
+          'Click a filmstrip frame to view prior meeting captures.' +
+          '</div>';
+      }
+      return;
+    }
+  }
+
+  // §6.1 — Agenda entry point
+  function _renderAgendaContent(meeting, workstreamId) {
+    var myToken = ++_agendaToken;
+    var tabbody = document.querySelector('.ac-col-tabbody[data-col="center"]');
+    if (!tabbody) return;
+
+    var agendaContainer = document.getElementById('ac-agenda-container');
+    if (!agendaContainer) {
+      agendaContainer = document.createElement('div');
+      agendaContainer.id = 'ac-agenda-container';
+      agendaContainer.className = 'ac-agenda-container';
+      tabbody.appendChild(agendaContainer);
+    }
+    agendaContainer.innerHTML = '<div class="ac-agenda-loading">Loading agenda\u2026</div>';
+
+    Promise.all([
+      _fetchAgendaItems(meeting.meeting_id),
+      _fetchPrepPrompts(meeting, workstreamId)
+    ]).then(function(results) {
+      if (_agendaToken !== myToken) return;
+      if (!agendaContainer.isConnected) return;
+      _paintAgenda(agendaContainer, results[0], results[1], meeting, workstreamId);
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] agenda fetch failed', e);
+      if (agendaContainer.isConnected)
+        agendaContainer.innerHTML = '<div class="ac-agenda-error">Could not load agenda.</div>';
+    });
+  }
+
+  // §6.2 — Fetch agenda items
+  function _fetchAgendaItems(meetingId) {
+    return API.get(
+      'accord_agenda_items?meeting_id=eq.' + meetingId +
+      '&order=position.asc,created_at.asc' +
+      '&select=agenda_item_id,title,position,status,item_type,' +
+              'duration_minutes_estimate,pulled_from_node_id,pulled_from_tag'
+    ).then(function(rows) { return rows || []; });
+  }
+
+  // §6.3 — Fetch prep prompts (substrate-derived, no AI)
+  // Ownership match is approximate in v1 (users.id vs resources.id).
+  // C-08 enriches with full user→resource resolution.
+  function _fetchPrepPrompts(meeting, workstreamId) {
+    if (!workstreamId) return Promise.resolve([]);
+
+    return Promise.all([
+      API.get(
+        'accord_meeting_attendees?meeting_id=eq.' + meeting.meeting_id +
+        '&select=resource_id,role_in_meeting'
+      ),
+      API.get(
+        'accord_meetings?workstream_id=eq.' + workstreamId +
+        '&state=in.(closed,sealed,running)&select=meeting_id&limit=20'
+      ).then(function(mtgs) {
+        if (!mtgs || !mtgs.length) return [];
+        var ids = mtgs.map(function(m) { return m.meeting_id; }).join(',');
+        return API.get(
+          'accord_nodes?meeting_id=in.(' + ids + ')' +
+          '&tag=eq.dissent' +
+          '&select=node_id,summary,dissented_by,seq_id,meeting_id'
+        ).then(function(rows) { return rows || []; });
+      })
+    ]).then(function(results) {
+      var dissents = results[1] || [];
+      var prompts  = [];
+
+      dissents.forEach(function(d) {
+        if (d.dissented_by) {
+          prompts.push({
+            type:   'dissent',
+            text:   'Unresolved dissent ' + esc(d.seq_id || 'DS') +
+                    ' in workstream. ' + esc((d.summary || '').slice(0, 60)),
+            action: 'PULL AS THREAD \u2192',
+            nodeId: d.node_id
+          });
+        }
+      });
+
+      return prompts.slice(0, 3);
+    }).catch(function() { return []; });
+  }
+
+  // §6.4 — Paint agenda
+  function _paintAgenda(container, items, prompts, meeting, workstreamId) {
+    var isIdle = meeting.state === 'idle';
+    var html   = '';
+
+    // Prep prompt strip
+    if (prompts.length && isIdle) {
+      html += '<div class="ac-prep-prompt-strip">';
+      var p = prompts[0];
+      html += '<div class="ac-prep-prompt" data-prompt-idx="0">';
+      html += '<span class="ac-prep-glyph">\u26a1</span>';
+      html += '<span class="ac-prep-text">' + p.text + '</span>';
+      html += '<button class="ac-prep-action" data-action="prep-action" ' +
+              (p.nodeId ? 'data-node-id="' + esc(p.nodeId) + '"' : '') + '>' +
+              esc(p.action) + '</button>';
+      html += '<button class="ac-prep-dismiss" data-action="dismiss-prompt" ' +
+              'data-prompt-idx="0" title="Dismiss">\u00d7</button>';
+      html += '</div>';
+      if (prompts.length > 1) {
+        html += '<div class="ac-prep-more ac-muted">' +
+                (prompts.length - 1) + ' more insight' +
+                (prompts.length > 2 ? 's' : '') + '</div>';
+      }
+      html += '</div>';
+    }
+
+    // Agenda header
+    html += '<div class="ac-agenda-header">';
+    html += '<span class="ac-agenda-label">AGENDA</span>';
+    var stats = _agendaStats(items);
+    if (stats) html += '<span class="ac-agenda-stats ac-muted">' + esc(stats) + '</span>';
+    html += '</div>';
+
+    // Agenda list
+    html += '<div class="ac-agenda-list" id="ac-agenda-list">';
+    if (!items.length) {
+      html += '<div class="ac-agenda-empty ac-muted">No agenda items. Add one below.</div>';
+    } else {
+      items.forEach(function(item, idx) {
+        html += _agendaItemHtml(item, idx, items.length, isIdle);
+      });
+    }
+    html += '</div>';
+
+    // Add item row (idle only)
+    if (isIdle) {
+      html += '<div class="ac-agenda-add-row">';
+      html += '<input class="ac-agenda-add-input" id="ac-agenda-add-input" ' +
+              'type="text" placeholder="Accord will infer the NRA shape\u2026" autocomplete="off">';
+      html += '<button class="ac-agenda-add-btn" data-action="add-agenda-item">+</button>';
+      html += '</div>';
+    }
+
+    container.innerHTML = html;
+    _wireAgendaEvents(container, items, meeting, workstreamId);
+    _initDragToReorder(container, items, meeting);
+  }
+
+  function _agendaStats(items) {
+    if (!items.length) return '';
+    var pulled   = items.filter(function(i) { return i.pulled_from_node_id; }).length;
+    var timed    = items.filter(function(i) { return i.duration_minutes_estimate; });
+    var totalMin = timed.reduce(function(s, i) { return s + i.duration_minutes_estimate; }, 0);
+    var parts    = [items.length + ' item' + (items.length !== 1 ? 's' : '')];
+    if (pulled)   parts.push(pulled + ' carried');
+    if (totalMin) parts.push(totalMin + 'm est.');
+    return parts.join(' \u00b7 ');
+  }
+
+  // §6.5 — Agenda item HTML
+  function _agendaItemHtml(item, idx, total, isIdle) {
+    var isCarried = !!item.pulled_from_node_id;
+    var itemCls   = 'ac-agenda-item' + (isCarried ? ' ac-agenda-item--carried' : '');
+
+    var html = '<div class="' + itemCls + '" ' +
+               'data-item-id="' + esc(item.agenda_item_id) + '" ' +
+               'data-position="' + item.position + '">';
+
+    if (isIdle) {
+      html += '<div class="ac-agenda-handle" draggable="false">\u2837</div>';
+    }
+
+    if (isIdle) {
+      html += '<div class="ac-agenda-title ac-agenda-title--editable" ' +
+              'contenteditable="true" spellcheck="false">' +
+              esc(item.title || '') + '</div>';
+    } else {
+      html += '<div class="ac-agenda-title">' + esc(item.title || '') + '</div>';
+    }
+
+    if (item.item_type) {
+      var typeCls = 'ac-item-type ac-item-type--' + item.item_type.toLowerCase();
+      html += '<span class="' + typeCls + '">' + esc(item.item_type) + '</span>';
+    } else if (isIdle) {
+      html += '<button class="ac-item-type-set" data-action="set-item-type" ' +
+              'data-item-id="' + esc(item.agenda_item_id) + '">+ type</button>';
+    }
+
+    html += '<button class="ac-agenda-expand" data-action="toggle-item-meta" ' +
+            'title="' + (isIdle ? 'Edit / expand' : 'Expand') + '">\u25b8</button>';
+
+    html += '<div class="ac-agenda-meta" id="ac-agenda-meta-' +
+            esc(item.agenda_item_id) + '" style="display:none;">';
+
+    if (isCarried && item.pulled_from_tag) {
+      html += '<span class="ac-agenda-carried-badge ac-agenda-pulled-' +
+              esc(item.pulled_from_tag.toLowerCase()) + '">\u2190 ' +
+              esc(item.pulled_from_tag.toUpperCase()) + '</span>';
+    }
+
+    if (isIdle) {
+      html += '<span class="ac-agenda-time-label">\u23f1</span>';
+      html += '<input class="ac-agenda-time-input" type="number" min="1" max="120" ' +
+              'placeholder="min" value="' +
+              esc(item.duration_minutes_estimate ? String(item.duration_minutes_estimate) : '') +
+              '" data-item-id="' + esc(item.agenda_item_id) + '">';
+    } else if (item.duration_minutes_estimate) {
+      html += '<span class="ac-agenda-time-label">\u23f1 ' +
+              item.duration_minutes_estimate + 'm</span>';
+    }
+
+    if (isIdle) {
+      html += '<button class="ac-agenda-delete" data-action="delete-agenda-item" ' +
+              'title="Remove item">\u00d7</button>';
+    }
+
+    html += '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  // §6.6 — Event wiring
+  function _wireAgendaEvents(container, items, meeting, workstreamId) {
+    container.addEventListener('click', function(ev) {
+      var action = ev.target.dataset.action ||
+                   (ev.target.closest('[data-action]') &&
+                    ev.target.closest('[data-action]').dataset.action);
+      if (!action) return;
+
+      if (action === 'toggle-item-meta') {
+        var agendaItem = ev.target.closest('.ac-agenda-item');
+        if (!agendaItem) return;
+        var itemId = agendaItem.dataset.itemId;
+        var meta   = container.querySelector('#ac-agenda-meta-' + itemId);
+        var btn    = ev.target.closest('[data-action="toggle-item-meta"]');
+        if (!meta) return;
+        var visible = meta.style.display !== 'none';
+        meta.style.display = visible ? 'none' : '';
+        if (btn) btn.textContent = visible ? '\u25b8' : '\u25be';
+        return;
+      }
+
+      if (action === 'add-agenda-item') {
+        var input = container.querySelector('#ac-agenda-add-input');
+        if (!input) return;
+        var title = input.value.trim();
+        if (!title) return;
+        _addAgendaItem(title, items, meeting, container, workstreamId);
+        input.value = '';
+        return;
+      }
+
+      if (action === 'delete-agenda-item') {
+        var row = ev.target.closest('.ac-agenda-item');
+        if (!row) return;
+        _deleteAgendaItem(row.dataset.itemId, meeting, container, workstreamId);
+        return;
+      }
+
+      if (action === 'set-item-type') {
+        var btn2 = ev.target.closest('[data-action="set-item-type"]');
+        if (!btn2) return;
+        _showTypePicker(btn2, btn2.dataset.itemId, meeting, container, workstreamId);
+        return;
+      }
+
+      if (action === 'select-type') {
+        var btn3 = ev.target.closest('[data-action="select-type"]');
+        if (!btn3) return;
+        _setItemType(btn3.dataset.itemId, btn3.dataset.type, meeting, container, workstreamId);
+        return;
+      }
+
+      if (action === 'dismiss-prompt') {
+        var strip = container.querySelector('.ac-prep-prompt-strip');
+        if (strip) strip.style.display = 'none';
+        return;
+      }
+    });
+
+    var addInput = container.querySelector('#ac-agenda-add-input');
+    if (addInput && !addInput.dataset.listenerBound) {
+      addInput.dataset.listenerBound = '1';
+      addInput.addEventListener('keydown', function(ev) {
+        if (ev.key !== 'Enter') return;
+        ev.preventDefault();
+        var title = addInput.value.trim();
+        if (!title) return;
+        _addAgendaItem(title, items, meeting, container, workstreamId);
+        addInput.value = '';
+      });
+    }
+
+    container.addEventListener('input', function(ev) {
+      var titleEl = ev.target.closest('.ac-agenda-title--editable');
+      if (titleEl) {
+        var row2 = titleEl.closest('.ac-agenda-item');
+        if (!row2) return;
+        var itemId = row2.dataset.itemId;
+        if (_agendaTitleTimers[itemId]) clearTimeout(_agendaTitleTimers[itemId]);
+        _agendaTitleTimers[itemId] = setTimeout(function() {
+          var val = titleEl.textContent.trim();
+          if (!val) return;
+          API.patch('accord_agenda_items?agenda_item_id=eq.' + itemId, { title: val })
+            .catch(function(e) { console.error('[AccordMeetingSetup] title patch failed', e); });
+        }, 800);
+        return;
+      }
+
+      var timeInput = ev.target.closest('.ac-agenda-time-input');
+      if (timeInput) {
+        var itemId2 = timeInput.dataset.itemId;
+        if (_agendaTimeTimers[itemId2]) clearTimeout(_agendaTimeTimers[itemId2]);
+        _agendaTimeTimers[itemId2] = setTimeout(function() {
+          var val2 = parseInt(timeInput.value, 10);
+          API.patch('accord_agenda_items?agenda_item_id=eq.' + itemId2, {
+            duration_minutes_estimate: val2 > 0 ? val2 : null
+          }).catch(function(e) { console.error('[AccordMeetingSetup] time patch failed', e); });
+        }, 800);
+      }
+    });
+  }
+
+  // §6.7 — CRUD
+  function _addAgendaItem(title, items, meeting, container, workstreamId) {
+    if (container.dataset.submitting === '1') return;
+    container.dataset.submitting = '1';
+    var nextPos = items.length;
+    API.post('accord_agenda_items', {
+      firm_id:    meeting.firm_id,
+      meeting_id: meeting.meeting_id,
+      title:      title,
+      position:   nextPos,
+      status:     'pending'
+    }).then(function() {
+      container.dataset.submitting = '';
+      _renderAgendaContent(meeting, workstreamId);
+    }).catch(function(e) {
+      container.dataset.submitting = '';
+      console.error('[AccordMeetingSetup] add agenda item failed', e);
+    });
+  }
+
+  function _deleteAgendaItem(itemId, meeting, container, workstreamId) {
+    API.del('accord_agenda_items?agenda_item_id=eq.' + itemId)
+      .then(function() { _renderAgendaContent(meeting, workstreamId); })
+      .catch(function(e) { console.error('[AccordMeetingSetup] delete agenda item failed', e); });
+  }
+
+  function _setItemType(itemId, type, meeting, container, workstreamId) {
+    API.patch('accord_agenda_items?agenda_item_id=eq.' + itemId, { item_type: type })
+      .then(function() { _renderAgendaContent(meeting, workstreamId); })
+      .catch(function(e) { console.error('[AccordMeetingSetup] type patch failed', e); });
+  }
+
+  function _showTypePicker(anchor, itemId, meeting, container, workstreamId) {
+    var existing = container.querySelector('.ac-type-picker');
+    if (existing) existing.remove();
+
+    var types = ['DECIDE', 'ASSIGN', 'INFORM', 'RISK', 'QUESTION'];
+    var picker = document.createElement('div');
+    picker.className = 'ac-type-picker';
+    picker.innerHTML = types.map(function(t) {
+      return '<button class="ac-type-option ac-item-type--' + t.toLowerCase() + '" ' +
+             'data-action="select-type" data-item-id="' + esc(itemId) + '" ' +
+             'data-type="' + t + '">' + t + '</button>';
+    }).join('');
+    anchor.insertAdjacentElement('afterend', picker);
+  }
+
+  // §6.8 — Drag-to-reorder
+  function _initDragToReorder(container, items, meeting) {
+    var list = container.querySelector('#ac-agenda-list');
+    if (!list) return;
+
+    var _dragSrc = null;
+
+    list.addEventListener('dragstart', function(ev) {
+      var handle = ev.target.closest('.ac-agenda-handle');
+      var row    = handle && handle.closest('.ac-agenda-item');
+      if (!row) { ev.preventDefault(); return; }
+      _dragSrc = row;
+      row.classList.add('ac-agenda-item--dragging');
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', row.dataset.itemId);
+    });
+
+    list.addEventListener('dragover', function(ev) {
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'move';
+      var target = ev.target.closest('.ac-agenda-item');
+      if (!target || target === _dragSrc) return;
+      list.querySelectorAll('.ac-agenda-item--over').forEach(function(el) {
+        el.classList.remove('ac-agenda-item--over');
+      });
+      target.classList.add('ac-agenda-item--over');
+    });
+
+    list.addEventListener('drop', function(ev) {
+      ev.preventDefault();
+      var target = ev.target.closest('.ac-agenda-item');
+      if (!target || !_dragSrc || target === _dragSrc) return;
+      var srcId  = _dragSrc.dataset.itemId;
+      var tgtId  = target.dataset.itemId;
+      var srcPos = parseInt(_dragSrc.dataset.position, 10);
+      var tgtPos = parseInt(target.dataset.position, 10);
+      // Sequential PATCHes — not Promise.all (shared-state write)
+      API.patch('accord_agenda_items?agenda_item_id=eq.' + srcId, { position: tgtPos })
+        .then(function() {
+          return API.patch('accord_agenda_items?agenda_item_id=eq.' + tgtId, { position: srcPos });
+        })
+        .then(function() { _renderAgendaContent(meeting, meeting.workstream_id); })
+        .catch(function(e) {
+          console.error('[AccordMeetingSetup] reorder failed', e);
+          _renderAgendaContent(meeting, meeting.workstream_id);
+        });
+    });
+
+    list.addEventListener('dragend', function() {
+      list.querySelectorAll('.ac-agenda-item--dragging, .ac-agenda-item--over')
+        .forEach(function(el) {
+          el.classList.remove('ac-agenda-item--dragging', 'ac-agenda-item--over');
+        });
+      _dragSrc = null;
+    });
+
+    list.querySelectorAll('.ac-agenda-handle').forEach(function(h) {
+      h.addEventListener('mousedown', function() {
+        h.closest('.ac-agenda-item').setAttribute('draggable', 'true');
+      });
+      h.addEventListener('mouseup', function() {
+        h.closest('.ac-agenda-item').setAttribute('draggable', 'false');
+      });
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════
   // RENDER ENTRY POINT
   // ══════════════════════════════════════════════════════════════
 
@@ -2842,6 +3387,10 @@
     // ── CMD-ACCORD-SETUP-BRIEFING-TABS-1: left column tab bar ────
     _renderLeftTabBar(meeting);
     _activateLeftTab(_leftActiveTab, meeting);
+
+    // ── CMD-ACCORD-SETUP-AGENDA-ENHANCED-1: center tab bar + agenda
+    _renderCenterTabBar(meeting);
+    _renderAgendaContent(meeting, workstreamId);
 
     // ── CMD-ACCORD-SETUP-HEADER-1: header render ──────────────
     _renderHeader(meeting, workstreamId);
