@@ -2284,6 +2284,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   display: flex;
   gap: 2px;
   align-items: flex-end;
+  position: relative;
+  z-index: 1;
 }
 
 /* Stepper wrapper for rotating columns (.ac-col-stepper scopes
