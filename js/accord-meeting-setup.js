@@ -4318,11 +4318,14 @@
       card.classList.add('ac-card-dragging');
       ev.dataTransfer.effectAllowed = 'move';
       ev.dataTransfer.setData('text/plain', _dragAction);
-      // Use a 1x1 transparent GIF as drag image — this suppresses the browser's
-      // snap-back ghost animation entirely. The card itself stays visible in place.
-      var ghost = new Image();
-      ghost.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      // Use a pre-rendered off-screen div as drag image — suppresses browser snap-back.
+      // Cannot use new Image() with a data URI as Chrome requires it to be loaded first.
+      var ghost = document.createElement('div');
+      ghost.style.cssText = 'position:fixed;top:-1000px;left:-1000px;width:1px;height:1px;opacity:0.01;';
+      document.body.appendChild(ghost);
       ev.dataTransfer.setDragImage(ghost, 0, 0);
+      // Remove after dragstart completes
+      requestAnimationFrame(function() { if (ghost.parentNode) ghost.parentNode.removeChild(ghost); });
     });
 
     tabbody.addEventListener('dragover', function(ev) {
