@@ -2401,5 +2401,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 .ac-percolate-dismiss:hover { opacity: 1; }
 
+/* Attendee cards stay clickable when faded — needed to switch filter to a different person */
+.ac-attendee-card.ac-percolate-faded { pointer-events: auto; }
+
 /* Hidden owner anchor span inside .ac-agenda-item (C-11 D1) */
 .ac-percolate-owner { display: none; }
