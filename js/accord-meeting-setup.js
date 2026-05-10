@@ -2930,6 +2930,9 @@
 
     var agendaContainer = document.getElementById('ac-agenda-container');
     if (!agendaContainer) {
+      // Remove legacy placeholder before creating agenda container
+      var placeholder = tabbody.querySelector('.ac-col-placeholder');
+      if (placeholder) placeholder.remove();
       agendaContainer = document.createElement('div');
       agendaContainer.id = 'ac-agenda-container';
       agendaContainer.className = 'ac-agenda-container';
