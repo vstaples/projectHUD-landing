@@ -2222,6 +2222,10 @@
       f.classList.remove('ac-film-frame--scrubbing');
     });
 
+    // Hide scrub agenda if present
+    var scrubAgenda = document.getElementById('ac-scrub-agenda');
+    if (scrubAgenda) scrubAgenda.style.display = 'none';
+
     var todayCtrl = document.querySelector('[data-action="scrub-today"]');
     if (todayCtrl) todayCtrl.classList.add('ac-film-ctrl--active');
 
@@ -2915,13 +2919,32 @@
     var tabbody = document.querySelector('.ac-col-tabbody[data-col="center"]');
     if (!tabbody) return;
 
+    // If scrub is active, both tabs show prior meeting content
+    if (_scrubState && _scrubState.active) {
+      if (tab === 'agenda') {
+        _loadScrubAgenda(_scrubState.meetingId, tabbody);
+      } else {
+        var overlay = document.getElementById('ac-scrub-overlay');
+        if (overlay) {
+          tabbody.querySelectorAll(':scope > *:not(#ac-scrub-overlay)')
+            .forEach(function(el) { el.style.display = 'none'; });
+          overlay.style.display = '';
+        }
+      }
+      return;
+    }
+
+    // No scrub active — normal idle meeting behavior
     if (tab === 'agenda') {
       tabbody.querySelectorAll(':scope > *').forEach(function(el) {
         el.style.display = '';
       });
-      var overlay = document.getElementById('ac-scrub-overlay');
-      if (overlay) overlay.style.display = 'none';
-      // Re-render agenda container if it was destroyed by minute-notes branch
+      var overlay2 = document.getElementById('ac-scrub-overlay');
+      if (overlay2) overlay2.style.display = 'none';
+      var scrubAgenda2 = document.getElementById('ac-scrub-agenda');
+      if (scrubAgenda2) scrubAgenda2.style.display = 'none';
+      var prompt2 = document.getElementById('ac-minute-notes-prompt');
+      if (prompt2) prompt2.style.display = 'none';
       if (!document.getElementById('ac-agenda-container')) {
         _renderAgendaContent(meeting, meeting.workstream_id);
       }
@@ -2929,30 +2952,71 @@
     }
 
     if (tab === 'minute-notes') {
-      var overlay2 = document.getElementById('ac-scrub-overlay');
-      if (overlay2 && _scrubState && _scrubState.active) {
-        tabbody.querySelectorAll(':scope > *:not(#ac-scrub-overlay)').forEach(function(el) {
-          el.style.display = 'none';
-        });
-        overlay2.style.display = '';
-      } else {
-        // Hide existing children — do NOT wipe innerHTML (preserves agenda container)
-        tabbody.querySelectorAll(':scope > *').forEach(function(el) {
-          el.style.display = 'none';
-        });
-        // Show or create the prompt
-        var prompt = document.getElementById('ac-minute-notes-prompt');
-        if (!prompt) {
-          prompt = document.createElement('div');
-          prompt.id = 'ac-minute-notes-prompt';
-          prompt.className = 'ac-minute-notes-prompt';
-          prompt.textContent = 'Click a filmstrip frame to view prior meeting captures.';
-          tabbody.appendChild(prompt);
-        }
-        prompt.style.display = '';
+      tabbody.querySelectorAll(':scope > *').forEach(function(el) {
+        el.style.display = 'none';
+      });
+      var prompt = document.getElementById('ac-minute-notes-prompt');
+      if (!prompt) {
+        prompt = document.createElement('div');
+        prompt.id = 'ac-minute-notes-prompt';
+        prompt.className = 'ac-minute-notes-prompt';
+        prompt.textContent = 'Click a filmstrip frame to view prior meeting captures.';
+        tabbody.appendChild(prompt);
       }
+      prompt.style.display = '';
       return;
     }
+  }
+
+  function _loadScrubAgenda(meetingId, tabbody) {
+    tabbody.querySelectorAll(':scope > *:not(#ac-scrub-agenda)')
+      .forEach(function(el) { el.style.display = 'none'; });
+
+    var scrubAgenda = document.getElementById('ac-scrub-agenda');
+    if (!scrubAgenda) {
+      scrubAgenda = document.createElement('div');
+      scrubAgenda.id = 'ac-scrub-agenda';
+      scrubAgenda.className = 'ac-scrub-overlay';
+      tabbody.appendChild(scrubAgenda);
+    }
+    scrubAgenda.style.display = '';
+    scrubAgenda.innerHTML = '<div class="ac-scrub-loading">Loading agenda\u2026</div>';
+
+    API.get(
+      'accord_agenda_items?meeting_id=eq.' + meetingId +
+      '&order=position.asc&select=agenda_item_id,title,position,item_type'
+    ).then(function(items) {
+      if (!scrubAgenda.isConnected) return;
+      items = items || [];
+      if (!items.length) {
+        scrubAgenda.innerHTML = '<div class="ac-scrub-empty">No agenda items in this meeting.</div>';
+        return;
+      }
+      scrubAgenda.innerHTML = [
+        '<div class="ac-scrub-header">',
+          '<span class="ac-scrub-title">Agenda</span>',
+          '<button class="ac-scrub-close" data-action="scrub-close">Back to agenda</button>',
+        '</div>',
+        '<div class="ac-scrub-nodes">',
+          items.map(function(i) {
+            return '<div class="ac-scrub-node">' +
+              (i.item_type ? '<span class="ac-scrub-node-tag">' + esc(i.item_type) + '</span>' : '') +
+              '<span class="ac-scrub-node-summary">' + esc(i.title || '') + '</span>' +
+              '</div>';
+          }).join(''),
+        '</div>'
+      ].join('');
+
+      scrubAgenda.addEventListener('click', function(ev) {
+        var action = ev.target.dataset.action ||
+                     (ev.target.closest('[data-action]') &&
+                      ev.target.closest('[data-action]').dataset.action);
+        if (action === 'scrub-close') _deactivateScrub(window.Accord.state.meeting);
+      });
+    }).catch(function() {
+      if (scrubAgenda.isConnected)
+        scrubAgenda.innerHTML = '<div class="ac-scrub-error">Could not load agenda.</div>';
+    });
   }
 
   // §6.1 — Agenda entry point
