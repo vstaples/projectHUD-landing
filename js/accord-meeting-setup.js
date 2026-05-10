@@ -4007,24 +4007,33 @@
   }
 
   // §6 — Week bounds and column assignment
+  // Rolling 5-weekday window starting today (or upcoming Monday on weekends).
+  // Past days are never shown as drop targets; _assignColumn buckets past
+  // due_dates to 'past-due' regardless. nextMonday is the first weekday
+  // immediately AFTER the visible 5-day window — used as the cutoff for
+  // the 'next-week' bucket.
   function _getWeekBounds() {
-    var now    = new Date();
-    var day    = now.getDay();
-    var monday = new Date(now);
-    monday.setDate(now.getDate() - ((day + 6) % 7));
-    monday.setHours(0, 0, 0, 0);
+    var start = new Date();
+    start.setHours(0, 0, 0, 0);
+    var dow = start.getDay();
+    if (dow === 0)      start.setDate(start.getDate() + 1);  // Sun -> Mon
+    else if (dow === 6) start.setDate(start.getDate() + 2);  // Sat -> Mon
 
     var days = [];
-    for (var i = 0; i < 5; i++) {
-      var d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      days.push(d);
+    var d = new Date(start);
+    while (days.length < 5) {
+      var wd = d.getDay();
+      if (wd !== 0 && wd !== 6) days.push(new Date(d));
+      d.setDate(d.getDate() + 1);
     }
+    // d now points at the first calendar day after the 5-weekday window.
+    // Advance to the next weekday for the 'next-week' cutoff.
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    var nextMonday = new Date(d);
+    nextMonday.setHours(0, 0, 0, 0);
 
-    var nextMonday = new Date(monday);
-    nextMonday.setDate(monday.getDate() + 7);
-
-    return { monday: monday, days: days, nextMonday: nextMonday };
+    // 'monday' retained for back-compat with any caller; equals window start.
+    return { monday: new Date(days[0]), days: days, nextMonday: nextMonday };
   }
 
   function _assignColumn(action, bounds) {
@@ -4304,29 +4313,39 @@
   }
 
   // §9 — Drag-to-reschedule
+  // Mirrors Pipeline's kanban DnD recipe: no setDragImage (browser default
+  // ghost is the smooth visual). Source card fades via .ac-card-dragging.
+  // Optimistic repaint on drop. Click suppression flag prevents post-drop
+  // click from firing action-card-click (would jump-scroll to agenda item).
   function _initKanbanDrag(tabbody, actions, meeting, bounds) {
     if (tabbody.dataset.dragWired) return;
     tabbody.dataset.dragWired = '1';
 
     var _dragAction = null;
+    var _wasDragging = false;
 
     tabbody.addEventListener('dragstart', function(ev) {
       var card = ev.target.closest('.ac-action-card');
       if (!card) { ev.preventDefault(); return; }
       ev.stopPropagation();
       _dragAction = card.dataset.nodeId;
+      _wasDragging = true;
       card.classList.add('ac-card-dragging');
       ev.dataTransfer.effectAllowed = 'move';
-      ev.dataTransfer.setData('text/plain', _dragAction);
-      // Use a pre-rendered off-screen div as drag image — suppresses browser snap-back.
-      // Cannot use new Image() with a data URI as Chrome requires it to be loaded first.
-      var ghost = document.createElement('div');
-      ghost.style.cssText = 'position:fixed;top:-1000px;left:-1000px;width:1px;height:1px;opacity:0.01;';
-      document.body.appendChild(ghost);
-      ev.dataTransfer.setDragImage(ghost, 0, 0);
-      // Remove after dragstart completes
-      requestAnimationFrame(function() { if (ghost.parentNode) ghost.parentNode.removeChild(ghost); });
+      try { ev.dataTransfer.setData('text/plain', _dragAction); } catch (e) {}
+      // Intentionally NO setDragImage — browser default produces the smooth
+      // translucent-card-following-cursor visual. See Pipeline DnD parity.
     });
+
+    // Suppress the click that fires immediately after a drop completes;
+    // otherwise action-card-click handler scroll-targets the agenda item.
+    tabbody.addEventListener('click', function(ev) {
+      if (!_wasDragging) return;
+      var card = ev.target.closest('.ac-action-card');
+      if (!card) return;
+      ev.stopPropagation();
+      ev.preventDefault();
+    }, true);
 
     tabbody.addEventListener('dragover', function(ev) {
       if (!_dragAction) return;
@@ -4392,6 +4411,9 @@
           el.classList.remove('ac-card-dragging', 'ac-kanban-cards--drag-over');
         });
       _dragAction = null;
+      // Release click-suppression after the post-drop click has fired & been
+      // swallowed. 50ms matches Pipeline's pattern.
+      setTimeout(function() { _wasDragging = false; }, 50);
     });
 
   }
