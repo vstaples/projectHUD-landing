@@ -4164,6 +4164,13 @@
       _rightActiveTab = tabId;
       _activateRightTab(tabId, meeting, workstreamId);
     }
+    // Soft fade-in on tabbody for rotation-driven switches.
+    var tabbody = document.querySelector('.ac-col-tabbody[data-col="' + col + '"]');
+    if (tabbody) {
+      tabbody.classList.remove('ac-tab-fade-in');
+      void tabbody.offsetWidth; // reflow — restarts CSS animation
+      tabbody.classList.add('ac-tab-fade-in');
+    }
   }
 
   // Apply 60s manual-click pause (resets progress to 0).
