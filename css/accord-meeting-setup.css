@@ -2355,3 +2355,51 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   to   { opacity: 1; transform: translateY(0);   }
 }
 .ac-tab-fade-in { animation: acTabFadeIn 0.22s ease; }
+
+
+/* ──────────────────────────────────────────────────────────── */
+/* CMD-ACCORD-SETUP-PERCOLATE-1 — Click-to-percolate by person  */
+/* All tokens --ac-* only; scoped to .ac-setup-shell            */
+/* ──────────────────────────────────────────────────────────── */
+
+.ac-percolate-faded {
+  opacity: 0.35;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+.ac-percolate-raised {
+  opacity: 1;
+  transition: opacity 0.18s ease;
+}
+
+/* Filter pill — mounts in .ac-agenda-header */
+.ac-percolate-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--ac-font-mono);
+  font-size: 9px;
+  color: var(--ac-cyan);
+  background: var(--ac-cyan-dim);
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  border-radius: 20px;
+  padding: 3px 10px;
+  margin-left: 10px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.ac-percolate-name { font-weight: 600; }
+.ac-percolate-dismiss {
+  font-size: 10px;
+  color: var(--ac-cyan);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.7;
+}
+.ac-percolate-dismiss:hover { opacity: 1; }
+
+/* Hidden owner anchor span inside .ac-agenda-item (C-11 D1) */
+.ac-percolate-owner { display: none; }

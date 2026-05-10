@@ -120,6 +120,10 @@
   // ── CMD-ACCORD-SETUP-SLIDESHOW-1: rotation engine state ───────
   var _slideshowEngines = { left: null, right: null };
 
+  // ── CMD-ACCORD-SETUP-PERCOLATE-1: percolate state ─────────────
+  var _percolateResourceId   = null;   // active filter; null = no filter
+  var _percolateResourceName = null;   // display name for pill
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() {
     // Remove fullpage classes only when genuinely leaving Setup.
@@ -238,6 +242,9 @@
 
     // ── CMD-ACCORD-SETUP-SLIDESHOW-1: rotation engine teardown ───
     _destroySlideshow();
+
+    // ── CMD-ACCORD-SETUP-PERCOLATE-1: percolate teardown ─────────
+    _clearPercolate();
   }
 
   // ── Briefing autosave ─────────────────────────────────────────
@@ -1448,6 +1455,8 @@
 
     block.innerHTML = html;
     _wireOutcomeEvents(block, outcomes, meeting);
+    _wirePercolateOnOutcomes(block);
+    if (_percolateResourceId) _applyPercolate();
   }
 
   // §5.4 — Outcome row HTML
@@ -1465,7 +1474,8 @@
     }
 
     if (o.owner_resource_id && o._owner_name) {
-      html += '<span class="ac-outcome-owner">' + esc(o._owner_name) + '</span>';
+      html += '<span class="ac-outcome-owner" data-resource-id="' +
+              esc(o.owner_resource_id) + '">' + esc(o._owner_name) + '</span>';
     }
 
     if (o.condition) {
@@ -1817,6 +1827,8 @@
     block.innerHTML = html;
     _setGatheringMode(block, meeting);
     _wireAttendeeEvents(block, meeting);
+    _wirePercolateOnAttendees(block);
+    if (_percolateResourceId) _applyPercolate();
   }
 
   // §5.6 — Attendee card HTML
@@ -3198,7 +3210,7 @@
       'accord_agenda_items?meeting_id=eq.' + meetingId +
       '&order=position.asc,created_at.asc' +
       '&select=agenda_item_id,title,position,status,item_type,' +
-              'duration_minutes_estimate,pulled_from_node_id,pulled_from_tag'
+              'duration_minutes_estimate,pulled_from_node_id,pulled_from_tag,owner_resource_id'
     ).then(function(rows) { return rows || []; });
   }
 
@@ -3301,6 +3313,8 @@
     container.innerHTML = html;
     _wireAgendaEvents(container, items, meeting, workstreamId);
     _initDragToReorder(container, items, meeting);
+    _wirePercolateOnAgenda(container);
+    if (_percolateResourceId) _applyPercolate();
   }
 
   function _agendaStats(items) {
@@ -3322,6 +3336,12 @@
     var html = '<div class="' + itemCls + '" ' +
                'data-item-id="' + esc(item.agenda_item_id) + '" ' +
                'data-position="' + item.position + '">';
+
+    // Hidden owner anchor for percolate matching (C-11).
+    if (item.owner_resource_id) {
+      html += '<span class="ac-percolate-owner" data-resource-id="' +
+              esc(item.owner_resource_id) + '" aria-hidden="true" style="display:none"></span>';
+    }
 
     if (isIdle) {
       html += '<div class="ac-agenda-handle" draggable="true" data-drag-handle="1">\u2837</div>';
@@ -4320,6 +4340,184 @@
     if (window.AccordSlideshow) { window.AccordSlideshow = null; }
   }
 
+  // ============================================================
+  // CMD-ACCORD-SETUP-PERCOLATE-1 — Click-to-percolate by person
+  // ============================================================
+
+  function _setPercolate(resourceId, name) {
+    if (_percolateResourceId === resourceId) { _clearPercolate(); return; }
+    _percolateResourceId   = resourceId;
+    _percolateResourceName = name;
+    _applyPercolate();
+    _renderPercolatePill();
+  }
+
+  function _clearPercolate() {
+    _percolateResourceId   = null;
+    _percolateResourceName = null;
+    document.querySelectorAll('.ac-percolate-faded').forEach(function(el) {
+      el.classList.remove('ac-percolate-faded');
+    });
+    document.querySelectorAll('.ac-percolate-raised').forEach(function(el) {
+      el.classList.remove('ac-percolate-raised');
+      el.style.order = '';
+    });
+    var pill = document.getElementById('ac-percolate-pill');
+    if (pill) pill.remove();
+  }
+
+  function _applyPercolate() {
+    if (!_percolateResourceId) return;
+    var rid = _percolateResourceId;
+
+    // ── Center: agenda items ─────────────────────────────────────
+    var agendaList = document.getElementById('ac-agenda-list');
+    if (agendaList) {
+      var agendaOrder = 1;
+      agendaList.querySelectorAll('.ac-agenda-item').forEach(function(item) {
+        var chip = item.querySelector('[data-resource-id="' + rid + '"]');
+        if (chip) {
+          item.classList.add('ac-percolate-raised');
+          item.classList.remove('ac-percolate-faded');
+          item.style.order = String(agendaOrder++);
+        } else {
+          item.classList.add('ac-percolate-faded');
+          item.classList.remove('ac-percolate-raised');
+          item.style.order = '';
+        }
+      });
+    }
+
+    // ── Center: outcomes rows ────────────────────────────────────
+    var outcomesList = document.getElementById('ac-outcomes-list');
+    if (outcomesList) {
+      outcomesList.querySelectorAll('.ac-outcome-row').forEach(function(row) {
+        var chip = row.querySelector('[data-resource-id="' + rid + '"]');
+        if (chip) {
+          row.classList.add('ac-percolate-raised');
+          row.classList.remove('ac-percolate-faded');
+        } else {
+          row.classList.add('ac-percolate-faded');
+          row.classList.remove('ac-percolate-raised');
+        }
+      });
+    }
+
+    // ── Right: attendee cards ────────────────────────────────────
+    var attendeesBlock = document.getElementById('ac-attendees-block');
+    if (attendeesBlock) {
+      attendeesBlock.querySelectorAll('.ac-attendee-card').forEach(function(card) {
+        if (card.dataset.resourceId === rid) {
+          card.classList.add('ac-percolate-raised');
+          card.classList.remove('ac-percolate-faded');
+        } else {
+          card.classList.add('ac-percolate-faded');
+          card.classList.remove('ac-percolate-raised');
+        }
+      });
+    }
+
+    // ── Right: action cards (kanban) ─────────────────────────────
+    var kanbanTrack = document.querySelector('.ac-kanban-track');
+    if (kanbanTrack) {
+      kanbanTrack.querySelectorAll('.ac-action-card').forEach(function(card) {
+        if (card.dataset.resourceId === rid) {
+          card.classList.add('ac-percolate-raised');
+          card.classList.remove('ac-percolate-faded');
+        } else {
+          card.classList.add('ac-percolate-faded');
+          card.classList.remove('ac-percolate-raised');
+        }
+      });
+    }
+  }
+
+  function _renderPercolatePill() {
+    var existing = document.getElementById('ac-percolate-pill');
+    if (existing) existing.remove();
+    if (!_percolateResourceId || !_percolateResourceName) return;
+
+    // Mount in .ac-agenda-header (Option Y — stable per _paintAgenda repaint cycle).
+    var header = document.querySelector('.ac-agenda-header');
+    if (!header) return;
+
+    var pill = document.createElement('div');
+    pill.id        = 'ac-percolate-pill';
+    pill.className = 'ac-percolate-pill';
+    pill.innerHTML = 'Filtered: <span class="ac-percolate-name">' +
+                     esc(_percolateResourceName) + '</span>' +
+                     ' <button class="ac-percolate-dismiss" ' +
+                     'data-action="percolate-clear" title="Clear filter">\u2715</button>';
+    header.appendChild(pill);
+
+    pill.querySelector('[data-action="percolate-clear"]')
+      .addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        _clearPercolate();
+      });
+  }
+
+  // ── Percolate click wiring ────────────────────────────────────
+
+  function _wirePercolateOnAttendees(block) {
+    if (!block || block.dataset.percolateWired) return;
+    block.dataset.percolateWired = '1';
+    block.addEventListener('click', function(ev) {
+      if (ev.target.closest('button')) return;
+      var card = ev.target.closest('.ac-attendee-card[data-resource-id]');
+      if (!card) return;
+      var rid  = card.dataset.resourceId;
+      var name = (card.querySelector('.ac-attendee-name') || {}).textContent || rid;
+      _setPercolate(rid, name.trim());
+    });
+  }
+
+  function _wirePercolateOnAgenda(container) {
+    if (!container || container.dataset.percolateWired) return;
+    container.dataset.percolateWired = '1';
+    container.addEventListener('click', function(ev) {
+      var chip = ev.target.closest('.ac-action-owner-chip[data-resource-id]');
+      if (!chip) return;
+      ev.stopPropagation();
+      _setPercolate(chip.dataset.resourceId, chip.textContent.trim());
+    });
+  }
+
+  function _wirePercolateOnOutcomes(block) {
+    if (!block || block.dataset.percolateWired) return;
+    block.dataset.percolateWired = '1';
+    block.addEventListener('click', function(ev) {
+      if (!ev.target.closest('.ac-outcome-row')) return;
+      var chip = ev.target.closest('[data-resource-id]');
+      if (!chip) return;
+      ev.stopPropagation();
+      _setPercolate(chip.dataset.resourceId, chip.textContent.trim());
+    });
+  }
+
+  function _wirePercolateOnActions(tabbody) {
+    if (!tabbody || tabbody.dataset.percolateWired) return;
+    tabbody.dataset.percolateWired = '1';
+    tabbody.addEventListener('click', function(ev) {
+      // Try owner chip with data-resource-id first
+      var chip = ev.target.closest('.ac-action-owner[data-resource-id]');
+      if (chip) {
+        ev.stopPropagation();
+        _setPercolate(chip.dataset.resourceId, chip.textContent.trim());
+        return;
+      }
+      // Fallback: owner div → card data-resource-id
+      var ownerDiv = ev.target.closest('.ac-action-owner');
+      if (!ownerDiv) return;
+      var card = ownerDiv.closest('.ac-action-card[data-resource-id]');
+      if (!card) return;
+      var rid  = card.dataset.resourceId;
+      var name = ownerDiv.textContent.trim();
+      if (!rid || !name) return;
+      _setPercolate(rid, name);
+    });
+  }
+
   // §5 — Action items fetch
   function _renderActionItems(meeting, workstreamId) {
     var myToken = ++_actionItemsToken;
@@ -4520,6 +4718,7 @@
       tabbody.innerHTML = html;
       _wireActionEvents(tabbody, actions, meeting, bounds, view, _renderKanban, _renderGrid);
       _initKanbanDrag(tabbody, actions, meeting, bounds);
+      if (_percolateResourceId) _applyPercolate();
     }
 
     function _renderGrid() {
@@ -4527,6 +4726,7 @@
     }
 
     _renderKanban();
+    _wirePercolateOnActions(tabbody);
   }
 
   function _kanbanCol(label, items, colId, isAlert, isToday) {
