@@ -1966,8 +1966,8 @@
   function _renderFilmstrip(meeting, workstreamId) {
     _filmstripAborted = false;
     var myToken = ++_filmstripToken;
+    var content = document.querySelector('.ac-filmstrip-content'); // captured once; not re-queried
     console.log('[FILM] start token=', myToken, 'ws=', workstreamId);
-    var content = document.querySelector('.ac-filmstrip-content');
     if (!content) { console.log('[FILM] no content element'); return; }
     content.innerHTML = '<div class="ac-film-loading">Loading timeline\u2026</div>';
 
@@ -1983,8 +1983,7 @@
         return _fetchFilmNodeCounts(meetings).then(function(countMap) {
           console.log('[FILM] counts cb token=', _filmstripToken, 'mine=', myToken, 'ok=', _filmstripToken === myToken);
           if (_filmstripToken !== myToken) return;
-          var content = document.querySelector('.ac-filmstrip-content');
-          if (!content) { console.log('[FILM] content gone'); return; }
+          if (!content.isConnected) return;  // detached — second shell replaced us
           _paintFilmstrip(content, meetings, countMap, meeting, workstreamId);
           console.log('[FILM] painted!');
           _initFilmDensity();
@@ -1993,8 +1992,8 @@
       .catch(function(e) {
         console.error('[AccordMeetingSetup] filmstrip fetch failed', e);
         if (_filmstripToken !== myToken) return;
-        var content = document.querySelector('.ac-filmstrip-content');
-        if (content) content.innerHTML = '<div class="ac-film-error">Could not load timeline.</div>';
+        if (!content.isConnected) return;
+        content.innerHTML = '<div class="ac-film-error">Could not load timeline.</div>';
       });
   }
 
