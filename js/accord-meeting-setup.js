@@ -3090,7 +3090,7 @@
                'data-position="' + item.position + '">';
 
     if (isIdle) {
-      html += '<div class="ac-agenda-handle" draggable="false">\u2837</div>';
+      html += '<div class="ac-agenda-handle" draggable="true" data-drag-handle="1">\u2837</div>';
     }
 
     if (isIdle) {
@@ -3300,10 +3300,12 @@
     var _dragSrc = null;
 
     list.addEventListener('dragstart', function(ev) {
-      var handle = ev.target.closest('.ac-agenda-handle');
-      var row    = handle && handle.closest('.ac-agenda-item');
+      var handle = ev.target.closest('[data-drag-handle]');
+      if (!handle) { ev.preventDefault(); return; }
+      var row = handle.closest('.ac-agenda-item');
       if (!row) { ev.preventDefault(); return; }
       _dragSrc = row;
+      row.setAttribute('draggable', 'true');
       row.classList.add('ac-agenda-item--dragging');
       ev.dataTransfer.effectAllowed = 'move';
       ev.dataTransfer.setData('text/plain', row.dataset.itemId);
@@ -3328,10 +3330,15 @@
       var tgtId  = target.dataset.itemId;
       var srcPos = parseInt(_dragSrc.dataset.position, 10);
       var tgtPos = parseInt(target.dataset.position, 10);
-      // Sequential PATCHes — not Promise.all (shared-state write)
-      API.patch('accord_agenda_items?agenda_item_id=eq.' + srcId, { position: tgtPos })
+      // Three-step swap via temp position to avoid UNIQUE(meeting_id, position) collision.
+      // Step 1: move src to temp (-1), Step 2: move tgt to src's slot,
+      // Step 3: move src from temp to tgt's slot. Sequential — not Promise.all.
+      API.patch('accord_agenda_items?agenda_item_id=eq.' + srcId, { position: -1 })
         .then(function() {
           return API.patch('accord_agenda_items?agenda_item_id=eq.' + tgtId, { position: srcPos });
+        })
+        .then(function() {
+          return API.patch('accord_agenda_items?agenda_item_id=eq.' + srcId, { position: tgtPos });
         })
         .then(function() { _renderAgendaContent(meeting, meeting.workstream_id); })
         .catch(function(e) {
@@ -3344,17 +3351,9 @@
       list.querySelectorAll('.ac-agenda-item--dragging, .ac-agenda-item--over')
         .forEach(function(el) {
           el.classList.remove('ac-agenda-item--dragging', 'ac-agenda-item--over');
+          el.removeAttribute('draggable');
         });
       _dragSrc = null;
-    });
-
-    list.querySelectorAll('.ac-agenda-handle').forEach(function(h) {
-      h.addEventListener('mousedown', function() {
-        h.closest('.ac-agenda-item').setAttribute('draggable', 'true');
-      });
-      h.addEventListener('mouseup', function() {
-        h.closest('.ac-agenda-item').setAttribute('draggable', 'false');
-      });
     });
   }
 
