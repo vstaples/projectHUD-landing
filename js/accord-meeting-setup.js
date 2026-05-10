@@ -3210,7 +3210,7 @@
       'accord_agenda_items?meeting_id=eq.' + meetingId +
       '&order=position.asc,created_at.asc' +
       '&select=agenda_item_id,title,position,status,item_type,' +
-              'duration_minutes_estimate,pulled_from_node_id,pulled_from_tag,owner_resource_id'
+              'duration_minutes_estimate,pulled_from_node_id,pulled_from_tag'
     ).then(function(rows) { return rows || []; });
   }
 
@@ -3336,12 +3336,6 @@
     var html = '<div class="' + itemCls + '" ' +
                'data-item-id="' + esc(item.agenda_item_id) + '" ' +
                'data-position="' + item.position + '">';
-
-    // Hidden owner anchor for percolate matching (C-11).
-    if (item.owner_resource_id) {
-      html += '<span class="ac-percolate-owner" data-resource-id="' +
-              esc(item.owner_resource_id) + '" aria-hidden="true" style="display:none"></span>';
-    }
 
     if (isIdle) {
       html += '<div class="ac-agenda-handle" draggable="true" data-drag-handle="1">\u2837</div>';
