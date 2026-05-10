@@ -68,6 +68,10 @@
   var _outcomesAborted  = false;
   var _descPatchTimers  = {};   // keyed by outcome_id
 
+  // ── CMD-ACCORD-SETUP-ATTENDEES-1: attendees state ─────────────
+  var _attendeesAborted = false;
+  var _searchTimer      = null;
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() { teardown(); }
 
@@ -103,6 +107,10 @@
       if (_descPatchTimers[k]) clearTimeout(_descPatchTimers[k]);
     });
     _descPatchTimers = {};
+
+    // ── CMD-ACCORD-SETUP-ATTENDEES-1: attendees teardown ────────
+    _attendeesAborted = true;
+    if (_searchTimer) { clearTimeout(_searchTimer); _searchTimer = null; }
 
     // ── CMD-ACCORD-SETUP-LAYOUT-1: layout teardown ─────────────
     // Undo full-page mechanism (regression-critical — smoke test 7).
@@ -1435,11 +1443,15 @@
   // §5.7 — CRUD
 
   function _submitOutcome(block, meeting) {
+    // Guard against double-submission (e.g. rapid double-click or bubbling).
+    if (block.dataset.submitting) return;
+    block.dataset.submitting = '1';
+
     var verbEl  = document.getElementById('ac-outcome-verb-select');
     var descEl  = document.getElementById('ac-outcome-desc-input');
     var verb    = verbEl  ? verbEl.value          : '';
     var desc    = descEl  ? descEl.value.trim()   : '';
-    if (!verb || !desc) return;
+    if (!verb || !desc) { block.dataset.submitting = ''; return; }
 
     var list = block.querySelector('#ac-outcomes-list');
     var pos  = list ? list.querySelectorAll('.ac-outcome-row').length : 0;
@@ -1452,9 +1464,11 @@
       position:    pos,
       status:      'open'
     }).then(function() {
+      block.dataset.submitting = '';
       _hideAddForm(block);
       _loadOutcomes(meeting);
     }).catch(function(e) {
+      block.dataset.submitting = '';
       console.error('[AccordMeetingSetup] add outcome failed', e);
     });
   }
@@ -1524,6 +1538,388 @@
   }
 
   // ══════════════════════════════════════════════════════════════
+  // ATTENDEES — CMD-ACCORD-SETUP-ATTENDEES-1
+  // V4: organizer_id = auth.users.id; resources linked via user_id.
+  // V5: accord_nodes.created_by = users.id; matched via _user_id
+  //     enriched onto attendees from resources.user_id.
+  // ══════════════════════════════════════════════════════════════
+
+  // §5 auth helper — parse JWT sub from localStorage
+  // (window.Auth does not exist in this codebase per V4 browser probe)
+  function _getCurrentUserId() {
+    try {
+      var key = null;
+      for (var k in localStorage) {
+        if (k.indexOf('auth-token') !== -1) { key = k; break; }
+      }
+      if (!key) return null;
+      var session = JSON.parse(localStorage.getItem(key));
+      var token = session && session.access_token;
+      if (!token) return null;
+      var payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.sub || null;
+    } catch(e) { return null; }
+  }
+
+  function _isCurrentUserOrganizer(meeting) {
+    try {
+      var uid = _getCurrentUserId();
+      return !!uid && uid === meeting.organizer_id;
+    } catch(e) { return false; }
+  }
+
+  // §5.1 — Entry point
+  function _renderAttendees(meeting, workstreamId) {
+    _attendeesAborted = false;
+    var host = document.querySelector('.ac-col-tabbody[data-col="right"]');
+    if (!host) return;
+    host.innerHTML = '<div class="ac-attendees-block" id="ac-attendees-block">' +
+                     '<div class="ac-attendees-loading">Loading\u2026</div>' +
+                     '</div>';
+    _loadAttendees(meeting, workstreamId);
+  }
+
+  // §5.2 — Load + organizer auto-seed
+  function _loadAttendees(meeting, workstreamId) {
+    API.get(
+      'accord_meeting_attendees?meeting_id=eq.' + meeting.meeting_id +
+      '&select=attendee_id,resource_id,role_in_meeting,rsvp_status' +
+      '&order=role_in_meeting.asc,invited_at.asc'
+    ).then(function(rows) {
+      if (_attendeesAborted) return;
+      rows = rows || [];
+
+      // Auto-seed organizer row if absent and meeting is idle
+      var hasOrganizer = rows.some(function(r) {
+        return r.role_in_meeting === 'organizer';
+      });
+      if (!hasOrganizer && meeting.state === 'idle') {
+        return _seedOrganizer(meeting).then(function() {
+          if (_attendeesAborted) return;
+          return _loadAttendees(meeting, workstreamId);
+        });
+      }
+
+      // Parallel: resolve names+user_ids AND stakes lines
+      return Promise.all([
+        _resolveAttendeeNames(rows),
+        _resolveStakesLines(rows, workstreamId, meeting.meeting_id)
+      ]).then(function(results) {
+        if (_attendeesAborted) return;
+        var enriched  = results[0];
+        var stakesMap = results[1];
+        // Attach stakes count to each attendee via _user_id
+        enriched.forEach(function(a) {
+          a._actionCount = (a._user_id && stakesMap[a._user_id]) || 0;
+        });
+        var block = document.getElementById('ac-attendees-block'); // IR71
+        if (!block) return;
+        _paintAttendees(block, enriched, meeting);
+      });
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] attendees fetch failed', e);
+      var block = document.getElementById('ac-attendees-block');
+      if (block) block.innerHTML = '<div class="ac-attendees-error">Could not load attendees.</div>';
+    });
+  }
+
+  // Seed organizer — V4: organizer_id is users.id; look up via resources.user_id
+  function _seedOrganizer(meeting) {
+    return API.get(
+      'resources?user_id=eq.' + meeting.organizer_id + '&select=id,name&limit=1'
+    ).then(function(rows) {
+      if (!rows || !rows.length) {
+        console.warn('[AccordMeetingSetup] organizer resource not found for user', meeting.organizer_id);
+        return;
+      }
+      return API.post('accord_meeting_attendees', {
+        firm_id:         meeting.firm_id,
+        meeting_id:      meeting.meeting_id,
+        resource_id:     rows[0].id,
+        role_in_meeting: 'organizer',
+        rsvp_status:     'accepted'
+      }).catch(function(e) {
+        // Ignore duplicate key — idempotent
+        console.warn('[AccordMeetingSetup] organizer seed skipped:', e && e.message);
+      });
+    });
+  }
+
+  // §5.3 — Resolve names + user_id (needed for V5 stakes matching)
+  function _resolveAttendeeNames(attendees) {
+    if (!attendees.length) return Promise.resolve([]);
+    var ids = attendees.map(function(a) { return a.resource_id; }).join(',');
+    return API.get(
+      'resources?id=in.(' + ids + ')&select=id,name,user_id'
+    ).then(function(rows) {
+      var map = {};
+      (rows || []).forEach(function(r) { map[r.id] = r; });
+      attendees.forEach(function(a) {
+        var rec = map[a.resource_id];
+        a._name    = rec ? rec.name    : 'Unknown';
+        a._user_id = rec ? rec.user_id : null;  // users.id for stakes matching
+      });
+      return attendees;
+    }).catch(function() { return attendees; });
+  }
+
+  // §5.4 — Stakes line: count actions owned by each attendee in this workstream
+  // V5: accord_nodes.created_by = users.id; map keyed by users.id
+  function _resolveStakesLines(attendees, workstreamId, currentMeetingId) {
+    if (!workstreamId || !attendees.length) return Promise.resolve({});
+    return API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&state=in.(closed,sealed,running)' +
+      '&select=meeting_id'
+    ).then(function(meetings) {
+      if (!meetings || !meetings.length) return {};
+      var mids = meetings.map(function(m) { return m.meeting_id; }).join(',');
+      return API.get(
+        'accord_nodes?meeting_id=in.(' + mids + ')' +
+        '&tag=eq.action' +
+        '&select=created_by'
+      ).then(function(nodes) {
+        var counts = {};
+        (nodes || []).forEach(function(n) {
+          if (n.created_by) counts[n.created_by] = (counts[n.created_by] || 0) + 1;
+        });
+        return counts;  // { users_id: count }
+      });
+    }).catch(function() { return {}; });
+  }
+
+  // §5.5 — Paint
+  function _paintAttendees(block, attendees, meeting) {
+    var isOrganizer = _isCurrentUserOrganizer(meeting);
+    var isIdle      = meeting.state === 'idle';
+
+    var html = '<div class="ac-attendees-header">';
+    html += '<span class="ac-attendees-label">EXPECTED ATTENDEES</span>';
+    html += '<span class="ac-attendees-count">' + attendees.length + '</span>';
+    html += '</div>';
+
+    html += '<div class="ac-attendees-list">';
+    attendees.forEach(function(a) {
+      html += _attendeeCardHtml(a, meeting, isOrganizer && isIdle);
+    });
+    html += '</div>';
+
+    if (isOrganizer && isIdle) {
+      html += _addAttendeeHtml();
+    }
+
+    block.innerHTML = html;
+    _setGatheringMode(block, meeting);
+    _wireAttendeeEvents(block, meeting);
+  }
+
+  // §5.6 — Attendee card HTML
+  function _attendeeCardHtml(attendee, meeting, canRemove) {
+    var isYou       = attendee.role_in_meeting === 'organizer';
+    var initials    = _initials(attendee._name || '');
+    var statusBadge = _statusBadge(attendee);
+
+    var html = '<div class="ac-attendee-card" data-attendee-id="' +
+               esc(attendee.attendee_id) + '">';
+
+    // Connection dot (static; C-12 wires presence)
+    html += '<div class="ac-conn-dot ac-conn-dot--idle" title="Connection status"></div>';
+
+    // Avatar
+    html += '<div class="ac-attendee-avatar' +
+            (isYou ? ' ac-attendee-avatar--you' : '') + '">' +
+            esc(initials) + '</div>';
+
+    // Name block
+    html += '<div class="ac-attendee-name-block">';
+    html += '<div class="ac-attendee-name">' + esc(attendee._name || 'Unknown') + '</div>';
+    html += '<div class="ac-attendee-role">' +
+            esc(attendee.role_in_meeting.toUpperCase()) + '</div>';
+
+    // Stakes line: action count (omit if zero or no workstream)
+    if (attendee._actionCount > 0) {
+      html += '<div class="ac-attendee-stakes">Owns ' + attendee._actionCount +
+              ' action' + (attendee._actionCount === 1 ? '' : 's') +
+              ' in this workstream.</div>';
+    }
+
+    html += '</div>';
+
+    // YOU badge
+    if (isYou) html += '<span class="ac-attendee-you">YOU</span>';
+
+    // Status badge
+    if (statusBadge) html += statusBadge;
+
+    // Remove button (organizer + idle + not self)
+    if (canRemove && !isYou) {
+      html += '<button class="ac-attendee-remove" data-action="remove-attendee"' +
+              ' title="Remove attendee">\u00d7</button>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function _statusBadge(attendee) {
+    var map = {
+      'accepted':  { cls: 'ac-badge--accepted',  label: 'ACCEPTED'  },
+      'declined':  { cls: 'ac-badge--declined',  label: 'DECLINED'  },
+      'tentative': { cls: 'ac-badge--tentative', label: 'TENTATIVE' },
+      'pending':   null
+    };
+    var entry = map[attendee.rsvp_status];
+    if (!entry) return '';
+    return '<span class="ac-attendee-badge ' + entry.cls + '">' +
+           entry.label + '</span>';
+  }
+
+  function _initials(name) {
+    var parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
+
+  // §5.7 — Add attendee HTML
+  function _addAttendeeHtml() {
+    return [
+      '<div class="ac-add-attendee-row" id="ac-add-attendee-row">',
+        '<button class="ac-add-attendee-btn" data-action="show-add-attendee">',
+          '+ Add attendee',
+        '</button>',
+      '</div>',
+      '<div class="ac-add-attendee-form" id="ac-add-attendee-form" style="display:none;">',
+        '<input class="ac-add-attendee-input" id="ac-add-attendee-input"',
+               ' type="text" placeholder="Search by name\u2026" autocomplete="off">',
+        '<div class="ac-add-attendee-results" id="ac-add-attendee-results"></div>',
+        '<button class="btn btn-ghost ac-add-attendee-cancel"',
+                ' data-action="hide-add-attendee">Cancel</button>',
+      '</div>'
+    ].join('');
+  }
+
+  // §5.8 — Event wiring (delegated on block)
+  function _wireAttendeeEvents(block, meeting) {
+    block.addEventListener('click', function(ev) {
+      var target = ev.target;
+      var action = target.dataset.action ||
+                   (target.closest('[data-action]') &&
+                    target.closest('[data-action]').dataset.action);
+      if (!action) return;
+
+      if (action === 'show-add-attendee') { _showAddAttendee(block, meeting); return; }
+      if (action === 'hide-add-attendee') { _hideAddAttendee(block); return; }
+
+      if (action === 'remove-attendee') {
+        var card = target.closest('.ac-attendee-card');
+        if (!card) return;
+        _removeAttendee(card.dataset.attendeeId, meeting);
+        return;
+      }
+
+      if (action === 'add-attendee-select') {
+        var btn = target.closest('[data-action="add-attendee-select"]');
+        if (!btn) return;
+        _hideAddAttendee(block);
+        _addAttendee(btn.dataset.resourceId, meeting);
+        return;
+      }
+    });
+  }
+
+  // §5.9 — Search, add, remove
+  function _showAddAttendee(block, meeting) {
+    var row   = block.querySelector('#ac-add-attendee-row');
+    var form  = block.querySelector('#ac-add-attendee-form');
+    var input = block.querySelector('#ac-add-attendee-input');
+    if (row)  row.style.display  = 'none';
+    if (form) form.style.display = '';
+    if (input) {
+      input.focus();
+      input.addEventListener('input', function() {
+        _debouncedResourceSearch(input.value.trim(), block);
+      });
+    }
+  }
+
+  function _hideAddAttendee(block) {
+    var row     = block.querySelector('#ac-add-attendee-row');
+    var form    = block.querySelector('#ac-add-attendee-form');
+    var input   = block.querySelector('#ac-add-attendee-input');
+    var results = block.querySelector('#ac-add-attendee-results');
+    if (row)     row.style.display  = '';
+    if (form)    form.style.display = 'none';
+    if (input)   input.value = '';
+    if (results) results.innerHTML = '';
+    if (_searchTimer) { clearTimeout(_searchTimer); _searchTimer = null; }
+  }
+
+  function _debouncedResourceSearch(query, block) {
+    if (_searchTimer) clearTimeout(_searchTimer);
+    if (!query || query.length < 2) {
+      var results = block.querySelector('#ac-add-attendee-results');
+      if (results) results.innerHTML = '';
+      return;
+    }
+    _searchTimer = setTimeout(function() {
+      _searchTimer = null;
+      API.get(
+        'resources?name=ilike.*' + encodeURIComponent(query) + '*' +
+        '&select=id,name&limit=8'
+      ).then(function(rows) {
+        var results = block.querySelector('#ac-add-attendee-results');
+        if (!results) return;
+        if (!rows || !rows.length) {
+          results.innerHTML = '<div class="ac-search-empty">No results.</div>';
+          return;
+        }
+        results.innerHTML = rows.map(function(r) {
+          return '<button class="ac-search-result"' +
+                 ' data-action="add-attendee-select"' +
+                 ' data-resource-id="' + esc(r.id) + '"' +
+                 ' data-name="' + esc(r.name) + '">' +
+                 esc(r.name) + '</button>';
+        }).join('');
+      }).catch(function() {});
+    }, 300);
+  }
+
+  function _addAttendee(resourceId, meeting) {
+    API.post('accord_meeting_attendees', {
+      firm_id:         meeting.firm_id,
+      meeting_id:      meeting.meeting_id,
+      resource_id:     resourceId,
+      role_in_meeting: 'participant',
+      rsvp_status:     'pending'
+    }).then(function() {
+      _loadAttendees(meeting);
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] add attendee failed', e);
+    });
+  }
+
+  function _removeAttendee(attendeeId, meeting) {
+    API.del('accord_meeting_attendees?attendee_id=eq.' + attendeeId)
+      .then(function() { _loadAttendees(meeting); })
+      .catch(function(e) {
+        console.error('[AccordMeetingSetup] remove attendee failed', e);
+      });
+  }
+
+  // §5.10 — Gathering mode data attribute (C-12 wires visual transition)
+  function _setGatheringMode(block, meeting) {
+    if (!meeting.scheduled_for) {
+      block.setAttribute('data-mode', 'prep');
+      return;
+    }
+    var diffMs = new Date(meeting.scheduled_for).getTime() - Date.now();
+    var isGathering = diffMs > 0 && diffMs < 15 * 60 * 1000;
+    block.setAttribute('data-mode', isGathering ? 'gathering' : 'prep');
+  }
+
+  // ══════════════════════════════════════════════════════════════
   // RENDER ENTRY POINT
   // ══════════════════════════════════════════════════════════════
 
@@ -1559,6 +1955,9 @@
 
     // ── CMD-ACCORD-SETUP-OUTCOMES-1: outcomes render ──────────
     _renderOutcomes(meeting);
+
+    // ── CMD-ACCORD-SETUP-ATTENDEES-1: attendees render ────────
+    _renderAttendees(meeting, workstreamId);
 
     // Breadcrumb async resolve — also caches _workstreamName for briefing
     // CMD-ACCORD-SETUP-LAYOUT-1: breadcrumb element no longer in shell;

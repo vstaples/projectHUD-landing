@@ -619,6 +619,191 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-outcome-form-actions { display: flex; gap: 8px; }
 
 /* ──────────────────────────────────────────────────────────── */
+/* CMD-ACCORD-SETUP-ATTENDEES-1 — Attendee roster styles §7     */
+/* All tokens --ac-* only; scoped to .ac-setup-shell            */
+/* ──────────────────────────────────────────────────────────── */
+
+.ac-attendees-block { padding: 14px 16px; }
+.ac-attendees-loading,
+.ac-attendees-error {
+  font-size: 11px;
+  color: var(--ac-text-faint);
+  font-style: italic;
+  padding: 8px 0;
+}
+.ac-attendees-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.ac-attendees-label {
+  font-family: var(--ac-font-mono);
+  font-size: 9px;
+  color: var(--ac-text-tertiary);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.ac-attendees-count {
+  font-family: var(--ac-font-mono);
+  font-size: 9px;
+  color: var(--ac-cyan);
+  font-weight: 600;
+}
+
+/* Attendee card */
+.ac-attendee-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--ac-bg-tile);
+  border: 1px solid var(--ac-border-subtle);
+  border-radius: 7px;
+  padding: 10px 11px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+/* Connection dot (static v1; C-12 wires presence) */
+.ac-conn-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ac-conn-dot--idle {
+  background: transparent;
+  border: 2px solid var(--ac-text-tertiary);
+  box-shadow: 0 0 8px rgba(138,149,165,0.4);
+  animation: ac-conn-glow 2.5s ease-in-out infinite;
+}
+@keyframes ac-conn-glow {
+  0%,100% { box-shadow: 0 0 6px rgba(138,149,165,0.4); }
+  50%      { box-shadow: 0 0 14px rgba(138,149,165,0.8); }
+}
+
+/* Avatar */
+.ac-attendee-avatar {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--ac-bg-elevated);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9.5px; color: var(--ac-text-secondary); font-weight: 600;
+  flex-shrink: 0;
+  font-family: var(--ac-font-mono);
+}
+.ac-attendee-avatar--you {
+  background: var(--ac-cyan-dim);
+  color: var(--ac-cyan);
+}
+
+/* Name block */
+.ac-attendee-name-block { flex: 1; min-width: 0; }
+.ac-attendee-name {
+  font-size: 12.5px;
+  color: var(--ac-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-attendee-role {
+  font-family: var(--ac-font-mono);
+  font-size: 8.5px;
+  color: var(--ac-text-tertiary);
+  letter-spacing: 0.5px;
+}
+.ac-attendee-stakes {
+  font-size: 10px;
+  color: var(--ac-text-tertiary);
+  margin-top: 2px;
+}
+
+/* YOU badge */
+.ac-attendee-you {
+  font-family: var(--ac-font-mono);
+  font-size: 8px;
+  color: var(--ac-cyan);
+  letter-spacing: 0.8px;
+  flex-shrink: 0;
+}
+
+/* Status badges */
+.ac-attendee-badge {
+  font-family: var(--ac-font-mono);
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.ac-badge--accepted  { background: var(--ac-green-dim);  color: var(--ac-green);  }
+.ac-badge--declined  { background: var(--ac-rose-dim);   color: var(--ac-rose);   }
+.ac-badge--tentative { background: var(--ac-amber-dim);  color: var(--ac-amber);  }
+
+/* Remove button */
+.ac-attendee-remove {
+  font-size: 14px;
+  color: var(--ac-text-faint);
+  background: none; border: none;
+  cursor: pointer; padding: 0 2px;
+  line-height: 1; flex-shrink: 0;
+}
+.ac-attendee-remove:hover { color: var(--ac-rose); }
+
+/* Add attendee */
+.ac-add-attendee-row { margin-top: 8px; }
+.ac-add-attendee-btn {
+  font-family: var(--ac-font-mono);
+  font-size: 9px;
+  color: var(--ac-cyan);
+  background: none; border: none;
+  cursor: pointer; padding: 0;
+  letter-spacing: 0.8px;
+}
+.ac-add-attendee-btn:hover { text-decoration: underline; }
+.ac-add-attendee-form { margin-top: 8px; }
+.ac-add-attendee-input {
+  width: 100%;
+  font-size: 12px;
+  background: var(--ac-bg-tile);
+  color: var(--ac-text-primary);
+  border: 1px solid var(--ac-border-mid);
+  border-radius: 4px;
+  padding: 6px 10px;
+  outline: none;
+  margin-bottom: 6px;
+}
+.ac-add-attendee-input:focus { border-color: var(--ac-border-active); }
+.ac-add-attendee-results { margin-bottom: 6px; }
+.ac-search-result {
+  display: block; width: 100%;
+  text-align: left;
+  font-size: 12px;
+  color: var(--ac-text-primary);
+  background: var(--ac-bg-tile);
+  border: 1px solid var(--ac-border-subtle);
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-bottom: 3px;
+  cursor: pointer;
+}
+.ac-search-result:hover {
+  background: var(--ac-bg-elevated);
+  border-color: var(--ac-border-mid);
+}
+.ac-search-empty {
+  font-size: 11px;
+  color: var(--ac-text-tertiary);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+/* Gathering mode hook (C-12 wires visual transition) */
+.ac-attendees-block[data-mode="gathering"] .ac-add-attendee-row { display: none; }
+
+/* ──────────────────────────────────────────────────────────── */
 /* CMD-ACCORD-MEETING-SETUP-1 (prior phases) — DEFERRED         */
 /* The rules below shipped in Phases 2-7. Their selectors do    */
 /* not match the new shell structure introduced above. They     */
