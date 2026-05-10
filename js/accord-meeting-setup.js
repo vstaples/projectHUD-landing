@@ -4320,12 +4320,12 @@
     });
 
     tabbody.addEventListener('dragover', function(ev) {
-      if (!_dragAction) return;  // only intercept if dragging a card
+      if (!_dragAction) return;
       ev.preventDefault();
       ev.stopPropagation();
       ev.dataTransfer.dropEffect = 'move';
 
-      // Fix 3: auto-scroll kanban track when near edges
+      // Auto-scroll kanban track when near edges
       var track = tabbody.querySelector('.ac-kanban-track');
       if (track) {
         var rect = track.getBoundingClientRect();
