@@ -3977,7 +3977,7 @@
       return API.get(
         'accord_nodes?meeting_id=in.(' + ids + ')' +
         '&tag=eq.action' +
-        '&select=node_id,summary,seq_id,due_date,created_by,meeting_id,agenda_item_id' +
+        '&select=node_id,summary,seq_id,due_date,created_by,meeting_id,agenda_item_id,sealed_at' +
         '&order=due_date.asc.nullslast,created_at.asc'
       ).then(function(nodes) { return nodes || []; });
     });
@@ -4154,6 +4154,7 @@
                'data-node-id="' + esc(action.node_id) + '" ' +
                'data-agenda-item-id="' + esc(action.agenda_item_id || '') + '" ' +
                'data-resource-id="' + esc(action._owner_resource_id || '') + '" ' +
+               'data-sealed="' + (action.sealed_at ? '1' : '0') + '" ' +
                'data-action="action-card-click">';
 
     html += '<div class="ac-action-seq">' + esc(action.seq_id || 'AX') + '</div>';
@@ -4294,6 +4295,7 @@
     tabbody.addEventListener('dragstart', function(ev) {
       var card = ev.target.closest('.ac-action-card');
       if (!card) { ev.preventDefault(); return; }
+      ev.stopPropagation();
       _dragAction = card.dataset.nodeId;
       card.classList.add('ac-card-dragging');
       ev.dataTransfer.effectAllowed = 'move';
@@ -4304,6 +4306,7 @@
       var col = ev.target.closest('.ac-kanban-cards');
       if (!col) return;
       ev.preventDefault();
+      ev.stopPropagation();
       ev.dataTransfer.dropEffect = 'move';
       tabbody.querySelectorAll('.ac-kanban-cards--drag-over').forEach(function(el) {
         el.classList.remove('ac-kanban-cards--drag-over');
@@ -4313,6 +4316,7 @@
 
     tabbody.addEventListener('drop', function(ev) {
       ev.preventDefault();
+      ev.stopPropagation();
       var col = ev.target.closest('.ac-kanban-cards');
       if (!col || !_dragAction) return;
       var colId      = col.dataset.colId;
@@ -4344,7 +4348,7 @@
     });
 
     tabbody.querySelectorAll('.ac-action-card').forEach(function(card) {
-      card.setAttribute('draggable', 'true');
+      if (card.dataset.sealed !== '1') card.setAttribute('draggable', 'true');
     });
   }
 
