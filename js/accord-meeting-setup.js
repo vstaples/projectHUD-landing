@@ -2321,8 +2321,11 @@
   function render(host, meeting, workstreamId) {
     if (!host) return;
     teardown();
-    _currentMeetingId   = meeting.meeting_id;
-    _agendaFetchAborted = false;
+    _currentMeetingId      = meeting.meeting_id;
+    _agendaFetchAborted    = false;
+    _outcomesAborted       = false;
+    _attendeesAborted      = false;
+    _filmstripAborted      = false;   // reset here AND in _renderFilmstrip; belt+suspenders
     window._accordDetachSurfaceHost = _detachHandler;
 
     // ── CMD-ACCORD-SETUP-LAYOUT-1: full-page host mechanism (§3, Option A)
