@@ -4424,6 +4424,20 @@
         }
       });
     }
+
+    // ── Right: action cards (grid view) ──────────────────────────
+    var gridView = document.querySelector('.ac-grid-view');
+    if (gridView) {
+      gridView.querySelectorAll('.ac-grid-action-card').forEach(function(card) {
+        if (card.dataset.resourceId === rid) {
+          card.classList.add('ac-percolate-raised');
+          card.classList.remove('ac-percolate-faded');
+        } else {
+          card.classList.add('ac-percolate-faded');
+          card.classList.remove('ac-percolate-raised');
+        }
+      });
+    }
   }
 
   function _renderPercolatePill() {
@@ -4833,6 +4847,7 @@
 
     tabbody.innerHTML = html;
     _wireActionEvents(tabbody, actions, meeting, bounds, 'grid', onKanban, onGrid);
+    if (_percolateResourceId) _applyPercolate();
   }
 
   // §8 — Event wiring
