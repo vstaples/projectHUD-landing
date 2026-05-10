@@ -88,7 +88,14 @@
   ];
 
   // ── Detach hook ───────────────────────────────────────────────
-  function _detachHandler() { teardown(); }
+  function _detachHandler() {
+    // Remove fullpage classes here (not in teardown) so they only disappear
+    // when genuinely leaving Setup for a non-idle surface.
+    var appRoot = document.getElementById('accord-app');
+    if (appRoot) appRoot.classList.remove(FULLPAGE_CLS);
+    document.body.classList.remove(FULLPAGE_CLS);
+    teardown();
+  }
 
   // ── teardown ──────────────────────────────────────────────────
   function teardown() {
@@ -144,10 +151,11 @@
     }
 
     // ── CMD-ACCORD-SETUP-LAYOUT-1: layout teardown ─────────────
-    // Undo full-page mechanism (regression-critical — smoke test 7).
-    var appRoot = document.getElementById('accord-app');
-    if (appRoot) appRoot.classList.remove(FULLPAGE_CLS);
-    document.body.classList.remove(FULLPAGE_CLS);
+    // NOTE: fullpage classes (FULLPAGE_CLS) are NOT removed here.
+    // They are removed only in _detachHandler, which fires when
+    // genuinely navigating away from Setup to a non-idle surface.
+    // Removing them here causes a rail flash during idle→idle
+    // NEXT navigation (teardown fires, classes gone, render re-applies).
     // Drop in-flight column-drag listeners.
     if (_colDrag.active) {
       document.removeEventListener('mousemove', _onHandleMouseMove);
