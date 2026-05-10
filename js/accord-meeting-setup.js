@@ -4824,7 +4824,7 @@
       html += '<div class="ac-grid-time">' + h + ':00</div>';
       DAY_NAMES.forEach(function(name, i) {
         var dayActions = actions.filter(function(a) {
-          return a.due_date && _isSameDay(new Date(a.due_date), bounds.days[i]);
+          return a.due_date && _isSameDay(new Date(a.due_date + 'T00:00:00'), bounds.days[i]);
         });
         html += '<div class="ac-grid-cell" data-day-idx="' + i + '" data-hour="' + h + '">';
         if (h === 8) {
