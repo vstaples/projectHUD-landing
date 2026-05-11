@@ -2393,13 +2393,6 @@
       var hasDuration = !!meeting.duration_minutes;
       checks.push({ label: 'Duration set', passed: hasDuration, blocking: false });
 
-      var pendingInvites = attendees.filter(function(a) { return a.rsvp_status === 'pending'; });
-      checks.push({
-        label:    pendingInvites.length + ' attendee' + (pendingInvites.length !== 1 ? 's' : '') + ' pending RSVP',
-        passed:   pendingInvites.length === 0,
-        blocking: false
-      });
-
       checks.push({
         label:    overdueActions.length + ' overdue action' + (overdueActions.length !== 1 ? 's' : '') + ' in workstream',
         passed:   overdueActions.length === 0,
@@ -2502,7 +2495,7 @@
       html += '<div class="ac-budget-fill ' + barCls + '" style="width:' + pct + '%"></div>';
       html += '</div>';
       html += '<span class="ac-budget-stats">';
-      if (budget.used) html += budget.used + 'm used';
+      if (budget.used) html += budget.used + 'm planned';
       if (budget.slack > 0) html += ' \u00b7 ' + budget.slack + 'm slack';
       if (budget.slack < 0) html += ' \u00b7 ' + Math.abs(budget.slack) + 'm over';
       html += '</span>';
