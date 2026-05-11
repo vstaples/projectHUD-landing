@@ -634,15 +634,20 @@
     });
   }
 
-  // §7 — Realtime subscription (P1: uses window.supabase)
+  // §7 — Realtime subscription
+  // P1 amendment (revised): window.supabase is the SDK library, not a client instance.
+  // Actual realtime client is window.Accord.state.realtimeClient.realtime.
   function _subscribeChatChannel(meetingId) {
-    var supabase = window.supabase;
-    if (!supabase) {
-      console.error('[AccordChat] window.supabase not available');
+    var realtimeClient = window.Accord &&
+                         window.Accord.state &&
+                         window.Accord.state.realtimeClient &&
+                         window.Accord.state.realtimeClient.realtime;
+    if (!realtimeClient) {
+      console.error('[AccordChat] realtime client not available');
       return;
     }
 
-    _chatSubscription = supabase
+    _chatSubscription = realtimeClient
       .channel('accord-chat-' + meetingId)
       .on('postgres_changes', {
         event:  'INSERT',
