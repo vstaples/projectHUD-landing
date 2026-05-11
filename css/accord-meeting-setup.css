@@ -858,7 +858,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 9px 22px;
+  padding: 9px 22px 4px 22px;
   gap: 6px;
 }
 .ac-film-loading,
@@ -916,8 +916,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 /* Individual frame */
 .ac-film-frame {
   flex-shrink: 0;
-  height: 100%;
-  width: auto;
+  align-self: stretch;
   aspect-ratio: 1 / 1;
   min-width: 60px;
   max-width: 200px;
