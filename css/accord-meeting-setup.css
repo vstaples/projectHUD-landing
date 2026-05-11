@@ -3007,10 +3007,6 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-meta-row--when { position: relative; cursor: pointer; }
 
 #ac-when-picker {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 6px;
   z-index: 8000;
   background: var(--ac-bg-elevated);
   border: 1px solid var(--ac-border-mid);

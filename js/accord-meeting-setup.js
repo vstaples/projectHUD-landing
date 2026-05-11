@@ -3805,10 +3805,17 @@
     var existing = document.getElementById('ac-when-picker');
     if (existing) existing.remove();
 
+    // Mount on body to escape overflow:hidden on ac-setup-shell
     var picker = document.createElement('div');
     picker.id = 'ac-when-picker';
     picker.className = 'ac-when-picker';
-    whenRow.insertAdjacentElement('afterend', picker);
+    document.body.appendChild(picker);
+
+    // Position using WHEN row rect — align right edge, below row
+    var rect = whenRow.getBoundingClientRect();
+    picker.style.position = 'fixed';
+    picker.style.top      = (rect.bottom + 6) + 'px';
+    picker.style.right    = (window.innerWidth - rect.right) + 'px';
 
     _paintPicker(picker, meeting);
 
