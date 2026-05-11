@@ -2691,7 +2691,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-budget-empty { font-size: 11px; font-style: italic; }
 .ac-budget-warning {
   font-family: var(--ac-font-mono);
-  font-size: 8px;
+  font-size: 10px;
   padding: 2px 8px;
   border-radius: 3px;
   white-space: nowrap;

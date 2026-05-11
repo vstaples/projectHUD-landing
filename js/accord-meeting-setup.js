@@ -2402,9 +2402,9 @@
     var pills = [];
     if (!intelData || !intelData.attendees) return pills;
     intelData.attendees.forEach(function(a) {
-      if (a.status_tag === 'QUIET \u00b7 RE-ONBOARD') {
-        pills.push({ text: esc(a.name) + ' off-substrate ' +
-                     (a.days_off_substrate ? a.days_off_substrate + 'd' : ''), severity: 'mid' });
+    if (a.status_tag === 'QUIET \u00b7 RE-ONBOARD') {
+        var dayStr = a.days_off_substrate ? ' \u00b7 ' + a.days_off_substrate + 'd silent' : '';
+        pills.push({ text: esc(a.name) + ' \u2014 no recent activity' + dayStr, severity: 'mid' });
       }
       if (a.status_tag === 'OVERDUE \u00b7 PRESSURE') {
         pills.push({ text: esc(a.name) + ' \u00b7 ' + a.overdue_actions + ' overdue', severity: 'high' });
