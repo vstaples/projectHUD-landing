@@ -127,11 +127,13 @@
   width: auto;
   max-width: 320px;
   margin-left: auto;
+  margin-top: 10px;
   overflow: visible;
 }
 .ac-meta-row {
   display: flex;
   justify-content: flex-end;
+  align-items: baseline;
   white-space: nowrap;
   gap: 6px;
   position: relative;
@@ -230,9 +232,20 @@
   text-transform: uppercase;
   flex-shrink: 0;
 }
+.ac-meta-row .ac-meta-value {
+  text-align: right;
+  flex-shrink: 1;
+  min-width: 0;
+}
+.ac-meta-editable {
+  text-align: right;
+  display: inline;
+  cursor: text;
+  outline: none;
+  min-width: 80px;
+}
 .ac-when-date { color: var(--ac-amber); }
 .ac-when-time { color: var(--ac-cyan); }
-.ac-meta-editable { cursor: text; outline: none; min-width: 120px; }
 .ac-meta-editable:focus { color: var(--ac-text-primary); }
 
 /* STARTS IN countdown row */
@@ -889,10 +902,10 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   gap: 5px;
   overflow-x: auto;
   flex: 1;
+  min-height: 0;
   scrollbar-width: thin;
   scrollbar-color: var(--ac-border-mid) transparent;
   align-items: stretch;
-  height: 100%;
 }
 .ac-film-track::-webkit-scrollbar { height: 4px; }
 .ac-film-track::-webkit-scrollbar-thumb {
