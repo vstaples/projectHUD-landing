@@ -2825,7 +2825,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-meta-row--when:hover .ac-duration-edit-hint { opacity: 1; }
 .ac-duration-edit-hint {
   font-family: var(--ac-font-mono);
-  font-size: 8px;
+  font-size: 11px;
   color: var(--ac-text-faint);
   margin-left: 8px;
   opacity: 0;
@@ -2840,21 +2840,22 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   padding-left: 42px;
 }
 .ac-duration-input {
-  width: 54px;
-  font-size: 12px;
+  width: 64px;
+  font-size: 14px;
   font-family: var(--ac-font-mono);
   background: var(--ac-bg-tile);
   color: var(--ac-text-primary);
   border: 1px solid var(--ac-border-active);
   border-radius: 3px;
-  padding: 3px 6px;
+  padding: 3px 8px;
   outline: none;
   text-align: right;
 }
 .ac-duration-unit {
   font-family: var(--ac-font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--ac-text-tertiary);
+  margin-left: 2px;
 }
 .ac-duration-save, .ac-duration-cancel {
   font-size: 11px;
