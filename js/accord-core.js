@@ -249,13 +249,18 @@ const Accord = (() => {
       _setMeetingHeader(state.meeting);
       _refreshTimer();
       _enableComposerForState();
-      await loadMeeting(m.meeting_id);   // ← X-13: reload surface; running state routes to capture shell
+      // X-13: dispatch level-changed so accord-rails re-routes to running shell
+      window.dispatchEvent(new CustomEvent('accord:level-changed', {
+        detail: {
+          level:   state.level,
+          context: state.levelContext
+        }
+      }));
     } catch (e) {
       console.error('[Accord] startMeeting failed', e);
       alert('Failed to start meeting: ' + (e?.message || e));
     }
   }
-
   async function endMeeting() {
     const m = state.meeting;
     if (!m || m.state !== 'running') return;
