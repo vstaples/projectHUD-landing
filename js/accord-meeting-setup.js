@@ -67,6 +67,15 @@
   // ── X-11: briefing edit state ─────────────────────────────────
   var _briefingEditTimer = null;
 
+  // ── X-14: WHEN picker state ───────────────────────────────────
+  var _pickerOpen      = false;
+  var _pickerDate      = null;
+  var _pickerHour      = 9;
+  var _pickerMinute    = 0;
+  var _pickerDuration  = 60;
+  var _pickerViewYear  = null;
+  var _pickerViewMonth = null;
+
   // ── CMD-ACCORD-SETUP-OUTCOMES-1: outcomes state ───────────────
   var _outcomesAborted  = false;
   var _descPatchTimers  = {};   // keyed by outcome_id
@@ -271,6 +280,13 @@
 
     // ── CMD-ACCORD-SETUP-SLIDESHOW-1: rotation engine teardown ───
     _destroySlideshow();
+
+    // ── X-14: WHEN picker teardown ────────────────────────────────
+    _closeWhenPicker();
+    _pickerOpen      = false;
+    _pickerDate      = null;
+    _pickerViewYear  = null;
+    _pickerViewMonth = null;
 
     // ── CMD-ACCORD-SETUP-PERCOLATE-1: percolate teardown ─────────
     _clearPercolate();
@@ -1032,7 +1048,7 @@
     if (whenEl) {
       whenEl.innerHTML = _fmtWhen(meeting.scheduled_for, meeting.duration_minutes);
     }
-    _wireDurationEdit(meeting);   // X-12: wire duration inline edit on WHEN row
+    _wireWhenPicker(meeting);   // X-14: replaces X-12 _wireDurationEdit
 
     var whereEl = document.getElementById('ac-meta-where');
     if (whereEl) {
@@ -3739,95 +3755,340 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  // X-12 — Duration inline edit (F-C13-2 resolution)
-  // WHEN row click → compact input → PATCH + footer re-render.
+  // ══════════════════════════════════════════════════════════════
+  // X-14 — WHEN picker (replaces X-12 duration-only inline edit)
+  // §5 wiring · §6 open/close · §7 paint · §8 events · §9 save
+  // Optional-chaining removed throughout — matches codebase pattern.
+  // _isSameDay reuses existing helper (line ~5627).
   // ══════════════════════════════════════════════════════════════
 
-  function _wireDurationEdit(meeting) {
+  // §5 — Wire WHEN row click to open picker
+  function _wireWhenPicker(meeting) {
     var whenRow = document.getElementById('ac-meta-when-row');
-    if (!whenRow || whenRow.dataset.durationWired) return;
-    whenRow.dataset.durationWired = '1';
+    if (!whenRow || whenRow.dataset.whenPickerWired) return;
+    whenRow.dataset.whenPickerWired = '1';
+    delete whenRow.dataset.durationWired;
 
     var hint = document.getElementById('ac-duration-hint');
-    if (hint) {
-      hint.textContent = meeting.duration_minutes ? 'click to edit duration' : '+ add duration';
-    }
+    if (hint) hint.textContent = 'click to schedule';
 
     whenRow.addEventListener('click', function(ev) {
-      if (ev.target.closest('.ac-duration-input-row')) return;
-      _openDurationEdit(meeting);
+      if (ev.target.closest('#ac-when-picker')) return;
+      _toggleWhenPicker(meeting);
     });
   }
 
-  function _openDurationEdit(meeting) {
+  function _toggleWhenPicker(meeting) {
+    if (_pickerOpen) { _closeWhenPicker(); } else { _openWhenPicker(meeting); }
+  }
+
+  // §6 — Open / close
+  function _openWhenPicker(meeting) {
+    _pickerOpen = true;
+
+    if (meeting.scheduled_for) {
+      _pickerDate   = new Date(meeting.scheduled_for);
+      _pickerHour   = _pickerDate.getHours();
+      _pickerMinute = _pickerDate.getMinutes() >= 30 ? 30 : 0;
+    } else {
+      _pickerDate   = _nextWeekday(new Date());
+      _pickerHour   = 9;
+      _pickerMinute = 0;
+    }
+    _pickerDuration  = meeting.duration_minutes || 60;
+    _pickerViewYear  = _pickerDate.getFullYear();
+    _pickerViewMonth = _pickerDate.getMonth();
+
     var whenRow = document.getElementById('ac-meta-when-row');
     if (!whenRow) return;
-    if (document.querySelector('.ac-duration-input-row')) return;  // already open
 
-    var current  = meeting.duration_minutes || '';
-    var inputRow = document.createElement('div');
-    inputRow.className = 'ac-duration-input-row';
-    inputRow.innerHTML =
-      '<input class="ac-duration-input" type="number" min="5" max="480" step="5" ' +
-      'value="' + esc(String(current)) + '" placeholder="min" autocomplete="off">' +
-      '<span class="ac-duration-unit">min</span>' +
-      '<button class="ac-duration-save" data-action="save-duration">\u2713</button>' +
-      '<button class="ac-duration-cancel" data-action="cancel-duration">\u2715</button>';
+    var existing = document.getElementById('ac-when-picker');
+    if (existing) existing.remove();
 
-    // Append to ac-header-meta as a sibling row, not inside the WHEN row
-    var meta = whenRow.closest('.ac-header-meta') || whenRow.parentElement;
-    meta.appendChild(inputRow);
+    var picker = document.createElement('div');
+    picker.id = 'ac-when-picker';
+    picker.className = 'ac-when-picker';
+    whenRow.insertAdjacentElement('afterend', picker);
 
-    var input = inputRow.querySelector('.ac-duration-input');
-    if (input) {
-      input.focus();
-      input.select();
+    _paintPicker(picker, meeting);
 
-      input.addEventListener('keydown', function(ev) {
-        if (ev.key === 'Enter')  { ev.preventDefault(); _saveDurationEdit(meeting); }
-        if (ev.key === 'Escape') { _cancelDurationEdit(meeting); }
+    setTimeout(function() {
+      document.addEventListener('click', _onPickerOutsideClick);
+    }, 0);
+  }
+
+  function _closeWhenPicker() {
+    _pickerOpen = false;
+    var picker = document.getElementById('ac-when-picker');
+    if (picker) picker.remove();
+    document.removeEventListener('click', _onPickerOutsideClick);
+  }
+
+  function _onPickerOutsideClick(ev) {
+    var picker  = document.getElementById('ac-when-picker');
+    var whenRow = document.getElementById('ac-meta-when-row');
+    if (!picker) { document.removeEventListener('click', _onPickerOutsideClick); return; }
+    if (!picker.contains(ev.target) && whenRow && !whenRow.contains(ev.target)) {
+      _closeWhenPicker();
+    }
+  }
+
+  function _nextWeekday(date) {
+    var d = new Date(date);
+    d.setDate(d.getDate() + 1);
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    return d;
+  }
+
+  // §7 — Picker paint
+  function _paintPicker(picker, meeting) {
+    picker.innerHTML = [
+      '<div class="ac-picker-body">',
+        '<div class="ac-picker-left">',
+          _calendarHtml(_pickerViewYear, _pickerViewMonth, _pickerDate),
+        '</div>',
+        '<div class="ac-picker-right">',
+          '<div class="ac-picker-field">',
+            '<label class="ac-picker-label">START TIME</label>',
+            _timeSelectHtml(_pickerHour, _pickerMinute),
+          '</div>',
+          '<div class="ac-picker-field">',
+            '<label class="ac-picker-label">DURATION</label>',
+            _durationSelectHtml(_pickerDuration),
+          '</div>',
+          '<div class="ac-picker-actions">',
+            '<button class="ac-picker-set" data-action="picker-set">\u2713 Set</button>',
+            '<button class="ac-picker-cancel" data-action="picker-cancel">Cancel</button>',
+          '</div>',
+        '</div>',
+      '</div>'
+    ].join('');
+
+    _wirePickerEvents(picker, meeting);
+  }
+
+  // §7.1 — Calendar HTML
+  function _calendarHtml(year, month, selectedDate) {
+    var MONTHS = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+    var DAY_HEADERS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+    var html = '<div class="ac-cal">';
+    html += '<div class="ac-cal-nav">';
+    html += '<button class="ac-cal-prev" data-action="cal-prev">\u2039</button>';
+    html += '<span class="ac-cal-month-label">' + esc(MONTHS[month]) + ' ' + year + '</span>';
+    html += '<button class="ac-cal-next" data-action="cal-next">\u203a</button>';
+    html += '</div>';
+
+    html += '<div class="ac-cal-grid">';
+    DAY_HEADERS.forEach(function(d) {
+      html += '<span class="ac-cal-day-header">' + d + '</span>';
+    });
+
+    var firstDay    = new Date(year, month, 1).getDay();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    var today       = new Date();
+
+    for (var i = 0; i < firstDay; i++) {
+      html += '<span class="ac-cal-cell ac-cal-cell--empty"></span>';
+    }
+
+    for (var d2 = 1; d2 <= daysInMonth; d2++) {
+      var cellDate = new Date(year, month, d2);
+      var isPast   = cellDate < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      var isToday  = _isSameDay(cellDate, today);
+      var isSel    = selectedDate && _isSameDay(cellDate, selectedDate);
+      var cls = 'ac-cal-cell';
+      if (isPast)  cls += ' ac-cal-cell--past';
+      if (isToday) cls += ' ac-cal-cell--today';
+      if (isSel)   cls += ' ac-cal-cell--selected';
+      html += '<span class="' + cls + '" data-action="cal-select" data-day="' + d2 + '">' +
+              d2 + '</span>';
+    }
+
+    html += '</div></div>';
+    return html;
+  }
+
+  // §7.2 — Time select HTML
+  function _timeSelectHtml(hour, minute) {
+    var html = '<select class="ac-picker-select" id="ac-picker-time">';
+    for (var h = 6; h <= 22; h++) {
+      for (var m = 0; m < 60; m += 30) {
+        var label = _fmt12h(h, m);
+        var val   = h + ':' + (m === 0 ? '00' : '30');
+        var sel   = (h === hour && m === minute) ? ' selected' : '';
+        html += '<option value="' + val + '"' + sel + '>' + esc(label) + '</option>';
+      }
+    }
+    html += '</select>';
+    return html;
+  }
+
+  function _fmt12h(hour, minute) {
+    var ampm = hour >= 12 ? 'PM' : 'AM';
+    var h12  = hour % 12 || 12;
+    var mStr = minute === 0 ? ':00' : ':30';
+    return h12 + mStr + ' ' + ampm;
+  }
+
+  // §7.3 — Duration select HTML
+  function _durationSelectHtml(currentDuration) {
+    var options = [30, 45, 60, 90, 120];
+    var html = '<select class="ac-picker-select" id="ac-picker-duration">';
+    options.forEach(function(min) {
+      var label = min < 60  ? min + ' min'
+                : min === 60 ? '1 hour'
+                : (min / 60) + ' hours';
+      var sel = (min === currentDuration) ? ' selected' : '';
+      html += '<option value="' + min + '"' + sel + '>' + label + '</option>';
+    });
+    var isCustom = options.indexOf(currentDuration) === -1 && currentDuration > 0;
+    html += '<option value="custom"' + (isCustom ? ' selected' : '') + '>Custom\u2026</option>';
+    html += '</select>';
+    if (isCustom) {
+      html += '<input class="ac-picker-custom-duration" type="number" ' +
+              'min="5" max="480" step="5" value="' + currentDuration + '">';
+    }
+    return html;
+  }
+
+  // §8 — Picker event wiring
+  // Optional-chaining removed — uses established delegation pattern
+  function _wirePickerEvents(picker, meeting) {
+    picker.addEventListener('click', function(ev) {
+      var target = ev.target;
+      var action = target.dataset.action ||
+                   (target.closest('[data-action]') &&
+                    target.closest('[data-action]').dataset.action);
+      if (!action) return;
+      ev.stopPropagation();
+
+      if (action === 'cal-prev') {
+        _pickerViewMonth--;
+        if (_pickerViewMonth < 0) { _pickerViewMonth = 11; _pickerViewYear--; }
+        var cal = picker.querySelector('.ac-cal');
+        if (cal) cal.outerHTML = _calendarHtml(_pickerViewYear, _pickerViewMonth, _pickerDate);
+        _wirePickerEvents(picker, meeting);
+        return;
+      }
+      if (action === 'cal-next') {
+        _pickerViewMonth++;
+        if (_pickerViewMonth > 11) { _pickerViewMonth = 0; _pickerViewYear++; }
+        var cal2 = picker.querySelector('.ac-cal');
+        if (cal2) cal2.outerHTML = _calendarHtml(_pickerViewYear, _pickerViewMonth, _pickerDate);
+        _wirePickerEvents(picker, meeting);
+        return;
+      }
+      if (action === 'cal-select') {
+        var btn = target.closest('[data-action="cal-select"]');
+        if (!btn || btn.classList.contains('ac-cal-cell--past')) return;
+        var day = parseInt(btn.dataset.day, 10);
+        _pickerDate = new Date(_pickerViewYear, _pickerViewMonth, day);
+        var cal3 = picker.querySelector('.ac-cal');
+        if (cal3) cal3.outerHTML = _calendarHtml(_pickerViewYear, _pickerViewMonth, _pickerDate);
+        _wirePickerEvents(picker, meeting);
+        return;
+      }
+      if (action === 'picker-set')    { _saveWhenPicker(meeting); return; }
+      if (action === 'picker-cancel') { _closeWhenPicker(); return; }
+    });
+
+    // Time select
+    var timeSelect = picker.querySelector('#ac-picker-time');
+    if (timeSelect && !timeSelect.dataset.wired) {
+      timeSelect.dataset.wired = '1';
+      timeSelect.addEventListener('change', function() {
+        var parts    = timeSelect.value.split(':');
+        _pickerHour   = parseInt(parts[0], 10);
+        _pickerMinute = parseInt(parts[1], 10);
       });
     }
 
-    inputRow.querySelector('[data-action="save-duration"]')
-      .addEventListener('click', function() { _saveDurationEdit(meeting); });
-    inputRow.querySelector('[data-action="cancel-duration"]')
-      .addEventListener('click', function() { _cancelDurationEdit(meeting); });
+    // Duration select
+    var durSelect = picker.querySelector('#ac-picker-duration');
+    if (durSelect && !durSelect.dataset.wired) {
+      durSelect.dataset.wired = '1';
+      durSelect.addEventListener('change', function() {
+        if (durSelect.value === 'custom') {
+          var existingInp = picker.querySelector('.ac-picker-custom-duration');
+          if (!existingInp) {
+            var inp = document.createElement('input');
+            inp.className = 'ac-picker-custom-duration';
+            inp.type = 'number';
+            inp.min  = '5';
+            inp.max  = '480';
+            inp.step = '5';
+            inp.value = '60';
+            durSelect.insertAdjacentElement('afterend', inp);
+            inp.focus();
+          }
+        } else {
+          _pickerDuration = parseInt(durSelect.value, 10);
+          var customInp2 = picker.querySelector('.ac-picker-custom-duration');
+          if (customInp2) customInp2.remove();
+        }
+      });
+    }
+
+    // Custom duration input
+    var customInp = picker.querySelector('.ac-picker-custom-duration');
+    if (customInp && !customInp.dataset.wired) {
+      customInp.dataset.wired = '1';
+      customInp.addEventListener('input', function() {
+        var val = parseInt(customInp.value, 10);
+        if (val > 0) _pickerDuration = val;
+      });
+    }
   }
 
-  function _saveDurationEdit(meeting) {
-    var input = document.querySelector('.ac-duration-input');
-    if (!input) return;
-    var val         = parseInt(input.value, 10);
-    var newDuration = (val > 0) ? val : null;
+  // §9 — Save
+  function _saveWhenPicker(meeting) {
+    if (!_pickerDate) { _closeWhenPicker(); return; }
+
+    var d = new Date(
+      _pickerDate.getFullYear(),
+      _pickerDate.getMonth(),
+      _pickerDate.getDate(),
+      _pickerHour,
+      _pickerMinute,
+      0, 0
+    );
+    var scheduledFor = d.toISOString();
+
+    var customInp = document.querySelector('.ac-picker-custom-duration');
+    if (customInp) {
+      var val = parseInt(customInp.value, 10);
+      if (val > 0) _pickerDuration = val;
+    }
 
     API.patch(
       'accord_meetings?meeting_id=eq.' + meeting.meeting_id,
-      { duration_minutes: newDuration }
+      { scheduled_for: scheduledFor, duration_minutes: _pickerDuration }
     ).then(function() {
-      meeting.duration_minutes = newDuration;
-      _closeDurationEdit(meeting);
+      meeting.scheduled_for    = scheduledFor;
+      meeting.duration_minutes = _pickerDuration;
+      _closeWhenPicker();
       var whenEl = document.getElementById('ac-meta-when');
       if (whenEl) whenEl.innerHTML = _fmtWhen(meeting.scheduled_for, meeting.duration_minutes);
       _renderFooter(meeting, meeting.workstream_id || null);
     }).catch(function(e) {
-      console.error('[AccordMeetingSetup] duration_minutes patch failed', e);
-      _cancelDurationEdit(meeting);
+      console.error('[AccordMeetingSetup] scheduled_for patch failed', e);
+      _closeWhenPicker();
     });
   }
 
-  function _cancelDurationEdit(meeting) {
-    _closeDurationEdit(meeting);
-  }
-
-  function _closeDurationEdit(meeting) {
-    var row = document.querySelector('.ac-duration-input-row');
-    if (row) row.remove();
-    var hint = document.getElementById('ac-duration-hint');
-    if (hint) {
-      hint.textContent = meeting.duration_minutes ? 'click to edit duration' : '+ add duration';
+  // §10 — Keyboard: Escape closes picker, Enter confirms
+  document.addEventListener('keydown', function _pickerKeydown(ev) {
+    if (!_pickerOpen) return;
+    if (ev.key === 'Escape') { _closeWhenPicker(); }
+    if (ev.key === 'Enter') {
+      var picker = document.getElementById('ac-when-picker');
+      if (picker && window.Accord && window.Accord.state && window.Accord.state.meeting) {
+        _saveWhenPicker(window.Accord.state.meeting);
+      }
     }
-  }
+  });
 
   // §7 — Decisions tab
 

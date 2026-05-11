@@ -2997,3 +2997,159 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 /* Full tier (≥ 140px) — show seq IDs + summaries */
 .ac-film-frame--full .ac-film-nodes    { display: flex; }
 .ac-film-frame--full .ac-film-node-summary { display: inline; }
+
+
+/* ──────────────────────────────────────────────────────────── */
+/* X-14 — WHEN picker panel                                     */
+/* Replaces X-12 duration-only inline edit.                     */
+/* ──────────────────────────────────────────────────────────── */
+
+.ac-meta-row--when { position: relative; cursor: pointer; }
+
+#ac-when-picker {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 6px;
+  z-index: 8000;
+  background: var(--ac-bg-elevated);
+  border: 1px solid var(--ac-border-mid);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  padding: 14px;
+  min-width: 360px;
+}
+.ac-picker-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+/* Calendar */
+.ac-picker-left { flex-shrink: 0; }
+.ac-cal { width: 196px; }
+.ac-cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.ac-cal-prev, .ac-cal-next {
+  background: none;
+  border: none;
+  color: var(--ac-text-tertiary);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.ac-cal-prev:hover, .ac-cal-next:hover { color: var(--ac-cyan); background: var(--ac-bg-tile); }
+.ac-cal-month-label {
+  font-family: var(--ac-font-mono);
+  font-size: 10px;
+  color: var(--ac-text-secondary);
+  letter-spacing: 0.5px;
+}
+.ac-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.ac-cal-day-header {
+  font-family: var(--ac-font-mono);
+  font-size: 8px;
+  color: var(--ac-text-faint);
+  text-align: center;
+  padding: 2px 0;
+}
+.ac-cal-cell {
+  font-family: var(--ac-font-mono);
+  font-size: 11px;
+  text-align: center;
+  padding: 5px 2px;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--ac-text-secondary);
+  user-select: none;
+}
+.ac-cal-cell:hover:not(.ac-cal-cell--past):not(.ac-cal-cell--empty) {
+  background: var(--ac-bg-tile);
+  color: var(--ac-text-primary);
+}
+.ac-cal-cell--empty   { cursor: default; }
+.ac-cal-cell--past    { color: var(--ac-text-faint); cursor: not-allowed; }
+.ac-cal-cell--today   { color: var(--ac-cyan); font-weight: 600; }
+.ac-cal-cell--selected {
+  background: var(--ac-cyan);
+  color: var(--ac-bg-deep);
+  font-weight: 700;
+  border-radius: 50%;
+}
+
+/* Right panel */
+.ac-picker-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ac-picker-field { display: flex; flex-direction: column; gap: 5px; }
+.ac-picker-label {
+  font-family: var(--ac-font-mono);
+  font-size: 8px;
+  color: var(--ac-text-tertiary);
+  letter-spacing: 1px;
+}
+.ac-picker-select {
+  font-family: var(--ac-font-mono);
+  font-size: 11px;
+  color: var(--ac-text-primary);
+  background: var(--ac-bg-tile);
+  border: 1px solid var(--ac-border-mid);
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  outline: none;
+  width: 100%;
+}
+.ac-picker-select:focus { border-color: var(--ac-border-active); }
+.ac-picker-custom-duration {
+  font-family: var(--ac-font-mono);
+  font-size: 11px;
+  color: var(--ac-text-primary);
+  background: var(--ac-bg-tile);
+  border: 1px solid var(--ac-border-active);
+  border-radius: 4px;
+  padding: 5px 8px;
+  outline: none;
+  width: 100%;
+  margin-top: 4px;
+  box-sizing: border-box;
+}
+.ac-picker-actions { display: flex; gap: 8px; margin-top: 4px; }
+.ac-picker-set {
+  font-family: var(--ac-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  padding: 7px 16px;
+  background: var(--ac-cyan);
+  color: var(--ac-bg-deep);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  flex: 1;
+}
+.ac-picker-set:hover { opacity: 0.88; }
+.ac-picker-cancel {
+  font-family: var(--ac-font-mono);
+  font-size: 10px;
+  padding: 7px 12px;
+  background: none;
+  color: var(--ac-text-faint);
+  border: 1px solid var(--ac-border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ac-picker-cancel:hover { color: var(--ac-text-secondary); }
