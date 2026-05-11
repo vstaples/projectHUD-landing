@@ -46,8 +46,8 @@ The CMD naming convention evolved mid-build:
 | | C-09 | CMD-ACCORD-SETUP-ACTION-KANBAN-1 | IN PROGRESS |
 | | C-10 | CMD-ACCORD-SETUP-SLIDESHOW-1 | SEALED |
 | **C — Meeting Setup · Wave 3** | C-11 | CMD-ACCORD-SETUP-PERCOLATE-1 | QUEUED |
-| | C-12 | CMD-ACCORD-SETUP-GATHERING-1 | QUEUED |
-| | C-13 | CMD-ACCORD-SETUP-VERDICT-1 | QUEUED |
+| | C-12 | CMD-ACCORD-SETUP-GATHERING-1 | SEALED |
+| | C-13 | CMD-ACCORD-SETUP-VERDICT-1 | SEALED |
 | **D — Projection Engine** | D-01 | CMD-PROJECTION-ENGINE-1 | QUEUED |
 | | D-02 | CMD-SUBSTRATE-COUNTERFACTUAL-MIN | QUEUED |
 | | D-03 | CMD-COUNTERFACTUAL-POC | QUEUED |
@@ -69,8 +69,12 @@ The CMD naming convention evolved mid-build:
 | | X-07 | CMD-ACCORD-CAPTURE-CONTROLS-FIX-1 | QUEUED |
 | | X-08 | CMD-BRIEFING-SYNTHESIS-1 (AI) | QUEUED |
 | | X-09 | CMD-ATTENDEE-PATTERNS-1 (AI) | QUEUED |
+| | X-10 | CMD-ACCORD-GRID-TIMEZONE-FIX-1 — Grid date parse UTC bug | RESOLVED (inline C-11) |
+| | X-11 | CMD-ACCORD-BRIEFING-EDIT-FIX-1 — "Write one" click targets wrong field | QUEUED |
+| | X-12 | CMD-ACCORD-SETUP-DURATION-EDIT-1 — Inline duration edit in header WHEN row | QUEUED |
+| | X-13 | CMD-ACCORD-SETUP-TRANSITIONS-FIX-1 — startMeeting level-changed not firing from Setup shell | QUEUED · PRIORITY |
 
-**Total CMDs:** ~43 · **Sealed:** 21 · **In Progress:** 0 · **Queued:** ~22 · **Wave 2 closed**
+**Total CMDs:** ~43 · **Sealed:** 24 · **In Progress:** 0 · **Queued:** ~20 · **Wave 2 closed · Wave 3 closed · Setup Shell complete**
 
 ---
 

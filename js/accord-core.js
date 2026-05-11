@@ -249,6 +249,7 @@ const Accord = (() => {
       _setMeetingHeader(state.meeting);
       _refreshTimer();
       _enableComposerForState();
+      await loadMeeting(m.meeting_id);   // ← X-13: reload surface; running state routes to capture shell
     } catch (e) {
       console.error('[Accord] startMeeting failed', e);
       alert('Failed to start meeting: ' + (e?.message || e));
