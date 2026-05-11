@@ -19,15 +19,23 @@
     activeAgenda: null,
     captureNodes: [],   // current meeting
     historyNodes: [],   // thread history (across meetings)
-    chatMessages: [],
     streamTab:    'present',
     agendaFilter: 'active',
   };
+
+  // ── A-08 Chat state ──────────────────────────────────────────
+  var _chatMessages      = [];
+  var _chatSubscription  = null;
+  var _chatResourceId    = null;
+  var _chatResourceName  = null;
+  var _chatMeetingState  = 'idle';
 
   // ── Lifecycle hookup ─────────────────────────────────────────
   window.addEventListener('accord:meeting-loaded', async (ev) => {
     const { meeting, thread } = ev.detail;
     await _loadAll(meeting, thread);
+    // A-08: initialise persisted chat after meeting loads
+    _initChat(meeting);
   });
 
   window.addEventListener('accord:meeting-sealed', async (ev) => {
@@ -57,17 +65,6 @@
       _renderStream();
     }
   });
-  window.addEventListener('accord:remote-chat', (ev) => {
-    const p = ev.detail?.payload || ev.detail;
-    if (!p) return;
-    local.chatMessages.push({
-      author: p.author_name || 'Unknown',
-      text:   p.text || '',
-      ts:     p.ts || Date.now(),
-      isMe:   false,
-    });
-    _renderChat();
-  });
   window.addEventListener('accord:remote-agenda', async () => {
     if (Accord.state.meeting) await _loadAgenda(Accord.state.meeting.meeting_id);
   });
@@ -80,7 +77,6 @@
     if (thread) await _loadThreadHistory(thread.thread_id);
     _renderAgenda();
     _renderStream();
-    _renderChat();
     _updateContextStrip();
     _updateCoverage();
   }
@@ -564,43 +560,266 @@
     }).join('');
   }
 
-  // ── Chat ─────────────────────────────────────────────────────
-  function _wireChat() {
-    const send = async () => {
-      const m = Accord.state.meeting;
-      if (!m || m.state !== 'running') return;
-      const text = $('chatInput').value.trim();
-      if (!text) return;
-      const author = Accord.state.me?.name || 'You';
-      const ts = Date.now();
-      local.chatMessages.push({ author, text, ts, isMe: true });
-      $('chatInput').value = '';
-      _renderChat();
-      // Broadcast (chat is ephemeral for v0.1; not persisted)
-      Accord.broadcast('accord.chat.posted', {
-        author_name: author,
-        text,
-        ts,
+  // ── A-08 Chat — CMD-ACCORD-CAPTURE-CHAT-1 ───────────────────
+  // P1 amendment: Supabase client is window.supabase (not
+  //   window.Accord.state.supabase — not exposed there).
+  // P2 amendment: _chatResourceId resolved from resource row
+  //   via API.get('resources?user_id=eq.') — state.me.id is
+  //   auth user_id, not resource row id.
+  // Replaces ephemeral broadcast chat (accord:remote-chat + local.chatMessages).
+
+  function _initChat(meeting) {
+    _teardownChat();
+    _chatMeetingState = meeting.state;
+
+    // P2: resolve resource row id from auth user_id
+    var userId = Accord.state.me && Accord.state.me.id;
+    if (!userId) { console.error('[AccordChat] no user id'); return; }
+
+    API.get('resources?user_id=eq.' + userId + '&select=id,name&limit=1')
+      .then(function(rows) {
+        if (!rows || !rows.length) {
+          console.error('[AccordChat] resource row not found');
+          return;
+        }
+        _chatResourceId   = rows[0].id;
+        _chatResourceName = rows[0].name;
+        _loadChatHistory(meeting.meeting_id);
+        _subscribeChatChannel(meeting.meeting_id);
+        _wireChatInput(meeting);
+      })
+      .catch(function(e) {
+        console.error('[AccordChat] resource resolve failed', e);
       });
-    };
-    $('chatSendBtn').addEventListener('click', send);
-    $('chatInput').addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(); }
+  }
+
+  function _teardownChat() {
+    if (_chatSubscription) {
+      try { _chatSubscription.unsubscribe(); } catch (e) {}
+      _chatSubscription = null;
+    }
+    _chatMessages     = [];
+    _chatResourceId   = null;
+    _chatResourceName = null;
+  }
+
+  // §6 — History load
+  function _loadChatHistory(meetingId) {
+    API.get(
+      'accord_chat_messages?meeting_id=eq.' + meetingId +
+      '&order=created_at.asc&limit=50' +
+      '&select=message_id,body,created_at,author_resource_id'
+    ).then(function(rows) {
+      rows = rows || [];
+      if (!rows.length) { _renderChatStream([]); return; }
+      var resourceIds = [];
+      rows.forEach(function(r) {
+        if (resourceIds.indexOf(r.author_resource_id) === -1)
+          resourceIds.push(r.author_resource_id);
+      });
+      API.get('resources?id=in.(' + resourceIds.join(',') + ')&select=id,name')
+        .then(function(resources) {
+          var nameMap = {};
+          (resources || []).forEach(function(r) { nameMap[r.id] = r.name; });
+          rows.forEach(function(m) {
+            m._author_name = nameMap[m.author_resource_id] || 'Unknown';
+            m._is_me = m.author_resource_id === _chatResourceId;
+          });
+          _chatMessages = rows;
+          _renderChatStream(_chatMessages);
+          _scrollChatToBottom(false);
+        });
+    }).catch(function(e) {
+      console.error('[AccordChat] history load failed', e);
     });
   }
 
+  // §7 — Realtime subscription (P1: uses window.supabase)
+  function _subscribeChatChannel(meetingId) {
+    var supabase = window.supabase;
+    if (!supabase) {
+      console.error('[AccordChat] window.supabase not available');
+      return;
+    }
+
+    _chatSubscription = supabase
+      .channel('accord-chat-' + meetingId)
+      .on('postgres_changes', {
+        event:  'INSERT',
+        schema: 'public',
+        table:  'accord_chat_messages',
+        filter: 'meeting_id=eq.' + meetingId
+      }, function(payload) {
+        var msg = payload.new;
+        if (!msg) return;
+        // Skip if already in local array (own send via realtime echo)
+        if (_chatMessages.find(function(m) { return m.message_id === msg.message_id; })) return;
+        API.get('resources?id=eq.' + msg.author_resource_id + '&select=id,name&limit=1')
+          .then(function(rows) {
+            msg._author_name = (rows && rows[0]) ? rows[0].name : 'Unknown';
+            msg._is_me       = msg.author_resource_id === _chatResourceId;
+            _chatMessages.push(msg);
+            _appendChatMessage(msg);
+            _scrollChatToBottom(true);
+          });
+      })
+      .subscribe();
+  }
+
+  // §8.1 — Full stream render
+  function _renderChatStream(messages) {
+    var stream = document.querySelector('.chat-stream');
+    if (!stream) return;
+
+    if (!messages.length) {
+      stream.innerHTML = '';
+      return;
+    }
+
+    var html = '';
+    var lastAuthorId = null;
+
+    messages.forEach(function(msg) {
+      var isMe    = msg._is_me;
+      var meClass = isMe ? ' me' : ' other';
+
+      if (msg.author_resource_id !== lastAuthorId) {
+        if (lastAuthorId !== null) html += '</div>';
+        var time = _fmtChatTime(msg.created_at);
+        html += '<div class="chat-msg-group">';
+        html += '<div class="chat-msg-header' + meClass + '">';
+        html += '<span class="chat-msg-author">' + esc(msg._author_name || '') + '</span>';
+        html += '<span class="chat-msg-time">' + esc(time) + '</span>';
+        html += '</div>';
+        lastAuthorId = msg.author_resource_id;
+      }
+
+      html += '<div class="chat-msg-row' + meClass + '">';
+      html += '<div class="chat-msg-bubble" data-message-id="' +
+              esc(msg.message_id) + '">' + esc(msg.body) + '</div>';
+      html += '</div>';
+    });
+
+    if (lastAuthorId !== null) html += '</div>';
+    stream.innerHTML = html;
+  }
+
+  // §8.2 — Append single new message (realtime)
+  function _appendChatMessage(msg) {
+    var stream = document.querySelector('.chat-stream');
+    if (!stream) return;
+
+    var isMe    = msg._is_me;
+    var meClass = isMe ? ' me' : ' other';
+    var time    = _fmtChatTime(msg.created_at);
+
+    var lastGroup  = stream.querySelector('.chat-msg-group:last-child');
+    var lastAuthor = lastGroup && lastGroup.querySelector('.chat-msg-author');
+    var sameAuthor = lastAuthor && lastAuthor.textContent === (msg._author_name || '');
+
+    var rowHtml = '<div class="chat-msg-row' + meClass + '">' +
+                  '<div class="chat-msg-bubble new" data-message-id="' +
+                  esc(msg.message_id) + '">' + esc(msg.body) + '</div>' +
+                  '</div>';
+
+    if (!lastGroup || !sameAuthor) {
+      var groupHtml = '<div class="chat-msg-group">' +
+                      '<div class="chat-msg-header' + meClass + '">' +
+                      '<span class="chat-msg-author">' + esc(msg._author_name || '') + '</span>' +
+                      '<span class="chat-msg-time">' + esc(time) + '</span>' +
+                      '</div>' + rowHtml + '</div>';
+      stream.insertAdjacentHTML('beforeend', groupHtml);
+    } else {
+      lastGroup.insertAdjacentHTML('beforeend', rowHtml);
+    }
+
+    var newBubble = stream.querySelector('[data-message-id="' + msg.message_id + '"]');
+    if (newBubble) {
+      setTimeout(function() { newBubble.classList.remove('new'); }, 1200);
+    }
+  }
+
+  // §8.3 — Time formatter
+  function _fmtChatTime(isoString) {
+    if (!isoString) return '';
+    var d = new Date(isoString);
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // §8.4 — Auto-scroll
+  function _scrollChatToBottom(smooth) {
+    var stream = document.querySelector('.chat-stream');
+    if (!stream) return;
+    stream.scrollTo({ top: stream.scrollHeight, behavior: smooth ? 'smooth' : 'instant' });
+  }
+
+  // §9 — Input wiring + send
+  function _wireChatInput(meeting) {
+    var input   = document.querySelector('.chat-input, #chatInput');
+    var sendBtn = document.querySelector('.chat-send, #chatSendBtn');
+    if (!input || !sendBtn) return;
+
+    _applyChatState(meeting.state);
+
+    input.addEventListener('input', function() {
+      sendBtn.disabled = input.value.trim().length === 0;
+    });
+
+    input.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
+        if (!sendBtn.disabled) _sendChatMessage(meeting, input, sendBtn);
+      }
+    });
+
+    sendBtn.addEventListener('click', function() {
+      if (!sendBtn.disabled) _sendChatMessage(meeting, input, sendBtn);
+    });
+  }
+
+  function _sendChatMessage(meeting, input, sendBtn) {
+    var body = input.value.trim();
+    if (!body || !_chatResourceId) return;
+
+    sendBtn.disabled = true;
+    input.value = '';
+
+    API.post('accord_chat_messages', {
+      firm_id:            meeting.firm_id,
+      meeting_id:         meeting.meeting_id,
+      author_resource_id: _chatResourceId,
+      body:               body
+    }).catch(function(e) {
+      console.error('[AccordChat] send failed', e);
+      input.value = body;
+      sendBtn.disabled = false;
+    });
+    // Message display handled by realtime subscription — no optimistic insert
+  }
+
+  function _applyChatState(meetingState) {
+    var input    = document.querySelector('.chat-input, #chatInput');
+    var sendBtn  = document.querySelector('.chat-send, #chatSendBtn');
+    var inputRow = document.querySelector('.chat-input-row');
+    if (!input) return;
+
+    if (meetingState === 'idle' || meetingState === 'running') {
+      input.placeholder = 'Message the meeting\u2026';
+      input.disabled    = false;
+      if (sendBtn) sendBtn.disabled = input.value.trim().length === 0;
+      if (inputRow) inputRow.style.display = '';
+    } else if (meetingState === 'closed') {
+      if (inputRow) inputRow.style.display = 'none';
+      var stream = document.querySelector('.chat-stream, #chatStream');
+      if (stream && !document.querySelector('.chat-closed-label')) {
+        stream.insertAdjacentHTML('afterend',
+          '<div class="chat-closed-label">Chat archived \u00b7 read-only</div>');
+      }
+    }
+  }
+
   function _renderChat() {
-    const el = $('chatStream');
-    el.innerHTML = local.chatMessages.map(m => {
-      const t = new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      return `
-        <div class="chat-msg">
-          <span class="chat-author">${esc(m.author)}</span>
-          <span class="chat-text">${esc(m.text)}</span>
-          <span class="chat-time">${t}</span>
-        </div>`;
-    }).join('');
-    el.scrollTop = el.scrollHeight;
+    // Legacy stub — no-op. A-08 uses _renderChatStream.
   }
 
   // ── Init ────────────────────────────────────────────────────
@@ -608,7 +827,7 @@
     _wireAgendaUI();
     _wireComposer();
     _wireStreamTabs();
-    _wireChat();
+    // A-08: chat wired in _initChat() after meeting-loaded (resource id resolved async)
     _wireCaptureDateModal();
     console.log('[Accord] capture surface ready');
   }

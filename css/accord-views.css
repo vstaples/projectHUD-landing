@@ -41,12 +41,13 @@
    Title + meta on row 1. Organizer + filed-under on row 2. */
 #accord-app .ac-view-header-grid {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr minmax(auto, max-content);
   grid-template-rows: auto auto;
   column-gap: 20px;
   row-gap: 3px;
   align-items: baseline;
   margin-top: 6px;
+  width: 100%;
 }
 #accord-app .ac-view-header-grid .ac-view-title {
   grid-column: 1;

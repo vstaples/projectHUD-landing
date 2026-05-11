@@ -308,7 +308,7 @@
   flex-shrink: 0;
 }
 #accord-app .ac-tree-dot-sealed   { background: var(--ink-faint); }
-#accord-app .ac-tree-dot-running  { background: var(--signal); animation: ac-pulse 1.6s ease-in-out infinite; }
+#accord-app .ac-tree-dot-running  { background: #22c55e; animation: ac-pulse 1.6s ease-in-out infinite; }
 #accord-app .ac-tree-dot-closed   { background: var(--ink-muted); }
 #accord-app .ac-tree-dot-draft    { background: transparent; border: 1px solid var(--ink-ghost); }
 
@@ -385,7 +385,7 @@
   flex-shrink: 0;
 }
 #accord-app .ac-parking-dot-sealed   { background: var(--ink-faint); }
-#accord-app .ac-parking-dot-running  { background: var(--signal); animation: ac-pulse 1.6s ease-in-out infinite; }
+#accord-app .ac-parking-dot-running  { background: #22c55e; animation: ac-pulse 1.6s ease-in-out infinite; }
 #accord-app .ac-parking-dot-closed   { background: var(--ink-muted); }
 #accord-app .ac-parking-dot-draft    { background: transparent; border: 1px solid var(--ink-ghost); }
 

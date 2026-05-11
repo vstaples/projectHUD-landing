@@ -3162,3 +3162,100 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   cursor: pointer;
 }
 .ac-picker-cancel:hover { color: rgba(255,255,255,0.6); }
+
+
+/* ──────────────────────────────────────────────────────────── */
+/* A-08 · CMD-ACCORD-CAPTURE-CHAT-1 — Team Chat                 */
+/* Replaces ephemeral chat (accord:remote-chat broadcast).      */
+/* Uses existing #chatStream / #chatInput / #chatSendBtn DOM.   */
+/* ──────────────────────────────────────────────────────────── */
+
+/* Override existing .chat-stream height for A-08 */
+#accord-app .chat-stream {
+  height: 200px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ac-border-mid, rgba(255,255,255,0.1)) transparent;
+}
+#accord-app .chat-stream:empty::after {
+  content: 'No messages yet.';
+  display: block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-ghost);
+  font-style: italic;
+  text-align: center;
+  padding: 30px 0;
+}
+
+/* Message groups */
+#accord-app .chat-msg-group { margin-top: 10px; }
+#accord-app .chat-msg-group:first-child { margin-top: 0; }
+
+#accord-app .chat-msg-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+#accord-app .chat-msg-header.me { flex-direction: row-reverse; }
+
+#accord-app .chat-msg-author {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+#accord-app .chat-msg-time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--ink-ghost);
+}
+
+/* Bubbles */
+#accord-app .chat-msg-row {
+  display: flex;
+  margin-top: 2px;
+}
+#accord-app .chat-msg-row.me    { justify-content: flex-end; }
+#accord-app .chat-msg-row.other { justify-content: flex-start; }
+
+#accord-app .chat-msg-bubble {
+  max-width: 82%;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--ink-body);
+  line-height: 1.45;
+  word-break: break-word;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--canvas-elev);
+  transition: background 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease;
+}
+#accord-app .chat-msg-row.me .chat-msg-bubble {
+  background: rgba(212,160,74,0.12);
+  border-color: rgba(212,160,74,0.25);
+  color: var(--ink-primary);
+}
+#accord-app .chat-msg-bubble.new {
+  background: rgba(74,222,128,0.1);
+  border-color: rgba(74,222,128,0.3);
+  box-shadow: 0 0 10px rgba(74,222,128,0.2);
+}
+
+/* Closed label */
+#accord-app .chat-closed-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--ink-ghost);
+  text-align: center;
+  padding: 6px;
+  border-top: 1px solid var(--rule);
+  letter-spacing: 0.6px;
+}
