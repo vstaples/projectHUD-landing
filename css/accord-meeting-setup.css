@@ -978,14 +978,17 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   position: absolute;
   bottom: 0; left: 0; right: 0;
   background: linear-gradient(180deg, transparent, rgba(10,14,20,0.92));
-  padding: 9px 6px 4px 6px;
+  padding: 16px 6px 4px 6px;
   font-family: var(--ac-font-mono);
   font-size: 9.5px;
-  line-height: 1.3;
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 .ac-film-date          { color: var(--ac-text-primary); font-weight: 600; }
 .ac-film-date--current { color: var(--ac-cyan); }
-.ac-film-counts        { color: var(--ac-text-tertiary); }
+.ac-film-counts        { color: var(--ac-text-tertiary); margin-bottom: 2px; }
 
 /* Density state adaptation (§6) */
 .ac-setup-filmstrip[data-density="compact"] .ac-film-counts { display: none; }

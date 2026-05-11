@@ -2781,9 +2781,9 @@
       else if (hasDecision) html += '<div class="ac-film-marker ac-film-marker--decision"></div>';
 
       html += '<div class="ac-film-meta">';
+      if (summary) html += '<div class="ac-film-counts">' + esc(summary) + '</div>';
       html += '<div class="ac-film-date' + (isCurrent ? ' ac-film-date--current' : '') + '">';
       html += esc(date) + '</div>';
-      if (summary) html += '<div class="ac-film-counts">' + esc(summary) + '</div>';
       html += '</div>';
       html += '</div>'; // .ac-film-frame
     });
