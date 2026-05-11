@@ -2788,6 +2788,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   line-height: 1.6;
   font-family: var(--ac-font-sans);
   box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
 }
 .ac-briefing-textarea::placeholder { color: var(--ac-text-faint); }
 .ac-briefing-textarea:focus { border-left-color: var(--ac-cyan); }
