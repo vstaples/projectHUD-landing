@@ -36,6 +36,48 @@
   border-bottom: 1px solid var(--rule);
   background: var(--canvas);
 }
+
+/* F-LIVE-2 + F-LIVE-3: 2-row grid for meeting header.
+   Title + meta on row 1. Organizer + filed-under on row 2. */
+#accord-app .ac-view-header-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 20px;
+  row-gap: 3px;
+  align-items: baseline;
+  margin-top: 6px;
+}
+#accord-app .ac-view-header-grid .ac-view-title {
+  grid-column: 1;
+  grid-row: 1;
+}
+#accord-app .ac-view-header-grid .meeting-meta {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  white-space: nowrap;
+  justify-self: end;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+#accord-app .ac-view-header-grid .meeting-organizer {
+  grid-column: 1;
+  grid-row: 2;
+  margin-top: 0;
+}
+#accord-app .ac-view-header-grid .meeting-filed {
+  grid-column: 2;
+  grid-row: 2;
+  text-align: right;
+  white-space: nowrap;
+  justify-self: end;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
 #accord-app .ac-view-body {
   flex: 1;
   overflow-y: auto;

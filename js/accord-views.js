@@ -445,6 +445,7 @@
               ${esc(meeting.title || '(untitled)')}
             </span>
           </nav>
+          <div class="ac-view-header-grid">
           <h1 class="ac-view-title">${esc(meeting.title || '(untitled)')}</h1>
           <div class="meeting-organizer" id="cap-organizer" style="display:none">
             <span class="organizer-label">Organized by</span>
@@ -458,6 +459,7 @@
             <span class="filed-label">Filed under:</span>
             <span class="filed-value" id="cap-filed-value">Unfiled</span>
             <a href="#" class="filed-action" id="cap-filed-action">[file]</a>
+          </div>
           </div>
         </header>
 

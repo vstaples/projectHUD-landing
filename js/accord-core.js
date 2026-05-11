@@ -596,6 +596,9 @@ const Accord = (() => {
   }
 
   function _wireNewMeetingModal() {
+    // F-LIVE-1: #newMeetingBtn removed from live capture surface.
+    // Guard prevents throw if button is absent.
+    if (!$('newMeetingBtn')) return;
     const modal  = $('newMeetingModal');
     const open   = () => { $('nmTitle').value = ''; $('nmThreadTitle').value = ''; modal.classList.add('visible'); $('nmTitle').focus(); };
     const close  = () => modal.classList.remove('visible');
