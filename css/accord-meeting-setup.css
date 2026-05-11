@@ -2927,34 +2927,54 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-film-dot--risk     { background: var(--ac-rose); opacity: 0.7; }
 
 /* Node lines container — hidden by default, revealed by tier classes */
+/* Node lines container — hidden by default, revealed by tier classes */
 .ac-film-nodes {
   position: absolute;
-  bottom: 20px;
+  top: 20px;        /* below dot strip */
   left: 0;
   right: 0;
-  padding: 0 5px;
+  padding: 4px 6px;
   display: none;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   overflow: hidden;
 }
 .ac-film-node {
   display: flex;
-  align-items: baseline;
-  gap: 4px;
-  line-height: 1.2;
+  align-items: center;
+  gap: 5px;
   overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 .ac-film-node-seq {
   font-family: var(--ac-font-mono);
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 700;
   flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 1.4;
+}
+/* Pill colors per tag */
+.ac-film-node--decision .ac-film-node-seq {
+  color: var(--ac-bg-deep);
+  background: var(--ac-cyan);
+}
+.ac-film-node--action .ac-film-node-seq {
+  color: var(--ac-bg-deep);
+  background: var(--ac-amber);
+}
+.ac-film-node--dissent .ac-film-node-seq {
+  color: var(--ac-bg-deep);
+  background: var(--ac-rose);
+}
+.ac-film-node--risk .ac-film-node-seq {
+  color: var(--ac-bg-deep);
+  background: var(--ac-rose);
+  opacity: 0.85;
 }
 .ac-film-node-summary {
-  font-size: 10px;
+  font-size: 9.5px;
   color: var(--ac-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2962,11 +2982,11 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   display: none;
 }
 
-/* Tag colors */
-.ac-film-node--decision .ac-film-node-seq { color: var(--ac-cyan); }
-.ac-film-node--action   .ac-film-node-seq { color: var(--ac-amber); }
-.ac-film-node--dissent  .ac-film-node-seq { color: var(--ac-rose); }
-.ac-film-node--risk     .ac-film-node-seq { color: var(--ac-rose); opacity: 0.7; }
+/* Tag dot colors (kept separate from node-seq overrides above) */
+.ac-film-node--decision .ac-film-node-seq { color: var(--ac-bg-deep); background: var(--ac-cyan); }
+.ac-film-node--action   .ac-film-node-seq { color: var(--ac-bg-deep); background: var(--ac-amber); }
+.ac-film-node--dissent  .ac-film-node-seq { color: var(--ac-bg-deep); background: var(--ac-rose); }
+.ac-film-node--risk     .ac-film-node-seq { color: var(--ac-bg-deep); background: var(--ac-rose); opacity: 0.85; }
 
 /* Compact tier (≥ 90px) — show seq IDs */
 .ac-film-frame--compact .ac-film-nodes { display: flex; }
