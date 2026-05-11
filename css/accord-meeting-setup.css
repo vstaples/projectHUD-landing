@@ -1108,8 +1108,6 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   margin-bottom: 6px;
 }
 .ac-briefing-synthesis {
-  border-left: 2px solid var(--ac-cyan-dim);
-  padding-left: 11px;
 }
 .ac-briefing-synthesis-label {
   font-family: var(--ac-font-mono);

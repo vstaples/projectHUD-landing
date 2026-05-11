@@ -3320,7 +3320,7 @@
 
     // Synthesis block
     html += '<div class="ac-briefing-synthesis">';
-    html += '<div class="ac-briefing-synthesis-label">WHAT CAME BEFORE</div>';
+    html += '<div class="ac-briefing-synthesis-label">IMPORTANT HIGHLIGHTS</div>';
     if (meeting.briefing_text) {
       html += '<div class="ac-briefing-synthesis-text">' + esc(meeting.briefing_text) + '</div>';
     } else {
