@@ -209,10 +209,11 @@
 }
 
 /* §7.5 — Schedule meta rows */
-.ac-header-meta { display: flex; flex-direction: column; gap: 5px; }
+.ac-header-meta { display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
 .ac-meta-row {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
   font-family: var(--ac-font-mono);
   font-size: 11px;
