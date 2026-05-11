@@ -131,6 +131,12 @@
   var _connDotStates     = {};         // { [attendee_id]: 'none' | 'on-time' | 'late' }
   var _fiveMinWarned     = false;      // has 5-min warning fired this session
 
+  // ── CMD-ACCORD-SETUP-VERDICT-1 (C-13): footer + countdown state ─
+  var _currentWorkstreamId = null;     // cached in render(); used by footer re-render triggers
+  var _verdictToken        = 0;
+  var _verdictPopoverOpen  = false;
+  var _countdownInterval   = null;     // gathering countdown handle (renamed from C-13 spec to avoid collision with header _countdownTimer)
+
   // ── Detach hook ───────────────────────────────────────────────
   function _detachHandler() {
     // Remove fullpage classes only when genuinely leaving Setup.
@@ -262,6 +268,13 @@
     var fiveMinBanner = document.getElementById('ac-five-min-banner');
     if (fiveMinBanner) fiveMinBanner.remove();
     _exitGatheringMode();   // removes ac-gathering-active class + header chrome
+
+    // ── CMD-ACCORD-SETUP-VERDICT-1 (C-13): teardown (§12) ────────
+    _stopGatheringCountdown();
+    _verdictToken       = 0;
+    _verdictPopoverOpen = false;
+    var popover = document.getElementById('ac-verdict-popover');
+    if (popover) popover.remove();
   }
 
   // ── Briefing autosave ─────────────────────────────────────────
@@ -1600,6 +1613,7 @@
       block.dataset.submitting = '';
       _hideAddForm(block);
       _loadOutcomes(meeting);
+      _renderFooter(meeting, _currentWorkstreamId);   // C-13 §11: verdict re-derive on outcome add
     }).catch(function(e) {
       block.dataset.submitting = '';
       console.error('[AccordMeetingSetup] add outcome failed', e);
@@ -1608,7 +1622,10 @@
 
   function _deleteOutcome(outcomeId, meeting) {
     API.del('accord_meeting_outcomes?outcome_id=eq.' + outcomeId)
-      .then(function() { _loadOutcomes(meeting); })
+      .then(function() {
+        _loadOutcomes(meeting);
+        _renderFooter(meeting, _currentWorkstreamId);   // C-13 §11: verdict re-derive on outcome remove
+      })
       .catch(function(e) {
         console.error('[AccordMeetingSetup] delete outcome failed', e);
       });
@@ -2054,6 +2071,7 @@
       rsvp_status:     'pending'
     }).then(function() {
       _loadAttendees(meeting);
+      _renderFooter(meeting, _currentWorkstreamId);   // C-13 §11: verdict re-derive on attendee add
     }).catch(function(e) {
       console.error('[AccordMeetingSetup] add attendee failed', e);
     });
@@ -2061,7 +2079,10 @@
 
   function _removeAttendee(attendeeId, meeting) {
     API.del('accord_meeting_attendees?attendee_id=eq.' + attendeeId)
-      .then(function() { _loadAttendees(meeting); })
+      .then(function() {
+        _loadAttendees(meeting);
+        _renderFooter(meeting, _currentWorkstreamId);   // C-13 §11: verdict re-derive on attendee remove
+      })
       .catch(function(e) {
         console.error('[AccordMeetingSetup] remove attendee failed', e);
       });
@@ -2114,10 +2135,10 @@
       // Within window: engage or maintain gathering mode
       if (!_gatheringMode) _enterGatheringMode(meeting);
 
-      // 5-minute warning
+      // 5-minute warning — C-13 replaces banner with persistent countdown
       if (minutesUntil <= 5 && minutesUntil > 0 && !_fiveMinWarned) {
         _fiveMinWarned = true;
-        _showFiveMinWarning();
+        _startGatheringCountdown(meeting.scheduled_for);  // persistent timer replaces C-12 banner
       }
     } else {
       // Outside window: exit if active (operator rescheduled)
@@ -2142,6 +2163,7 @@
 
     _paintGatheringHeader(false);
     _applyGatheringToCards(false);
+    _stopGatheringCountdown();   // C-13 §10.2: stop countdown on exit
 
     var rightCol = document.querySelector('.ac-setup-col-right');
     if (rightCol) rightCol.classList.remove('ac-gathering-active');
@@ -2269,7 +2291,341 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  // FILMSTRIP — CMD-ACCORD-SETUP-FILMSTRIP-2
+  // CMD-ACCORD-SETUP-VERDICT-1 (C-13) — Footer zone
+  // §4 verdict · §5 budget · §6 warning pills · §7 footer render
+  // §8 popover · §9 begin meeting · §10 countdown timer
+  // Amendments from pre-flight: P1 — countdown renamed
+  // _startGatheringCountdown/_stopGatheringCountdown (avoids
+  // collision with header _startCountdown/_stopCountdown);
+  // P2 — barCls uses ac-budget-fill-- prefix matching CSS §13;
+  // _wireFooterEvents rewritten without optional chaining;
+  // _currentWorkstreamId cached in render() for re-render triggers.
+  // ══════════════════════════════════════════════════════════════
+
+  // §4.2 — Verdict derivation
+  function _deriveVerdict(meeting, workstreamId, callback) {
+    var myToken = ++_verdictToken;
+
+    Promise.all([
+      API.get('accord_meeting_outcomes?meeting_id=eq.' + meeting.meeting_id +
+              '&select=outcome_id,verb,owner_resource_id,status'),
+      API.get('accord_meeting_attendees?meeting_id=eq.' + meeting.meeting_id +
+              '&select=attendee_id,resource_id,role_in_meeting,rsvp_status'),
+      workstreamId ? API.get(
+        'accord_meetings?workstream_id=eq.' + workstreamId +
+        '&state=in.(closed,sealed,running,idle)&select=meeting_id&limit=50'
+      ).then(function(mtgs) {
+        if (!mtgs || !mtgs.length) return [];
+        var ids = mtgs.map(function(m) { return m.meeting_id; }).join(',');
+        return API.get(
+          'accord_nodes?meeting_id=in.(' + ids + ')&tag=eq.action' +
+          '&select=node_id,due_date,sealed_at' +
+          '&order=due_date.asc'
+        ).then(function(nodes) { return nodes || []; });
+      }) : Promise.resolve([])
+    ]).then(function(results) {
+      if (_verdictToken !== myToken) return;
+
+      var outcomes  = results[0] || [];
+      var attendees = results[1] || [];
+      var actions   = results[2] || [];
+
+      var now = Date.now();
+      var overdueActions = actions.filter(function(a) {
+        return !a.sealed_at && a.due_date &&
+               new Date(a.due_date + 'T00:00:00').getTime() < now;
+      });
+
+      var checks = [];
+
+      // Blocking checks
+      var hasOutcomes = outcomes.length > 0;
+      checks.push({ label: 'Outcomes defined', passed: hasOutcomes, blocking: true });
+
+      var declined = attendees.filter(function(a) {
+        return a.rsvp_status === 'declined' &&
+               (a.role_in_meeting === 'lead' || a.role_in_meeting === 'organizer');
+      });
+      checks.push({ label: 'No required attendee declined', passed: declined.length === 0, blocking: true });
+
+      // Advisory checks
+      var allOutcomesOwned = outcomes.every(function(o) { return o.owner_resource_id; });
+      checks.push({ label: 'All outcomes have owners', passed: allOutcomesOwned, blocking: false });
+
+      var hasDuration = !!meeting.duration_minutes;
+      checks.push({ label: 'Duration set', passed: hasDuration, blocking: false });
+
+      var pendingInvites = attendees.filter(function(a) { return a.rsvp_status === 'pending'; });
+      checks.push({
+        label:    pendingInvites.length + ' attendee' + (pendingInvites.length !== 1 ? 's' : '') + ' pending RSVP',
+        passed:   pendingInvites.length === 0,
+        blocking: false
+      });
+
+      checks.push({
+        label:    overdueActions.length + ' overdue action' + (overdueActions.length !== 1 ? 's' : '') + ' in workstream',
+        passed:   overdueActions.length === 0,
+        blocking: false
+      });
+
+      var blockingFail = checks.some(function(c) { return c.blocking && !c.passed; });
+      var advisoryFail = checks.some(function(c) { return !c.blocking && !c.passed; });
+
+      var state, label, color;
+      if (blockingFail)      { state = 'not-ready'; label = 'NOT READY';        color = 'rose';  }
+      else if (advisoryFail) { state = 'caveats';   label = 'GO WITH CAVEATS';  color = 'amber'; }
+      else                   { state = 'go';         label = 'GO';               color = 'green'; }
+
+      callback({ state: state, label: label, color: color, checks: checks });
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] verdict derivation failed', e);
+      callback(null);
+    });
+  }
+
+  // §5 — Budget bar derivation
+  function _deriveBudget(meeting, meetingId, callback) {
+    API.get(
+      'accord_agenda_items?meeting_id=eq.' + meetingId +
+      '&select=duration_minutes_estimate&order=position.asc'
+    ).then(function(items) {
+      items = items || [];
+      var used  = items.reduce(function(s, i) { return s + (i.duration_minutes_estimate || 0); }, 0);
+      var total = meeting.duration_minutes || 0;
+      var slack = total - used;
+      callback({ used: used, total: total, slack: slack });
+    }).catch(function() { callback({ used: 0, total: 0, slack: 0 }); });
+  }
+
+  // §6 — Warning pills (substrate-derived from _intelData if available)
+  function _deriveWarningPills(meeting, workstreamId, intelData) {
+    var pills = [];
+    if (!intelData || !intelData.attendees) return pills;
+    intelData.attendees.forEach(function(a) {
+      if (a.status_tag === 'QUIET \u00b7 RE-ONBOARD') {
+        pills.push({ text: esc(a.name) + ' off-substrate ' +
+                     (a.days_off_substrate ? a.days_off_substrate + 'd' : ''), severity: 'mid' });
+      }
+      if (a.status_tag === 'OVERDUE \u00b7 PRESSURE') {
+        pills.push({ text: esc(a.name) + ' \u00b7 ' + a.overdue_actions + ' overdue', severity: 'high' });
+      }
+    });
+    return pills.slice(0, 2);
+  }
+
+  // §7.1 — Footer entry point
+  function _renderFooter(meeting, workstreamId) {
+    var footer = document.querySelector('.ac-setup-footer');
+    if (!footer) return;
+
+    footer.innerHTML = _footerLoadingHtml();
+
+    Promise.all([
+      new Promise(function(resolve) { _deriveVerdict(meeting, workstreamId, resolve); }),
+      new Promise(function(resolve) { _deriveBudget(meeting, meeting.meeting_id, resolve); })
+    ]).then(function(results) {
+      if (!footer.isConnected) return;
+      var verdict      = results[0];
+      var budget       = results[1];
+      var warningPills = _deriveWarningPills(meeting, workstreamId, _intelData);
+      footer.innerHTML = _footerHtml(meeting, verdict, budget, warningPills);
+      _wireFooterEvents(footer, meeting, verdict);
+    });
+  }
+
+  function _footerLoadingHtml() {
+    return '<div class="ac-footer-loading">Evaluating readiness\u2026</div>';
+  }
+
+  // §7.2 — Footer HTML
+  // P2 amendment: barCls uses ac-budget-fill-- prefix (matches §13 CSS; commission had ac-budget-bar--)
+  function _footerHtml(meeting, verdict, budget, warningPills) {
+    var html = '';
+
+    // Verdict pill (left)
+    if (verdict) {
+      html += '<div class="ac-footer-left">';
+      html += '<button class="ac-verdict-pill ac-verdict-pill--' + verdict.color +
+              '" data-action="verdict-popover">' + esc(verdict.label) + '</button>';
+      html += '</div>';
+    } else {
+      html += '<div class="ac-footer-left"></div>';
+    }
+
+    // Budget bar (center)
+    html += '<div class="ac-footer-center">';
+    if (budget.total > 0) {
+      var pct    = Math.min(100, Math.round((budget.used / budget.total) * 100));
+      var barCls = pct >= 100 ? 'ac-budget-fill--over'   // P2: --fill not --bar
+                 : pct >= 80  ? 'ac-budget-fill--warn'
+                 : 'ac-budget-fill--ok';
+      html += '<span class="ac-budget-label">TIME BUDGET</span>';
+      html += '<div class="ac-budget-track">';
+      html += '<div class="ac-budget-fill ' + barCls + '" style="width:' + pct + '%"></div>';
+      html += '</div>';
+      html += '<span class="ac-budget-stats">';
+      if (budget.used) html += budget.used + 'm used';
+      if (budget.slack > 0) html += ' \u00b7 ' + budget.slack + 'm slack';
+      if (budget.slack < 0) html += ' \u00b7 ' + Math.abs(budget.slack) + 'm over';
+      html += '</span>';
+      warningPills.forEach(function(p) {
+        html += '<span class="ac-budget-warning ac-budget-warning--' +
+                p.severity + '">' + p.text + '</span>';
+      });
+    } else {
+      html += '<span class="ac-budget-label">TIME BUDGET</span>';
+      html += '<span class="ac-budget-empty ac-muted">Set duration in header to track time</span>';
+    }
+    html += '</div>';
+
+    // Action buttons (right)
+    html += '<div class="ac-footer-right">';
+    html += '<button class="ac-btn-secondary" data-action="save-invite" disabled ' +
+            'title="Invitations \u2014 coming soon">Save &amp; invite</button>';
+    html += '<button class="ac-btn-primary" data-action="begin-meeting">Begin Meeting \u2192</button>';
+    html += '</div>';
+
+    return html;
+  }
+
+  // §7.3 — Footer event wiring
+  // Optional-chaining removed — rewritten to match established codebase pattern
+  function _wireFooterEvents(footer, meeting, verdict) {
+    footer.addEventListener('click', function(ev) {
+      var target = ev.target;
+      var action = target.dataset.action ||
+                   (target.closest('[data-action]') &&
+                    target.closest('[data-action]').dataset.action);
+      if (!action) return;
+
+      if (action === 'verdict-popover') {
+        var btn = target.closest('[data-action="verdict-popover"]');
+        if (!btn) return;
+        _toggleVerdictPopover(btn, verdict);
+        return;
+      }
+
+      if (action === 'begin-meeting') {
+        _onBeginMeeting(meeting);
+        return;
+      }
+    });
+  }
+
+  // §8 — Verdict popover
+  function _toggleVerdictPopover(anchor, verdict) {
+    var existing = document.getElementById('ac-verdict-popover');
+    if (existing) {
+      existing.remove();
+      _verdictPopoverOpen = false;
+      return;
+    }
+
+    if (!verdict) return;
+    _verdictPopoverOpen = true;
+
+    var popover = document.createElement('div');
+    popover.id = 'ac-verdict-popover';
+    popover.className = 'ac-verdict-popover';
+
+    var checksHtml = verdict.checks.map(function(c) {
+      var icon = c.passed ? '\u2713' : (c.blocking ? '\u2717' : '\u25b3');
+      var cls  = c.passed ? 'ac-check--pass' : (c.blocking ? 'ac-check--fail' : 'ac-check--warn');
+      return '<div class="ac-check-row ' + cls + '">' +
+             '<span class="ac-check-icon">' + icon + '</span>' +
+             '<span class="ac-check-label">' + esc(c.label) + '</span>' +
+             '</div>';
+    }).join('');
+
+    popover.innerHTML = '<div class="ac-popover-title">Readiness</div>' + checksHtml;
+
+    document.body.appendChild(popover);
+    var rect = anchor.getBoundingClientRect();
+    popover.style.left   = rect.left + 'px';
+    popover.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+
+    // Click outside to close — named function for self-removal
+    setTimeout(function() {
+      document.addEventListener('click', function _closePopover(ev) {
+        if (!popover.contains(ev.target) && ev.target !== anchor) {
+          popover.remove();
+          _verdictPopoverOpen = false;
+          document.removeEventListener('click', _closePopover);
+        }
+      });
+    }, 0);
+  }
+
+  // §9 — Begin Meeting
+  function _onBeginMeeting(meeting) {
+    var btn = document.querySelector('[data-action="begin-meeting"]');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Starting\u2026';
+    }
+
+    if (typeof window.Accord.startMeeting !== 'function') {
+      console.error('[AccordMeetingSetup] Accord.startMeeting not available');
+      if (btn) { btn.disabled = false; btn.textContent = 'Begin Meeting \u2192'; }
+      return;
+    }
+
+    window.Accord.startMeeting(meeting.meeting_id)
+      .catch(function(e) {
+        console.error('[AccordMeetingSetup] startMeeting failed', e);
+        if (btn && btn.isConnected) {
+          btn.disabled = false;
+          btn.textContent = 'Begin Meeting \u2192';
+        }
+      });
+    // Success: accord-core transitions surface to running shell; teardown fires automatically
+  }
+
+  // §10 — Gathering countdown timer (F-C12-1 carry-forward)
+  // Renamed from C-13 spec (_startCountdown/_stopCountdown) to avoid
+  // collision with CMD-ACCORD-SETUP-HEADER-1's _startCountdown/_stopCountdown
+  // (header "STARTS IN" countdown, lines 1104/1142). State var: _countdownInterval.
+  function _startGatheringCountdown(scheduledFor) {
+    _stopGatheringCountdown();
+
+    var target = new Date(scheduledFor).getTime();
+
+    function _tick() {
+      var remaining = Math.max(0, target - Date.now());
+      var mins  = Math.floor(remaining / 60000);
+      var secs  = Math.floor((remaining % 60000) / 1000);
+      var display = mins + ':' + (secs < 10 ? '0' : '') + secs;
+
+      var el = document.getElementById('ac-countdown-timer');
+      if (!el) { _stopGatheringCountdown(); return; }
+      el.textContent = display;
+      if (remaining === 0) _stopGatheringCountdown();
+    }
+
+    // Mount timer element inside setup shell
+    var shell = document.querySelector('.ac-setup-shell');
+    if (!shell) return;
+
+    var existing = document.getElementById('ac-countdown-timer');
+    if (!existing) {
+      var timer = document.createElement('div');
+      timer.id = 'ac-countdown-timer';
+      timer.className = 'ac-countdown-timer';
+      shell.appendChild(timer);
+    }
+
+    _tick();   // immediate first tick
+    _countdownInterval = setInterval(_tick, 1000);
+  }
+
+  function _stopGatheringCountdown() {
+    if (_countdownInterval) {
+      clearInterval(_countdownInterval);
+      _countdownInterval = null;
+    }
+    var el = document.getElementById('ac-countdown-timer');
+    if (el) el.remove();
+  }
   // §4 entry + §5 fetch/paint/scrub + §6 density.
   // Sequential fetch: node counts depend on meeting IDs from first
   // fetch — not Promise.all by design.
@@ -5258,6 +5614,7 @@
     if (!host) return;
     teardown();
     _currentMeetingId      = meeting.meeting_id;
+    _currentWorkstreamId   = workstreamId;          // C-13: cached for footer re-render triggers
     _agendaFetchAborted    = false;
     _outcomesAborted       = false;
     _attendeesAborted      = false;
@@ -5363,6 +5720,9 @@
     // Polls scheduled_for every 30s and engages gathering mode within
     // the 15-min window; auto-exits when meeting transitions out of idle.
     _startGatheringTimer(meeting);
+
+    // ── CMD-ACCORD-SETUP-VERDICT-1 (C-13): footer render ─────────
+    _renderFooter(meeting, workstreamId);
 
     // NRA event listeners for live badge refresh -- Phase 5
     // CMD-ACCORD-SETUP-LAYOUT-1: paired with _renderAnticipation deferral.
