@@ -398,7 +398,6 @@
               '<div class="ac-meta-row ac-meta-row--when" id="ac-meta-when-row">' +
                 '<span class="ac-meta-label">WHEN</span>' +
                 '<span class="ac-meta-value" id="ac-meta-when">\u2014</span>' +
-                '<span class="ac-duration-edit-hint" id="ac-duration-hint"></span>' +
               '</div>' +
               '<div class="ac-meta-row">' +
                 '<span class="ac-meta-label">WHERE</span>' +
@@ -3768,9 +3767,6 @@
     if (!whenRow || whenRow.dataset.whenPickerWired) return;
     whenRow.dataset.whenPickerWired = '1';
     delete whenRow.dataset.durationWired;
-
-    var hint = document.getElementById('ac-duration-hint');
-    if (hint) hint.textContent = 'click to schedule';
 
     whenRow.addEventListener('click', function(ev) {
       if (ev.target.closest('#ac-when-picker')) return;
