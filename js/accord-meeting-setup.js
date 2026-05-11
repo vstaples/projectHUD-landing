@@ -3617,7 +3617,7 @@
   function _openDurationEdit(meeting) {
     var whenRow = document.getElementById('ac-meta-when-row');
     if (!whenRow) return;
-    if (whenRow.querySelector('.ac-duration-input-row')) return;  // already open
+    if (document.querySelector('.ac-duration-input-row')) return;  // already open
 
     var current  = meeting.duration_minutes || '';
     var inputRow = document.createElement('div');
@@ -3629,7 +3629,9 @@
       '<button class="ac-duration-save" data-action="save-duration">\u2713</button>' +
       '<button class="ac-duration-cancel" data-action="cancel-duration">\u2715</button>';
 
-    whenRow.appendChild(inputRow);
+    // Append to ac-header-meta as a sibling row, not inside the WHEN row
+    var meta = whenRow.closest('.ac-header-meta') || whenRow.parentElement;
+    meta.appendChild(inputRow);
 
     var input = inputRow.querySelector('.ac-duration-input');
     if (input) {

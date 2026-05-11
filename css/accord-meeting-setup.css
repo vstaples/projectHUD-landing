@@ -2822,7 +2822,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-briefing-cancel-btn:hover { color: var(--ac-text-secondary); }
 
 /* X-12: Duration inline edit */
-.ac-meta-row--when { cursor: pointer; position: relative; flex-wrap: wrap; }
+.ac-meta-row--when { cursor: pointer; position: relative; }
 .ac-meta-row--when:hover .ac-duration-edit-hint { opacity: 1; }
 .ac-duration-edit-hint {
   font-family: var(--ac-font-mono);
@@ -2836,9 +2836,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-duration-input-row {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 5px;
-  margin-top: 4px;
-  padding-left: 0;
   width: 100%;
 }
 .ac-duration-input {
