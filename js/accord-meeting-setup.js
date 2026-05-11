@@ -1020,7 +1020,7 @@
   function _paintMeta(meeting, workstreamId) {
     var whenEl = document.getElementById('ac-meta-when');
     if (whenEl) {
-      whenEl.textContent = _fmtWhen(meeting.scheduled_for, meeting.duration_minutes);
+      whenEl.innerHTML = _fmtWhen(meeting.scheduled_for, meeting.duration_minutes);
     }
     _wireDurationEdit(meeting);   // X-12: wire duration inline edit on WHEN row
 
@@ -1040,14 +1040,19 @@
 
   function _fmtWhen(scheduledFor, durationMinutes) {
     if (!scheduledFor) return '\u2014';
-    var d    = new Date(scheduledFor);
-    var opts = { weekday: 'short', month: 'short', day: 'numeric' };
+    var d         = new Date(scheduledFor);
+    var opts      = { weekday: 'short', month: 'short', day: 'numeric' };
     var date      = d.toLocaleDateString(undefined, opts);
     var startTime = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    if (!durationMinutes) return date + ' \u00b7 ' + startTime;
-    var end     = new Date(d.getTime() + durationMinutes * 60000);
-    var endTime = end.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    return date + ' \u00b7 ' + startTime + ' \u2014 ' + endTime;
+    var timeStr   = startTime;
+    if (durationMinutes) {
+      var end     = new Date(d.getTime() + durationMinutes * 60000);
+      var endTime = end.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      timeStr += ' \u2014 ' + endTime;
+    }
+    return '<span class="ac-when-date">' + esc(date) + '</span>' +
+           ' \u00b7 ' +
+           '<span class="ac-when-time">' + esc(timeStr) + '</span>';
   }
 
   // §5.4 — WORKSTREAM meta (async two-pass: initial '—', then populated)
@@ -3663,7 +3668,7 @@
       meeting.duration_minutes = newDuration;
       _closeDurationEdit(meeting);
       var whenEl = document.getElementById('ac-meta-when');
-      if (whenEl) whenEl.textContent = _fmtWhen(meeting.scheduled_for, meeting.duration_minutes);
+      if (whenEl) whenEl.innerHTML = _fmtWhen(meeting.scheduled_for, meeting.duration_minutes);
       _renderFooter(meeting, meeting.workstream_id || null);
     }).catch(function(e) {
       console.error('[AccordMeetingSetup] duration_minutes patch failed', e);
