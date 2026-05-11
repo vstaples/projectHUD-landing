@@ -90,6 +90,12 @@
     { tag: 'dissent',  abbr: 'Di' }
   ];
 
+  // ── CMD-ACCORD-SETUP-FILMSTRIP-CARDS-1 (C-14): card enrichment state ─
+  // P1 amendment: renamed from _filmResizeObserver (already used by
+  // _initFilmDensity for zone-level density observer) to _filmTierObserver.
+  var _filmCardToken   = 0;
+  var _filmTierObserver = null;
+
   // ── CMD-ACCORD-SETUP-BRIEFING-TABS-1: tab state ───────────────
   // _leftActiveTab persists across renders intentionally (smoke test 8).
   // Do NOT reset in teardown().
@@ -198,6 +204,10 @@
     _filmstripAborted = true;
     _filmstripToken++;            // invalidates all in-flight filmstrip callbacks
     if (_filmResizeObserver) { _filmResizeObserver.disconnect(); _filmResizeObserver = null; }
+
+    // ── CMD-ACCORD-SETUP-FILMSTRIP-CARDS-1 (C-14): card tier teardown ─
+    _stopFilmCardTiers();
+    _filmCardToken = 0;
     if (_scrubState.active) {
       _scrubState.active    = false;
       _scrubState.meetingId = null;
@@ -2689,6 +2699,9 @@
           _paintFilmstrip(content, meetings, countMap, meeting, workstreamId);
           console.log('[FILM] painted!');
           _initFilmDensity();
+          // C-14: enrich cards with node data + start tier observer
+          _enrichFilmCards();
+          setTimeout(function() { _initFilmCardTiers(); }, 50);
         });
       })
       .catch(function(e) {
@@ -3045,6 +3058,133 @@
     var h = filmstrip.offsetHeight;
     filmstrip.setAttribute('data-density',
       h < 130 ? 'compact' : (h < 260 ? 'medium' : 'expanded'));
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // CMD-ACCORD-SETUP-FILMSTRIP-CARDS-1 (C-14) — Card information density
+  // §4 data fetch · §5 card paint · §7 ResizeObserver tier classes
+  // P1 amendment: tier observer uses _filmTierObserver (not
+  // _filmResizeObserver — already used by _initFilmDensity).
+  // sealed_at=not.is.null filter — committed content only.
+  // ══════════════════════════════════════════════════════════════
+
+  // §4 — Batch fetch and enrich all visible cards
+  function _enrichFilmCards() {
+    var myToken = ++_filmCardToken;
+
+    var frames = document.querySelectorAll('.ac-film-frame[data-meeting-id]');
+    if (!frames.length) return;
+
+    var ids = Array.from(frames).map(function(f) {
+      return f.dataset.meetingId;
+    }).filter(Boolean);
+
+    if (!ids.length) return;
+
+    API.get(
+      'accord_nodes?meeting_id=in.(' + ids.join(',') + ')' +
+      '&tag=in.(decision,action,dissent,risk)' +
+      '&sealed_at=not.is.null' +
+      '&select=meeting_id,tag,seq_id,summary,created_by' +
+      '&order=meeting_id.asc,seq_number.asc' +
+      '&limit=60'
+    ).then(function(nodes) {
+      if (_filmCardToken !== myToken) return;
+      nodes = nodes || [];
+
+      // Group by meeting_id
+      var byMeeting = {};
+      nodes.forEach(function(n) {
+        if (!byMeeting[n.meeting_id]) byMeeting[n.meeting_id] = [];
+        byMeeting[n.meeting_id].push(n);
+      });
+
+      // Enrich each frame in place
+      frames.forEach(function(frame) {
+        var mid = frame.dataset.meetingId;
+        if (!mid) return;
+        _paintFilmCardContent(frame, byMeeting[mid] || []);
+      });
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] filmcard enrich failed', e);
+    });
+  }
+
+  // §5 — Paint dots + node lines onto a single card
+  function _paintFilmCardContent(frame, nodes) {
+    // Remove any existing enrichment
+    var existing = frame.querySelector('.ac-film-dots');
+    if (existing) existing.remove();
+    var existingNodes = frame.querySelector('.ac-film-nodes');
+    if (existingNodes) existingNodes.remove();
+
+    if (!nodes.length) return;
+
+    // ── Dot strip (always visible) ────────────────────────
+    var tagTypes = {};
+    nodes.forEach(function(n) { tagTypes[n.tag] = true; });
+
+    var dotHtml = '<div class="ac-film-dots">';
+    if (tagTypes.decision) dotHtml += '<span class="ac-film-dot ac-film-dot--decision"></span>';
+    if (tagTypes.action)   dotHtml += '<span class="ac-film-dot ac-film-dot--action"></span>';
+    if (tagTypes.dissent)  dotHtml += '<span class="ac-film-dot ac-film-dot--dissent"></span>';
+    if (tagTypes.risk)     dotHtml += '<span class="ac-film-dot ac-film-dot--risk"></span>';
+    dotHtml += '</div>';
+
+    frame.insertAdjacentHTML('afterbegin', dotHtml);
+
+    // ── Node lines (visibility CSS-controlled by tier class) ──
+    var tagOrder = ['decision', 'action', 'dissent', 'risk'];
+    var sorted = nodes.slice().sort(function(a, b) {
+      return tagOrder.indexOf(a.tag) - tagOrder.indexOf(b.tag);
+    });
+
+    var nodesHtml = '<div class="ac-film-nodes">';
+    sorted.slice(0, 4).forEach(function(n) {
+      nodesHtml += '<div class="ac-film-node ac-film-node--' + n.tag + '">';
+      nodesHtml += '<span class="ac-film-node-seq">' + esc(n.seq_id || '') + '</span>';
+      if (n.summary) {
+        nodesHtml += '<span class="ac-film-node-summary">' +
+                     esc(n.summary.slice(0, 40)) + '</span>';
+      }
+      nodesHtml += '</div>';
+    });
+    nodesHtml += '</div>';
+
+    frame.insertAdjacentHTML('beforeend', nodesHtml);
+  }
+
+  // §7 — ResizeObserver: apply tier classes to each frame based on height
+  // Uses _filmTierObserver (P1 amendment — avoids collision with
+  // _filmResizeObserver used by _initFilmDensity for zone density)
+  function _initFilmCardTiers() {
+    if (typeof ResizeObserver === 'undefined') return;
+
+    _stopFilmCardTiers();
+
+    _filmTierObserver = new ResizeObserver(function(entries) {
+      entries.forEach(function(entry) {
+        var frame  = entry.target;
+        var height = entry.contentRect.height;
+        frame.classList.remove('ac-film-frame--compact', 'ac-film-frame--full');
+        if (height >= 140) {
+          frame.classList.add('ac-film-frame--full');
+        } else if (height >= 90) {
+          frame.classList.add('ac-film-frame--compact');
+        }
+      });
+    });
+
+    document.querySelectorAll('.ac-film-frame').forEach(function(frame) {
+      _filmTierObserver.observe(frame);
+    });
+  }
+
+  function _stopFilmCardTiers() {
+    if (_filmTierObserver) {
+      _filmTierObserver.disconnect();
+      _filmTierObserver = null;
+    }
   }
 
   // ══════════════════════════════════════════════════════════════
