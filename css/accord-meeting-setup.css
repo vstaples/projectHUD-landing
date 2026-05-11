@@ -2757,17 +2757,16 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 /* X-12 — Duration inline edit (F-C13-2 resolution)            */
 /* ──────────────────────────────────────────────────────────── */
 
-/* X-11: Briefing synthesis text (saved state) */
+/* X-11: Briefing synthesis text (saved state — plain italic block per mockup) */
 .ac-briefing-synthesis-text {
   font-size: 13px;
   color: var(--ac-text-primary);
   line-height: 1.6;
   font-style: italic;
-  border-left: 3px solid var(--ac-cyan);
   padding: 8px 12px;
   margin: 6px 0;
   background: var(--ac-bg-pane);
-  border-radius: 0 4px 4px 0;
+  border-radius: 4px;
   cursor: pointer;
 }
 .ac-briefing-synthesis-text:hover { background: var(--ac-bg-tile); }

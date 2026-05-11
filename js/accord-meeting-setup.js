@@ -3449,6 +3449,12 @@
 
   function _wireBriefingEvents(tabbody, meeting) {
     tabbody.addEventListener('click', function(ev) {
+      // Click on existing saved briefing text opens edit (no data-action needed)
+      if (ev.target.closest('.ac-briefing-synthesis-text')) {
+        _openBriefingEdit(meeting);
+        return;
+      }
+
       var action = ev.target.dataset.action ||
                    (ev.target.closest('[data-action]') &&
                     ev.target.closest('[data-action]').dataset.action);
