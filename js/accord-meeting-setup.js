@@ -2512,7 +2512,7 @@
     });
   }
 
-  // §8 — Verdict popover
+  // §8 — Verdict modal (centered, dimmed backdrop)
   function _toggleVerdictPopover(anchor, verdict) {
     var existing = document.getElementById('ac-verdict-popover');
     if (existing) {
@@ -2524,9 +2524,14 @@
     if (!verdict) return;
     _verdictPopoverOpen = true;
 
-    var popover = document.createElement('div');
-    popover.id = 'ac-verdict-popover';
-    popover.className = 'ac-verdict-popover';
+    // Backdrop
+    var backdrop = document.createElement('div');
+    backdrop.id = 'ac-verdict-popover';
+    backdrop.className = 'ac-verdict-backdrop';
+
+    // Modal
+    var modal = document.createElement('div');
+    modal.className = 'ac-verdict-modal';
 
     var checksHtml = verdict.checks.map(function(c) {
       var icon = c.passed ? '\u2713' : (c.blocking ? '\u2717' : '\u25b3');
@@ -2537,23 +2542,37 @@
              '</div>';
     }).join('');
 
-    popover.innerHTML = '<div class="ac-popover-title">Readiness</div>' + checksHtml;
+    modal.innerHTML =
+      '<div class="ac-verdict-modal-header">' +
+        '<span class="ac-verdict-modal-title">READINESS</span>' +
+        '<button class="ac-verdict-modal-close" data-action="verdict-close">\u2715</button>' +
+      '</div>' +
+      '<div class="ac-verdict-modal-pill ac-verdict-pill--' + verdict.color + '">' +
+        esc(verdict.label) +
+      '</div>' +
+      '<div class="ac-verdict-modal-checks">' + checksHtml + '</div>';
 
-    document.body.appendChild(popover);
-    var rect = anchor.getBoundingClientRect();
-    popover.style.left   = rect.left + 'px';
-    popover.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
 
-    // Click outside to close — named function for self-removal
-    setTimeout(function() {
-      document.addEventListener('click', function _closePopover(ev) {
-        if (!popover.contains(ev.target) && ev.target !== anchor) {
-          popover.remove();
-          _verdictPopoverOpen = false;
-          document.removeEventListener('click', _closePopover);
-        }
-      });
-    }, 0);
+    // Close on backdrop click or ✕ button
+    backdrop.addEventListener('click', function(ev) {
+      if (ev.target === backdrop ||
+          (ev.target.dataset && ev.target.dataset.action === 'verdict-close')) {
+        backdrop.remove();
+        _verdictPopoverOpen = false;
+      }
+    });
+
+    // Close on Escape
+    function _onEsc(ev) {
+      if (ev.key === 'Escape') {
+        backdrop.remove();
+        _verdictPopoverOpen = false;
+        document.removeEventListener('keydown', _onEsc);
+      }
+    }
+    document.addEventListener('keydown', _onEsc);
   }
 
   // §9 — Begin Meeting
