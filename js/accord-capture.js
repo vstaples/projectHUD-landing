@@ -52,8 +52,29 @@
   window.addEventListener('accord:meeting-loaded', async (ev) => {
     const { meeting, thread } = ev.detail;
     await _loadAll(meeting, thread);
-    // A-08: initialise persisted chat after meeting loads
-    _initChat(meeting);
+
+    // A-08: always initialise chat for the URL meeting, not the context meeting.
+    // accord:meeting-loaded fires for every meeting accord-core loads —
+    // we must ensure chat subscribes to the meeting the operator is viewing.
+    var _urlMeetingId = new URLSearchParams(location.search).get('meeting');
+    if (_urlMeetingId && meeting.meeting_id !== _urlMeetingId) {
+      // Context meeting fired first — fetch the URL meeting and init chat.
+      // Guard: skip if chat is already initialised for the URL meeting.
+      if (!_chatResourceId) {
+        API.get(
+          'accord_meetings?meeting_id=eq.' + _urlMeetingId +
+          '&select=meeting_id,firm_id,state,workstream_id&limit=1'
+        ).then(function(rows) {
+          if (rows && rows[0] && !_chatResourceId) {
+            _initChat(rows[0]);
+          }
+        });
+      }
+    } else {
+      // This event is for the URL meeting — init chat directly.
+      _initChat(meeting);
+    }
+
     // A-09: mount workstream timeline filmstrip
     _mountLiveFilmstrip(meeting);
   });
@@ -595,6 +616,11 @@
     var stream = document.getElementById('chatStream');
     if (!stream) return;
 
+    // Ensure .chat-stream class is on the stream element — _renderChatStream queries by this class
+    if (!stream.classList.contains('chat-stream')) {
+      stream.classList.add('chat-stream');
+    }
+
     // Stamp .chat-panel onto the existing parent — do NOT move the element
     var parent = stream.parentNode;
     if (parent && !parent.classList.contains('chat-panel')) {
@@ -621,28 +647,7 @@
   }
 
   function _initChat(meeting) {
-    // Guard: only initialise chat for the meeting shown in the URL.
-    // accord:meeting-loaded fires for every meeting the core loads
-    // (e.g. workstream context meetings), not just the URL meeting.
-    // IMPORTANT: always re-fetch the URL meeting fresh — Accord.state.meeting
-    // may be set to a different (context) meeting by the time this fires.
-    var urlMeetingId = new URLSearchParams(location.search).get('meeting');
-    if (!urlMeetingId) {
-      // No meeting in URL — use the passed meeting if it matches state
-      if (!meeting || !meeting.meeting_id) return;
-    } else if (meeting.meeting_id !== urlMeetingId) {
-      // This event is for a context meeting, not the URL meeting.
-      // Re-fetch the URL meeting and init chat with it instead.
-      // Only do this once — if we already have the right meeting running, skip.
-      if (_chatResourceId) return;  // already initialised — resource resolved
-      API.get('accord_meetings?meeting_id=eq.' + urlMeetingId +
-              '&select=meeting_id,firm_id,state,workstream_id&limit=1')
-        .then(function(rows) {
-          if (rows && rows[0]) _initChat(rows[0]);
-        });
-      return;
-    }
-
+    if (!meeting || !meeting.meeting_id) return;
     _teardownChat();
     _chatMeetingState = meeting.state;
 
