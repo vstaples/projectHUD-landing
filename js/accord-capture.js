@@ -603,9 +603,18 @@
       panel.appendChild(stream);
     }
 
-    // Inject .chat-input-row below stream if absent
+    // Ensure the existing input row has the .chat-input-row class so _applyChatState can find it
+    var existingInput = document.getElementById('chatInput');
+    if (existingInput) {
+      var existingRow = existingInput.closest('div');
+      if (existingRow && !existingRow.classList.contains('chat-input-row')) {
+        existingRow.classList.add('chat-input-row');
+      }
+    }
+
+    // Inject .chat-input-row below stream only if input doesn't already exist in DOM
     var panel = stream.closest('.chat-panel');
-    if (panel && !panel.querySelector('.chat-input-row')) {
+    if (panel && !document.getElementById('chatInput')) {
       panel.insertAdjacentHTML('beforeend',
         '<div class="chat-input-row">' +
           '<input id="chatInput" class="chat-input" type="text" ' +
