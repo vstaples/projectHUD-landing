@@ -30,16 +30,29 @@
   var _chatResourceName  = null;
   var _chatMeetingState  = 'idle';
 
+  // ── A-09 Live filmstrip state ─────────────────────────────────
+  var _liveFilmToken    = 0;
+  var _liveFilmMeetings = [];
+  var _liveFilmActiveId = null;
+  var _liveFilmResizing = false;
+
   // ── Lifecycle hookup ─────────────────────────────────────────
   window.addEventListener('accord:level-changed', function() {
     _teardownChat();
+    // A-09: live filmstrip teardown on navigation
+    _liveFilmToken    = 0;
+    _liveFilmMeetings = [];
+    _liveFilmActiveId = null;
+    _liveFilmResizing = false;
+    var liveFilm = document.getElementById('ac-live-filmstrip');
+    if (liveFilm) liveFilm.remove();
   });
 
   window.addEventListener('accord:meeting-loaded', async (ev) => {
     const { meeting, thread } = ev.detail;
     await _loadAll(meeting, thread);
-    // A-08: initialise persisted chat after meeting loads
     _initChat(meeting);
+    _mountLiveFilmstrip(meeting);   // A-09
   });
 
   window.addEventListener('accord:meeting-sealed', async (ev) => {
@@ -562,6 +575,237 @@
           </div>
         </div>`;
     }).join('');
+  }
+
+  // ── A-09 · CMD-ACCORD-CAPTURE-FILMSTRIP-1 ───────────────────
+  // §5 mount · §6 fetch/render · §7 frame click · §8 thread history
+  // V1 amendment: center pane is .capture-pane (not .capture-center).
+  // V2 amendment: tabs use data-stream-tab; replicate _wireStreamTabs pattern.
+  // _enrichFilmCards() reused from C-14 (same IIFE scope in accord-meeting-setup.js).
+
+  function _mountLiveFilmstrip(meeting) {
+    var center = document.querySelector('.capture-pane');
+    if (!center) return;
+    if (document.getElementById('ac-live-filmstrip')) return;
+
+    var zone = document.createElement('div');
+    zone.id = 'ac-live-filmstrip';
+    zone.className = 'ac-live-filmstrip';
+    zone.innerHTML = [
+      '<div class="ac-live-film-handle" id="ac-live-film-handle"></div>',
+      '<div class="ac-live-film-header">',
+        '<span class="ac-live-film-label">WORKSTREAM TIMELINE</span>',
+        '<span class="ac-live-film-hint" id="ac-live-film-hint"></span>',
+      '</div>',
+      '<div class="ac-live-film-track" id="ac-live-film-track">',
+        '<div class="ac-live-film-loading">Loading timeline\u2026</div>',
+      '</div>'
+    ].join('');
+
+    center.appendChild(zone);
+    _wireFilmResizeHandle(zone);
+    _loadLiveFilmFrames(meeting);
+  }
+
+  function _loadLiveFilmFrames(meeting) {
+    var myToken = ++_liveFilmToken;
+    if (!meeting.workstream_id) {
+      var track0 = document.getElementById('ac-live-film-track');
+      if (track0) track0.innerHTML = '<div class="ac-live-film-empty">No workstream context.</div>';
+      return;
+    }
+
+    API.get(
+      'accord_meetings?workstream_id=eq.' + meeting.workstream_id +
+      '&state=in.(closed,sealed)' +
+      '&order=sealed_at.asc' +
+      '&select=meeting_id,title,scheduled_for,sealed_at,state' +
+      '&limit=30'
+    ).then(function(meetings) {
+      if (_liveFilmToken !== myToken) return;
+      meetings = meetings || [];
+
+      var track = document.getElementById('ac-live-film-track');
+      if (!track || !track.isConnected) return;
+
+      _liveFilmMeetings = meetings;
+
+      if (!meetings.length) {
+        track.innerHTML = '<div class="ac-live-film-empty">No prior meetings in this workstream.</div>';
+        return;
+      }
+
+      var hint = document.getElementById('ac-live-film-hint');
+      if (hint) hint.textContent = meetings.length + ' prior meeting' +
+                                   (meetings.length !== 1 ? 's' : '') +
+                                   ' \u00b7 click to filter thread history';
+
+      var html = meetings.map(function(m) {
+        var date = m.scheduled_for
+          ? new Date(m.scheduled_for).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+          : 'Unknown';
+        var isActive = m.meeting_id === _liveFilmActiveId;
+        return '<div class="ac-film-frame' + (isActive ? ' ac-film-frame--active' : '') + '" ' +
+               'data-meeting-id="' + esc(m.meeting_id) + '" ' +
+               'data-action="live-film-select">' +
+               '<div class="ac-film-thumb ac-film-thumb--f1"></div>' +
+               '<div class="ac-film-meta">' +
+                 '<div class="ac-film-date">' + esc(date) + '</div>' +
+               '</div>' +
+               '</div>';
+      }).join('');
+
+      track.innerHTML = html;
+
+      track.addEventListener('click', function(ev) {
+        var frame = ev.target.closest('[data-action="live-film-select"]');
+        if (!frame) return;
+        _onLiveFilmSelect(frame.dataset.meetingId, meeting);
+      });
+
+      // C-14 enrichment — only available in Setup shell IIFE; guard gracefully
+      if (typeof _enrichFilmCards === 'function') _enrichFilmCards();
+
+      setTimeout(function() { track.scrollLeft = track.scrollWidth; }, 50);
+    }).catch(function(e) {
+      console.error('[AccordCapture] live filmstrip load failed', e);
+    });
+  }
+
+  function _onLiveFilmSelect(meetingId, currentMeeting) {
+    var track = document.getElementById('ac-live-film-track');
+    if (!track) return;
+
+    if (_liveFilmActiveId === meetingId) {
+      _liveFilmActiveId = null;
+      track.querySelectorAll('.ac-film-frame--active').forEach(function(f) {
+        f.classList.remove('ac-film-frame--active');
+      });
+      _restoreCaptureStream();
+      return;
+    }
+
+    _liveFilmActiveId = meetingId;
+    track.querySelectorAll('.ac-film-frame--active').forEach(function(f) {
+      f.classList.remove('ac-film-frame--active');
+    });
+    var newFrame = track.querySelector('[data-meeting-id="' + meetingId + '"]');
+    if (newFrame) newFrame.classList.add('ac-film-frame--active');
+
+    _activateThreadHistoryTab();
+    _loadFilmThreadHistory(meetingId);
+  }
+
+  function _activateThreadHistoryTab() {
+    local.streamTab = 'history';
+    document.querySelectorAll('#accord-app .stream-tab').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.streamTab === 'history');
+    });
+    if ($('captureStream'))       $('captureStream').style.display       = 'none';
+    if ($('threadHistoryStream')) $('threadHistoryStream').style.display = '';
+  }
+
+  function _restoreCaptureStream() {
+    local.streamTab = 'present';
+    document.querySelectorAll('#accord-app .stream-tab').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.streamTab === 'present');
+    });
+    if ($('captureStream'))       $('captureStream').style.display       = '';
+    if ($('threadHistoryStream')) {
+      $('threadHistoryStream').style.display = 'none';
+      var filmHeader = $('threadHistoryStream').querySelector('.ac-film-th-header');
+      if (filmHeader) filmHeader.remove();
+    }
+  }
+
+  function _loadFilmThreadHistory(meetingId) {
+    var stream = $('threadHistoryStream');
+    if (!stream) return;
+
+    var meta = _liveFilmMeetings.filter(function(m) { return m.meeting_id === meetingId; })[0];
+    stream.innerHTML = '<div class="ac-film-th-loading">Loading\u2026</div>';
+
+    API.get(
+      'accord_nodes?meeting_id=eq.' + meetingId +
+      '&sealed_at=not.is.null' +
+      '&select=node_id,tag,seq_id,summary,seq_number' +
+      '&order=seq_number.asc' +
+      '&limit=80'
+    ).then(function(nodes) {
+      if (!stream.isConnected) return;
+      nodes = nodes || [];
+
+      var tagOrder = ['decision', 'action', 'risk', 'dissent', 'note', 'question'];
+      nodes.sort(function(a, b) {
+        var ai = tagOrder.indexOf(a.tag); var bi = tagOrder.indexOf(b.tag);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      });
+
+      var title = meta ? esc(meta.title || 'Prior meeting') : 'Prior meeting';
+      var date  = meta && meta.scheduled_for
+        ? new Date(meta.scheduled_for).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        : '';
+
+      var html = '<div class="ac-film-th-header">' +
+                 '<span class="ac-film-th-title">' + title + '</span>' +
+                 (date ? '<span class="ac-film-th-date">' + esc(date) + '</span>' : '') +
+                 '<button class="ac-film-th-close" id="ac-film-th-close">\u2715 Back</button>' +
+                 '</div>';
+
+      if (!nodes.length) {
+        html += '<div class="ac-film-th-empty">No captured nodes in this meeting.</div>';
+      } else {
+        nodes.forEach(function(n) {
+          html += '<div class="ac-th-node ac-th-node--' + esc(n.tag) + '">' +
+                  '<span class="ac-th-node-seq">' + esc(n.seq_id || '') + '</span>' +
+                  '<span class="ac-th-node-summary">' + esc(n.summary || '') + '</span>' +
+                  '</div>';
+        });
+      }
+
+      stream.innerHTML = html;
+
+      var closeBtn = document.getElementById('ac-film-th-close');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+          _liveFilmActiveId = null;
+          var track = document.getElementById('ac-live-film-track');
+          if (track) track.querySelectorAll('.ac-film-frame--active').forEach(function(f) {
+            f.classList.remove('ac-film-frame--active');
+          });
+          _restoreCaptureStream();
+        });
+      }
+    }).catch(function(e) {
+      console.error('[AccordCapture] thread history load failed', e);
+      if (stream.isConnected) stream.innerHTML = '<div class="ac-film-th-empty">Failed to load.</div>';
+    });
+  }
+
+  function _wireFilmResizeHandle(zone) {
+    var handle = zone.querySelector('.ac-live-film-handle');
+    if (!handle) return;
+
+    handle.addEventListener('mousedown', function(ev) {
+      ev.preventDefault();
+      _liveFilmResizing = true;
+      var startY = ev.clientY;
+      var startH = zone.getBoundingClientRect().height;
+
+      function onMove(ev2) {
+        if (!_liveFilmResizing) return;
+        zone.style.height = Math.max(60, Math.min(220, startH + (startY - ev2.clientY))) + 'px';
+      }
+
+      function onUp() {
+        _liveFilmResizing = false;
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
   }
 
   // ── A-08 Chat — CMD-ACCORD-CAPTURE-CHAT-1 ───────────────────
