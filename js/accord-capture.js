@@ -632,9 +632,6 @@
     // Mount DOM wrapper and input row first (idempotent)
     _mountChatPanel();
 
-    // ← ADD THIS LINE: apply state immediately after mount, before async
-    _applyChatState(meeting.state);
-
     // P2: resolve resource row id from auth user_id
     var userId = Accord.state.me && Accord.state.me.id;
     if (!userId) { console.error('[AccordChat] no user id'); return; }
@@ -882,21 +879,25 @@
   }
 
   function _applyChatState(meetingState) {
-    var input    = document.querySelector('.chat-input, #chatInput');
-    var sendBtn  = document.querySelector('.chat-send, #chatSendBtn');
-    var inputRow = document.querySelector('.chat-input-row');
+    var input   = document.querySelector('.chat-input, #chatInput');
+    var sendBtn = document.querySelector('.chat-send, #chatSendBtn');
     if (!input) return;
+
+    // Input row visibility is now controlled entirely by CSS:
+    // .surface-capture.meeting-closed .chat-input-row { display: none }
+    // Do NOT set inline display styles here — they cause race condition bugs
+    // when accord:meeting-loaded fires for multiple meetings concurrently.
 
     if (meetingState === 'idle' || meetingState === 'running') {
       input.placeholder = 'Message the meeting\u2026';
       input.disabled    = false;
       if (sendBtn) sendBtn.disabled = input.value.trim().length === 0;
-      if (inputRow) inputRow.style.display = '';
       // Remove any stale closed-label from a previous meeting navigation
       var stale = document.querySelector('.chat-closed-label');
       if (stale) stale.remove();
     } else if (meetingState === 'closed') {
-      if (inputRow) inputRow.style.display = 'none';
+      input.disabled = true;
+      if (sendBtn) sendBtn.disabled = true;
       var stream = document.querySelector('.chat-stream, #chatStream');
       if (stream && !document.querySelector('.chat-closed-label')) {
         stream.insertAdjacentHTML('afterend',

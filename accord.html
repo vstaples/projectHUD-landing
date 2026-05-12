@@ -825,6 +825,8 @@
 #accord-app .chat-msg .chat-time { font: 500 11px 'IBM Plex Mono', monospace; color: var(--ink-ghost); }
 
 #accord-app .chat-input-row { display: flex; gap: 6px; }
+/* Hide chat input row when meeting is closed — controlled by CSS, not JS inline styles */
+#accord-app .surface-capture.meeting-closed .chat-input-row { display: none !important; }
 #accord-app .chat-input {
   flex: 1;
   background: var(--canvas-raised);
