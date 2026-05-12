@@ -632,6 +632,9 @@
     // Mount DOM wrapper and input row first (idempotent)
     _mountChatPanel();
 
+    // ← ADD THIS LINE: apply state immediately after mount, before async
+    _applyChatState(meeting.state);
+
     // P2: resolve resource row id from auth user_id
     var userId = Accord.state.me && Accord.state.me.id;
     if (!userId) { console.error('[AccordChat] no user id'); return; }
