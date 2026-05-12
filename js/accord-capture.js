@@ -44,8 +44,8 @@
     _liveFilmMeetings = [];
     _liveFilmActiveId = null;
     _liveFilmResizing = false;
-    _stopLiveFilmTiers();
-    if (_liveFilmDensityObserver) { _liveFilmDensityObserver.disconnect(); _liveFilmDensityObserver = null; }
+    _stopFilmCardTiers();
+    if (_filmResizeObserver) { _filmResizeObserver.disconnect(); _filmResizeObserver = null; }
     var liveFilm = document.getElementById('ac-live-filmstrip');
     if (liveFilm) liveFilm.remove();
   });
@@ -580,20 +580,14 @@
   }
 
   // ── A-09 · CMD-ACCORD-CAPTURE-FILMSTRIP-1 ───────────────────
-  // Direct port of Setup shell filmstrip (C-05 + C-14).
-  // Identical HTML structure, CSS classes, resize handle, FIRST/TODAY/NEXT.
-  // ONE behavioral difference: frame click → Thread History filter
-  //   (not scrub overlay — that's Setup shell only).
-  // All Setup shell filmstrip CSS is in accord-meeting-setup.css —
-  //   same classes reused here; no new CSS needed for structure.
-
-  var _liveFilmToken    = 0;
-  var _liveFilmMeetings = [];   // all workstream meetings (same as Setup shell)
-  var _liveFilmActiveId = null;
-  var _liveFilmResizing = false;
-  var _liveFilmDensityObserver = null;
-
-  var LIVE_FILM_TAG_ORDER = [
+  // Verbatim port of Setup shell filmstrip (C-05 + C-14).
+  // State vars required by the copied functions:
+  var _filmstripAborted    = false;
+  var _filmstripToken      = 0;
+  var _filmResizeObserver  = null;
+  var _filmCardToken       = 0;
+  var _filmTierObserver    = null;
+  var FILM_TAG_ORDER = [
     { tag: 'note',     abbr: 'N'  },
     { tag: 'decision', abbr: 'D'  },
     { tag: 'action',   abbr: 'A'  },
@@ -602,7 +596,7 @@
     { tag: 'dissent',  abbr: 'Di' }
   ];
 
-  // §5 — Mount filmstrip zone (same HTML as Setup shell)
+  // Mount: inject filmstrip zone HTML (same structure as Setup shell _buildHTML)
   function _mountLiveFilmstrip(meeting) {
     var surface = document.querySelector('.surface-capture');
     if (!surface) return;
@@ -610,56 +604,54 @@
 
     var zone = document.createElement('div');
     zone.id = 'ac-live-filmstrip';
-    // Use SAME CSS class as Setup shell — identical look
     zone.className = 'ac-setup-filmstrip';
     zone.innerHTML =
-      '<div class="ac-filmstrip-handle" id="ac-live-film-handle"></div>' +
-      '<div class="ac-filmstrip-content" id="ac-live-film-content">' +
-        '<div class="ac-film-loading">Loading timeline\u2026</div>' +
-      '</div>';
+      '<div class="ac-filmstrip-handle"></div>' +
+      '<div class="ac-filmstrip-content"></div>';
 
     var captureBody = surface.querySelector('.capture-body');
-    if (captureBody) {
-      captureBody.insertAdjacentElement('afterend', zone);
-    } else {
-      surface.appendChild(zone);
-    }
+    if (captureBody) captureBody.insertAdjacentElement('afterend', zone);
+    else surface.appendChild(zone);
 
-    _wireLiveFilmHandle(zone);
-    _renderLiveFilmstrip(meeting);
+    _wireFilmstripHandle();
+    _renderFilmstrip(meeting, meeting.workstream_id);
   }
 
-  // §6 — Fetch + render (ported from _renderFilmstrip)
-  function _renderLiveFilmstrip(meeting) {
-    var myToken = ++_liveFilmToken;
-    var content = document.getElementById('ac-live-film-content');
+  // Verbatim from accord-meeting-setup.js _renderFilmstrip:
+  function _renderFilmstrip(meeting, workstreamId) {
+    _filmstripAborted = false;
+    var myToken = ++_filmstripToken;
+    var content = document.querySelector('.ac-filmstrip-content');
     if (!content) return;
     content.innerHTML = '<div class="ac-film-loading">Loading timeline\u2026</div>';
 
-    if (!meeting.workstream_id) {
+    if (!workstreamId) {
       content.innerHTML = '<div class="ac-film-empty">No workstream \u2014 standalone meeting.</div>';
       return;
     }
 
-    _liveFilmFetchMeetings(meeting.workstream_id)
+    _fetchFilmMeetings(meeting.meeting_id, workstreamId)
       .then(function(meetings) {
-        if (_liveFilmToken !== myToken) return;
-        return _liveFilmFetchCounts(meetings).then(function(countMap) {
-          if (_liveFilmToken !== myToken) return;
+        if (_filmstripToken !== myToken) return;
+        return _fetchFilmNodeCounts(meetings).then(function(countMap) {
+          if (_filmstripToken !== myToken) return;
           if (!content.isConnected) return;
-          _liveFilmMeetings = meetings;
-          _paintLiveFilmstrip(content, meetings, countMap, meeting);
-          _initLiveFilmDensity();
-          _enrichLiveFilmCards();
-          setTimeout(function() { _initLiveFilmTiers(); }, 50);
+          _paintFilmstrip(content, meetings, countMap, meeting, workstreamId);
+          _initFilmDensity();
+          _enrichFilmCards();
+          setTimeout(function() { _initFilmCardTiers(); }, 50);
         });
       })
       .catch(function(e) {
-        console.error('[AccordCapture] live filmstrip fetch failed', e);
+        console.error('[AccordCapture] filmstrip fetch failed', e);
+        if (_filmstripToken !== myToken) return;
+        if (!content.isConnected) return;
+        content.innerHTML = '<div class="ac-film-error">Could not load timeline.</div>';
       });
   }
 
-  function _liveFilmFetchMeetings(workstreamId) {
+  // Verbatim from accord-meeting-setup.js _fetchFilmMeetings:
+  function _fetchFilmMeetings(currentMeetingId, workstreamId) {
     return API.get(
       'accord_meetings?workstream_id=eq.' + workstreamId +
       '&select=meeting_id,title,scheduled_for,sealed_at,state' +
@@ -667,7 +659,8 @@
     ).then(function(rows) { return rows || []; });
   }
 
-  function _liveFilmFetchCounts(meetings) {
+  // Verbatim from accord-meeting-setup.js _fetchFilmNodeCounts:
+  function _fetchFilmNodeCounts(meetings) {
     if (!meetings.length) return Promise.resolve({});
     var ids = meetings.map(function(m) { return m.meeting_id; }).join(',');
     return API.get(
@@ -683,29 +676,31 @@
     }).catch(function() { return {}; });
   }
 
-  // §6.3 — Paint (ported from _paintFilmstrip; identical HTML)
-  function _paintLiveFilmstrip(content, meetings, countMap, currentMeeting) {
+  // Verbatim from accord-meeting-setup.js _paintFilmstrip:
+  function _paintFilmstrip(content, meetings, countMap, currentMeeting, workstreamId) {
     var priorCount = meetings.filter(function(m) {
       return m.state === 'closed' || m.state === 'sealed';
     }).length;
 
-    var html = '<div class="ac-film-header">';
+    var html = '';
+    html += '<div class="ac-film-header">';
     html += '<span class="ac-film-label">WORKSTREAM TIMELINE \u00b7 ';
     html += priorCount + ' PRIOR MEETING' + (priorCount !== 1 ? 'S' : '');
     html += ' \u00b7 CLICK ANY FRAME TO SCRUB</span>';
     html += '<div class="ac-film-controls">';
-    html += '<span class="ac-film-ctrl" data-action="live-scrub-first">\u23ee FIRST</span>';
-    html += '<span class="ac-film-ctrl ac-film-ctrl--active" data-action="live-scrub-today">\u2299 TODAY</span>';
-    html += '<span class="ac-film-ctrl" data-action="live-scrub-next">\u23ed NEXT</span>';
-    html += '</div></div>';
+    html += '<span class="ac-film-ctrl" data-action="scrub-first">\u23ee FIRST</span>';
+    html += '<span class="ac-film-ctrl ac-film-ctrl--active" data-action="scrub-today">\u2299 TODAY</span>';
+    html += '<span class="ac-film-ctrl" data-action="scrub-next">\u23ed NEXT</span>';
+    html += '</div>';
+    html += '</div>';
 
-    html += '<div class="ac-film-track" id="ac-live-film-track">';
+    html += '<div class="ac-film-track" id="ac-film-track">';
     meetings.forEach(function(m, idx) {
       var isCurrent = m.meeting_id === currentMeeting.meeting_id;
       var isFuture  = (m.state === 'idle') && !isCurrent;
       var counts    = countMap[m.meeting_id] || {};
-      var date      = _liveFilmDate(m);
-      var summary   = _liveFilmCountSummary(counts);
+      var date      = _filmDate(m);
+      var summary   = _filmCountSummary(counts);
       var hasDissent  = (counts['dissent']  || 0) > 0;
       var hasDecision = (counts['decision'] || 0) > 0;
       var thumbIdx  = (idx % 12) + 1;
@@ -713,7 +708,6 @@
       var frameClass = 'ac-film-frame';
       if (isCurrent) frameClass += ' ac-film-frame--current';
       if (isFuture)  frameClass += ' ac-film-frame--future';
-      if (m.meeting_id === _liveFilmActiveId) frameClass += ' ac-film-frame--active';
 
       html += '<div class="' + frameClass + '" data-meeting-id="' + esc(m.meeting_id) + '">';
       html += '<div class="ac-film-thumb ac-film-thumb--f' + thumbIdx + '"></div>';
@@ -723,47 +717,54 @@
       if (summary) html += '<div class="ac-film-counts">' + esc(summary) + '</div>';
       html += '<div class="ac-film-date' + (isCurrent ? ' ac-film-date--current' : '') + '">';
       html += esc(date) + '</div>';
-      html += '</div></div>';
+      html += '</div>';
+      html += '</div>';
     });
     html += '</div>';
 
     content.innerHTML = html;
-    _wireLiveFilmEvents(content, meetings, currentMeeting);
-    _liveFilmScrollToCurrent(content);
+    _wireFilmstripEvents(content, meetings, currentMeeting, workstreamId);
+    _scrollToCurrentFrame(content);
   }
 
-  function _liveFilmDate(m) {
-    var d = m.scheduled_for || m.sealed_at;
+  // Verbatim from accord-meeting-setup.js _filmDate:
+  function _filmDate(meeting) {
+    var d = meeting.scheduled_for || meeting.sealed_at;
     if (!d) return '\u2014';
     return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
-  function _liveFilmCountSummary(counts) {
+  // Verbatim from accord-meeting-setup.js _filmCountSummary:
+  function _filmCountSummary(counts) {
     var parts = [];
-    LIVE_FILM_TAG_ORDER.forEach(function(t) {
+    FILM_TAG_ORDER.forEach(function(t) {
       var n = counts[t.tag] || 0;
       if (n > 0) parts.push(n + t.abbr);
     });
     return parts.length ? parts.join(' \u00b7 ') : '';
   }
 
-  // §7 — Events: frame click → Thread History (only behavioral difference from Setup)
-  function _wireLiveFilmEvents(content, meetings, currentMeeting) {
-    var track = content.querySelector('#ac-live-film-track');
+  // Verbatim from accord-meeting-setup.js _wireFilmstripEvents —
+  // ONLY CHANGE: replace _activateScrub with _onLiveFilmSelect (Step 5):
+  function _wireFilmstripEvents(content, meetings, currentMeeting, workstreamId) {
+    var track = content.querySelector('#ac-film-track');
     if (track) {
       track.addEventListener('click', function(ev) {
         var frame = ev.target.closest('.ac-film-frame');
         if (!frame) return;
         var meetingId = frame.dataset.meetingId;
-        if (!meetingId || meetingId === currentMeeting.meeting_id) return;
-        var mtg = meetings.filter(function(m) { return m.meeting_id === meetingId; })[0];
-        if (!mtg || mtg.state === 'idle') return;
-        // BEHAVIORAL DIFFERENCE: Thread History filter (not scrub overlay)
+        if (!meetingId) return;
+
+        if (meetingId === currentMeeting.meeting_id) return;
+
+        var mtg = meetings.find(function(m) { return m.meeting_id === meetingId; });
+        if (!mtg || (mtg.state === 'idle' && meetingId !== currentMeeting.meeting_id)) return;
+
+        // ONLY CHANGE FROM SETUP SHELL: Thread History filter instead of scrub overlay
         _onLiveFilmSelect(meetingId, meetings);
       });
     }
 
-    // FIRST / TODAY / NEXT controls — same as Setup shell
     content.addEventListener('click', function(ev) {
       var action = ev.target.dataset.action ||
                    (ev.target.closest('[data-action]') &&
@@ -774,31 +775,208 @@
         return m.state === 'closed' || m.state === 'sealed';
       });
 
-      if (action === 'live-scrub-first' && priorMeetings.length) {
+      if (action === 'scrub-first' && priorMeetings.length) {
         _onLiveFilmSelect(priorMeetings[0].meeting_id, meetings);
+        return;
       }
-      if (action === 'live-scrub-today') {
-        _liveFilmClearFilter(content);
-        _liveFilmScrollToCurrent(content);
+      if (action === 'scrub-today') {
+        _liveFilmClearFilter();
+        _scrollToCurrentFrame(content);
+        return;
       }
     });
   }
 
-  function _liveFilmScrollToCurrent(content) {
+  // Verbatim from accord-meeting-setup.js _scrollToCurrentFrame:
+  function _scrollToCurrentFrame(content) {
     var current = content.querySelector('.ac-film-frame--current');
-    if (current) current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    if (current) {
+      current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
   }
 
-  // §8 — Thread History filter (live-mode exclusive behavior)
+  // Verbatim from accord-meeting-setup.js _initFilmDensity:
+  function _initFilmDensity() {
+    var filmstrip = document.querySelector('.ac-setup-filmstrip');
+    if (!filmstrip || typeof ResizeObserver === 'undefined') return;
+
+    if (_filmResizeObserver) { _filmResizeObserver.disconnect(); _filmResizeObserver = null; }
+
+    _filmResizeObserver = new ResizeObserver(function(entries) {
+      var h = (entries[0] && entries[0].contentRect && entries[0].contentRect.height)
+              || filmstrip.offsetHeight;
+      filmstrip.setAttribute('data-density',
+        h < 130 ? 'compact' : (h < 260 ? 'medium' : 'expanded'));
+    });
+    _filmResizeObserver.observe(filmstrip);
+
+    var h = filmstrip.offsetHeight;
+    filmstrip.setAttribute('data-density',
+      h < 130 ? 'compact' : (h < 260 ? 'medium' : 'expanded'));
+  }
+
+  // Verbatim from accord-meeting-setup.js _enrichFilmCards:
+  function _enrichFilmCards() {
+    var myToken = ++_filmCardToken;
+
+    var frames = document.querySelectorAll('.ac-film-frame[data-meeting-id]');
+    if (!frames.length) return;
+
+    var ids = Array.from(frames).map(function(f) {
+      return f.dataset.meetingId;
+    }).filter(Boolean);
+
+    if (!ids.length) return;
+
+    API.get(
+      'accord_nodes?meeting_id=in.(' + ids.join(',') + ')' +
+      '&tag=in.(decision,action,dissent,risk)' +
+      '&sealed_at=not.is.null' +
+      '&select=meeting_id,tag,seq_id,summary,created_by' +
+      '&order=meeting_id.asc,seq_number.asc' +
+      '&limit=60'
+    ).then(function(nodes) {
+      if (_filmCardToken !== myToken) return;
+      nodes = nodes || [];
+
+      var byMeeting = {};
+      nodes.forEach(function(n) {
+        if (!byMeeting[n.meeting_id]) byMeeting[n.meeting_id] = [];
+        byMeeting[n.meeting_id].push(n);
+      });
+
+      frames.forEach(function(frame) {
+        var mid = frame.dataset.meetingId;
+        if (!mid) return;
+        _paintFilmCardContent(frame, byMeeting[mid] || []);
+      });
+    }).catch(function(e) {
+      console.error('[AccordCapture] filmcard enrich failed', e);
+    });
+  }
+
+  // Verbatim from accord-meeting-setup.js _paintFilmCardContent:
+  function _paintFilmCardContent(frame, nodes) {
+    var existing = frame.querySelector('.ac-film-dots');
+    if (existing) existing.remove();
+    var existingNodes = frame.querySelector('.ac-film-nodes');
+    if (existingNodes) existingNodes.remove();
+
+    if (!nodes.length) return;
+
+    var tagTypes = {};
+    nodes.forEach(function(n) { tagTypes[n.tag] = true; });
+
+    var dotHtml = '<div class="ac-film-dots">';
+    if (tagTypes.decision) dotHtml += '<span class="ac-film-dot ac-film-dot--decision"></span>';
+    if (tagTypes.action)   dotHtml += '<span class="ac-film-dot ac-film-dot--action"></span>';
+    if (tagTypes.dissent)  dotHtml += '<span class="ac-film-dot ac-film-dot--dissent"></span>';
+    if (tagTypes.risk)     dotHtml += '<span class="ac-film-dot ac-film-dot--risk"></span>';
+    dotHtml += '</div>';
+
+    frame.insertAdjacentHTML('afterbegin', dotHtml);
+
+    var tagOrder = ['decision', 'action', 'dissent', 'risk'];
+    var sorted = nodes.slice().sort(function(a, b) {
+      return tagOrder.indexOf(a.tag) - tagOrder.indexOf(b.tag);
+    });
+
+    var nodesHtml = '<div class="ac-film-nodes">';
+    sorted.slice(0, 4).forEach(function(n) {
+      nodesHtml += '<div class="ac-film-node ac-film-node--' + n.tag + '">';
+      nodesHtml += '<span class="ac-film-node-seq">' + esc(n.seq_id || '') + '</span>';
+      if (n.summary) {
+        nodesHtml += '<span class="ac-film-node-summary">' +
+                     esc(n.summary.slice(0, 40)) + '</span>';
+      }
+      nodesHtml += '</div>';
+    });
+    nodesHtml += '</div>';
+
+    frame.insertAdjacentHTML('beforeend', nodesHtml);
+  }
+
+  // Verbatim from accord-meeting-setup.js _initFilmCardTiers:
+  function _initFilmCardTiers() {
+    if (typeof ResizeObserver === 'undefined') return;
+
+    _stopFilmCardTiers();
+
+    _filmTierObserver = new ResizeObserver(function(entries) {
+      entries.forEach(function(entry) {
+        var frame  = entry.target;
+        var height = entry.contentRect.height;
+        frame.classList.remove('ac-film-frame--compact', 'ac-film-frame--full');
+        if (height >= 140) {
+          frame.classList.add('ac-film-frame--full');
+        } else if (height >= 90) {
+          frame.classList.add('ac-film-frame--compact');
+        }
+      });
+    });
+
+    document.querySelectorAll('.ac-film-frame').forEach(function(frame) {
+      _filmTierObserver.observe(frame);
+    });
+  }
+
+  // Verbatim from accord-meeting-setup.js _stopFilmCardTiers:
+  function _stopFilmCardTiers() {
+    if (_filmTierObserver) {
+      _filmTierObserver.disconnect();
+      _filmTierObserver = null;
+    }
+  }
+
+  // Verbatim from accord-meeting-setup.js _isSameDay / _fmtShort / _getWeekBounds:
+  function _isSameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() &&
+           a.getMonth()    === b.getMonth()    &&
+           a.getDate()     === b.getDate();
+  }
+
+  function _fmtShort(date) {
+    return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
+  }
+
+  // Resize handle (same logic as Setup shell _wireFilmstripHandle / _onFilmHandleMouseDown):
+  function _wireFilmstripHandle() {
+    var handle = document.querySelector('#ac-live-filmstrip .ac-filmstrip-handle');
+    if (!handle) return;
+
+    handle.addEventListener('mousedown', function(ev) {
+      ev.preventDefault();
+      var zone   = document.getElementById('ac-live-filmstrip');
+      var startY = ev.clientY;
+      var startH = zone ? zone.offsetHeight : 100;
+      handle.classList.add('dragging');
+
+      function onMove(ev2) {
+        if (!zone) return;
+        var dy   = ev2.clientY - startY;
+        var newH = Math.max(60, Math.min(350, startH - dy));
+        zone.style.height = newH + 'px';
+      }
+      function onUp() {
+        handle.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  // Thread History filter (live-mode exclusive — replaces scrub overlay):
   function _onLiveFilmSelect(meetingId, meetings) {
-    var track = document.getElementById('ac-live-film-track');
+    var track = document.getElementById('ac-film-track');
 
     if (_liveFilmActiveId === meetingId) {
       _liveFilmActiveId = null;
       if (track) track.querySelectorAll('.ac-film-frame--active').forEach(function(f) {
         f.classList.remove('ac-film-frame--active');
       });
-      _restoreCaptureStream();
+      _liveRestoreCaptureStream();
       return;
     }
 
@@ -811,19 +989,20 @@
       if (newFrame) newFrame.classList.add('ac-film-frame--active');
     }
 
-    _activateThreadHistoryTab();
-    _loadFilmThreadHistory(meetingId, meetings);
+    _liveActivateThreadHistoryTab();
+    _liveLoadFilmThreadHistory(meetingId, meetings);
   }
 
-  function _liveFilmClearFilter(content) {
+  function _liveFilmClearFilter() {
     _liveFilmActiveId = null;
-    if (content) content.querySelectorAll('.ac-film-frame--active').forEach(function(f) {
+    var track = document.getElementById('ac-film-track');
+    if (track) track.querySelectorAll('.ac-film-frame--active').forEach(function(f) {
       f.classList.remove('ac-film-frame--active');
     });
-    _restoreCaptureStream();
+    _liveRestoreCaptureStream();
   }
 
-  function _activateThreadHistoryTab() {
+  function _liveActivateThreadHistoryTab() {
     local.streamTab = 'history';
     document.querySelectorAll('#accord-app .stream-tab').forEach(function(b) {
       b.classList.toggle('active', b.dataset.streamTab === 'history');
@@ -832,7 +1011,7 @@
     if ($('threadHistoryStream')) $('threadHistoryStream').style.display = '';
   }
 
-  function _restoreCaptureStream() {
+  function _liveRestoreCaptureStream() {
     local.streamTab = 'present';
     document.querySelectorAll('#accord-app .stream-tab').forEach(function(b) {
       b.classList.toggle('active', b.dataset.streamTab === 'present');
@@ -845,7 +1024,7 @@
     }
   }
 
-  function _loadFilmThreadHistory(meetingId, meetings) {
+  function _liveLoadFilmThreadHistory(meetingId, meetings) {
     var stream = $('threadHistoryStream');
     if (!stream) return;
 
@@ -890,12 +1069,7 @@
       var closeBtn = document.getElementById('ac-film-th-close');
       if (closeBtn) {
         closeBtn.addEventListener('click', function() {
-          _liveFilmActiveId = null;
-          var track = document.getElementById('ac-live-film-track');
-          if (track) track.querySelectorAll('.ac-film-frame--active').forEach(function(f) {
-            f.classList.remove('ac-film-frame--active');
-          });
-          _restoreCaptureStream();
+          _liveFilmClearFilter();
         });
       }
     }).catch(function(e) {
@@ -904,130 +1078,7 @@
     });
   }
 
-  // §9 — Density (ported from _initFilmDensity — targets ac-setup-filmstrip)
-  function _initLiveFilmDensity() {
-    var filmstrip = document.getElementById('ac-live-filmstrip');
-    if (!filmstrip || typeof ResizeObserver === 'undefined') return;
-    if (_liveFilmDensityObserver) { _liveFilmDensityObserver.disconnect(); _liveFilmDensityObserver = null; }
-    _liveFilmDensityObserver = new ResizeObserver(function(entries) {
-      var h = (entries[0] && entries[0].contentRect && entries[0].contentRect.height) || filmstrip.offsetHeight;
-      filmstrip.setAttribute('data-density', h < 130 ? 'compact' : (h < 260 ? 'medium' : 'expanded'));
-    });
-    _liveFilmDensityObserver.observe(filmstrip);
-    var h = filmstrip.offsetHeight;
-    filmstrip.setAttribute('data-density', h < 130 ? 'compact' : (h < 260 ? 'medium' : 'expanded'));
-  }
-
-  // §10 — C-14 enrichment (ported from _enrichFilmCards — queries same DOM classes)
-  function _enrichLiveFilmCards() {
-    var frames = document.querySelectorAll('#ac-live-filmstrip .ac-film-frame[data-meeting-id]');
-    if (!frames.length) return;
-    var ids = Array.from(frames).map(function(f) { return f.dataset.meetingId; }).filter(Boolean);
-    if (!ids.length) return;
-    API.get(
-      'accord_nodes?meeting_id=in.(' + ids.join(',') + ')' +
-      '&tag=in.(decision,action,dissent,risk)' +
-      '&sealed_at=not.is.null' +
-      '&select=meeting_id,tag,seq_id,summary' +
-      '&order=meeting_id.asc,seq_number.asc&limit=60'
-    ).then(function(nodes) {
-      nodes = nodes || [];
-      var byMeeting = {};
-      nodes.forEach(function(n) {
-        if (!byMeeting[n.meeting_id]) byMeeting[n.meeting_id] = [];
-        byMeeting[n.meeting_id].push(n);
-      });
-      frames.forEach(function(frame) {
-        var mid = frame.dataset.meetingId;
-        if (!mid) return;
-        _paintLiveFilmCardContent(frame, byMeeting[mid] || []);
-      });
-    }).catch(function(e) { console.error('[AccordCapture] live filmcard enrich failed', e); });
-  }
-
-  function _paintLiveFilmCardContent(frame, nodes) {
-    var existing = frame.querySelector('.ac-film-dots');
-    if (existing) existing.remove();
-    var existingNodes = frame.querySelector('.ac-film-nodes');
-    if (existingNodes) existingNodes.remove();
-    if (!nodes.length) return;
-
-    var tagTypes = {};
-    nodes.forEach(function(n) { tagTypes[n.tag] = true; });
-    var dotHtml = '<div class="ac-film-dots">';
-    if (tagTypes.decision) dotHtml += '<span class="ac-film-dot ac-film-dot--decision"></span>';
-    if (tagTypes.action)   dotHtml += '<span class="ac-film-dot ac-film-dot--action"></span>';
-    if (tagTypes.dissent)  dotHtml += '<span class="ac-film-dot ac-film-dot--dissent"></span>';
-    if (tagTypes.risk)     dotHtml += '<span class="ac-film-dot ac-film-dot--risk"></span>';
-    dotHtml += '</div>';
-    frame.insertAdjacentHTML('afterbegin', dotHtml);
-
-    var tagOrder = ['decision', 'action', 'dissent', 'risk'];
-    var sorted = nodes.slice().sort(function(a, b) {
-      return tagOrder.indexOf(a.tag) - tagOrder.indexOf(b.tag);
-    });
-    var nodesHtml = '<div class="ac-film-nodes">';
-    sorted.slice(0, 4).forEach(function(n) {
-      nodesHtml += '<div class="ac-film-node ac-film-node--' + n.tag + '">' +
-                   '<span class="ac-film-node-seq">' + esc(n.seq_id || '') + '</span>' +
-                   (n.summary ? '<span class="ac-film-node-summary">' + esc(n.summary.slice(0, 40)) + '</span>' : '') +
-                   '</div>';
-    });
-    nodesHtml += '</div>';
-    frame.insertAdjacentHTML('beforeend', nodesHtml);
-  }
-
-  // §11 — Tier ResizeObserver (ported from _initFilmCardTiers)
-  var _liveFilmTierObserver = null;
-  function _initLiveFilmTiers() {
-    if (typeof ResizeObserver === 'undefined') return;
-    _stopLiveFilmTiers();
-    _liveFilmTierObserver = new ResizeObserver(function(entries) {
-      entries.forEach(function(entry) {
-        var frame = entry.target;
-        var h = entry.contentRect.height;
-        frame.classList.remove('ac-film-frame--compact', 'ac-film-frame--full');
-        if (h >= 140) frame.classList.add('ac-film-frame--full');
-        else if (h >= 90) frame.classList.add('ac-film-frame--compact');
-      });
-    });
-    document.querySelectorAll('#ac-live-filmstrip .ac-film-frame').forEach(function(f) {
-      _liveFilmTierObserver.observe(f);
-    });
-  }
-
-  function _stopLiveFilmTiers() {
-    if (_liveFilmTierObserver) { _liveFilmTierObserver.disconnect(); _liveFilmTierObserver = null; }
-  }
-
-  // §12 — Resize handle (simplified — no grid row; just height on the zone)
-  function _wireLiveFilmHandle(zone) {
-    var handle = zone.querySelector('.ac-filmstrip-handle');
-    if (!handle) return;
-    handle.addEventListener('mousedown', function(ev) {
-      ev.preventDefault();
-      var startY = ev.clientY;
-      var startH = zone.getBoundingClientRect().height;
-      _liveFilmResizing = true;
-
-      function onMove(ev2) {
-        if (!_liveFilmResizing) return;
-        var dy   = ev2.clientY - startY;
-        var newH = Math.max(60, Math.min(350, startH - dy));
-        zone.style.height = newH + 'px';
-      }
-      function onUp() {
-        _liveFilmResizing = false;
-        handle.classList.remove('dragging');
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-      }
-      handle.classList.add('dragging');
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-    });
-  }
-
+  // ── A-08 Chat — CMD-ACCORD-CAPTURE-CHAT-1 ───────────────────
   // ── A-08 Chat — CMD-ACCORD-CAPTURE-CHAT-1 ───────────────────
   // P1 amendment: Supabase client is window.supabase (not
   //   window.Accord.state.supabase — not exposed there).
