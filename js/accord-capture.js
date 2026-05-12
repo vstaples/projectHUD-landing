@@ -584,8 +584,10 @@
   // _enrichFilmCards() reused from C-14 (same IIFE scope in accord-meeting-setup.js).
 
   function _mountLiveFilmstrip(meeting) {
-    var center = document.querySelector('.capture-pane');
-    if (!center) return;
+    // V1 amendment (revised): mount on .surface-capture after .capture-body
+    // to span full width — same pattern as Setup shell filmstrip grid zone.
+    var surface = document.querySelector('.surface-capture');
+    if (!surface) return;
     if (document.getElementById('ac-live-filmstrip')) return;
 
     var zone = document.createElement('div');
@@ -602,7 +604,14 @@
       '</div>'
     ].join('');
 
-    center.appendChild(zone);
+    // Append after .capture-body for full-width span
+    var captureBody = surface.querySelector('.capture-body');
+    if (captureBody) {
+      captureBody.insertAdjacentElement('afterend', zone);
+    } else {
+      surface.appendChild(zone);
+    }
+
     _wireFilmResizeHandle(zone);
     _loadLiveFilmFrames(meeting);
   }
