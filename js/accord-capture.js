@@ -621,6 +621,11 @@
   }
 
   function _initChat(meeting) {
+    // Guard: only initialise chat for the meeting shown in the URL.
+    // accord:meeting-loaded fires for every meeting the core loads
+    // (e.g. workstream context meetings), not just the URL meeting.
+    var urlMeetingId = new URLSearchParams(location.search).get('meeting');
+    if (urlMeetingId && meeting.meeting_id !== urlMeetingId) return;
     _teardownChat();
     _chatMeetingState = meeting.state;
 
@@ -905,6 +910,8 @@
 
   // §5 — Mount filmstrip zone at base of center capture pane
   function _mountLiveFilmstrip(meeting) {
+    var urlMeetingId = new URLSearchParams(location.search).get('meeting');
+    if (urlMeetingId && meeting.meeting_id !== urlMeetingId) return;
     var center = document.querySelector('.capture-center, #captureCenter');
     if (!center) return;
     if (document.getElementById('ac-live-filmstrip')) return; // idempotent
