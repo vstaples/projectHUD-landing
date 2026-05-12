@@ -31,6 +31,10 @@
   var _chatMeetingState  = 'idle';
 
   // ── Lifecycle hookup ─────────────────────────────────────────
+  window.addEventListener('accord:level-changed', function() {
+    _teardownChat();
+  });
+
   window.addEventListener('accord:meeting-loaded', async (ev) => {
     const { meeting, thread } = ev.detail;
     await _loadAll(meeting, thread);
