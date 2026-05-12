@@ -624,15 +624,32 @@
     // Guard: only initialise chat for the meeting shown in the URL.
     // accord:meeting-loaded fires for every meeting the core loads
     // (e.g. workstream context meetings), not just the URL meeting.
+    // IMPORTANT: always re-fetch the URL meeting fresh — Accord.state.meeting
+    // may be set to a different (context) meeting by the time this fires.
     var urlMeetingId = new URLSearchParams(location.search).get('meeting');
-    if (urlMeetingId && meeting.meeting_id !== urlMeetingId) return;
+    if (!urlMeetingId) {
+      // No meeting in URL — use the passed meeting if it matches state
+      if (!meeting || !meeting.meeting_id) return;
+    } else if (meeting.meeting_id !== urlMeetingId) {
+      // This event is for a context meeting, not the URL meeting.
+      // Re-fetch the URL meeting and init chat with it instead.
+      // Only do this once — if we already have the right meeting running, skip.
+      if (_chatMeetingState && _chatResourceId) return;  // already initialised
+      API.get('accord_meetings?meeting_id=eq.' + urlMeetingId +
+              '&select=meeting_id,firm_id,state,workstream_id&limit=1')
+        .then(function(rows) {
+          if (rows && rows[0]) _initChat(rows[0]);
+        });
+      return;
+    }
+
     _teardownChat();
     _chatMeetingState = meeting.state;
 
     // Mount DOM wrapper and input row first (idempotent)
     _mountChatPanel();
 
-    // P2: resolve resource row id from auth user_id
+    // Resolve resource row id from auth user_id
     var userId = Accord.state.me && Accord.state.me.id;
     if (!userId) { console.error('[AccordChat] no user id'); return; }
 
