@@ -28,7 +28,7 @@
   var _chatSubscription  = null;
   var _chatResourceId    = null;
   var _chatResourceName  = null;
-  var _chatMeetingState  = 'idle';
+  var _chatMeetingState  = null;   // null until _initChat runs
 
   // ── A-09 Live filmstrip state ─────────────────────────────────
   var _liveFilmToken     = 0;
@@ -634,7 +634,7 @@
       // This event is for a context meeting, not the URL meeting.
       // Re-fetch the URL meeting and init chat with it instead.
       // Only do this once — if we already have the right meeting running, skip.
-      if (_chatMeetingState && _chatResourceId) return;  // already initialised
+      if (_chatResourceId) return;  // already initialised — resource resolved
       API.get('accord_meetings?meeting_id=eq.' + urlMeetingId +
               '&select=meeting_id,firm_id,state,workstream_id&limit=1')
         .then(function(rows) {
