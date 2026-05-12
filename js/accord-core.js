@@ -64,6 +64,18 @@ const Accord = (() => {
     state.levelContext = JSON.parse(ctxRaw || '{}');
   } catch (e) { state.levelContext = {}; }
 
+  // ── A-12 attendee panel state ────────────────────────────────────
+  // CMD-ACCORD-CAPTURE-ATTENDEES-1: attendees panel reads invited
+  // attendees from accord_meeting_attendees (resource_id keyed) and
+  // overlays presence from CMDCenter sessions (user_id keyed). The
+  // resource map bridges that join — populated once at firm load.
+  // Rows with null user_id (seeded/external resources) are excluded
+  // from the map; they correctly render gray presence dots since they
+  // can never match a logged-in session.
+  var _resourceMapByUserId  = {};   // { user_id: resource_id }
+  var _attendeeList         = [];   // resolved attendees for current meeting
+  var _attendeeRefreshTimer = null;
+
   // ── Level setters (consumed by accord-rails.js) ──────────────────
   function setLevel(nextLevel, ctx) {
     if (nextLevel !== 'constellation' && nextLevel !== 'workstream' && nextLevel !== 'meeting') return;
@@ -116,6 +128,16 @@ const Accord = (() => {
         email,
         firm_id: u?.firm_id || window.FIRM_ID || null,
       };
+
+      // A-12: resolve resource_id for the current user. accord_meeting_attendees
+      // joins on resource_id (resources.id), not user_id. state.me.resource_id
+      // is used downstream for the "you" label and any future resource-keyed
+      // identity check. Failure non-fatal — falls through with no resource_id.
+      const rRows = await API.get(
+        'resources?user_id=eq.' + sub + '&select=id&limit=1'
+      ).catch(() => []);
+      if (rRows && rRows[0]) state.me.resource_id = rRows[0].id;
+
       window.CURRENT_USER = state.me;
       return state.me;
     } catch (e) {
@@ -496,39 +518,172 @@ const Accord = (() => {
     return state.channel.send({ type: 'broadcast', event, payload: env });
   }
 
-  // ── Aegis presence integration ──────────────────────────────
-  // Subscribe to the Aegis hud:{firm_id} session map. Render the local
-  // sessions list as attendees + presence dots.
-  function _wirePresence() {
-    function renderAttendees() {
-      const el = $('attendeesList');
-      if (!el) return;
-      const sessions = (window.CMDCenter && window.CMDCenter.sessions && window.CMDCenter.sessions()) || {};
-      const rows = [];
-      const myId = state.me?.id;
-      Object.keys(sessions).forEach(uid => {
-        const s = sessions[uid] || {};
-        const isMe = uid === myId;
-        const status = s.online === false ? 'offline' : (s.unstable ? 'unstable' : 'present');
-        const dotCls = status === 'present' ? 'present' : (status === 'unstable' ? 'unstable' : '');
-        rows.push(`
-          <div class="attendee-row">
-            <span class="presence-dot ${dotCls}"></span>
-            <span class="attendee-name">${_esc(s.name || 'Unknown')}</span>
-            ${isMe ? '<span class="attendee-self">you</span>' : ''}
-          </div>`);
+  // ── A-12 attendees panel ────────────────────────────────────
+  // CMD-ACCORD-CAPTURE-ATTENDEES-1: replaces former Aegis-session
+  // attendee source. Panel now reads invited attendees from
+  // accord_meeting_attendees for the current meeting, overlays
+  // presence dots derived from CMDCenter sessions via the firm
+  // resource map.
+  //
+  // Lifecycle:
+  //  - Firm resource map: fetched once at init (after _resolveMe)
+  //  - Attendee list: loaded on accord:meeting-loaded; cleared on
+  //    accord:level-changed when leaving meeting level
+  //  - Presence re-render: CMDCenter.onAppEvent + 30s polling
+  //    (running meetings only)
+  function _loadFirmResourceMap() {
+    if (!state.me || !state.me.firm_id) return;
+    API.get('resources?firm_id=eq.' + state.me.firm_id + '&select=id,user_id')
+      .then(function(rows) {
+        (rows || []).forEach(function(r) {
+          if (r.user_id) _resourceMapByUserId[r.user_id] = r.id;
+        });
+        // Re-render in case attendees loaded before the map was ready
+        _renderAttendees(_attendeeList);
+      })
+      .catch(function(e) {
+        console.warn('[Accord] firm resource map load failed', e);
       });
-      el.innerHTML = rows.join('') ||
-        '<div class="attendee-row" style="color:var(--ink-faint);font-size:11px">No other sessions detected.</div>';
+  }
+
+  function _loadAttendees(meetingId) {
+    if (!meetingId) return;
+    API.get(
+      'accord_meeting_attendees?meeting_id=eq.' + meetingId +
+      '&select=attendee_id,resource_id,role_in_meeting,rsvp_status'
+    ).then(function(rows) {
+      rows = rows || [];
+      if (!rows.length) {
+        _attendeeList = [];
+        _renderAttendees([]);
+        return;
+      }
+      // Resolve display names by resource_id
+      var resourceIds = rows.map(function(r) { return r.resource_id; });
+      API.get(
+        'resources?id=in.(' + resourceIds.join(',') + ')&select=id,name'
+      ).then(function(resources) {
+        var nameMap = {};
+        (resources || []).forEach(function(r) { nameMap[r.id] = r.name; });
+        _attendeeList = rows.map(function(a) {
+          return {
+            attendee_id: a.attendee_id,
+            resource_id: a.resource_id,
+            name:        nameMap[a.resource_id] || 'Unknown',
+            role:        a.role_in_meeting,
+            rsvp:        a.rsvp_status,
+          };
+        });
+        _renderAttendees(_attendeeList);
+      });
+    }).catch(function(e) {
+      console.error('[Accord] attendees load failed', e);
+    });
+  }
+
+  // Build a { resource_id: true } map of currently-online attendees by
+  // walking the live CMDCenter session map and translating each
+  // user_id key through _resourceMapByUserId. Sessions with no resource
+  // mapping (anon users, edge cases) are silently skipped — they'll
+  // never match any invited attendee row.
+  function _buildPresenceMap() {
+    var presence = {};
+    var sessions = (window.CMDCenter && window.CMDCenter.sessions && window.CMDCenter.sessions()) || {};
+    Object.keys(sessions).forEach(function(uid) {
+      var s = sessions[uid] || {};
+      if (s.online === false) return;
+      var resourceId = _resourceMapByUserId[uid];
+      if (resourceId) presence[resourceId] = true;
+    });
+    return presence;
+  }
+
+  function _renderAttendees(attendees) {
+    var list = $('attendeesList');
+    if (!list) return;
+
+    // Bail at constellation/workstream — panel renders empty
+    if (!state.meeting || !state.meeting.meeting_id) {
+      list.innerHTML = '';
+      return;
     }
-    // Initial
-    renderAttendees();
-    // Re-render on Aegis events
+
+    var presence     = _buildPresenceMap();
+    var myResourceId = (state.me && state.me.resource_id) || null;
+
+    if (!attendees || !attendees.length) {
+      list.innerHTML = '<div class="ac-attendees-empty">No attendees added yet.</div>';
+      return;
+    }
+
+    // Sort: organizer first, then by name
+    var sorted = attendees.slice().sort(function(a, b) {
+      if (a.role === 'organizer' && b.role !== 'organizer') return -1;
+      if (b.role === 'organizer' && a.role !== 'organizer') return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    var html = sorted.map(function(a) {
+      var isPresent = !!presence[a.resource_id];
+      var isMe      = a.resource_id === myResourceId;
+      var dotCls    = isPresent ? 'ac-presence-dot ac-presence-dot--live'
+                                : 'ac-presence-dot ac-presence-dot--away';
+      return '<div class="ac-attendee-row" data-resource-id="' + _esc(a.resource_id) + '">' +
+               '<span class="' + dotCls + '"></span>' +
+               '<span class="ac-attendee-name">' + _esc(a.name) + '</span>' +
+               (a.role === 'organizer'
+                 ? '<span class="ac-attendee-role">organizer</span>'
+                 : '') +
+               (isMe ? '<span class="ac-attendee-you">you</span>' : '') +
+             '</div>';
+    }).join('');
+
+    list.innerHTML = html;
+  }
+
+  function _startAttendeeRefresh(meetingId) {
+    _stopAttendeeRefresh();
+    if (!state.meeting || state.meeting.state !== 'running') return;
+    _attendeeRefreshTimer = setInterval(function() {
+      _renderAttendees(_attendeeList);
+    }, 30000);
+  }
+
+  function _stopAttendeeRefresh() {
+    if (_attendeeRefreshTimer) {
+      clearInterval(_attendeeRefreshTimer);
+      _attendeeRefreshTimer = null;
+    }
+  }
+
+  // Wire subscriptions only. DB calls (firm resource map) deferred to
+  // _init after _resolveMe resolves state.me.firm_id.
+  function _wirePresence() {
+    // Live presence dot updates — fires whenever Aegis sessions change.
     if (window.CMDCenter && typeof window.CMDCenter.onAppEvent === 'function') {
-      window.CMDCenter.onAppEvent(() => renderAttendees());
+      window.CMDCenter.onAppEvent(function() { _renderAttendees(_attendeeList); });
     }
-    // Cheap polling fallback (every 4s) in case onAppEvent doesn't fire on session change
-    setInterval(renderAttendees, 4000);
+
+    // Load attendees on meeting load
+    window.addEventListener('accord:meeting-loaded', function(ev) {
+      var meetingId = ev && ev.detail && ev.detail.meeting && ev.detail.meeting.meeting_id;
+      if (!meetingId) return;
+      _loadAttendees(meetingId);
+      _startAttendeeRefresh(meetingId);
+    });
+
+    // Clear when leaving meeting level
+    window.addEventListener('accord:level-changed', function(ev) {
+      var level = ev && ev.detail && ev.detail.level;
+      if (level !== 'meeting') {
+        _attendeeList = [];
+        _stopAttendeeRefresh();
+        _renderAttendees([]);
+      }
+    });
+
+    // Initial render — will bail (no meeting) or empty-render
+    _renderAttendees(_attendeeList);
   }
 
   function _esc(s) {
@@ -681,6 +836,12 @@ const Accord = (() => {
     _wirePresence();
 
     await _resolveMe();
+
+    // A-12: kick off the firm resource map fetch now that state.me.firm_id
+    // is populated. Fire-and-forget — the map populates in parallel with
+    // loadMeeting below. Worst case: first attendees render shows gray
+    // presence dots; .then() callback re-renders once map is ready.
+    _loadFirmResourceMap();
 
     // If URL has ?meeting=<id>, load it; otherwise show empty state.
     const params = new URLSearchParams(window.location.search);

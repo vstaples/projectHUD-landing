@@ -1,633 +1,993 @@
-// ============================================================
-// ProjectHUD — accord-views.js
-// CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 4a
-//
-// Center-pane view rendering for two non-constellation levels:
-//   • workstream-level — STRICT NAVIGATIONAL per IR70 boundary
-//     (commission §2). Breadcrumb, sub-workstreams list, meetings
-//     list, +New Workstream (sub), +New Meeting. No activity
-//     intelligence, aggregated badges, or substrate prompts.
-//   • meeting-level — scaffolding only. Breadcrumb, meeting-scoped
-//     tab bar (Live Capture / Living Document / Decision Ledger /
-//     Digest & Send / Minutes). Each tab DOES NOT re-render the
-//     full surface; instead it loads the active meeting via
-//     Accord.loadMeeting() and switches to the legacy section
-//     embedded inside the meeting-view frame.
-//
-// Mount/unmount are coordinated by accord-transitions.js. This
-// module exposes pure render functions; transitions own the DOM
-// swap timing.
-//
-// Listens for: accord:level-changed, accord:meeting-filed/-unfiled/
-// -refiled, accord:workstream-renamed/-archived/-restored.
-// ============================================================
+/* ============================================================
+   accord-views.css
+   CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 4a
 
-(function () {
-  'use strict';
+   Workstream-level + meeting-level center-pane views.
+   Strict navigational per IR70 boundary (no activity intelligence
+   on workstream-level surface).
 
-  const API = window.API;
-  const $   = id => document.getElementById(id);
+   Style tokens: Accord editorial-amber palette only (Phase 2 IR64;
+   no Compass cyan creep).
+   All declared font sizes ≥ 11px.
+   ============================================================ */
 
-  function esc(s) {
-    return String(s ?? '')
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* ── View host wrapper (created by accord-transitions.js) ──── */
+#accord-app .ac-view-host {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: var(--canvas-deep);
+}
+
+/* ── View shell (workstream + meeting share most layout) ──── */
+#accord-app .ac-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+#accord-app .ac-view-header {
+  flex-shrink: 0;
+  padding: 22px 32px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--canvas);
+}
+
+/* F-LIVE-2 + F-LIVE-3: 2-row grid for meeting header.
+   Title + meta on row 1. Organizer + filed-under on row 2. */
+#accord-app .ac-view-header-grid {
+  display: grid;
+  grid-template-columns: 1fr minmax(auto, max-content);
+  grid-template-rows: auto auto;
+  column-gap: 20px;
+  row-gap: 3px;
+  align-items: baseline;
+  margin-top: 6px;
+  width: 100%;
+}
+#accord-app .ac-view-header-grid .ac-view-title {
+  grid-column: 1;
+  grid-row: 1;
+}
+#accord-app .ac-view-header-grid .meeting-meta {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  white-space: nowrap;
+  justify-self: end;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+#accord-app .ac-view-header-grid .meeting-organizer {
+  grid-column: 1;
+  grid-row: 2;
+  margin-top: 0;
+}
+#accord-app .ac-view-header-grid .meeting-filed {
+  grid-column: 2;
+  grid-row: 2;
+  text-align: right;
+  white-space: nowrap;
+  justify-self: end;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+#accord-app .ac-view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 32px 40px;
+}
+
+/* ── Breadcrumb ─────────────────────────────────────────────── */
+#accord-app .ac-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+#accord-app .ac-bc-crumb {
+  color: var(--ink-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 120ms;
+}
+#accord-app .ac-bc-crumb:hover {
+  color: var(--signal);
+}
+/* Static crumb (e.g., "Parking lot" — not navigable since parking-lot
+   isn't a level we can ascend back to from a meeting view). */
+#accord-app .ac-bc-crumb-static {
+  color: var(--ink-faint);
+  cursor: default;
+}
+#accord-app .ac-bc-crumb-static:hover {
+  color: var(--ink-faint);
+}
+#accord-app .ac-bc-sep {
+  color: var(--ink-ghost);
+}
+#accord-app .ac-bc-current {
+  color: var(--signal);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── View title ─────────────────────────────────────────────── */
+#accord-app .ac-view-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.2;
+  color: var(--ink-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+/* CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b: header action group beside title */
+#accord-app .ac-view-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+#accord-app .ac-view-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+#accord-app .ac-view-desc {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-muted);
+  margin: 8px 0 0;
+  max-width: 720px;
+}
+
+/* ── Sections ───────────────────────────────────────────────── */
+#accord-app .ac-view-section {
+  margin-bottom: 28px;
+}
+#accord-app .ac-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+#accord-app .ac-section-head h2 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+#accord-app .ac-btn-primary,
+#accord-app .ac-btn-secondary {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+#accord-app .ac-btn-primary {
+  background: var(--signal-soft);
+  border: 1px solid var(--signal-dim);
+  color: var(--signal);
+}
+#accord-app .ac-btn-primary:hover {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--canvas-deep);
+}
+#accord-app .ac-btn-secondary {
+  background: none;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-muted);
+}
+#accord-app .ac-btn-secondary:hover {
+  border-color: var(--signal-dim);
+  color: var(--signal);
+}
+
+/* ── Lists (sub-workstreams, meetings) ─────────────────────── */
+#accord-app .ac-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#accord-app .ac-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--ink-body);
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  transition: background 120ms, border-color 120ms;
+}
+#accord-app .ac-list-row:hover {
+  background: var(--signal-soft);
+  border-color: var(--signal-dim);
+}
+#accord-app .ac-list-row:focus-visible {
+  outline: 1px solid var(--signal);
+  outline-offset: 1px;
+}
+#accord-app .ac-list-row-label {
+  flex: 1;
+  font-weight: 500;
+  color: var(--ink-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#accord-app .ac-list-row-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+}
+
+#accord-app .ac-list-empty {
+  padding: 18px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-faint);
+}
+
+/* ── Meeting state dots (shared with rails / tree) ─────────── */
+#accord-app .ac-list-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+#accord-app .ac-list-dot-sealed   { background: var(--ink-faint); }
+#accord-app .ac-list-dot-running  { background: var(--signal); animation: ac-pulse 1.6s ease-in-out infinite; }
+#accord-app .ac-list-dot-closed   { background: var(--ink-muted); }
+#accord-app .ac-list-dot-draft    { background: transparent; border: 1px solid var(--ink-ghost); }
+
+/* ── Meeting view: tab bar ──────────────────────────────────── */
+#accord-app .ac-meeting-tabs-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+#accord-app .ac-meeting-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 22px;
+  flex-shrink: 0;
+}
+#accord-app .ac-mtg-tab {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  padding: 10px 14px;
+  cursor: pointer;
+  position: relative;
+  transition: color 120ms;
+}
+#accord-app .ac-mtg-tab:hover {
+  color: var(--ink-primary);
+}
+#accord-app .ac-mtg-tab.active {
+  color: var(--signal);
+}
+#accord-app .ac-mtg-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--signal);
+}
+
+#accord-app .ac-meeting-tab-body {
+  flex: 1;
+  min-height: 0;
+}
+#accord-app .ac-meeting-tab-stub {
+  padding: 24px 0;
+  max-width: 640px;
+}
+#accord-app .ac-meeting-tab-stub p {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-muted);
+  margin: 0 0 14px;
+}
+#accord-app .ac-meeting-tab-stub strong {
+  color: var(--ink-primary);
+}
+
+/* ── Empty fallback (workstream/meeting not found) ─────────── */
+#accord-app .ac-view-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+#accord-app .ac-view-empty h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  color: var(--ink-primary);
+  margin: 0 0 8px;
+}
+#accord-app .ac-view-empty p {
+  font-size: 13px;
+  color: var(--ink-muted);
+  margin: 0;
+}
+#accord-app .ac-view-empty a {
+  color: var(--signal);
+  text-decoration: none;
+}
+#accord-app .ac-view-empty a:hover {
+  text-decoration: underline;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  #accord-app .ac-list-row,
+  #accord-app .ac-bc-crumb,
+  #accord-app .ac-mtg-tab,
+  #accord-app .ac-btn-primary,
+  #accord-app .ac-btn-secondary,
+  #accord-app .ac-row-action {
+    transition: none;
   }
-
-  // ── Cache for derived view data (cleared on substrate events) ──
-  const cache = {
-    workstreams: null,    // active rows
-    filedMtgs:   null,    // meetings with workstream_id NOT NULL
-  };
-
-  async function _loadIfNeeded() {
-    if (cache.workstreams && cache.filedMtgs) return;
-    try {
-      const [ws, mtgs] = await Promise.all([
-        API.get('workstreams?state=eq.active&select=workstream_id,parent_workstream_id,name,created_at&order=name.asc'),
-        API.get('accord_meetings?workstream_id=not.is.null&select=meeting_id,title,workstream_id,scheduled_for,created_at,sealed_at,state&order=scheduled_for.desc.nullslast,created_at.desc'),
-      ]);
-      cache.workstreams = Array.isArray(ws) ? ws : [];
-      cache.filedMtgs   = Array.isArray(mtgs) ? mtgs : [];
-    } catch (e) {
-      console.error('[Accord-views] data load failed', e);
-      cache.workstreams = cache.workstreams || [];
-      cache.filedMtgs   = cache.filedMtgs   || [];
-    }
+  #accord-app .ac-list-dot-running {
+    animation: none;
   }
+}
 
-  function _invalidate() {
-    cache.workstreams = null;
-    cache.filedMtgs   = null;
+/* ── Narrow viewport ────────────────────────────────────────── */
+@media (max-width: 1080px) {
+  #accord-app .ac-view-header { padding: 18px 22px 14px; }
+  #accord-app .ac-view-body   { padding: 18px 22px 30px; }
+  #accord-app .ac-view-title  { font-size: 24px; }
+}
+
+/* ============================================================
+   CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b additions
+   Sub-row hover-actions, drop-target visual feedback, modal
+   styles for archive-confirm + drag-drop disambiguation.
+   ============================================================ */
+
+/* Sub-list row: hover-revealed actions (mirrors parking-lot
+   "file…" pattern from rails). */
+#accord-app .ac-sub-row {
+  position: relative;
+}
+#accord-app .ac-list-row-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+#accord-app .ac-sub-row:hover .ac-list-row-actions,
+#accord-app .ac-sub-row:focus-within .ac-list-row-actions {
+  opacity: 1;
+}
+#accord-app .ac-row-action {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  background: none;
+  border: 1px solid var(--rule);
+  color: var(--ink-faint);
+  padding: 2px 7px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+#accord-app .ac-row-action:hover {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+}
+
+/* Archive-confirm modal — reuses .modal-backdrop / .modal from
+   hud.css; we only style the summary block. */
+#accord-app .ac-archive-summary {
+  margin: 8px 0 12px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-body);
+  max-height: 320px;
+  overflow-y: auto;
+}
+#accord-app .ac-archive-loading {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-faint);
+  margin: 0;
+}
+#accord-app .ac-archive-section {
+  margin-bottom: 14px;
+}
+#accord-app .ac-archive-section-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+#accord-app .ac-archive-list {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+#accord-app .ac-archive-list-tight { margin-top: 4px; }
+#accord-app .ac-archive-list li {
+  padding: 3px 0 3px 12px;
+  border-left: 2px solid var(--rule);
+  margin-bottom: 2px;
+  font-size: 12px;
+}
+#accord-app .ac-archive-list-name {
+  color: var(--ink-primary);
+  font-weight: 500;
+}
+#accord-app .ac-archive-list-meta {
+  color: var(--ink-faint);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+}
+#accord-app .ac-archive-count-only {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+#accord-app .ac-archive-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+  font-style: italic;
+}
+#accord-app .ac-archive-footnote {
+  margin: 14px 0 0;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ink-ghost);
+  border-top: 1px solid var(--rule);
+  padding-top: 8px;
+}
+
+/* Drag-drop disambiguation modal */
+#accord-app .ac-dnd-subtitle {
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin: 4px 0 12px;
+}
+#accord-app .ac-dnd-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+#accord-app .ac-dnd-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+#accord-app .ac-dnd-choice:hover {
+  background: var(--signal-soft);
+  border-color: var(--signal-dim);
+}
+#accord-app .ac-dnd-choice input[type="radio"] {
+  flex-shrink: 0;
+  accent-color: var(--signal);
+}
+#accord-app .ac-dnd-choice-label {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--ink-body);
+}
+#accord-app .ac-dnd-choice-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-left: 4px;
+}
+
+/* Drop-target visual feedback (applies to constellation node, tree
+   row, workstream-view body when a drag is over them). */
+#accord-app .ac-dnd-droppable-active {
+  outline: 2px dashed var(--signal);
+  outline-offset: 2px;
+  background: var(--signal-soft) !important;
+}
+#accord-app .ac-node.ac-dnd-droppable-active .ac-node-body {
+  fill: var(--signal-soft);
+  stroke: var(--signal);
+  stroke-width: 2;
+}
+#accord-app .ac-node.ac-dnd-droppable-active .ac-node-glow {
+  opacity: 0.95 !important;
+}
+
+/* Parking-lot row dragging visual */
+#accord-app .ac-parking-row-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+/* Tree right-click context menu (positioned absolutely inside body) */
+.ac-tree-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 200px;
+  padding: 4px 0;
+  background: var(--canvas-raised, #2a2620);
+  border: 1px solid var(--rule-strong, rgba(244, 237, 224, 0.12));
+  border-radius: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+.ac-tree-menu-header {
+  padding: 8px 12px 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint, #908572);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--rule, rgba(244, 237, 224, 0.06));
+  margin-bottom: 4px;
+}
+.ac-tree-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink-body, #d6cdb8);
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.ac-tree-menu-item:hover {
+  background: var(--canvas-hover, #3d372d);
+  color: var(--ink-primary, #f4ede0);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  #accord-app .ac-list-row-actions,
+  #accord-app .ac-row-action,
+  #accord-app .ac-dnd-choice,
+  #accord-app .ac-dnd-droppable-active,
+  .ac-tree-menu-item {
+    transition: none;
   }
+}
 
-  // ────────────────────────────────────────────────────────────
-  // WORKSTREAM-LEVEL VIEW
-  // ────────────────────────────────────────────────────────────
-  async function renderWorkstreamView(host, workstreamId) {
-    if (!host) return;
-    await _loadIfNeeded();
+/* ──────────────────────────────────────────────────────────── */
+/* A-08 · CMD-ACCORD-CAPTURE-CHAT-1 — Team Chat                 */
+/* ──────────────────────────────────────────────────────────── */
 
-    // Phase 5: ensure surface host is detached from any prior meeting
-    // tab body. Park it on document.body (hidden by default CSS) so
-    // re-mounts find it without DOM lookups failing.
-    _detachSurfaceHost();
+/* Panel wrapper */
+#accord-app .chat-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas-deep, #0f0d0a);
+  border: 1px solid var(--rule, rgba(255,255,255,0.08));
+  border-radius: 4px;
+  overflow: hidden;
+}
 
-    const ws = cache.workstreams.find(w => w.workstream_id === workstreamId);
-    if (!ws) {
-      host.innerHTML = `
-        <div class="ac-view-empty">
-          <h3>Workstream not found</h3>
-          <p>It may have been archived. <a href="#" data-ascend>Return to constellation.</a></p>
-        </div>`;
-      host.querySelector('[data-ascend]')?.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        window.Accord?.setLevel?.('constellation', {});
-      });
-      return;
-    }
+/* Stream */
+#accord-app .chat-stream {
+  height: 200px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule, rgba(255,255,255,0.08)) transparent;
+}
+#accord-app .chat-stream:empty::after {
+  content: 'No chat messages yet.';
+  display: block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-ghost, rgba(255,255,255,0.25));
+  font-style: italic;
+  text-align: center;
+  padding: 30px 0;
+}
 
-    const isSub = !!ws.parent_workstream_id;
-    const parent = isSub
-      ? cache.workstreams.find(w => w.workstream_id === ws.parent_workstream_id)
-      : null;
+/* Message groups */
+#accord-app .chat-msg-group          { margin-top: 10px; }
+#accord-app .chat-msg-group:first-child { margin-top: 0; }
 
-    const subs = cache.workstreams.filter(w => w.parent_workstream_id === workstreamId);
-    const directMeetings = cache.filedMtgs.filter(m => m.workstream_id === workstreamId);
+#accord-app .chat-msg-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+#accord-app .chat-msg-header.me { flex-direction: row-reverse; }
 
-    let html = `
-      <div class="ac-view ac-view-workstream" data-ws-id="${esc(workstreamId)}">
-        <header class="ac-view-header">
-          <nav class="ac-breadcrumb" aria-label="Breadcrumb">
-            <a href="#" class="ac-bc-crumb" data-ascend-to="constellation">Constellation</a>
-            <span class="ac-bc-sep" aria-hidden="true">›</span>`;
-    if (isSub && parent) {
-      html += `
-            <a href="#" class="ac-bc-crumb" data-ascend-to="workstream" data-ws-id="${esc(parent.workstream_id)}">${esc(parent.name)}</a>
-            <span class="ac-bc-sep" aria-hidden="true">›</span>`;
-    }
-    html += `
-            <span class="ac-bc-current">${esc(ws.name)}</span>
-          </nav>
-          <div class="ac-view-title-row">
-            <h1 class="ac-view-title">${esc(ws.name)}</h1>
-            <div class="ac-view-actions">
-              <button type="button" class="ac-btn-secondary" data-action="ws-rename"  data-ws-id="${esc(workstreamId)}">Rename</button>
-              <button type="button" class="ac-btn-secondary" data-action="ws-archive" data-ws-id="${esc(workstreamId)}">Archive</button>
-            </div>
-          </div>
-          ${ws.description ? `<p class="ac-view-desc">${esc(ws.description)}</p>` : ''}
-        </header>
+#accord-app .chat-msg-author {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted, rgba(255,255,255,0.45));
+}
+#accord-app .chat-msg-time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--ink-ghost, rgba(255,255,255,0.25));
+}
 
-        <div class="ac-view-body">`;
+/* Bubbles */
+#accord-app .chat-msg-row          { display: flex; margin-top: 2px; }
+#accord-app .chat-msg-row.me       { justify-content: flex-end; }
+#accord-app .chat-msg-row.other    { justify-content: flex-start; }
 
-    // Sub-workstreams section (only at top-level)
-    if (!isSub) {
-      html += `
-        <section class="ac-view-section">
-          <header class="ac-section-head">
-            <h2>Sub-workstreams</h2>
-            <button type="button" class="ac-btn-secondary" data-action="new-sub" data-ws-id="${esc(workstreamId)}">+ New sub-workstream</button>
-          </header>`;
-      if (!subs.length) {
-        html += `<div class="ac-list-empty">No sub-workstreams.</div>`;
-      } else {
-        html += `<ul class="ac-list ac-sub-list">`;
-        subs.forEach(s => {
-          const subMtgCount = cache.filedMtgs.filter(m => m.workstream_id === s.workstream_id).length;
-          html += `
-            <li class="ac-list-row ac-sub-row" data-ws-id="${esc(s.workstream_id)}" tabindex="0" role="button">
-              <span class="ac-list-row-label">${esc(s.name)}</span>
-              <span class="ac-list-row-meta">${subMtgCount} meeting${subMtgCount === 1 ? '' : 's'}</span>
-              <span class="ac-list-row-actions">
-                <button type="button" class="ac-row-action" data-action="sub-rename"  data-ws-id="${esc(s.workstream_id)}" title="Rename">rename</button>
-                <button type="button" class="ac-row-action" data-action="sub-archive" data-ws-id="${esc(s.workstream_id)}" title="Archive">archive</button>
-              </span>
-            </li>`;
-        });
-        html += `</ul>`;
-      }
-      html += `</section>`;
-    }
+#accord-app .chat-msg-bubble {
+  max-width: 82%;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--ink-body, #d6cdb8);
+  line-height: 1.45;
+  word-break: break-word;
+  border: 1px solid var(--rule, rgba(255,255,255,0.08));
+  border-radius: 4px;
+  background: var(--canvas-elev, #1a1812);
+  transition: background 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease;
+}
+#accord-app .chat-msg-row.me .chat-msg-bubble {
+  background: rgba(212,160,74,0.12);
+  border-color: rgba(212,160,74,0.25);
+  color: var(--ink-primary, #f4ede0);
+}
+#accord-app .chat-msg-bubble.new {
+  background: rgba(74,222,128,0.1);
+  border-color: rgba(74,222,128,0.3);
+  box-shadow: 0 0 10px rgba(74,222,128,0.2);
+}
 
-    // Meetings section
-    html += `
-      <section class="ac-view-section">
-        <header class="ac-section-head">
-          <h2>${isSub ? 'Meetings' : 'Direct meetings'}</h2>
-          <button type="button" class="ac-btn-primary" data-action="new-meeting" data-ws-id="${esc(workstreamId)}">+ New meeting</button>
-        </header>`;
-    if (!directMeetings.length) {
-      html += `<div class="ac-list-empty">${isSub ? 'No meetings filed yet.' : 'No meetings filed directly under this workstream.'}</div>`;
-    } else {
-      html += `<ul class="ac-list ac-meeting-list">`;
-      directMeetings.forEach(m => {
-        const dot =
-          m.sealed_at         ? 'sealed'   :
-          m.state === 'running' ? 'running'  :
-          m.state === 'closed'  ? 'closed'   :
-                                  'draft';
-        const dateStr = m.scheduled_for
-          ? new Date(m.scheduled_for).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })
-          : '—';
-        html += `
-          <li class="ac-list-row ac-meeting-row" data-mtg-id="${esc(m.meeting_id)}" tabindex="0" role="button">
-            <span class="ac-list-dot ac-list-dot-${dot}" aria-hidden="true"></span>
-            <span class="ac-list-row-label">${esc(m.title || '(untitled)')}</span>
-            <span class="ac-list-row-meta">${esc(dateStr)}</span>
-          </li>`;
-      });
-      html += `</ul>`;
-    }
-    html += `</section>`;
+/* Input row */
+#accord-app .chat-input-row {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  border-top: 1px solid var(--rule, rgba(255,255,255,0.08));
+  background: var(--canvas-pane, #141210);
+}
+#accord-app .chat-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--canvas-deep, #0f0d0a);
+  border: 1px solid var(--rule, rgba(255,255,255,0.08));
+  color: var(--ink-primary, #f4ede0);
+  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-size: 11px;
+  padding: 5px 8px;
+  outline: none;
+  border-radius: 3px;
+  transition: border-color 0.15s;
+}
+#accord-app .chat-input:focus      { border-color: rgba(94,234,212,0.4); }
+#accord-app .chat-input::placeholder { color: var(--ink-ghost, rgba(255,255,255,0.25)); }
 
-    html += `
-        </div>
-      </div>`;
+#accord-app .chat-send {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  background: transparent;
+  border: 1px solid var(--rule, rgba(255,255,255,0.08));
+  color: var(--ink-ghost, rgba(255,255,255,0.25));
+  padding: 5px 10px;
+  cursor: not-allowed;
+  border-radius: 3px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+#accord-app .chat-send:not(:disabled) {
+  background: rgba(94,234,212,0.08);
+  border-color: rgba(94,234,212,0.3);
+  color: rgb(94,234,212);
+  cursor: pointer;
+}
+#accord-app .chat-send:not(:disabled):hover {
+  background: rgb(94,234,212);
+  color: var(--canvas-deep, #0f0d0a);
+}
 
-    host.innerHTML = html;
-    _wireWorkstreamView(host, workstreamId);
+/* Closed state */
+#accord-app .chat-closed-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--ink-ghost, rgba(255,255,255,0.25));
+  text-align: center;
+  padding: 6px;
+  border-top: 1px solid var(--rule, rgba(255,255,255,0.08));
+  letter-spacing: 0.6px;
+}
+
+
+/* ──────────────────────────────────────────────────────────── */
+/* A-09 · CMD-ACCORD-CAPTURE-FILMSTRIP-1 — Workstream Timeline  */
+/* ──────────────────────────────────────────────────────────── */
+
+/* Filmstrip zone */
+#ac-live-filmstrip {
+  display: flex;
+  flex-direction: column;
+  height: 100px;
+  min-height: 60px;
+  max-height: 220px;
+  border-top: 1px solid var(--rule, rgba(255,255,255,0.08));
+  background: var(--canvas-deep, #0f0d0a);
+  flex-shrink: 0;
+  position: relative;
+  --filmstrip-h: 100px;
+}
+
+/* Resize handle */
+.ac-live-film-handle {
+  height: 4px;
+  cursor: ns-resize;
+  background: transparent;
+  border-bottom: 1px solid var(--rule, rgba(255,255,255,0.08));
+  flex-shrink: 0;
+}
+.ac-live-film-handle:hover { background: rgba(94,234,212,0.12); }
+
+/* Header */
+.ac-live-film-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 14px 2px 14px;
+  flex-shrink: 0;
+}
+.ac-live-film-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  color: var(--ink-ghost, rgba(255,255,255,0.25));
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.ac-live-film-hint {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  color: var(--ink-ghost, rgba(255,255,255,0.25));
+}
+
+/* Track */
+.ac-live-film-track {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px 14px 8px 14px;
+  flex: 1;
+  align-items: flex-start;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule, rgba(255,255,255,0.08)) transparent;
+}
+.ac-live-film-loading,
+.ac-live-film-empty {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--ink-ghost, rgba(255,255,255,0.25));
+  font-style: italic;
+  padding: 8px 0;
+  align-self: center;
+}
+
+/* Active frame highlight */
+.ac-film-frame--active {
+  border: 2px solid rgb(94,234,212) !important;
+  box-shadow: 0 0 6px rgba(94,234,212,0.3);
+}
+
+/* Thread History filtered view — header */
+.ac-film-th-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 16px 6px 16px;
+  border-bottom: 1px solid var(--rule, rgba(255,255,255,0.08));
+  flex-shrink: 0;
+}
+.ac-film-th-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-primary, #f4ede0);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-film-th-date {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--ink-muted, rgba(255,255,255,0.45));
+  white-space: nowrap;
+}
+.ac-film-th-close {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--ink-ghost, rgba(255,255,255,0.25));
+  background: none;
+  border: 1px solid var(--rule, rgba(255,255,255,0.08));
+  border-radius: 3px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ac-film-th-close:hover { color: var(--ink-muted, rgba(255,255,255,0.45)); }
+
+.ac-film-th-loading,
+.ac-film-th-empty {
+  font-size: 12px;
+  color: var(--ink-muted, rgba(255,255,255,0.45));
+  font-style: italic;
+  padding: 16px;
+}
+
+/* Node rows in filtered Thread History */
+.ac-th-node {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--rule, rgba(255,255,255,0.08));
+  font-size: 12px;
+}
+.ac-th-node:last-child               { border-bottom: none; }
+.ac-th-node-seq {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 52px;
+}
+.ac-th-node-summary {
+  color: var(--ink-body, #d6cdb8);
+  line-height: 1.4;
+}
+
+/* Tag seq-ID colors */
+.ac-th-node--decision .ac-th-node-seq { color: rgb(94,234,212); }
+.ac-th-node--action   .ac-th-node-seq { color: rgb(251,191,36); }
+.ac-th-node--dissent  .ac-th-node-seq { color: rgb(251,113,133); }
+.ac-th-node--risk     .ac-th-node-seq { color: rgb(251,113,133); }
+.ac-th-node--note     .ac-th-node-seq { color: var(--ink-muted, rgba(255,255,255,0.45)); }
+.ac-th-node--question .ac-th-node-seq { color: rgb(167,139,250); }
+/* ============================================================
+   A-12 · CMD-ACCORD-CAPTURE-ATTENDEES-1
+   Attendees panel: invited attendees from accord_meeting_attendees
+   overlaid with live Aegis presence dots.
+   ============================================================ */
+
+/* ── Attendee rows ──────────────────────────────────────────── */
+#accord-app .ac-attendee-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  color: var(--ink-body);
+}
+
+#accord-app .ac-attendee-name {
+  flex: 1;
+}
+
+#accord-app .ac-attendee-role,
+#accord-app .ac-attendee-you {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+#accord-app .ac-attendee-role {
+  letter-spacing: 0.8px;
+}
+
+/* ── Presence dots ──────────────────────────────────────────── */
+#accord-app .ac-presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+#accord-app .ac-presence-dot--live {
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25),
+              0 0 6px rgba(34, 197, 94, 0.4);
+  animation: ac-presence-pulse 2s ease-in-out infinite;
+}
+
+#accord-app .ac-presence-dot--away {
+  background: transparent;
+  border: 1.5px solid var(--ink-ghost);
+}
+
+@keyframes ac-presence-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25),
+                0 0 6px rgba(34, 197, 94, 0.4);
   }
-
-  function _wireWorkstreamView(host, workstreamId) {
-    // Breadcrumb crumbs
-    host.querySelectorAll('[data-ascend-to]').forEach(el => {
-      el.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        const to = el.dataset.ascendTo;
-        if (to === 'constellation') {
-          window.Accord?.setLevel?.('constellation', {});
-        } else if (to === 'workstream') {
-          window.Accord?.setLevel?.('workstream', { workstreamId: el.dataset.wsId });
-        }
-      });
-    });
-
-    // Sub-workstream click → descend.
-    // BUT: if the click target is one of the row-action buttons
-    // (rename/archive), don't descend — the action button has its own
-    // handler. Same guard applies to keyboard activation.
-    host.querySelectorAll('.ac-sub-list .ac-list-row[data-ws-id]').forEach(row => {
-      const handler = () => window.Accord?.setLevel?.('workstream', { workstreamId: row.dataset.wsId });
-      row.addEventListener('click', (ev) => {
-        if (ev.target.closest('.ac-row-action')) return;
-        handler();
-      });
-      row.addEventListener('keydown', (ev) => {
-        if (ev.target.closest('.ac-row-action')) return;
-        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); handler(); }
-      });
-    });
-
-    // Meeting click → descend to meeting level
-    host.querySelectorAll('.ac-meeting-list .ac-meeting-row[data-mtg-id]').forEach(row => {
-      const handler = () => window.Accord?.setLevel?.('meeting', {
-        meetingId: row.dataset.mtgId,
-        workstreamId,
-      });
-      row.addEventListener('click', handler);
-      row.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); handler(); }
-      });
-    });
-
-    // + New sub-workstream — pre-selects the current workstream as
-    // parent so the operator doesn't have to remember to pick it
-    // (Phase 4a operator-found UX defect).
-    host.querySelector('[data-action="new-sub"]')?.addEventListener('click', () => {
-      window.AccordWorkstreams?.openCreate?.(workstreamId);
-    });
-
-    // CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 4b: header rename/archive
-    // for the current workstream itself
-    host.querySelector('[data-action="ws-rename"]')?.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      window.AccordWorkstreams?.openRename?.(workstreamId);
-    });
-    host.querySelector('[data-action="ws-archive"]')?.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      window.AccordWorkstreams?.openArchiveConfirm?.(workstreamId);
-    });
-
-    // Phase 4b: per-sub-row hover-revealed rename/archive actions
-    host.querySelectorAll('[data-action="sub-rename"]').forEach(btn => {
-      btn.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        window.AccordWorkstreams?.openRename?.(btn.dataset.wsId);
-      });
-    });
-    host.querySelectorAll('[data-action="sub-archive"]').forEach(btn => {
-      btn.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        window.AccordWorkstreams?.openArchiveConfirm?.(btn.dataset.wsId);
-      });
-    });
-
-    // + New meeting — opens the legacy #newMeetingModal to collect
-    // title and thread, then creates the meeting in the operator's
-    // firm, PATCHes workstream_id to bind it under this workstream,
-    // emits the filed event, and descends to the new meeting.
-    host.querySelector('[data-action="new-meeting"]')?.addEventListener('click', () => {
-      _openNewMeetingForWorkstream(workstreamId);
-    });
+  50% {
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.10),
+                0 0 12px rgba(34, 197, 94, 0.25);
   }
+}
 
-  // Phase 5 fix: open #newMeetingModal with a one-shot submit handler
-  // that creates + files in this workstream. The legacy modal already
-  // wires its own submit/cancel — we set them fresh each open so the
-  // workstream context binds correctly without leaking listeners.
-  // Pattern note: cloneNode-replace + state mutation must operate on
-  // the new node throughout (Phase 4b D1 lesson).
-  function _openNewMeetingForWorkstream(workstreamId) {
-    const modal       = document.getElementById('newMeetingModal');
-    const titleInput  = document.getElementById('nmTitle');
-    const threadInput = document.getElementById('nmThreadTitle');
-    const okBtn       = document.getElementById('nmCreate');
-    const cancelBtn   = document.getElementById('nmCancel');
-    if (!modal || !titleInput || !threadInput || !okBtn || !cancelBtn) {
-      console.error('[Accord-views] #newMeetingModal anchors missing — falling back to direct create');
-      _createMeetingDirect(workstreamId);
-      return;
-    }
-
-    // Clone-replace buttons FIRST, then wire fresh handlers
-    const newOk = okBtn.cloneNode(true);
-    okBtn.parentNode.replaceChild(newOk, okBtn);
-    const newCancel = cancelBtn.cloneNode(true);
-    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
-
-    titleInput.value = '';
-    threadInput.value = '';
-    modal.classList.add('visible');
-    setTimeout(() => titleInput.focus(), 30);
-
-    const close = () => modal.classList.remove('visible');
-
-    newOk.addEventListener('click', async () => {
-      const title  = titleInput.value.trim();
-      const thread = threadInput.value.trim();
-      if (!title) { titleInput.focus(); return; }
-      newOk.disabled = true;
-      newOk.textContent = 'Creating…';
-      try {
-        const m = await window.Accord?.createMeeting?.(title, thread || title);
-        if (!m?.meeting_id) { close(); return; }
-        await API.patch(`accord_meetings?meeting_id=eq.${m.meeting_id}`, {
-          workstream_id: workstreamId,
-        });
-        window.dispatchEvent(new CustomEvent('accord:meeting-filed', {
-          detail: {
-            meeting_id: m.meeting_id,
-            from_workstream_id: null,
-            to_workstream_id: workstreamId,
-          },
-        }));
-        close();
-        window.Accord?.setLevel?.('meeting', { meetingId: m.meeting_id, workstreamId });
-      } catch (e) {
-        console.error('[Accord-views] new meeting flow failed', e);
-        alert('Could not create meeting: ' + (e?.message || e));
-      } finally {
-        newOk.disabled = false;
-        newOk.textContent = 'Create meeting';
-      }
-    });
-    newCancel.addEventListener('click', close);
-  }
-
-  // Last-resort fallback if the modal is missing (shouldn't happen):
-  // create with a placeholder title so the operator can rename later.
-  async function _createMeetingDirect(workstreamId) {
-    try {
-      const m = await window.Accord?.createMeeting?.('Untitled meeting');
-      if (!m?.meeting_id) return;
-      await API.patch(`accord_meetings?meeting_id=eq.${m.meeting_id}`, {
-        workstream_id: workstreamId,
-      });
-      window.dispatchEvent(new CustomEvent('accord:meeting-filed', {
-        detail: {
-          meeting_id: m.meeting_id,
-          from_workstream_id: null,
-          to_workstream_id: workstreamId,
-        },
-      }));
-      window.Accord?.setLevel?.('meeting', { meetingId: m.meeting_id, workstreamId });
-    } catch (e) {
-      console.error('[Accord-views] direct create failed', e);
-    }
-  }
-
-  // ────────────────────────────────────────────────────────────
-  // MEETING-LEVEL VIEW (scaffolding)
-  // ────────────────────────────────────────────────────────────
-  async function renderMeetingView(host, meetingId, workstreamId) {
-    if (!host) return;
-
-    // Fetch meeting basics
-    let meeting = null;
-    try {
-      const rows = await API.get(`accord_meetings?meeting_id=eq.${meetingId}&select=meeting_id,firm_id,title,workstream_id,scheduled_for,created_at,sealed_at,state,organizer_id,briefing_text,duration_minutes,stakes,location`);
-      meeting = rows?.[0] || null;
-    } catch (e) {
-      console.warn('[Accord-views] meeting load failed', e);
-    }
-
-    if (!meeting) {
-      host.innerHTML = `
-        <div class="ac-view-empty">
-          <h3>Meeting not found</h3>
-          <p><a href="#" data-ascend>Return to constellation.</a></p>
-        </div>`;
-      host.querySelector('[data-ascend]')?.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        window.Accord?.setLevel?.('constellation', {});
-      });
-      return;
-    }
-
-    // CMD-ACCORD-MEETING-SETUP-1 Phase 2: state-gated render swap.
-    // idle → Meeting Setup shell (accord-meeting-setup.js)
-    // running / closed / sealed → existing 5-tab shell (unchanged)
-    if (meeting.state === 'idle') {
-      // Detach surface host first so controls bar is rescued from any
-      // prior ac-view-header before AccordMeetingSetup.render() wipes host.innerHTML.
-      _detachSurfaceHost();
-      // Populate Accord.state.meeting so startMeeting() has a target.
-      if (window.Accord && window.Accord.loadMeeting && meeting.meeting_id) {
-        try { await window.Accord.loadMeeting(meeting.meeting_id); }
-        catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure (setup)', e); }
-      }
-      if (window.AccordMeetingSetup && window.AccordMeetingSetup.render) {
-        window.AccordMeetingSetup.render(host, meeting, workstreamId);
-      }
-      return;
-    }
-
-    await _loadIfNeeded();
-    const owningWsId = workstreamId || meeting.workstream_id;
-    const ws = owningWsId ? cache.workstreams.find(w => w.workstream_id === owningWsId) : null;
-    const parent = ws && ws.parent_workstream_id
-      ? cache.workstreams.find(w => w.workstream_id === ws.parent_workstream_id)
-      : null;
-
-    const dot =
-      meeting.sealed_at        ? 'sealed'  :
-      meeting.state === 'running' ? 'running' :
-      meeting.state === 'closed'  ? 'closed'  :
-                                    'draft';
-
-    let html = `
-      <div class="ac-view ac-view-meeting" data-mtg-id="${esc(meetingId)}">
-        <header class="ac-view-header">
-          <nav class="ac-breadcrumb" aria-label="Breadcrumb">
-            <a href="#" class="ac-bc-crumb" data-ascend-to="constellation">Constellation</a>`;
-    if (parent) {
-      html += `
-            <span class="ac-bc-sep" aria-hidden="true">›</span>
-            <a href="#" class="ac-bc-crumb" data-ascend-to="workstream" data-ws-id="${esc(parent.workstream_id)}">${esc(parent.name)}</a>`;
-    }
-    if (ws) {
-      html += `
-            <span class="ac-bc-sep" aria-hidden="true">›</span>
-            <a href="#" class="ac-bc-crumb" data-ascend-to="workstream" data-ws-id="${esc(ws.workstream_id)}">${esc(ws.name)}</a>`;
-    } else {
-      // Parking-lot meeting: no workstream context. Render an explicit
-      // "Parking lot" crumb so the breadcrumb chain doesn't jump straight
-      // from Constellation to the meeting title (operator-found UX gap).
-      html += `
-            <span class="ac-bc-sep" aria-hidden="true">›</span>
-            <span class="ac-bc-crumb ac-bc-crumb-static">Parking lot</span>`;
-    }
-    html += `
-            <span class="ac-bc-sep" aria-hidden="true">›</span>
-            <span class="ac-bc-current">
-              <span class="ac-list-dot ac-list-dot-${dot}" aria-hidden="true"></span>
-              ${esc(meeting.title || '(untitled)')}
-            </span>
-          </nav>
-          <div class="ac-view-header-grid">
-          <h1 class="ac-view-title">${esc(meeting.title || '(untitled)')}</h1>
-          <div class="meeting-organizer" id="cap-organizer" style="display:none">
-            <span class="organizer-label">Organized by</span>
-            <span class="organizer-name" id="cap-organizer-name"></span>
-          </div>
-          <div class="meeting-meta" id="cap-meta">
-            <span class="live-pulse" id="cap-pulse" title="Meeting status"></span>
-            <span id="cap-meta-text"></span>
-          </div>
-          <div class="meeting-filed" id="cap-filed" style="display:none">
-            <span class="filed-label">Filed under:</span>
-            <span class="filed-value" id="cap-filed-value">Unfiled</span>
-            <a href="#" class="filed-action" id="cap-filed-action">[file]</a>
-          </div>
-          </div>
-        </header>
-
-        <div class="ac-view-body ac-meeting-tabs-shell">
-          <div class="ac-meeting-tabs" role="tablist">
-            <button type="button" class="ac-mtg-tab active" data-mtg-tab="capture"  role="tab">Live Capture</button>
-            <button type="button" class="ac-mtg-tab"        data-mtg-tab="document" role="tab">Living Document</button>
-            <button type="button" class="ac-mtg-tab"        data-mtg-tab="ledger"   role="tab">Decision Ledger</button>
-            <button type="button" class="ac-mtg-tab"        data-mtg-tab="digest"   role="tab">Digest &amp; Send</button>
-            <button type="button" class="ac-mtg-tab"        data-mtg-tab="minutes"  role="tab">Minutes</button>
-          </div>
-          <div class="ac-meeting-tab-body" id="ac-meeting-tab-body"></div>
-        </div>
-      </div>`;
-
-    // CMD-ACCORD-LEDGER-NAV-FIX-1 Phase 2: detach #ac-meeting-surface-host
-    // back to document.body BEFORE host.innerHTML = html. If a prior
-    // meeting-view render left the surface host nested inside this
-    // viewHost, the innerHTML overwrite below would destroy it (and
-    // children including #cap-title), causing _setMeetingHeader to
-    // throw on the subsequent loadMeeting call. Detaching first parks
-    // the host safely at body; _mountSurfaceHostInTabBody() re-mounts
-    // after the new tab-body container is in place.
-    _detachSurfaceHost();
-
-    host.innerHTML = html;
-    _wireMeetingView(host, meeting);
-
-    // Mount host BEFORE loadMeeting so DOM elements exist when meeting-loaded fires.
-    _mountSurfaceHostInTabBody();
-    _activateMeetingTab(host, 'capture');
-    if (window.Accord?.loadMeeting && meeting.meeting_id) {
-      try { await window.Accord.loadMeeting(meeting.meeting_id); }
-      catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure', e); }
-    }
-  }
-
-  function _wireMeetingView(host, meeting) {
-    host.querySelectorAll('[data-ascend-to]').forEach(el => {
-      el.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        const to = el.dataset.ascendTo;
-        if (to === 'constellation') {
-          window.Accord?.setLevel?.('constellation', {});
-        } else if (to === 'workstream') {
-          window.Accord?.setLevel?.('workstream', { workstreamId: el.dataset.wsId });
-        }
-      });
-    });
-
-    // Tab buttons — Phase 5: each tab activates its inlined surface
-    // via the relocated #ac-meeting-surface-host. Surface modules
-    // listen for accord:surface-changed and re-render against the
-    // currently-loaded meeting; we dispatch that event so existing
-    // modules trigger correctly.
-    host.querySelectorAll('.ac-mtg-tab[data-mtg-tab]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        _activateMeetingTab(host, btn.dataset.mtgTab);
-      });
-    });
-  }
-
-  // Phase 5: relocate #ac-meeting-surface-host into the meeting-view
-  // tab body. Idempotent — safe to call on every meeting render.
-  function _mountSurfaceHostInTabBody() {
-    const tabBody = document.getElementById('ac-meeting-tab-body');
-    const surfHost = document.getElementById('ac-meeting-surface-host');
-    if (!tabBody || !surfHost) return;
-    if (surfHost.parentElement !== tabBody) {
-      tabBody.appendChild(surfHost);
-    }
-    surfHost.classList.add('active');
-    // CMD-ACCORD-NEWMEETING-ROUTING-FIX-1: relocate controls bar into
-    // ac-view-header so it sits in the same flex row as the meeting title.
-    const ctrlBar  = document.getElementById('ac-meeting-controls-bar');
-    const viewHdr  = document.querySelector('.ac-view-header');
-    if (ctrlBar && viewHdr && ctrlBar.parentElement !== viewHdr) {
-      viewHdr.appendChild(ctrlBar);
-    }
-    if (ctrlBar) ctrlBar.style.display = '';
-  }
-
-  // Phase 5: park the surface host back at document.body (hidden by
-  // default CSS) so meeting-view re-mounts find it intact. Called when
-  // the operator ascends out of meeting view.
-  function _detachSurfaceHost() {
-    // Chain to any surface-module detach handler registered via
-    // window._accordDetachSurfaceHost (e.g. AccordMeetingSetup sets
-    // window._accordDetachSurfaceHost = _detachHandler in render()).
-    // Teardown() nulls the ref after firing so no recursion is possible.
-    // CMD-ACCORD-SETUP-HEADER-1: fixes smoke test 7 — fullpage classes
-    // were not removed on workstream-level navigation because renderWorkstreamView
-    // calls this local function directly, bypassing the window ref.
-    if (typeof window._accordDetachSurfaceHost === 'function' &&
-        window._accordDetachSurfaceHost !== _detachSurfaceHost) {
-      window._accordDetachSurfaceHost();
-    }
-    const surfHost = document.getElementById('ac-meeting-surface-host');
-    if (!surfHost) return;
-    surfHost.classList.remove('active');
-    // Move controls bar back to body before host is re-rendered.
-    // If left inside ac-view-header, host.innerHTML = html will destroy it.
-    const ctrlBar = document.getElementById('ac-meeting-controls-bar');
-    if (ctrlBar) {
-      ctrlBar.style.display = 'none';
-      if (ctrlBar.parentElement !== document.body) {
-        document.body.appendChild(ctrlBar);
-      }
-    }
-    if (surfHost.parentElement !== document.body) {
-      document.body.appendChild(surfHost);
-    }
-  }
-  // Expose for accord-transitions.js to call on the constellation path
-  window._accordDetachSurfaceHost = _detachSurfaceHost;
-
-  // Phase 5: activate one meeting-scoped surface tab. Mirrors the
-  // legacy switchSurface() semantics on the .surface elements inside
-  // the relocated host, plus drives the existing accord:surface-changed
-  // event chain so capture/document/ledger/digest/minutes modules
-  // react.
-  function _activateMeetingTab(host, surfaceName) {
-    if (!surfaceName) return;
-    // Tab visual state
-    host.querySelectorAll('.ac-mtg-tab').forEach(b => {
-      b.classList.toggle('active', b.dataset.mtgTab === surfaceName);
-    });
-    // Surface module hand-off — drive Accord.switchSurface so it owns
-    // the .surface.active toggling and dispatches accord:surface-changed
-    if (window.Accord?.switchSurface) {
-      window.Accord.switchSurface(surfaceName);
-    }
-  }
-
-  // ── Substrate event invalidation + reactive re-render ──────
-  // Cache is always invalidated. Additionally, if the operator is
-  // currently viewing a workstream- or meeting-level surface and the
-  // event affects what's on screen, re-render in place so the view
-  // doesn't show stale state until the operator navigates away.
-  // (Phase 4a operator-found defect: created sub-workstreams appeared
-  // in left rail but not in workstream-view sub-list until reload.)
-  function _reactiveRerender() {
-    const lvl = window.Accord?.state?.level;
-    const ctx = window.Accord?.state?.levelContext || {};
-    // Find a host: accord-transitions.js mounts views into .ac-view-host
-    const host = document.querySelector('.ac-view-host');
-    if (!host || host.style.display === 'none') return;
-
-    if (lvl === 'workstream' && ctx.workstreamId) {
-      renderWorkstreamView(host, ctx.workstreamId);
-    } else if (lvl === 'meeting' && ctx.meetingId) {
-      renderMeetingView(host, ctx.meetingId, ctx.workstreamId);
-    }
-  }
-
-  ['accord:meeting-filed', 'accord:meeting-unfiled', 'accord:meeting-refiled',
-   'accord:workstream-created', 'accord:workstream-renamed',
-   'accord:workstream-archived', 'accord:workstream-restored'].forEach(name => {
-    window.addEventListener(name, () => {
-      _invalidate();
-      _reactiveRerender();
-    });
-  });
-
-  // ── Expose ──────────────────────────────────────────────────
-  window.AccordViews = {
-    renderWorkstreamView,
-    renderMeetingView,
-    invalidate: _invalidate,
-  };
-})();
+/* ── Empty state ────────────────────────────────────────────── */
+#accord-app .ac-attendees-empty {
+  font-size: 11px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  color: var(--ink-ghost);
+  font-style: italic;
+  padding: 4px 0;
+}
