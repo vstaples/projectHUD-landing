@@ -1,5 +1,5 @@
 /* ============================================================
-   accord-meeting-setup.css — Meeting Setup surface
+   accord-meeting-setup.css â€” Meeting Setup surface
 
    CMD-ACCORD-SETUP-LAYOUT-1 (current):
    - 4-zone grid host (header/columns/filmstrip/footer)
@@ -9,21 +9,21 @@
    - Full-page host class on #accord-app suppresses both rails
 
    PRIOR (CMD-ACCORD-MEETING-SETUP-1 Phases 2-7):
-   - Style Doctrine v1.8 §3.8 — Accord palette discipline
+   - Style Doctrine v1.8 Â§3.8 â€” Accord palette discipline
    - Header internals, briefing/agenda/anticipation panels, prior
      meetings filmstrip, footer duration widget. All deferred to
      successor wave CMDs which target the new structure; rules
      below the new layout block are dormant in this CMD.
    ============================================================ */
 
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* CMD-ACCORD-SETUP-LAYOUT-1: layout shell and token palette    */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* §7 — Mockup v5 palette tokens, scoped to .ac-setup-shell.
-   Spec §12.3 + Style Doctrine v1.8 §3.8: Setup shell has its own
+/* Â§7 â€” Mockup v5 palette tokens, scoped to .ac-setup-shell.
+   Spec Â§12.3 + Style Doctrine v1.8 Â§3.8: Setup shell has its own
    visual identity vs. the running-meeting (Accord production)
-   palette. --ac-* prefix is exclusive — no --signal, no --canvas-*. */
+   palette. --ac-* prefix is exclusive â€” no --signal, no --canvas-*. */
 .ac-setup-shell {
   /* Backgrounds */
   --ac-bg-deep:       #0a0e14;
@@ -55,7 +55,7 @@
   --ac-font-mono:  "SF Mono", "JetBrains Mono", "Fira Code", Menlo, monospace;
   --ac-font-serif: "Lora", "Charter", "Georgia", serif;
 
-  /* §4 — 4-zone grid host */
+  /* Â§4 â€” 4-zone grid host */
   display: grid;
   grid-template-rows: auto 1fr 102px 54px;
   grid-template-areas:
@@ -64,7 +64,7 @@
     "filmstrip"
     "footer";
   /* Width is set defensively because .ac-view-host (parent) is
-     display:flex and the flex-direction is not guaranteed —
+     display:flex and the flex-direction is not guaranteed â€”
      V1 reported display:flex with no direction in the audit. */
   width:  100%;
   height: 100%;
@@ -77,7 +77,7 @@
   overflow: hidden;
 }
 
-/* §4 — Zone placement */
+/* Â§4 â€” Zone placement */
 .ac-setup-header    { grid-area: header;    }
 .ac-setup-columns   { grid-area: columns;   min-height: 0; overflow: hidden; }
 .ac-setup-filmstrip { grid-area: filmstrip; }
@@ -100,9 +100,9 @@
   padding: 12px 16px;
 }
 
-/* Header zone — CMD-ACCORD-SETUP-HEADER-1 §7 ─────────────── */
+/* Header zone â€” CMD-ACCORD-SETUP-HEADER-1 Â§7 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* §7.1 — Two-column layout: left (title + stakes) / right (toggle + meta) */
+/* Â§7.1 â€” Two-column layout: left (title + stakes) / right (toggle + meta) */
 .ac-setup-header {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -142,7 +142,7 @@
   color: var(--ac-text-secondary);
 }
 
-/* §7.2 — Meeting title */
+/* Â§7.2 â€” Meeting title */
 .ac-header-title {
   font-family: var(--ac-font-serif);
   font-size: 25px;
@@ -166,7 +166,7 @@
   overflow: visible;
 }
 
-/* §7.3 — Stakes */
+/* Â§7.3 â€” Stakes */
 .ac-header-stakes-block { display: flex; flex-direction: column; gap: 3px; }
 .ac-header-stakes-label {
   font-family: var(--ac-font-mono);
@@ -190,7 +190,7 @@
 .ac-header-stakes:hover,
 .ac-header-stakes:focus { border-left-color: var(--ac-cyan); }
 
-/* Placeholder via CSS ::before — no innerHTML manipulation */
+/* Placeholder via CSS ::before â€” no innerHTML manipulation */
 .ac-header-stakes.ac-placeholder::before,
 .ac-meta-editable.ac-placeholder::before {
   content: attr(data-placeholder);
@@ -200,7 +200,7 @@
 }
 .ac-header-stakes.ac-placeholder::before { display: block; }
 
-/* §7.4 — FOLLOW-UP / FIRST-EVER mode toggle */
+/* Â§7.4 â€” FOLLOW-UP / FIRST-EVER mode toggle */
 .ac-header-mode-toggle {
   display: flex;
   background: var(--ac-bg-pane);
@@ -224,7 +224,7 @@
   background: var(--ac-cyan-dim);
 }
 
-/* §7.5 — Schedule meta rows — see ac-header-right block above */
+/* Â§7.5 â€” Schedule meta rows â€” see ac-header-right block above */
 .ac-meta-label {
   color: var(--ac-text-tertiary);
   font-size: 9px;
@@ -265,7 +265,7 @@
 }
 
 
-/* §5 — Three-column grid inside .ac-setup-columns */
+/* Â§5 â€” Three-column grid inside .ac-setup-columns */
 .ac-setup-columns {
   display: grid;
   grid-template-columns: var(--col-left-w, 360px) 1fr var(--col-right-w, 380px);
@@ -300,11 +300,11 @@
   flex-direction: column;
 }
 
-/* Wave 2 affordance hooks (§8.1): tab bar + tab body per column.
+/* Wave 2 affordance hooks (Â§8.1): tab bar + tab body per column.
    Empty containers; Wave 2 CMDs render content into tabbar/tabbody. */
 .ac-col-tabbar {
   flex: 0 0 auto;
-  /* No height yet — Wave 2 CMDs set this when tab buttons render.
+  /* No height yet â€” Wave 2 CMDs set this when tab buttons render.
      Empty bar is invisible by design. */
   display: flex;
   align-items: stretch;
@@ -337,7 +337,7 @@
   text-align: center;
 }
 
-/* §5.1 — Drag handles. Sit on the right border of the left column
+/* Â§5.1 â€” Drag handles. Sit on the right border of the left column
    and the right border of the center column, 8px hit target with
    visual feedback only on hover/drag. */
 .ac-col-handle {
@@ -356,7 +356,7 @@
   background: var(--ac-border-active);
 }
 
-/* §6 — Filmstrip zone with drag handle on the top border.
+/* Â§6 â€” Filmstrip zone with drag handle on the top border.
    Height is controlled via grid-template-rows on .ac-setup-shell;
    _setShellFilmstripRow() in JS updates the third row value. */
 .ac-setup-filmstrip {
@@ -389,7 +389,7 @@
   /* Placeholder content this CMD; FILMSTRIP-2 populates with frames. */
 }
 
-/* Footer zone — placeholder this CMD; VERDICT-1 replaces. */
+/* Footer zone â€” placeholder this CMD; VERDICT-1 replaces. */
 .ac-setup-footer {
   border-top: 1px solid var(--ac-border-subtle);
   background: var(--ac-bg-pane);
@@ -397,28 +397,28 @@
   align-items: center;
 }
 
-/* §8.2 — Intelligence Mode overlay stub (outside grid, full viewport).
+/* Â§8.2 â€” Intelligence Mode overlay stub (outside grid, full viewport).
    Wave 2 CMD-ACCORD-SETUP-INTELLIGENCE-1 populates content + reveals. */
 .ac-intel-overlay {
   position: fixed;
   inset: 0;
   z-index: 100;
   background: rgba(10, 14, 20, 0.92);
-  /* Wave 2 will manage display:none → flex transitions. */
+  /* Wave 2 will manage display:none â†’ flex transitions. */
 }
 
-/* §8.3 — Gathering-mode hook (data-mode="gathering" set by Wave 3). */
+/* Â§8.3 â€” Gathering-mode hook (data-mode="gathering" set by Wave 3). */
 .ac-setup-shell[data-mode="gathering"] .ac-col-placeholder {
   /* Gathering-specific overrides land here in CMD-ACCORD-SETUP-GATHERING-1 */
 }
 
-/* ──────────────────────────────────────────────────────────── */
-/* §3 — Full-page host mechanism (Option A) — dual-anchor.      */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Â§3 â€” Full-page host mechanism (Option A) â€” dual-anchor.      */
 /*                                                              */
 /* IR64 V1 (authoritative): .ac-view-host is 819px wide with   */
 /* a 250px left offset. Parent is MAIN.ac-center.               */
-/* Layout host siblings: ASIDE.ac-rail-left · MAIN.ac-center   */
-/* · ASIDE.ac-rail-right.                                       */
+/* Layout host siblings: ASIDE.ac-rail-left Â· MAIN.ac-center   */
+/* Â· ASIDE.ac-rail-right.                                       */
 /*                                                              */
 /* IR64 V2 (authoritative): Commission selector guesses         */
 /* ('.ac-left-rail', '.ac-workstreams-rail', '#accord-          */
@@ -444,25 +444,25 @@
 /* 250px natural width with rails hidden. flex:1 1 auto lets    */
 /* it fill the freed rail space. body anchor is sufficient.     */
 /*                                                              */
-/* Both classes removed in teardown() — smoke test 7.           */
+/* Both classes removed in teardown() â€” smoke test 7.           */
 /* This block is the authoritative selector record for all      */
 /* future CMDs that interact with the rail layout.              */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* Rail hiding — #accord-app prefix required for specificity */
+/* Rail hiding â€” #accord-app prefix required for specificity */
 #accord-app.accord-setup-fullpage .ac-rail-left  { display: none; }
 #accord-app.accord-setup-fullpage .ac-rail-right { display: none; }
 
-/* Center expansion — grid-column: 1/-1 spans all .ac-three-pane tracks.
+/* Center expansion â€” grid-column: 1/-1 spans all .ac-three-pane tracks.
    .ac-three-pane is display:grid (not flex); flex:1 1 auto has no effect
    on grid children. Confirmed via console: center 1130px with this rule,
    250px without. #accord-app prefix required for specificity. */
 #accord-app.accord-setup-fullpage .ac-center { grid-column: 1 / -1; }
 
-/* View host — body prefix sufficient; resolves to 100% of expanded center */
+/* View host â€” body prefix sufficient; resolves to 100% of expanded center */
 body.accord-setup-fullpage .ac-view-host { width: 100%; height: 100%; }
 
-/* Running-meeting tab panes — body prefix required            */
+/* Running-meeting tab panes â€” body prefix required            */
 /* (panes are outside #accord-app; y > 945px in document)     */
 body.accord-setup-fullpage .ac-meeting-surface-host,
 body.accord-setup-fullpage .agenda-rail,
@@ -475,10 +475,10 @@ body.accord-setup-fullpage .digest-recipients,
 body.accord-setup-fullpage .minutes-rail,
 body.accord-setup-fullpage .minutes-history { display: none !important; }
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-OUTCOMES-1 — Outcomes block styles §7       */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-OUTCOMES-1 â€” Outcomes block styles Â§7       */
 /* All tokens --ac-* only; scoped to .ac-setup-shell            */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Outcomes block */
 .ac-outcomes-block {
@@ -640,10 +640,10 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-outcome-desc-input:focus { border-color: var(--ac-border-active); }
 .ac-outcome-form-actions { display: flex; gap: 8px; }
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-ATTENDEES-1 — Attendee roster styles §7     */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-ATTENDEES-1 â€” Attendee roster styles Â§7     */
 /* All tokens --ac-* only; scoped to .ac-setup-shell            */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .ac-attendees-block { padding: 14px 16px; }
 .ac-attendees-loading,
@@ -686,7 +686,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   flex-wrap: wrap;
 }
 
-/* Connection dot — CMD-ACCORD-SETUP-GATHERING-1 (C-12) §11 */
+/* Connection dot â€” CMD-ACCORD-SETUP-GATHERING-1 (C-12) Â§11 */
 .ac-conn-dot {
   display: inline-block;
   width: 12px;
@@ -700,7 +700,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   background: transparent;
   border: 2px solid var(--ac-border-mid);
   box-shadow: 0 0 0 0 transparent;
-  /* Glowing outline — not connected */
+  /* Glowing outline â€” not connected */
   animation: ac-conn-glow 2s ease-in-out infinite;
 }
 .ac-conn-dot--on-time {
@@ -841,16 +841,16 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   padding: 4px 0;
 }
 
-/* Gathering mode — hide add-attendee row in gathering window
+/* Gathering mode â€” hide add-attendee row in gathering window
    (C-12 absorbed prior _setGatheringMode scaffolding; selector
    migrated from .ac-attendees-block[data-mode="gathering"] to
    .ac-gathering-active on .ac-setup-col-right) */
 .ac-gathering-active .ac-add-attendee-row { display: none; }
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-FILMSTRIP-2 — Filmstrip + scrub styles §8   */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-FILMSTRIP-2 â€” Filmstrip + scrub styles Â§8   */
 /* All tokens --ac-* only; scoped to .ac-setup-shell            */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Filmstrip content wrapper (overrides LAYOUT-1 placeholder rule) */
 .ac-filmstrip-content {
@@ -990,7 +990,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-film-date--current { color: var(--ac-cyan); }
 .ac-film-counts        { color: var(--ac-text-tertiary); margin-bottom: 2px; }
 
-/* Density state adaptation (§6) */
+/* Density state adaptation (Â§6) */
 .ac-setup-filmstrip[data-density="compact"] .ac-film-counts { display: none; }
 .ac-setup-filmstrip[data-density="compact"] .ac-film-header { display: none; }
 .ac-setup-filmstrip[data-density="expanded"] .ac-film-frame { /* height scales with zone */ }
@@ -1088,10 +1088,10 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   padding: 8px 0;
 }
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-BRIEFING-TABS-1 — Tab bar + content styles  */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-BRIEFING-TABS-1 â€” Tab bar + content styles  */
 /* All tokens --ac-* only; scoped to .ac-setup-shell            */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Tab bar */
 .ac-col-tabbar {
@@ -1246,10 +1246,10 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   font-style: italic; padding: 16px;
 }
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-AGENDA-ENHANCED-1 — Center tab + agenda     */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-AGENDA-ENHANCED-1 â€” Center tab + agenda     */
 /* All tokens --ac-* only; scoped to .ac-setup-shell            */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Center tabbar */
 .ac-col-tabbar[data-col="center"] {
@@ -1360,10 +1360,10 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-agenda-add-btn { font-size: 16px; color: var(--ac-cyan); background: none; border: none; cursor: pointer; padding: 0 4px; line-height: 1; }
 .ac-agenda-add-btn:hover { color: var(--ac-text-primary); }
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-INTELLIGENCE-1 — Intel overlay + enrichment */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-INTELLIGENCE-1 â€” Intel overlay + enrichment */
 /* All tokens --ac-* only; scoped to .ac-setup-shell            */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Intelligence overlay */
 #ac-intel-overlay {
@@ -1475,10 +1475,10 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-intel-notes-textarea:focus { border-color: var(--ac-border-active); }
 .ac-intel-notes-textarea::placeholder { color: var(--ac-text-faint); font-style: italic; }
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-ACTION-KANBAN-1 — Kanban + grid styles      */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-ACTION-KANBAN-1 â€” Kanban + grid styles      */
 /* All tokens --ac-* only; scoped to .ac-setup-shell            */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .ac-actions-loading, .ac-actions-empty, .ac-actions-error {
   font-size: 12px; color: var(--ac-text-tertiary);
@@ -1583,8 +1583,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   border-color: var(--ac-amber) !important;
 }
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-MEETING-SETUP-1 (prior phases) — DEFERRED         */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-MEETING-SETUP-1 (prior phases) â€” DEFERRED         */
 /* The rules below shipped in Phases 2-7. Their selectors do    */
 /* not match the new shell structure introduced above. They     */
 /* remain in place because the JS module preserves              */
@@ -1594,7 +1594,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 /* ATTENDEES-1, BRIEFING-TABS-1, FILMSTRIP-2, VERDICT-1) will   */
 /* reauthor whichever rules they need against the new --ac-*    */
 /* token palette. Until then these rules are dormant.           */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 
 .ac-setup-breadcrumb {
@@ -1638,7 +1638,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   padding: 1px 6px;
 }
 
-/* ── 3-column body ────────────────────────────────────────── */
+/* â”€â”€ 3-column body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .ac-setup-body {
   display: flex;
   flex-direction: row;
@@ -1713,16 +1713,16 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   font-style: italic;
 }
 
-/* ── Filmstrip ────────────────────────────────────────────── */
+/* â”€â”€ Filmstrip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* CMD-ACCORD-SETUP-LAYOUT-1: prior .ac-setup-filmstrip rule
-   (height:72px / flex / overflow-x:auto) removed — conflicted
+   (height:72px / flex / overflow-x:auto) removed â€” conflicted
    with the new grid-area-controlled height. New rule lives in
    the layout block at the top of this file. CMD-ACCORD-SETUP-
    FILMSTRIP-2 will reauthor inner-frame styles. */
 
-/* ── Footer ───────────────────────────────────────────────── */
+/* â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* CMD-ACCORD-SETUP-LAYOUT-1: prior .ac-setup-footer rule
-   (flex / space-between / padding / border) removed —
+   (flex / space-between / padding / border) removed â€”
    conflicted with the new grid-area version. New rule lives
    in the layout block at the top of this file.
    CMD-ACCORD-SETUP-VERDICT-1 will reauthor footer internals. */
@@ -1739,7 +1739,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   gap: 8px;
 }
 
-/* ── Agenda column (Phase 3) ──────────────────────────────── */
+/* â”€â”€ Agenda column (Phase 3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .ac-agenda-loading,
 .ac-agenda-error {
@@ -2002,7 +2002,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   background: var(--canvas-raised);
 }
 
-/* ── Meeting controls bar (CMD-ACCORD-NEWMEETING-ROUTING-FIX-1) ──
+/* â”€â”€ Meeting controls bar (CMD-ACCORD-NEWMEETING-ROUTING-FIX-1) â”€â”€
    Relocated into .ac-view-header by _mountSurfaceHostInTabBody().
    ac-view-header uses flex so the bar sits right-aligned on the
    same row as breadcrumb/title.                                  */
@@ -2047,7 +2047,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   position: relative;
 }
 
-/* ── Briefing column — Phase 4 ────────────────────────────── */
+/* â”€â”€ Briefing column â€” Phase 4 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .ac-setup-briefing-default {
   display: flex;
@@ -2120,7 +2120,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   flex-shrink: 0;
 }
 
-/* ── Agenda separator + typed badges — Phase 4 ─────────────── */
+/* â”€â”€ Agenda separator + typed badges â€” Phase 4 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .ac-agenda-section-divider {
   border: none;
@@ -2128,7 +2128,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   margin: 10px 0;
 }
 
-/* Typed pulled badges — Accord tag palette tokens */
+/* Typed pulled badges â€” Accord tag palette tokens */
 .ac-agenda-pulled-badge    { font-size: 11px; color: var(--ink-faint); font-style: italic; flex-shrink: 0; white-space: nowrap; }
 .ac-agenda-pulled-decision { color: var(--tag-decision); font-style: normal; }
 .ac-agenda-pulled-action   { color: var(--tag-action);   font-style: normal; }
@@ -2136,7 +2136,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-agenda-pulled-note     { color: var(--tag-note);     font-style: normal; }
 .ac-agenda-pulled-dissent  { color: var(--ink-muted);    font-style: normal; }
 
-/* ── Anticipation column -- Phase 5 ──────────────────────── */
+/* â”€â”€ Anticipation column -- Phase 5 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .ac-anticipation-loading,
 .ac-anticipation-error,
@@ -2216,7 +2216,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   line-height: 1.4;
 }
 
-/* ── Filmstrip -- Phase 6 ─────────────────────────────────── */
+/* â”€â”€ Filmstrip -- Phase 6 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .ac-film-track {
   display: flex;
@@ -2275,7 +2275,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   padding: 4px 0;
 }
 
-/* ── Footer duration widget -- Phase 7 ───────────────────── */
+/* â”€â”€ Footer duration widget -- Phase 7 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .ac-footer-duration {
   display: flex;
@@ -2318,10 +2318,10 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   padding: 2px 8px;
 }
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-SLIDESHOW-1 — Per-column rotation UI        */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-SLIDESHOW-1 â€” Per-column rotation UI        */
 /* All tokens --ac-* only; scoped to .ac-setup-shell            */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Rotating-column tabbars: space-between layout + position:relative
    for the absolute-positioned progress bar.                     */
@@ -2332,7 +2332,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   justify-content: space-between;
 }
 
-/* Tab button group wrapper — left side of rotating tabbars */
+/* Tab button group wrapper â€” left side of rotating tabbars */
 .ac-tabs {
   display: flex;
   gap: 2px;
@@ -2357,14 +2357,14 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   flex-shrink: 0;
 }
 
-/* 1px progress drain line — absolute at bottom of tabbar header */
+/* 1px progress drain line â€” absolute at bottom of tabbar header */
 .ac-rotation-progress {
   position: absolute;
   bottom: -1px; /* overlaps the tabbar border-bottom so lines align */
   left: 0;
   right: 0;
   height: 2px;
-  background: rgba(251, 191, 36, 0.75); /* amber — distinct from cyan active-tab underline */
+  background: rgba(251, 191, 36, 0.75); /* amber â€” distinct from cyan active-tab underline */
   transform: scaleX(0);
   transform-origin: left center;
   transition: transform 100ms linear; /* smooth 2-tick drain steps */
@@ -2410,10 +2410,10 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-tab-fade-in { animation: acTabFadeIn 0.22s ease; }
 
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-PERCOLATE-1 — Click-to-percolate by person  */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-PERCOLATE-1 â€” Click-to-percolate by person  */
 /* All tokens --ac-* only; scoped to .ac-setup-shell            */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .ac-percolate-faded {
   opacity: 0.35;
@@ -2425,7 +2425,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   transition: opacity 0.18s ease;
 }
 
-/* Filter pill — mounts in .ac-agenda-header */
+/* Filter pill â€” mounts in .ac-agenda-header */
 .ac-percolate-pill {
   display: inline-flex;
   align-items: center;
@@ -2454,21 +2454,21 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 .ac-percolate-dismiss:hover { opacity: 1; }
 
-/* Attendee cards stay clickable when faded — needed to switch filter to a different person */
+/* Attendee cards stay clickable when faded â€” needed to switch filter to a different person */
 .ac-attendee-card.ac-percolate-faded { pointer-events: auto; }
 
 /* Hidden owner anchor span inside .ac-agenda-item (C-11 D1) */
 .ac-percolate-owner { display: none; }
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-GATHERING-1 (C-12) — §11 visual layer       */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-GATHERING-1 (C-12) â€” Â§11 visual layer       */
 /* Conn-dot rules above (replaced legacy --idle block).         */
 /* Architect amendment: gathering label uses margin-left: auto  */
 /* to push right of slideshow stepper + rotation progress in    */
 /* the existing .ac-col-tabbar[data-col="right"] flex row.      */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* Gathering active column — slightly tighter card padding */
+/* Gathering active column â€” slightly tighter card padding */
 .ac-gathering-active .ac-attendee-card {
   padding: 10px 12px;
 }
@@ -2555,10 +2555,10 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-VERDICT-1 (C-13) — §13 footer visual layer  */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-VERDICT-1 (C-13) â€” Â§13 footer visual layer  */
 /* P2 amendment: ac-budget-fill-- prefix (not ac-budget-bar--). */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Footer layout */
 .ac-setup-footer {
@@ -2618,7 +2618,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   border: 1px solid rgba(251,113,133,0.3);
 }
 
-/* Verdict modal — centered, dimmed backdrop */
+/* Verdict modal â€” centered, dimmed backdrop */
 .ac-verdict-backdrop {
   position: fixed;
   inset: 0;
@@ -2783,12 +2783,12 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 
 
-/* ──────────────────────────────────────────────────────────── */
-/* X-11 — Briefing inline edit                                  */
-/* X-12 — Duration inline edit (F-C13-2 resolution)            */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* X-11 â€” Briefing inline edit                                  */
+/* X-12 â€” Duration inline edit (F-C13-2 resolution)            */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* X-11: Briefing synthesis text (saved state — matches mockup .synthesis) */
+/* X-11: Briefing synthesis text (saved state â€” matches mockup .synthesis) */
 .ac-briefing-synthesis-text {
   background: var(--ac-bg-tile);
   border: 1px solid var(--ac-border-subtle);
@@ -2909,12 +2909,12 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-duration-cancel:hover { color: var(--ac-rose); }
 
 
-/* ──────────────────────────────────────────────────────────── */
-/* CMD-ACCORD-SETUP-FILMSTRIP-CARDS-1 (C-14) — Card density     */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* CMD-ACCORD-SETUP-FILMSTRIP-CARDS-1 (C-14) â€” Card density     */
 /* Dot strip always visible; node lines gated by tier classes.  */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* Dot strip — always visible, top-left of card */
+/* Dot strip â€” always visible, top-left of card */
 .ac-film-dots {
   position: absolute;
   top: 4px;
@@ -2934,8 +2934,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-film-dot--dissent  { background: var(--ac-rose); }
 .ac-film-dot--risk     { background: var(--ac-rose); opacity: 0.7; }
 
-/* Node lines container — hidden by default, revealed by tier classes */
-/* Node lines container — hidden by default, revealed by tier classes */
+/* Node lines container â€” hidden by default, revealed by tier classes */
+/* Node lines container â€” hidden by default, revealed by tier classes */
 .ac-film-nodes {
   position: absolute;
   top: 20px;        /* below dot strip */
@@ -2996,24 +2996,24 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-film-node--dissent  .ac-film-node-seq { color: var(--ac-bg-deep); background: var(--ac-rose); }
 .ac-film-node--risk     .ac-film-node-seq { color: var(--ac-bg-deep); background: var(--ac-rose); opacity: 0.85; }
 
-/* Compact tier (≥ 90px) — show seq IDs */
+/* Compact tier (â‰¥ 90px) â€” show seq IDs */
 .ac-film-frame--compact .ac-film-nodes { display: flex; }
 
-/* Full tier (≥ 140px) — show seq IDs + summaries */
+/* Full tier (â‰¥ 140px) â€” show seq IDs + summaries */
 .ac-film-frame--full .ac-film-nodes    { display: flex; }
 .ac-film-frame--full .ac-film-node-summary { display: inline; }
 
 
-/* ──────────────────────────────────────────────────────────── */
-/* X-14 — WHEN picker panel                                     */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* X-14 â€” WHEN picker panel                                     */
 /* Replaces X-12 duration-only inline edit.                     */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .ac-meta-row--when { position: relative; cursor: pointer; }
 
 #ac-when-picker {
   z-index: 8000;
-  background: #161c26;   /* --ac-bg-elevated hardcoded — picker mounts on body outside shell scope */
+  background: #161c26;   /* --ac-bg-elevated hardcoded â€” picker mounts on body outside shell scope */
   border: 1px solid rgba(255,255,255,0.15);
   border-top: 2px solid #5eead4;  /* --ac-cyan accent top edge */
   border-radius: 10px;
@@ -3164,11 +3164,11 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-picker-cancel:hover { color: rgba(255,255,255,0.6); }
 
 
-/* ──────────────────────────────────────────────────────────── */
-/* A-08 · CMD-ACCORD-CAPTURE-CHAT-1 — Team Chat                 */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* A-08 Â· CMD-ACCORD-CAPTURE-CHAT-1 â€” Team Chat                 */
 /* Replaces ephemeral chat (accord:remote-chat broadcast).      */
 /* Uses existing #chatStream / #chatInput / #chatSendBtn DOM.   */
-/* ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Override existing .chat-stream height for A-08 */
 #accord-app .chat-stream {
