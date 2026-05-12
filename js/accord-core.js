@@ -71,6 +71,18 @@ const Accord = (() => {
     state.levelContext = ctx || {};
     _persistWrite('accord-level', state.level);
     _persistWrite('accord-level-context', JSON.stringify(state.levelContext));
+
+    // X-16: update URL to reflect current meeting.
+    // This enables hard refresh, bookmarking, and multi-user session sync.
+    // replaceState (not pushState) avoids polluting browser history on every level change.
+    if (nextLevel === 'meeting' && ctx && ctx.meetingId) {
+      var newUrl = location.pathname + '?meeting=' + ctx.meetingId;
+      history.replaceState({ level: nextLevel, meetingId: ctx.meetingId }, '', newUrl);
+    } else if (nextLevel === 'constellation' || nextLevel === 'workstream') {
+      // Clear meeting param when ascending so URL stays clean at every level.
+      history.replaceState({ level: nextLevel }, '', location.pathname);
+    }
+
     window.dispatchEvent(new CustomEvent('accord:level-changed', {
       detail: { level: state.level, context: state.levelContext },
     }));
@@ -647,6 +659,19 @@ const Accord = (() => {
 
   // ── Init ────────────────────────────────────────────────────
   async function _init() {
+    // X-16: if URL contains ?meeting=<id>, honour it over persisted level.
+    // Module-load hydration (lines 61–65) has already populated state.level
+    // from localStorage; URL is the higher authority and overrides it here
+    // before any consumer reads state.level. This keeps level state in sync
+    // with the URL deep-link handler further down in _init.
+    var _urlMtgId = new URLSearchParams(location.search).get('meeting');
+    if (_urlMtgId) {
+      state.level        = 'meeting';
+      state.levelContext = { meetingId: _urlMtgId };
+      _persistWrite('accord-level', 'meeting');
+      _persistWrite('accord-level-context', JSON.stringify({ meetingId: _urlMtgId }));
+    }
+
     _wireTopNav();
     _wireToggle();
     _wireNewMeetingModal();
