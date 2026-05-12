@@ -696,7 +696,10 @@ const Accord = (() => {
       // Idempotent: state.level, persisted level, and URL are already correct
       // from the §3.2 override at the top of _init and the §3.1 amendment.
       // Sole new effect is the event dispatch.
-      setLevel('meeting', { meetingId: meetingId });
+      setLevel('meeting', {
+        meetingId:    meetingId,
+        workstreamId: state.meeting && state.meeting.workstream_id,
+      });
     } else if (meetingId) {
       // Stale ?meeting=undefined or similar — clear it from the URL silently.
       const url = new URL(window.location);
