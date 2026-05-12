@@ -688,6 +688,15 @@ const Accord = (() => {
     const validUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (meetingId && validUuid.test(meetingId)) {
       await loadMeeting(meetingId);
+      // X-16: dispatch accord:level-changed now that _resolveMe and
+      // loadMeeting have completed. accord-transitions.js owns the surface
+      // switch on this event; its own boot-time safety net fires too early
+      // (before AccordViews is on the global), so accord-core re-fires
+      // through setLevel here at a point where the environment is ready.
+      // Idempotent: state.level, persisted level, and URL are already correct
+      // from the §3.2 override at the top of _init and the §3.1 amendment.
+      // Sole new effect is the event dispatch.
+      setLevel('meeting', { meetingId: meetingId });
     } else if (meetingId) {
       // Stale ?meeting=undefined or similar — clear it from the URL silently.
       const url = new URL(window.location);
