@@ -30,9 +30,23 @@
   var _chatResourceName  = null;
   var _chatMeetingState  = 'idle';
 
+  // ── A-09 Live filmstrip state ─────────────────────────────────
+  var _liveFilmToken     = 0;
+  var _liveFilmMeetings  = [];
+  var _liveFilmActiveId  = null;
+  var _liveFilmResizing  = false;
+  var _liveFilmCardToken = 0;
+
   // ── Lifecycle hookup ─────────────────────────────────────────
   window.addEventListener('accord:level-changed', function() {
     _teardownChat();
+    // A-09: filmstrip teardown
+    _liveFilmToken    = 0;
+    _liveFilmMeetings = [];
+    _liveFilmActiveId = null;
+    _liveFilmResizing = false;
+    var liveFilm = document.getElementById('ac-live-filmstrip');
+    if (liveFilm) liveFilm.remove();
   });
 
   window.addEventListener('accord:meeting-loaded', async (ev) => {
@@ -40,6 +54,8 @@
     await _loadAll(meeting, thread);
     // A-08: initialise persisted chat after meeting loads
     _initChat(meeting);
+    // A-09: mount workstream timeline filmstrip
+    _mountLiveFilmstrip(meeting);
   });
 
   window.addEventListener('accord:meeting-sealed', async (ev) => {
@@ -572,9 +588,39 @@
   //   auth user_id, not resource row id.
   // Replaces ephemeral broadcast chat (accord:remote-chat + local.chatMessages).
 
+  // §A-08-mount — Ensure .chat-panel wrapper and .chat-input-row exist in DOM.
+  // The #chatStream stub is guaranteed by accord.html; this wraps it and injects
+  // the input row if a prior rollback left them absent.
+  function _mountChatPanel() {
+    var stream = document.getElementById('chatStream');
+    if (!stream) return;
+
+    // Wrap in .chat-panel if not already wrapped
+    if (!stream.closest('.chat-panel')) {
+      var panel = document.createElement('div');
+      panel.className = 'chat-panel';
+      stream.parentNode.insertBefore(panel, stream);
+      panel.appendChild(stream);
+    }
+
+    // Inject .chat-input-row below stream if absent
+    var panel = stream.closest('.chat-panel');
+    if (panel && !panel.querySelector('.chat-input-row')) {
+      panel.insertAdjacentHTML('beforeend',
+        '<div class="chat-input-row">' +
+          '<input id="chatInput" class="chat-input" type="text" ' +
+                 'placeholder="Message the meeting\u2026" autocomplete="off">' +
+          '<button id="chatSendBtn" class="chat-send" disabled>SEND</button>' +
+        '</div>');
+    }
+  }
+
   function _initChat(meeting) {
     _teardownChat();
     _chatMeetingState = meeting.state;
+
+    // Mount DOM wrapper and input row first (idempotent)
+    _mountChatPanel();
 
     // P2: resolve resource row id from auth user_id
     var userId = Accord.state.me && Accord.state.me.id;
@@ -602,6 +648,22 @@
       try { _chatSubscription.unsubscribe(); } catch (e) {}
       _chatSubscription = null;
     }
+    // Clean any stale accord-chat channels left in the realtime registry
+    // (guards against async _initChat completing after level-changed fires)
+    var rc = window.Accord &&
+             window.Accord.state &&
+             window.Accord.state.realtimeClient &&
+             window.Accord.state.realtimeClient.realtime;
+    if (rc && rc.channels) {
+      rc.channels.filter(function(c) {
+        return c.topic && c.topic.indexOf('accord-chat-') !== -1;
+      }).forEach(function(c) {
+        try { c.unsubscribe(); } catch (e) {}
+      });
+    }
+    // Remove stale closed-label so it cannot bleed into the next meeting
+    var staleLabel = document.querySelector('.chat-closed-label');
+    if (staleLabel) staleLabel.remove();
     _chatMessages     = [];
     _chatResourceId   = null;
     _chatResourceName = null;
@@ -817,6 +879,9 @@
       input.disabled    = false;
       if (sendBtn) sendBtn.disabled = input.value.trim().length === 0;
       if (inputRow) inputRow.style.display = '';
+      // Remove any stale closed-label from a previous meeting navigation
+      var stale = document.querySelector('.chat-closed-label');
+      if (stale) stale.remove();
     } else if (meetingState === 'closed') {
       if (inputRow) inputRow.style.display = 'none';
       var stream = document.querySelector('.chat-stream, #chatStream');
@@ -829,6 +894,309 @@
 
   function _renderChat() {
     // Legacy stub — no-op. A-08 uses _renderChatStream.
+  }
+
+  // ── A-09 · CMD-ACCORD-CAPTURE-FILMSTRIP-1 ───────────────────
+
+  // §5 — Mount filmstrip zone at base of center capture pane
+  function _mountLiveFilmstrip(meeting) {
+    var center = document.querySelector('.capture-center, #captureCenter');
+    if (!center) return;
+    if (document.getElementById('ac-live-filmstrip')) return; // idempotent
+
+    var zone = document.createElement('div');
+    zone.id        = 'ac-live-filmstrip';
+    zone.className = 'ac-live-filmstrip';
+    zone.innerHTML = [
+      '<div class="ac-live-film-handle" id="ac-live-film-handle"></div>',
+      '<div class="ac-live-film-header">',
+        '<span class="ac-live-film-label">WORKSTREAM TIMELINE</span>',
+        '<span class="ac-live-film-hint" id="ac-live-film-hint"></span>',
+      '</div>',
+      '<div class="ac-live-film-track" id="ac-live-film-track">',
+        '<div class="ac-live-film-loading">Loading timeline\u2026</div>',
+      '</div>'
+    ].join('');
+
+    var footer = center.querySelector('.capture-footer, .capture-controls');
+    if (footer) {
+      center.insertBefore(zone, footer);
+    } else {
+      center.appendChild(zone);
+    }
+
+    _wireFilmResizeHandle(zone);
+    _loadLiveFilmFrames(meeting);
+  }
+
+  // §6 — Fetch sealed workstream meetings and render frames
+  function _loadLiveFilmFrames(meeting) {
+    var myToken = ++_liveFilmToken;
+    var track   = document.getElementById('ac-live-film-track');
+
+    if (!meeting.workstream_id) {
+      if (track) track.innerHTML = '<div class="ac-live-film-empty">No workstream context.</div>';
+      return;
+    }
+
+    API.get(
+      'accord_meetings?workstream_id=eq.' + meeting.workstream_id +
+      '&state=in.(closed,sealed)' +
+      '&order=sealed_at.asc' +
+      '&select=meeting_id,title,scheduled_for,sealed_at,state' +
+      '&limit=30'
+    ).then(function(meetings) {
+      if (_liveFilmToken !== myToken) return;
+      meetings = meetings || [];
+
+      var track = document.getElementById('ac-live-film-track');
+      if (!track || !track.isConnected) return;
+
+      _liveFilmMeetings = meetings;
+
+      if (!meetings.length) {
+        track.innerHTML = '<div class="ac-live-film-empty">No prior meetings in this workstream.</div>';
+        return;
+      }
+
+      var hint = document.getElementById('ac-live-film-hint');
+      if (hint) hint.textContent = meetings.length + ' prior meeting' +
+                                   (meetings.length !== 1 ? 's' : '') +
+                                   ' \u00b7 click to filter thread history';
+
+      var html = meetings.map(function(m) {
+        var date     = m.scheduled_for
+          ? new Date(m.scheduled_for).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+          : 'Unknown';
+        var isActive = m.meeting_id === _liveFilmActiveId;
+
+        return '<div class="ac-film-frame' + (isActive ? ' ac-film-frame--active' : '') + '" ' +
+               'data-meeting-id="' + esc(m.meeting_id) + '" ' +
+               'data-action="live-film-select">' +
+               '<div class="ac-film-thumb ac-film-thumb--f1"></div>' +
+               '<div class="ac-film-meta">' +
+                 '<div class="ac-film-date">' + esc(date) + '</div>' +
+               '</div>' +
+               '</div>';
+      }).join('');
+
+      track.innerHTML = html;
+
+      // Click delegation — one listener on the track
+      track.addEventListener('click', function(ev) {
+        var frame = ev.target.closest('[data-action="live-film-select"]');
+        if (!frame) return;
+        _onLiveFilmSelect(frame.dataset.meetingId, meeting);
+      });
+
+      _enrichLiveFilmCards();
+
+      // Scroll to most recent
+      setTimeout(function() { track.scrollLeft = track.scrollWidth; }, 50);
+    }).catch(function(e) {
+      console.error('[AccordCapture] live filmstrip load failed', e);
+    });
+  }
+
+  // §6-enrich — Dot indicators + seq-ID lines on each frame
+  function _enrichLiveFilmCards() {
+    var myToken = ++_liveFilmCardToken;
+    var frames  = document.querySelectorAll('#ac-live-film-track .ac-film-frame[data-meeting-id]');
+    if (!frames.length) return;
+
+    var ids = Array.from(frames).map(function(f) { return f.dataset.meetingId; }).filter(Boolean);
+    if (!ids.length) return;
+
+    API.get(
+      'accord_nodes?meeting_id=in.(' + ids.join(',') + ')' +
+      '&tag=in.(decision,action,dissent,risk)' +
+      '&sealed_at=not.is.null' +
+      '&select=meeting_id,tag,seq_id,summary' +
+      '&order=meeting_id.asc,seq_number.asc' +
+      '&limit=60'
+    ).then(function(nodes) {
+      if (_liveFilmCardToken !== myToken) return;
+      nodes = nodes || [];
+
+      var byMeeting = {};
+      nodes.forEach(function(n) {
+        if (!byMeeting[n.meeting_id]) byMeeting[n.meeting_id] = [];
+        byMeeting[n.meeting_id].push(n);
+      });
+
+      frames.forEach(function(frame) {
+        _paintLiveFilmCardContent(frame, byMeeting[frame.dataset.meetingId] || []);
+      });
+    }).catch(function(e) {
+      console.error('[AccordCapture] film card enrich failed', e);
+    });
+  }
+
+  function _paintLiveFilmCardContent(frame, nodes) {
+    var ex = frame.querySelector('.ac-film-dots');  if (ex) ex.remove();
+    var en = frame.querySelector('.ac-film-nodes'); if (en) en.remove();
+    if (!nodes.length) return;
+
+    var tagTypes = {};
+    nodes.forEach(function(n) { tagTypes[n.tag] = true; });
+
+    var dotHtml = '<div class="ac-film-dots">';
+    if (tagTypes.decision) dotHtml += '<span class="ac-film-dot ac-film-dot--decision"></span>';
+    if (tagTypes.action)   dotHtml += '<span class="ac-film-dot ac-film-dot--action"></span>';
+    if (tagTypes.dissent)  dotHtml += '<span class="ac-film-dot ac-film-dot--dissent"></span>';
+    if (tagTypes.risk)     dotHtml += '<span class="ac-film-dot ac-film-dot--risk"></span>';
+    dotHtml += '</div>';
+    frame.insertAdjacentHTML('afterbegin', dotHtml);
+
+    var TAG_ORDER = ['decision', 'action', 'dissent', 'risk'];
+    var sorted    = nodes.slice().sort(function(a, b) {
+      return TAG_ORDER.indexOf(a.tag) - TAG_ORDER.indexOf(b.tag);
+    });
+
+    var nodesHtml = '<div class="ac-film-nodes">';
+    sorted.slice(0, 4).forEach(function(n) {
+      nodesHtml += '<div class="ac-film-node ac-film-node--' + n.tag + '">';
+      nodesHtml += '<span class="ac-film-node-seq">' + esc(n.seq_id || '') + '</span>';
+      if (n.summary) {
+        nodesHtml += '<span class="ac-film-node-summary">' + esc(n.summary.slice(0, 40)) + '</span>';
+      }
+      nodesHtml += '</div>';
+    });
+    nodesHtml += '</div>';
+    frame.insertAdjacentHTML('beforeend', nodesHtml);
+  }
+
+  // §7 — Frame click: toggle or switch Thread History filter
+  function _onLiveFilmSelect(meetingId, currentMeeting) {
+    var track = document.getElementById('ac-live-film-track');
+
+    if (_liveFilmActiveId === meetingId) {
+      // Same frame — clear filter
+      _liveFilmActiveId = null;
+      track.querySelectorAll('.ac-film-frame--active').forEach(function(f) {
+        f.classList.remove('ac-film-frame--active');
+      });
+      _restoreCaptureStream();
+      return;
+    }
+
+    _liveFilmActiveId = meetingId;
+    track.querySelectorAll('.ac-film-frame--active').forEach(function(f) {
+      f.classList.remove('ac-film-frame--active');
+    });
+    var activeFrame = track.querySelector('[data-meeting-id="' + meetingId + '"]');
+    if (activeFrame) activeFrame.classList.add('ac-film-frame--active');
+
+    _activateThreadHistoryTab();
+    _loadFilmThreadHistory(meetingId);
+  }
+
+  function _activateThreadHistoryTab() {
+    var thBtn = document.querySelector('[data-tab="thread-history"], #threadHistoryTab');
+    if (thBtn && !thBtn.classList.contains('active')) thBtn.click();
+    var thStream = document.querySelector('#threadHistoryStream, .thread-history-stream');
+    if (thStream) thStream.style.display = '';
+    var captureStream = document.querySelector('#captureStream, .capture-stream');
+    if (captureStream) captureStream.style.display = 'none';
+  }
+
+  function _restoreCaptureStream() {
+    var captureBtn = document.querySelector('[data-tab="captured"], [data-tab="captured-this-meeting"]');
+    if (captureBtn) captureBtn.click();
+  }
+
+  function _loadFilmThreadHistory(meetingId) {
+    var thStream = document.querySelector('#threadHistoryStream, .thread-history-stream');
+    if (!thStream) return;
+    thStream.innerHTML = '<div class="ac-film-th-loading">Loading\u2026</div>';
+
+    API.get(
+      'accord_nodes?meeting_id=eq.' + meetingId +
+      '&tag=in.(decision,action,dissent,risk,note,question)' +
+      '&order=created_at.asc' +
+      '&select=node_id,tag,seq_id,summary,created_at,sealed_at'
+    ).then(function(nodes) {
+      if (!thStream.isConnected) return;
+      nodes = nodes || [];
+
+      if (!nodes.length) {
+        thStream.innerHTML = '<div class="ac-film-th-empty">No captures in this meeting.</div>';
+        return;
+      }
+
+      var meeting = _liveFilmMeetings.find(function(m) { return m.meeting_id === meetingId; });
+      var title   = meeting ? (meeting.title || 'Prior meeting') : 'Prior meeting';
+      var date    = meeting && meeting.scheduled_for
+        ? new Date(meeting.scheduled_for).toLocaleDateString(undefined,
+            { weekday: 'short', month: 'short', day: 'numeric' })
+        : '';
+
+      var html = '<div class="ac-film-th-header">' +
+                 '<span class="ac-film-th-title">' + esc(title) + '</span>' +
+                 '<span class="ac-film-th-date">' + esc(date) + '</span>' +
+                 '<button class="ac-film-th-close" data-action="film-th-close">\u2715 Back</button>' +
+                 '</div>';
+
+      var TAG_ORDER = ['decision', 'action', 'dissent', 'risk', 'note', 'question'];
+      var sorted    = nodes.slice().sort(function(a, b) {
+        return TAG_ORDER.indexOf(a.tag) - TAG_ORDER.indexOf(b.tag);
+      });
+
+      sorted.forEach(function(n) {
+        html += '<div class="ac-th-node ac-th-node--' + n.tag + '">';
+        html += '<span class="ac-th-node-seq">' + esc(n.seq_id || '') + '</span>';
+        html += '<span class="ac-th-node-summary">' + esc(n.summary || '') + '</span>';
+        html += '</div>';
+      });
+
+      thStream.innerHTML = html;
+
+      var closeBtn = thStream.querySelector('[data-action="film-th-close"]');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+          _liveFilmActiveId = null;
+          var track = document.getElementById('ac-live-film-track');
+          if (track) track.querySelectorAll('.ac-film-frame--active').forEach(function(f) {
+            f.classList.remove('ac-film-frame--active');
+          });
+          _restoreCaptureStream();
+        });
+      }
+    }).catch(function(e) {
+      console.error('[AccordCapture] film thread history load failed', e);
+      if (thStream.isConnected)
+        thStream.innerHTML = '<div class="ac-film-th-empty">Could not load captures.</div>';
+    });
+  }
+
+  // §8 — Resize handle — drag up to expand, drag down to collapse
+  function _wireFilmResizeHandle(zone) {
+    var handle = document.getElementById('ac-live-film-handle');
+    if (!handle) return;
+
+    handle.addEventListener('mousedown', function(ev) {
+      ev.preventDefault();
+      _liveFilmResizing = true;
+      var startY = ev.clientY;
+      var startH = zone.getBoundingClientRect().height;
+
+      function onMove(ev2) {
+        if (!_liveFilmResizing) return;
+        var delta = startY - ev2.clientY; // drag up = expand
+        var newH  = Math.max(60, Math.min(220, startH + delta));
+        zone.style.height = newH + 'px';
+        zone.style.setProperty('--filmstrip-h', newH + 'px');
+      }
+
+      function onUp() {
+        _liveFilmResizing = false;
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup',  onUp);
+      }
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup',   onUp);
+    });
   }
 
   // ── Init ────────────────────────────────────────────────────
