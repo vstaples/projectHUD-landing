@@ -1962,6 +1962,8 @@
   }
 
   function _statusBadge(attendee) {
+    // Organizer is implicitly accepted — suppress badge on their card.
+    if (attendee.role_in_meeting === 'organizer') return '';
     var map = {
       'accepted':  { cls: 'ac-badge--accepted',  label: 'ACCEPTED'  },
       'declined':  { cls: 'ac-badge--declined',  label: 'DECLINED'  },
