@@ -36,6 +36,17 @@
   var _liveFilmActiveId  = null;
   var _liveFilmResizing  = false;
   var _liveFilmCardToken = 0;
+  // A-09 verbatim: C-14 card token + tier observer (from accord-meeting-setup.js)
+  var _filmCardToken    = 0;
+  var _filmTierObserver = null;
+  var FILM_TAG_ORDER = [
+    { tag: 'note',     abbr: 'N'  },
+    { tag: 'decision', abbr: 'D'  },
+    { tag: 'action',   abbr: 'A'  },
+    { tag: 'risk',     abbr: 'R'  },
+    { tag: 'question', abbr: 'Q'  },
+    { tag: 'dissent',  abbr: 'Di' }
+  ];
 
   // ── Lifecycle hookup ─────────────────────────────────────────
   window.addEventListener('accord:level-changed', function() {
@@ -45,6 +56,9 @@
     _liveFilmMeetings = [];
     _liveFilmActiveId = null;
     _liveFilmResizing = false;
+    // A-09 verbatim: stop C-14 tier observer + reset card token
+    _stopFilmCardTiers();
+    _filmCardToken = 0;
     var liveFilm = document.getElementById('ac-live-filmstrip');
     if (liveFilm) liveFilm.remove();
   });
@@ -1027,7 +1041,9 @@
         _onLiveFilmSelect(frame.dataset.meetingId, meeting);
       });
 
-      _enrichLiveFilmCards();
+      // A-09 verbatim: use same call pattern as _renderFilmstrip in accord-meeting-setup.js
+      _enrichFilmCards();
+      setTimeout(function() { _initFilmCardTiers(); }, 50);
 
       // Scroll to most recent
       setTimeout(function() { track.scrollLeft = track.scrollWidth; }, 50);
@@ -1036,45 +1052,64 @@
     });
   }
 
-  // §6-enrich — Dot indicators + seq-ID lines on each frame
-  function _enrichLiveFilmCards() {
-    var myToken = ++_liveFilmCardToken;
-    var frames  = document.querySelectorAll('#ac-live-film-track .ac-film-frame[data-meeting-id]');
+  // ── A-09 · Verbatim from accord-meeting-setup.js (C-14) ───────────────────
+  // _enrichFilmCards, _paintFilmCardContent, _initFilmCardTiers, _stopFilmCardTiers
+  // copied verbatim — same names, same logic, same CSS class assumptions.
+  // _enrichLiveFilmCards / _paintLiveFilmCardContent removed.
+
+  // §4 — Batch fetch and enrich all visible cards
+  function _enrichFilmCards() {
+    var myToken = ++_filmCardToken;
+
+    var frames = document.querySelectorAll('.ac-film-frame[data-meeting-id]');
     if (!frames.length) return;
 
-    var ids = Array.from(frames).map(function(f) { return f.dataset.meetingId; }).filter(Boolean);
+    var ids = Array.from(frames).map(function(f) {
+      return f.dataset.meetingId;
+    }).filter(Boolean);
+
     if (!ids.length) return;
 
     API.get(
       'accord_nodes?meeting_id=in.(' + ids.join(',') + ')' +
       '&tag=in.(decision,action,dissent,risk)' +
       '&sealed_at=not.is.null' +
-      '&select=meeting_id,tag,seq_id,summary' +
+      '&select=meeting_id,tag,seq_id,summary,created_by' +
       '&order=meeting_id.asc,seq_number.asc' +
       '&limit=60'
     ).then(function(nodes) {
-      if (_liveFilmCardToken !== myToken) return;
+      if (_filmCardToken !== myToken) return;
       nodes = nodes || [];
 
+      // Group by meeting_id
       var byMeeting = {};
       nodes.forEach(function(n) {
         if (!byMeeting[n.meeting_id]) byMeeting[n.meeting_id] = [];
         byMeeting[n.meeting_id].push(n);
       });
 
+      // Enrich each frame in place
       frames.forEach(function(frame) {
-        _paintLiveFilmCardContent(frame, byMeeting[frame.dataset.meetingId] || []);
+        var mid = frame.dataset.meetingId;
+        if (!mid) return;
+        _paintFilmCardContent(frame, byMeeting[mid] || []);
       });
     }).catch(function(e) {
-      console.error('[AccordCapture] film card enrich failed', e);
+      console.error('[AccordMeetingSetup] filmcard enrich failed', e);
     });
   }
 
-  function _paintLiveFilmCardContent(frame, nodes) {
-    var ex = frame.querySelector('.ac-film-dots');  if (ex) ex.remove();
-    var en = frame.querySelector('.ac-film-nodes'); if (en) en.remove();
+  // §5 — Paint dots + node lines onto a single card
+  function _paintFilmCardContent(frame, nodes) {
+    // Remove any existing enrichment
+    var existing = frame.querySelector('.ac-film-dots');
+    if (existing) existing.remove();
+    var existingNodes = frame.querySelector('.ac-film-nodes');
+    if (existingNodes) existingNodes.remove();
+
     if (!nodes.length) return;
 
+    // ── Dot strip (always visible) ────────────────────────
     var tagTypes = {};
     nodes.forEach(function(n) { tagTypes[n.tag] = true; });
 
@@ -1084,11 +1119,13 @@
     if (tagTypes.dissent)  dotHtml += '<span class="ac-film-dot ac-film-dot--dissent"></span>';
     if (tagTypes.risk)     dotHtml += '<span class="ac-film-dot ac-film-dot--risk"></span>';
     dotHtml += '</div>';
+
     frame.insertAdjacentHTML('afterbegin', dotHtml);
 
-    var TAG_ORDER = ['decision', 'action', 'dissent', 'risk'];
-    var sorted    = nodes.slice().sort(function(a, b) {
-      return TAG_ORDER.indexOf(a.tag) - TAG_ORDER.indexOf(b.tag);
+    // ── Node lines (visibility CSS-controlled by tier class) ──
+    var tagOrder = ['decision', 'action', 'dissent', 'risk'];
+    var sorted = nodes.slice().sort(function(a, b) {
+      return tagOrder.indexOf(a.tag) - tagOrder.indexOf(b.tag);
     });
 
     var nodesHtml = '<div class="ac-film-nodes">';
@@ -1096,15 +1133,50 @@
       nodesHtml += '<div class="ac-film-node ac-film-node--' + n.tag + '">';
       nodesHtml += '<span class="ac-film-node-seq">' + esc(n.seq_id || '') + '</span>';
       if (n.summary) {
-        nodesHtml += '<span class="ac-film-node-summary">' + esc(n.summary.slice(0, 40)) + '</span>';
+        nodesHtml += '<span class="ac-film-node-summary">' +
+                     esc(n.summary.slice(0, 40)) + '</span>';
       }
       nodesHtml += '</div>';
     });
     nodesHtml += '</div>';
+
     frame.insertAdjacentHTML('beforeend', nodesHtml);
   }
 
-  // §7 — Frame click: toggle or switch Thread History filter
+  // §7 — ResizeObserver: apply tier classes to each frame based on height
+  // Uses _filmTierObserver (P1 amendment — avoids collision with
+  // _filmResizeObserver used by _initFilmDensity for zone density)
+  function _initFilmCardTiers() {
+    if (typeof ResizeObserver === 'undefined') return;
+
+    _stopFilmCardTiers();
+
+    _filmTierObserver = new ResizeObserver(function(entries) {
+      entries.forEach(function(entry) {
+        var frame  = entry.target;
+        var height = entry.contentRect.height;
+        frame.classList.remove('ac-film-frame--compact', 'ac-film-frame--full');
+        if (height >= 140) {
+          frame.classList.add('ac-film-frame--full');
+        } else if (height >= 90) {
+          frame.classList.add('ac-film-frame--compact');
+        }
+      });
+    });
+
+    document.querySelectorAll('.ac-film-frame').forEach(function(frame) {
+      _filmTierObserver.observe(frame);
+    });
+  }
+
+  function _stopFilmCardTiers() {
+    if (_filmTierObserver) {
+      _filmTierObserver.disconnect();
+      _filmTierObserver = null;
+    }
+  }
+
+    // §7 — Frame click: toggle or switch Thread History filter
   function _onLiveFilmSelect(meetingId, currentMeeting) {
     var track = document.getElementById('ac-live-film-track');
 

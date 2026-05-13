@@ -837,157 +837,211 @@
   align-self: center;
 }
 
-/* Active frame highlight */
+
+/* ============================================================
+   A-09 · CMD-ACCORD-CAPTURE-FILMSTRIP-1
+   ac-film-* rules copied VERBATIM from accord-meeting-setup.css.
+   Do not modify — source of truth is accord-meeting-setup.css.
+   ============================================================ */
+
+.ac-film-loading,
+.ac-film-empty,
+.ac-film-error {
+  font-family: var(--ac-font-mono);
+  font-size: 10px;
+  color: var(--ac-text-tertiary);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* Header */
+.ac-film-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.ac-film-label {
+  font-family: var(--ac-font-mono);
+  font-size: 9.5px;
+  color: var(--ac-text-tertiary);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.ac-film-controls {
+  display: flex;
+  gap: 12px;
+  font-family: var(--ac-font-mono);
+  font-size: 10px;
+  color: var(--ac-text-tertiary);
+}
+.ac-film-ctrl { cursor: pointer; user-select: none; }
+.ac-film-ctrl:hover { color: var(--ac-cyan); }
+.ac-film-ctrl--active { color: var(--ac-cyan); }
+
+/* Frame track */
+.ac-film-track {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  flex: 1;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ac-border-mid) transparent;
+  align-items: stretch;
+}
+.ac-film-track::-webkit-scrollbar { height: 4px; }
+.ac-film-track::-webkit-scrollbar-thumb {
+  background: var(--ac-border-mid);
+  border-radius: 2px;
+}
+
+/* Individual frame */
+.ac-film-frame {
+  flex-shrink: 0;
+  align-self: stretch;
+  aspect-ratio: 1 / 1;
+  min-width: 60px;
+  background: var(--ac-bg-pane);
+  border: 1px solid var(--ac-border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: border-color .2s, transform .2s;
+  overflow: hidden;
+}
+.ac-film-frame:hover {
+  border-color: var(--ac-border-active);
+  transform: translateY(-2px);
+}
+.ac-film-frame--current {
+  border-color: var(--ac-cyan);
+  box-shadow: 0 0 10px rgba(94,234,212,0.4);
+}
+.ac-film-frame--future {
+  border-style: dashed;
+  background: transparent;
+  cursor: default;
+}
+.ac-film-frame--future:hover { transform: none; }
+.ac-film-frame--scrubbing {
+  border-color: var(--ac-amber);
+  box-shadow: 0 0 8px rgba(251,191,119,0.4);
+}
+
+/* Active frame highlight (live capture — cyan border) */
 .ac-film-frame--active {
-  border: 2px solid rgb(94,234,212) !important;
+  border-color: var(--ac-cyan) !important;
   box-shadow: 0 0 6px rgba(94,234,212,0.3);
 }
 
-/* Thread History filtered view — header */
-.ac-film-th-header {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 8px 16px 6px 16px;
-  border-bottom: 1px solid var(--rule, rgba(255,255,255,0.08));
-  flex-shrink: 0;
-}
-.ac-film-th-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-primary, #f4ede0);
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ac-film-th-date {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 9px;
-  color: var(--ink-muted, rgba(255,255,255,0.45));
-  white-space: nowrap;
-}
-.ac-film-th-close {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 9px;
-  color: var(--ink-ghost, rgba(255,255,255,0.25));
-  background: none;
-  border: 1px solid var(--rule, rgba(255,255,255,0.08));
-  border-radius: 3px;
-  padding: 2px 8px;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.ac-film-th-close:hover { color: var(--ink-muted, rgba(255,255,255,0.45)); }
+/* Gradient thumb backgrounds */
+.ac-film-thumb { position: absolute; inset: 0; opacity: 0.5; }
+.ac-film-thumb--f1  { background: linear-gradient(135deg, #1a3a4a 0%,  #0d2030 100%); }
+.ac-film-thumb--f2  { background: linear-gradient(135deg, #2a3a4a 0%,  #1d2030 100%); }
+.ac-film-thumb--f3  { background: linear-gradient(135deg, #1a3a3a 0%,  #0d3020 100%); }
+.ac-film-thumb--f4  { background: linear-gradient(135deg, #1a3a4a 30%, #2d1030 100%); }
+.ac-film-thumb--f5  { background: linear-gradient(135deg, #2a3a5a 0%,  #0d2040 100%); }
+.ac-film-thumb--f6  { background: linear-gradient(135deg, #1a4a4a 0%,  #0d2030 100%); }
+.ac-film-thumb--f7  { background: linear-gradient(135deg, #1a3a4a 50%, #3d1020 100%); }
+.ac-film-thumb--f8  { background: linear-gradient(135deg, #1a3a4a 70%, #1d2030 100%); }
+.ac-film-thumb--f9  { background: linear-gradient(135deg, #2a3a3a 0%,  #1d3030 100%); }
+.ac-film-thumb--f10 { background: linear-gradient(135deg, #1a4a5a 0%,  #0d2040 100%); }
+.ac-film-thumb--f11 { background: linear-gradient(135deg, #1a3a4a 60%, #2d2030 100%); }
+.ac-film-thumb--f12 { background: linear-gradient(135deg, #1a3a4a 0%,  #0d2030 100%); }
+.ac-film-frame--current .ac-film-thumb { opacity: 0.75; }
 
-.ac-film-th-loading,
-.ac-film-th-empty {
-  font-size: 12px;
-  color: var(--ink-muted, rgba(255,255,255,0.45));
-  font-style: italic;
-  padding: 16px;
+/* Marker dots */
+.ac-film-marker {
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
 }
+.ac-film-marker--dissent  { background: var(--ac-rose); }
+.ac-film-marker--decision { background: var(--ac-cyan); }
 
-/* Node rows in filtered Thread History */
-.ac-th-node {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 6px 16px;
-  border-bottom: 1px solid var(--rule, rgba(255,255,255,0.08));
-  font-size: 12px;
-}
-.ac-th-node:last-child               { border-bottom: none; }
-.ac-th-node-seq {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 9px;
-  font-weight: 700;
-  flex-shrink: 0;
-  width: 52px;
-}
-.ac-th-node-summary {
-  color: var(--ink-body, #d6cdb8);
+/* Frame meta overlay */
+.ac-film-meta {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(180deg, transparent, rgba(10,14,20,0.92));
+  padding: 16px 6px 4px 6px;
+  font-family: var(--ac-font-mono);
+  font-size: 9.5px;
   line-height: 1.4;
-}
-
-/* Tag seq-ID colors */
-.ac-th-node--decision .ac-th-node-seq { color: rgb(94,234,212); }
-.ac-th-node--action   .ac-th-node-seq { color: rgb(251,191,36); }
-.ac-th-node--dissent  .ac-th-node-seq { color: rgb(251,113,133); }
-.ac-th-node--risk     .ac-th-node-seq { color: rgb(251,113,133); }
-.ac-th-node--note     .ac-th-node-seq { color: var(--ink-muted, rgba(255,255,255,0.45)); }
-.ac-th-node--question .ac-th-node-seq { color: rgb(167,139,250); }
-/* ============================================================
-   A-12 · CMD-ACCORD-CAPTURE-ATTENDEES-1
-   Attendees panel: invited attendees from accord_meeting_attendees
-   overlaid with live Aegis presence dots.
-   ============================================================ */
-
-/* ── Attendee rows ──────────────────────────────────────────── */
-#accord-app .ac-attendee-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  font-size: 12px;
-  font-family: 'IBM Plex Sans', system-ui, sans-serif;
-  color: var(--ink-body);
+  flex-direction: column;
+  align-items: flex-start;
 }
+.ac-film-date          { color: var(--ac-text-primary); font-weight: 600; }
+.ac-film-date--current { color: var(--ac-cyan); }
+.ac-film-counts        { color: var(--ac-text-tertiary); margin-bottom: 2px; }
 
-#accord-app .ac-attendee-name {
-  flex: 1;
+/* C-14 dot strip */
+.ac-film-dots {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  gap: 3px;
+  z-index: 2;
 }
-
-#accord-app .ac-attendee-role,
-#accord-app .ac-attendee-you {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px;
-  color: var(--ink-ghost);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-
-#accord-app .ac-attendee-role {
-  letter-spacing: 0.8px;
-}
-
-/* ── Presence dots ──────────────────────────────────────────── */
-#accord-app .ac-presence-dot {
-  width: 8px;
-  height: 8px;
+.ac-film-dot {
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   flex-shrink: 0;
 }
+.ac-film-dot--decision { background: var(--ac-cyan); }
+.ac-film-dot--action   { background: var(--ac-amber); }
+.ac-film-dot--dissent  { background: var(--ac-rose); }
+.ac-film-dot--risk     { background: var(--ac-rose); opacity: 0.7; }
 
-#accord-app .ac-presence-dot--live {
-  background: #22c55e;
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25),
-              0 0 6px rgba(34, 197, 94, 0.4);
-  animation: ac-presence-pulse 2s ease-in-out infinite;
+/* Node lines container — hidden by default, revealed by tier classes */
+.ac-film-nodes {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 0;
+  padding: 4px 6px;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+.ac-film-node {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ac-film-node-seq {
+  font-family: var(--ac-font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 1.4;
+}
+.ac-film-node--decision .ac-film-node-seq { color: var(--ac-bg-deep); background: var(--ac-cyan); }
+.ac-film-node--action   .ac-film-node-seq { color: var(--ac-bg-deep); background: var(--ac-amber); }
+.ac-film-node--dissent  .ac-film-node-seq { color: var(--ac-bg-deep); background: var(--ac-rose); }
+.ac-film-node--risk     .ac-film-node-seq { color: var(--ac-bg-deep); background: var(--ac-rose); opacity: 0.85; }
+.ac-film-node-summary {
+  font-size: 9.5px;
+  color: var(--ac-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: none;
 }
 
-#accord-app .ac-presence-dot--away {
-  background: transparent;
-  border: 1.5px solid var(--ink-ghost);
-}
+/* Compact tier (≥90px) — show seq IDs */
+.ac-film-frame--compact .ac-film-nodes { display: flex; }
 
-@keyframes ac-presence-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25),
-                0 0 6px rgba(34, 197, 94, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.10),
-                0 0 12px rgba(34, 197, 94, 0.25);
-  }
-}
-
-/* ── Empty state ────────────────────────────────────────────── */
-#accord-app .ac-attendees-empty {
-  font-size: 11px;
-  font-family: 'IBM Plex Sans', system-ui, sans-serif;
-  color: var(--ink-ghost);
-  font-style: italic;
-  padding: 4px 0;
-}
+/* Full tier (≥140px) — show seq IDs + summaries */
+.ac-film-frame--full .ac-film-nodes        { display: flex; }
+.ac-film-frame--full .ac-film-node-summary { display: inline; }
