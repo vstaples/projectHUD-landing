@@ -998,7 +998,7 @@
 .ac-film-dot--dissent  { background: var(--ac-rose); }
 .ac-film-dot--risk     { background: var(--ac-rose); opacity: 0.7; }
 
-/* Node lines container — hidden by default, revealed by tier classes */
+/* Node line container — hidden by default, revealed by tier classes */
 .ac-film-nodes {
   position: absolute;
   top: 20px;
