@@ -1,9 +1,10 @@
 // ============================================================
 // ProjectHUD — accord-rails.js
 // CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 3
-// Last modified: v20260513-X-17b (2026-05-13)
-//   - X-17: promote RLS-orphaned workstreams to root in _renderTree.
-//     IR Rule fix: replaced const/let/arrow in lines 181-201 with var/function.
+// Last modified: v20260513-CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 (2026-05-13)
+//   - CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 S5.1: mount slideshow on zero-workstream
+//     empty state; dismiss when workstreams exist.
+//   - X-17: promote RLS-orphaned workstreams to root; var/function IR fix.
 //   - v20260513-CMD-ACCORD-MY-MEETINGS-1: MY MEETINGS rail item injection.
 //
 // Three-pane layout orchestrator:
@@ -169,9 +170,16 @@
     if (!body) return;
 
     if (!local.workstreams.length) {
-      body.innerHTML = '<div class="ac-tree-empty">No workstreams yet.<br>Create one to organize meetings.</div>';
+      body.innerHTML = '<div class="ac-tree-empty">No workstreams yet.<br>Use + NEW WORKSTREAM to begin.</div>';
+      // CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 S5.1 -- mount slideshow if not dismissed
+      if (window.AccordSlideshow && window.AccordSlideshow.shouldShow()) {
+        var ssHost = document.getElementById('ac-constellation-host');
+        if (ssHost) window.AccordSlideshow.mount(ssHost);
+      }
       return;
     }
+    // If workstreams exist -- dismiss slideshow if somehow still showing
+    if (window.AccordSlideshow) window.AccordSlideshow.dismiss();
 
     // Build hierarchy
     // X-17: promote workstreams whose parent is invisible (RLS-filtered) to root

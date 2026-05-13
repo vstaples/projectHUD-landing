@@ -1,7 +1,7 @@
 /* ============================================================
    accord-views.css
    CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 4a
-   Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-1 (2026-05-13)
+   Last modified: v20260513-CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 (2026-05-13)
      - Appended .ac-mm-* and .ac-rail-nav-item styles (§10).
      - Token values verified present in deployed :root (IR66).
      - Fix: .ac-mm-back contrast bumped from --ac-text-faint
@@ -1348,3 +1348,156 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ============================================================
+   CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 §6 — Onboarding slideshow
+   Appended 2026-05-13.
+   ============================================================ */
+
+/* ── Constellation onboarding slideshow ─────────────── */
+.ac-slideshow {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--ac-bg-deep);
+}
+
+.ac-ss-inner {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+}
+
+/* Ambient background glow */
+.ac-ss-ambient {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(
+    circle at center,
+    rgba(94,234,212,0.04) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ac-ss-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.ac-ss-label {
+  font-family: var(--ac-font-mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.ac-ss-headline {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--ac-text-primary);
+  line-height: 1.2;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.ac-ss-body {
+  font-size: 14px;
+  color: var(--ac-text-tertiary);
+  line-height: 1.7;
+  max-width: 400px;
+  margin: 0;
+}
+
+/* ── CTA button ─────────────────────────────────────── */
+.ac-ss-cta {
+  font-family: var(--ac-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 10px 24px;
+  background: transparent;
+  color: var(--ac-cyan);
+  border: 1px solid rgba(94,234,212,0.4);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  margin-top: 8px;
+}
+.ac-ss-cta:hover {
+  background: rgba(94,234,212,0.08);
+  border-color: rgba(94,234,212,0.7);
+}
+.ac-ss-cta--pulse {
+  animation: ac-ss-pulse 2.5s ease-in-out infinite;
+}
+@keyframes ac-ss-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(94,234,212,0.3); }
+  50%       { box-shadow: 0 0 0 8px rgba(94,234,212,0); }
+}
+
+/* ── Dot indicators ─────────────────────────────────── */
+.ac-ss-dots {
+  display: flex;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+.ac-ss-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ac-border-mid);
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.ac-ss-dot--active {
+  background: var(--ac-cyan);
+  transform: scale(1.3);
+}
+.ac-ss-dot:hover { background: var(--ac-text-tertiary); }
+
+/* ── Prev / Next nav ────────────────────────────────── */
+.ac-ss-nav {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  padding: 0 12px;
+  pointer-events: none;
+  z-index: 2;
+}
+.ac-ss-prev, .ac-ss-next {
+  font-size: 20px;
+  color: var(--ac-text-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  pointer-events: auto;
+  transition: color 0.15s;
+  line-height: 1;
+}
+.ac-ss-prev:hover, .ac-ss-next:hover { color: var(--ac-text-secondary); }
