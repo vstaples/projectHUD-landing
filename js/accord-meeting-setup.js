@@ -2659,7 +2659,8 @@
           recipient_email: email,
           recipient_name:  name
         }).then(function(tokenRow) {
-          var token = tokenRow && tokenRow.token;
+          // API.post returns an array — extract first element
+          var token = tokenRow && tokenRow[0] && tokenRow[0].token;
           if (!token) return { error: 'no token', name: name };
 
           // Call notify-meeting-invitation Edge Function
