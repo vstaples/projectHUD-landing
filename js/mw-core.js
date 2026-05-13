@@ -38,6 +38,68 @@ document.getElementById('compass-date').textContent =
 // ══════════════════════════════════════════════════════════
 // VIEW: MY WORK (Individual Contributor) — Feature #1 · Session 16
 // ══════════════════════════════════════════════════════════
+// D-Phase · CMD-ACCORD-INVITATION-PIPELINE-1
+// Renders pending Accord meeting invitations as a labeled section
+// above #work-list-rows in My Dashboard → Work Queue.
+// Internal authenticated path — no token required.
+// Accept/Decline route through meeting-rsvp.html?attendee_id=<id>
+// which directs internal users back to the Work Queue (Phase D spec).
+// D-S3 Option C: scheduled_for always rendered; duration omitted if null.
+window._renderAccordInvites = function(invites) {
+  if (!invites || !invites.length) return '';
+
+  function escHtml(s) {
+    return String(s||'').replace(/[&<>"']/g, function(c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function fmtMtgDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return d.toLocaleDateString(undefined, {
+      weekday:'short', month:'short', day:'numeric',
+      hour:'2-digit', minute:'2-digit'
+    });
+  }
+
+  var rows = invites.map(function(inv) {
+    var mtg     = inv.accord_meetings || {};
+    var title   = mtg.title || 'Meeting invitation';
+    var dateStr = mtg.scheduled_for ? fmtMtgDate(mtg.scheduled_for) : '';
+    var durStr  = mtg.duration_minutes ? (' · ' + mtg.duration_minutes + ' min') : '';
+    var whenStr = dateStr ? (dateStr + durStr) : '';
+    var rsvpBase = '/meeting-rsvp.html?attendee_id=' + encodeURIComponent(inv.attendee_id);
+
+    return '<div class="wi-row" style="display:grid;grid-template-columns:1fr auto auto;' +
+           'align-items:center;gap:8px;padding:8px 13px;border-bottom:1px solid rgba(255,255,255,.04)">' +
+           '<div>' +
+             '<div style="font-family:var(--font-mono);font-size:11px;color:var(--compass-cyan);' +
+               'letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px">● Accord Invitation</div>' +
+             '<div style="font-size:12px;font-weight:700;color:#F0F6FF">' + escHtml(title) + '</div>' +
+             (whenStr ? '<div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px">' + escHtml(whenStr) + '</div>' : '') +
+           '</div>' +
+           '<a href="' + rsvpBase + '&outcome=accepted"' +
+             ' style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;font-weight:700;' +
+               'color:#00e5a0;border:1px solid rgba(0,229,160,.4);background:rgba(0,229,160,.08);' +
+               'text-decoration:none;letter-spacing:.06em;white-space:nowrap">✓ Accept</a>' +
+           '<a href="' + rsvpBase + '&outcome=declined"' +
+             ' style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;font-weight:700;' +
+               'color:#ff6b6b;border:1px solid rgba(255,107,107,.4);background:rgba(255,107,107,.08);' +
+               'text-decoration:none;letter-spacing:.06em;white-space:nowrap">✕ Decline</a>' +
+           '</div>';
+  }).join('');
+
+  return '<div style="margin-bottom:8px">' +
+    '<div class="myr-cat-label">Accord Meeting Invitations' +
+      '<div class="myr-cat-line"></div>' +
+      '<span style="font-size:10px;color:rgba(0,210,255,.5)">' + invites.length + ' pending</span>' +
+    '</div>' +
+    rows +
+  '</div>';
+};
+
+// ══════════════════════════════════════════════════════════
 // Lightweight work list refresh — re-fetches action items and re-renders
 // #work-list-rows without resetting tab state or triggering compass.html tab restoration.
 window._mwRefreshWorkItems = async function() {
@@ -45,9 +107,11 @@ window._mwRefreshWorkItems = async function() {
   if (!resId) return;
   try {
     const today = new Date().toLocaleDateString('en-CA');
-    const [freshActions, freshReviews] = await Promise.all([
+    const [freshActions, freshReviews, freshInvites] = await Promise.all([
       API.get(`workflow_action_items?select=id,title,body,status,due_date,owner_resource_id,owner_name,created_by_name,instance_id,negotiation_state&owner_resource_id=eq.${resId}&status=eq.open&limit=100`).catch(() => []),
       API.get(`workflow_requests?select=id,title,body,status,role,due_date,owner_resource_id,owner_name,created_by_name,instance_id,workflow_instances!inner(status)&owner_resource_id=eq.${resId}&status=eq.open&workflow_instances.status=not.in.(cancelled,completed,withdrawn)&limit=50`).catch(() => []),
+      // D-Phase: Accord meeting invitations — pending RSVPs for this resource
+      API.get(`accord_meeting_attendees?resource_id=eq.${resId}&rsvp_status=eq.pending&select=attendee_id,meeting_id,role_in_meeting,accord_meetings!inner(title,scheduled_for,duration_minutes,organizer_id)`).catch(() => []),
     ]);
     // Rebuild work items for action items and pending reviews only
     const wrInstanceIds = new Set();
@@ -76,6 +140,10 @@ window._mwRefreshWorkItems = async function() {
     window._wiItems = _wiItems;
     window.myActionItems = freshActions||[];
     window._myPendingReviews = freshReviews||[];
+    // D-Phase: store Accord pending invitations + re-render invite section
+    window._accordInvites = freshInvites||[];
+    var _ais = document.getElementById('accord-invites-section');
+    if (_ais) _ais.innerHTML = window._renderAccordInvites(window._accordInvites);
     // Only reload the full view if the user is currently on the work tab.
     // On any other tab, mark stale — uSwitchTab will reload when they return.
     const _refreshActiveTab = typeof _uActiveTab !== 'undefined' ? _uActiveTab : 'work';
@@ -1090,6 +1158,7 @@ window._mwLoadUserView = async function() {
                 onmouseleave="clearTimeout(window._wqLegendTimer)">?</span>
             </div>
           </div>
+          <div id="accord-invites-section">${window._renderAccordInvites ? window._renderAccordInvites(window._accordInvites||[]) : ''}</div>
           <div id="work-list-rows" style="${_diagramMode?'display:none':''}">${workListRows()}</div>
           <!-- Diagram view -->
           <div id="mw-diagram-wrap" style="${_diagramMode?'':'display:none'}">
@@ -1521,7 +1590,7 @@ window._mwLoadUserView = async function() {
         if (!_myResource?.id) { console.warn('[Poll] _myResource not ready — skipping'); return; }
         _pollCount++;
         try {
-          const [freshActions, freshReviews, freshInsts] = await Promise.all([
+          const [freshActions, freshReviews, freshInsts, freshPollInvites] = await Promise.all([
             API.get(
               `workflow_action_items?owner_resource_id=eq.${_myResource.id}&status=eq.open&select=id,title&limit=50`
             ).catch(e => { console.warn('[Poll] action_items fetch error:', e.message); return null; }),
@@ -1531,6 +1600,10 @@ window._mwLoadUserView = async function() {
             API.get(
               `workflow_instances?submitted_by_resource_id=eq.${_myResource.id}&status=in.(in_progress,complete)&select=id,current_step_name,updated_at&limit=50`
             ).catch(() => null),
+            // D-Phase: poll pending Accord invitations
+            API.get(
+              `accord_meeting_attendees?resource_id=eq.${_myResource.id}&rsvp_status=eq.pending&select=attendee_id,meeting_id,role_in_meeting,accord_meetings!inner(title,scheduled_for,duration_minutes,organizer_id)`
+            ).catch(() => []),
           ]);
           const newActions  = (freshActions||[]).filter(a => !_knownActionIds.has(a.id));
           const newReviews  = (freshReviews||[]).filter(r => !_knownReviewIds.has(r.id));
@@ -1551,6 +1624,14 @@ window._mwLoadUserView = async function() {
           // Re-notification on changes_requested is handled directly by approve.html.
           // The poll detects the step change back to Review via stepChanged above,
           // which triggers a My Requests reload so the submitter sees the reset state.
+
+          // D-Phase: update Accord invites section if pending count changed
+          var _prevInviteCount = (window._accordInvites||[]).length;
+          window._accordInvites = freshPollInvites||[];
+          if (_prevInviteCount !== window._accordInvites.length) {
+            var _pollAis = document.getElementById('accord-invites-section');
+            if (_pollAis) _pollAis.innerHTML = window._renderAccordInvites(window._accordInvites);
+          }
 
           const totalOpen = (freshActions?.length||0) + (freshReviews?.length||0);
           const totalNew  = newActions.length + newReviews.length + stepChanged.length;
