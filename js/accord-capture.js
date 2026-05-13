@@ -1202,17 +1202,17 @@
   }
 
   function _activateThreadHistoryTab() {
-    var thBtn = document.querySelector('[data-tab="thread-history"], #threadHistoryTab');
+    // V2 confirmed: second .stream-tab button is Thread History
+    var tabs = document.querySelectorAll('.stream-tab');
+    var thBtn = tabs[1]; // index 1 = Thread History
     if (thBtn && !thBtn.classList.contains('active')) thBtn.click();
-    var thStream = document.querySelector('#threadHistoryStream, .thread-history-stream');
-    if (thStream) thStream.style.display = '';
-    var captureStream = document.querySelector('#captureStream, .capture-stream');
-    if (captureStream) captureStream.style.display = 'none';
   }
 
   function _restoreCaptureStream() {
-    var captureBtn = document.querySelector('[data-tab="captured"], [data-tab="captured-this-meeting"]');
-    if (captureBtn) captureBtn.click();
+    // V2 confirmed: first .stream-tab button is Captured This Meeting
+    var tabs = document.querySelectorAll('.stream-tab');
+    var captureBtn = tabs[0]; // index 0 = Captured This Meeting
+    if (captureBtn && !captureBtn.classList.contains('active')) captureBtn.click();
   }
 
   function _loadFilmThreadHistory(meetingId) {
