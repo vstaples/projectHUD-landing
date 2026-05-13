@@ -952,7 +952,7 @@
   function _mountLiveFilmstrip(meeting) {
     var urlMeetingId = new URLSearchParams(location.search).get('meeting');
     if (urlMeetingId && meeting.meeting_id !== urlMeetingId) return;
-    var center = document.querySelector('.capture-center, #captureCenter');
+    var center = document.querySelector('.capture-center, #captureCenter, .ac-center, main.ac-center');
     if (!center) return;
     if (document.getElementById('ac-live-filmstrip')) return; // idempotent
 
