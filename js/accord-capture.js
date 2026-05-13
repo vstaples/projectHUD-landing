@@ -1203,6 +1203,13 @@
     var activeFrame = track.querySelector('[data-meeting-id="' + meetingId + '"]');
     if (activeFrame) activeFrame.classList.add('ac-film-frame--active');
 
+    // Activate Back button when viewing a prior meeting
+    var closeBtn = document.querySelector('.ac-film-th-close');
+    if (closeBtn) {
+      var isCurrentMeeting = meetingId === (window.Accord && window.Accord.state && window.Accord.state.meeting && window.Accord.state.meeting.meeting_id);
+      closeBtn.classList.toggle('ac-film-th-close--active', !isCurrentMeeting);
+    }
+
     _activateThreadHistoryTab();
     _loadFilmThreadHistory(meetingId);
   }
@@ -1250,7 +1257,7 @@
       var html = '<div class="ac-film-th-header">' +
                  '<span class="ac-film-th-title">' + esc(title) + '</span>' +
                  '<span class="ac-film-th-date">' + esc(date) + '</span>' +
-                 '<button class="ac-film-th-close" data-action="film-th-close">\u2715 Back</button>' +
+                 '' +
                  '</div>';
 
       var TAG_ORDER = ['decision', 'action', 'dissent', 'risk', 'note', 'question'];
