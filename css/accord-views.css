@@ -1501,3 +1501,32 @@
   line-height: 1;
 }
 .ac-ss-prev:hover, .ac-ss-next:hover { color: var(--ac-text-secondary); }
+
+/* ============================================================
+   RAIL-RESTRUCTURE-1 — Personal nav + workstream section split
+   Appended 2026-05-13.
+   ============================================================ */
+
+/* ── Personal nav section (top of left rail) ─────────── */
+.ac-rail-personal {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0 4px;
+}
+
+/* ── 1px divider between personal and workstream sections  */
+.ac-rail-divider {
+  height: 1px;
+  background: var(--ac-border-subtle);
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* ── Workstream section wrapper ───────────────────────── */
+.ac-rail-workstreams {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}

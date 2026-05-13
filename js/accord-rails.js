@@ -1,7 +1,8 @@
 // ============================================================
 // ProjectHUD — accord-rails.js
 // CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 3
-// Last modified: v20260513-CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 (2026-05-13)
+// Last modified: v20260513-RAIL-RESTRUCTURE-1 (2026-05-13)
+//   - Rail restructure: MY MEETINGS injected into .ac-rail-personal wrapper.
 //   - CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 S5.1: mount slideshow on zero-workstream
 //     empty state; dismiss when workstreams exist.
 //   - X-17: promote RLS-orphaned workstreams to root; var/function IR fix.
@@ -642,12 +643,18 @@
 
     // Insert between .ac-rail-header and #ac-tree-search (V1-bis confirmed
     // these are direct children of #ac-rail-left).
-    var search = $('ac-tree-search');
-    if (search && search.parentNode === rail) {
-      rail.insertBefore(item, search);
+    // Prepend into .ac-rail-personal (rail restructure wrapper).
+    // Fallback: insert before .ac-rail-divider or at rail top.
+    var personal = document.getElementById('ac-rail-personal');
+    if (personal) {
+      personal.appendChild(item);
     } else {
-      // Fallback — prepend (still inside the rail, above all content)
-      rail.insertBefore(item, rail.firstChild);
+      var divider = rail.querySelector('.ac-rail-divider');
+      if (divider) {
+        rail.insertBefore(item, divider);
+      } else {
+        rail.insertBefore(item, rail.firstChild);
+      }
     }
 
     // Click handler — call the My Meetings module
