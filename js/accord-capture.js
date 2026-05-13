@@ -759,6 +759,14 @@
       return;
     }
 
+    var channelName = 'accord-chat-' + meetingId;
+    var existing = window.Accord.state.realtimeClient.getChannels()
+      .find(function(ch) { return ch.topic.includes(channelName); });
+    if (existing) {
+      console.log('[AccordChat] channel already exists — skipping resubscribe');
+      return;
+    }
+
     _chatSubscription = realtimeClient
       .channel('accord-chat-' + meetingId)
       .on('postgres_changes', {

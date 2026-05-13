@@ -21,6 +21,47 @@
 <link rel="stylesheet" href="/css/accord-meeting-setup.css">
 <style>
 /* ============================================================
+   A-09 · CMD-ACCORD-CAPTURE-FILMSTRIP-1
+   Global --ac-* token definitions.
+   Values sourced verbatim from accord-meeting-setup.css :root
+   (scoped to .ac-setup-shell). Moved here so all Accord surfaces
+   share a single canonical token definition.
+   IR66: token values always sourced from deployed CSS — never
+   from architect memory or spec documents.
+   ============================================================ */
+:root {
+  /* Backgrounds */
+  --ac-bg-deep:       #0a0e14;
+  --ac-bg-pane:       #11161e;
+  --ac-bg-elevated:   #161c26;
+  --ac-bg-tile:       #1a212c;
+  /* Borders */
+  --ac-border-subtle: rgba(255, 255, 255, 0.06);
+  --ac-border-mid:    rgba(255, 255, 255, 0.12);
+  --ac-border-active: rgba(94, 234, 212, 0.4);
+  /* Text */
+  --ac-text-primary:   #e8edf2;
+  --ac-text-secondary: #8a95a5;
+  --ac-text-tertiary:  #5a6678;
+  --ac-text-faint:     #3a4456;
+  /* Accents */
+  --ac-cyan:       #5eead4;
+  --ac-cyan-dim:   rgba(94, 234, 212, 0.15);
+  --ac-amber:      #fbbf77;
+  --ac-amber-dim:  rgba(251, 191, 119, 0.18);
+  --ac-rose:       #fb7185;
+  --ac-rose-dim:   rgba(251, 113, 133, 0.18);
+  --ac-violet:     #a78bfa;
+  --ac-violet-dim: rgba(167, 139, 250, 0.18);
+  --ac-green:      #4ade80;
+  --ac-green-dim:  rgba(74, 222, 128, 0.18);
+  /* Typography */
+  --ac-font-sans:  -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  --ac-font-mono:  "SF Mono", "JetBrains Mono", "Fira Code", Menlo, monospace;
+  --ac-font-serif: "Lora", "Charter", "Georgia", serif;
+}
+
+/* ============================================================
    Accord — Live Capture surface (CMD-A3)
    Scoped under #accord-app. Tokens follow prototype v3b-4 +
    Style Doctrine v1.7 (§3.5 surface tiers, §7 glyphs, §6 markup).
