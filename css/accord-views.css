@@ -4,6 +4,11 @@
    Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-1 (2026-05-13)
      - Appended .ac-mm-* and .ac-rail-nav-item styles (§10).
      - Token values verified present in deployed :root (IR66).
+     - Fix: .ac-mm-back contrast bumped from --ac-text-faint
+       (2.4:1) to --ac-text-secondary (8.0:1) on --ac-bg-deep
+       panel background; hover lifts to --ac-text-primary with
+       --ac-amber border. Smoke-test 4 surfaced near-invisible
+       Back button.
 
    Workstream-level + meeting-level center-pane views.
    Strict navigational per IR70 boundary (no activity intelligence
@@ -1192,15 +1197,16 @@
 .ac-mm-back {
   font-family: var(--ac-font-mono);
   font-size: 9px;
-  color: var(--ac-text-faint);
+  color: var(--ac-text-secondary);
   background: none;
-  border: 1px solid var(--ac-border-subtle);
+  border: 1px solid var(--ac-border-mid);
   border-radius: 3px;
   padding: 3px 10px;
   cursor: pointer;
 }
 .ac-mm-back:hover {
-  color: var(--ac-text-secondary);
+  color: var(--ac-text-primary);
+  border-color: var(--ac-amber);
 }
 
 /* ── Zones ────────────────────────────────────────────────── */
