@@ -1257,8 +1257,8 @@
       var html = '<div class="ac-film-th-header">' +
                  '<span class="ac-film-th-title">' + esc(title) + '</span>' +
                  '<span class="ac-film-th-date">' + esc(date) + '</span>' +
-                 '' +
-                 '</div>';
+                 '</div>' +
+                 '<button class="ac-film-th-close" data-action="film-th-close">← Back</button>';
 
       var TAG_ORDER = ['decision', 'action', 'dissent', 'risk', 'note', 'question'];
       var sorted    = nodes.slice().sort(function(a, b) {
@@ -1267,8 +1267,8 @@
 
       sorted.forEach(function(n) {
         html += '<div class="ac-th-node ac-th-node--' + n.tag + '">';
-        html += '<span class="ac-th-node-seq">' + esc(n.seq_id || '') + '</span>';
-        html += '<span class="ac-th-node-summary">' + esc(n.summary || '') + '</span>';
+        html += '<span class="ac-th-node-seq">' + esc(n.seq_id || '') + '</span>' +
+               '<span class="ac-th-node-summary"> ' + esc(n.summary || '') + '</span>';
         html += '</div>';
       });
 
