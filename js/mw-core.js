@@ -1,6 +1,6 @@
-// VERSION: 20260430-CMD100.39
-window._mwCoreVersion = 'v20260430-CMD100.39';
-console.log('%c[mw-core] v20260430-CMD100.39 — every row reserves 3px border-left so negotiation indicator does not shift task rows','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
+// VERSION: v20260509-CMD-ACCORD-MEETING-SETUP-127r
+window._mwCoreVersion = 'v20260509-CMD-ACCORD-MEETING-SETUP-127r';
+console.log('%c[mw-core] v20260509-CMD-ACCORD-MEETING-SETUP-127r — D-Phase: Accord meeting invitations in Work Queue','background:#c47d18;color:#000;font-weight:700;padding:2px 8px;border-radius:3px');
 
 // ── HTML escape helper (used throughout this module) ──────────────────────
 function _esc(s) {
