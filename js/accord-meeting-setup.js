@@ -83,6 +83,7 @@
   // ── CMD-ACCORD-SETUP-ATTENDEES-1: attendees state ─────────────
   var _attendeesAborted = false;
   var _searchTimer      = null;
+  var _rsvpPollTimer    = null;   // E-Phase: RSVP status poll handle
 
   // ── CMD-ACCORD-SETUP-FILMSTRIP-2: filmstrip state ─────────────
   var _filmstripAborted    = false;
@@ -208,6 +209,8 @@
     // ── CMD-ACCORD-SETUP-ATTENDEES-1: attendees teardown ────────
     _attendeesAborted = true;
     if (_searchTimer) { clearTimeout(_searchTimer); _searchTimer = null; }
+    // E-Phase: stop RSVP poll on teardown
+    _stopRsvpPoll();
 
     // ── CMD-ACCORD-SETUP-FILMSTRIP-2: filmstrip teardown ────────
     _filmstripAborted = true;
@@ -1803,6 +1806,8 @@
         var block = document.getElementById('ac-attendees-block'); // IR71
         if (!block) return;
         _paintAttendees(block, enriched, meeting);
+        // E-Phase: start RSVP poll after initial paint (idle meetings only)
+        if (meeting.state === 'idle') _startRsvpPoll(meeting, workstreamId);
       });
     }).catch(function(e) {
       console.error('[AccordMeetingSetup] attendees fetch failed', e);
@@ -2511,8 +2516,15 @@
 
     // Action buttons (right)
     html += '<div class="ac-footer-right">';
-    html += '<button class="ac-btn-secondary" data-action="save-invite" disabled ' +
-            'title="Invitations \u2014 coming soon">Save &amp; invite</button>';
+    // E-Phase: Save & invite button — enabled only when meeting.scheduled_for is set.
+    // D-S3 hard guard: an invitation without a date is meaningless.
+    if (meeting.scheduled_for) {
+      html += '<button class="ac-btn-secondary" data-action="save-invite"' +
+              ' title="Send invitations to pending attendees">Save &amp; invite</button>';
+    } else {
+      html += '<button class="ac-btn-secondary" data-action="save-invite" disabled' +
+              ' title="Set a meeting date before sending invitations">Save &amp; invite</button>';
+    }
     html += '<button class="ac-btn-primary" data-action="begin-meeting">Begin Meeting \u2192</button>';
     html += '</div>';
 
@@ -2540,7 +2552,176 @@
         _onBeginMeeting(meeting);
         return;
       }
+
+      if (action === 'save-invite') {
+        _onSaveInvite(meeting);
+        return;
+      }
     });
+  }
+
+  // ── E-Phase · RSVP poll (E2, Option A) ──────────────────────────────────────
+  // Polls accord_meeting_attendees every 10s for rsvp_status changes and
+  // re-renders the attendees block if any status changed. Fires only on idle
+  // meetings. Stopped by teardown or on meeting state change.
+  function _startRsvpPoll(meeting, workstreamId) {
+    _stopRsvpPoll();
+    _rsvpPollTimer = setInterval(function() {
+      if (_attendeesAborted) { _stopRsvpPoll(); return; }
+      API.get(
+        'accord_meeting_attendees?meeting_id=eq.' + meeting.meeting_id +
+        '&select=attendee_id,rsvp_status'
+      ).then(function(rows) {
+        if (_attendeesAborted) return;
+        rows = rows || [];
+        // Check if any rsvp_status changed since last render
+        var block = document.getElementById('ac-attendees-block');
+        if (!block) { _stopRsvpPoll(); return; }
+        var currentCards = block.querySelectorAll('[data-attendee-id]');
+        var changed = rows.some(function(row) {
+          var card = block.querySelector('[data-attendee-id="' + row.attendee_id + '"]');
+          if (!card) return true; // new attendee added
+          // Compare rendered badge vs fetched status
+          var hasBadge  = !!card.querySelector('.ac-attendee-badge');
+          var isPending = row.rsvp_status === 'pending';
+          if (isPending && hasBadge)  return true;  // badge appeared but shouldn't be there
+          if (!isPending && !hasBadge) return true; // status changed, badge missing
+          // Check badge class matches
+          if (!isPending) {
+            var badge = card.querySelector('.ac-attendee-badge');
+            return badge && !badge.classList.contains('ac-badge--' + row.rsvp_status);
+          }
+          return false;
+        });
+        if (changed) {
+          // Re-render full attendee list to pick up new rsvp_status badges
+          _loadAttendees(meeting, workstreamId);
+        }
+      }).catch(function() {}); // silent — poll failure is non-fatal
+    }, 10000);
+  }
+
+  function _stopRsvpPoll() {
+    if (_rsvpPollTimer) {
+      clearInterval(_rsvpPollTimer);
+      _rsvpPollTimer = null;
+    }
+  }
+
+  // ── E-Phase · CMD-ACCORD-INVITATION-PIPELINE-1 ──────────────────────────────
+  // E1: "Save & invite" dispatch handler.
+  // Fetches all pending attendees for the meeting, inserts accord_invitation_tokens
+  // rows, calls notify-meeting-invitation Edge Function for each, and shows
+  // inline confirmation. D-S3: scheduled_for is guaranteed non-null by the
+  // button guard in _footerHtml.
+  function _onSaveInvite(meeting) {
+    var btn = document.querySelector('[data-action="save-invite"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+    var SUPA_URL = 'https://dvbetgdzksatcgdfftbs.supabase.co';
+    var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmV0Z2R6a3NhdGNnZGZmdGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDc2MTYsImV4cCI6MjA4OTEyMzYxNn0.1geeKhrLL3nhjW08ieKr7YZmE0AVX4xnom7i2j1W358';
+
+    // Step 1: fetch pending attendees with resource email + name
+    API.get(
+      'accord_meeting_attendees?meeting_id=eq.' + meeting.meeting_id +
+      '&rsvp_status=eq.pending' +
+      '&select=attendee_id,resource_id,resources!inner(name,email)'
+    ).then(function(rows) {
+      rows = rows || [];
+      if (!rows.length) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save & invite'; }
+        _showInviteResult('No pending attendees to invite.', false);
+        return;
+      }
+
+      // Format meeting date string (D-S3: scheduled_for always present here)
+      var meetingDate = new Date(meeting.scheduled_for).toLocaleDateString(undefined, {
+        weekday: 'long', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+      var meetingDuration = meeting.duration_minutes ? (meeting.duration_minutes + ' min') : null;
+      var organizerName   = (window.Accord && window.Accord.state && window.Accord.state.me)
+                            ? (window.Accord.state.me.name || 'Organizer') : 'Organizer';
+      var firmName        = meeting.firm_id ? 'Apex Consulting Group' : '';
+
+      // Step 2: for each pending attendee, insert token + call Edge Function
+      var promises = rows.map(function(a) {
+        var res   = a.resources || {};
+        var email = res.email;
+        var name  = res.name || 'Invitee';
+        if (!email) return Promise.resolve({ skipped: true, name: name });
+
+        // Insert invitation token
+        return API.post('accord_invitation_tokens', {
+          firm_id:         meeting.firm_id,
+          meeting_id:      meeting.meeting_id,
+          attendee_id:     a.attendee_id,
+          recipient_email: email,
+          recipient_name:  name
+        }).then(function(tokenRow) {
+          var token = tokenRow && tokenRow.token;
+          if (!token) return { error: 'no token', name: name };
+
+          // Call notify-meeting-invitation Edge Function
+          return fetch(
+            SUPA_URL + '/functions/v1/notify-meeting-invitation',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY },
+              body: JSON.stringify({
+                token:            token,
+                recipient_email:  email,
+                recipient_name:   name,
+                meeting_title:    meeting.title,
+                meeting_date:     meetingDate,
+                meeting_duration: meetingDuration,
+                meeting_location: meeting.location || null,
+                organizer_name:   organizerName,
+                firm_name:        firmName
+              })
+            }
+          ).then(function(r) { return r.json(); })
+           .then(function(data) { return { sent: !!data.sent, name: name, data: data }; })
+           .catch(function(e) { return { error: e.message, name: name }; });
+        }).catch(function(e) { return { error: e.message, name: name }; });
+      });
+
+      Promise.all(promises).then(function(results) {
+        var sent    = results.filter(function(r) { return r.sent; }).length;
+        var skipped = results.filter(function(r) { return r.skipped; }).length;
+        var errors  = results.filter(function(r) { return r.error; }).length;
+
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Resend invitations';
+          btn.title = 'Resend invitations to pending attendees';
+        }
+
+        var msg = 'Invitations sent to ' + sent + ' attendee' + (sent === 1 ? '' : 's');
+        if (skipped) msg += ' (' + skipped + ' skipped — no email)';
+        if (errors)  msg += ' · ' + errors + ' error' + (errors === 1 ? '' : 's');
+        _showInviteResult(msg, errors > 0);
+      });
+    }).catch(function(e) {
+      console.error('[AccordMeetingSetup] save-invite failed', e);
+      if (btn) { btn.disabled = false; btn.textContent = 'Save & invite'; }
+      _showInviteResult('Error: ' + e.message, true);
+    });
+  }
+
+  function _showInviteResult(msg, isError) {
+    var footer = document.querySelector('.ac-setup-footer');
+    if (!footer) return;
+    var existing = footer.querySelector('.ac-invite-result');
+    if (existing) existing.remove();
+    var el = document.createElement('div');
+    el.className = 'ac-invite-result';
+    el.style.cssText = 'font-family:var(--ac-font-mono,monospace);font-size:11px;' +
+      'color:' + (isError ? 'var(--ac-rose,#ff6b6b)' : 'var(--ac-green,#00e5a0)') + ';' +
+      'padding:4px 8px;letter-spacing:.04em;';
+    el.textContent = msg;
+    footer.querySelector('.ac-footer-right').insertAdjacentElement('beforebegin', el);
+    setTimeout(function() { if (el.parentNode) el.remove(); }, 6000);
   }
 
   // §8 — Verdict modal (centered, dimmed backdrop)
