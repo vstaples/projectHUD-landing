@@ -1,6 +1,10 @@
 // ============================================================
 // ProjectHUD — accord-rails.js
 // CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 3
+// Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-1 (2026-05-13)
+//   - Inject MY MEETINGS item into #ac-rail-left chrome (§5.1).
+//   - Wire click → window.AccordMyMeetings.open().
+//   - All other rail behavior unchanged.
 //
 // Three-pane layout orchestrator:
 //   • Left rail — hierarchical workstream tree (workstream →
@@ -603,8 +607,62 @@
     // draggable=true so the affordance is discoverable.
   }
 
+  // ── CMD-ACCORD-MY-MEETINGS-1 §5.1 — MY MEETINGS rail injection ──
+  // Uses `var` per Iron Rule for new code added in this commission.
+  function _ensureMyMeetingsRailItem() {
+    var rail = $('ac-rail-left');
+    if (!rail) {
+      console.warn('[Accord-rails] #ac-rail-left missing; cannot mount MY MEETINGS');
+      return;
+    }
+    if ($('ac-my-meetings-nav')) return;  // idempotent — already mounted
+
+    var item = document.createElement('div');
+    item.id          = 'ac-my-meetings-nav';
+    item.className   = 'ac-rail-nav-item';
+    item.setAttribute('data-action', 'open-my-meetings');
+    item.setAttribute('role', 'button');
+    item.setAttribute('tabindex', '0');
+    item.innerHTML =
+      '<span class="ac-rail-nav-glyph">◈</span>' +
+      '<span class="ac-rail-nav-label">MY MEETINGS</span>';
+
+    // Insert between .ac-rail-header and #ac-tree-search (V1-bis confirmed
+    // these are direct children of #ac-rail-left).
+    var search = $('ac-tree-search');
+    if (search && search.parentNode === rail) {
+      rail.insertBefore(item, search);
+    } else {
+      // Fallback — prepend (still inside the rail, above all content)
+      rail.insertBefore(item, rail.firstChild);
+    }
+
+    // Click handler — call the My Meetings module
+    item.addEventListener('click', function () {
+      if (window.AccordMyMeetings && typeof window.AccordMyMeetings.open === 'function') {
+        window.AccordMyMeetings.open();
+      } else {
+        console.warn('[Accord-rails] window.AccordMyMeetings not loaded');
+      }
+    });
+
+    // Keyboard parity — Enter/Space activates like a button
+    item.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        item.click();
+      }
+    });
+  }
+
   // ── Chrome wiring (rail collapse, sort toggle) ──
   function _wireChrome() {
+    // CMD-ACCORD-MY-MEETINGS-1 §5.1 — inject MY MEETINGS rail item.
+    // Placed as a direct child of #ac-rail-left, between .ac-rail-header
+    // and #ac-tree-search. Outside #ac-tree-body so survives _renderTree().
+    // Idempotent — guard against double-init.
+    _ensureMyMeetingsRailItem();
+
     // Left-rail collapse button
     $('ac-leftrail-collapse')?.addEventListener('click', () => {
       const next = !$('ac-rail-left')?.classList.contains('collapsed');
