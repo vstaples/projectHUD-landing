@@ -970,12 +970,10 @@
       '</div>'
     ].join('');
 
-    var footer = center.querySelector('.capture-footer, .capture-controls');
-    if (footer) {
-      center.insertBefore(zone, footer);
-    } else {
-      center.appendChild(zone);
-    }
+    // Append filmstrip as last child of center — footer is nested inside
+    // HEADER.capture-header (not a direct child of MAIN.ac-center) so
+    // insertBefore is not viable. appendChild puts it at the bottom.
+    center.appendChild(zone);
 
     _wireFilmResizeHandle(zone);
     _loadLiveFilmFrames(meeting);
