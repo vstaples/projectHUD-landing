@@ -1,10 +1,9 @@
 // ============================================================
 // ProjectHUD — accord-rails.js
 // CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 3
-// Last modified: v20260513-X-17 (2026-05-13)
+// Last modified: v20260513-X-17b (2026-05-13)
 //   - X-17: promote RLS-orphaned workstreams to root in _renderTree.
-//     visibleIds set built from local.workstreams; tops filter extended
-//     to include any ws whose parent_workstream_id is not in visible set.
+//     IR Rule fix: replaced const/let/arrow in lines 181-201 with var/function.
 //   - v20260513-CMD-ACCORD-MY-MEETINGS-1: MY MEETINGS rail item injection.
 //
 // Three-pane layout orchestrator:
@@ -176,27 +175,27 @@
 
     // Build hierarchy
     // X-17: promote workstreams whose parent is invisible (RLS-filtered) to root
-    // rather than dropping them. Uses var per Iron Rule for new code.
+    // rather than dropping them.
     var visibleIds = new Set(local.workstreams.map(function(w) { return w.workstream_id; }));
-    const tops = local.workstreams.filter(function(w) {
+    var tops = local.workstreams.filter(function(w) {
       return !w.parent_workstream_id || !visibleIds.has(w.parent_workstream_id);
     });
-    const subsByParent = {};
-    local.workstreams.filter(w => w.parent_workstream_id).forEach(w => {
+    var subsByParent = {};
+    local.workstreams.filter(function(w) { return w.parent_workstream_id; }).forEach(function(w) {
       if (!subsByParent[w.parent_workstream_id]) subsByParent[w.parent_workstream_id] = [];
       subsByParent[w.parent_workstream_id].push(w);
     });
-    const meetingsByWs = {};
-    local.meetings.forEach(m => {
+    var meetingsByWs = {};
+    local.meetings.forEach(function(m) {
       if (!meetingsByWs[m.workstream_id]) meetingsByWs[m.workstream_id] = [];
       meetingsByWs[m.workstream_id].push(m);
     });
 
-    const lvl = window.Accord?.state?.level     || 'constellation';
-    const ctx = window.Accord?.state?.levelContext || {};
+    var lvl = (window.Accord && window.Accord.state && window.Accord.state.level) || 'constellation';
+    var ctx = (window.Accord && window.Accord.state && window.Accord.state.levelContext) || {};
 
-    let html = '';
-    tops.forEach(top => {
+    var html = '';
+    tops.forEach(function(top) {
       html += _renderTopWs(top, subsByParent[top.workstream_id] || [], meetingsByWs, lvl, ctx);
     });
 
