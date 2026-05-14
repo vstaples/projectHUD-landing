@@ -3,7 +3,7 @@
 // current version literal. All loaders, banners, and cache-bust
 // query strings derive from window._PROJECTHUD_VERSION.
 //
-// To bump the version: change the literal below. Every loader
+// To bump the version: change the literal below. Every loaders
 // and every internal banner picks up the change automatically
 // on next deploy.
 //
