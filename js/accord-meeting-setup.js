@@ -1780,11 +1780,17 @@
       if (_attendeesAborted) return;
       rows = rows || [];
 
-      // Auto-seed organizer row if absent and meeting is idle
+      // Auto-seed organizer row if absent, meeting is idle, AND current
+      // user is the organizer. X-28: previously attempted seed regardless
+      // of who was viewing — non-organizers hit a 403 which the catch
+      // silently swallowed, but _loadAttendees was then called recursively
+      // (line 1790), creating an infinite retry loop.
       var hasOrganizer = rows.some(function(r) {
         return r.role_in_meeting === 'organizer';
       });
-      if (!hasOrganizer && meeting.state === 'idle') {
+      var me = window.Accord && window.Accord.state && window.Accord.state.me;
+      var isOrganizer = me && (me.id === meeting.organizer_id);
+      if (!hasOrganizer && meeting.state === 'idle' && isOrganizer) {
         return _seedOrganizer(meeting).then(function() {
           if (_attendeesAborted) return;
           return _loadAttendees(meeting, workstreamId);
@@ -1968,9 +1974,7 @@
       'accepted':  { cls: 'ac-badge--accepted',  label: 'ACCEPTED'  },
       'declined':  { cls: 'ac-badge--declined',  label: 'DECLINED'  },
       'tentative': { cls: 'ac-badge--tentative', label: 'TENTATIVE' },
-      // X-25: render PENDING badge so the card signals "no response yet".
-      // Previously null (no badge), which hid the invitation status.
-      'pending':   { cls: 'ac-badge--pending',   label: 'PENDING'   }
+      'pending':   null
     };
     var entry = map[attendee.rsvp_status];
     if (!entry) return '';
@@ -2585,15 +2589,17 @@
         var changed = rows.some(function(row) {
           var card = block.querySelector('[data-attendee-id="' + row.attendee_id + '"]');
           if (!card) return true; // new attendee added
-          // X-25: pending now renders .ac-badge--pending; treat all
-          // statuses uniformly — any missing or class-mismatched badge
-          // triggers a re-render. (Organizer cards lack a badge by
-          // design and may cause a spurious re-render each cycle; that's
-          // a pre-existing no-op since the output is identical.)
-          var badge    = card.querySelector('.ac-attendee-badge');
-          var hasBadge = !!badge;
-          if (!hasBadge) return true;  // badge missing → re-render
-          return !badge.classList.contains('ac-badge--' + row.rsvp_status);
+          // Compare rendered badge vs fetched status
+          var hasBadge  = !!card.querySelector('.ac-attendee-badge');
+          var isPending = row.rsvp_status === 'pending';
+          if (isPending && hasBadge)  return true;  // badge appeared but shouldn't be there
+          if (!isPending && !hasBadge) return true; // status changed, badge missing
+          // Check badge class matches
+          if (!isPending) {
+            var badge = card.querySelector('.ac-attendee-badge');
+            return badge && !badge.classList.contains('ac-badge--' + row.rsvp_status);
+          }
+          return false;
         });
         if (changed) {
           // Re-render full attendee list to pick up new rsvp_status badges
