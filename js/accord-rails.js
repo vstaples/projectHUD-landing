@@ -725,11 +725,17 @@
     if (!rail) return;
     if (document.getElementById('ac-rail-resize-handle')) return;  // idempotent
 
+    // Layout is CSS grid on .ac-three-pane -- must update gridTemplateColumns,
+    // not rail.style.width (grid overrides element width). IR66 confirmed 2026-05-13.
+    var pane = rail.parentNode;
+
     // Restore saved width
     var saved = localStorage.getItem('accord-rail-width');
-    if (saved) {
+    if (saved && pane) {
       var w = parseInt(saved, 10);
-      if (w >= 200 && w <= 380) rail.style.width = w + 'px';
+      if (w >= 200 && w <= 380) {
+        pane.style.gridTemplateColumns = w + 'px 1fr 280px';
+      }
     }
 
     // Build handle
@@ -752,9 +758,9 @@
     });
 
     document.addEventListener('mousemove', function (ev) {
-      if (!_dragging) return;
+      if (!_dragging || !pane) return;
       var newW = Math.min(380, Math.max(200, _startW + (ev.clientX - _startX)));
-      rail.style.width = newW + 'px';
+      pane.style.gridTemplateColumns = newW + 'px 1fr 280px';
     });
 
     document.addEventListener('mouseup', function () {
