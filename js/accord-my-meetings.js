@@ -60,6 +60,19 @@
     } catch (e) { return 'TBD'; }
   }
 
+  // X-26: refresh rail on navigation so JOIN / "In meeting" state updates
+  // immediately. Listen on both events:
+  //   accord:level-changed  — fires when setLevel is called (state may not
+  //                           be written yet — catches the "leaving" case)
+  //   accord:meeting-loaded — fires after state.meeting is fully hydrated
+  //                           (catches the "just joined" case)
+  window.addEventListener('accord:level-changed', function () {
+    if (_mmContainer) _fetchAndRender();
+  });
+  window.addEventListener('accord:meeting-loaded', function () {
+    if (_mmContainer) _fetchAndRender();
+  });
+
   window.AccordMyMeetings = {
     renderInRail: _renderInRail,
     pauseRefresh: _pauseRefresh,
@@ -215,9 +228,17 @@
         if (meta.length) {
           html += '<div class="ac-mm-card-meta">' + meta.join(' &middot; ') + '</div>';
         }
-        html += '<a class="ac-mm-join-btn" data-action="mm-join" ' +
-                'data-meeting-id="' + esc(m.meeting_id) + '" ' +
-                'href="accord.html?meeting=' + esc(m.meeting_id) + '">JOIN &#8594;</a>';
+        var activeMtgId = window.Accord && window.Accord.state &&
+                          window.Accord.state.meeting &&
+                          window.Accord.state.meeting.meeting_id;
+        var alreadyIn = (activeMtgId === m.meeting_id);
+        if (alreadyIn) {
+          html += '<div class="ac-mm-in-meeting">&#9679; In meeting</div>';
+        } else {
+          html += '<a class="ac-mm-join-btn" data-action="mm-join" ' +
+                  'data-meeting-id="' + esc(m.meeting_id) + '" ' +
+                  'href="accord.html?meeting=' + esc(m.meeting_id) + '">JOIN &#8594;</a>';
+        }
         html += '</div>';
       });
       html += '</div>';
