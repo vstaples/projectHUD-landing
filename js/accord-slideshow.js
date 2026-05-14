@@ -3,8 +3,9 @@
 // Constellation zone onboarding slideshow for new users.
 // Shows when user has no visible workstreams.
 // Dismissed permanently on first workstream creation.
-// Version: v20260513-CMD-ACCORD-CONSTELLATION-SLIDESHOW-1
+// Version: v20260509-CMD-ACCORD-MEETING-SETUP-129p
 // Modified: 2026-05-13
+// Fix: expose dismiss in public API (IR67)
 // ============================================================
 
 (function() {
