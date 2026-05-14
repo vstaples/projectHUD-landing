@@ -831,9 +831,12 @@
   font-size: 12px;
   color: var(--ink-body);
 }
+/* X-25: bumped 8px → 10px and ghost → faint so the dot is visible
+   against the warm canvas. State classes (.present / .unstable)
+   below still override base background. */
 #accord-app .presence-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--ink-ghost);
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--ink-faint);
   flex-shrink: 0;
 }
 #accord-app .presence-dot.present  { background: #6ba88c; }       /* sage green per palette */

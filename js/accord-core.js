@@ -626,15 +626,24 @@ const Accord = (() => {
     var html = sorted.map(function(a) {
       var isPresent = !!presence[a.resource_id];
       var isMe      = a.resource_id === myResourceId;
-      var dotCls    = isPresent ? 'ac-presence-dot ac-presence-dot--live'
-                                : 'ac-presence-dot ac-presence-dot--away';
-      return '<div class="ac-attendee-row" data-resource-id="' + _esc(a.resource_id) + '">' +
+      // X-25 (2026-05-14): swap IDLE-shell class names (ac-attendee-row /
+      // ac-presence-dot / ac-attendee-role / ac-attendee-you) for the
+      // LIVE-shell convention (attendee-row / presence-dot / attendee-self).
+      // The IDLE names had no row/dot CSS in the LIVE shell -> row wasn't a
+      // flex container (spans crushed) and the dot was a zero-size unstyled
+      // span (invisible). They also dragged cyan `.ac-attendee-you` styling
+      // out of the Setup palette into the running-meeting surface (Style
+      // Doctrine v1.8 §3.8 module-palette leak). LIVE-shell CSS in accord.html
+      // (.attendee-row / .presence-dot[.present] / .attendee-name /
+      // .attendee-self) styles these correctly in the warm-amber palette.
+      var dotCls    = isPresent ? 'presence-dot present' : 'presence-dot';
+      return '<div class="attendee-row" data-resource-id="' + _esc(a.resource_id) + '">' +
                '<span class="' + dotCls + '"></span>' +
-               '<span class="ac-attendee-name">' + _esc(a.name) + '</span>' +
+               '<span class="attendee-name">' + _esc(a.name) + '</span>' +
                (a.role === 'organizer'
-                 ? '<span class="ac-attendee-role">organizer</span>'
+                 ? '<span class="attendee-self">organizer</span>'
                  : '') +
-               (isMe ? '<span class="ac-attendee-you">you</span>' : '') +
+               (isMe ? '<span class="attendee-self">you</span>' : '') +
              '</div>';
     }).join('');
 
