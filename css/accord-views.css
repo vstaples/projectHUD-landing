@@ -3,7 +3,8 @@
    CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 4a
 // X-23: collapsed rail tab visibility fix — 2026-05-14
    // X-23b: right rail collapsed width fix — 2026-05-14
-   // Version: v20260514-X-23c
+   // X-23d: center pane flex expansion + rail flex-shrink discipline — 2026-05-14
+   // Version: v20260514-X-23d
    // Modified: 2026-05-14
    Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-2b (2026-05-13)
      - CMD-ACCORD-MY-MEETINGS-2: tab bar + narrow card styles.
@@ -1503,4 +1504,18 @@
   width: 36px;
   min-width: 36px;
   overflow: hidden;
+}
+/* ============================================================
+   X-23: center pane expansion + rail flex discipline — 2026-05-14
+   Center grows/shrinks to fill space vacated by collapsed rails.
+   Rails must not shrink — only center flexes.
+   ============================================================ */
+.ac-center {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+}
+#ac-rail-left,
+#ac-rail-right {
+  flex-shrink: 0;
 }
