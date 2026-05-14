@@ -1,18 +1,14 @@
 // ============================================================
 // ProjectHUD — accord-my-meetings.js
-// Version: v20260513-CMD-ACCORD-MY-MEETINGS-2
+// Version: v20260513-CMD-ACCORD-MY-MEETINGS-2b
 // Modified: 2026-05-13
 //
-// CMD-ACCORD-MY-MEETINGS-2 — tabbed rail pattern.
-// Renders LIVE NOW / PENDING / UPCOMING directly in the left rail
-// MY MEETINGS tab panel. No full-page overlay.
+// CMD-ACCORD-MY-MEETINGS-2b — enriched card content.
+//   - LIVE NOW: title + time running + workstream + JOIN
+//   - PENDING:  title + date/time/duration + "Invited by" + RSVP
+//   - UPCOMING: title + date/time + workstream + role
 //
-// Public API:
-//   window.AccordMyMeetings.renderInRail(container)
-//   window.AccordMyMeetings.pauseRefresh()
-//   window.AccordMyMeetings.refresh()
-//
-// IR66 — tokens verified in deployed :root (2026-05-13).
+// IR66 — data shape verified via console probes 2026-05-13.
 // IR67 — version + date stamped above.
 // ============================================================
 
@@ -31,6 +27,37 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function _timeAgo(iso) {
+    if (!iso) return '';
+    var mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins === 1) return '1 min ago';
+    return mins + ' min ago';
+  }
+
+  function _fmtDateTime(iso) {
+    if (!iso) return 'Date TBD';
+    try {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return 'Date TBD';
+      return d.toLocaleString(undefined, {
+        weekday: 'short', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } catch (e) { return 'Date TBD'; }
+  }
+
+  function _fmtDate(iso) {
+    if (!iso) return 'TBD';
+    try {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return 'TBD';
+      return d.toLocaleDateString(undefined, {
+        weekday: 'short', month: 'short', day: 'numeric'
+      });
+    } catch (e) { return 'TBD'; }
   }
 
   window.AccordMyMeetings = {
@@ -77,20 +104,24 @@
       return;
     }
 
+    // Q1 -- organized meetings (running or idle) with workstream name
     var qOrganized = API.get(
       'accord_meetings?organizer_id=eq.' + uid +
       '&state=in.(running,idle)' +
       '&order=scheduled_for.asc.nullsfirst' +
-      '&select=meeting_id,title,state,scheduled_for,duration_minutes,workstream_id' +
+      '&select=meeting_id,title,state,scheduled_for,duration_minutes,' +
+      'workstream_id,started_at,workstreams(name)' +
       '&limit=50'
     ).catch(function () { return []; });
 
+    // Q2 -- invited meetings with organizer name + workstream name
     var qInvites = rid
       ? API.get(
           'accord_meeting_attendees?resource_id=eq.' + rid +
           '&select=attendee_id,meeting_id,rsvp_status,' +
           'accord_meetings!inner(meeting_id,title,state,scheduled_for,' +
-          'duration_minutes,workstream_id,organizer_id)'
+          'duration_minutes,workstream_id,organizer_id,started_at,' +
+          'workstreams(name),users(name))'
         ).catch(function () { return []; })
       : Promise.resolve([]);
 
@@ -104,19 +135,36 @@
       var meetingMap = {};
       organized.forEach(function (m) {
         meetingMap[m.meeting_id] = {
-          meeting_id: m.meeting_id, title: m.title, state: m.state,
-          scheduled_for: m.scheduled_for, workstream_id: m.workstream_id,
-          role: 'organizer', rsvp_status: 'accepted'
+          meeting_id:       m.meeting_id,
+          title:            m.title,
+          state:            m.state,
+          scheduled_for:    m.scheduled_for,
+          duration_minutes: m.duration_minutes,
+          workstream_id:    m.workstream_id,
+          workstream_name:  m.workstreams ? m.workstreams.name : null,
+          started_at:       m.started_at,
+          organizer_name:   null,
+          role:             'organizer',
+          rsvp_status:      'accepted'
         };
       });
+
       invites.forEach(function (inv) {
         var m = inv.accord_meetings;
         if (!m || meetingMap[m.meeting_id]) return;
         meetingMap[m.meeting_id] = {
-          meeting_id: m.meeting_id, title: m.title, state: m.state,
-          scheduled_for: m.scheduled_for, workstream_id: m.workstream_id,
-          role: 'attendee', rsvp_status: inv.rsvp_status,
-          attendee_id: inv.attendee_id
+          meeting_id:       m.meeting_id,
+          title:            m.title,
+          state:            m.state,
+          scheduled_for:    m.scheduled_for,
+          duration_minutes: m.duration_minutes,
+          workstream_id:    m.workstream_id,
+          workstream_name:  m.workstreams ? m.workstreams.name : null,
+          started_at:       m.started_at,
+          organizer_name:   m.users ? m.users.name : null,
+          role:             'attendee',
+          rsvp_status:      inv.rsvp_status,
+          attendee_id:      inv.attendee_id
         };
       });
 
@@ -140,7 +188,6 @@
       });
 
       container.innerHTML = _myMeetingsHtml(liveNow, pendingZ, upcoming);
-
       _clickHandler = function (ev) { _onContainerClick(ev); };
       container.addEventListener('click', _clickHandler);
 
@@ -155,12 +202,19 @@
   function _myMeetingsHtml(liveNow, pending, upcoming) {
     var html = '';
 
+    // LIVE NOW
     if (liveNow.length) {
       html += '<div class="ac-mm-zone">';
       html += '<div class="ac-mm-zone-label">&#9679; LIVE NOW</div>';
       liveNow.forEach(function (m) {
         html += '<div class="ac-mm-card ac-mm-card--live">';
         html += '<div class="ac-mm-card-title">' + esc(m.title || 'Untitled') + '</div>';
+        var meta = [];
+        if (m.started_at) meta.push(_timeAgo(m.started_at));
+        if (m.workstream_name) meta.push(esc(m.workstream_name));
+        if (meta.length) {
+          html += '<div class="ac-mm-card-meta">' + meta.join(' &middot; ') + '</div>';
+        }
         html += '<a class="ac-mm-join-btn" data-action="mm-join" ' +
                 'data-meeting-id="' + esc(m.meeting_id) + '" ' +
                 'href="accord.html?meeting=' + esc(m.meeting_id) + '">JOIN &#8594;</a>';
@@ -169,18 +223,24 @@
       html += '</div>';
     }
 
+    // PENDING
     if (pending.length) {
       html += '<div class="ac-mm-zone">';
       html += '<div class="ac-mm-zone-label">PENDING ' +
               '<span class="ac-mm-badge">' + pending.length + '</span></div>';
       pending.forEach(function (m) {
-        var dateStr = m.scheduled_for
-          ? new Date(m.scheduled_for).toLocaleDateString(undefined,
-              { month: 'short', day: 'numeric' })
-          : 'Date TBD';
         html += '<div class="ac-mm-card ac-mm-card--pending">';
         html += '<div class="ac-mm-card-title">' + esc(m.title || 'Untitled') + '</div>';
-        html += '<div class="ac-mm-card-meta">' + esc(dateStr) + '</div>';
+        var meta = [];
+        if (m.scheduled_for) meta.push(_fmtDateTime(m.scheduled_for));
+        if (m.duration_minutes) meta.push(m.duration_minutes + ' min');
+        if (meta.length) {
+          html += '<div class="ac-mm-card-meta">' + esc(meta.join(' \u00b7 ')) + '</div>';
+        }
+        if (m.organizer_name) {
+          html += '<div class="ac-mm-card-meta ac-mm-card-invited">' +
+                  'Invited by ' + esc(m.organizer_name) + '</div>';
+        }
         html += '<div class="ac-mm-rsvp-row">';
         html += '<button class="ac-mm-rsvp-btn ac-mm-rsvp-accept" ' +
                 'data-action="mm-rsvp-accept" ' +
@@ -195,20 +255,24 @@
       html += '</div>';
     }
 
+    // UPCOMING
     if (upcoming.length) {
       html += '<div class="ac-mm-zone">';
       html += '<div class="ac-mm-zone-label">UPCOMING</div>';
       upcoming.forEach(function (m) {
-        var dateStr = m.scheduled_for
-          ? new Date(m.scheduled_for).toLocaleDateString(undefined,
-              { weekday: 'short', month: 'short', day: 'numeric' })
-          : 'TBD';
         html += '<div class="ac-mm-card ac-mm-card--upcoming" ' +
                 'data-action="mm-open-meeting" ' +
                 'data-meeting-id="' + esc(m.meeting_id) + '" ' +
                 'data-workstream-id="' + esc(m.workstream_id || '') + '">';
         html += '<div class="ac-mm-card-title">' + esc(m.title || 'Untitled') + '</div>';
-        html += '<div class="ac-mm-card-meta">' + esc(dateStr) + '</div>';
+        var meta = [];
+        if (m.scheduled_for) meta.push(_fmtDate(m.scheduled_for));
+        if (m.workstream_name) meta.push(esc(m.workstream_name));
+        if (meta.length) {
+          html += '<div class="ac-mm-card-meta">' + meta.join(' &middot; ') + '</div>';
+        }
+        html += '<div class="ac-mm-card-role">' +
+                (m.role === 'organizer' ? 'Organizer' : 'Invited') + '</div>';
         html += '</div>';
       });
       html += '</div>';
@@ -259,11 +323,9 @@
   function _rsvp(btn, outcome) {
     var attendeeId = btn.dataset.attendeeId;
     if (!attendeeId) { console.warn('[MyMeetings] RSVP missing attendee-id'); return; }
-
     btn.disabled = true;
     var row = btn.closest('.ac-mm-rsvp-row');
     if (row) row.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
-
     API.patch(
       'accord_meeting_attendees?attendee_id=eq.' + attendeeId,
       { rsvp_status: outcome }

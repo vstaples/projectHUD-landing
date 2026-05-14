@@ -1,7 +1,9 @@
 // ============================================================
 // ProjectHUD — accord-rails.js
 // CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 3
-// Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-2 (2026-05-13)
+// Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-2b (2026-05-13)
+//   - X-19: drag-to-resize rail handle + localStorage persist.
+//   - Card enrichment queries (started_at, workstreams(name), users(name)).
 //   - Replace _ensureMyMeetingsRailItem with _ensureRailTabs + _switchRailTab.
 //   - Tab bar pattern: WORKSTREAMS / MY MEETINGS tabs in left rail.
 //   - CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 S5.1: mount slideshow on zero-workstream
@@ -717,10 +719,59 @@
     }
   }
 
+  // X-19 -- drag-to-resize left rail
+  function _initRailResize() {
+    var rail = document.getElementById('ac-rail-left');
+    if (!rail) return;
+    if (document.getElementById('ac-rail-resize-handle')) return;  // idempotent
+
+    // Restore saved width
+    var saved = localStorage.getItem('accord-rail-width');
+    if (saved) {
+      var w = parseInt(saved, 10);
+      if (w >= 200 && w <= 380) rail.style.width = w + 'px';
+    }
+
+    // Build handle
+    var handle = document.createElement('div');
+    handle.id        = 'ac-rail-resize-handle';
+    handle.className = 'ac-rail-resize-handle';
+    rail.appendChild(handle);
+
+    var _dragging = false;
+    var _startX   = 0;
+    var _startW   = 0;
+
+    handle.addEventListener('mousedown', function (ev) {
+      ev.preventDefault();
+      _dragging = true;
+      _startX   = ev.clientX;
+      _startW   = rail.offsetWidth;
+      document.body.style.cursor     = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', function (ev) {
+      if (!_dragging) return;
+      var newW = Math.min(380, Math.max(200, _startW + (ev.clientX - _startX)));
+      rail.style.width = newW + 'px';
+    });
+
+    document.addEventListener('mouseup', function () {
+      if (!_dragging) return;
+      _dragging = false;
+      document.body.style.cursor     = '';
+      document.body.style.userSelect = '';
+      localStorage.setItem('accord-rail-width', String(rail.offsetWidth));
+    });
+  }
+
   // ── Chrome wiring (rail collapse, sort toggle) ──
   function _wireChrome() {
     // CMD-ACCORD-MY-MEETINGS-2 -- replace overlay nav item with tab bar.
     _ensureRailTabs();
+    // X-19 -- drag-to-resize handle
+    _initRailResize();
 
     // Left-rail collapse button
     $('ac-leftrail-collapse')?.addEventListener('click', () => {
