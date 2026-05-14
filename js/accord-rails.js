@@ -1,8 +1,8 @@
 // ============================================================
 // ProjectHUD — accord-rails.js
 // CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 3
-// X-23: duplicate collapse handler removed — 2026-05-14
-// Version: v20260514-X-23
+// X-23: duplicate collapse handler removed + stale sessionStorage clear — 2026-05-14
+// Version: v20260514-X-23b
 // Modified: 2026-05-14
 // Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-2b (2026-05-13)
 //   - X-19: drag-to-resize rail handle + localStorage persist.
@@ -109,6 +109,10 @@
 
     // Wire chrome (toggles, sort buttons, collapse buttons)
     _wireChrome();
+
+    // X-23: clear stale sessionStorage collapse state on boot
+    sessionStorage.removeItem('accord-leftrail-collapsed');
+    sessionStorage.removeItem('accord-rightrail-collapsed');
 
     // Initial collapse state from persistence
     _applyRailCollapse('left',  _persistRead('accord-leftrail-collapsed',  'false') === 'true');
