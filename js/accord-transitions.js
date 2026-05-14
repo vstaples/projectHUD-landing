@@ -1,6 +1,9 @@
 // ============================================================
 // ProjectHUD — accord-transitions.js
 // CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 4a
+// X-27: coalescing queue fix — 2026-05-14
+// Version: v20260514-X-27
+// Modified: 2026-05-14
 //
 // Dissolve transition orchestrator. Reacts to accord:level-changed
 // (dispatched by accord-core's setLevel) and swaps the center pane
@@ -43,6 +46,7 @@
     viewHost:          null,    // dynamically-created sibling for views
     inFlight:          false,
     lastSourceRect:    null,    // optional bbox for anchored descent
+    _pendingEvent:     null,    // X-27: latest-wins coalesce slot
   };
 
   function _ensureChrome() {
@@ -90,11 +94,11 @@
 
     const { level, context } = ev.detail || {};
     if (state.inFlight) {
-      // Coalesce rapid changes — finish the current and re-fire after
-      setTimeout(() => _onLevelChanged(ev), TIMING.OUT_MS + TIMING.IN_MS + 16);
+      state._pendingEvent = ev;   // X-27: keep only latest; discard earlier
       return;
     }
     state.inFlight = true;
+    state._pendingEvent = null;
 
     try {
       if (level === 'constellation') {
@@ -108,6 +112,11 @@
       console.error('[Accord-transitions] failed', e);
     } finally {
       state.inFlight = false;
+      if (state._pendingEvent) {
+        var pending = state._pendingEvent;
+        state._pendingEvent = null;
+        _onLevelChanged(pending);
+      }
     }
   }
 
