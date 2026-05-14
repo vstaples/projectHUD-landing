@@ -513,6 +513,12 @@
       _sfHost2.classList.remove('idle', 'running', 'closed', 'sealed');
       _sfHost2.classList.add(_sfState);
     }
+    // Stamp .ac-center meeting state class — required for filmstrip visibility CSS
+    var _sfCenter2 = document.querySelector('.ac-center');
+    if (_sfCenter2 && _sfState) {
+      _sfCenter2.classList.remove('meeting-idle', 'meeting-running', 'meeting-closed');
+      _sfCenter2.classList.add('meeting-' + _sfState);
+    }
   }
 
   function _wireMeetingView(host, meeting) {
