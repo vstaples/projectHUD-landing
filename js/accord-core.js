@@ -75,6 +75,14 @@ const Accord = (() => {
   var _resourceMapByUserId  = {};   // { user_id: resource_id }
   var _attendeeList         = [];   // resolved attendees for current meeting
   var _attendeeRefreshTimer = null;
+  // X-26: meeting-channel presence layer. Keyed by resource_id → last-seen
+  // timestamp (ms). Entries expire after 70s (2 missed 30s heartbeats + buffer).
+  // Supplements CMDCenter sessions for cross-firm attendees whose heartbeats
+  // arrive on a different firm channel and are invisible to the organizer's map.
+  var _meetingPresenceMap    = {};  // { resource_id: timestamp }
+  var _presenceHeartbeatTimer = null;
+  var _PRESENCE_INTERVAL_MS   = 30000;
+  var _PRESENCE_EXPIRE_MS     = 70000;
 
   // ── Level setters (consumed by accord-rails.js) ──────────────────
   function setLevel(nextLevel, ctx) {
@@ -467,6 +475,7 @@ const Accord = (() => {
       }
       // Tear down any prior subscription
       if (state.channel) {
+        _stopPresenceHeartbeat(); // X-26: clear heartbeat before unsubscribing
         try { await state.channel.unsubscribe(); } catch (e) {}
         state.channel = null;
       }
@@ -477,7 +486,16 @@ const Accord = (() => {
       state.channel
         .on('broadcast', { event: 'accord.node.committed' },   payload => _onRemoteEvent('node', payload))
         .on('broadcast', { event: 'accord.chat.posted' },      payload => _onRemoteEvent('chat', payload))
-        .on('broadcast', { event: 'accord.agenda.changed' },   payload => _onRemoteEvent('agenda', payload));
+        .on('broadcast', { event: 'accord.agenda.changed' },   payload => _onRemoteEvent('agenda', payload))
+        // X-26: meeting-channel presence. Receive heartbeats from ALL
+        // participants (including cross-firm) and update _meetingPresenceMap.
+        .on('broadcast', { event: 'accord.presence.heartbeat' }, function(env) {
+          var rid = env && env.payload && env.payload.resource_id;
+          if (rid) {
+            _meetingPresenceMap[rid] = Date.now();
+            _renderAttendees(_attendeeList);
+          }
+        });
       // CMD-A7: relay minutes-render broadcasts to the toast surface.
       _wireMinutesEventsForChannel(state.channel);
       state.channel
@@ -485,8 +503,17 @@ const Accord = (() => {
           const lc = $('liveConnectBtn');
           if (status === 'SUBSCRIBED') {
             lc?.classList.add('connected');
+            // X-26: start broadcasting presence on the meeting channel.
+            // Fires immediately so other participants see us at once,
+            // then repeats every 30s. self:false means we don't receive
+            // our own heartbeats — _meetingPresenceMap won't contain our
+            // own resource_id, but _buildPresenceMap also checks CMDCenter
+            // sessions (same-firm) and the attendee list re-render marks
+            // the current user's dot via isMe logic, not presence.
+            _startPresenceHeartbeat();
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             lc?.classList.remove('connected');
+            _stopPresenceHeartbeat();
           }
         });
     } catch (e) {
@@ -592,6 +619,45 @@ const Accord = (() => {
     });
   }
 
+  // X-26: meeting-channel presence heartbeat ──────────────────
+  // Broadcasts resource_id on the meeting channel so all participants
+  // (including cross-firm) can track each other's presence without
+  // relying on the firm-scoped CMDCenter session map.
+  function _sendPresenceHeartbeat() {
+    if (!state.channel || !state.me) return;
+    state.channel.send({
+      type:    'broadcast',
+      event:   'accord.presence.heartbeat',
+      payload: { resource_id: state.me.resource_id }
+    }).catch(function() { /* non-fatal */ });
+  }
+
+  function _startPresenceHeartbeat() {
+    _stopPresenceHeartbeat();
+    _sendPresenceHeartbeat(); // immediate on subscribe
+    _presenceHeartbeatTimer = setInterval(function() {
+      _sendPresenceHeartbeat();
+      // Expire stale entries (participant closed tab without unsubscribing)
+      var cutoff = Date.now() - _PRESENCE_EXPIRE_MS;
+      var changed = false;
+      Object.keys(_meetingPresenceMap).forEach(function(rid) {
+        if (_meetingPresenceMap[rid] < cutoff) {
+          delete _meetingPresenceMap[rid];
+          changed = true;
+        }
+      });
+      if (changed) _renderAttendees(_attendeeList);
+    }, _PRESENCE_INTERVAL_MS);
+  }
+
+  function _stopPresenceHeartbeat() {
+    if (_presenceHeartbeatTimer) {
+      clearInterval(_presenceHeartbeatTimer);
+      _presenceHeartbeatTimer = null;
+    }
+    _meetingPresenceMap = {};
+  }
+
   // Build a { resource_id: true } map of currently-online attendees by
   // walking the live CMDCenter session map and translating each
   // user_id key through _resourceMapByUserId. Sessions with no resource
@@ -599,12 +665,18 @@ const Accord = (() => {
   // never match any invited attendee row.
   function _buildPresenceMap() {
     var presence = {};
+    // Same-firm: CMDCenter session map (user_id → resource_id via _resourceMapByUserId)
     var sessions = (window.CMDCenter && window.CMDCenter.sessions && window.CMDCenter.sessions()) || {};
     Object.keys(sessions).forEach(function(uid) {
       var s = sessions[uid] || {};
       if (s.online === false) return;
       var resourceId = _resourceMapByUserId[uid];
       if (resourceId) presence[resourceId] = true;
+    });
+    // X-26: cross-firm: meeting-channel heartbeat map (resource_id direct).
+    // Merges on top — if both maps agree the person is present, no conflict.
+    Object.keys(_meetingPresenceMap).forEach(function(rid) {
+      presence[rid] = true;
     });
     return presence;
   }
