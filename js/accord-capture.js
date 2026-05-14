@@ -1278,14 +1278,20 @@
 
       thStream.innerHTML = html;
 
-      var closeBtn = thStream.querySelector('[data-action="film-th-close"]');
+      // X-20: button is now #ac-film-th-back (outside the scroll container).
+      // Wire handler here (after each scrub load) so it's always fresh.
+      var closeBtn = document.getElementById('ac-film-th-back');
       if (closeBtn) {
-        closeBtn.addEventListener('click', function() {
+        // Clone-replace to avoid stacking duplicate listeners across scrubs
+        var fresh = closeBtn.cloneNode(true);
+        closeBtn.parentNode.replaceChild(fresh, closeBtn);
+        fresh.addEventListener('click', function() {
           _liveFilmActiveId = null;
           var track = document.getElementById('ac-live-film-track');
           if (track) track.querySelectorAll('.ac-film-frame--active').forEach(function(f) {
             f.classList.remove('ac-film-frame--active');
           });
+          fresh.classList.remove('ac-film-th-close--active');
           _restoreCaptureStream();
         });
       }
