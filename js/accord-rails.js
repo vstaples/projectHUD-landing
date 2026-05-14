@@ -991,8 +991,9 @@
      'accord:meeting-filed',
      'accord:meeting-unfiled',
      'accord:meeting-refiled',
-     // X-15: refresh tree dots when a meeting ends/seals so the
-     // green running dot updates to closed/sealed immediately.
+     // X-15: refresh tree dots when a meeting starts or ends/seals so
+     // the dot state (idle→running→closed/sealed) updates immediately.
+     'accord:meeting-loaded',
      'accord:meeting-sealed'].forEach(eventName => {
       window.addEventListener(eventName, _refreshAll);
     });
