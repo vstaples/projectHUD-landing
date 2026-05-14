@@ -221,7 +221,9 @@
     if (!local.workstreams.length) {
       body.innerHTML = '<div class="ac-tree-empty">No workstreams yet.<br>Use + NEW WORKSTREAM to begin.</div>';
       // CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 S5.1 -- mount slideshow if not dismissed
-      if (window.AccordSlideshow && window.AccordSlideshow.shouldShow()) {
+      // X-29: guard typeof shouldShow — AccordSlideshow may exist as a partial
+      // object if accord-slideshow.js loses the async load race on first render.
+      if (window.AccordSlideshow && typeof window.AccordSlideshow.shouldShow === 'function' && window.AccordSlideshow.shouldShow()) {
         var ssHost = document.getElementById('ac-constellation-host');
         if (ssHost) window.AccordSlideshow.mount(ssHost);
       }
