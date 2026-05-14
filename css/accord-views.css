@@ -1475,8 +1475,10 @@
    when meeting is idle. State class stamped by accord-views.js
    _mountSurfaceHostInTabBody().
    ============================================================ */
+/* State classes stamped on .ac-center (filmstrip is sibling of meeting view,
+   not inside .ac-meeting-surface-host -- confirmed via console 2026-05-13) */
 .ac-meeting-surface-host.running .ac-setup-shell  { display: none !important; }
 .ac-meeting-surface-host.sealed  .ac-setup-shell  { display: none !important; }
 .ac-meeting-surface-host.closed  .ac-setup-shell  { display: none !important; }
 .ac-meeting-surface-host.idle    .ac-live-capture-center { display: none !important; }
-.ac-meeting-surface-host.idle    #ac-live-filmstrip      { display: none !important; }
+.ac-center.meeting-idle          #ac-live-filmstrip      { display: none !important; }

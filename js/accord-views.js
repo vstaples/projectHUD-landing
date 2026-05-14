@@ -404,6 +404,9 @@
       // CMD-ACCORD-SURFACE-STATE-FIX-1: stamp state after loadMeeting resolves
       var _sfHost1 = document.getElementById('ac-meeting-surface-host');
       if (_sfHost1) { _sfHost1.classList.remove('idle','running','closed','sealed'); _sfHost1.classList.add('idle'); }
+      // Filmstrip is sibling of meeting view inside .ac-center -- stamp there too
+      var _sfCenter1 = document.querySelector('.ac-center');
+      if (_sfCenter1) { _sfCenter1.classList.remove('meeting-idle','meeting-running','meeting-closed'); _sfCenter1.classList.add('meeting-idle'); }
       if (window.AccordMeetingSetup && window.AccordMeetingSetup.render) {
         window.AccordMeetingSetup.render(host, meeting, workstreamId);
       }
