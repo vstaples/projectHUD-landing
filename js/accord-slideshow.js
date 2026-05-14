@@ -9,7 +9,6 @@
 // ============================================================
 
 (function() {
-  'use strict';
 
   var STORAGE_KEY     = 'accord-slideshow-dismissed';
   var _slideIndex     = 0;
