@@ -1,9 +1,10 @@
 /* ============================================================
    accord-views.css
    CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 4a
-   X-23: collapsed rail tab visibility fix — 2026-05-14
-   Version: v20260514-X-23
-   Modified: 2026-05-14
+// X-23: collapsed rail tab visibility fix — 2026-05-14
+   // X-23b: right rail collapsed width fix — 2026-05-14
+   // Version: v20260514-X-23c
+   // Modified: 2026-05-14
    Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-2b (2026-05-13)
      - CMD-ACCORD-MY-MEETINGS-2: tab bar + narrow card styles.
        Removed MM1 overlay styles, rail-restructure styles.
@@ -1497,4 +1498,9 @@
 }
 #ac-rail-left.collapsed .ac-rail-tab {
   display: none;
+}
+#ac-rail-right.collapsed {
+  width: 36px;
+  min-width: 36px;
+  overflow: hidden;
 }
