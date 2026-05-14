@@ -1,6 +1,9 @@
 // ============================================================
 // ProjectHUD — accord-rails.js
 // CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 3
+// X-23: duplicate collapse handler removed — 2026-05-14
+// Version: v20260514-X-23
+// Modified: 2026-05-14
 // Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-2b (2026-05-13)
 //   - X-19: drag-to-resize rail handle + localStorage persist.
 //   - Card enrichment queries (started_at, workstreams(name), users(name)).
@@ -697,14 +700,6 @@
       _switchRailTab(target.dataset.tab);
     });
 
-    // Wire collapse button in new tab bar
-    var newCollapseBtn = tabBar.querySelector('.ac-rail-collapse');
-    if (newCollapseBtn) {
-      newCollapseBtn.addEventListener('click', function () {
-        var next = !document.getElementById('ac-rail-left').classList.contains('collapsed');
-        _applyRailCollapse('left', next);
-      });
-    }
   }
 
   function _switchRailTab(tab) {
