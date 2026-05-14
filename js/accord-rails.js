@@ -183,7 +183,13 @@
       return;
     }
     // If workstreams exist -- dismiss slideshow if somehow still showing
-    if (window.AccordSlideshow) window.AccordSlideshow.dismiss();
+    if (window.AccordSlideshow) {
+      if (typeof window.AccordSlideshow.dismiss === 'function') {
+        window.AccordSlideshow.dismiss();
+      } else if (typeof window.AccordSlideshow.dismount === 'function') {
+        window.AccordSlideshow.dismount();
+      }
+    }
 
     // Build hierarchy
     // X-17: promote workstreams whose parent is invisible (RLS-filtered) to root
