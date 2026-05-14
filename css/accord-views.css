@@ -1,6 +1,9 @@
 /* ============================================================
    accord-views.css
    CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 4a
+   X-23: collapsed rail tab visibility fix — 2026-05-14
+   Version: v20260514-X-23
+   Modified: 2026-05-14
    Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-2b (2026-05-13)
      - CMD-ACCORD-MY-MEETINGS-2: tab bar + narrow card styles.
        Removed MM1 overlay styles, rail-restructure styles.
@@ -1482,3 +1485,16 @@
 .ac-meeting-surface-host.closed  .ac-setup-shell  { display: none !important; }
 .ac-meeting-surface-host.idle    .ac-live-capture-center { display: none !important; }
 .ac-center.meeting-idle          #ac-live-filmstrip      { display: none !important; }
+/* ============================================================
+   X-23: collapsed rail tab visibility — 2026-05-14
+   Collapsed left rail shows only the expand › button at edge;
+   tab labels hidden when collapsed.
+   ============================================================ */
+#ac-rail-left.collapsed .ac-rail-tabs {
+  overflow: hidden;
+  padding: 0;
+  justify-content: flex-end;
+}
+#ac-rail-left.collapsed .ac-rail-tab {
+  display: none;
+}
