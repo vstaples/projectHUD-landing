@@ -153,6 +153,40 @@
   margin-left: auto;
 }
 
+/* X-27: logged-in user identity chip — far right of topnav.
+   Prevents session confusion during multi-user testing and
+   gives all users a persistent identity anchor in production. */
+#accord-app .ac-identity-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+#accord-app .ac-identity-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--signal-soft);
+  border: 1px solid var(--signal-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--signal);
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+#accord-app .ac-identity-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
 /* ============================================================
    CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4 — chrome additions
    ============================================================ */
@@ -2781,6 +2815,14 @@
     <a href="#" class="chrome-link" id="manageWorkstreamsLink"
        title="Manage workstream organizing buckets">Manage workstreams</a>
 
+    <!-- X-27: logged-in user identity chip. Populated by accord-core.js
+         after identity resolves. Prevents session confusion in multi-user
+         testing and gives all users a persistent identity anchor. -->
+    <div class="ac-identity-chip" id="acIdentityChip" style="display:none">
+      <div class="ac-identity-avatar" id="acIdentityAvatar"></div>
+      <span class="ac-identity-name" id="acIdentityName"></span>
+    </div>
+
     <!-- CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 5: top-level tab bar
          + Legacy view toggle REMOVED at closure. Surfaces are
          meeting-scoped and accessible only via meeting-view tabs. -->
@@ -2914,12 +2956,6 @@
           </div>
           <div id="captureStream"></div>
           <div id="threadHistoryStream" style="display:none"></div>
-          <!-- X-20: Back button lives outside #threadHistoryStream so it isn't
-               inside the scrolling container. Positioned absolute to
-               .captures-stream (position:relative) — always anchored
-               bottom-right regardless of scroll depth. Hidden by default;
-               accord-capture.js adds .ac-film-th-close--active when scrubbing. -->
-          <button class="ac-film-th-close" id="ac-film-th-back" data-action="film-th-close">← Back</button>
         </div>
 
       </div>

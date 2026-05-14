@@ -147,6 +147,24 @@ const Accord = (() => {
       if (rRows && rRows[0]) state.me.resource_id = rRows[0].id;
 
       window.CURRENT_USER = state.me;
+
+      // X-27: populate topnav identity chip so the logged-in user is
+      // always visible. Prevents session confusion in multi-user testing.
+      (function _paintIdentityChip(me) {
+        var chip   = document.getElementById('acIdentityChip');
+        var avatar = document.getElementById('acIdentityAvatar');
+        var label  = document.getElementById('acIdentityName');
+        if (!chip || !avatar || !label) return;
+        var name    = (me && me.name) || 'You';
+        var parts   = name.trim().split(/\s+/);
+        var initials = parts.length >= 2
+          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+          : name.slice(0, 2).toUpperCase();
+        avatar.textContent   = initials;
+        label.textContent    = name;
+        chip.style.display   = 'flex';
+      }(state.me));
+
       return state.me;
     } catch (e) {
       console.error('[Accord] identity resolution failed', e);
