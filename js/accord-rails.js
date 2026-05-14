@@ -990,7 +990,10 @@
      'accord:workstream-restored',
      'accord:meeting-filed',
      'accord:meeting-unfiled',
-     'accord:meeting-refiled'].forEach(eventName => {
+     'accord:meeting-refiled',
+     // X-15: refresh tree dots when a meeting ends/seals so the
+     // green running dot updates to closed/sealed immediately.
+     'accord:meeting-sealed'].forEach(eventName => {
       window.addEventListener(eventName, _refreshAll);
     });
   }
