@@ -1,6 +1,10 @@
 // ============================================================
 // ProjectHUD — accord-views.js
 // CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 4a
+// Last modified: v20260513-CMD-ACCORD-SURFACE-STATE-FIX-1 (2026-05-13)
+//   - _mountSurfaceHostInTabBody: stamp meeting state class (idle/running/
+//     closed/sealed) on #ac-meeting-surface-host so CSS can show/hide
+//     setup shell vs live capture surfaces correctly.
 //
 // Center-pane view rendering for two non-constellation levels:
 //   • workstream-level — STRICT NAVIGATIONAL per IR70 boundary
@@ -532,6 +536,14 @@
       tabBody.appendChild(surfHost);
     }
     surfHost.classList.add('active');
+    // CMD-ACCORD-SURFACE-STATE-FIX-1: stamp meeting state class so CSS can
+    // show/hide setup shell vs live capture surfaces correctly.
+    var _meetingState = window.Accord && window.Accord.state &&
+                        window.Accord.state.meeting && window.Accord.state.meeting.state;
+    if (_meetingState) {
+      surfHost.classList.remove('idle', 'running', 'closed', 'sealed');
+      surfHost.classList.add(_meetingState);
+    }
     // CMD-ACCORD-NEWMEETING-ROUTING-FIX-1: relocate controls bar into
     // ac-view-header so it sits in the same flex row as the meeting title.
     const ctrlBar  = document.getElementById('ac-meeting-controls-bar');

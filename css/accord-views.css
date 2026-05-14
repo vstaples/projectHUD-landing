@@ -1468,3 +1468,15 @@
 #ac-rail-left {
   position: relative;
 }
+
+/* ============================================================
+   CMD-ACCORD-SURFACE-STATE-FIX-1 — 2026-05-13
+   Hide setup shell when meeting is running; hide live capture
+   when meeting is idle. State class stamped by accord-views.js
+   _mountSurfaceHostInTabBody().
+   ============================================================ */
+.ac-meeting-surface-host.running .ac-setup-shell  { display: none !important; }
+.ac-meeting-surface-host.sealed  .ac-setup-shell  { display: none !important; }
+.ac-meeting-surface-host.closed  .ac-setup-shell  { display: none !important; }
+.ac-meeting-surface-host.idle    .ac-live-capture-center { display: none !important; }
+.ac-meeting-surface-host.idle    #ac-live-filmstrip      { display: none !important; }
