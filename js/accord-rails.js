@@ -95,6 +95,43 @@
     } catch (e) { return '—'; }
   }
 
+  // ── Grid-template-columns helper (X-23e fix) ───────────────
+  // Centralizes the inline `grid-template-columns` write on
+  // .ac-three-pane so rail collapse and rail resize stay in sync.
+  //
+  // Why inline: _initRailResize() persists user drag-resize via an
+  // inline style on the grid container. That inline style beats the
+  // CSS :has(.collapsed) rules' specificity, so the collapse rules
+  // can't shrink the relevant column track on their own. This helper
+  // is the single writer — it considers all four inputs together:
+  //   • left rail collapsed?  → left track = 36px
+  //   • right rail collapsed? → right track = 36px
+  //   • optional drag override (live mousemove width)
+  //   • else saved width (localStorage 'accord-rail-width', clamp 200–380)
+  //   • else default 250px
+  // Right track is fixed 280px when expanded (matches the CSS
+  // baseline grid-template-columns in accord-rails.css).
+  function _applyGridCols(overrideLeftW) {
+    const pane = document.querySelector('.ac-three-pane');
+    if (!pane) return;
+    const left  = $('ac-rail-left');
+    const right = $('ac-rail-right');
+    const leftCollapsed  = !!(left  && left.classList.contains('collapsed'));
+    const rightCollapsed = !!(right && right.classList.contains('collapsed'));
+
+    let leftW;
+    if (leftCollapsed) {
+      leftW = 36;
+    } else if (typeof overrideLeftW === 'number') {
+      leftW = overrideLeftW;
+    } else {
+      const saved = parseInt(localStorage.getItem('accord-rail-width'), 10);
+      leftW = (Number.isFinite(saved) && saved >= 200 && saved <= 380) ? saved : 250;
+    }
+    const rightW = rightCollapsed ? 36 : 280;
+    pane.style.gridTemplateColumns = leftW + 'px 1fr ' + rightW + 'px';
+  }
+
   // ── Boot sequence ───────────────────────────────────────────
   async function _init() {
     if (local.initialized) return;
@@ -734,14 +771,11 @@
     // not rail.style.width (grid overrides element width). IR66 confirmed 2026-05-13.
     var pane = rail.parentNode;
 
-    // Restore saved width
-    var saved = localStorage.getItem('accord-rail-width');
-    if (saved && pane) {
-      var w = parseInt(saved, 10);
-      if (w >= 200 && w <= 380) {
-        pane.style.gridTemplateColumns = w + 'px 1fr 280px';
-      }
-    }
+    // X-23e: restore saved width through the helper so the right-rail
+    // and both-rail collapse states are honored on boot. Previous
+    // direct inline-style write hard-coded 280px on the right column
+    // and ignored the .collapsed class, breaking the collapse CSS.
+    _applyGridCols();
 
     // Build handle
     var handle = document.createElement('div');
@@ -765,7 +799,9 @@
     document.addEventListener('mousemove', function (ev) {
       if (!_dragging || !pane) return;
       var newW = Math.min(380, Math.max(200, _startW + (ev.clientX - _startX)));
-      pane.style.gridTemplateColumns = newW + 'px 1fr 280px';
+      // X-23e: route through helper so the right column stays at 36px
+      // if the right rail is collapsed during a left-rail drag.
+      _applyGridCols(newW);
     });
 
     document.addEventListener('mouseup', function () {
@@ -850,6 +886,11 @@
     btn?.setAttribute('aria-expanded', String(!collapsed));
     btn?.setAttribute('title', collapsed ? 'Expand' : 'Collapse');
     _persistWrite(`accord-${side === 'left' ? 'leftrail' : 'rightrail'}-collapsed`, String(collapsed));
+    // X-23e: shrink/expand the actual grid column track to match.
+    // Without this the rail element shrinks (width:36px from CSS) but
+    // its column track stays at the saved width, leaving a dead gap
+    // between the spine and the center pane.
+    _applyGridCols();
   }
 
   function _updateSortBtnLabel() {
