@@ -1968,7 +1968,9 @@
       'accepted':  { cls: 'ac-badge--accepted',  label: 'ACCEPTED'  },
       'declined':  { cls: 'ac-badge--declined',  label: 'DECLINED'  },
       'tentative': { cls: 'ac-badge--tentative', label: 'TENTATIVE' },
-      'pending':   null
+      // X-25: render PENDING badge so the card signals "no response yet".
+      // Previously null (no badge), which hid the invitation status.
+      'pending':   { cls: 'ac-badge--pending',   label: 'PENDING'   }
     };
     var entry = map[attendee.rsvp_status];
     if (!entry) return '';
@@ -2583,17 +2585,15 @@
         var changed = rows.some(function(row) {
           var card = block.querySelector('[data-attendee-id="' + row.attendee_id + '"]');
           if (!card) return true; // new attendee added
-          // Compare rendered badge vs fetched status
-          var hasBadge  = !!card.querySelector('.ac-attendee-badge');
-          var isPending = row.rsvp_status === 'pending';
-          if (isPending && hasBadge)  return true;  // badge appeared but shouldn't be there
-          if (!isPending && !hasBadge) return true; // status changed, badge missing
-          // Check badge class matches
-          if (!isPending) {
-            var badge = card.querySelector('.ac-attendee-badge');
-            return badge && !badge.classList.contains('ac-badge--' + row.rsvp_status);
-          }
-          return false;
+          // X-25: pending now renders .ac-badge--pending; treat all
+          // statuses uniformly — any missing or class-mismatched badge
+          // triggers a re-render. (Organizer cards lack a badge by
+          // design and may cause a spurious re-render each cycle; that's
+          // a pre-existing no-op since the output is identical.)
+          var badge    = card.querySelector('.ac-attendee-badge');
+          var hasBadge = !!badge;
+          if (!hasBadge) return true;  // badge missing → re-render
+          return !badge.classList.contains('ac-badge--' + row.rsvp_status);
         });
         if (changed) {
           // Re-render full attendee list to pick up new rsvp_status badges

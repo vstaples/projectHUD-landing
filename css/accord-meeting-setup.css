@@ -782,6 +782,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-badge--accepted  { background: var(--ac-green-dim);  color: var(--ac-green);  }
 .ac-badge--declined  { background: var(--ac-rose-dim);   color: var(--ac-rose);   }
 .ac-badge--tentative { background: var(--ac-amber-dim);  color: var(--ac-amber);  }
+/* X-25: PENDING — muted neutral; no response yet, no positive/negative signal. */
+.ac-badge--pending   { background: var(--ac-bg-elevated); color: var(--ac-text-tertiary); }
 
 /* Remove button */
 .ac-attendee-remove {
