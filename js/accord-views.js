@@ -401,6 +401,9 @@
         try { await window.Accord.loadMeeting(meeting.meeting_id); }
         catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure (setup)', e); }
       }
+      // CMD-ACCORD-SURFACE-STATE-FIX-1: stamp state after loadMeeting resolves
+      var _sfHost1 = document.getElementById('ac-meeting-surface-host');
+      if (_sfHost1) { _sfHost1.classList.remove('idle','running','closed','sealed'); _sfHost1.classList.add('idle'); }
       if (window.AccordMeetingSetup && window.AccordMeetingSetup.render) {
         window.AccordMeetingSetup.render(host, meeting, workstreamId);
       }
@@ -498,6 +501,14 @@
     if (window.Accord?.loadMeeting && meeting.meeting_id) {
       try { await window.Accord.loadMeeting(meeting.meeting_id); }
       catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure', e); }
+    }
+    // CMD-ACCORD-SURFACE-STATE-FIX-1: stamp state class after loadMeeting resolves
+    var _sfHost2 = document.getElementById('ac-meeting-surface-host');
+    var _sfState = window.Accord && window.Accord.state &&
+                   window.Accord.state.meeting && window.Accord.state.meeting.state;
+    if (_sfHost2 && _sfState) {
+      _sfHost2.classList.remove('idle', 'running', 'closed', 'sealed');
+      _sfHost2.classList.add(_sfState);
     }
   }
 
