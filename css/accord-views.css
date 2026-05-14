@@ -1,14 +1,10 @@
 /* ============================================================
    accord-views.css
    CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 4a
-   Last modified: v20260513-CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 (2026-05-13)
-     - Appended .ac-mm-* and .ac-rail-nav-item styles (§10).
-     - Token values verified present in deployed :root (IR66).
-     - Fix: .ac-mm-back contrast bumped from --ac-text-faint
-       (2.4:1) to --ac-text-secondary (8.0:1) on --ac-bg-deep
-       panel background; hover lifts to --ac-text-primary with
-       --ac-amber border. Smoke-test 4 surfaced near-invisible
-       Back button.
+   Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-2 (2026-05-13)
+     - CMD-ACCORD-MY-MEETINGS-2: tab bar + narrow card styles.
+       Removed MM1 overlay styles, rail-restructure styles.
+     - Slideshow styles retained from SLIDESHOW-1.
 
    Workstream-level + meeting-level center-pane views.
    Strict navigational per IR70 boundary (no activity intelligence
@@ -1125,228 +1121,154 @@
   padding: 16px;
 }
 /* ============================================================
-   CMD-ACCORD-MY-MEETINGS-1 §10 — Personal meeting dashboard
-   Appended 2026-05-13.
+   CMD-ACCORD-MY-MEETINGS-2 -- Tab bar + narrow rail card styles
+   Added 2026-05-13.
    ============================================================ */
 
-/* ── Rail nav item (MY MEETINGS entry in #ac-rail-left) ───── */
-.ac-rail-nav-item {
+/* -- Rail tab bar ----------------------------------------- */
+.ac-rail-tabs {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  margin: 0 14px 4px;
-  cursor: pointer;
-  font-size: 11px;
-  color: var(--ac-text-tertiary);
-  border-radius: 3px;
-  transition: background 0.12s, color 0.12s;
-  user-select: none;
-}
-.ac-rail-nav-item:hover {
-  background: var(--ac-bg-tile);
-  color: var(--ac-text-secondary);
-}
-.ac-rail-nav-item.active {
-  background: var(--ac-bg-tile);
-  color: var(--ac-amber);
-}
-.ac-rail-nav-item:focus-visible {
-  outline: 1px solid var(--ac-border-active);
-  outline-offset: 1px;
-}
-.ac-rail-nav-glyph {
-  font-size: 12px;
-  flex-shrink: 0;
-}
-.ac-rail-nav-label {
-  font-family: var(--ac-font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.0px;
-}
-
-/* ── My Meetings view host (sibling of #ac-constellation-host) */
-.ac-my-meetings-view {
-  position: absolute;
-  inset: 0;
-  background: var(--ac-bg-deep);
-  z-index: 100;
-  overflow-y: auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-/* ── Header ───────────────────────────────────────────────── */
-.ac-mm-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   border-bottom: 1px solid var(--ac-border-subtle);
-  padding-bottom: 12px;
+  flex-shrink: 0;
+  padding: 0 4px;
+  gap: 2px;
 }
-.ac-mm-title {
+.ac-rail-tab {
+  flex: 1;
   font-family: var(--ac-font-mono);
-  font-size: 11px;
+  font-size: 8.5px;
   font-weight: 700;
-  letter-spacing: 1.4px;
-  color: var(--ac-text-secondary);
-}
-.ac-mm-back {
-  font-family: var(--ac-font-mono);
-  font-size: 9px;
-  color: var(--ac-text-secondary);
+  letter-spacing: 0.9px;
+  padding: 9px 4px;
   background: none;
-  border: 1px solid var(--ac-border-mid);
-  border-radius: 3px;
-  padding: 3px 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ac-text-faint);
   cursor: pointer;
+  text-align: center;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
 }
-.ac-mm-back:hover {
-  color: var(--ac-text-primary);
-  border-color: var(--ac-amber);
+.ac-rail-tab:hover { color: var(--ac-text-tertiary); }
+.ac-rail-tab--active {
+  color: var(--ac-cyan);
+  border-bottom-color: var(--ac-cyan);
 }
 
-/* ── Zones ────────────────────────────────────────────────── */
-.ac-mm-zone {
+/* -- Rail panels ------------------------------------------ */
+.ac-rail-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
 }
+
+/* -- My Meetings narrow cards ----------------------------- */
+#ac-mm-rail-content {
+  overflow-y: auto;
+  padding: 10px 10px 20px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+}
+.ac-mm-zone { display: flex; flex-direction: column; gap: 6px; }
 .ac-mm-zone-label {
   font-family: var(--ac-font-mono);
-  font-size: 11px;
+  font-size: 8px;
   font-weight: 700;
   letter-spacing: 1.2px;
   color: var(--ac-text-tertiary);
   text-transform: uppercase;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding: 4px 0 2px 0;
 }
 .ac-mm-badge {
   background: var(--ac-amber-dim);
   color: var(--ac-amber);
-  border-radius: 10px;
-  padding: 1px 7px;
-  font-size: 11px;
+  border-radius: 8px;
+  padding: 1px 5px;
+  font-size: 8px;
 }
-.ac-mm-empty-zone {
-  font-size: 11px;
-  color: var(--ac-text-faint);
-  font-style: italic;
-  padding: 6px 0;
-}
-.ac-mm-loading {
-  font-family: var(--ac-font-mono);
-  font-size: 11px;
-  color: var(--ac-text-faint);
-  letter-spacing: 0.8px;
-  text-align: center;
-  padding: 40px 0;
-}
-
-/* ── Cards ────────────────────────────────────────────────── */
 .ac-mm-card {
   background: var(--ac-bg-pane);
   border: 1px solid var(--ac-border-subtle);
-  border-radius: 5px;
-  padding: 12px 14px;
+  border-radius: 4px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
-.ac-mm-card--live {
-  border-color: rgba(34, 197, 94, 0.35);
-  background: rgba(34, 197, 94, 0.05);
-}
-.ac-mm-card--pending {
-  border-color: rgba(251, 191, 119, 0.25);
-}
-.ac-mm-card--upcoming {
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
-}
+.ac-mm-card--live { border-color: rgba(34,197,94,0.3); }
+.ac-mm-card--upcoming { cursor: pointer; }
 .ac-mm-card--upcoming:hover {
-  border-color: var(--ac-border-mid);
   background: var(--ac-bg-tile);
+  border-color: var(--ac-border-mid);
 }
 .ac-mm-card-title {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--ac-text-primary);
+  line-height: 1.3;
 }
 .ac-mm-card-meta {
   font-family: var(--ac-font-mono);
-  font-size: 11px;
+  font-size: 8.5px;
   color: var(--ac-text-tertiary);
 }
-.ac-mm-card-role {
-  font-family: var(--ac-font-mono);
-  font-size: 11px;
-  color: var(--ac-text-faint);
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-}
-
-/* ── JOIN button (live now) ──────────────────────────────── */
 .ac-mm-join-btn {
   display: inline-block;
-  margin-top: 6px;
+  margin-top: 4px;
   font-family: var(--ac-font-mono);
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.8px;
-  padding: 7px 16px;
-  background: #22c55e;
-  color: var(--ac-bg-deep);
-  border: none;
-  border-radius: 4px;
+  letter-spacing: 0.6px;
+  padding: 5px 10px;
+  background: rgba(34,197,94,0.12);
+  color: #22c55e;
+  border: 1px solid rgba(34,197,94,0.3);
+  border-radius: 3px;
   text-decoration: none;
   align-self: flex-start;
-  cursor: pointer;
 }
-.ac-mm-join-btn:hover {
-  opacity: 0.88;
-}
-
-/* ── RSVP buttons (pending) ──────────────────────────────── */
-.ac-mm-rsvp-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 6px;
-}
+.ac-mm-join-btn:hover { background: rgba(34,197,94,0.22); }
+.ac-mm-rsvp-row { display: flex; gap: 6px; margin-top: 4px; }
 .ac-mm-rsvp-btn {
   font-family: var(--ac-font-mono);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.8px;
-  padding: 5px 14px;
+  padding: 3px 10px;
   border-radius: 3px;
   cursor: pointer;
   border: 1px solid;
 }
 .ac-mm-rsvp-accept {
-  background: rgba(34, 197, 94, 0.1);
+  background: rgba(34,197,94,0.1);
   color: #22c55e;
-  border-color: rgba(34, 197, 94, 0.35);
-}
-.ac-mm-rsvp-accept:hover {
-  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34,197,94,0.3);
 }
 .ac-mm-rsvp-decline {
-  background: rgba(251, 113, 133, 0.1);
+  background: rgba(251,113,133,0.1);
   color: var(--ac-rose);
-  border-color: rgba(251, 113, 133, 0.25);
+  border-color: rgba(251,113,133,0.25);
 }
-.ac-mm-rsvp-decline:hover {
-  background: rgba(251, 113, 133, 0.2);
+.ac-mm-rsvp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ac-mm-empty {
+  font-size: 11px;
+  color: var(--ac-text-faint);
+  font-style: italic;
+  padding: 8px 0;
 }
-.ac-mm-rsvp-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.ac-mm-loading {
+  font-family: var(--ac-font-mono);
+  font-size: 9px;
+  color: var(--ac-text-faint);
+  padding: 16px 0;
+  text-align: center;
 }
 
 /* ============================================================
@@ -1501,32 +1423,3 @@
   line-height: 1;
 }
 .ac-ss-prev:hover, .ac-ss-next:hover { color: var(--ac-text-secondary); }
-
-/* ============================================================
-   RAIL-RESTRUCTURE-1 — Personal nav + workstream section split
-   Appended 2026-05-13.
-   ============================================================ */
-
-/* ── Personal nav section (top of left rail) ─────────── */
-.ac-rail-personal {
-  display: flex;
-  flex-direction: column;
-  padding: 6px 0 4px;
-}
-
-/* ── 1px divider between personal and workstream sections  */
-.ac-rail-divider {
-  height: 1px;
-  background: var(--ac-border-subtle);
-  margin: 0;
-  flex-shrink: 0;
-}
-
-/* ── Workstream section wrapper ───────────────────────── */
-.ac-rail-workstreams {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}

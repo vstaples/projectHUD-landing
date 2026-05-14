@@ -1,8 +1,9 @@
 // ============================================================
 // ProjectHUD — accord-rails.js
 // CMD-ACCORD-CONSTELLATION-ENTRY-1 · Phase 3
-// Last modified: v20260513-RAIL-RESTRUCTURE-1 (2026-05-13)
-//   - Rail restructure: MY MEETINGS injected into .ac-rail-personal wrapper.
+// Last modified: v20260513-CMD-ACCORD-MY-MEETINGS-2 (2026-05-13)
+//   - Replace _ensureMyMeetingsRailItem with _ensureRailTabs + _switchRailTab.
+//   - Tab bar pattern: WORKSTREAMS / MY MEETINGS tabs in left rail.
 //   - CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 S5.1: mount slideshow on zero-workstream
 //     empty state; dismiss when workstreams exist.
 //   - X-17: promote RLS-orphaned workstreams to root; var/function IR fix.
@@ -621,67 +622,105 @@
     // draggable=true so the affordance is discoverable.
   }
 
-  // ── CMD-ACCORD-MY-MEETINGS-1 §5.1 — MY MEETINGS rail injection ──
-  // Uses `var` per Iron Rule for new code added in this commission.
-  function _ensureMyMeetingsRailItem() {
-    var rail = $('ac-rail-left');
-    if (!rail) {
-      console.warn('[Accord-rails] #ac-rail-left missing; cannot mount MY MEETINGS');
-      return;
-    }
-    if ($('ac-my-meetings-nav')) return;  // idempotent — already mounted
+  // CMD-ACCORD-MY-MEETINGS-2 -- tab bar injection
+  function _ensureRailTabs() {
+    if (document.querySelector('.ac-rail-tabs')) return;  // idempotent
+    var railLeft = document.getElementById('ac-rail-left');
+    if (!railLeft) return;
 
-    var item = document.createElement('div');
-    item.id          = 'ac-my-meetings-nav';
-    item.className   = 'ac-rail-nav-item';
-    item.setAttribute('data-action', 'open-my-meetings');
-    item.setAttribute('role', 'button');
-    item.setAttribute('tabindex', '0');
-    item.innerHTML =
-      '<span class="ac-rail-nav-glyph">◈</span>' +
-      '<span class="ac-rail-nav-label">MY MEETINGS</span>';
+    // Remove legacy personal/divider/workstreams wrappers if present
+    var personal  = railLeft.querySelector('.ac-rail-personal');
+    var divider   = railLeft.querySelector('.ac-rail-divider');
+    var wsWrapper = railLeft.querySelector('.ac-rail-workstreams');
+    if (personal) personal.remove();
+    if (divider)  divider.remove();
 
-    // Insert between .ac-rail-header and #ac-tree-search (V1-bis confirmed
-    // these are direct children of #ac-rail-left).
-    // Prepend into .ac-rail-personal (rail restructure wrapper).
-    // Fallback: insert before .ac-rail-divider or at rail top.
-    var personal = document.getElementById('ac-rail-personal');
-    if (personal) {
-      personal.appendChild(item);
+    // Remove old nav item if present
+    var oldNav = document.getElementById('ac-my-meetings-nav');
+    if (oldNav) oldNav.remove();
+
+    // Capture header + collapse btn before removing
+    var oldHeader   = railLeft.querySelector('.ac-rail-header');
+    var collapseBtn = oldHeader ? oldHeader.querySelector('.ac-rail-collapse') : null;
+
+    // Build tab bar
+    var tabBar = document.createElement('div');
+    tabBar.className = 'ac-rail-tabs';
+    tabBar.innerHTML =
+      '<button class="ac-rail-tab ac-rail-tab--active" ' +
+      'data-tab="workstreams" data-action="rail-tab-switch">WORKSTREAMS</button>' +
+      '<button class="ac-rail-tab" ' +
+      'data-tab="my-meetings" data-action="rail-tab-switch">MY MEETINGS</button>' +
+      (collapseBtn ? collapseBtn.outerHTML : '');
+
+    // Workstream panel -- wrap existing content
+    var wsPanel = document.createElement('div');
+    wsPanel.className = 'ac-rail-panel';
+    wsPanel.setAttribute('data-panel', 'workstreams');
+
+    if (wsWrapper) {
+      wsPanel.appendChild(wsWrapper);
     } else {
-      var divider = rail.querySelector('.ac-rail-divider');
-      if (divider) {
-        rail.insertBefore(item, divider);
-      } else {
-        rail.insertBefore(item, rail.firstChild);
-      }
+      var search = document.getElementById('ac-tree-search');
+      var newBtn = document.getElementById('ac-tree-new-btn');
+      var scroll = document.querySelector('.ac-tree-scroll');
+      if (search) wsPanel.appendChild(search);
+      if (newBtn) wsPanel.appendChild(newBtn);
+      if (scroll) wsPanel.appendChild(scroll);
     }
 
-    // Click handler — call the My Meetings module
-    item.addEventListener('click', function () {
-      if (window.AccordMyMeetings && typeof window.AccordMyMeetings.open === 'function') {
-        window.AccordMyMeetings.open();
-      } else {
-        console.warn('[Accord-rails] window.AccordMyMeetings not loaded');
-      }
+    // My Meetings panel
+    var mmPanel = document.createElement('div');
+    mmPanel.className = 'ac-rail-panel';
+    mmPanel.setAttribute('data-panel', 'my-meetings');
+    mmPanel.style.display = 'none';
+    mmPanel.innerHTML = '<div id="ac-mm-rail-content"></div>';
+
+    // Remove old header, insert new structure
+    if (oldHeader) oldHeader.remove();
+    railLeft.insertBefore(tabBar, railLeft.firstChild);
+    railLeft.appendChild(wsPanel);
+    railLeft.appendChild(mmPanel);
+
+    // Wire tab delegation
+    tabBar.addEventListener('click', function (ev) {
+      var target = ev.target;
+      if (!target.dataset || target.dataset.action !== 'rail-tab-switch') return;
+      _switchRailTab(target.dataset.tab);
     });
 
-    // Keyboard parity — Enter/Space activates like a button
-    item.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Enter' || ev.key === ' ') {
-        ev.preventDefault();
-        item.click();
-      }
+    // Wire collapse button in new tab bar
+    var newCollapseBtn = tabBar.querySelector('.ac-rail-collapse');
+    if (newCollapseBtn) {
+      newCollapseBtn.addEventListener('click', function () {
+        var next = !document.getElementById('ac-rail-left').classList.contains('collapsed');
+        _applyRailCollapse('left', next);
+      });
+    }
+  }
+
+  function _switchRailTab(tab) {
+    document.querySelectorAll('.ac-rail-tab').forEach(function (t) {
+      t.classList.toggle('ac-rail-tab--active', t.dataset.tab === tab);
     });
+    document.querySelectorAll('.ac-rail-panel').forEach(function (p) {
+      p.style.display = p.getAttribute('data-panel') === tab ? '' : 'none';
+    });
+    if (tab === 'my-meetings') {
+      if (window.AccordMyMeetings) {
+        window.AccordMyMeetings.renderInRail(
+          document.getElementById('ac-mm-rail-content')
+        );
+      }
+    } else {
+      if (window.AccordMyMeetings) window.AccordMyMeetings.pauseRefresh();
+    }
   }
 
   // ── Chrome wiring (rail collapse, sort toggle) ──
   function _wireChrome() {
-    // CMD-ACCORD-MY-MEETINGS-1 §5.1 — inject MY MEETINGS rail item.
-    // Placed as a direct child of #ac-rail-left, between .ac-rail-header
-    // and #ac-tree-search. Outside #ac-tree-body so survives _renderTree().
-    // Idempotent — guard against double-init.
-    _ensureMyMeetingsRailItem();
+    // CMD-ACCORD-MY-MEETINGS-2 -- replace overlay nav item with tab bar.
+    _ensureRailTabs();
 
     // Left-rail collapse button
     $('ac-leftrail-collapse')?.addEventListener('click', () => {
