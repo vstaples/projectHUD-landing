@@ -831,16 +831,17 @@
   font-size: 12px;
   color: var(--ink-body);
 }
-/* X-25: bumped 8px → 10px and ghost → faint so the dot is visible
-   against the warm canvas. State classes (.present / .unstable)
-   below still override base background. */
+/* X-25: hollow ring = not connected; solid fill = connected.
+   Mirrors the IDLE shell's ac-conn-dot--none / ac-conn-dot--on-time pattern. */
 #accord-app .presence-dot {
   width: 10px; height: 10px; border-radius: 50%;
-  background: var(--ink-faint);
+  background: transparent;
+  border: 2px solid var(--ink-faint);
   flex-shrink: 0;
+  box-sizing: border-box;
 }
-#accord-app .presence-dot.present  { background: #6ba88c; }       /* sage green per palette */
-#accord-app .presence-dot.unstable { background: var(--signal); animation: lc-pulse 1.4s ease-in-out infinite; }
+#accord-app .presence-dot.present  { background: #6ba88c; border-color: #6ba88c; }
+#accord-app .presence-dot.unstable { background: var(--signal); border-color: var(--signal); animation: lc-pulse 1.4s ease-in-out infinite; }
 #accord-app .attendee-name { flex: 1; }
 #accord-app .attendee-self  { color: var(--ink-faint); font-size: 11px; }
 

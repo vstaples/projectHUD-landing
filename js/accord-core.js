@@ -560,11 +560,22 @@ const Accord = (() => {
       }
       // Resolve display names by resource_id
       var resourceIds = rows.map(function(r) { return r.resource_id; });
+      // Resolve display names AND user_ids by resource_id.
+      // X-26: include user_id in the select so cross-firm attendees
+      // get added to _resourceMapByUserId. _loadFirmResourceMap only
+      // covers Vaughn's firm — without this, Ron's user_id is never
+      // mapped and _buildPresenceMap can never mark him present.
       API.get(
-        'resources?id=in.(' + resourceIds.join(',') + ')&select=id,name'
+        'resources?id=in.(' + resourceIds.join(',') + ')&select=id,name,user_id'
       ).then(function(resources) {
         var nameMap = {};
-        (resources || []).forEach(function(r) { nameMap[r.id] = r.name; });
+        (resources || []).forEach(function(r) {
+          nameMap[r.id] = r.name;
+          // Populate cross-firm entries the firm map fetch missed
+          if (r.user_id && !_resourceMapByUserId[r.user_id]) {
+            _resourceMapByUserId[r.user_id] = r.id;
+          }
+        });
         _attendeeList = rows.map(function(a) {
           return {
             attendee_id: a.attendee_id,
@@ -626,17 +637,10 @@ const Accord = (() => {
     var html = sorted.map(function(a) {
       var isPresent = !!presence[a.resource_id];
       var isMe      = a.resource_id === myResourceId;
-      // X-25 (2026-05-14): swap IDLE-shell class names (ac-attendee-row /
-      // ac-presence-dot / ac-attendee-role / ac-attendee-you) for the
-      // LIVE-shell convention (attendee-row / presence-dot / attendee-self).
-      // The IDLE names had no row/dot CSS in the LIVE shell -> row wasn't a
-      // flex container (spans crushed) and the dot was a zero-size unstyled
-      // span (invisible). They also dragged cyan `.ac-attendee-you` styling
-      // out of the Setup palette into the running-meeting surface (Style
-      // Doctrine v1.8 §3.8 module-palette leak). LIVE-shell CSS in accord.html
-      // (.attendee-row / .presence-dot[.present] / .attendee-name /
-      // .attendee-self) styles these correctly in the warm-amber palette.
-      var dotCls    = isPresent ? 'presence-dot present' : 'presence-dot';
+      // X-25: LIVE-shell class names (presence-dot / attendee-row /
+      // attendee-name / attendee-self). ac-* names were IDLE-shell
+      // identifiers with no rules in the running-meeting surface.
+      var dotCls = isPresent ? 'presence-dot present' : 'presence-dot';
       return '<div class="attendee-row" data-resource-id="' + _esc(a.resource_id) + '">' +
                '<span class="' + dotCls + '"></span>' +
                '<span class="attendee-name">' + _esc(a.name) + '</span>' +
