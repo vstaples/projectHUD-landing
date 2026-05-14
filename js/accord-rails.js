@@ -223,10 +223,20 @@
       // CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 S5.1 -- mount slideshow if not dismissed
       // X-29: guard typeof shouldShow — AccordSlideshow may exist as a partial
       // object if accord-slideshow.js loses the async load race on first render.
-      if (window.AccordSlideshow && typeof window.AccordSlideshow.shouldShow === 'function' && window.AccordSlideshow.shouldShow()) {
-        var ssHost = document.getElementById('ac-constellation-host');
-        if (ssHost) window.AccordSlideshow.mount(ssHost);
-      }
+      // If the object exists but shouldShow isn't ready yet, retry once after
+      // 500ms to catch the common case where the script loads just after boot.
+      (function _trySlideshowMount() {
+        if (window.AccordSlideshow && typeof window.AccordSlideshow.shouldShow === 'function') {
+          if (window.AccordSlideshow.shouldShow()) {
+            var ssHost = document.getElementById('ac-constellation-host');
+            if (ssHost) window.AccordSlideshow.mount(ssHost);
+          }
+        } else if (window.AccordSlideshow) {
+          // Object exists but not yet fully initialized — retry once
+          setTimeout(_trySlideshowMount, 500);
+        }
+        // If AccordSlideshow doesn't exist at all, silently skip (no slideshow module)
+      }());
       return;
     }
     // If workstreams exist -- dismiss slideshow if somehow still showing
