@@ -1203,8 +1203,10 @@
     var activeFrame = track.querySelector('[data-meeting-id="' + meetingId + '"]');
     if (activeFrame) activeFrame.classList.add('ac-film-frame--active');
 
-    // Activate Back button when viewing a prior meeting
-    var closeBtn = document.querySelector('.ac-film-th-close');
+    // Activate Back button when viewing a prior meeting.
+    // X-20: button is now #ac-film-th-back (sibling of #threadHistoryStream,
+    // outside the scroll container). Query by ID for reliability.
+    var closeBtn = document.getElementById('ac-film-th-back');
     if (closeBtn) {
       var isCurrentMeeting = meetingId === (window.Accord && window.Accord.state && window.Accord.state.meeting && window.Accord.state.meeting.meeting_id);
       closeBtn.classList.toggle('ac-film-th-close--active', !isCurrentMeeting);
@@ -1257,8 +1259,10 @@
       var html = '<div class="ac-film-th-header">' +
                  '<span class="ac-film-th-title">' + esc(title) + '</span>' +
                  '<span class="ac-film-th-date">' + esc(date) + '</span>' +
-                 '</div>' +
-                 '<button class="ac-film-th-close" data-action="film-th-close">← Back</button>';
+                 '</div>';
+                 // X-20: Back button is now a persistent sibling element
+                 // (#ac-film-th-back in accord.html) outside the scrolling
+                 // container. Do not inject it here.
 
       var TAG_ORDER = ['decision', 'action', 'dissent', 'risk', 'note', 'question'];
       var sorted    = nodes.slice().sort(function(a, b) {

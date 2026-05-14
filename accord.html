@@ -831,39 +831,19 @@
   font-size: 12px;
   color: var(--ink-body);
 }
-/* X-25: hollow ring = not connected; solid fill = connected.
-   Mirrors the IDLE shell's ac-conn-dot--none / ac-conn-dot--on-time pattern. */
 #accord-app .presence-dot {
-  width: 10px; height: 10px; border-radius: 50%;
-  background: transparent;
-  border: 2px solid var(--ink-faint);
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ink-ghost);
   flex-shrink: 0;
-  box-sizing: border-box;
 }
-#accord-app .presence-dot.present  { background: #6ba88c; border-color: #6ba88c; }
-#accord-app .presence-dot.unstable { background: var(--signal); border-color: var(--signal); animation: lc-pulse 1.4s ease-in-out infinite; }
+#accord-app .presence-dot.present  { background: #6ba88c; }       /* sage green per palette */
+#accord-app .presence-dot.unstable { background: var(--signal); animation: lc-pulse 1.4s ease-in-out infinite; }
 #accord-app .attendee-name { flex: 1; }
 #accord-app .attendee-self  { color: var(--ink-faint); font-size: 11px; }
 
 /* Chat */
-/* X-24: the team-chat wrapper (the <div> in meta-pane containing
-   .chat-stream + .chat-input-row) becomes a flex column that fills
-   remaining meta-pane height. chat-stream inside it flex-grows so
-   the bordered chat box extends down to the workstream timeline. */
-#accord-app .meta-pane > div:has(.chat-stream) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
 #accord-app .chat-stream {
-  /* X-24: was `max-height: 220px` (this rule) + `height: 200px`
-     (accord-views.css). Both replaced with flex-grow so the chat
-     box fills remaining height in the team-chat wrapper. */
-  flex: 1;
-  min-height: 0;
-  height: auto;
-  max-height: none;
+  max-height: 220px;
   overflow-y: auto;
   background: var(--canvas-raised);
   border: 1px solid var(--rule);
@@ -2934,6 +2914,12 @@
           </div>
           <div id="captureStream"></div>
           <div id="threadHistoryStream" style="display:none"></div>
+          <!-- X-20: Back button lives outside #threadHistoryStream so it isn't
+               inside the scrolling container. Positioned absolute to
+               .captures-stream (position:relative) — always anchored
+               bottom-right regardless of scroll depth. Hidden by default;
+               accord-capture.js adds .ac-film-th-close--active when scrubbing. -->
+          <button class="ac-film-th-close" id="ac-film-th-back" data-action="film-th-close">← Back</button>
         </div>
 
       </div>
