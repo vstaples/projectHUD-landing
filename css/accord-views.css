@@ -330,7 +330,16 @@
 #accord-app .ac-meeting-tab-body {
   flex: 1;
   min-height: 0;
+  /* X-24: surface host inside needs a flex parent for its flex:1 to take
+     effect. Without this the host collapses to natural content height
+     and the capture-body grid columns can't fill vertically. */
+  display: flex;
+  flex-direction: column;
 }
+/* X-24: drop bottom padding under the 5-tab shell so the capture
+   columns sit flush against the workstream-timeline filmstrip. The
+   22px top padding + 32px side padding from .ac-view-body remain. */
+#accord-app .ac-view-meeting > .ac-view-body { padding-bottom: 0; }
 #accord-app .ac-meeting-tab-stub {
   padding: 24px 0;
   max-width: 640px;

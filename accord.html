@@ -842,8 +842,24 @@
 #accord-app .attendee-self  { color: var(--ink-faint); font-size: 11px; }
 
 /* Chat */
+/* X-24: the team-chat wrapper (the <div> in meta-pane containing
+   .chat-stream + .chat-input-row) becomes a flex column that fills
+   remaining meta-pane height. chat-stream inside it flex-grows so
+   the bordered chat box extends down to the workstream timeline. */
+#accord-app .meta-pane > div:has(.chat-stream) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 #accord-app .chat-stream {
-  max-height: 220px;
+  /* X-24: was `max-height: 220px` (this rule) + `height: 200px`
+     (accord-views.css). Both replaced with flex-grow so the chat
+     box fills remaining height in the team-chat wrapper. */
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  max-height: none;
   overflow-y: auto;
   background: var(--canvas-raised);
   border: 1px solid var(--rule);
