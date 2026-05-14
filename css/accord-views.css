@@ -1469,8 +1469,16 @@
   opacity: 0.5;
 }
 
-/* Ensure rail is position:relative so handle offsets work */
-#ac-rail-left {
+/* X-19b: right-rail handle modifier -- anchor to the LEFT edge of the
+   right rail (mirror of left handle on right edge of left rail). */
+.ac-rail-resize-handle--right {
+  right: auto;
+  left: -3px;
+}
+
+/* Ensure rails are position:relative so handle offsets work */
+#ac-rail-left,
+#ac-rail-right {
   position: relative;
 }
 

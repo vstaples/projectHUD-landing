@@ -95,7 +95,7 @@
     } catch (e) { return '—'; }
   }
 
-  // ── Grid-template-columns helper (X-23e fix) ───────────────
+  // ── Grid-template-columns helper (X-23e + X-19b) ───────────
   // Centralizes the inline `grid-template-columns` write on
   // .ac-three-pane so rail collapse and rail resize stay in sync.
   //
@@ -103,32 +103,33 @@
   // inline style on the grid container. That inline style beats the
   // CSS :has(.collapsed) rules' specificity, so the collapse rules
   // can't shrink the relevant column track on their own. This helper
-  // is the single writer — it considers all four inputs together:
-  //   • left rail collapsed?  → left track = 36px
-  //   • right rail collapsed? → right track = 36px
-  //   • optional drag override (live mousemove width)
-  //   • else saved width (localStorage 'accord-rail-width', clamp 200–380)
-  //   • else default 250px
-  // Right track is fixed 280px when expanded (matches the CSS
-  // baseline grid-template-columns in accord-rails.css).
-  function _applyGridCols(overrideLeftW) {
+  // is the single writer — it considers per-side inputs together:
+  //   • collapsed?     → that track = 36px
+  //   • drag override? → use it (live mousemove width)
+  //   • saved width?   → localStorage 'accord-rail-width' (left) /
+  //                       'accord-rightrail-width' (right), clamp 200–380
+  //   • else default   → 250px (left) / 280px (right)
+  //
+  // overrides: optional { left?: number, right?: number } — passed
+  // from the live mousemove handlers during drag.
+  function _applyGridCols(overrides) {
     const pane = document.querySelector('.ac-three-pane');
     if (!pane) return;
     const left  = $('ac-rail-left');
     const right = $('ac-rail-right');
     const leftCollapsed  = !!(left  && left.classList.contains('collapsed'));
     const rightCollapsed = !!(right && right.classList.contains('collapsed'));
+    overrides = overrides || {};
 
-    let leftW;
-    if (leftCollapsed) {
-      leftW = 36;
-    } else if (typeof overrideLeftW === 'number') {
-      leftW = overrideLeftW;
-    } else {
-      const saved = parseInt(localStorage.getItem('accord-rail-width'), 10);
-      leftW = (Number.isFinite(saved) && saved >= 200 && saved <= 380) ? saved : 250;
+    function _resolveW(collapsed, override, savedKey, defaultW) {
+      if (collapsed) return 36;
+      if (typeof override === 'number') return override;
+      const saved = parseInt(localStorage.getItem(savedKey), 10);
+      return (Number.isFinite(saved) && saved >= 200 && saved <= 380) ? saved : defaultW;
     }
-    const rightW = rightCollapsed ? 36 : 280;
+
+    const leftW  = _resolveW(leftCollapsed,  overrides.left,  'accord-rail-width',      250);
+    const rightW = _resolveW(rightCollapsed, overrides.right, 'accord-rightrail-width', 280);
     pane.style.gridTemplateColumns = leftW + 'px 1fr ' + rightW + 'px';
   }
 
@@ -761,55 +762,74 @@
     }
   }
 
-  // X-19 -- drag-to-resize left rail
+  // X-19 + X-19b -- drag-to-resize both rails
   function _initRailResize() {
-    var rail = document.getElementById('ac-rail-left');
+    _setupRailDrag('left');
+    _setupRailDrag('right');
+  }
+
+  function _setupRailDrag(side) {
+    const rail = document.getElementById('ac-rail-' + side);
     if (!rail) return;
-    if (document.getElementById('ac-rail-resize-handle')) return;  // idempotent
+
+    // Per-side handle ID. Left keeps the legacy 'ac-rail-resize-handle'
+    // ID from X-19 for back-compat; right uses a qualified ID.
+    const handleId = side === 'left'
+      ? 'ac-rail-resize-handle'
+      : 'ac-rail-resize-handle-right';
+    if (document.getElementById(handleId)) return;  // idempotent
 
     // Layout is CSS grid on .ac-three-pane -- must update gridTemplateColumns,
     // not rail.style.width (grid overrides element width). IR66 confirmed 2026-05-13.
-    var pane = rail.parentNode;
+    const pane = rail.parentNode;
 
-    // X-23e: restore saved width through the helper so the right-rail
-    // and both-rail collapse states are honored on boot. Previous
-    // direct inline-style write hard-coded 280px on the right column
-    // and ignored the .collapsed class, breaking the collapse CSS.
+    // X-23e: restore widths through helper so collapse state is honored
+    // on boot. (Idempotent — fine to call once per rail.)
     _applyGridCols();
 
-    // Build handle
-    var handle = document.createElement('div');
-    handle.id        = 'ac-rail-resize-handle';
-    handle.className = 'ac-rail-resize-handle';
+    // Build handle. Side modifier flips positioning in CSS (right handle
+    // anchors to left edge of right rail).
+    const handle = document.createElement('div');
+    handle.id = handleId;
+    handle.className = 'ac-rail-resize-handle ac-rail-resize-handle--' + side;
     rail.appendChild(handle);
 
-    var _dragging = false;
-    var _startX   = 0;
-    var _startW   = 0;
+    let dragging = false;
+    let startX   = 0;
+    let startW   = 0;
 
     handle.addEventListener('mousedown', function (ev) {
+      // No-op when the rail is collapsed -- prevents drag from clobbering
+      // the saved width with the 36px spine measurement on mouseup.
+      if (rail.classList.contains('collapsed')) return;
       ev.preventDefault();
-      _dragging = true;
-      _startX   = ev.clientX;
-      _startW   = rail.offsetWidth;
+      dragging = true;
+      startX   = ev.clientX;
+      startW   = rail.offsetWidth;
       document.body.style.cursor     = 'col-resize';
       document.body.style.userSelect = 'none';
     });
 
     document.addEventListener('mousemove', function (ev) {
-      if (!_dragging || !pane) return;
-      var newW = Math.min(380, Math.max(200, _startW + (ev.clientX - _startX)));
-      // X-23e: route through helper so the right column stays at 36px
-      // if the right rail is collapsed during a left-rail drag.
-      _applyGridCols(newW);
+      if (!dragging || !pane) return;
+      // Left rail: dragging right widens it. Right rail: dragging right
+      // narrows it (handle is on the rail's LEFT edge).
+      const delta = ev.clientX - startX;
+      const newW  = side === 'left'
+        ? Math.min(380, Math.max(200, startW + delta))
+        : Math.min(380, Math.max(200, startW - delta));
+      // X-23e: route through helper so the opposite rail's collapse
+      // state is respected during this drag.
+      _applyGridCols(side === 'left' ? { left: newW } : { right: newW });
     });
 
     document.addEventListener('mouseup', function () {
-      if (!_dragging) return;
-      _dragging = false;
+      if (!dragging) return;
+      dragging = false;
       document.body.style.cursor     = '';
       document.body.style.userSelect = '';
-      localStorage.setItem('accord-rail-width', String(rail.offsetWidth));
+      const key = side === 'left' ? 'accord-rail-width' : 'accord-rightrail-width';
+      localStorage.setItem(key, String(rail.offsetWidth));
     });
   }
 
