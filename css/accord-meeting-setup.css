@@ -1010,12 +1010,12 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   transition: border-color .2s, transform .2s;
   overflow: hidden;
 }
-/* Deterministic left-edge color cycling by frame index */
-.ac-film-frame:nth-child(5n+1) { border-left-color: var(--ac-cyan); }
-.ac-film-frame:nth-child(5n+2) { border-left-color: var(--ac-amber); }
-.ac-film-frame:nth-child(5n+3) { border-left-color: var(--ac-rose); }
-.ac-film-frame:nth-child(5n+4) { border-left-color: #8b5cf6; } /* violet */
-.ac-film-frame:nth-child(5n+5) { border-left-color: #1d9e75; } /* teal */
+/* Deterministic left-edge color cycling by frame index — vibrant palette */
+.ac-film-frame:nth-child(5n+1) { border-left-color: #00d2ff; } /* electric cyan */
+.ac-film-frame:nth-child(5n+2) { border-left-color: #ffaa00; } /* vivid amber */
+.ac-film-frame:nth-child(5n+3) { border-left-color: #ff4d6d; } /* hot pink-red */
+.ac-film-frame:nth-child(5n+4) { border-left-color: #a855f7; } /* vivid violet */
+.ac-film-frame:nth-child(5n+5) { border-left-color: #00e5a0; } /* electric mint */
 .ac-film-frame:hover {
   border-color: var(--ac-border-active);
   transform: translateY(-2px);
@@ -1286,11 +1286,11 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-briefing-action-row:has(.ac-briefing-note-seq) {
   border-left-color: #00B0F0;
 }
-/* Risk rows — rose left edge */
+/* Risk rows — vivid hot pink-red left edge */
 .ac-briefing-action-row:has(.ac-briefing-risk-seq) {
-  border-left-color: var(--ac-rose);
+  border-left-color: #ff4d6d;
 }
-.ac-briefing-action-row--overdue { border-left-color: var(--ac-rose); }
+.ac-briefing-action-row--overdue { border-left-color: #ff4d6d; }
 .ac-briefing-action-seq { font-family: var(--ac-font-mono); font-size: 10px; color: var(--ac-amber); flex-shrink: 0; }
 .ac-briefing-note-seq   { font-family: var(--ac-font-mono); font-size: 10px; color: #00B0F0; flex-shrink: 0; }
 .ac-briefing-risk-seq   { font-family: var(--ac-font-mono); font-size: 10px; color: var(--ac-rose); flex-shrink: 0; }
@@ -1678,8 +1678,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 .ac-action-card:hover { border-color: var(--ac-border-mid); border-left-color: var(--ac-cyan); }
 .ac-action-card.ac-card-dragging { opacity: 0.5; }
-/* Past-due cards get rose left edge */
-.ac-kanban-col--alert .ac-action-card { border-left-color: var(--ac-rose); }
+/* Past-due cards get vivid pink-red left edge */
+.ac-kanban-col--alert .ac-action-card { border-left-color: #ff4d6d; }
 .ac-action-seq { font-family: var(--ac-font-mono); font-size: 8.5px; color: var(--ac-amber); font-weight: 600; }
 .ac-action-summary { font-size: 11.5px; color: var(--ac-text-primary); line-height: 1.3; }
 .ac-action-owner   { font-size: 10px; color: var(--ac-cyan); }  /* X-34 */
