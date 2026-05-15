@@ -2070,6 +2070,25 @@
 
   // §5.9 — Search, add, remove
   function _showAddAttendee(block, meeting) {
+    // X-39: use PersonPicker.show() — the universal person selector per
+    // person-picker.js RULE. Do not duplicate inline search/avatar/grouping.
+    // Fall back to the inline form only if PersonPicker is not loaded.
+    if (window.PersonPicker && typeof window.PersonPicker.show === 'function') {
+      var anchor = block.querySelector('#ac-add-attendee-row') ||
+                   block.querySelector('.ac-add-attendee-btn');
+      window.PersonPicker.show(anchor, function(resource) {
+        if (resource && resource.id) {
+          _addAttendee(resource.id, meeting);
+        }
+      }, {
+        // Exclude resources already added as attendees
+        resources: (window._inviteResources || []).filter(function(r) {
+          return !block.querySelector('.ac-attendee-card[data-resource-id="' + r.id + '"]');
+        })
+      });
+      return;
+    }
+    // Fallback: inline form (pre-PersonPicker path)
     var row   = block.querySelector('#ac-add-attendee-row');
     var form  = block.querySelector('#ac-add-attendee-form');
     var input = block.querySelector('#ac-add-attendee-input');
@@ -2077,7 +2096,6 @@
     if (form) form.style.display = '';
     if (input) {
       input.focus();
-      // Guard: only wire the input listener once per render cycle
       if (!input.dataset.listenerBound) {
         input.dataset.listenerBound = '1';
         input.addEventListener('input', function() {
@@ -2108,9 +2126,10 @@
     }
     _searchTimer = setTimeout(function() {
       _searchTimer = null;
+      // X-39: added title to select so the result card shows name + role line.
       API.get(
         'resources?name=ilike.*' + encodeURIComponent(query) + '*' +
-        '&select=id,name&limit=8'
+        '&select=id,name,title&limit=8'
       ).then(function(rows) {
         var results = block.querySelector('#ac-add-attendee-results');
         if (!results) return;
@@ -2119,11 +2138,23 @@
           return;
         }
         results.innerHTML = rows.map(function(r) {
+          // Compute initials from name (up to 2 chars)
+          var parts    = (r.name || '').trim().split(/\s+/);
+          var initials = parts.length >= 2
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : (r.name || '??').slice(0, 2).toUpperCase();
           return '<button class="ac-search-result"' +
                  ' data-action="add-attendee-select"' +
                  ' data-resource-id="' + esc(r.id) + '"' +
                  ' data-name="' + esc(r.name) + '">' +
-                 esc(r.name) + '</button>';
+                 '<span class="ac-search-result-avatar">' + esc(initials) + '</span>' +
+                 '<span class="ac-search-result-info">' +
+                   '<span class="ac-search-result-name">' + esc(r.name || '') + '</span>' +
+                   (r.title
+                     ? '<span class="ac-search-result-title">' + esc(r.title) + '</span>'
+                     : '') +
+                 '</span>' +
+                 '</button>';
         }).join('');
       }).catch(function() {});
     }, 300);
