@@ -4037,7 +4037,7 @@
         : '';
       html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
               'data-action="toggle-actions-detail">' +
-              'PRIOR ACTIONS \u00b7 ' + actionNodes.length + ' tracked' +
+              'PRIOR ACTIONS (' + actionNodes.length + ')' +
               overdueSuffix + weekSuffix +
               ' <span class="ac-briefing-actions-expand">\u25be</span></div>';
       html += '<div class="ac-briefing-actions-detail" id="ac-briefing-actions-detail">';
@@ -4076,7 +4076,7 @@
     } else {
       html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
               'data-action="toggle-notes-detail">' +
-              'PRIOR NOTES \u00b7 ' + noteNodes.length +
+              'PRIOR NOTES (' + noteNodes.length + ')' +
               ' <span class="ac-briefing-actions-expand">\u25be</span></div>';
       html += '<div class="ac-briefing-notes-detail" id="ac-briefing-notes-detail">';
       noteNodes.slice(0, 10).forEach(function(n) {
@@ -4108,7 +4108,7 @@
     } else {
       html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
               'data-action="toggle-decisions-detail">' +
-              'PRIOR DECISIONS \u00b7 ' + decisions.length +
+              'PRIOR DECISIONS (' + decisions.length + ')' +
               ' <span class="ac-briefing-actions-expand">\u25be</span></div>';
       html += '<div class="ac-briefing-decisions-detail" id="ac-briefing-decisions-detail">';
       decisions.slice(0, 8).forEach(function(d) {
@@ -4141,7 +4141,7 @@
     } else {
       html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
               'data-action="toggle-risks-detail">' +
-              'PRIOR RISKS \u00b7 ' + risks.length +
+              'PRIOR RISKS (' + risks.length + ')' +
               ' <span class="ac-briefing-actions-expand">\u25be</span></div>';
       html += '<div class="ac-briefing-risks-detail" id="ac-briefing-risks-detail">';
       risks.slice(0, 8).forEach(function(r) {
