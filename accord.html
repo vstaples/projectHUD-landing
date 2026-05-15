@@ -240,16 +240,16 @@
   letter-spacing: 0.03em;
   cursor: pointer;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
   transition: color 120ms;
-  flex-shrink: 1;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  padding: 2px 8px;
 }
 #accord-app .ac-topnav-context-ws:hover {
   color: var(--ink-body);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  border-color: rgba(255,255,255,0.25);
+  text-decoration: none;
 }
 
 /* ============================================================
@@ -3566,7 +3566,8 @@
         var wsEl = document.getElementById('acTopnavWs');
         if (wsEl) {
           var freshWs = wsEl.cloneNode(false);
-          freshWs.textContent = wsName;
+          freshWs.textContent = '← Back';
+          freshWs.title = wsName; // tooltip still shows workstream name
           wsEl.parentNode.replaceChild(freshWs, wsEl);
           freshWs.addEventListener('click', function() {
             if (wsId && window.Accord && typeof window.Accord.setLevel === 'function') {
@@ -3657,7 +3658,6 @@
     load('/js/accord-rails.js');
     load('/js/accord-dnd.js');
     // CMD-ACCORD-MEETING-SETUP-1 Phase 2
-    load('/js/person-picker.js');
     load('/js/accord-meeting-setup.js');
   })();
 </script>
