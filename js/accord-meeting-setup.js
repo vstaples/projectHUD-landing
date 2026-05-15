@@ -4047,16 +4047,16 @@
         html += '<span class="ac-briefing-action-seq">' + esc(n.seq_id || 'A') + '</span>';
         html += '<span class="ac-briefing-action-summary">' +
                 esc((n.summary || '').slice(0, 80)) + '</span>';
+        if (n.due_date) {
+          html += '<span class="ac-briefing-action-due' + (overdue ? ' ac-overdue' : '') + '">' +
+                  esc(new Date(n.due_date).toLocaleDateString(undefined,
+                    { month: 'short', day: 'numeric' })) + '</span>';
+        }
         if (n._owner_name && n._owner_resource_id) {
           html += '<span class="ac-briefing-owner" data-owner-id="' +
                   esc(n._owner_resource_id) +
                   '" data-action="percolate-owner">' +
                   esc(n._owner_name) + '</span>';
-        }
-        if (n.due_date) {
-          html += '<span class="ac-briefing-action-due' + (overdue ? ' ac-overdue' : '') + '">' +
-                  esc(new Date(n.due_date).toLocaleDateString(undefined,
-                    { month: 'short', day: 'numeric' })) + '</span>';
         }
         html += '</div>';
       });
