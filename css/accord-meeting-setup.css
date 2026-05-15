@@ -493,8 +493,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 .ac-outcomes-label {
   font-family: var(--ac-font-mono);
-  font-size: 11px;
-  color: var(--ac-text-secondary);
+  font-size: 10px;
+  color: var(--ac-text-primary);
   letter-spacing: 1.4px;
   text-transform: uppercase;
 }
@@ -899,8 +899,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 .ac-film-label {
   font-family: var(--ac-font-mono);
-  font-size: 9.5px;
-  color: var(--ac-text-tertiary);
+  font-size: 10px;
+  color: var(--ac-text-primary);
   letter-spacing: 1.4px;
   text-transform: uppercase;
 }
@@ -908,9 +908,10 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-film-label--toggle:hover { color: var(--ac-text-secondary); }
 .ac-film-collapse-arrow {
   margin-left: 10px;
-  font-size: 16px;
+  font-size: 18px;
   vertical-align: middle;
-  color: var(--ac-text-secondary);
+  color: var(--ac-text-primary);
+  line-height: 1;
 }
 .ac-film-controls {
   display: flex;
@@ -1183,10 +1184,10 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 .ac-tab {
   font-family: var(--ac-font-mono);
-  font-size: 9.5px;
+  font-size: 10px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: var(--ac-text-tertiary);
+  color: var(--ac-text-primary);
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -1214,8 +1215,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 .ac-briefing-section-label {
   font-family: var(--ac-font-mono);
-  font-size: 11px;
-  color: var(--ac-text-secondary);
+  font-size: 10px;
+  color: var(--ac-text-primary);
   letter-spacing: 1.4px;
   text-transform: uppercase;
   margin-bottom: 6px;
@@ -1260,7 +1261,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-briefing-actions-summary { cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px; }
 .ac-briefing-actions-count { color: var(--ac-text-secondary); }
 .ac-briefing-actions-count--alert { color: var(--ac-rose); font-weight: 600; }
-.ac-briefing-actions-expand { font-size: 10px; color: var(--ac-text-tertiary); }
+.ac-briefing-actions-expand { font-size: 18px; color: var(--ac-text-primary); vertical-align: middle; line-height: 1; }
 .ac-briefing-actions-detail { margin-top: 8px; }
 .ac-briefing-action-row {
   display: flex; gap: 8px; padding: 5px 0;
@@ -1368,9 +1369,9 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   padding: 12px 18px 16px;
 }
 .ac-unresolved-label {
-  font-family: var(--ac-font-mono); font-size: 11px;
+  font-family: var(--ac-font-mono); font-size: 10px;
   letter-spacing: 1.4px; text-transform: uppercase;
-  color: var(--ac-text-secondary); margin-bottom: 10px;
+  color: var(--ac-text-primary); margin-bottom: 10px;
 }
 .ac-unresolved-row {
   display: flex; align-items: center; gap: 8px;
@@ -1402,7 +1403,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   border-top: 1px solid var(--ac-border-subtle);
   margin-top: 8px;
 }
-.ac-agenda-label { font-family: var(--ac-font-mono); font-size: 11px; color: var(--ac-text-secondary); letter-spacing: 1.4px; text-transform: uppercase; }
+.ac-agenda-label { font-family: var(--ac-font-mono); font-size: 10px; color: var(--ac-text-primary); letter-spacing: 1.4px; text-transform: uppercase; }
 .ac-agenda-stats { font-family: var(--ac-font-mono); font-size: 9px; }
 .ac-agenda-loading, .ac-agenda-error { font-size: 12px; color: var(--ac-text-tertiary); font-style: italic; padding: 12px 18px; }
 
@@ -3410,9 +3411,9 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   flex: 1; min-height: 0;
 }
 .ac-setup-chat-label {
-  font-family: var(--ac-font-mono); font-size: 11px;
+  font-family: var(--ac-font-mono); font-size: 10px;
   letter-spacing: 1.4px; text-transform: uppercase;
-  color: var(--ac-text-secondary); margin-bottom: 8px;
+  color: var(--ac-text-primary); margin-bottom: 8px;
   padding: 0 16px;
 }
 .ac-setup-chat-stream {
