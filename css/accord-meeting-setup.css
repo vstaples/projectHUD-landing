@@ -48,8 +48,8 @@
   --ac-rose-dim:   rgba(251, 113, 133, 0.18);
   --ac-violet:     #a78bfa;
   --ac-violet-dim: rgba(167, 139, 250, 0.18);
-  --ac-green:      #4ade80;
-  --ac-green-dim:  rgba(74, 222, 128, 0.18);
+  --ac-green:      #00e5a0;  /* vivid mint — overrides Tailwind 300 value */
+  --ac-green-dim:  rgba(0, 229, 160, 0.18);
   /* Typography */
   --ac-font-sans:  -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
   --ac-font-mono:  "SF Mono", "JetBrains Mono", "Fira Code", Menlo, monospace;
@@ -273,7 +273,7 @@
   grid-template-areas: "col-left col-center col-right";
   gap: 10px;
   height: 100%;
-  overflow: hidden;
+  overflow: clip;
 }
 .ac-setup-col-left {
   grid-area: col-left;
@@ -1011,12 +1011,13 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   transition: border-color .2s, transform .2s;
   overflow: hidden;
 }
-/* Deterministic left-edge color cycling by frame index — vibrant palette */
-.ac-film-frame:nth-child(5n+1) { border-left-color: #00d2ff; } /* electric cyan */
-.ac-film-frame:nth-child(5n+2) { border-left-color: #ffaa00; } /* vivid amber */
-.ac-film-frame:nth-child(5n+3) { border-left-color: #ff4d6d; } /* hot pink-red */
-.ac-film-frame:nth-child(5n+4) { border-left-color: #a855f7; } /* vivid violet */
-.ac-film-frame:nth-child(5n+5) { border-left-color: #00e5a0; } /* electric mint */
+/* Deterministic left-edge color cycling — reuses accent tokens so
+   tuning panel accent color changes propagate here automatically */
+.ac-film-frame:nth-child(5n+1) { border-left-color: var(--ac-cyan,   #00d2ff); }
+.ac-film-frame:nth-child(5n+2) { border-left-color: var(--ac-amber,  #ffaa00); }
+.ac-film-frame:nth-child(5n+3) { border-left-color: var(--ac-rose,   #ff4d6d); }
+.ac-film-frame:nth-child(5n+4) { border-left-color: var(--ac-violet, #a855f7); }
+.ac-film-frame:nth-child(5n+5) { border-left-color: var(--ac-green,  #00e5a0); }
 .ac-film-frame:hover {
   border-color: var(--ac-border-active);
   transform: translateY(-2px);

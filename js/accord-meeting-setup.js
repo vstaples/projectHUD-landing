@@ -1286,7 +1286,7 @@
       style.textContent =
         '.ac-setup-col-left,.ac-setup-col-center,.ac-setup-col-right{border-radius:' + rad + '}' +
         '.ac-film-frame,.ac-action-card,.ac-briefing-action-row,.ac-briefing-decision-row,' +
-        '.ac-attendee-card,.ac-last-meeting-block,.ac-highlights-block,' +
+        '.ac-attendee-card,.ac-briefing-last,.ac-briefing-synthesis,' +
         '.ac-outcomes-add-row,.ac-unresolved-row{border-radius:' + rad + '!important}';
       // CSS custom properties for accents and text
       shell.style.setProperty('--ac-cyan',           t.cyan);
