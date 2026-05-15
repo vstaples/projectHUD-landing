@@ -1239,9 +1239,8 @@
 
     var STORE_KEY = 'accord-display-tuning';
     var DEFAULTS  = { brightness: 100, contrast: 100, saturation: 100,
-                      colGap: 10, zoneGap: 10,
-                      leftBg: '#161c26', centerBg: '#0d1117', rightBg: '#161c26',
-                      filmBg: '#11161e', tileBg: '#1a212c',
+                      colGap: 10, zoneGap: 10, radius: 6,
+                      colBg: '#161c26', filmBg: '#11161e', tileBg: '#1a212c',
                       cyan: '#00d2ff', amber: '#ffaa00', risk: '#ff4d6d',
                       violet: '#a855f7', mint: '#00e5a0',
                       textPrimary: '#e8edf2', textSecondary: '#8a95a5',
@@ -1267,20 +1266,34 @@
       var cols = document.querySelector('.ac-setup-columns');
       if (cols) cols.style.gap = t.colGap + 'px';
       shell.style.rowGap = t.zoneGap + 'px';
-      // Column backgrounds
+      // Column backgrounds — single shared color
       var left   = document.querySelector('.ac-setup-col-left');
       var center = document.querySelector('.ac-setup-col-center');
       var right  = document.querySelector('.ac-setup-col-right');
       var film   = document.querySelector('.ac-setup-filmstrip');
-      if (left)   left.style.background   = t.leftBg;
-      if (center) center.style.background = t.centerBg;
-      if (right)  right.style.background  = t.rightBg;
+      if (left)   left.style.background   = t.colBg || t.leftBg   || '#161c26';
+      if (center) center.style.background = t.colBg || t.centerBg || '#0d1117';
+      if (right)  right.style.background  = t.colBg || t.rightBg  || '#161c26';
       if (film)   film.style.background   = t.filmBg;
+      // Corner radius — columns + all cards
+      var rad = (t.radius !== undefined ? t.radius : 6) + 'px';
+      var style = document.getElementById('ac-dp-radius-style');
+      if (!style) {
+        style = document.createElement('style');
+        style.id = 'ac-dp-radius-style';
+        document.head.appendChild(style);
+      }
+      style.textContent =
+        '.ac-setup-col-left,.ac-setup-col-center,.ac-setup-col-right{border-radius:' + rad + '}' +
+        '.ac-film-frame,.ac-action-card,.ac-briefing-action-row,.ac-briefing-decision-row,' +
+        '.ac-attendee-card,.ac-last-meeting-block,.ac-highlights-block,' +
+        '.ac-outcomes-add-row,.ac-unresolved-row{border-radius:' + rad + '!important}';
       // CSS custom properties for accents and text
       shell.style.setProperty('--ac-cyan',           t.cyan);
       shell.style.setProperty('--ac-amber',          t.amber);
       shell.style.setProperty('--ac-rose',           t.risk);
       shell.style.setProperty('--ac-violet',         t.violet);
+      shell.style.setProperty('--ac-green',          t.mint);
       shell.style.setProperty('--ac-text-primary',   t.textPrimary);
       shell.style.setProperty('--ac-text-secondary', t.textSecondary);
     }
@@ -1319,6 +1332,12 @@
           '<div class="ac-dp-row"><label>Risk / overdue</label><input type="color" id="dp-risk"></div>',
           '<div class="ac-dp-row"><label>Violet</label><input type="color" id="dp-violet"></div>',
           '<div class="ac-dp-row"><label>Mint</label><input type="color" id="dp-mint"></div>',
+          '<div class="ac-dp-section">FILMSTRIP EDGE COLORS</div>',
+          '<div class="ac-dp-row"><label>Frame 1 edge</label><input type="color" id="dp-f1"></div>',
+          '<div class="ac-dp-row"><label>Frame 2 edge</label><input type="color" id="dp-f2"></div>',
+          '<div class="ac-dp-row"><label>Frame 3 edge</label><input type="color" id="dp-f3"></div>',
+          '<div class="ac-dp-row"><label>Frame 4 edge</label><input type="color" id="dp-f4"></div>',
+          '<div class="ac-dp-row"><label>Frame 5 edge</label><input type="color" id="dp-f5"></div>',
           '<div class="ac-dp-section">TEXT</div>',
           '<div class="ac-dp-row"><label>Primary text</label><input type="color" id="dp-tp"></div>',
           '<div class="ac-dp-row"><label>Secondary text</label><input type="color" id="dp-ts"></div>',
@@ -1421,9 +1440,84 @@
     }
 
     btn.addEventListener('click', function() {
+      var w = window.open('', 'accord-display-tuning',
+        'width=360,height=720,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no');
+      if (!w) { alert('Allow popups for this site to use the display tuning panel.'); return; }
+
       var t = _load();
-      panel.classList.toggle('ac-display-panel--open');
-      if (panel.classList.contains('ac-display-panel--open')) _apply(t);
+      var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+        '<title>Accord Display Tuning</title>' +
+        '<style>' +
+        '*{box-sizing:border-box;margin:0;padding:0}' +
+        'body{background:#0a0e14;color:#e8edf2;font-family:"JetBrains Mono",monospace;font-size:10px;padding:16px}' +
+        'h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#5eead4;border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:10px;margin-bottom:14px}' +
+        '.presets{display:flex;gap:6px;margin-bottom:14px}' +
+        '.preset{flex:1;background:none;border:1px solid rgba(255,255,255,.12);border-radius:4px;color:#5a6678;font-family:inherit;font-size:9px;letter-spacing:.1em;padding:6px;cursor:pointer}' +
+        '.preset:hover{border-color:#fbbf77;color:#fbbf77}' +
+        '.section{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#8a95a5;margin:12px 0 6px;border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:3px}' +
+        '.row{display:flex;align-items:center;gap:8px;margin-bottom:6px}' +
+        '.row label{font-size:10px;color:#8a95a5;width:140px;flex-shrink:0}' +
+        '.row input[type=range]{flex:1;accent-color:#5eead4}' +
+        '.row input[type=color]{width:32px;height:22px;border:1px solid rgba(255,255,255,.15);border-radius:3px;background:transparent;cursor:pointer;padding:0}' +
+        '.val{font-size:10px;color:#fbbf77;width:36px;text-align:right;flex-shrink:0}' +
+        '.footer{display:flex;gap:6px;margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}' +
+        '.btn{flex:1;background:none;border:1px solid rgba(255,255,255,.1);border-radius:4px;color:#5a6678;font-family:inherit;font-size:9px;letter-spacing:.08em;padding:7px;cursor:pointer}' +
+        '.btn:hover{border-color:#5eead4;color:#5eead4}' +
+        '</style></head><body>' +
+        '<h2>⚙ Accord Display Tuning</h2>' +
+        '<div class="presets">' +
+          '<button class="preset" data-preset="dark">☽ Dark</button>' +
+          '<button class="preset" data-preset="medium">◑ Medium</button>' +
+          '<button class="preset" data-preset="bright">☀ Bright</button>' +
+        '</div>' +
+        '<div class="section">Global</div>' +
+        '<div class="row"><label>Brightness</label><input type="range" id="dp-bri" min="80" max="140" step="1" value="' + t.brightness + '"><span class="val" id="dp-bri-v">' + t.brightness + '%</span></div>' +
+        '<div class="row"><label>Contrast</label><input type="range" id="dp-con" min="80" max="160" step="1" value="' + t.contrast + '"><span class="val" id="dp-con-v">' + t.contrast + '%</span></div>' +
+        '<div class="row"><label>Saturation</label><input type="range" id="dp-sat" min="60" max="180" step="1" value="' + t.saturation + '"><span class="val" id="dp-sat-v">' + t.saturation + '%</span></div>' +
+        '<div class="section">Spacing &amp; Shape</div>' +
+        '<div class="row"><label>Column gap</label><input type="range" id="dp-cgap" min="0" max="24" step="1" value="' + t.colGap + '"><span class="val" id="dp-cgap-v">' + t.colGap + 'px</span></div>' +
+        '<div class="row"><label>Zone gap</label><input type="range" id="dp-zgap" min="0" max="24" step="1" value="' + t.zoneGap + '"><span class="val" id="dp-zgap-v">' + t.zoneGap + 'px</span></div>' +
+        '<div class="row"><label>Corner radius</label><input type="range" id="dp-rad" min="0" max="16" step="1" value="' + t.radius + '"><span class="val" id="dp-rad-v">' + t.radius + 'px</span></div>' +
+        '<div class="section">Backgrounds</div>' +
+        '<div class="row"><label>Columns</label><input type="color" id="dp-col" value="' + t.colBg + '"></div>' +
+        '<div class="row"><label>Filmstrip</label><input type="color" id="dp-fbg" value="' + t.filmBg + '"></div>' +
+        '<div class="row"><label>Cards &amp; tiles</label><input type="color" id="dp-tile" value="' + t.tileBg + '"></div>' +
+        '<div class="section">Accent colors</div>' +
+        '<div class="row"><label>Cyan (decisions)</label><input type="color" id="dp-cyan" value="' + t.cyan + '"></div>' +
+        '<div class="row"><label>Amber (actions)</label><input type="color" id="dp-amber" value="' + t.amber + '"></div>' +
+        '<div class="row"><label>Risk / overdue</label><input type="color" id="dp-risk" value="' + t.risk + '"></div>' +
+        '<div class="row"><label>Violet</label><input type="color" id="dp-violet" value="' + t.violet + '"></div>' +
+        '<div class="row"><label>Mint</label><input type="color" id="dp-mint" value="' + t.mint + '"></div>' +
+        '<div class="section">Text</div>' +
+        '<div class="row"><label>Primary text</label><input type="color" id="dp-tp" value="' + t.textPrimary + '"></div>' +
+        '<div class="row"><label>Secondary text</label><input type="color" id="dp-ts" value="' + t.textSecondary + '"></div>' +
+        '<div class="footer">' +
+          '<button class="btn" id="dp-reset">↩ Reset all</button>' +
+          '<button class="btn" id="dp-export">↗ Export</button>' +
+        '</div>' +
+        '<script>' +
+        'var STORE_KEY="accord-display-tuning";' +
+        'var PRESETS={dark:{brightness:100,contrast:100,saturation:100},medium:{brightness:108,contrast:112,saturation:105},bright:{brightness:120,contrast:125,saturation:110}};' +
+        'var DEFAULTS={brightness:100,contrast:100,saturation:100,colGap:10,zoneGap:10,radius:6,colBg:"#161c26",filmBg:"#11161e",tileBg:"#1a212c",cyan:"#00d2ff",amber:"#ffaa00",risk:"#ff4d6d",violet:"#a855f7",mint:"#00e5a0",textPrimary:"#e8edf2",textSecondary:"#8a95a5",colBorder:"rgba(255,255,255,0.18)"};' +
+        'function _read(){return{brightness:+document.getElementById("dp-bri").value,contrast:+document.getElementById("dp-con").value,saturation:+document.getElementById("dp-sat").value,colGap:+document.getElementById("dp-cgap").value,zoneGap:+document.getElementById("dp-zgap").value,radius:+document.getElementById("dp-rad").value,colBg:document.getElementById("dp-col").value,filmBg:document.getElementById("dp-fbg").value,tileBg:document.getElementById("dp-tile").value,cyan:document.getElementById("dp-cyan").value,amber:document.getElementById("dp-amber").value,risk:document.getElementById("dp-risk").value,violet:document.getElementById("dp-violet").value,mint:document.getElementById("dp-mint").value,textPrimary:document.getElementById("dp-tp").value,textSecondary:document.getElementById("dp-ts").value,colBorder:DEFAULTS.colBorder};}' +
+        'function _save(t){try{localStorage.setItem(STORE_KEY,JSON.stringify(t));}catch(e){}}' +
+        'function _sync(t){document.getElementById("dp-bri").value=t.brightness;document.getElementById("dp-con").value=t.contrast;document.getElementById("dp-sat").value=t.saturation;document.getElementById("dp-cgap").value=t.colGap;document.getElementById("dp-zgap").value=t.zoneGap;document.getElementById("dp-rad").value=t.radius||6;document.getElementById("dp-col").value=t.colBg||"#161c26";document.getElementById("dp-fbg").value=t.filmBg;document.getElementById("dp-tile").value=t.tileBg;document.getElementById("dp-cyan").value=t.cyan;document.getElementById("dp-amber").value=t.amber;document.getElementById("dp-risk").value=t.risk;document.getElementById("dp-violet").value=t.violet;document.getElementById("dp-mint").value=t.mint;document.getElementById("dp-tp").value=t.textPrimary;document.getElementById("dp-ts").value=t.textSecondary;document.getElementById("dp-bri-v").textContent=t.brightness+"%";document.getElementById("dp-con-v").textContent=t.contrast+"%";document.getElementById("dp-sat-v").textContent=t.saturation+"%";document.getElementById("dp-cgap-v").textContent=t.colGap+"px";document.getElementById("dp-zgap-v").textContent=t.zoneGap+"px";document.getElementById("dp-rad-v").textContent=(t.radius||6)+"px";}' +
+        'document.addEventListener("input",function(){var t=_read();document.getElementById("dp-bri-v").textContent=t.brightness+"%";document.getElementById("dp-con-v").textContent=t.contrast+"%";document.getElementById("dp-sat-v").textContent=t.saturation+"%";document.getElementById("dp-cgap-v").textContent=t.colGap+"px";document.getElementById("dp-zgap-v").textContent=t.zoneGap+"px";document.getElementById("dp-rad-v").textContent=t.radius+"px";_save(t);});' +
+        'document.querySelectorAll(".preset").forEach(function(b){b.addEventListener("click",function(){var p=PRESETS[b.dataset.preset]||{};var t=Object.assign(_read(),p);_sync(t);_save(t);});});' +
+        'document.getElementById("dp-reset").addEventListener("click",function(){_sync(Object.assign({},DEFAULTS));_save(Object.assign({},DEFAULTS));});' +
+        'document.getElementById("dp-export").addEventListener("click",function(){var t=_read();var out=JSON.stringify(t,null,2);window.opener&&window.opener.console&&window.opener.console.log("[Accord Display Tuning]\\n"+out);alert("Values exported to main window console.");});' +
+        '<\/script></body></html>';
+
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+
+      // Listen for localStorage changes from the popup and apply in real time
+      window.addEventListener('storage', function(ev) {
+        if (ev.key === STORE_KEY && ev.newValue) {
+          try { _apply(JSON.parse(ev.newValue)); } catch(e) {}
+        }
+      });
     });
   }
 
