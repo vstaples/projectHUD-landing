@@ -1787,8 +1787,22 @@
     if (!host) return;
     host.innerHTML = '<div class="ac-attendees-block" id="ac-attendees-block">' +
                      '<div class="ac-attendees-loading">Loading\u2026</div>' +
+                     '</div>' +
+                     // X-42: pre-meeting team chat — same channel as Live Capture.
+                     // Lets attendees message as they arrive; seamless on Begin Meeting.
+                     '<div class="ac-setup-chat" id="ac-setup-chat">' +
+                       '<div class="ac-setup-chat-label">TEAM CHAT</div>' +
+                       '<div class="ac-setup-chat-stream" id="ac-setup-chat-stream">' +
+                         '<div class="ac-setup-chat-empty">No messages yet.</div>' +
+                       '</div>' +
+                       '<div class="ac-setup-chat-input-row">' +
+                         '<input class="ac-setup-chat-input" id="ac-setup-chat-input" ' +
+                                'type="text" placeholder="Message the meeting\u2026" autocomplete="off">' +
+                         '<button class="ac-setup-chat-send" id="ac-setup-chat-send">Send</button>' +
+                       '</div>' +
                      '</div>';
     _loadAttendees(meeting, workstreamId);
+    _wireSetupChat(meeting);
   }
 
   // §5.2 — Load + organizer auto-seed
@@ -2178,6 +2192,56 @@
     }).catch(function(e) {
       console.error('[AccordMeetingSetup] add attendee failed', e);
     });
+  }
+
+  // X-42: pre-meeting team chat wiring
+  function _wireSetupChat(meeting) {
+    var input  = document.getElementById('ac-setup-chat-input');
+    var send   = document.getElementById('ac-setup-chat-send');
+    var stream = document.getElementById('ac-setup-chat-stream');
+    if (!input || !send || !stream) return;
+
+    function _appendMsg(name, text, isMe) {
+      var empty = stream.querySelector('.ac-setup-chat-empty');
+      if (empty) empty.remove();
+      var row = document.createElement('div');
+      row.className = 'ac-setup-chat-msg' + (isMe ? ' ac-setup-chat-msg--me' : '');
+      row.innerHTML = '<span class="ac-setup-chat-name">' + _esc(name) + '</span>' +
+                      '<span class="ac-setup-chat-text">' + _esc(text) + '</span>';
+      stream.appendChild(row);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    function _send() {
+      var text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      var me = window.Accord && window.Accord.state && window.Accord.state.me;
+      var ch = window.Accord && window.Accord.state && window.Accord.state.channel;
+      if (ch) {
+        ch.send({ type: 'broadcast', event: 'accord.chat.posted',
+                  payload: { text: text, sender_name: me && me.name,
+                             resource_id: me && me.resource_id } });
+      }
+      _appendMsg((me && me.name) || 'You', text, true);
+    }
+
+    send.addEventListener('click', _send);
+    input.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); _send(); }
+    });
+
+    // Listen for incoming chat messages on the meeting channel
+    var ch = window.Accord && window.Accord.state && window.Accord.state.channel;
+    if (ch) {
+      ch.on('broadcast', { event: 'accord.chat.posted' }, function(env) {
+        var p = env && env.payload;
+        if (!p) return;
+        var me = window.Accord && window.Accord.state && window.Accord.state.me;
+        var isMe = p.resource_id && me && p.resource_id === me.resource_id;
+        if (!isMe) _appendMsg(p.sender_name || 'Attendee', p.text || '', false);
+      });
+    }
   }
 
   function _removeAttendee(attendeeId, meeting) {
