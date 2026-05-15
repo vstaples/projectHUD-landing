@@ -58,7 +58,12 @@
   var COL_MAX_W    = 1400;
   var FILM_MIN_H   = 48;
   var FILM_MAX_H   = 350;
-  var FILM_DEFAULT = 102;
+  // X-35/X-38: raised from 102 → 130 so cards reach ≥90px height on first
+  // load and the compact tier (seq IDs visible) fires without a drag gesture.
+  // At 102px the header consumed ~24px leaving ~78px card height — just under
+  // the 90px threshold, so _initFilmCardTiers never applied --compact and
+  // node text stayed hidden.
+  var FILM_DEFAULT = 130;
   var FOOTER_H     = 54;
   var LS_KEY_LEFT  = 'accord-setup-col-left-w';
   var LS_KEY_RIGHT = 'accord-setup-col-right-w';
@@ -1371,8 +1376,7 @@
     if (!shell) return;
     try {
       var hRaw = localStorage.getItem(LS_KEY_FILM);
-      if (!hRaw) return;
-      var h = parseInt(hRaw, 10);
+      var h = hRaw ? parseInt(hRaw, 10) : FILM_DEFAULT;
       if (!h || h < FILM_MIN_H) h = FILM_MIN_H;
       if (h > FILM_MAX_H) h = FILM_MAX_H;
       _setShellFilmstripRow(shell, h);
