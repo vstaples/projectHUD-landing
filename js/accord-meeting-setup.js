@@ -6125,12 +6125,12 @@
         _clearPercolate();
       }
     };
-    document.addEventListener('keydown', _percolateEscHandler);
+    document.addEventListener('keydown', _percolateEscHandler, true);  // C-11: capture=true beats parent
   }
 
   function _teardownPercolate() {
     if (_percolateEscHandler) {
-      document.removeEventListener('keydown', _percolateEscHandler);
+      document.removeEventListener('keydown', _percolateEscHandler, true);
       _percolateEscHandler = null;
     }
     _clearPercolate();
