@@ -1244,6 +1244,7 @@
                       cyan: '#00d2ff', amber: '#ffaa00', risk: '#ff4d6d',
                       violet: '#a855f7', mint: '#00e5a0',
                       textPrimary: '#e8edf2', textSecondary: '#8a95a5',
+                      textTertiary: '#5a6678', metaSize: 11,
                       colBorder: 'rgba(255,255,255,0.18)' };
 
     function _load() {
@@ -1297,6 +1298,16 @@
       shell.style.setProperty('--ac-bg-tile',        t.tileBg);
       shell.style.setProperty('--ac-text-primary',   t.textPrimary);
       shell.style.setProperty('--ac-text-secondary', t.textSecondary);
+      shell.style.setProperty('--ac-text-tertiary',  t.textTertiary || '#5a6678');
+      // Meta row font size — controls WHEN/WHERE/WORKSTREAM text
+      var metaSz = (t.metaSize || 11) + 'px';
+      var metaStyle = document.getElementById('ac-dp-meta-style');
+      if (!metaStyle) {
+        metaStyle = document.createElement('style');
+        metaStyle.id = 'ac-dp-meta-style';
+        document.head.appendChild(metaStyle);
+      }
+      metaStyle.textContent = '.ac-meta-row{font-size:' + metaSz + '}';
     }
 
     // Build panel once
@@ -1492,6 +1503,8 @@
         '<div class="section">Text</div>' +
         '<div class="row"><label>Primary text</label><input type="color" id="dp-tp" value="' + t.textPrimary + '"></div>' +
         '<div class="row"><label>Secondary text</label><input type="color" id="dp-ts" value="' + t.textSecondary + '"></div>' +
+        '<div class="row"><label>Header meta labels</label><input type="color" id="dp-tert" value="' + t.textTertiary + '"></div>' +
+        '<div class="row"><label>Header meta size</label><input type="range" id="dp-metasz" min="8" max="14" step="1" value="' + t.metaSize + '"><span class="val" id="dp-metasz-v">' + t.metaSize + 'px</span></div>' +
         '<div class="footer">' +
           '<button class="btn" id="dp-reset">↩ Reset all</button>' +
           '<button class="btn" id="dp-export">↗ Export</button>' +
@@ -1499,11 +1512,11 @@
         '<script>' +
         'var STORE_KEY="accord-display-tuning";' +
         'var PRESETS={dark:{brightness:100,contrast:100,saturation:100},medium:{brightness:108,contrast:112,saturation:105},bright:{brightness:120,contrast:125,saturation:110}};' +
-        'var DEFAULTS={brightness:100,contrast:100,saturation:100,colGap:10,zoneGap:10,radius:6,colBg:"#161c26",filmBg:"#11161e",tileBg:"#1a212c",cyan:"#00d2ff",amber:"#ffaa00",risk:"#ff4d6d",violet:"#a855f7",mint:"#00e5a0",textPrimary:"#e8edf2",textSecondary:"#8a95a5",colBorder:"rgba(255,255,255,0.18)"};' +
-        'function _read(){return{brightness:+document.getElementById("dp-bri").value,contrast:+document.getElementById("dp-con").value,saturation:+document.getElementById("dp-sat").value,colGap:+document.getElementById("dp-cgap").value,zoneGap:+document.getElementById("dp-zgap").value,radius:+document.getElementById("dp-rad").value,colBg:document.getElementById("dp-col").value,filmBg:document.getElementById("dp-fbg").value,tileBg:document.getElementById("dp-tile").value,cyan:document.getElementById("dp-cyan").value,amber:document.getElementById("dp-amber").value,risk:document.getElementById("dp-risk").value,violet:document.getElementById("dp-violet").value,mint:document.getElementById("dp-mint").value,textPrimary:document.getElementById("dp-tp").value,textSecondary:document.getElementById("dp-ts").value,colBorder:DEFAULTS.colBorder};}' +
+        'var DEFAULTS={brightness:100,contrast:100,saturation:100,colGap:10,zoneGap:10,radius:6,colBg:"#161c26",filmBg:"#11161e",tileBg:"#1a212c",cyan:"#00d2ff",amber:"#ffaa00",risk:"#ff4d6d",violet:"#a855f7",mint:"#00e5a0",textPrimary:"#e8edf2",textSecondary:"#8a95a5",textTertiary:"#5a6678",metaSize:11,colBorder:"rgba(255,255,255,0.18)"};' +
+        'function _read(){return{brightness:+document.getElementById("dp-bri").value,contrast:+document.getElementById("dp-con").value,saturation:+document.getElementById("dp-sat").value,colGap:+document.getElementById("dp-cgap").value,zoneGap:+document.getElementById("dp-zgap").value,radius:+document.getElementById("dp-rad").value,colBg:document.getElementById("dp-col").value,filmBg:document.getElementById("dp-fbg").value,tileBg:document.getElementById("dp-tile").value,cyan:document.getElementById("dp-cyan").value,amber:document.getElementById("dp-amber").value,risk:document.getElementById("dp-risk").value,violet:document.getElementById("dp-violet").value,mint:document.getElementById("dp-mint").value,textPrimary:document.getElementById("dp-tp").value,textSecondary:document.getElementById("dp-ts").value,textTertiary:document.getElementById("dp-tert").value,metaSize:+document.getElementById("dp-metasz").value,colBorder:DEFAULTS.colBorder};}' +
         'function _save(t){try{localStorage.setItem(STORE_KEY,JSON.stringify(t));}catch(e){}}' +
-        'function _sync(t){document.getElementById("dp-bri").value=t.brightness;document.getElementById("dp-con").value=t.contrast;document.getElementById("dp-sat").value=t.saturation;document.getElementById("dp-cgap").value=t.colGap;document.getElementById("dp-zgap").value=t.zoneGap;document.getElementById("dp-rad").value=t.radius||6;document.getElementById("dp-col").value=t.colBg||"#161c26";document.getElementById("dp-fbg").value=t.filmBg;document.getElementById("dp-tile").value=t.tileBg;document.getElementById("dp-cyan").value=t.cyan;document.getElementById("dp-amber").value=t.amber;document.getElementById("dp-risk").value=t.risk;document.getElementById("dp-violet").value=t.violet;document.getElementById("dp-mint").value=t.mint;document.getElementById("dp-tp").value=t.textPrimary;document.getElementById("dp-ts").value=t.textSecondary;document.getElementById("dp-bri-v").textContent=t.brightness+"%";document.getElementById("dp-con-v").textContent=t.contrast+"%";document.getElementById("dp-sat-v").textContent=t.saturation+"%";document.getElementById("dp-cgap-v").textContent=t.colGap+"px";document.getElementById("dp-zgap-v").textContent=t.zoneGap+"px";document.getElementById("dp-rad-v").textContent=(t.radius||6)+"px";}' +
-        'document.addEventListener("input",function(){var t=_read();document.getElementById("dp-bri-v").textContent=t.brightness+"%";document.getElementById("dp-con-v").textContent=t.contrast+"%";document.getElementById("dp-sat-v").textContent=t.saturation+"%";document.getElementById("dp-cgap-v").textContent=t.colGap+"px";document.getElementById("dp-zgap-v").textContent=t.zoneGap+"px";document.getElementById("dp-rad-v").textContent=t.radius+"px";_save(t);});' +
+        'function _sync(t){document.getElementById("dp-bri").value=t.brightness;document.getElementById("dp-con").value=t.contrast;document.getElementById("dp-sat").value=t.saturation;document.getElementById("dp-cgap").value=t.colGap;document.getElementById("dp-zgap").value=t.zoneGap;document.getElementById("dp-rad").value=t.radius||6;document.getElementById("dp-col").value=t.colBg||"#161c26";document.getElementById("dp-fbg").value=t.filmBg;document.getElementById("dp-tile").value=t.tileBg;document.getElementById("dp-cyan").value=t.cyan;document.getElementById("dp-amber").value=t.amber;document.getElementById("dp-risk").value=t.risk;document.getElementById("dp-violet").value=t.violet;document.getElementById("dp-mint").value=t.mint;document.getElementById("dp-tp").value=t.textPrimary;document.getElementById("dp-ts").value=t.textSecondary;document.getElementById("dp-tert").value=t.textTertiary||"#5a6678";document.getElementById("dp-metasz").value=t.metaSize||11;document.getElementById("dp-bri-v").textContent=t.brightness+"%";document.getElementById("dp-con-v").textContent=t.contrast+"%";document.getElementById("dp-sat-v").textContent=t.saturation+"%";document.getElementById("dp-cgap-v").textContent=t.colGap+"px";document.getElementById("dp-zgap-v").textContent=t.zoneGap+"px";document.getElementById("dp-rad-v").textContent=(t.radius||6)+"px";document.getElementById("dp-metasz-v").textContent=(t.metaSize||11)+"px";}' +
+        'document.addEventListener("input",function(){var t=_read();document.getElementById("dp-bri-v").textContent=t.brightness+"%";document.getElementById("dp-con-v").textContent=t.contrast+"%";document.getElementById("dp-sat-v").textContent=t.saturation+"%";document.getElementById("dp-cgap-v").textContent=t.colGap+"px";document.getElementById("dp-zgap-v").textContent=t.zoneGap+"px";document.getElementById("dp-rad-v").textContent=t.radius+"px";document.getElementById("dp-metasz-v").textContent=t.metaSize+"px";_save(t);});' +
         'document.querySelectorAll(".preset").forEach(function(b){b.addEventListener("click",function(){var p=PRESETS[b.dataset.preset]||{};var t=Object.assign(_read(),p);_sync(t);_save(t);});});' +
         'document.getElementById("dp-reset").addEventListener("click",function(){_sync(Object.assign({},DEFAULTS));_save(Object.assign({},DEFAULTS));});' +
         'document.getElementById("dp-export").addEventListener("click",function(){var t=_read();var out=JSON.stringify(t,null,2);window.opener&&window.opener.console&&window.opener.console.log("[Accord Display Tuning]\\n"+out);alert("Values exported to main window console.");});' +
