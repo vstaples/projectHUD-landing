@@ -916,6 +916,50 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   border-radius: 2px;
 }
 
+/* CMD-ACCORD-FILMSTRIP-SCRUB-1: drag scrub handle */
+.ac-film-scrub-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--ac-cyan);
+  opacity: 0.7;
+  border-radius: 2px;
+  cursor: ew-resize;
+  z-index: 20;
+  transform: translateX(-50%);
+  transition: opacity 120ms, width 120ms;
+  pointer-events: all;
+}
+.ac-film-scrub-handle::before {
+  /* Wider invisible hit target for easier grabbing */
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  right: -8px;
+}
+.ac-film-scrub-handle::after {
+  /* Diamond grip indicator at vertical center */
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  width: 8px;
+  height: 8px;
+  background: var(--ac-cyan);
+  border-radius: 1px;
+}
+.ac-film-scrub-handle:hover,
+.ac-film-scrub-handle.dragging {
+  opacity: 1;
+  width: 4px;
+}
+/* Track must be position:relative for handle absolute positioning */
+.ac-film-track { position: relative; }
+
 /* Individual frame */
 .ac-film-frame {
   flex-shrink: 0;

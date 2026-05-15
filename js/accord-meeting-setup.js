@@ -3209,6 +3209,12 @@
 
         _activateScrub(meetingId, meetings, currentMeeting, workstreamId);
       });
+
+      // CMD-ACCORD-FILMSTRIP-SCRUB-1: drag handle overlaid on the track.
+      // A thin vertical bar rides left/right. As it crosses frame boundaries
+      // it calls _activateScrub on the frame underneath, giving continuous
+      // scrubbing without click-per-card.
+      _wireFilmScrubHandle(track, meetings, currentMeeting, workstreamId);
     }
 
     // Header controls
@@ -3239,10 +3245,86 @@
           Accord.setLevel('meeting', {
             meetingId:    futureIdle[0].meeting_id,
             workstreamId: workstreamId,
-            meetingState: 'idle'   // pre-signals transitions to apply fullpage before animation
+            meetingState: 'idle'
           });
         }
       }
+    });
+  }
+
+  // CMD-ACCORD-FILMSTRIP-SCRUB-1 — drag scrub handle
+  function _wireFilmScrubHandle(track, meetings, currentMeeting, workstreamId) {
+    // Build handle element
+    var handle = document.createElement('div');
+    handle.className = 'ac-film-scrub-handle';
+    handle.title = 'Drag to scrub through meetings';
+    track.appendChild(handle);
+
+    // Position handle over the current frame on boot
+    function _positionHandleOnFrame(meetingId) {
+      var frame = track.querySelector('.ac-film-frame[data-meeting-id="' + meetingId + '"]');
+      if (!frame) return;
+      var trackRect = track.getBoundingClientRect();
+      var frameRect = frame.getBoundingClientRect();
+      var left = frameRect.left - trackRect.left + track.scrollLeft + (frameRect.width / 2);
+      handle.style.left = left + 'px';
+    }
+    _positionHandleOnFrame(currentMeeting.meeting_id);
+
+    var dragging = false;
+    var lastFrameId = null;
+
+    handle.addEventListener('mousedown', function(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      dragging = true;
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', function(ev) {
+      if (!dragging) return;
+      var trackRect = track.getBoundingClientRect();
+      var x = ev.clientX - trackRect.left + track.scrollLeft;
+      x = Math.max(0, Math.min(track.scrollWidth, x));
+      handle.style.left = x + 'px';
+
+      // Find which frame the handle is over
+      var frames = track.querySelectorAll('.ac-film-frame[data-meeting-id]');
+      var hit = null;
+      frames.forEach(function(f) {
+        var fr = f.getBoundingClientRect();
+        if (ev.clientX >= fr.left && ev.clientX <= fr.right) hit = f;
+      });
+      if (!hit) return;
+
+      var meetingId = hit.dataset.meetingId;
+      if (meetingId === lastFrameId) return; // no change
+      lastFrameId = meetingId;
+
+      if (meetingId === currentMeeting.meeting_id) {
+        if (_scrubState.active) _deactivateScrub(currentMeeting);
+        return;
+      }
+      var mtg = meetings.find(function(m) { return m.meeting_id === meetingId; });
+      if (!mtg || (mtg.state === 'idle' && meetingId !== currentMeeting.meeting_id)) return;
+      _activateScrub(meetingId, meetings, currentMeeting, workstreamId);
+    });
+
+    document.addEventListener('mouseup', function() {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      lastFrameId = null;
+    });
+
+    // Keep handle in sync when scrub is activated by other means (click/nav)
+    window.addEventListener('accord:film-scrub-changed', function(ev) {
+      var id = ev && ev.detail && ev.detail.meetingId;
+      if (id && track.isConnected) _positionHandleOnFrame(id);
     });
   }
 
