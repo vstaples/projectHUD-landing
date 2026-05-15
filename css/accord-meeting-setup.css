@@ -1538,7 +1538,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-action-card.ac-card-dragging { opacity: 0.5; }
 .ac-action-seq { font-family: var(--ac-font-mono); font-size: 8.5px; color: var(--ac-amber); font-weight: 600; }
 .ac-action-summary { font-size: 11.5px; color: var(--ac-text-primary); line-height: 1.3; }
-.ac-action-owner   { font-size: 10px; color: var(--ac-text-tertiary); }
+.ac-action-owner   { font-size: 10px; color: var(--ac-cyan); }  /* X-34 */
 .ac-action-slack   { font-family: var(--ac-font-mono); font-size: 9px; }
 .ac-slack--red  { color: var(--ac-rose); }
 .ac-slack--amber { color: var(--ac-amber); }
