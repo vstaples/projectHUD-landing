@@ -3564,11 +3564,12 @@
       _fetchPriorMeetingBrief(meeting.meeting_id, meeting.workstream_id),
       _fetchPriorActionsSummary(meeting.meeting_id, meeting.workstream_id),
       _fetchPriorDecisions(meeting.workstream_id),
-      _fetchAnnotations(meeting.workstream_id)
+      _fetchAnnotations(meeting.workstream_id),
+      _fetchPriorRisks(meeting.workstream_id)
     ]).then(function(results) {
       if (_briefingToken !== myToken) return;
       if (!tabbody.isConnected) return;
-      _paintBriefingTab(tabbody, meeting, results[0], results[1], results[2], results[3]);
+      _paintBriefingTab(tabbody, meeting, results[0], results[1], results[2], results[3], results[4]);
     }).catch(function(e) {
       console.error('[AccordMeetingSetup] briefing fetch failed', e);
       if (tabbody.isConnected) {
@@ -3714,7 +3715,28 @@
     }).catch(function() { return []; });
   }
 
-  function _paintBriefingTab(tabbody, meeting, lastMtg, actionsSummary, decisions, annotations) {
+  function _fetchPriorRisks(workstreamId) {
+    return API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&state=in.(closed,sealed)' +
+      '&select=meeting_id&limit=20'
+    ).then(function(meetings) {
+      if (!meetings || !meetings.length) return [];
+      var ids = meetings.map(function(m) { return m.meeting_id; }).join(',');
+      return API.get(
+        'accord_nodes?meeting_id=in.(' + ids + ')' +
+        '&tag=eq.risk' +
+        '&select=node_id,summary,seq_id,seq_number,created_by,status,created_at' +
+        '&order=seq_number.asc' +
+        '&limit=20'
+      ).then(function(nodes) {
+        return _resolveNodeOwnerNames(nodes || [], 'created_by');
+      });
+    }).catch(function() { return []; });
+  }
+
+  function _paintBriefingTab(tabbody, meeting, lastMtg, actionsSummary, decisions, annotations, risks) {
+    risks = risks || [];
     var html = '<div class="ac-briefing-wrap">';
 
     // Synthesis block
@@ -3769,24 +3791,21 @@
 
     // ── PRIOR ACTIONS ──
     html += '<div class="ac-briefing-actions">';
-    html += '<div class="ac-briefing-section-label">PRIOR ACTIONS</div>';
     if (!actionNodes.length) {
+      html += '<div class="ac-briefing-section-label">PRIOR ACTIONS</div>';
       html += '<div class="ac-muted">No prior actions in this workstream.</div>';
     } else {
-      var overdueCls = actionsSummary.overdue > 0 ? ' ac-briefing-actions-count--alert' : '';
-      html += '<div class="ac-briefing-actions-summary" data-action="toggle-actions-detail">';
-      html += '<span class="ac-briefing-actions-count' + overdueCls + '">' +
-              actionNodes.length + ' tracked</span>';
-      if (actionsSummary.overdue > 0) {
-        html += '<span class="ac-briefing-actions-count ac-briefing-actions-count--alert"> \u00b7 ' +
-                actionsSummary.overdue + ' overdue</span>';
-      }
-      if (actionsSummary.dueThisWeek > 0) {
-        html += '<span class="ac-briefing-actions-count ac-muted"> \u00b7 ' +
-                actionsSummary.dueThisWeek + ' due this week</span>';
-      }
-      html += ' <span class="ac-briefing-actions-expand">\u25b8</span>';
-      html += '</div>';
+      var overdueSuffix = actionsSummary.overdue > 0
+        ? ' \u00b7 <span class="ac-briefing-actions-count--alert">' + actionsSummary.overdue + ' overdue</span>'
+        : '';
+      var weekSuffix = actionsSummary.dueThisWeek > 0
+        ? ' \u00b7 <span class="ac-muted">' + actionsSummary.dueThisWeek + ' due this week</span>'
+        : '';
+      html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
+              'data-action="toggle-actions-detail">' +
+              'PRIOR ACTIONS \u00b7 ' + actionNodes.length + ' tracked' +
+              overdueSuffix + weekSuffix +
+              ' <span class="ac-briefing-actions-expand">\u25b8</span></div>';
       html += '<div class="ac-briefing-actions-detail" id="ac-briefing-actions-detail" style="display:none;">';
       actionNodes.slice(0, 10).forEach(function(n) {
         var overdue = n.due_date && new Date(n.due_date) < new Date();
@@ -3817,14 +3836,14 @@
 
     // ── PRIOR NOTES ──
     html += '<div class="ac-briefing-notes">';
-    html += '<div class="ac-briefing-section-label">PRIOR NOTES</div>';
     if (!noteNodes.length) {
+      html += '<div class="ac-briefing-section-label">PRIOR NOTES</div>';
       html += '<div class="ac-muted">No prior notes in this workstream.</div>';
     } else {
-      html += '<div class="ac-briefing-notes-summary" data-action="toggle-notes-detail">';
-      html += '<span class="ac-briefing-actions-count">' + noteNodes.length + ' notes</span>';
-      html += ' <span class="ac-briefing-actions-expand">\u25b8</span>';
-      html += '</div>';
+      html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
+              'data-action="toggle-notes-detail">' +
+              'PRIOR NOTES \u00b7 ' + noteNodes.length +
+              ' <span class="ac-briefing-actions-expand">\u25b8</span></div>';
       html += '<div class="ac-briefing-notes-detail" id="ac-briefing-notes-detail" style="display:none;">';
       noteNodes.slice(0, 10).forEach(function(n) {
         html += '<div class="ac-briefing-action-row">';
@@ -3849,10 +3868,15 @@
 
     // Prior decisions block
     html += '<div class="ac-briefing-decisions">';
-    html += '<div class="ac-briefing-section-label">PRIOR DECISIONS</div>';
     if (!decisions.length) {
+      html += '<div class="ac-briefing-section-label">PRIOR DECISIONS</div>';
       html += '<div class="ac-muted">No decisions captured yet.</div>';
     } else {
+      html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
+              'data-action="toggle-decisions-detail">' +
+              'PRIOR DECISIONS \u00b7 ' + decisions.length +
+              ' <span class="ac-briefing-actions-expand">\u25b8</span></div>';
+      html += '<div class="ac-briefing-decisions-detail" id="ac-briefing-decisions-detail" style="display:none;">';
       decisions.slice(0, 8).forEach(function(d) {
         html += '<div class="ac-briefing-decision-row">';
         html += '<span class="ac-briefing-decision-seq">' + esc(d.seq_id || 'DC') + '</span>';
@@ -3871,6 +3895,39 @@
         html += '<div class="ac-muted ac-briefing-more">+' +
                 (decisions.length - 8) + ' more \u2014 see Decisions tab</div>';
       }
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Prior risks block
+    html += '<div class="ac-briefing-risks">';
+    if (!risks.length) {
+      html += '<div class="ac-briefing-section-label">PRIOR RISKS</div>';
+      html += '<div class="ac-muted">No risks flagged yet.</div>';
+    } else {
+      html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
+              'data-action="toggle-risks-detail">' +
+              'PRIOR RISKS \u00b7 ' + risks.length +
+              ' <span class="ac-briefing-actions-expand">\u25b8</span></div>';
+      html += '<div class="ac-briefing-risks-detail" id="ac-briefing-risks-detail" style="display:none;">';
+      risks.slice(0, 8).forEach(function(r) {
+        html += '<div class="ac-briefing-action-row">';
+        html += '<span class="ac-briefing-action-seq ac-briefing-risk-seq">' + esc(r.seq_id || 'RK') + '</span>';
+        html += '<span class="ac-briefing-action-summary">' +
+                esc((r.summary || '').slice(0, 80)) + '</span>';
+        if (r._owner_name && r._owner_resource_id) {
+          html += '<span class="ac-briefing-owner" data-owner-id="' +
+                  esc(r._owner_resource_id) +
+                  '" data-action="percolate-owner">' +
+                  esc(r._owner_name) + '</span>';
+        }
+        html += '</div>';
+      });
+      if (risks.length > 8) {
+        html += '<div class="ac-muted ac-briefing-more">+' +
+                (risks.length - 8) + ' more</div>';
+      }
+      html += '</div>';
     }
     html += '</div>';
 
@@ -3922,7 +3979,7 @@
 
       if (action === 'toggle-actions-detail') {
         var detail = tabbody.querySelector('#ac-briefing-actions-detail');
-        var arrow  = tabbody.querySelector('.ac-briefing-actions-summary .ac-briefing-actions-expand');
+        var arrow  = tabbody.querySelector('[data-action="toggle-actions-detail"] .ac-briefing-actions-expand');
         if (!detail) return;
         var visible = detail.style.display !== 'none';
         detail.style.display = visible ? 'none' : '';
@@ -3937,6 +3994,26 @@
         var notesVisible = notesDetail.style.display !== 'none';
         notesDetail.style.display = notesVisible ? 'none' : '';
         if (notesArrow) notesArrow.textContent = notesVisible ? '\u25b8' : '\u25be';
+        return;
+      }
+
+      if (action === 'toggle-decisions-detail') {
+        var decDetail  = tabbody.querySelector('#ac-briefing-decisions-detail');
+        var decArrow   = tabbody.querySelector('[data-action="toggle-decisions-detail"] .ac-briefing-actions-expand');
+        if (!decDetail) return;
+        var decVisible = decDetail.style.display !== 'none';
+        decDetail.style.display = decVisible ? 'none' : '';
+        if (decArrow) decArrow.textContent = decVisible ? '\u25b8' : '\u25be';
+        return;
+      }
+
+      if (action === 'toggle-risks-detail') {
+        var riskDetail  = tabbody.querySelector('#ac-briefing-risks-detail');
+        var riskArrow   = tabbody.querySelector('[data-action="toggle-risks-detail"] .ac-briefing-actions-expand');
+        if (!riskDetail) return;
+        var riskVisible = riskDetail.style.display !== 'none';
+        riskDetail.style.display = riskVisible ? 'none' : '';
+        if (riskArrow) riskArrow.textContent = riskVisible ? '\u25b8' : '\u25be';
         return;
       }
 
