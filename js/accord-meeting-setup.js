@@ -409,6 +409,21 @@
               '<span class="ac-mode-tab" id="ac-mode-followup">FOLLOW-UP</span>' +
               '<span class="ac-mode-tab" id="ac-mode-firstever">FIRST-EVER</span>' +
             '</div>' +
+            // X-46: display tuning button — launches the Accord Display Tuning
+            // panel. Matches the sun icon pattern from hud-shell.js CMD100.26.
+            '<button class="ac-display-btn" id="ac-display-btn" title="Display tuning" aria-label="Display tuning">' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">' +
+                '<circle cx="12" cy="12" r="4"/>' +
+                '<line x1="12" y1="2" x2="12" y2="4"/>' +
+                '<line x1="12" y1="20" x2="12" y2="22"/>' +
+                '<line x1="2" y1="12" x2="4" y2="12"/>' +
+                '<line x1="20" y1="12" x2="22" y2="12"/>' +
+                '<line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>' +
+                '<line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>' +
+                '<line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>' +
+                '<line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>' +
+              '</svg>' +
+            '</button>' +
             '<div class="ac-header-meta">' +
               '<div class="ac-meta-row ac-meta-row--when" id="ac-meta-when-row">' +
                 '<span class="ac-meta-label">WHEN</span>' +
@@ -1033,6 +1048,7 @@
     _paintMeta(meeting, workstreamId);
     _paintModeToggle(meeting, workstreamId);
     _wireHeaderEdits(meeting);
+    _wireDisplayBtn();
     _startCountdown(meeting);
   }
 
@@ -1215,6 +1231,202 @@
   // save signal; debounce exists only to reduce mid-type traffic.
   // IR71: `el` captured in forEach closure at wire time — synchronous
   // so no async mutation risk; blur fires before any DOM wipe.
+  // X-46: Display tuning panel — launch via sun icon in header
+  function _wireDisplayBtn() {
+    var btn = document.getElementById('ac-display-btn');
+    if (!btn || btn.dataset.wired) return;
+    btn.dataset.wired = '1';
+
+    var STORE_KEY = 'accord-display-tuning';
+    var DEFAULTS  = { brightness: 100, contrast: 100, saturation: 100,
+                      colGap: 10, zoneGap: 10,
+                      leftBg: '#161c26', centerBg: '#0d1117', rightBg: '#161c26',
+                      filmBg: '#11161e', tileBg: '#1a212c',
+                      cyan: '#00d2ff', amber: '#ffaa00', risk: '#ff4d6d',
+                      violet: '#a855f7', mint: '#00e5a0',
+                      textPrimary: '#e8edf2', textSecondary: '#8a95a5',
+                      colBorder: 'rgba(255,255,255,0.18)' };
+
+    function _load() {
+      try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(STORE_KEY) || '{}')); }
+      catch(e) { return Object.assign({}, DEFAULTS); }
+    }
+    function _save(t) {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(t)); } catch(e) {}
+    }
+    function _apply(t) {
+      var shell = document.querySelector('.ac-setup-shell');
+      if (!shell) return;
+      // Global filter
+      var f = [];
+      if (t.brightness !== 100) f.push('brightness(' + t.brightness + '%)');
+      if (t.contrast   !== 100) f.push('contrast('   + t.contrast   + '%)');
+      if (t.saturation !== 100) f.push('saturate('   + t.saturation + '%)');
+      shell.style.filter = f.join(' ');
+      // Gaps
+      var cols = document.querySelector('.ac-setup-columns');
+      if (cols) cols.style.gap = t.colGap + 'px';
+      shell.style.rowGap = t.zoneGap + 'px';
+      // Column backgrounds
+      var left   = document.querySelector('.ac-setup-col-left');
+      var center = document.querySelector('.ac-setup-col-center');
+      var right  = document.querySelector('.ac-setup-col-right');
+      var film   = document.querySelector('.ac-setup-filmstrip');
+      if (left)   left.style.background   = t.leftBg;
+      if (center) center.style.background = t.centerBg;
+      if (right)  right.style.background  = t.rightBg;
+      if (film)   film.style.background   = t.filmBg;
+      // CSS custom properties for accents and text
+      shell.style.setProperty('--ac-cyan',           t.cyan);
+      shell.style.setProperty('--ac-amber',          t.amber);
+      shell.style.setProperty('--ac-rose',           t.risk);
+      shell.style.setProperty('--ac-violet',         t.violet);
+      shell.style.setProperty('--ac-text-primary',   t.textPrimary);
+      shell.style.setProperty('--ac-text-secondary', t.textSecondary);
+    }
+
+    // Build panel once
+    var panel = document.getElementById('ac-display-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'ac-display-panel';
+      panel.innerHTML = [
+        '<div class="ac-dp-header">',
+          '<span class="ac-dp-title">Display Tuning</span>',
+          '<div class="ac-dp-presets">',
+            '<button class="ac-dp-preset" data-preset="dark">☽ Dark</button>',
+            '<button class="ac-dp-preset" data-preset="medium">◑ Medium</button>',
+            '<button class="ac-dp-preset" data-preset="bright">☀ Bright</button>',
+          '</div>',
+          '<button class="ac-dp-close" id="ac-dp-close">✕</button>',
+        '</div>',
+        '<div class="ac-dp-body">',
+          '<div class="ac-dp-section">GLOBAL</div>',
+          '<div class="ac-dp-row"><label>Brightness</label><input type="range" id="dp-bri" min="80" max="140" step="1"><span class="ac-dp-val" id="dp-bri-v">100%</span></div>',
+          '<div class="ac-dp-row"><label>Contrast</label><input type="range" id="dp-con" min="80" max="160" step="1"><span class="ac-dp-val" id="dp-con-v">100%</span></div>',
+          '<div class="ac-dp-row"><label>Saturation</label><input type="range" id="dp-sat" min="60" max="180" step="1"><span class="ac-dp-val" id="dp-sat-v">100%</span></div>',
+          '<div class="ac-dp-section">SPACING</div>',
+          '<div class="ac-dp-row"><label>Column gap</label><input type="range" id="dp-cgap" min="0" max="24" step="1"><span class="ac-dp-val" id="dp-cgap-v">10px</span></div>',
+          '<div class="ac-dp-row"><label>Zone gap</label><input type="range" id="dp-zgap" min="0" max="24" step="1"><span class="ac-dp-val" id="dp-zgap-v">10px</span></div>',
+          '<div class="ac-dp-section">BACKGROUNDS</div>',
+          '<div class="ac-dp-row"><label>Left column</label><input type="color" id="dp-lbg"></div>',
+          '<div class="ac-dp-row"><label>Center column</label><input type="color" id="dp-cbg"></div>',
+          '<div class="ac-dp-row"><label>Right column</label><input type="color" id="dp-rbg"></div>',
+          '<div class="ac-dp-row"><label>Filmstrip</label><input type="color" id="dp-fbg"></div>',
+          '<div class="ac-dp-section">ACCENT COLORS</div>',
+          '<div class="ac-dp-row"><label>Cyan</label><input type="color" id="dp-cyan"></div>',
+          '<div class="ac-dp-row"><label>Amber</label><input type="color" id="dp-amber"></div>',
+          '<div class="ac-dp-row"><label>Risk / overdue</label><input type="color" id="dp-risk"></div>',
+          '<div class="ac-dp-row"><label>Violet</label><input type="color" id="dp-violet"></div>',
+          '<div class="ac-dp-row"><label>Mint</label><input type="color" id="dp-mint"></div>',
+          '<div class="ac-dp-section">TEXT</div>',
+          '<div class="ac-dp-row"><label>Primary text</label><input type="color" id="dp-tp"></div>',
+          '<div class="ac-dp-row"><label>Secondary text</label><input type="color" id="dp-ts"></div>',
+          '<div class="ac-dp-footer">',
+            '<button class="ac-dp-btn" id="dp-reset">↩ Reset</button>',
+            '<button class="ac-dp-btn" id="dp-export">↗ Export</button>',
+          '</div>',
+        '</div>'
+      ].join('');
+      document.querySelector('.ac-setup-shell').appendChild(panel);
+
+      var PRESET_VALUES = {
+        dark:   { brightness: 100, contrast: 100, saturation: 100 },
+        medium: { brightness: 108, contrast: 112, saturation: 105 },
+        bright: { brightness: 120, contrast: 125, saturation: 110 }
+      };
+
+      function _sync(t) {
+        document.getElementById('dp-bri').value   = t.brightness;
+        document.getElementById('dp-con').value   = t.contrast;
+        document.getElementById('dp-sat').value   = t.saturation;
+        document.getElementById('dp-cgap').value  = t.colGap;
+        document.getElementById('dp-zgap').value  = t.zoneGap;
+        document.getElementById('dp-lbg').value   = t.leftBg;
+        document.getElementById('dp-cbg').value   = t.centerBg;
+        document.getElementById('dp-rbg').value   = t.rightBg;
+        document.getElementById('dp-fbg').value   = t.filmBg;
+        document.getElementById('dp-cyan').value  = t.cyan;
+        document.getElementById('dp-amber').value = t.amber;
+        document.getElementById('dp-risk').value  = t.risk;
+        document.getElementById('dp-violet').value= t.violet;
+        document.getElementById('dp-mint').value  = t.mint;
+        document.getElementById('dp-tp').value    = t.textPrimary;
+        document.getElementById('dp-ts').value    = t.textSecondary;
+        document.getElementById('dp-bri-v').textContent  = t.brightness + '%';
+        document.getElementById('dp-con-v').textContent  = t.contrast   + '%';
+        document.getElementById('dp-sat-v').textContent  = t.saturation + '%';
+        document.getElementById('dp-cgap-v').textContent = t.colGap     + 'px';
+        document.getElementById('dp-zgap-v').textContent = t.zoneGap    + 'px';
+      }
+
+      function _read() {
+        return {
+          brightness:    +document.getElementById('dp-bri').value,
+          contrast:      +document.getElementById('dp-con').value,
+          saturation:    +document.getElementById('dp-sat').value,
+          colGap:        +document.getElementById('dp-cgap').value,
+          zoneGap:       +document.getElementById('dp-zgap').value,
+          leftBg:        document.getElementById('dp-lbg').value,
+          centerBg:      document.getElementById('dp-cbg').value,
+          rightBg:       document.getElementById('dp-rbg').value,
+          filmBg:        document.getElementById('dp-fbg').value,
+          tileBg:        DEFAULTS.tileBg,
+          cyan:          document.getElementById('dp-cyan').value,
+          amber:         document.getElementById('dp-amber').value,
+          risk:          document.getElementById('dp-risk').value,
+          violet:        document.getElementById('dp-violet').value,
+          mint:          document.getElementById('dp-mint').value,
+          textPrimary:   document.getElementById('dp-tp').value,
+          textSecondary: document.getElementById('dp-ts').value,
+          colBorder:     DEFAULTS.colBorder
+        };
+      }
+
+      panel.addEventListener('input', function() {
+        var t = _read();
+        document.getElementById('dp-bri-v').textContent  = t.brightness + '%';
+        document.getElementById('dp-con-v').textContent  = t.contrast   + '%';
+        document.getElementById('dp-sat-v').textContent  = t.saturation + '%';
+        document.getElementById('dp-cgap-v').textContent = t.colGap     + 'px';
+        document.getElementById('dp-zgap-v').textContent = t.zoneGap    + 'px';
+        _apply(t); _save(t);
+      });
+
+      panel.querySelectorAll('.ac-dp-preset').forEach(function(b) {
+        b.addEventListener('click', function() {
+          var p = PRESET_VALUES[b.dataset.preset] || {};
+          var t = Object.assign(_read(), p);
+          _sync(t); _apply(t); _save(t);
+        });
+      });
+
+      document.getElementById('dp-reset').addEventListener('click', function() {
+        var t = Object.assign({}, DEFAULTS);
+        _sync(t); _apply(t); _save(t);
+      });
+
+      document.getElementById('dp-export').addEventListener('click', function() {
+        var t = _read();
+        var out = JSON.stringify(t, null, 2);
+        console.log('[Accord Display Tuning]\n' + out);
+        alert('Values copied to console. Paste to your architect to lock into CSS.');
+      });
+
+      document.getElementById('ac-dp-close').addEventListener('click', function() {
+        panel.classList.remove('ac-display-panel--open');
+      });
+
+      _sync(_load());
+    }
+
+    btn.addEventListener('click', function() {
+      var t = _load();
+      panel.classList.toggle('ac-display-panel--open');
+      if (panel.classList.contains('ac-display-panel--open')) _apply(t);
+    });
+  }
+
   function _wireHeaderEdits(meeting) {
     var fields = [
       { id: 'ac-meeting-title',  col: 'title',    singleLine: true  },
