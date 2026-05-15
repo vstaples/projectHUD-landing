@@ -493,8 +493,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 .ac-outcomes-label {
   font-family: var(--ac-font-mono);
-  font-size: 9px;
-  color: var(--ac-text-tertiary);
+  font-size: 11px;
+  color: var(--ac-text-secondary);
   letter-spacing: 1.4px;
   text-transform: uppercase;
 }
@@ -1386,7 +1386,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   border-top: 1px solid var(--ac-border-subtle);
   margin-top: 8px;
 }
-.ac-agenda-label { font-family: var(--ac-font-mono); font-size: 9px; color: var(--ac-text-tertiary); letter-spacing: 1.4px; text-transform: uppercase; }
+.ac-agenda-label { font-family: var(--ac-font-mono); font-size: 11px; color: var(--ac-text-secondary); letter-spacing: 1.4px; text-transform: uppercase; }
 .ac-agenda-stats { font-family: var(--ac-font-mono); font-size: 9px; }
 .ac-agenda-loading, .ac-agenda-error { font-size: 12px; color: var(--ac-text-tertiary); font-style: italic; padding: 12px 18px; }
 
@@ -3394,9 +3394,9 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   flex: 1; min-height: 0;
 }
 .ac-setup-chat-label {
-  font-family: var(--ac-font-mono); font-size: 9px;
+  font-family: var(--ac-font-mono); font-size: 11px;
   letter-spacing: 1.4px; text-transform: uppercase;
-  color: var(--ac-text-tertiary); margin-bottom: 8px;
+  color: var(--ac-text-secondary); margin-bottom: 8px;
   padding: 0 16px;
 }
 .ac-setup-chat-stream {
