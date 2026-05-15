@@ -3289,7 +3289,13 @@
   function _enrichFilmCards() {
     var myToken = ++_filmCardToken;
 
-    var frames = document.querySelectorAll('.ac-film-frame[data-meeting-id]');
+    // X-35: scope to .ac-setup-filmstrip only — document-wide query was
+    // also picking up .ac-film-frame elements from the Live Capture surface
+    // (.ac-live-film-track), causing _enrichFilmCards to send the wrong
+    // meeting IDs and paint into zero-height frames.
+    var container = document.querySelector('.ac-setup-filmstrip');
+    if (!container) return;
+    var frames = container.querySelectorAll('.ac-film-frame[data-meeting-id]');
     if (!frames.length) return;
 
     var ids = Array.from(frames).map(function(f) {
@@ -3392,7 +3398,11 @@
       });
     });
 
-    document.querySelectorAll('.ac-film-frame').forEach(function(frame) {
+    // X-35: scope to .ac-setup-filmstrip — same cross-surface leak as
+    // _enrichFilmCards. ResizeObserver must not observe Live Capture frames.
+    var filmContainer = document.querySelector('.ac-setup-filmstrip');
+    if (!filmContainer) return;
+    filmContainer.querySelectorAll('.ac-film-frame').forEach(function(frame) {
       _filmTierObserver.observe(frame);
     });
   }
