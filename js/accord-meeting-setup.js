@@ -3112,10 +3112,13 @@
 
     content.innerHTML = html;
 
-    // Apply collapsed state on render
+    // Apply collapsed state on render — hide track AND shrink grid row
     var track = content.querySelector('#ac-film-track');
-    if (track && localStorage.getItem('accord-film-collapsed') === '1') {
-      track.style.display = 'none';
+    var filmCollapsedOnLoad = localStorage.getItem('accord-film-collapsed') === '1';
+    if (filmCollapsedOnLoad) {
+      if (track) track.style.display = 'none';
+      var shellEl = document.querySelector('.ac-setup-shell');
+      if (shellEl) _setShellFilmstripRow(shellEl, 40);
     }
 
     _wireFilmstripEvents(content, meetings, currentMeeting, workstreamId);
@@ -4228,7 +4231,7 @@
 
       if (action === 'toggle-notes-detail') {
         var notesDetail = tabbody.querySelector('#ac-briefing-notes-detail');
-        var notesArrow  = tabbody.querySelector('.ac-briefing-notes-summary .ac-briefing-actions-expand');
+        var notesArrow  = tabbody.querySelector('[data-action="toggle-notes-detail"] .ac-briefing-actions-expand');
         if (!notesDetail) return;
         var notesVisible = notesDetail.style.display !== 'none';
         notesDetail.style.display = notesVisible ? 'none' : '';
