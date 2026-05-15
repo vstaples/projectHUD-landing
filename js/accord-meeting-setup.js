@@ -3805,8 +3805,8 @@
               'data-action="toggle-actions-detail">' +
               'PRIOR ACTIONS \u00b7 ' + actionNodes.length + ' tracked' +
               overdueSuffix + weekSuffix +
-              ' <span class="ac-briefing-actions-expand">\u25b8</span></div>';
-      html += '<div class="ac-briefing-actions-detail" id="ac-briefing-actions-detail" style="display:none;">';
+              ' <span class="ac-briefing-actions-expand">\u25be</span></div>';
+      html += '<div class="ac-briefing-actions-detail" id="ac-briefing-actions-detail">';
       actionNodes.slice(0, 10).forEach(function(n) {
         var overdue = n.due_date && new Date(n.due_date) < new Date();
         html += '<div class="ac-briefing-action-row' + (overdue ? ' ac-briefing-action-row--overdue' : '') + '">';
@@ -3843,11 +3843,11 @@
       html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
               'data-action="toggle-notes-detail">' +
               'PRIOR NOTES \u00b7 ' + noteNodes.length +
-              ' <span class="ac-briefing-actions-expand">\u25b8</span></div>';
-      html += '<div class="ac-briefing-notes-detail" id="ac-briefing-notes-detail" style="display:none;">';
+              ' <span class="ac-briefing-actions-expand">\u25be</span></div>';
+      html += '<div class="ac-briefing-notes-detail" id="ac-briefing-notes-detail">';
       noteNodes.slice(0, 10).forEach(function(n) {
         html += '<div class="ac-briefing-action-row">';
-        html += '<span class="ac-briefing-action-seq">' + esc(n.seq_id || 'N') + '</span>';
+        html += '<span class="ac-briefing-note-seq">' + esc(n.seq_id || 'N') + '</span>';
         html += '<span class="ac-briefing-action-summary">' +
                 esc((n.summary || '').slice(0, 80)) + '</span>';
         if (n._owner_name && n._owner_resource_id) {
@@ -3875,8 +3875,8 @@
       html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
               'data-action="toggle-decisions-detail">' +
               'PRIOR DECISIONS \u00b7 ' + decisions.length +
-              ' <span class="ac-briefing-actions-expand">\u25b8</span></div>';
-      html += '<div class="ac-briefing-decisions-detail" id="ac-briefing-decisions-detail" style="display:none;">';
+              ' <span class="ac-briefing-actions-expand">\u25be</span></div>';
+      html += '<div class="ac-briefing-decisions-detail" id="ac-briefing-decisions-detail">';
       decisions.slice(0, 8).forEach(function(d) {
         html += '<div class="ac-briefing-decision-row">';
         html += '<span class="ac-briefing-decision-seq">' + esc(d.seq_id || 'DC') + '</span>';
@@ -3908,11 +3908,11 @@
       html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
               'data-action="toggle-risks-detail">' +
               'PRIOR RISKS \u00b7 ' + risks.length +
-              ' <span class="ac-briefing-actions-expand">\u25b8</span></div>';
-      html += '<div class="ac-briefing-risks-detail" id="ac-briefing-risks-detail" style="display:none;">';
+              ' <span class="ac-briefing-actions-expand">\u25be</span></div>';
+      html += '<div class="ac-briefing-risks-detail" id="ac-briefing-risks-detail">';
       risks.slice(0, 8).forEach(function(r) {
         html += '<div class="ac-briefing-action-row">';
-        html += '<span class="ac-briefing-action-seq ac-briefing-risk-seq">' + esc(r.seq_id || 'RK') + '</span>';
+        html += '<span class="ac-briefing-risk-seq">' + esc(r.seq_id || 'RK') + '</span>';
         html += '<span class="ac-briefing-action-summary">' +
                 esc((r.summary || '').slice(0, 80)) + '</span>';
         if (r._owner_name && r._owner_resource_id) {

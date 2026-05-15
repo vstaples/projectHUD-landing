@@ -1191,6 +1191,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 .ac-briefing-action-row:last-child { border-bottom: none; }
 .ac-briefing-action-seq { font-family: var(--ac-font-mono); font-size: 10px; color: var(--ac-amber); flex-shrink: 0; }
+.ac-briefing-note-seq   { font-family: var(--ac-font-mono); font-size: 10px; color: #00B0F0; flex-shrink: 0; }
+.ac-briefing-risk-seq   { font-family: var(--ac-font-mono); font-size: 10px; color: var(--ac-rose); flex-shrink: 0; }
 .ac-briefing-action-summary { flex: 1; font-size: 12px; color: var(--ac-text-secondary); }
 .ac-briefing-action-due { font-family: var(--ac-font-mono); font-size: 10px; color: var(--ac-text-tertiary); }
 .ac-overdue { color: var(--ac-rose) !important; }
