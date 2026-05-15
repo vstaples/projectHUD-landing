@@ -6120,6 +6120,8 @@
     if (_percolateEscHandler) return;   // idempotent
     _percolateEscHandler = function(ev) {
       if (ev.key === 'Escape' && _percolateResourceId) {
+        ev.preventDefault();
+        ev.stopPropagation();
         _clearPercolate();
       }
     };
