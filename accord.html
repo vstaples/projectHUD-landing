@@ -187,6 +187,71 @@
   white-space: nowrap;
 }
 
+/* X-30/31/32: meeting-context label — replaces LIVE CONNECT +
+   Manage workstreams in meeting context. Prefix (Preparing /
+   In Session) is dim; title and workstream are clickable with
+   hover underline. Identity chip keeps margin-left:auto and
+   pushes context label left naturally. */
+#accord-app .ac-topnav-context {
+  display: flex;
+  align-items: center;
+  margin-left: 24px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+#accord-app .ac-topnav-context-prefix {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+#accord-app .ac-topnav-context-sep {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-ghost);
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+#accord-app .ac-topnav-context-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-body);
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+  transition: color 120ms;
+}
+#accord-app .ac-topnav-context-title:hover {
+  color: var(--ink-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+#accord-app .ac-topnav-context-ws {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-muted);
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  transition: color 120ms;
+  flex-shrink: 1;
+}
+#accord-app .ac-topnav-context-ws:hover {
+  color: var(--ink-body);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* ============================================================
    CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4 — chrome additions
    ============================================================ */
@@ -2815,6 +2880,19 @@
     <a href="#" class="chrome-link" id="manageWorkstreamsLink"
        title="Manage workstream organizing buckets">Manage workstreams</a>
 
+    <!-- X-30/31/32: meeting-context label. Replaces LIVE CONNECT +
+         Manage workstreams when inside a meeting. Hidden by default;
+         accord-core.js shows/hides on accord:level-changed. -->
+    <div class="ac-topnav-context" id="acTopnavContext" style="display:none">
+      <span class="ac-topnav-context-prefix" id="acTopnavPrefix"></span>
+      <span class="ac-topnav-context-sep"> · </span>
+      <span class="ac-topnav-context-title" id="acTopnavTitle"
+            role="button" tabindex="0"></span>
+      <span class="ac-topnav-context-sep"> · </span>
+      <span class="ac-topnav-context-ws" id="acTopnavWs"
+            role="button" tabindex="0"></span>
+    </div>
+
     <!-- X-27: logged-in user identity chip. Populated by accord-core.js
          after identity resolves. Prevents session confusion in multi-user
          testing and gives all users a persistent identity anchor. -->
@@ -3423,10 +3501,10 @@
 <script src="/js/notif.js"></script>
 <script src="/js/version.js?v=seed"></script>
 
-<!-- ── Brand-meta dynamic label (CMD-A5 §8 polish) ── -->
+<!-- ── Brand-meta dynamic label + X-30/31/32 topnav context (CMD-A5 §8 + X-30/31/32) ── -->
 <script>
   (function() {
-    const SURFACE_LABELS = {
+    var SURFACE_LABELS = {
       capture:     'Live Capture',
       document:    'Living Document',
       ledger:      'Decision Ledger',
@@ -3434,23 +3512,118 @@
       minutes:     'Minutes',
       workstreams: 'Manage Workstreams',
     };
+    function _verShort() {
+      var ver = window._PROJECTHUD_VERSION || '';
+      return ver.replace(/^v\d+-/, '');
+    }
     function _setBrandMeta(surfaceKey) {
       var el = document.getElementById('brandMeta');
       if (!el) return;
-      var ver = window._PROJECTHUD_VERSION || '';
       var label = SURFACE_LABELS[surfaceKey] || 'Live Capture';
-      var ver_short = ver.replace(/^v\d+-/, '');
-      el.textContent = ver_short + ' · ' + label;
+      el.textContent = _verShort() + ' · ' + label;
     }
-    // Initial
+
+    // X-30/31/32: show/hide topnav chrome based on meeting level.
+    // In meeting context: hide LIVE CONNECT + Manage workstreams,
+    // show context label (Preparing/In Session · title · workstream).
+    // On ascent: restore chrome, hide context label.
+    function _applyTopnavContext(level) {
+      var liveBtn   = document.getElementById('liveConnectBtn');
+      var manageBtn = document.getElementById('manageWorkstreamsLink');
+      var ctx       = document.getElementById('acTopnavContext');
+      var prefix    = document.getElementById('acTopnavPrefix');
+      var brandEl   = document.getElementById('brandMeta');
+      if (!ctx) return;
+
+      if (level === 'meeting') {
+        var meeting      = window.Accord && window.Accord.state && window.Accord.state.meeting;
+        var meetingTitle = (meeting && meeting.title) || 'Meeting';
+        var wsName       = (meeting && meeting.workstreams && meeting.workstreams.name) || 'Workstream';
+        var wsId         = meeting && meeting.workstream_id;
+        var isRunning    = meeting && meeting.state === 'running';
+
+        // Brand-meta: level-aware label
+        if (brandEl) {
+          brandEl.textContent = _verShort() + ' · ' + (isRunning ? 'Live Capture' : 'Meeting Setup');
+        }
+
+        // Populate prefix
+        if (prefix) prefix.textContent = isRunning ? 'In Session' : 'Preparing';
+
+        // Populate + wire title span (clone to avoid listener stacking)
+        var titleEl = document.getElementById('acTopnavTitle');
+        if (titleEl) {
+          var freshTitle = titleEl.cloneNode(false);
+          freshTitle.textContent = meetingTitle;
+          titleEl.parentNode.replaceChild(freshTitle, titleEl);
+          // Title click: no-op (already at meeting level)
+          freshTitle.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') e.preventDefault();
+          });
+        }
+
+        // Populate + wire workstream span
+        var wsEl = document.getElementById('acTopnavWs');
+        if (wsEl) {
+          var freshWs = wsEl.cloneNode(false);
+          freshWs.textContent = wsName;
+          wsEl.parentNode.replaceChild(freshWs, wsEl);
+          freshWs.addEventListener('click', function() {
+            if (wsId && window.Accord && typeof window.Accord.setLevel === 'function') {
+              window.Accord.setLevel('workstream', { workstreamId: wsId });
+            }
+          });
+          freshWs.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              freshWs.click();
+            }
+          });
+        }
+
+        // Show context label; hide constellation-level chrome
+        ctx.style.display = 'flex';
+        if (liveBtn)   liveBtn.style.display  = 'none';
+        if (manageBtn) manageBtn.style.display = 'none';
+
+      } else {
+        // Ascending out of meeting — restore chrome, hide context label
+        ctx.style.display = 'none';
+        if (liveBtn)   liveBtn.style.display  = '';
+        if (manageBtn) manageBtn.style.display = '';
+        _setBrandMeta('capture');
+      }
+    }
+
+    // Initial boot
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', function() { _setBrandMeta('capture'); });
     } else {
       _setBrandMeta('capture');
     }
-    // Track surface changes
+
+    // Surface changes — only update brand-meta label when not in meeting context
     window.addEventListener('accord:surface-changed', function(ev) {
-      _setBrandMeta(ev.detail && ev.detail.surface);
+      var level = window.Accord && window.Accord.state && window.Accord.state.level;
+      if (level === 'meeting') {
+        // Re-apply to catch idle→running transition (Begin Meeting)
+        _applyTopnavContext('meeting');
+      } else {
+        _setBrandMeta(ev.detail && ev.detail.surface);
+      }
+    });
+
+    // Level changes — primary trigger for context label show/hide
+    window.addEventListener('accord:level-changed', function(ev) {
+      var level = ev && ev.detail && ev.detail.level;
+      _applyTopnavContext(level);
+    });
+
+    // meeting-loaded fires after state.meeting is hydrated — re-apply
+    // so title and workstream name are populated (level-changed may
+    // fire before state.meeting is set on the initial URL load path)
+    window.addEventListener('accord:meeting-loaded', function() {
+      _applyTopnavContext('meeting');
     });
   })();
 </script>
@@ -3481,7 +3654,7 @@
     load('/js/accord-transitions.js');
     load('/js/accord-my-meetings.js');
     load('/js/accord-slideshow.js');
-    load('/js/accord-rails.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-130v');
+    load('/js/accord-rails.js');
     load('/js/accord-dnd.js');
     // CMD-ACCORD-MEETING-SETUP-1 Phase 2
     load('/js/accord-meeting-setup.js');

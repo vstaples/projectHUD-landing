@@ -1,0 +1,2595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Accord — Rehearsal · Endoscope Replacement / Phase 2 Review</title>
+
+<!--
+  ============================================================================
+  README — Accord v4 · The Rehearsal Timeline
+  ============================================================================
+
+  WHAT I THREW OUT FROM v3 — AND WHY
+  -----------------------------------
+  Out: the three-column briefing-pack metaphor.
+  Out: the form-paradigm of composing an agenda as a vertical list.
+  Out: the static "show the operator the state of the world" model.
+  Out: the readiness verdict as a footer evaluating fields-the-operator-typed.
+
+  Why: v3 is a richer, more intelligent FORM. The operator READS substrate,
+  then COMPOSES the meeting. v3 hides paddling — it does not make the
+  operator extraordinary. It makes them well-briefed. The primary cognitive
+  act in v3 is reading; the primary motor act is typing. Neither is the
+  thing experienced operators actually do in their heads.
+
+  THE SINGLE MOVE I'M BETTING ON
+  -------------------------------
+  Meeting setup is a TEMPORAL INSTRUMENT, not a form.
+
+  The primary surface is a horizontal timeline that runs from meeting start
+  to hard stop. Substrate items are CLIPS — draggable, stretchable, snappable
+  to grid. The operator places them in time, sees overlap, sees overflow,
+  sees attendee presence as bands across the timeline. Then they press PLAY.
+
+  A playhead sweeps through the meeting in fast-forward. As it crosses each
+  clip, the right-side narration panel surfaces what's projected to happen
+  moment by moment, drawn from substrate history: "Tom likely raises DS-005
+  here." "Sarah's belief on optical array comes due." "FDA risk thread
+  triggers here per RX-014 dependency." Marker pins drop onto the timeline
+  as events fire.
+
+  The verdict is no longer subjective. It's mathematical: time you've
+  allocated vs. time available, attendee-presence vs. clip-needs, projected
+  friction vs. actual buffer.
+
+  The operator REHEARSES the meeting before it occurs. They walk in having
+  already watched it.
+
+  PRODUCT DOMAIN BORROWED FROM
+  -----------------------------
+  - Logic Pro X / DaVinci Resolve / Pro Tools: multi-track timeline,
+    transport controls, scrubbing, snap-to-grid, clip resize handles
+  - Aviation pre-flight workload planning: the "if I do this at minute 23,
+    what conflicts at minute 47?" temporal awareness
+  - Chess opening preparation: rehearsing lines before they're played
+  - Live broadcast run-of-show: scenes with durations, talent presence
+    bands, hard stops
+
+  Not borrowed from: any meeting tool, calendar tool, briefing tool, or
+  project management tool. Those think in lists and forms. This thinks in
+  time and bodies-in-time.
+
+  WHAT IT WOULD SOUND LIKE (sound design, not in HTML)
+  -----------------------------------------------------
+  - CLIP SNAP: a short, dry mechanical click — like a sequencer step button
+  - CLIP DROP from deck onto track: warmer ka-thunk, like a tape splice
+  - PLAYHEAD CROSSING 5-MIN TICK during simulation: subtle metronome tock
+  - EVENT MARKER FIRING: timbre per kind — gold bell for decision, muted
+    drum thud for dissent, low alert tone for risk, soft chime for question
+  - PRESENCE-BOUNDARY CROSSING (e.g., Sarah leaves): cool descending tone
+  - TRANSPORT PLAY: vintage tape-deck zhunk + low motor hum during play
+  - PRE-FLIGHT VERDICT: GO = single warm tone; CAVEATS = two tones; NOT
+    READY = three descending tones (aviation "negative" cadence)
+  - SEAL: deep oak thunk + faint resonant hum for one second after
+
+  WHAT I'D NEED TO SHIP THIS FOR PRODUCTION
+  ------------------------------------------
+  1. A simulation engine that pulls real predictions from substrate:
+     - Per-attendee likelihood of raising specific dissents based on prior
+       declarations and recency
+     - Per-decision typical resolution time, derived from workstream history
+     - Per-action probability of completion-before-meeting given owner load
+     - Cross-clip dependency conflicts (this clip needs Sarah; Sarah leaves
+       mid-clip)
+  2. Calendar federation for the attendee-presence bands (Google/Outlook),
+     so departure times and conflicts are real not hypothetical
+  3. A duration-estimator trained on workstream-specific history: "DC-117
+     supplier confirmation: 8-14 min based on 11 prior similar items"
+  4. Real drag-and-drop with multi-touch + keyboard accessibility (currently
+     mouse-only in this mock)
+  5. Mobile companion: the timeline collapses to a vertical scroll on small
+     screens with the playback intact
+  6. A sealed-meeting comparison view: post-meeting, replay the rehearsed
+     timeline next to what actually happened, surface deltas, feed back into
+     the duration-estimator
+  7. The simulation panel content needs an editorial layer — these are
+     PROJECTIONS, not predictions, and the language must continually
+     reinforce that distinction so operators don't over-trust
+  ============================================================================
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================================
+   TOKENS — Engineering instrument, not editorial document.
+   Cool deep canvas, single CRT-phosphor signal color for live state.
+   ============================================================================ */
+:root {
+  /* Canvas */
+  --canvas: #0a0c10;
+  --canvas-deep: #06080b;
+  --canvas-bright: #11141a;
+
+  /* Surface tiers */
+  --surface: #14171c;
+  --surface-elev: #1a1e25;
+  --surface-clip: #20252e;
+  --surface-clip-hi: #283040;
+
+  /* Lines */
+  --line: #232830;
+  --line-bright: #353c47;
+  --line-faint: #181c22;
+
+  /* Grid lines on the timeline */
+  --grid-major: rgba(255, 255, 255, 0.045);
+  --grid-minor: rgba(255, 255, 255, 0.018);
+
+  /* Text */
+  --ink: #e8ebf0;
+  --ink-soft: #a8aeba;
+  --ink-mute: #6a7080;
+  --ink-faint: #3e4350;
+  --ink-ghost: #262a32;
+
+  /* CRT phosphor — the live signal color. Reserved for playhead, "now",
+     and active-simulation indicators. */
+  --live: #5af5b0;
+  --live-soft: rgba(90, 245, 176, 0.18);
+  --live-glow: 0 0 12px rgba(90, 245, 176, 0.45);
+
+  /* Substrate amber — for committed substrate IDs, sealed objects */
+  --substrate: #d8a84a;
+  --substrate-soft: rgba(216, 168, 74, 0.16);
+
+  /* NRA kind colors — muted instrument-panel palette */
+  --kind-decision: #d8a84a;
+  --kind-decision-bg: rgba(216, 168, 74, 0.12);
+  --kind-action: #6dccaa;
+  --kind-action-bg: rgba(109, 204, 170, 0.12);
+  --kind-risk: #d68573;
+  --kind-risk-bg: rgba(214, 133, 115, 0.14);
+  --kind-question: #b0a8d4;
+  --kind-question-bg: rgba(176, 168, 212, 0.12);
+  --kind-dissent: #c47ec3;
+  --kind-dissent-bg: rgba(196, 126, 195, 0.14);
+  --kind-update: #8aaecf;
+  --kind-update-bg: rgba(138, 174, 207, 0.12);
+
+  /* Hard stop / alert */
+  --hardstop: #ec5b56;
+  --hardstop-bg: rgba(236, 91, 86, 0.15);
+
+  /* Verdict states */
+  --verdict-go: var(--live);
+  --verdict-caveat: #f0b45e;
+  --verdict-stop: var(--hardstop);
+
+  /* Type */
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Timeline geometry — 60-min meeting at 14px per minute = 840px */
+  --tl-px-per-min: 14px;
+  --tl-meeting-min: 60;
+  --tl-width: calc(var(--tl-px-per-min) * var(--tl-meeting-min));
+  --tl-lane-h-attendees: 92px;
+  --tl-lane-h-agenda: 72px;
+  --tl-lane-h-events: 48px;
+  --tl-gutter: 168px;
+}
+
+/* ============================================================================
+   Reset
+   ============================================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; width: 100%; overflow: hidden;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+button, input { font: inherit; color: inherit; background: none; border: none; outline: none; cursor: pointer; }
+::selection { background: var(--live-soft); color: var(--ink); }
+
+/* Subtle CRT-style background */
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 20% 0%, rgba(90, 245, 176, 0.025), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 100%, rgba(216, 168, 74, 0.02), transparent 60%);
+}
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  opacity: 0.04; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='150' height='150' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============================================================================
+   Layout shell
+   ============================================================================ */
+.app {
+  position: relative; z-index: 2;
+  display: grid;
+  grid-template-rows: 56px 1fr 116px;
+  grid-template-columns: 1fr 360px;
+  height: 100vh; width: 100vw;
+  min-width: 1280px;
+}
+
+/* ============================================================================
+   Top chrome
+   ============================================================================ */
+.chrome {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(20,23,28,0.7), rgba(20,23,28,0.35));
+  backdrop-filter: blur(12px);
+  gap: 32px;
+}
+.chrome-brand {
+  display: flex; align-items: center; gap: 12px;
+}
+.brand-mark {
+  width: 18px; height: 18px; position: relative;
+}
+.brand-mark::before, .brand-mark::after {
+  content: ""; position: absolute; inset: 0;
+  border: 1px solid var(--substrate); border-radius: 50%;
+}
+.brand-mark::after { inset: 5px; background: var(--substrate); opacity: 0.4; border: none; }
+.brand-name {
+  font-weight: 600; font-size: 14px; letter-spacing: -0.01em;
+}
+.brand-sep {
+  width: 1px; height: 16px; background: var(--line-bright); margin: 0 4px;
+}
+.crumb {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-mute);
+  display: flex; align-items: center; gap: 12px;
+}
+.crumb-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+  color: var(--ink-mute); transition: all 0.15s var(--ease);
+}
+.crumb-back:hover { border-color: var(--line-bright); color: var(--ink-soft); }
+.crumb-sep { color: var(--ink-faint); }
+.crumb-current { color: var(--live); }
+
+.chrome-meta {
+  display: flex; align-items: center; gap: 24px; justify-self: end;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em;
+  color: var(--ink-mute); text-transform: uppercase;
+}
+.chrome-meta-cell { display: flex; align-items: center; gap: 8px; }
+.chrome-meta-label { color: var(--ink-faint); }
+.chrome-meta-value { color: var(--ink); font-weight: 500; }
+.chrome-meta-value.live { color: var(--live); }
+.chrome-meta-pulse {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--live);
+  box-shadow: 0 0 8px var(--live);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* ============================================================================
+   MAIN — the timeline workspace
+   ============================================================================ */
+.main {
+  position: relative;
+  overflow: hidden;
+  background: var(--canvas);
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column;
+}
+
+/* Title strip — meeting identity above the timeline */
+.title-strip {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 22px 32px 18px;
+  border-bottom: 1px solid var(--line-faint);
+  gap: 24px;
+}
+.title-name {
+  font-size: 24px; font-weight: 500; letter-spacing: -0.02em;
+}
+.title-name-derived {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-faint); margin-top: 4px;
+}
+.title-derived-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px;
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--ink-mute); letter-spacing: 0.1em;
+}
+.title-summary {
+  display: flex; align-items: center; gap: 18px;
+  font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--ink-mute); letter-spacing: 0.04em;
+}
+.title-summary-cell {
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.title-summary-num {
+  color: var(--ink); font-weight: 500;
+}
+.title-summary-num.flag { color: var(--substrate); }
+.title-summary-num.alert { color: var(--hardstop); }
+.title-summary-sep { color: var(--ink-faint); }
+
+/* Mode tabs — Compose vs. Rehearse */
+.mode-strip {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 32px;
+  border-bottom: 1px solid var(--line-faint);
+}
+.mode-tabs {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+  padding: 3px;
+}
+.mode-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px; border-radius: 999px;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-mute);
+  transition: all 0.2s var(--ease);
+}
+.mode-tab:hover { color: var(--ink-soft); }
+.mode-tab.active {
+  background: var(--surface-clip); color: var(--ink);
+}
+.mode-tab.active.live-mode { color: var(--live); background: var(--live-soft); }
+.mode-tab-key {
+  font-family: var(--font-mono); font-size: 9px;
+  padding: 1px 5px; background: rgba(255,255,255,0.06); border-radius: 2px;
+  color: var(--ink-mute);
+}
+
+.zoom-cluster {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--ink-mute);
+  letter-spacing: 0.06em;
+}
+.zoom-btn {
+  width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-mute); transition: all 0.15s var(--ease);
+}
+.zoom-btn:hover { border-color: var(--line-bright); color: var(--ink); }
+.zoom-readout { padding: 0 4px; color: var(--ink-soft); min-width: 50px; text-align: center; }
+
+/* ============================================================================
+   THE TIMELINE — centerpiece
+   ============================================================================ */
+.tl-wrap {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  padding: 24px 0 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-bright) transparent;
+}
+.tl-wrap::-webkit-scrollbar { height: 10px; width: 10px; }
+.tl-wrap::-webkit-scrollbar-track { background: transparent; }
+.tl-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; }
+.tl-wrap::-webkit-scrollbar-thumb:hover { background: var(--line-bright); }
+
+.tl {
+  position: relative;
+  width: max-content;
+  min-width: 100%;
+  padding: 0 32px 24px;
+}
+
+/* Lane label gutter */
+.tl-lane {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--tl-gutter) 1fr;
+  align-items: stretch;
+}
+.tl-lane-label {
+  padding: 0 16px 0 0;
+  display: flex; flex-direction: column; justify-content: center;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-mute);
+  border-right: 1px solid var(--line);
+}
+.tl-lane-label-name { color: var(--ink-soft); font-weight: 500; }
+.tl-lane-label-sub { color: var(--ink-faint); font-size: 9px; margin-top: 2px; letter-spacing: 0.08em; }
+.tl-lane-track {
+  position: relative;
+  width: var(--tl-width);
+  min-height: 100%;
+}
+
+/* Time ruler */
+.tl-ruler {
+  height: 38px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.tl-ruler .tl-lane-label-name { color: var(--ink-mute); font-weight: 400; }
+.tl-ruler .tl-lane-track {
+  background:
+    repeating-linear-gradient(90deg,
+      transparent 0,
+      transparent calc(var(--tl-px-per-min) * 5 - 1px),
+      var(--grid-major) calc(var(--tl-px-per-min) * 5 - 1px),
+      var(--grid-major) calc(var(--tl-px-per-min) * 5)
+    );
+}
+.tl-tick {
+  position: absolute; bottom: 0; left: 0;
+  width: 1px; height: 8px; background: var(--line-bright);
+}
+.tl-tick-major { height: 14px; background: var(--ink-faint); }
+.tl-tick-label {
+  position: absolute; bottom: 16px; left: 0;
+  transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 10px; color: var(--ink-soft);
+  letter-spacing: 0.04em; white-space: nowrap;
+}
+.tl-tick-label-min {
+  position: absolute; bottom: 16px; left: 0;
+  transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 9px; color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+/* Universal background grid (vertical lines extend into all lanes) */
+.tl-grid-overlay {
+  position: absolute;
+  top: 38px; bottom: 0;
+  left: var(--tl-gutter); right: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg,
+      transparent 0,
+      transparent calc(var(--tl-px-per-min) - 1px),
+      var(--grid-minor) calc(var(--tl-px-per-min) - 1px),
+      var(--grid-minor) var(--tl-px-per-min)
+    ),
+    repeating-linear-gradient(90deg,
+      transparent 0,
+      transparent calc(var(--tl-px-per-min) * 5 - 1px),
+      var(--grid-major) calc(var(--tl-px-per-min) * 5 - 1px),
+      var(--grid-major) calc(var(--tl-px-per-min) * 5)
+    );
+}
+
+/* Hard stop marker */
+.tl-hardstop {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: var(--hardstop);
+  z-index: 8;
+  pointer-events: none;
+  box-shadow: 0 0 12px rgba(236, 91, 86, 0.4);
+}
+.tl-hardstop-label {
+  position: absolute;
+  top: 4px; left: 6px;
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--hardstop); letter-spacing: 0.12em; text-transform: uppercase;
+  background: var(--canvas); padding: 2px 6px; border: 1px solid var(--hardstop);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   ATTENDEE PRESENCE LANE
+   ============================================================================ */
+.tl-lane-attendees {
+  min-height: var(--tl-lane-h-attendees);
+}
+.tl-lane-attendees .tl-lane-track {
+  padding: 6px 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.attendee-row {
+  position: relative;
+  height: 14px;
+  display: flex; align-items: center;
+}
+.attendee-presence {
+  position: absolute;
+  height: 10px;
+  border-radius: 2px;
+  display: flex; align-items: center;
+  padding: 0 8px;
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  background: var(--surface-clip);
+  border: 1px solid var(--line-bright);
+  transition: all 0.2s var(--ease);
+}
+.attendee-presence.partial {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--line);
+  border-style: dashed;
+}
+.attendee-presence.full {
+  background: rgba(255, 255, 255, 0.05);
+}
+.attendee-presence:hover {
+  background: var(--surface-clip-hi);
+  z-index: 2;
+}
+.attendee-presence-name {
+  white-space: nowrap;
+}
+.attendee-presence-stake {
+  margin-left: auto;
+  color: var(--ink-mute);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+}
+.attendee-row.confirmed .attendee-presence-name {
+  color: var(--ink);
+}
+.attendee-row.tentative .attendee-presence {
+  border-color: var(--substrate);
+  border-style: dashed;
+}
+.attendee-row.tentative .attendee-presence-name {
+  color: var(--substrate);
+}
+.attendee-leaves-marker {
+  position: absolute;
+  top: -2px; bottom: -2px;
+  width: 1px;
+  background: var(--substrate);
+  z-index: 3;
+}
+.attendee-leaves-marker::before {
+  content: "▽"; position: absolute; top: -10px; left: -4px;
+  font-size: 8px; color: var(--substrate);
+}
+
+/* ============================================================================
+   AGENDA LANE — primary clip track
+   ============================================================================ */
+.tl-lane-agenda {
+  min-height: var(--tl-lane-h-agenda);
+  margin-top: 6px;
+}
+.tl-lane-agenda .tl-lane-track {
+  padding: 8px 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.012), transparent);
+}
+
+.clip {
+  position: absolute;
+  top: 8px; bottom: 8px;
+  background: var(--surface-clip);
+  border: 1px solid var(--line-bright);
+  border-radius: 3px;
+  padding: 8px 10px 6px;
+  cursor: grab;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  user-select: none;
+  z-index: 2;
+}
+.clip:hover {
+  background: var(--surface-clip-hi);
+  border-color: var(--line-bright);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.3);
+  z-index: 5;
+}
+.clip.dragging {
+  cursor: grabbing;
+  opacity: 0.85;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  z-index: 100;
+}
+.clip.now-playing {
+  border-color: var(--live);
+  box-shadow: 0 0 0 1px var(--live), 0 0 24px var(--live-soft);
+  background: linear-gradient(180deg, var(--surface-clip-hi), var(--surface-clip));
+}
+.clip-resize {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04));
+  z-index: 3;
+}
+.clip-resize:hover {
+  background: linear-gradient(90deg, transparent, var(--live-soft));
+}
+.clip-resize::after {
+  content: ""; position: absolute; right: 2px; top: 30%; bottom: 30%;
+  width: 1px; background: var(--ink-faint);
+}
+.clip-kind-strip {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+}
+.clip[data-kind="decision"] .clip-kind-strip { background: var(--kind-decision); }
+.clip[data-kind="action"] .clip-kind-strip { background: var(--kind-action); }
+.clip[data-kind="risk"] .clip-kind-strip { background: var(--kind-risk); }
+.clip[data-kind="question"] .clip-kind-strip { background: var(--kind-question); }
+.clip[data-kind="update"] .clip-kind-strip { background: var(--kind-update); }
+.clip[data-kind="open"] .clip-kind-strip { background: var(--ink-soft); }
+.clip[data-kind="wrap"] .clip-kind-strip { background: var(--ink-soft); }
+
+.clip-head {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-mute);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding-left: 8px;
+  margin-bottom: 3px;
+}
+.clip-head-id { color: var(--substrate); font-weight: 500; }
+.clip-head-id.fresh { color: var(--ink-faint); font-style: italic; }
+.clip-head-dur {
+  margin-left: auto;
+  color: var(--ink-soft); font-weight: 500;
+}
+.clip-body {
+  font-size: 12px; color: var(--ink); line-height: 1.35;
+  padding-left: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.clip.compact .clip-body {
+  font-size: 11px;
+}
+.clip-meta {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 4px;
+  padding-left: 8px;
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--ink-mute); letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.clip-meta-owner-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--ink-soft);
+  display: inline-block;
+}
+.clip-meta-needs {
+  color: var(--substrate);
+}
+.clip-meta-needs.unmet {
+  color: var(--hardstop);
+}
+
+/* ============================================================================
+   EVENTS LANE — projected friction markers
+   ============================================================================ */
+.tl-lane-events {
+  min-height: var(--tl-lane-h-events);
+  margin-top: 6px;
+}
+.event-marker {
+  position: absolute;
+  top: 6px;
+  display: flex; flex-direction: column; align-items: center;
+  cursor: pointer;
+  z-index: 4;
+  transition: all 0.2s var(--ease);
+}
+.event-marker:hover {
+  z-index: 10;
+}
+.event-marker-pin {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-weight: 600; font-size: 9px;
+  background: var(--surface);
+  border: 1.5px solid;
+  transition: all 0.2s var(--ease);
+}
+.event-marker[data-event-kind="dissent"] .event-marker-pin {
+  border-color: var(--kind-dissent); color: var(--kind-dissent);
+}
+.event-marker[data-event-kind="risk"] .event-marker-pin {
+  border-color: var(--kind-risk); color: var(--kind-risk);
+}
+.event-marker[data-event-kind="conflict"] .event-marker-pin {
+  border-color: var(--hardstop); color: var(--hardstop);
+}
+.event-marker[data-event-kind="decision"] .event-marker-pin {
+  border-color: var(--kind-decision); color: var(--kind-decision);
+}
+.event-marker[data-event-kind="late"] .event-marker-pin {
+  border-color: var(--ink-soft); color: var(--ink-soft);
+}
+.event-marker[data-event-kind="leaves"] .event-marker-pin {
+  border-color: var(--substrate); color: var(--substrate);
+}
+.event-marker:hover .event-marker-pin {
+  transform: scale(1.25);
+}
+.event-marker.fired .event-marker-pin {
+  background: var(--surface-clip-hi);
+  box-shadow: 0 0 12px currentColor;
+}
+.event-marker-stem {
+  width: 1px; flex: 1;
+  background: linear-gradient(180deg, currentColor 0%, transparent 100%);
+  opacity: 0.4;
+  margin-top: 1px;
+  min-height: 18px;
+}
+.event-marker[data-event-kind="dissent"] .event-marker-stem { color: var(--kind-dissent); }
+.event-marker[data-event-kind="risk"] .event-marker-stem { color: var(--kind-risk); }
+.event-marker[data-event-kind="conflict"] .event-marker-stem { color: var(--hardstop); }
+.event-marker[data-event-kind="decision"] .event-marker-stem { color: var(--kind-decision); }
+.event-marker[data-event-kind="late"] .event-marker-stem { color: var(--ink-soft); }
+.event-marker[data-event-kind="leaves"] .event-marker-stem { color: var(--substrate); }
+
+.event-marker-tooltip {
+  position: absolute;
+  bottom: 100%; left: 50%; transform: translateX(-50%) translateY(-6px);
+  background: var(--surface-elev);
+  border: 1px solid var(--line-bright);
+  border-radius: 3px;
+  padding: 8px 12px;
+  width: 240px;
+  font-size: 11px; line-height: 1.45;
+  color: var(--ink);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s var(--ease);
+  z-index: 30;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.event-marker-tooltip-title {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-mute);
+  margin-bottom: 4px;
+}
+.event-marker:hover .event-marker-tooltip { opacity: 1; }
+
+/* ============================================================================
+   PLAYHEAD — the live moment in rehearsal
+   ============================================================================ */
+.tl-playhead {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 1px;
+  background: var(--live);
+  z-index: 20;
+  pointer-events: none;
+  box-shadow: var(--live-glow);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+.tl-playhead.active {
+  opacity: 1;
+}
+.tl-playhead::before {
+  content: ""; position: absolute;
+  top: 0; left: -7px;
+  width: 15px; height: 15px;
+  background: var(--live);
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
+  box-shadow: var(--live-glow);
+}
+.tl-playhead-readout {
+  position: absolute;
+  top: 18px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 9px;
+  background: var(--canvas-deep);
+  border: 1px solid var(--live);
+  border-radius: 2px;
+  padding: 1px 5px;
+  color: var(--live);
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   DECK — carry-forward items and proposed clips, ready to drag onto track
+   ============================================================================ */
+.deck {
+  border-top: 1px solid var(--line);
+  background: var(--canvas-bright);
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+.deck-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--line-faint);
+}
+.deck-title {
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-soft); display: flex; align-items: center; gap: 12px;
+}
+.deck-title-count {
+  color: var(--ink-mute);
+}
+.deck-hint {
+  font-family: var(--font-mono); font-size: 9.5px;
+  color: var(--ink-mute); letter-spacing: 0.04em;
+  display: flex; align-items: center; gap: 12px;
+}
+.deck-hint kbd {
+  font-family: var(--font-mono); font-size: 9px;
+  padding: 1px 5px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 2px;
+  color: var(--ink-soft);
+}
+.deck-track {
+  padding: 12px 24px;
+  display: flex; gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-bright) transparent;
+}
+.deck-track::-webkit-scrollbar { height: 6px; }
+.deck-track::-webkit-scrollbar-track { background: transparent; }
+.deck-track::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+.deck-card {
+  flex: 0 0 224px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 10px 12px 10px 14px;
+  position: relative;
+  cursor: grab;
+  transition: all 0.15s var(--ease);
+  display: flex; flex-direction: column; gap: 4px;
+  user-select: none;
+}
+.deck-card:hover {
+  border-color: var(--line-bright);
+  background: var(--surface-elev);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+}
+.deck-card.dragging {
+  cursor: grabbing;
+  opacity: 0.7;
+  z-index: 100;
+}
+.deck-card.placed {
+  opacity: 0.3;
+  cursor: default;
+}
+.deck-card.placed:hover {
+  transform: none;
+  box-shadow: none;
+}
+.deck-card-strip {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+}
+.deck-card[data-kind="decision"] .deck-card-strip { background: var(--kind-decision); }
+.deck-card[data-kind="action"] .deck-card-strip { background: var(--kind-action); }
+.deck-card[data-kind="risk"] .deck-card-strip { background: var(--kind-risk); }
+.deck-card[data-kind="question"] .deck-card-strip { background: var(--kind-question); }
+.deck-card[data-kind="update"] .deck-card-strip { background: var(--kind-update); }
+.deck-card-head {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 9.5px;
+  color: var(--ink-mute); letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.deck-card-id { color: var(--substrate); font-weight: 500; }
+.deck-card-id.fresh { color: var(--ink-faint); font-style: italic; }
+.deck-card-est {
+  margin-left: auto; color: var(--ink-soft);
+  font-weight: 500;
+}
+.deck-card-text {
+  font-size: 12px; color: var(--ink); line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.deck-card-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--ink-mute); letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.deck-card-meta-state {
+  color: var(--substrate);
+}
+.deck-card-meta-state.urgent { color: var(--hardstop); }
+
+/* ============================================================================
+   NARRATION PANEL — projected commentary, fills during rehearsal
+   ============================================================================ */
+.narration {
+  grid-row: 2 / 4;
+  grid-column: 2;
+  background: var(--canvas-bright);
+  border-left: 1px solid var(--line);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.narration-head {
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.narration-title {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--ink-soft);
+  display: flex; align-items: center; gap: 10px;
+}
+.narration-mode {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.06em;
+  padding: 3px 8px; border-radius: 2px;
+  background: var(--surface); color: var(--ink-mute);
+  border: 1px solid var(--line);
+  text-transform: uppercase;
+}
+.narration-mode.live {
+  color: var(--live); background: var(--live-soft); border-color: var(--live);
+}
+
+.narration-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-bright) transparent;
+}
+.narration-body::-webkit-scrollbar { width: 6px; }
+.narration-body::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+/* Idle (compose mode) narration content */
+.narration-idle {
+  display: flex; flex-direction: column; gap: 20px;
+}
+.narration-idle-block-label {
+  font-family: var(--font-mono); font-size: 9.5px;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-mute);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line-faint);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.narration-idle-block-label-num {
+  color: var(--ink-soft); font-weight: 500;
+}
+
+.idle-stat {
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: baseline; gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-faint);
+}
+.idle-stat:last-child { border-bottom: none; }
+.idle-stat-label { font-size: 11px; color: var(--ink-soft); }
+.idle-stat-value {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--ink); font-weight: 500;
+}
+.idle-stat-value.flag { color: var(--substrate); }
+.idle-stat-value.alert { color: var(--hardstop); }
+.idle-stat-value.good { color: var(--live); }
+
+.idle-conflict {
+  background: var(--hardstop-bg);
+  border: 1px solid rgba(236, 91, 86, 0.3);
+  border-left: 3px solid var(--hardstop);
+  border-radius: 3px;
+  padding: 10px 12px;
+  margin-top: 6px;
+}
+.idle-conflict-title {
+  font-family: var(--font-mono); font-size: 9.5px;
+  color: var(--hardstop); letter-spacing: 0.1em; text-transform: uppercase;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.idle-conflict-body {
+  font-size: 11.5px; color: var(--ink-soft); line-height: 1.5;
+}
+.idle-conflict-body strong { color: var(--ink); font-weight: 500; }
+.idle-conflict-fix {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line-bright);
+  border-radius: 3px;
+  font-family: var(--font-mono); font-size: 9.5px;
+  color: var(--ink-soft); letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+.idle-conflict-fix:hover {
+  border-color: var(--live); color: var(--live);
+}
+
+.idle-empty {
+  font-size: 11.5px; color: var(--ink-mute);
+  font-style: italic; line-height: 1.5;
+  padding: 8px 0;
+}
+
+/* Live (rehearsing) narration content — scrolling moment-stream */
+.narration-live {
+  display: flex; flex-direction: column;
+  gap: 0;
+}
+.moment {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-faint);
+  opacity: 0;
+  transform: translateY(6px);
+  animation: moment-in 0.3s var(--ease-out) forwards;
+}
+@keyframes moment-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+.moment.upcoming {
+  opacity: 0.35;
+}
+.moment-time {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--live); font-weight: 500;
+  letter-spacing: 0.04em;
+  padding-top: 1px;
+}
+.moment.upcoming .moment-time {
+  color: var(--ink-mute);
+}
+.moment.past .moment-time {
+  color: var(--ink-faint);
+}
+.moment-body {
+  font-size: 12px; color: var(--ink); line-height: 1.45;
+}
+.moment-body em {
+  color: var(--ink-soft); font-style: normal;
+  font-family: var(--font-mono); font-size: 10.5px;
+  background: var(--surface); padding: 1px 5px; border-radius: 2px;
+}
+.moment-body .id {
+  color: var(--substrate); font-family: var(--font-mono); font-size: 11px;
+}
+.moment-body .name {
+  color: var(--ink); font-weight: 500;
+}
+.moment-tag {
+  display: inline-block;
+  font-family: var(--font-mono); font-size: 9px;
+  padding: 1px 6px; border-radius: 2px;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  margin-right: 4px;
+  vertical-align: 1px;
+}
+.moment-tag.dissent { color: var(--kind-dissent); background: var(--kind-dissent-bg); }
+.moment-tag.risk { color: var(--kind-risk); background: var(--kind-risk-bg); }
+.moment-tag.conflict { color: var(--hardstop); background: var(--hardstop-bg); }
+.moment-tag.decision { color: var(--kind-decision); background: var(--kind-decision-bg); }
+.moment-tag.late { color: var(--ink-soft); background: var(--surface-clip); }
+.moment-tag.leaves { color: var(--substrate); background: var(--substrate-soft); }
+
+/* Verdict appears at the END of the live narration */
+.live-verdict {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+.live-verdict.go { border-color: var(--verdict-go); background: var(--live-soft); }
+.live-verdict.caveat { border-color: var(--verdict-caveat); background: rgba(240, 180, 94, 0.1); }
+.live-verdict.stop { border-color: var(--verdict-stop); background: var(--hardstop-bg); }
+.live-verdict-label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; font-weight: 600;
+  margin-bottom: 6px;
+}
+.live-verdict.go .live-verdict-label { color: var(--verdict-go); }
+.live-verdict.caveat .live-verdict-label { color: var(--verdict-caveat); }
+.live-verdict.stop .live-verdict-label { color: var(--verdict-stop); }
+.live-verdict-summary {
+  font-size: 12px; line-height: 1.5; color: var(--ink-soft);
+}
+
+/* ============================================================================
+   TRANSPORT BAR — bottom row
+   ============================================================================ */
+.transport {
+  grid-column: 1;
+  grid-row: 3;
+  background: linear-gradient(180deg, var(--canvas-deep) 0%, #050608 100%);
+  border-top: 1px solid var(--line-bright);
+  padding: 0 32px;
+  display: grid;
+  grid-template-columns: 1.2fr auto 1.2fr;
+  align-items: center;
+  gap: 28px;
+}
+
+.transport-left {
+  display: flex; align-items: center; gap: 22px;
+  font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--ink-mute); letter-spacing: 0.05em;
+}
+.budget {
+  display: flex; flex-direction: column; gap: 5px; min-width: 280px;
+}
+.budget-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
+}
+.budget-head-label { color: var(--ink-mute); }
+.budget-head-value { color: var(--ink); font-weight: 500; }
+.budget-head-value .alert { color: var(--hardstop); }
+.budget-head-value .live { color: var(--live); }
+.budget-bar {
+  height: 6px;
+  background: var(--surface);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.budget-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--live), var(--substrate));
+  border-radius: 3px;
+  transition: width 0.3s var(--ease);
+}
+.budget-fill.over {
+  background: linear-gradient(90deg, var(--substrate), var(--hardstop));
+}
+.budget-marker {
+  position: absolute;
+  top: -2px; bottom: -2px;
+  width: 1px;
+  background: var(--ink-faint);
+}
+
+.transport-center {
+  display: flex; align-items: center; gap: 20px;
+}
+.transport-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+  border: 1px solid var(--line-bright);
+  border-radius: 4px;
+  color: var(--ink-soft);
+  background: var(--surface);
+  transition: all 0.15s var(--ease);
+}
+.transport-btn:hover {
+  border-color: var(--live);
+  color: var(--live);
+  background: var(--live-soft);
+}
+.transport-btn svg { width: 14px; height: 14px; fill: currentColor; }
+
+.transport-play {
+  width: 56px; height: 56px;
+  background: var(--live);
+  color: var(--canvas-deep);
+  border: none;
+  box-shadow:
+    0 0 0 1px var(--live),
+    0 0 28px rgba(90, 245, 176, 0.45),
+    0 4px 16px rgba(0,0,0,0.4);
+  transition: all 0.15s var(--ease);
+}
+.transport-play:hover {
+  transform: scale(1.05);
+  box-shadow:
+    0 0 0 1px var(--live),
+    0 0 40px rgba(90, 245, 176, 0.7),
+    0 6px 22px rgba(0,0,0,0.5);
+}
+.transport-play svg { width: 18px; height: 18px; fill: currentColor; }
+.transport-play.playing { background: var(--substrate); box-shadow: 0 0 0 1px var(--substrate), 0 0 28px rgba(216, 168, 74, 0.45); }
+.transport-play.playing:hover { box-shadow: 0 0 0 1px var(--substrate), 0 0 40px rgba(216, 168, 74, 0.7); }
+
+.transport-time {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--live);
+  letter-spacing: 0.05em;
+  background: var(--canvas);
+  border: 1px solid var(--line-bright);
+  border-radius: 3px;
+  padding: 6px 14px;
+  min-width: 130px;
+  text-align: center;
+  box-shadow: inset 0 0 12px rgba(0,0,0,0.5);
+}
+.transport-time.idle {
+  color: var(--ink-mute);
+}
+
+.transport-right {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 18px;
+}
+.verdict-pill {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px;
+  border: 1.5px solid;
+  border-radius: 999px;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  font-weight: 600;
+  background: var(--surface);
+  transition: all 0.2s var(--ease);
+}
+.verdict-pill.go { color: var(--verdict-go); border-color: var(--verdict-go); background: var(--live-soft); }
+.verdict-pill.caveat { color: var(--verdict-caveat); border-color: var(--verdict-caveat); background: rgba(240, 180, 94, 0.1); }
+.verdict-pill.stop { color: var(--verdict-stop); border-color: var(--verdict-stop); background: var(--hardstop-bg); }
+.verdict-pill-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; box-shadow: 0 0 8px currentColor;
+}
+
+.seal-btn {
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 13px 22px;
+  background: var(--substrate);
+  color: var(--canvas-deep);
+  border-radius: 4px;
+  font-weight: 600; font-size: 12px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  font-family: var(--font-sans);
+  box-shadow:
+    0 0 0 1px var(--substrate),
+    0 0 28px rgba(216, 168, 74, 0.3),
+    0 4px 14px rgba(0,0,0,0.4);
+  transition: all 0.2s var(--ease);
+}
+.seal-btn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px var(--substrate),
+    0 0 40px rgba(216, 168, 74, 0.55),
+    0 6px 18px rgba(0,0,0,0.5);
+}
+.seal-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+.seal-btn-mark {
+  width: 18px; height: 18px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+}
+
+/* ============================================================================
+   COMMIT TRANSITION — when seal fires
+   ============================================================================ */
+.commit-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--canvas-deep);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.5s var(--ease);
+}
+.commit-overlay.active { opacity: 1; pointer-events: auto; }
+.commit-content { max-width: 560px; padding: 0 40px; text-align: center; }
+.commit-eyebrow {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--substrate);
+  margin-bottom: 18px;
+  opacity: 0;
+  transition: opacity 0.5s var(--ease) 0.2s;
+}
+.commit-headline {
+  font-size: 30px; font-weight: 400; letter-spacing: -0.02em;
+  margin-bottom: 28px; line-height: 1.2;
+  opacity: 0;
+  transition: opacity 0.6s var(--ease) 0.3s;
+}
+.commit-headline em { color: var(--substrate); font-style: italic; }
+.commit-meta {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--ink-mute); margin-bottom: 24px;
+  opacity: 0;
+  transition: opacity 0.5s var(--ease) 0.6s;
+}
+.commit-meta-id { color: var(--substrate); }
+.commit-cta {
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 12px 24px;
+  border: 1px solid var(--live);
+  border-radius: 999px;
+  background: transparent; color: var(--ink);
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  transition: all 0.2s var(--ease);
+  opacity: 0;
+}
+.commit-cta:hover { background: var(--live); color: var(--canvas-deep); }
+.commit-overlay.active .commit-eyebrow,
+.commit-overlay.active .commit-headline,
+.commit-overlay.active .commit-meta,
+.commit-overlay.active .commit-cta { opacity: 1; }
+.commit-overlay.active .commit-cta { transition-delay: 1s; }
+
+/* ============================================================================
+   Misc
+   ============================================================================ */
+.no-select { user-select: none; }
+
+.tl.dimmed .clip:not(.now-playing) { opacity: 0.55; transition: opacity 0.3s var(--ease); }
+.tl.dimmed .deck-card { opacity: 0.6; }
+
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ============== TOP CHROME ============== -->
+  <div class="chrome">
+    <div class="chrome-brand">
+      <div class="brand-mark"></div>
+      <div class="brand-name">Accord</div>
+      <div class="brand-sep"></div>
+      <div class="crumb">
+        <button class="crumb-back">
+          <span style="font-family: var(--font-mono);">←</span>
+          <span>Constellation</span>
+        </button>
+        <span>WORKSTREAM</span>
+        <span class="crumb-sep">/</span>
+        <span>Endoscope Replacement</span>
+        <span class="crumb-sep">/</span>
+        <span class="crumb-current">Rehearsal</span>
+      </div>
+    </div>
+    <div></div>
+    <div class="chrome-meta">
+      <div class="chrome-meta-cell">
+        <span class="chrome-meta-label">Workstream history</span>
+        <span class="chrome-meta-value">12 sealed · 13th</span>
+      </div>
+      <div class="chrome-meta-cell">
+        <span class="chrome-meta-label">Last met</span>
+        <span class="chrome-meta-value">2026-05-01 · 6d ago</span>
+      </div>
+      <div class="chrome-meta-cell">
+        <span class="chrome-meta-pulse"></span>
+        <span class="chrome-meta-value live">Starts in 23 min</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== MAIN — TIMELINE WORKSPACE ============== -->
+  <main class="main">
+
+    <!-- Title strip -->
+    <div class="title-strip">
+      <div>
+        <div class="title-name">Endoscope Replacement — Phase 2 Review</div>
+        <div class="title-name-derived">
+          <span class="title-derived-pill">DERIVED · click to override</span>
+        </div>
+      </div>
+      <div class="title-summary">
+        <span class="title-summary-cell"><span class="title-summary-num">5</span> attendees</span>
+        <span class="title-summary-sep">·</span>
+        <span class="title-summary-cell"><span class="title-summary-num">14:00</span>—<span class="title-summary-num">15:00</span></span>
+        <span class="title-summary-sep">·</span>
+        <span class="title-summary-cell"><span class="title-summary-num flag">5</span> carry-forward</span>
+        <span class="title-summary-sep">·</span>
+        <span class="title-summary-cell"><span class="title-summary-num alert">1</span> open dissent</span>
+        <span class="title-summary-sep">·</span>
+        <span class="title-summary-cell"><span class="title-summary-num flag">3</span> awaiting belief</span>
+      </div>
+    </div>
+
+    <!-- Mode tabs and zoom -->
+    <div class="mode-strip">
+      <div class="mode-tabs" id="mode-tabs">
+        <button class="mode-tab active" data-mode="compose">
+          <span>Compose</span>
+          <span class="mode-tab-key">C</span>
+        </button>
+        <button class="mode-tab" data-mode="rehearse">
+          <span>Rehearse</span>
+          <span class="mode-tab-key">R</span>
+        </button>
+      </div>
+      <div class="zoom-cluster">
+        <span style="text-transform: uppercase;">Zoom</span>
+        <button class="zoom-btn" id="zoom-out">−</button>
+        <span class="zoom-readout" id="zoom-readout">14 px/min</span>
+        <button class="zoom-btn" id="zoom-in">+</button>
+      </div>
+    </div>
+
+    <!-- ===== THE TIMELINE ===== -->
+    <div class="tl-wrap" id="tl-wrap">
+      <div class="tl" id="tl">
+
+        <!-- Universal grid overlay -->
+        <div class="tl-grid-overlay" id="tl-grid-overlay"></div>
+
+        <!-- Hard stop -->
+        <div class="tl-hardstop" id="tl-hardstop">
+          <div class="tl-hardstop-label">HARD STOP · 15:00</div>
+        </div>
+
+        <!-- Playhead -->
+        <div class="tl-playhead" id="tl-playhead">
+          <div class="tl-playhead-readout" id="tl-playhead-readout">14:00</div>
+        </div>
+
+        <!-- Ruler lane -->
+        <div class="tl-lane tl-ruler">
+          <div class="tl-lane-label">
+            <div class="tl-lane-label-name">Time</div>
+            <div class="tl-lane-label-sub">14:00 — 15:00</div>
+          </div>
+          <div class="tl-lane-track" id="tl-ruler-track"></div>
+        </div>
+
+        <!-- Attendee presence lane -->
+        <div class="tl-lane tl-lane-attendees">
+          <div class="tl-lane-label">
+            <div class="tl-lane-label-name">Presence</div>
+            <div class="tl-lane-label-sub">5 attendees</div>
+          </div>
+          <div class="tl-lane-track" id="tl-attendees-track"></div>
+        </div>
+
+        <!-- Agenda (clip) lane -->
+        <div class="tl-lane tl-lane-agenda">
+          <div class="tl-lane-label">
+            <div class="tl-lane-label-name">Agenda</div>
+            <div class="tl-lane-label-sub" id="agenda-sub">6 clips placed</div>
+          </div>
+          <div class="tl-lane-track" id="tl-agenda-track"></div>
+        </div>
+
+        <!-- Projected events lane -->
+        <div class="tl-lane tl-lane-events">
+          <div class="tl-lane-label">
+            <div class="tl-lane-label-name">Projected</div>
+            <div class="tl-lane-label-sub">friction · likely</div>
+          </div>
+          <div class="tl-lane-track" id="tl-events-track"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===== DECK ===== -->
+    <div class="deck">
+      <div class="deck-head">
+        <div class="deck-title">
+          <span>Carry-forward · ready to slot</span>
+          <span class="deck-title-count" id="deck-count">2 unplaced · 4 placed</span>
+        </div>
+        <div class="deck-hint">
+          <span>Drag onto Agenda lane to schedule</span>
+          <kbd>·</kbd>
+          <span>Right edge of clip resizes duration</span>
+          <kbd>R</kbd> Rehearse
+        </div>
+      </div>
+      <div class="deck-track" id="deck-track">
+        <!-- cards render here -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============== NARRATION PANEL ============== -->
+  <aside class="narration">
+    <div class="narration-head">
+      <div class="narration-title">
+        <span id="narration-title-text">Pre-flight</span>
+      </div>
+      <div class="narration-mode" id="narration-mode">COMPOSE</div>
+    </div>
+    <div class="narration-body" id="narration-body">
+      <!-- content rendered by JS depending on mode -->
+    </div>
+  </aside>
+
+  <!-- ============== TRANSPORT BAR ============== -->
+  <div class="transport">
+    <div class="transport-left">
+      <div class="budget">
+        <div class="budget-head">
+          <span class="budget-head-label">Time budget</span>
+          <span class="budget-head-value" id="budget-readout">
+            <span id="budget-used">60</span>m used · <span id="budget-slack">0m slack</span>
+          </span>
+        </div>
+        <div class="budget-bar">
+          <div class="budget-fill" id="budget-fill" style="width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="transport-center">
+      <button class="transport-btn" id="transport-rewind" title="Rewind to start">
+        <svg viewBox="0 0 24 24"><polygon points="6 18 6 6 14 12"/><polygon points="14 18 14 6 22 12"/><rect x="3" y="6" width="2" height="12"/></svg>
+      </button>
+      <button class="transport-play" id="transport-play" title="Rehearse the meeting">
+        <svg viewBox="0 0 24 24" id="play-icon"><polygon points="6 4 20 12 6 20"/></svg>
+      </button>
+      <div class="transport-time idle" id="transport-time">14:00:00</div>
+      <button class="transport-btn" id="transport-step" title="Step forward 1 min">
+        <svg viewBox="0 0 24 24"><polygon points="6 4 18 12 6 20"/><rect x="20" y="4" width="2" height="16"/></svg>
+      </button>
+    </div>
+
+    <div class="transport-right">
+      <div class="verdict-pill caveat" id="verdict-pill">
+        <span class="verdict-pill-dot"></span>
+        <span id="verdict-pill-text">GO with caveats</span>
+      </div>
+      <button class="seal-btn" id="seal-btn">
+        <span class="seal-btn-mark">⊙</span>
+        <span>Seal &amp; Begin</span>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Commit overlay -->
+<div class="commit-overlay" id="commit-overlay">
+  <div class="commit-content">
+    <div class="commit-eyebrow">Substrate · committing</div>
+    <h2 class="commit-headline">
+      The rehearsal is sealed.<br/>
+      <em>The meeting begins now.</em>
+    </h2>
+    <div class="commit-meta">
+      <div>Meeting <span class="commit-meta-id">M-2026-05-07-003</span> · sealed at 14:00</div>
+      <div style="margin-top: 4px;">6 agenda clips · 2 anticipated friction events flagged · 1 unresolved conflict</div>
+    </div>
+    <button class="commit-cta" id="commit-cta">
+      Enter Live Capture
+      <span style="font-family: var(--font-mono);">→</span>
+    </button>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   STATE
+   ============================================================================ */
+const state = {
+  // Timeline geometry
+  meetingStartMin: 14 * 60,        // minutes-since-midnight: 14:00 = 840
+  meetingDurationMin: 60,           // 60-min meeting
+  pxPerMin: 14,                      // zoom level
+
+  // Mode
+  mode: 'compose',                   // 'compose' | 'rehearse'
+
+  // Playhead (in minutes from meeting start)
+  playheadMin: 0,
+  playing: false,
+  playSpeed: 4,                      // 4x — one minute per ~250ms
+  rafId: null,
+  lastTickMs: null,
+
+  // Clips on the agenda lane — { id, kind, text, startMin, durMin, substrateId, owner, requires, fresh }
+  clips: [
+    { id: 'C1', kind: 'open', text: 'Open · Phase 1 status carry-forward', startMin: 0, durMin: 5,
+      substrateId: null, owner: 'VS', requires: [] },
+    { id: 'C2', kind: 'decision', text: 'Confirm Olympus CV-1500 supplier', startMin: 5, durMin: 13,
+      substrateId: 'DC-117', owner: 'VS', requires: ['TL', 'SC'], lineage: 'awaiting belief from 3 since 2026-05-01' },
+    { id: 'C3', kind: 'action', text: 'Sterilization tray validation review', startMin: 18, durMin: 12,
+      substrateId: 'AX-091', owner: 'SC', requires: ['SC'], lineage: 'overdue 2d', urgent: true },
+    { id: 'C4', kind: 'decision', text: 'Approve Phase 2 launch criteria', startMin: 30, durMin: 15,
+      substrateId: null, fresh: true, owner: 'VS', requires: ['SC', 'ER'] },
+    { id: 'C5', kind: 'action', text: 'Owner-side cost analysis · platform B', startMin: 45, durMin: 10,
+      substrateId: 'AX-094', owner: 'MR', requires: ['MR', 'SC'], lineage: 'overdue 2d', urgent: true },
+    { id: 'C6', kind: 'wrap', text: 'Wrap · NRA review · next-meeting cadence', startMin: 55, durMin: 5,
+      substrateId: null, owner: 'VS', requires: [] },
+  ],
+
+  // Cards in the deck (not yet placed)
+  deck: [
+    { id: 'D1', kind: 'risk', text: 'FDA 510(k) review window — slip if validation delays continue', est: 8,
+      substrateId: 'RX-014', owner: 'VS', state: 'mitigation pending' },
+    { id: 'D2', kind: 'question', text: 'Reprocessing workflow with new optical fiber routing', est: 6,
+      substrateId: 'QX-007', owner: '', state: 'deferred 2× · needs resolution', urgent: true },
+    { id: 'D3', kind: 'update', text: 'EMI test results · async review per Marcus', est: 5,
+      substrateId: null, fresh: true, owner: 'MR', state: 'async-suggested' },
+    { id: 'D4', kind: 'decision', text: 'Tom\'s dissent on supplier exclusivity', est: 10,
+      substrateId: 'DS-005', owner: 'TL', state: 'dissent open · 22d', urgent: true },
+  ],
+
+  // Attendees with presence windows (in meeting-relative minutes)
+  attendees: [
+    { id: 'VS', name: 'Vaughn Staples', role: 'Operator', presence: { from: 0, to: 60 }, status: 'confirmed' },
+    { id: 'SC', name: 'Sarah Chen', role: 'Engineering Lead', presence: { from: 0, to: 45 }, status: 'confirmed', leavesAt: 45, leavesNote: 'Hard departure · double-booked 14:45' },
+    { id: 'TL', name: 'Tom Liu', role: 'Supplier Ops', presence: { from: 10, to: 60 }, status: 'tentative', joinsAt: 10, joinsNote: 'Likely 10 min late · standing pattern' },
+    { id: 'MR', name: 'Marcus Reed', role: 'Spec Author', presence: { from: 0, to: 60 }, status: 'confirmed' },
+    { id: 'ER', name: 'Elena Rodriguez', role: 'Regulatory', presence: { from: 0, to: 60 }, status: 'tentative', tentativeNote: 'Hasn\'t responded to invite — follow up' },
+  ],
+
+  // Projected friction events (computed from clips + attendees + history)
+  events: [],   // generated dynamically
+
+  // Drag state
+  drag: null,
+};
+
+/* ============================================================================
+   GEOMETRY HELPERS
+   ============================================================================ */
+function minToPx(min) { return min * state.pxPerMin; }
+function pxToMin(px) { return px / state.pxPerMin; }
+function snapMin(min, snap = 1) { return Math.round(min / snap) * snap; }
+function fmtClock(min) {
+  const total = state.meetingStartMin + min;
+  const h = Math.floor(total / 60);
+  const m = Math.floor(total % 60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function fmtClockSec(min) {
+  const totalSec = (state.meetingStartMin + min) * 60;
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = Math.floor(totalSec % 60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+/* ============================================================================
+   ZOOM
+   ============================================================================ */
+function setZoom(px) {
+  state.pxPerMin = Math.max(8, Math.min(28, px));
+  document.documentElement.style.setProperty('--tl-px-per-min', state.pxPerMin + 'px');
+  document.getElementById('zoom-readout').textContent = `${state.pxPerMin} px/min`;
+  renderAll();
+}
+
+/* ============================================================================
+   RENDER — Time ruler
+   ============================================================================ */
+function renderRuler() {
+  const track = document.getElementById('tl-ruler-track');
+  track.innerHTML = '';
+  for (let m = 0; m <= state.meetingDurationMin; m++) {
+    const tick = document.createElement('div');
+    tick.className = 'tl-tick';
+    if (m % 5 === 0) tick.classList.add('tl-tick-major');
+    tick.style.left = minToPx(m) + 'px';
+    track.appendChild(tick);
+
+    if (m % 5 === 0) {
+      const label = document.createElement('div');
+      label.className = 'tl-tick-label';
+      label.style.left = minToPx(m) + 'px';
+      label.textContent = fmtClock(m);
+      track.appendChild(label);
+    }
+  }
+}
+
+/* ============================================================================
+   RENDER — Hard stop
+   ============================================================================ */
+function renderHardStop() {
+  const hs = document.getElementById('tl-hardstop');
+  hs.style.left = `calc(var(--tl-gutter) + ${minToPx(state.meetingDurationMin)}px - 1px)`;
+}
+
+/* ============================================================================
+   RENDER — Attendees lane
+   ============================================================================ */
+function renderAttendees() {
+  const track = document.getElementById('tl-attendees-track');
+  track.innerHTML = '';
+  state.attendees.forEach(a => {
+    const row = document.createElement('div');
+    row.className = `attendee-row ${a.status}`;
+
+    const presence = document.createElement('div');
+    presence.className = 'attendee-presence';
+    if (a.presence.from > 0 || a.presence.to < state.meetingDurationMin) {
+      presence.classList.add('partial');
+    } else {
+      presence.classList.add('full');
+    }
+    presence.style.left = minToPx(a.presence.from) + 'px';
+    presence.style.width = minToPx(a.presence.to - a.presence.from) + 'px';
+    presence.innerHTML = `
+      <span class="attendee-presence-name">${a.name}</span>
+      <span class="attendee-presence-stake">${a.role.toUpperCase()}</span>
+    `;
+    row.appendChild(presence);
+
+    if (a.leavesAt !== undefined) {
+      const lm = document.createElement('div');
+      lm.className = 'attendee-leaves-marker';
+      lm.style.left = minToPx(a.leavesAt) + 'px';
+      lm.title = a.leavesNote;
+      row.appendChild(lm);
+    }
+
+    track.appendChild(row);
+  });
+}
+
+/* ============================================================================
+   RENDER — Agenda clips on the timeline
+   ============================================================================ */
+function renderClips() {
+  const track = document.getElementById('tl-agenda-track');
+  track.innerHTML = '';
+  state.clips.forEach(c => {
+    const clip = document.createElement('div');
+    clip.className = 'clip';
+    clip.dataset.kind = c.kind;
+    clip.dataset.id = c.id;
+    clip.style.left = minToPx(c.startMin) + 'px';
+    clip.style.width = minToPx(c.durMin) + 'px';
+    if (c.durMin <= 6) clip.classList.add('compact');
+
+    const idLabel = c.substrateId
+      ? `<span class="clip-head-id">${c.substrateId}</span>`
+      : (c.fresh ? `<span class="clip-head-id fresh">fresh · ID at seal</span>` : '');
+
+    // Compute requires-met state
+    let needsHtml = '';
+    if (c.requires && c.requires.length > 0) {
+      const requiresMet = c.requires.every(att => {
+        const a = state.attendees.find(x => x.id === att);
+        if (!a) return false;
+        const inWindow = a.presence.from <= c.startMin + c.durMin / 2 && a.presence.to >= c.startMin + c.durMin / 2;
+        return inWindow;
+      });
+      const reqClass = requiresMet ? 'clip-meta-needs' : 'clip-meta-needs unmet';
+      needsHtml = `<span class="${reqClass}">needs ${c.requires.join('·')}</span>`;
+    }
+
+    clip.innerHTML = `
+      <div class="clip-kind-strip"></div>
+      <div class="clip-head">
+        ${idLabel}
+        <span class="clip-head-dur">${c.durMin}m</span>
+      </div>
+      <div class="clip-body">${c.text}</div>
+      <div class="clip-meta">
+        ${c.owner ? `<span class="clip-meta-owner-dot"></span><span>${c.owner}</span>` : ''}
+        ${needsHtml}
+        ${c.lineage ? `<span style="color: var(--ink-mute);">${c.lineage}</span>` : ''}
+      </div>
+      <div class="clip-resize"></div>
+    `;
+    track.appendChild(clip);
+
+    // Drag — move clip body
+    clip.addEventListener('mousedown', e => {
+      if (e.target.classList.contains('clip-resize')) return;
+      startDragMove(clip, c, e);
+    });
+
+    // Resize — drag right edge
+    clip.querySelector('.clip-resize').addEventListener('mousedown', e => {
+      e.stopPropagation();
+      startDragResize(clip, c, e);
+    });
+  });
+
+  document.getElementById('agenda-sub').textContent = `${state.clips.length} clips placed`;
+}
+
+/* ============================================================================
+   RENDER — Projected event markers
+   ============================================================================ */
+function computeEvents() {
+  state.events = [];
+
+  // Tom's late join
+  const tom = state.attendees.find(a => a.id === 'TL');
+  if (tom && tom.joinsAt) {
+    state.events.push({
+      atMin: tom.joinsAt,
+      kind: 'late',
+      title: 'Tom Liu joins',
+      detail: tom.joinsNote
+    });
+  }
+
+  // Sarah leaves
+  const sarah = state.attendees.find(a => a.id === 'SC');
+  if (sarah && sarah.leavesAt) {
+    state.events.push({
+      atMin: sarah.leavesAt,
+      kind: 'leaves',
+      title: 'Sarah Chen leaves',
+      detail: sarah.leavesNote
+    });
+  }
+
+  // Tom likely raises DS-005 dissent if DC-117 supplier discussed
+  const supplierClip = state.clips.find(c => c.substrateId === 'DC-117');
+  if (supplierClip) {
+    state.events.push({
+      atMin: supplierClip.startMin + Math.min(7, Math.floor(supplierClip.durMin * 0.55)),
+      kind: 'dissent',
+      title: 'Tom likely raises DS-005',
+      detail: 'Supplier exclusivity dissent · 22 days open. Per substrate history, Tom raises this within 7 min of supplier topics — typically takes 4–6 min to address.'
+    });
+  }
+
+  // RX-014 FDA risk surfaces with sterilization
+  const sterilClip = state.clips.find(c => c.substrateId === 'AX-091');
+  if (sterilClip) {
+    state.events.push({
+      atMin: sterilClip.startMin + Math.floor(sterilClip.durMin * 0.6),
+      kind: 'risk',
+      title: 'RX-014 FDA timeline',
+      detail: 'FDA 510(k) review window risk likely surfaces in conversation about sterilization protocol. Cause-and-effect derivation per substrate.'
+    });
+  }
+
+  // Conflict: clip requires attendee not present
+  state.clips.forEach(c => {
+    if (!c.requires) return;
+    c.requires.forEach(req => {
+      const a = state.attendees.find(x => x.id === req);
+      if (!a) return;
+      const midpoint = c.startMin + c.durMin / 2;
+      if (a.presence.from > midpoint || a.presence.to < midpoint) {
+        state.events.push({
+          atMin: c.startMin,
+          kind: 'conflict',
+          title: `${a.name} not present`,
+          detail: `Clip "${c.text}" needs ${a.name}, but ${a.name} is ${a.presence.to < midpoint ? `gone by ${fmtClock(a.presence.to)}` : `not arriving until ${fmtClock(a.presence.from)}`}. Consider re-sequencing.`,
+          severity: 'critical',
+          conflictClipId: c.id,
+          conflictAttendee: a.id
+        });
+      }
+    });
+  });
+
+  state.events.sort((a, b) => a.atMin - b.atMin);
+}
+
+function renderEvents() {
+  const track = document.getElementById('tl-events-track');
+  track.innerHTML = '';
+  state.events.forEach((e, idx) => {
+    const m = document.createElement('div');
+    m.className = 'event-marker';
+    m.dataset.eventKind = e.kind;
+    m.dataset.eventIdx = idx;
+    m.style.left = minToPx(e.atMin) + 'px';
+
+    let pinChar = '!';
+    if (e.kind === 'dissent') pinChar = '⚐';
+    if (e.kind === 'risk') pinChar = '▲';
+    if (e.kind === 'conflict') pinChar = '✕';
+    if (e.kind === 'decision') pinChar = '◇';
+    if (e.kind === 'late') pinChar = '⏵';
+    if (e.kind === 'leaves') pinChar = '⏴';
+
+    m.innerHTML = `
+      <div class="event-marker-pin">${pinChar}</div>
+      <div class="event-marker-stem"></div>
+      <div class="event-marker-tooltip">
+        <div class="event-marker-tooltip-title">${fmtClock(e.atMin)} · ${e.kind}</div>
+        <div><strong>${e.title}</strong></div>
+        <div style="margin-top: 4px; color: var(--ink-soft);">${e.detail}</div>
+      </div>
+    `;
+    track.appendChild(m);
+  });
+}
+
+/* ============================================================================
+   RENDER — Deck cards
+   ============================================================================ */
+function renderDeck() {
+  const track = document.getElementById('deck-track');
+  track.innerHTML = '';
+  state.deck.forEach(card => {
+    const el = document.createElement('div');
+    el.className = 'deck-card';
+    el.dataset.kind = card.kind;
+    el.dataset.id = card.id;
+    if (card.placed) el.classList.add('placed');
+
+    const idLabel = card.substrateId
+      ? `<span class="deck-card-id">${card.substrateId}</span>`
+      : `<span class="deck-card-id fresh">fresh</span>`;
+
+    el.innerHTML = `
+      <div class="deck-card-strip"></div>
+      <div class="deck-card-head">
+        ${idLabel}
+        <span class="deck-card-est">${card.est}m est</span>
+      </div>
+      <div class="deck-card-text">${card.text}</div>
+      <div class="deck-card-meta">
+        ${card.owner ? `<span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 4px; height: 4px; border-radius: 50%; background: var(--ink-soft); display: inline-block;"></span>${card.owner}</span>` : ''}
+        <span class="deck-card-meta-state ${card.urgent ? 'urgent' : ''}">${card.state}</span>
+      </div>
+    `;
+    track.appendChild(el);
+
+    if (!card.placed) {
+      el.addEventListener('mousedown', e => startDragFromDeck(el, card, e));
+    }
+  });
+
+  const placed = state.deck.filter(c => c.placed).length;
+  const unplaced = state.deck.length - placed;
+  document.getElementById('deck-count').textContent = `${unplaced} unplaced · ${placed} placed`;
+}
+
+/* ============================================================================
+   RENDER — Narration panel
+   ============================================================================ */
+function renderNarration() {
+  const body = document.getElementById('narration-body');
+  const titleText = document.getElementById('narration-title-text');
+  const modeBadge = document.getElementById('narration-mode');
+
+  if (state.mode === 'compose') {
+    titleText.textContent = 'Pre-flight';
+    modeBadge.textContent = 'COMPOSE';
+    modeBadge.classList.remove('live');
+    renderNarrationCompose(body);
+  } else {
+    titleText.textContent = 'Rehearsal · Moment Stream';
+    modeBadge.textContent = 'REHEARSING';
+    modeBadge.classList.add('live');
+    renderNarrationRehearse(body);
+  }
+}
+
+function renderNarrationCompose(body) {
+  // Compute pre-flight stats
+  const totalAlloc = state.clips.reduce((s, c) => s + c.durMin, 0);
+  const slack = state.meetingDurationMin - totalAlloc;
+  const overrun = -slack;
+  const placedCarry = state.deck.filter(c => c.placed).length;
+  const unplacedCarry = state.deck.length - placedCarry;
+
+  // Find conflicts (clips that need an attendee not present)
+  const conflicts = state.events.filter(e => e.kind === 'conflict');
+
+  // Find hard-stop conflicts (clips extending past 60 min)
+  const overflowClips = state.clips.filter(c => c.startMin + c.durMin > state.meetingDurationMin);
+
+  let html = '';
+
+  // Time budget block
+  html += `<div class="narration-idle-block-label"><span>Time</span><span class="narration-idle-block-label-num">${totalAlloc}m / 60m</span></div>`;
+  html += `<div>`;
+  html += `<div class="idle-stat"><span class="idle-stat-label">Allocated</span><span class="idle-stat-value ${totalAlloc > 60 ? 'alert' : ''}">${totalAlloc} min</span></div>`;
+  html += `<div class="idle-stat"><span class="idle-stat-label">Slack</span><span class="idle-stat-value ${slack < 0 ? 'alert' : (slack < 5 ? 'flag' : 'good')}">${slack >= 0 ? slack + ' min' : (-slack) + ' min over'}</span></div>`;
+  html += `<div class="idle-stat"><span class="idle-stat-label">Hard stop</span><span class="idle-stat-value">15:00</span></div>`;
+  html += `</div>`;
+
+  if (overflowClips.length > 0) {
+    html += `<div class="idle-conflict">`;
+    html += `<div class="idle-conflict-title">⚠ Overflow past hard stop</div>`;
+    html += `<div class="idle-conflict-body">`;
+    overflowClips.forEach(c => {
+      html += `<strong>${c.substrateId || 'fresh'}</strong> ends at ${fmtClock(c.startMin + c.durMin)}, ${c.startMin + c.durMin - state.meetingDurationMin}m past hard stop.<br/>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // Conflicts block
+  if (conflicts.length > 0) {
+    html += `<div class="narration-idle-block-label" style="margin-top: 6px;"><span>Conflicts detected</span><span class="narration-idle-block-label-num" style="color: var(--hardstop);">${conflicts.length}</span></div>`;
+    conflicts.forEach(c => {
+      html += `<div class="idle-conflict">`;
+      html += `<div class="idle-conflict-title">⚠ ${c.title}</div>`;
+      html += `<div class="idle-conflict-body">${c.detail}</div>`;
+      html += `<button class="idle-conflict-fix" onclick="autoFixConflict('${c.conflictClipId}', '${c.conflictAttendee}')">→ AUTO-RESEQUENCE</button>`;
+      html += `</div>`;
+    });
+  }
+
+  // Carry-forward status
+  html += `<div class="narration-idle-block-label" style="margin-top: 6px;"><span>Carry-forward</span><span class="narration-idle-block-label-num">${placedCarry}/${state.deck.length}</span></div>`;
+  if (unplacedCarry > 0) {
+    html += `<div>`;
+    state.deck.filter(c => !c.placed).forEach(c => {
+      html += `<div class="idle-stat"><span class="idle-stat-label">${c.substrateId || 'fresh'} · ${c.text.substring(0, 38)}${c.text.length > 38 ? '…' : ''}</span><span class="idle-stat-value flag">unplaced</span></div>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<div class="idle-empty">All carry-forward items slotted.</div>`;
+  }
+
+  // Anticipated events
+  const friction = state.events.filter(e => e.kind === 'dissent' || e.kind === 'risk');
+  if (friction.length > 0) {
+    html += `<div class="narration-idle-block-label" style="margin-top: 6px;"><span>Anticipated friction</span><span class="narration-idle-block-label-num">${friction.length}</span></div>`;
+    html += `<div>`;
+    friction.forEach(f => {
+      html += `<div class="idle-stat"><span class="idle-stat-label">${fmtClock(f.atMin)} · ${f.title}</span><span class="idle-stat-value">${f.kind}</span></div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div class="idle-empty" style="margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line-faint);">Press <strong style="color: var(--live); font-family: var(--font-mono);">PLAY</strong> to rehearse the meeting before it happens. Watch for projected friction, attendee conflicts, and decisions that won't have time to seal.</div>`;
+
+  body.innerHTML = html;
+}
+
+function renderNarrationRehearse(body) {
+  // Build moment list combining clips and events, sorted by time
+  const moments = [];
+
+  state.clips.forEach(c => {
+    moments.push({
+      atMin: c.startMin,
+      kind: 'clip-start',
+      clip: c,
+      text: clipMomentText(c, 'start')
+    });
+    if (c.durMin > 4) {
+      moments.push({
+        atMin: c.startMin + Math.floor(c.durMin / 2),
+        kind: 'clip-mid',
+        clip: c,
+        text: clipMomentText(c, 'mid')
+      });
+    }
+  });
+
+  state.events.forEach(e => {
+    moments.push({
+      atMin: e.atMin,
+      kind: 'event',
+      event: e,
+      text: eventMomentText(e)
+    });
+  });
+
+  moments.sort((a, b) => a.atMin - b.atMin);
+
+  let html = '';
+  moments.forEach((m, idx) => {
+    let cls = 'moment';
+    if (m.atMin > state.playheadMin + 0.5) cls += ' upcoming';
+    else if (m.atMin < state.playheadMin - 1) cls += ' past';
+    html += `<div class="${cls}" data-moment-idx="${idx}">`;
+    html += `<div class="moment-time">${fmtClock(m.atMin)}</div>`;
+    html += `<div class="moment-body">${m.text}</div>`;
+    html += `</div>`;
+  });
+
+  // Verdict at end if rehearsal complete
+  if (state.playheadMin >= state.meetingDurationMin - 0.5) {
+    const verdict = computeVerdict();
+    html += `<div class="live-verdict ${verdict.tier}">`;
+    html += `<div class="live-verdict-label">${verdict.label}</div>`;
+    html += `<div class="live-verdict-summary">${verdict.summary}</div>`;
+    html += `</div>`;
+  }
+
+  body.innerHTML = html;
+
+  // Auto-scroll to current moment
+  const current = body.querySelector(`.moment:not(.upcoming)`);
+  if (current && state.playing) {
+    const lastNonUpcoming = body.querySelectorAll(`.moment:not(.upcoming)`);
+    if (lastNonUpcoming.length > 0) {
+      const target = lastNonUpcoming[lastNonUpcoming.length - 1];
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+}
+
+function clipMomentText(c, phase) {
+  if (c.kind === 'open') return `<span class="moment-tag late">OPEN</span>${c.text}. Vaughn opens; Phase 1 success referenced; tone-setting.`;
+  if (c.kind === 'wrap') return `<span class="moment-tag late">WRAP</span>${c.text}. NRA pass over each thread; cadence for next meeting confirmed.`;
+  if (phase === 'start') {
+    if (c.substrateId) {
+      return `<span class="id">${c.substrateId}</span> opens. <span class="name">${ownerName(c.owner)}</span> takes lead. ${c.text}.`;
+    } else {
+      return `Fresh thread opens: ${c.text}. <span class="name">${ownerName(c.owner)}</span> introduces.`;
+    }
+  } else {
+    // mid
+    if (c.kind === 'decision') return `Decision pressure point. <em>${c.requires ? 'needs ' + c.requires.map(ownerName).join(', ') : ''}</em>. Convergence likely if no friction.`;
+    if (c.kind === 'action') return `Action assignment phase. Owner-confirmation moment.`;
+    return ``;
+  }
+}
+
+function eventMomentText(e) {
+  let tag = `<span class="moment-tag ${e.kind}">${e.kind.toUpperCase()}</span>`;
+  return `${tag}<strong>${e.title}.</strong> ${e.detail}`;
+}
+
+function ownerName(id) {
+  const a = state.attendees.find(x => x.id === id);
+  return a ? a.name : id;
+}
+
+function computeVerdict() {
+  const totalAlloc = state.clips.reduce((s, c) => s + c.durMin, 0);
+  const slack = state.meetingDurationMin - totalAlloc;
+  const conflicts = state.events.filter(e => e.kind === 'conflict');
+  const overflow = state.clips.filter(c => c.startMin + c.durMin > state.meetingDurationMin);
+
+  if (conflicts.length === 0 && overflow.length === 0 && slack >= 5) {
+    return {
+      tier: 'go',
+      label: 'GO · Cleared for rehearsal',
+      summary: `60 min meeting · ${totalAlloc}m allocated · ${slack}m slack · all attendee dependencies satisfied · no projected friction unaddressed. Press <strong>SEAL & BEGIN</strong> to commit.`
+    };
+  } else if (conflicts.length > 0) {
+    return {
+      tier: 'stop',
+      label: 'NOT READY · Resequence required',
+      summary: `${conflicts.length} attendee conflict${conflicts.length > 1 ? 's' : ''} detected. ${conflicts[0].detail} <br/><br/>Resolve in Compose mode or accept the conflict explicitly.`
+    };
+  } else {
+    return {
+      tier: 'caveat',
+      label: 'GO with caveats',
+      summary: `${totalAlloc}m allocated against 60m hard stop · ${slack >= 0 ? slack + 'm slack' : Math.abs(slack) + 'm overrun'}. ${overflow.length > 0 ? overflow.length + ' clip(s) extend past hard stop. ' : ''}Substrate dependencies met but agenda is tight.`
+    };
+  }
+}
+
+/* ============================================================================
+   PLAYHEAD + PLAYBACK
+   ============================================================================ */
+function renderPlayhead() {
+  const ph = document.getElementById('tl-playhead');
+  ph.style.left = `calc(var(--tl-gutter) + ${minToPx(state.playheadMin)}px)`;
+  document.getElementById('tl-playhead-readout').textContent = fmtClock(state.playheadMin);
+
+  // Update transport time
+  document.getElementById('transport-time').textContent = fmtClockSec(state.playheadMin);
+
+  // Mark currently-playing clip
+  document.querySelectorAll('.clip').forEach(el => el.classList.remove('now-playing'));
+  if (state.mode === 'rehearse' && state.playing) {
+    state.clips.forEach(c => {
+      if (state.playheadMin >= c.startMin && state.playheadMin < c.startMin + c.durMin) {
+        const el = document.querySelector(`.clip[data-id="${c.id}"]`);
+        if (el) el.classList.add('now-playing');
+      }
+    });
+  }
+
+  // Mark events that have fired
+  document.querySelectorAll('.event-marker').forEach(el => {
+    const idx = parseInt(el.dataset.eventIdx);
+    const e = state.events[idx];
+    if (e && state.playheadMin >= e.atMin) {
+      el.classList.add('fired');
+    } else {
+      el.classList.remove('fired');
+    }
+  });
+}
+
+function setPlayhead(min) {
+  state.playheadMin = Math.max(0, Math.min(state.meetingDurationMin, min));
+  renderPlayhead();
+  if (state.mode === 'rehearse') renderNarration();
+}
+
+function play() {
+  if (state.mode !== 'rehearse') {
+    setMode('rehearse');
+  }
+  state.playing = true;
+  state.lastTickMs = performance.now();
+  document.getElementById('tl-playhead').classList.add('active');
+  document.getElementById('transport-play').classList.add('playing');
+  document.getElementById('transport-time').classList.remove('idle');
+  document.getElementById('play-icon').innerHTML = `<rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/>`;
+  document.getElementById('tl').classList.add('dimmed');
+  loop();
+}
+
+function pause() {
+  state.playing = false;
+  if (state.rafId) cancelAnimationFrame(state.rafId);
+  document.getElementById('transport-play').classList.remove('playing');
+  document.getElementById('play-icon').innerHTML = `<polygon points="6 4 20 12 6 20"/>`;
+  document.getElementById('tl').classList.remove('dimmed');
+}
+
+function rewind() {
+  pause();
+  setPlayhead(0);
+  document.getElementById('tl-playhead').classList.remove('active');
+  document.getElementById('transport-time').classList.add('idle');
+  document.getElementById('transport-time').textContent = fmtClockSec(0);
+}
+
+function loop() {
+  if (!state.playing) return;
+  const now = performance.now();
+  const dt = (now - state.lastTickMs) / 1000;     // seconds
+  state.lastTickMs = now;
+  // Advance: 1 simulated minute per (1/playSpeed) seconds. Default 4x = 250ms/min.
+  const dMin = dt * state.playSpeed;
+  setPlayhead(state.playheadMin + dMin);
+
+  if (state.playheadMin >= state.meetingDurationMin) {
+    state.playheadMin = state.meetingDurationMin;
+    renderPlayhead();
+    pause();
+    renderNarration();
+    return;
+  }
+  state.rafId = requestAnimationFrame(loop);
+}
+
+/* ============================================================================
+   MODE SWITCHING
+   ============================================================================ */
+function setMode(mode) {
+  state.mode = mode;
+  document.querySelectorAll('.mode-tab').forEach(t => {
+    const isActive = t.dataset.mode === mode;
+    t.classList.toggle('active', isActive);
+    t.classList.toggle('live-mode', isActive && mode === 'rehearse');
+  });
+  if (mode === 'compose') {
+    pause();
+    state.playheadMin = 0;
+    document.getElementById('tl-playhead').classList.remove('active');
+    document.getElementById('transport-time').classList.add('idle');
+  }
+  renderNarration();
+}
+
+/* ============================================================================
+   DRAG & DROP
+   ============================================================================ */
+function startDragMove(clipEl, clipData, e) {
+  e.preventDefault();
+  const trackRect = document.getElementById('tl-agenda-track').getBoundingClientRect();
+  const offsetX = e.clientX - clipEl.getBoundingClientRect().left;
+  state.drag = {
+    type: 'move', clipEl, clipData,
+    trackRect, offsetX,
+    originalStart: clipData.startMin
+  };
+  clipEl.classList.add('dragging');
+  document.body.classList.add('no-select');
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', onDragUp);
+}
+
+function startDragResize(clipEl, clipData, e) {
+  e.preventDefault();
+  const trackRect = document.getElementById('tl-agenda-track').getBoundingClientRect();
+  state.drag = {
+    type: 'resize', clipEl, clipData,
+    trackRect,
+    originalDur: clipData.durMin,
+    startX: e.clientX
+  };
+  document.body.classList.add('no-select');
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', onDragUp);
+}
+
+function startDragFromDeck(cardEl, cardData, e) {
+  e.preventDefault();
+  // We'll create a ghost clip on the timeline as the user drags
+  state.drag = {
+    type: 'fromDeck', cardEl, cardData,
+    ghostEl: null,
+    placed: false
+  };
+  cardEl.classList.add('dragging');
+  document.body.classList.add('no-select');
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', onDragUp);
+}
+
+function onDragMove(e) {
+  if (!state.drag) return;
+  const d = state.drag;
+
+  if (d.type === 'move') {
+    const trackRect = document.getElementById('tl-agenda-track').getBoundingClientRect();
+    const newLeft = e.clientX - trackRect.left - d.offsetX;
+    const newStart = snapMin(pxToMin(newLeft), 1);
+    const clamped = Math.max(0, Math.min(state.meetingDurationMin - d.clipData.durMin, newStart));
+    d.clipData.startMin = clamped;
+    d.clipEl.style.left = minToPx(clamped) + 'px';
+  }
+  else if (d.type === 'resize') {
+    const dx = e.clientX - d.startX;
+    const dMin = snapMin(pxToMin(dx), 1);
+    const newDur = Math.max(2, d.originalDur + dMin);
+    const maxDur = state.meetingDurationMin - d.clipData.startMin;
+    d.clipData.durMin = Math.min(maxDur, newDur);
+    d.clipEl.style.width = minToPx(d.clipData.durMin) + 'px';
+    // update head dur readout
+    const hd = d.clipEl.querySelector('.clip-head-dur');
+    if (hd) hd.textContent = d.clipData.durMin + 'm';
+  }
+  else if (d.type === 'fromDeck') {
+    const trackRect = document.getElementById('tl-agenda-track').getBoundingClientRect();
+    const overTrack = (
+      e.clientX >= trackRect.left && e.clientX <= trackRect.right &&
+      e.clientY >= trackRect.top - 20 && e.clientY <= trackRect.bottom + 20
+    );
+    if (overTrack && !d.ghostEl) {
+      // create ghost
+      const ghost = document.createElement('div');
+      ghost.className = 'clip dragging';
+      ghost.dataset.kind = d.cardData.kind;
+      ghost.style.opacity = '0.7';
+      ghost.style.pointerEvents = 'none';
+      ghost.innerHTML = `
+        <div class="clip-kind-strip"></div>
+        <div class="clip-head">
+          <span class="clip-head-id ${d.cardData.substrateId ? '' : 'fresh'}">${d.cardData.substrateId || 'fresh'}</span>
+          <span class="clip-head-dur">${d.cardData.est}m</span>
+        </div>
+        <div class="clip-body">${d.cardData.text}</div>
+      `;
+      ghost.style.width = minToPx(d.cardData.est) + 'px';
+      document.getElementById('tl-agenda-track').appendChild(ghost);
+      d.ghostEl = ghost;
+    }
+    if (overTrack && d.ghostEl) {
+      const newLeft = e.clientX - trackRect.left - minToPx(d.cardData.est) / 2;
+      const newStart = snapMin(pxToMin(newLeft), 1);
+      const clamped = Math.max(0, Math.min(state.meetingDurationMin - d.cardData.est, newStart));
+      d.ghostEl.style.left = minToPx(clamped) + 'px';
+      d.targetStart = clamped;
+      d.willPlace = true;
+    } else if (!overTrack && d.ghostEl) {
+      d.ghostEl.remove();
+      d.ghostEl = null;
+      d.willPlace = false;
+    }
+  }
+}
+
+function onDragUp(e) {
+  if (!state.drag) return;
+  const d = state.drag;
+
+  if (d.type === 'move') {
+    d.clipEl.classList.remove('dragging');
+  }
+  else if (d.type === 'fromDeck') {
+    d.cardEl.classList.remove('dragging');
+    if (d.ghostEl) d.ghostEl.remove();
+    if (d.willPlace) {
+      // Convert deck card into a clip on the timeline
+      const card = d.cardData;
+      card.placed = true;
+      state.clips.push({
+        id: 'C-' + card.id,
+        kind: card.kind,
+        text: card.text,
+        startMin: d.targetStart,
+        durMin: card.est,
+        substrateId: card.substrateId,
+        owner: card.owner,
+        requires: card.owner ? [card.owner] : [],
+        lineage: card.state,
+        urgent: card.urgent,
+        fresh: !card.substrateId,
+      });
+    }
+  }
+
+  document.body.classList.remove('no-select');
+  document.removeEventListener('mousemove', onDragMove);
+  document.removeEventListener('mouseup', onDragUp);
+  state.drag = null;
+  // Re-render the timeline (rebuild clips, re-compute events)
+  computeEvents();
+  renderClips();
+  renderEvents();
+  renderDeck();
+  renderNarration();
+  updateBudget();
+  updateVerdictPill();
+}
+
+/* ============================================================================
+   AUTO-FIX CONFLICT (called from idle-conflict-fix button in narration)
+   ============================================================================ */
+window.autoFixConflict = function(clipId, attendeeId) {
+  const clip = state.clips.find(c => c.id === clipId);
+  const attendee = state.attendees.find(a => a.id === attendeeId);
+  if (!clip || !attendee) return;
+
+  // Find a window where the attendee is present
+  // For Sarah leaves at 45: move clip to before 45 - durMin
+  if (attendee.leavesAt !== undefined) {
+    const newStart = Math.max(0, attendee.leavesAt - clip.durMin);
+    // Try to find empty space; for the demo, just swap with another clip
+    // Find another clip occupying that window
+    const other = state.clips.find(c => c.id !== clip.id && c.startMin < newStart + clip.durMin && c.startMin + c.durMin > newStart);
+    if (other) {
+      // Swap their start times
+      const tmp = clip.startMin;
+      clip.startMin = other.startMin;
+      other.startMin = tmp + (clip.durMin - other.durMin);
+      // Re-sort by startMin (just for cleanliness, not strictly necessary)
+    } else {
+      clip.startMin = newStart;
+    }
+  } else if (attendee.joinsAt !== undefined) {
+    clip.startMin = Math.max(clip.startMin, attendee.joinsAt);
+  }
+
+  // Recompute and rerender
+  computeEvents();
+  renderClips();
+  renderEvents();
+  renderNarration();
+  updateBudget();
+  updateVerdictPill();
+};
+
+/* ============================================================================
+   TIME BUDGET + VERDICT PILL
+   ============================================================================ */
+function updateBudget() {
+  const totalAlloc = state.clips.reduce((s, c) => s + c.durMin, 0);
+  const slack = state.meetingDurationMin - totalAlloc;
+  document.getElementById('budget-used').textContent = totalAlloc;
+  const slackEl = document.getElementById('budget-slack');
+  if (slack >= 0) {
+    slackEl.innerHTML = `<span class="${slack < 5 ? 'live' : ''}">${slack}m slack</span>`;
+  } else {
+    slackEl.innerHTML = `<span class="alert">${-slack}m over</span>`;
+  }
+  const fillPct = Math.min(100, (totalAlloc / state.meetingDurationMin) * 100);
+  const fill = document.getElementById('budget-fill');
+  fill.style.width = fillPct + '%';
+  fill.classList.toggle('over', totalAlloc > state.meetingDurationMin);
+}
+
+function updateVerdictPill() {
+  const v = computeVerdict();
+  const pill = document.getElementById('verdict-pill');
+  pill.classList.remove('go', 'caveat', 'stop');
+  pill.classList.add(v.tier);
+  document.getElementById('verdict-pill-text').textContent = v.label;
+}
+
+/* ============================================================================
+   MASTER RENDER
+   ============================================================================ */
+function renderAll() {
+  renderRuler();
+  renderHardStop();
+  renderAttendees();
+  computeEvents();
+  renderClips();
+  renderEvents();
+  renderDeck();
+  renderNarration();
+  renderPlayhead();
+  updateBudget();
+  updateVerdictPill();
+}
+
+/* ============================================================================
+   EVENT LISTENERS
+   ============================================================================ */
+document.querySelectorAll('.mode-tab').forEach(t => {
+  t.addEventListener('click', () => setMode(t.dataset.mode));
+});
+
+document.getElementById('zoom-in').addEventListener('click', () => setZoom(state.pxPerMin + 2));
+document.getElementById('zoom-out').addEventListener('click', () => setZoom(state.pxPerMin - 2));
+
+document.getElementById('transport-play').addEventListener('click', () => {
+  if (state.playing) pause();
+  else play();
+});
+
+document.getElementById('transport-rewind').addEventListener('click', () => {
+  rewind();
+});
+
+document.getElementById('transport-step').addEventListener('click', () => {
+  if (state.mode !== 'rehearse') setMode('rehearse');
+  document.getElementById('tl-playhead').classList.add('active');
+  document.getElementById('transport-time').classList.remove('idle');
+  setPlayhead(state.playheadMin + 1);
+});
+
+// Click anywhere on timeline to scrub
+document.getElementById('tl-wrap').addEventListener('click', (e) => {
+  if (state.drag) return;
+  // Only scrub if click is in the timeline area (not on a clip)
+  if (e.target.closest('.clip') || e.target.closest('.deck-card') || e.target.closest('.event-marker')) return;
+  const rulerRect = document.getElementById('tl-ruler-track').getBoundingClientRect();
+  if (e.clientY < rulerRect.top - 20 || e.clientY > rulerRect.top + 600) return;
+  if (e.clientX < rulerRect.left || e.clientX > rulerRect.right) return;
+
+  const min = pxToMin(e.clientX - rulerRect.left);
+  if (state.mode !== 'rehearse') setMode('rehearse');
+  document.getElementById('tl-playhead').classList.add('active');
+  document.getElementById('transport-time').classList.remove('idle');
+  setPlayhead(min);
+});
+
+// Seal button
+document.getElementById('seal-btn').addEventListener('click', () => {
+  document.getElementById('commit-overlay').classList.add('active');
+});
+document.getElementById('commit-cta').addEventListener('click', () => {
+  document.getElementById('commit-overlay').classList.remove('active');
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'c' || e.key === 'C') setMode('compose');
+  if (e.key === 'r' || e.key === 'R') setMode('rehearse');
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (state.playing) pause(); else play();
+  }
+  if (e.key === 'Escape' && document.getElementById('commit-overlay').classList.contains('active')) {
+    document.getElementById('commit-overlay').classList.remove('active');
+  }
+});
+
+/* ============================================================================
+   INITIAL RENDER
+   ============================================================================ */
+renderAll();
+
+</script>
+
+</body>
+</html>
