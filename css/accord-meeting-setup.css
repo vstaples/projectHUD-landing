@@ -498,17 +498,29 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   letter-spacing: 1.4px;
   text-transform: uppercase;
 }
-.ac-outcomes-add-btn {
-  font-family: var(--ac-font-mono);
-  font-size: 9px;
-  color: var(--ac-cyan);
+/* X-40: old top-right link — kept for any residual references, hidden by default */
+.ac-outcomes-add-btn { display: none; }
+/* X-40: dashed add-row at bottom of outcomes list — matches agenda composer pattern */
+.ac-outcomes-add-row {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 10px;
   background: none;
-  border: none;
+  border: 1px dashed var(--ac-border-mid);
+  border-radius: 4px;
+  color: var(--ac-text-tertiary);
+  font-family: var(--ac-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-align: left;
   cursor: pointer;
-  letter-spacing: 0.8px;
-  padding: 0;
+  transition: border-color 120ms, color 120ms;
 }
-.ac-outcomes-add-btn:hover { text-decoration: underline; }
+.ac-outcomes-add-row:hover {
+  border-color: var(--ac-cyan);
+  color: var(--ac-cyan);
+}
 .ac-outcomes-empty {
   font-size: 12px;
   color: var(--ac-text-tertiary);
@@ -1337,7 +1349,16 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 
 /* Prep prompt */
-.ac-prep-prompt-strip { padding: 0 18px 10px 18px; }
+/* X-40: dissent banner sticky to bottom of center column tab body.
+   Sits above the agenda composer so it doesn't interrupt the
+   Outcomes → Agenda reading flow. */
+.ac-prep-prompt-strip {
+  padding: 0 18px 10px 18px;
+  position: sticky;
+  bottom: 0;
+  background: var(--ac-bg-pane);
+  z-index: 5;
+}
 .ac-prep-prompt {
   display: flex; align-items: center; gap: 8px;
   background: var(--ac-amber-dim);
@@ -1356,11 +1377,14 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-prep-dismiss:hover { color: var(--ac-amber); }
 .ac-prep-more { font-family: var(--ac-font-mono); font-size: 9px; margin-top: 4px; padding-left: 4px; }
 
-/* Agenda header */
+/* Agenda header — X-40: top border acts as section separator between
+   Outcomes and Agenda regions. 16px vertical breathing room on each side. */
 .ac-agenda-container { display: flex; flex-direction: column; }
 .ac-agenda-header {
   display: flex; align-items: baseline; justify-content: space-between;
-  padding: 12px 18px 8px 18px;
+  padding: 16px 18px 8px 18px;
+  border-top: 1px solid var(--ac-border-subtle);
+  margin-top: 8px;
 }
 .ac-agenda-label { font-family: var(--ac-font-mono); font-size: 9px; color: var(--ac-text-tertiary); letter-spacing: 1.4px; text-transform: uppercase; }
 .ac-agenda-stats { font-family: var(--ac-font-mono); font-size: 9px; }

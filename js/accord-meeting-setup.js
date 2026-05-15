@@ -1516,9 +1516,6 @@
     var isRunning = meeting.state !== 'idle';
     var html = '<div class="ac-outcomes-header">';
     html += '<span class="ac-outcomes-label">INTENDED OUTCOMES</span>';
-    if (!isRunning) {
-      html += '<button class="ac-outcomes-add-btn" data-action="add-outcome">+ Add outcome</button>';
-    }
     html += '</div>';
     html += '<div class="ac-outcomes-list" id="ac-outcomes-list">';
 
@@ -1528,6 +1525,14 @@
       outcomes.forEach(function(o) {
         html += _outcomeRowHtml(o, isRunning);
       });
+    }
+
+    // X-40: + Add outcome moved from header (top-right link) to dashed
+    // row at bottom of list — matches the Agenda add-item composer pattern
+    // so both sections use the same interaction language.
+    if (!isRunning) {
+      html += '<button class="ac-outcomes-add-row" data-action="add-outcome">' +
+              '+ Add outcome</button>';
     }
 
     html += '</div>';
