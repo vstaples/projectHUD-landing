@@ -3602,10 +3602,10 @@
   }
 
   // C-11: Resolve created_by user_ids on a list of node-like rows to
-  // resource id + name. Mutates each row to add _owner_name and
-  // _owner_resource_id. Returns the same array for chaining.
-  // Used by prior actions, prior decisions, and annotations.
-  function _resolveOwnerNames(rows, userIdField) {
+  // resource id + name. Returns a Promise.
+  // Named _resolveNodeOwnerNames to avoid colliding with the pre-existing
+  // _resolveOwnerNames(outcomes, callback) function used by the outcomes path.
+  function _resolveNodeOwnerNames(rows, userIdField) {
     if (!rows || !rows.length) return Promise.resolve(rows);
     var userIds = [];
     rows.forEach(function(r) {
@@ -3645,7 +3645,7 @@
         nodes = nodes || [];
         // C-11: resolve owner names so prior action rows can render
         // a percolate-owner span.
-        return _resolveOwnerNames(nodes, 'created_by').then(function(enriched) {
+        return _resolveNodeOwnerNames(nodes, 'created_by').then(function(enriched) {
           var now = Date.now();
           var weekMs = 7 * 24 * 60 * 60 * 1000;
           var overdue = 0, dueThisWeek = 0;
@@ -3677,7 +3677,7 @@
         '&limit=12'
       ).then(function(nodes) {
         // C-11: resolve owner names for percolate-owner spans on decision rows.
-        return _resolveOwnerNames(nodes || [], 'created_by');
+        return _resolveNodeOwnerNames(nodes || [], 'created_by');
       });
     }).catch(function() { return []; });
   }
@@ -3706,7 +3706,7 @@
           // Assumes declared_by is a user_id (consistent with accord_nodes.created_by).
           // If schema treats declared_by as a resource_id, owner name will simply
           // not resolve and span will not render — graceful degradation.
-          return _resolveOwnerNames(rows || [], 'declared_by');
+          return _resolveNodeOwnerNames(rows || [], 'declared_by');
         });
       });
     }).catch(function() { return []; });
@@ -4386,7 +4386,7 @@
       ).then(function(nodes) {
         // C-11: resolve owner names so decision rows can rise/fade
         // when a person is percolated (ST-10).
-        return _resolveOwnerNames(nodes || [], 'created_by');
+        return _resolveNodeOwnerNames(nodes || [], 'created_by');
       });
     }).then(function(nodes) {
       if (!nodes) return;
