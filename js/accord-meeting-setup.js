@@ -1294,6 +1294,7 @@
       shell.style.setProperty('--ac-rose',           t.risk);
       shell.style.setProperty('--ac-violet',         t.violet);
       shell.style.setProperty('--ac-green',          t.mint);
+      shell.style.setProperty('--ac-bg-tile',        t.tileBg);
       shell.style.setProperty('--ac-text-primary',   t.textPrimary);
       shell.style.setProperty('--ac-text-secondary', t.textSecondary);
     }
