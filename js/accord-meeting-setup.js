@@ -1393,6 +1393,8 @@
   }
 
   function _onFilmHandleMouseDown(ev) {
+    // X-45: no-op when collapsed — prevents drag from fighting the collapse state
+    if (localStorage.getItem('accord-film-collapsed') === '1') return;
     var handle = ev.currentTarget;
     var strip  = document.querySelector('.ac-setup-filmstrip');
     if (!strip) return;
@@ -3357,8 +3359,8 @@
           localStorage.setItem('accord-film-collapsed', '1');
           if (filmTrack) filmTrack.style.display = 'none';
           if (arrow) arrow.textContent = '\u25b8';
-          // Shrink grid row to header-only height
-          if (shell) _setShellFilmstripRow(shell, 32);
+          // Shrink grid row to header height (32px) + handle (8px)
+          if (shell) _setShellFilmstripRow(shell, 40);
         }
         return;
       }

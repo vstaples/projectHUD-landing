@@ -889,9 +889,13 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 /* Header */
 .ac-film-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  padding: 0 12px;
+  height: 32px;
+  /* X-45: always visible — even in compact/collapsed state */
+  min-height: 32px;
 }
 .ac-film-label {
   font-family: var(--ac-font-mono);
@@ -1066,7 +1070,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 
 /* Density state adaptation (§6) */
 .ac-setup-filmstrip[data-density="compact"] .ac-film-counts { display: none; }
-.ac-setup-filmstrip[data-density="compact"] .ac-film-header { display: none; }
+.ac-setup-filmstrip[data-density="compact"] .ac-film-label { /* header stays visible in compact */ }
 .ac-setup-filmstrip[data-density="expanded"] .ac-film-frame { /* height scales with zone */ }
 
 /* Scrub overlay */
