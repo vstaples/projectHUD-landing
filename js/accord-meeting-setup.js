@@ -4158,6 +4158,11 @@
   }
 
   function _wireBriefingEvents(tabbody, meeting) {
+    // X-44: guard against stacking duplicate listeners on every tab switch.
+    // Without this, each visit to the Briefing tab adds another click handler;
+    // odd-numbered clicks set display:none, even-numbered immediately reset it.
+    if (tabbody.dataset.briefingWired) return;
+    tabbody.dataset.briefingWired = '1';
     tabbody.addEventListener('click', function(ev) {
       // Click on existing saved briefing text opens edit (no data-action needed)
       if (ev.target.closest('.ac-briefing-synthesis-text')) {
