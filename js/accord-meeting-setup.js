@@ -4030,10 +4030,10 @@
       html += '<div class="ac-muted">No prior actions in this workstream.</div>';
     } else {
       var overdueSuffix = actionsSummary.overdue > 0
-        ? ' \u00b7 <span class="ac-briefing-actions-count--alert">' + actionsSummary.overdue + ' overdue</span>'
+        ? ' <span class="ac-briefing-actions-count--alert">' + actionsSummary.overdue + ' overdue</span>'
         : '';
       var weekSuffix = actionsSummary.dueThisWeek > 0
-        ? ' \u00b7 <span class="ac-muted">' + actionsSummary.dueThisWeek + ' due this week</span>'
+        ? ' <span class="ac-muted">' + actionsSummary.dueThisWeek + ' due this week</span>'
         : '';
       html += '<div class="ac-briefing-section-label ac-briefing-section-toggle" ' +
               'data-action="toggle-actions-detail">' +
@@ -6815,20 +6815,18 @@
     html += '<div class="ac-action-summary">' +
             esc((action.summary || '').slice(0, 80)) + '</div>';
 
-    if (action._owner_name) {
-      // C-11: data-owner-id + data-action="percolate-owner" on the
-      // owner div makes the chip itself the click target for percolate.
-      html += '<div class="ac-action-owner" data-owner-id="' +
-              esc(action._owner_resource_id || '') +
-              '" data-action="percolate-owner">' +
-              esc(action._owner_name) + '</div>';
-    }
-
     if (slack !== null) {
       var slackText = isPast ? Math.abs(slack) + 'd overdue'
                     : slack === 0 ? 'due today'
                     : slack + 'd';
       html += '<div class="ac-action-slack ' + slackCls + '">' + esc(slackText) + '</div>';
+    }
+
+    if (action._owner_name) {
+      html += '<div class="ac-action-owner" data-owner-id="' +
+              esc(action._owner_resource_id || '') +
+              '" data-action="percolate-owner">' +
+              esc(action._owner_name) + '</div>';
     }
 
     html += '</div>';
