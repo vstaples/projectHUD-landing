@@ -1,12 +1,18 @@
 // ============================================================
 // accord-meeting-setup.js — Meeting Setup surface
 // CMD-ACCORD-MEETING-SETUP-1 Phase 2 + Phase 3 + Phase 4
+// CMD-ACCORD-SETUP-PERCOLATE-1 (C-11) · 2026-05-14
 //
 // Phase 2: shell chrome, Begin Meeting.
 // Phase 3: agenda render, add-item, reorder, pull-as-thread.
 // Phase 4: briefing two-state (mechanical default + override);
 //          agenda separator + typed pulled badges;
 //          pulled_from_tag on INSERT.
+// C-11:    insertBefore-based percolate reorder; Escape teardown;
+//          briefing-column trigger source; original-order snapshot
+//          restoration on clear; data-owner-id on outcome/action/
+//          briefing owner references; tab-switch re-application
+//          on left-column tabs.
 //
 // Exposes: window.AccordMeetingSetup = { render, teardown }
 // ============================================================
@@ -142,6 +148,8 @@
   // ── CMD-ACCORD-SETUP-PERCOLATE-1: percolate state ─────────────
   var _percolateResourceId   = null;   // active filter; null = no filter
   var _percolateResourceName = null;   // display name for pill
+  var _percolateEscHandler   = null;   // C-11: named ref for ESC teardown
+  var _percolateSnapshots    = null;   // C-11: original DOM order snapshot
 
   // ── CMD-ACCORD-SETUP-GATHERING-1: gathering mode state (C-12) ─
   var _gatheringMode     = false;      // is gathering mode currently active
@@ -291,8 +299,10 @@
     _pickerViewYear  = null;
     _pickerViewMonth = null;
 
-    // ── CMD-ACCORD-SETUP-PERCOLATE-1: percolate teardown ─────────
-    _clearPercolate();
+    // ── CMD-ACCORD-SETUP-PERCOLATE-1 (C-11): percolate teardown ──
+    // _teardownPercolate removes the ESC keydown listener and then
+    // delegates to _clearPercolate for class/order/snapshot cleanup.
+    _teardownPercolate();
 
     // ── CMD-ACCORD-SETUP-GATHERING-1 (C-12): teardown (§10) ──────
     _stopGatheringTimer();
@@ -1545,8 +1555,13 @@
     }
 
     if (o.owner_resource_id && o._owner_name) {
+      // C-11: data-owner-id + data-action="percolate-owner" are the
+      // canonical attributes the percolate-owner click handler matches.
+      // data-resource-id retained for legacy code paths.
       html += '<span class="ac-outcome-owner" data-resource-id="' +
-              esc(o.owner_resource_id) + '">' + esc(o._owner_name) + '</span>';
+              esc(o.owner_resource_id) + '" data-owner-id="' +
+              esc(o.owner_resource_id) + '" data-action="percolate-owner">' +
+              esc(o._owner_name) + '</span>';
     }
 
     if (o.condition) {
@@ -3586,6 +3601,32 @@
     }).catch(function() { return null; });
   }
 
+  // C-11: Resolve created_by user_ids on a list of node-like rows to
+  // resource id + name. Mutates each row to add _owner_name and
+  // _owner_resource_id. Returns the same array for chaining.
+  // Used by prior actions, prior decisions, and annotations.
+  function _resolveOwnerNames(rows, userIdField) {
+    if (!rows || !rows.length) return Promise.resolve(rows);
+    var userIds = [];
+    rows.forEach(function(r) {
+      var uid = r[userIdField];
+      if (uid && userIds.indexOf(uid) === -1) userIds.push(uid);
+    });
+    if (!userIds.length) return Promise.resolve(rows);
+    return API.get(
+      'resources?user_id=in.(' + userIds.join(',') + ')&select=id,name,user_id'
+    ).then(function(resources) {
+      var map = {};
+      (resources || []).forEach(function(rec) { map[rec.user_id] = rec; });
+      rows.forEach(function(r) {
+        var rec = map[r[userIdField]];
+        r._owner_name        = rec ? rec.name : null;
+        r._owner_resource_id = rec ? rec.id   : null;
+      });
+      return rows;
+    }).catch(function() { return rows; });
+  }
+
   function _fetchPriorActionsSummary(currentMeetingId, workstreamId) {
     return API.get(
       'accord_meetings?workstream_id=eq.' + workstreamId +
@@ -3602,16 +3643,20 @@
         '&order=due_date.asc.nullslast'
       ).then(function(nodes) {
         nodes = nodes || [];
-        var now = Date.now();
-        var weekMs = 7 * 24 * 60 * 60 * 1000;
-        var overdue = 0, dueThisWeek = 0;
-        nodes.forEach(function(n) {
-          if (!n.due_date) return;
-          var due = new Date(n.due_date).getTime();
-          if (due < now) overdue++;
-          else if (due < now + weekMs) dueThisWeek++;
+        // C-11: resolve owner names so prior action rows can render
+        // a percolate-owner span.
+        return _resolveOwnerNames(nodes, 'created_by').then(function(enriched) {
+          var now = Date.now();
+          var weekMs = 7 * 24 * 60 * 60 * 1000;
+          var overdue = 0, dueThisWeek = 0;
+          enriched.forEach(function(n) {
+            if (!n.due_date) return;
+            var due = new Date(n.due_date).getTime();
+            if (due < now) overdue++;
+            else if (due < now + weekMs) dueThisWeek++;
+          });
+          return { total: enriched.length, overdue: overdue, dueThisWeek: dueThisWeek, nodes: enriched };
         });
-        return { total: nodes.length, overdue: overdue, dueThisWeek: dueThisWeek, nodes: nodes };
       });
     }).catch(function() { return { total: 0, overdue: 0, dueThisWeek: 0, nodes: [] }; });
   }
@@ -3627,10 +3672,13 @@
       return API.get(
         'accord_nodes?meeting_id=in.(' + ids + ')' +
         '&tag=eq.decision' +
-        '&select=node_id,summary,seq_id,created_at,status' +
+        '&select=node_id,summary,seq_id,created_at,status,created_by' +
         '&order=created_at.desc' +
         '&limit=12'
-      ).then(function(nodes) { return nodes || []; });
+      ).then(function(nodes) {
+        // C-11: resolve owner names for percolate-owner spans on decision rows.
+        return _resolveOwnerNames(nodes || [], 'created_by');
+      });
     }).catch(function() { return []; });
   }
 
@@ -3653,7 +3701,13 @@
           '&select=adjustment_id,target_node_id,delta,rationale,declared_at,declared_by' +
           '&order=declared_at.desc' +
           '&limit=8'
-        ).then(function(rows) { return rows || []; });
+        ).then(function(rows) {
+          // C-11: resolve declared_by to owner name for percolate-owner span.
+          // Assumes declared_by is a user_id (consistent with accord_nodes.created_by).
+          // If schema treats declared_by as a resource_id, owner name will simply
+          // not resolve and span will not render — graceful degradation.
+          return _resolveOwnerNames(rows || [], 'declared_by');
+        });
       });
     }).catch(function() { return []; });
   }
@@ -3734,6 +3788,13 @@
         html += '<span class="ac-briefing-action-seq">' + esc(n.seq_id || 'A') + '</span>';
         html += '<span class="ac-briefing-action-summary">' +
                 esc((n.summary || '').slice(0, 80)) + '</span>';
+        // C-11: owner span — percolate trigger source #5
+        if (n._owner_name && n._owner_resource_id) {
+          html += '<span class="ac-briefing-owner" data-owner-id="' +
+                  esc(n._owner_resource_id) +
+                  '" data-action="percolate-owner">' +
+                  esc(n._owner_name) + '</span>';
+        }
         if (n.due_date) {
           html += '<span class="ac-briefing-action-due' + (overdue ? ' ac-overdue' : '') + '">' +
                   esc(new Date(n.due_date).toLocaleDateString(undefined,
@@ -3760,6 +3821,13 @@
         html += '<span class="ac-briefing-decision-seq">' + esc(d.seq_id || 'DC') + '</span>';
         html += '<span class="ac-briefing-decision-text">' +
                 esc((d.summary || '').slice(0, 90)) + '</span>';
+        // C-11: owner span — percolate trigger source #5 (prior decisions owner)
+        if (d._owner_name && d._owner_resource_id) {
+          html += '<span class="ac-briefing-owner" data-owner-id="' +
+                  esc(d._owner_resource_id) +
+                  '" data-action="percolate-owner">' +
+                  esc(d._owner_name) + '</span>';
+        }
         html += '</div>';
       });
       if (decisions.length > 8) {
@@ -3780,6 +3848,14 @@
         html += '<span class="ac-delta ' + deltaCls + '">' + esc(delta) + '</span>';
         html += '<span class="ac-briefing-annotation-rationale">' +
                 esc((a.rationale || '').slice(0, 80)) + '</span>';
+        // C-11: owner span — percolate trigger source #5 (belief adjustment author).
+        // Verification deferred to follow-on CMD (no annotation substrate seeded).
+        if (a._owner_name && a._owner_resource_id) {
+          html += '<span class="ac-briefing-owner" data-owner-id="' +
+                  esc(a._owner_resource_id) +
+                  '" data-action="percolate-owner">' +
+                  esc(a._owner_name) + '</span>';
+        }
         html += '</div>';
       });
       html += '</div>';
@@ -3788,6 +3864,10 @@
     html += '</div>'; // .ac-briefing-wrap
     tabbody.innerHTML = html;
     _wireBriefingEvents(tabbody, meeting);
+    // C-11: wire briefing percolate-owner clicks; re-apply active filter
+    // on tab-switch (per §5.8 of the brief).
+    _wirePercolateOnBriefing(tabbody);
+    if (_percolateResourceId) _applyPercolate();
   }
 
   function _wireBriefingEvents(tabbody, meeting) {
@@ -4301,9 +4381,13 @@
       return API.get(
         'accord_nodes?meeting_id=in.(' + ids + ')' +
         '&tag=eq.decision' +
-        '&select=node_id,summary,seq_id,created_at,status,dissented_by' +
+        '&select=node_id,summary,seq_id,created_at,status,dissented_by,created_by' +
         '&order=created_at.desc'
-      );
+      ).then(function(nodes) {
+        // C-11: resolve owner names so decision rows can rise/fade
+        // when a person is percolated (ST-10).
+        return _resolveOwnerNames(nodes || [], 'created_by');
+      });
     }).then(function(nodes) {
       if (!nodes) return;
       if (_decisionsToken !== myToken) return;
@@ -4332,9 +4416,22 @@
         ? filtered.map(function(n) {
             var hasDissent = !!n.dissented_by;
             var rowCls = 'ac-dec-row' + (hasDissent ? ' ac-dec-row--dissent' : '');
-            return '<div class="' + rowCls + '" data-node-id="' + esc(n.node_id) + '">' +
+            // C-11: data-owner-id on the row makes the row itself
+            // percolatable. Also emit a (hidden-by-default) owner span
+            // so clicking the seq/text label can fire percolate.
+            var ownerAttr = n._owner_resource_id
+              ? ' data-owner-id="' + esc(n._owner_resource_id) + '"' : '';
+            var ownerSpan = (n._owner_name && n._owner_resource_id)
+              ? '<span class="ac-dec-owner" data-owner-id="' +
+                esc(n._owner_resource_id) +
+                '" data-action="percolate-owner">' +
+                esc(n._owner_name) + '</span>'
+              : '';
+            return '<div class="' + rowCls + '" data-node-id="' + esc(n.node_id) + '"' +
+              ownerAttr + '>' +
               '<span class="ac-dec-seq">' + esc(n.seq_id || 'DC') + '</span>' +
               '<span class="ac-dec-text">' + esc((n.summary || '').slice(0, 100)) + '</span>' +
+              ownerSpan +
               (hasDissent ? '<span class="ac-dec-badge ac-dec-badge--dissent">DISSENT</span>' : '') +
               '</div>';
           }).join('')
@@ -4342,6 +4439,8 @@
 
       var list = tabbody.querySelector('#ac-dec-list');
       if (list) list.innerHTML = listHtml;
+      // C-11: re-apply percolate when filter changes the row set.
+      if (_percolateResourceId) _applyPercolate();
     }
 
     var filtersHtml = filters.map(function(f) {
@@ -5734,11 +5833,43 @@
   }
 
   // ============================================================
-  // CMD-ACCORD-SETUP-PERCOLATE-1 — Click-to-percolate by person
+  // CMD-ACCORD-SETUP-PERCOLATE-1 (C-11) — Click-to-percolate
+  //
+  // Rewrite vs. scaffolding:
+  //   - _applyPercolate uses insertBefore (was: style.order)
+  //   - _setPercolate snapshots original DOM order before reorder
+  //   - _clearPercolate restores from snapshot (was: leave reordered)
+  //   - _wirePercolateEsc / _teardownPercolate added
+  //   - _wirePercolateOnBriefing added (prior actions / prior
+  //     decisions / annotation rows)
   // ============================================================
+
+  // Selectors for every "row" that can be reordered/faded.
+  // Used by both snapshot (in _setPercolate) and _applyPercolate.
+  var _PERCOLATE_ROW_SELECTOR =
+    '.ac-outcome-row, .ac-agenda-item, .ac-attendee-card, ' +
+    '.ac-action-card, .ac-grid-action-card, ' +
+    '.ac-briefing-action-row, .ac-briefing-decision-row, ' +
+    '.ac-briefing-annotation-row, .ac-dec-row';
 
   function _setPercolate(resourceId, name) {
     if (_percolateResourceId === resourceId) { _clearPercolate(); return; }
+
+    // Snapshot original DOM order ONCE per percolate session.
+    // On switch (Tom -> Sarah), snapshot persists so clear still
+    // returns rows to their true pre-percolation positions.
+    if (_percolateSnapshots === null) {
+      _percolateSnapshots = [];
+      document.querySelectorAll(_PERCOLATE_ROW_SELECTOR).forEach(function(row) {
+        if (!row.parentElement) return;
+        _percolateSnapshots.push({
+          row:         row,
+          parent:      row.parentElement,
+          nextSibling: row.nextSibling
+        });
+      });
+    }
+
     _percolateResourceId   = resourceId;
     _percolateResourceName = name;
     _applyPercolate();
@@ -5748,95 +5879,121 @@
   function _clearPercolate() {
     _percolateResourceId   = null;
     _percolateResourceName = null;
+
     document.querySelectorAll('.ac-percolate-faded').forEach(function(el) {
       el.classList.remove('ac-percolate-faded');
     });
     document.querySelectorAll('.ac-percolate-raised').forEach(function(el) {
       el.classList.remove('ac-percolate-raised');
-      el.style.order = '';
+      el.style.order = '';   // belt-and-suspenders: clear any legacy state
     });
+
+    // Restore original DOM order from snapshot
+    if (_percolateSnapshots) {
+      _percolateSnapshots.forEach(function(snap) {
+        if (!snap.row.isConnected || !snap.parent.isConnected) return;
+        try {
+          // If nextSibling no longer in parent, insertBefore(row, null)
+          // appends to end - still correct relative to surviving siblings.
+          var ref = (snap.nextSibling && snap.nextSibling.parentElement === snap.parent)
+                    ? snap.nextSibling : null;
+          snap.parent.insertBefore(snap.row, ref);
+        } catch (e) { /* swallow - row removed by intervening re-render */ }
+      });
+      _percolateSnapshots = null;
+    }
+
     var pill = document.getElementById('ac-percolate-pill');
     if (pill) pill.remove();
+  }
+
+  // Map a percolatable element (chip, card, span) to the row container
+  // that should rise/fade as a unit.
+  function _percolateFindRow(el) {
+    return el.closest('.ac-outcome-row') ||
+           el.closest('.ac-agenda-item') ||
+           el.closest('.ac-attendee-card') ||
+           el.closest('.ac-action-card') ||
+           el.closest('.ac-grid-action-card') ||
+           el.closest('.ac-briefing-action-row') ||
+           el.closest('.ac-briefing-decision-row') ||
+           el.closest('.ac-briefing-annotation-row') ||
+           el.closest('.ac-dec-row') ||
+           null;
+  }
+
+  // Percolate one panel (left/center/right tabbody):
+  //   - Find every [data-owner-id] / [data-resource-id] descendant
+  //   - Walk each up to its row; row is matched if ANY anchor matches
+  //   - Apply faded/raised classes
+  //   - Reorder matched rows to top of their parent via insertBefore,
+  //     preserving original relative order
+  function _percolatePanel(panelEl, rid) {
+    if (!panelEl) return;
+
+    var anchors = Array.prototype.slice.call(panelEl.querySelectorAll(
+      '[data-resource-id], [data-owner-id]'
+    ));
+    if (!anchors.length) return;
+
+    // Dedup by row. If ANY anchor in a row matches, the row is matched.
+    var rows = [];   // [{ row, isMatch }]
+    anchors.forEach(function(el) {
+      var row = _percolateFindRow(el);
+      if (!row) return;
+      var matches = (el.dataset.resourceId === rid) ||
+                    (el.dataset.ownerId    === rid);
+      var existing = null;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].row === row) { existing = rows[i]; break; }
+      }
+      if (existing) {
+        if (matches) existing.isMatch = true;
+      } else {
+        rows.push({ row: row, isMatch: matches });
+      }
+    });
+
+    // Apply visual classes
+    rows.forEach(function(rec) {
+      if (rec.isMatch) {
+        rec.row.classList.add('ac-percolate-raised');
+        rec.row.classList.remove('ac-percolate-faded');
+      } else {
+        rec.row.classList.add('ac-percolate-faded');
+        rec.row.classList.remove('ac-percolate-raised');
+      }
+      rec.row.style.order = '';   // strip any legacy CSS order
+    });
+
+    // Group matched rows by parent; insertBefore parent.firstChild
+    // in REVERSE so the first-matched (DOM order) ends up at top.
+    var groups = [];   // [{ parent, rows: [...] }]
+    rows.forEach(function(rec) {
+      if (!rec.isMatch) return;
+      var parent = rec.row.parentElement;
+      if (!parent) return;
+      var g = null;
+      for (var j = 0; j < groups.length; j++) {
+        if (groups[j].parent === parent) { g = groups[j]; break; }
+      }
+      if (!g) { g = { parent: parent, rows: [] }; groups.push(g); }
+      g.rows.push(rec.row);
+    });
+    groups.forEach(function(g) {
+      g.rows.slice().reverse().forEach(function(row) {
+        g.parent.insertBefore(row, g.parent.firstChild);
+      });
+    });
   }
 
   function _applyPercolate() {
     if (!_percolateResourceId) return;
     var rid = _percolateResourceId;
 
-    // ── Center: agenda items ─────────────────────────────────────
-    var agendaList = document.getElementById('ac-agenda-list');
-    if (agendaList) {
-      var agendaOrder = 1;
-      agendaList.querySelectorAll('.ac-agenda-item').forEach(function(item) {
-        var chip = item.querySelector('[data-resource-id="' + rid + '"]');
-        if (chip) {
-          item.classList.add('ac-percolate-raised');
-          item.classList.remove('ac-percolate-faded');
-          item.style.order = String(agendaOrder++);
-        } else {
-          item.classList.add('ac-percolate-faded');
-          item.classList.remove('ac-percolate-raised');
-          item.style.order = '';
-        }
-      });
-    }
-
-    // ── Center: outcomes rows ────────────────────────────────────
-    var outcomesList = document.getElementById('ac-outcomes-list');
-    if (outcomesList) {
-      outcomesList.querySelectorAll('.ac-outcome-row').forEach(function(row) {
-        var chip = row.querySelector('[data-resource-id="' + rid + '"]');
-        if (chip) {
-          row.classList.add('ac-percolate-raised');
-          row.classList.remove('ac-percolate-faded');
-        } else {
-          row.classList.add('ac-percolate-faded');
-          row.classList.remove('ac-percolate-raised');
-        }
-      });
-    }
-
-    // ── Right: attendee cards ────────────────────────────────────
-    var attendeesBlock = document.getElementById('ac-attendees-block');
-    if (attendeesBlock) {
-      attendeesBlock.querySelectorAll('.ac-attendee-card').forEach(function(card) {
-        if (card.dataset.resourceId === rid) {
-          card.classList.add('ac-percolate-raised');
-          card.classList.remove('ac-percolate-faded');
-        } else {
-          card.classList.add('ac-percolate-faded');
-          card.classList.remove('ac-percolate-raised');
-        }
-      });
-    }
-
-    // ── Right: action cards (kanban) ─────────────────────────────
-    var kanbanTrack = document.querySelector('.ac-kanban-track');
-    if (kanbanTrack) {
-      kanbanTrack.querySelectorAll('.ac-action-card').forEach(function(card) {
-        if (card.dataset.resourceId === rid) {
-          card.classList.add('ac-percolate-raised');
-          card.classList.remove('ac-percolate-faded');
-        } else {
-          card.classList.add('ac-percolate-faded');
-          card.classList.remove('ac-percolate-raised');
-        }
-      });
-    }
-
-    // ── Right: action cards (grid view) ──────────────────────────
-    var gridView = document.querySelector('.ac-grid-view');
-    if (gridView) {
-      gridView.querySelectorAll('.ac-grid-action-card').forEach(function(card) {
-        if (card.dataset.resourceId === rid) {
-          card.classList.add('ac-percolate-raised');
-          card.classList.remove('ac-percolate-faded');
-        } else {
-          card.classList.add('ac-percolate-faded');
-          card.classList.remove('ac-percolate-raised');
-        }
-      });
-    }
+    _percolatePanel(document.querySelector('.ac-col-tabbody[data-col="left"]'),   rid);
+    _percolatePanel(document.querySelector('.ac-col-tabbody[data-col="center"]'), rid);
+    _percolatePanel(document.querySelector('.ac-col-tabbody[data-col="right"]'),  rid);
   }
 
   function _renderPercolatePill() {
@@ -5844,7 +6001,7 @@
     if (existing) existing.remove();
     if (!_percolateResourceId || !_percolateResourceName) return;
 
-    // Mount in .ac-agenda-header (Option Y — stable per _paintAgenda repaint cycle).
+    // Mount in .ac-agenda-header (stable per _paintAgenda repaint cycle).
     var header = document.querySelector('.ac-agenda-header');
     if (!header) return;
 
@@ -5864,7 +6021,7 @@
       });
   }
 
-  // ── Percolate click wiring ────────────────────────────────────
+  // -- Percolate click wiring ------------------------------------
 
   function _wirePercolateOnAttendees(block) {
     if (!block || block.dataset.percolateWired) return;
@@ -5883,10 +6040,16 @@
     if (!container || container.dataset.percolateWired) return;
     container.dataset.percolateWired = '1';
     container.addEventListener('click', function(ev) {
-      var chip = ev.target.closest('.ac-action-owner-chip[data-resource-id]');
+      // Agenda items themselves do not currently carry an
+      // owner_resource_id (schema gap - deferred to follow-on CMD).
+      // Listener stays so future agenda-owner chips will percolate.
+      if (!ev.target.closest('.ac-agenda-item')) return;
+      var chip = ev.target.closest('[data-action="percolate-owner"][data-owner-id]') ||
+                 ev.target.closest('.ac-action-owner-chip[data-resource-id]');
       if (!chip) return;
       ev.stopPropagation();
-      _setPercolate(chip.dataset.resourceId, chip.textContent.trim());
+      var rid = chip.dataset.ownerId || chip.dataset.resourceId;
+      _setPercolate(rid, chip.textContent.trim());
     });
   }
 
@@ -5895,10 +6058,14 @@
     block.dataset.percolateWired = '1';
     block.addEventListener('click', function(ev) {
       if (!ev.target.closest('.ac-outcome-row')) return;
-      var chip = ev.target.closest('[data-resource-id]');
+      // Prefer C-11 markup (data-action="percolate-owner" + data-owner-id);
+      // fall back to legacy data-resource-id for any unmigrated chip.
+      var chip = ev.target.closest('[data-action="percolate-owner"][data-owner-id]') ||
+                 ev.target.closest('[data-resource-id]');
       if (!chip) return;
       ev.stopPropagation();
-      _setPercolate(chip.dataset.resourceId, chip.textContent.trim());
+      var rid = chip.dataset.ownerId || chip.dataset.resourceId;
+      _setPercolate(rid, chip.textContent.trim());
     });
   }
 
@@ -5906,14 +6073,22 @@
     if (!tabbody || tabbody.dataset.percolateWired) return;
     tabbody.dataset.percolateWired = '1';
     tabbody.addEventListener('click', function(ev) {
-      // Try owner chip with data-resource-id first
-      var chip = ev.target.closest('.ac-action-owner[data-resource-id]');
+      // C-11 markup: .ac-action-owner div carries data-owner-id +
+      // data-action="percolate-owner". Match that first.
+      var chip = ev.target.closest('[data-action="percolate-owner"][data-owner-id]');
       if (chip) {
         ev.stopPropagation();
-        _setPercolate(chip.dataset.resourceId, chip.textContent.trim());
+        _setPercolate(chip.dataset.ownerId, chip.textContent.trim());
         return;
       }
-      // Fallback: owner div → card data-resource-id
+      // Legacy fallback for any unmigrated chip
+      var legacy = ev.target.closest('.ac-action-owner-chip[data-resource-id]');
+      if (legacy) {
+        ev.stopPropagation();
+        _setPercolate(legacy.dataset.resourceId, legacy.textContent.trim());
+        return;
+      }
+      // Last fallback: owner div -> card data-resource-id
       var ownerDiv = ev.target.closest('.ac-action-owner');
       if (!ownerDiv) return;
       var card = ownerDiv.closest('.ac-action-card[data-resource-id]');
@@ -5923,6 +6098,40 @@
       if (!rid || !name) return;
       _setPercolate(rid, name);
     });
+  }
+
+  // C-11: briefing column trigger source (#5 in section 2.1).
+  // Catches clicks on .ac-briefing-owner spans next to prior action
+  // rows, prior decision rows, and (deferred) annotation rows.
+  function _wirePercolateOnBriefing(tabbody) {
+    if (!tabbody || tabbody.dataset.percolateBriefingWired) return;
+    tabbody.dataset.percolateBriefingWired = '1';
+    tabbody.addEventListener('click', function(ev) {
+      var span = ev.target.closest('[data-action="percolate-owner"][data-owner-id]');
+      if (!span) return;
+      ev.stopPropagation();
+      _setPercolate(span.dataset.ownerId, span.textContent.trim());
+    });
+  }
+
+  // C-11: Escape key clears percolate. Named handler so teardown
+  // can removeEventListener safely.
+  function _wirePercolateEsc() {
+    if (_percolateEscHandler) return;   // idempotent
+    _percolateEscHandler = function(ev) {
+      if (ev.key === 'Escape' && _percolateResourceId) {
+        _clearPercolate();
+      }
+    };
+    document.addEventListener('keydown', _percolateEscHandler);
+  }
+
+  function _teardownPercolate() {
+    if (_percolateEscHandler) {
+      document.removeEventListener('keydown', _percolateEscHandler);
+      _percolateEscHandler = null;
+    }
+    _clearPercolate();
   }
 
   // §5 — Action items fetch
@@ -6179,7 +6388,12 @@
             esc((action.summary || '').slice(0, 80)) + '</div>';
 
     if (action._owner_name) {
-      html += '<div class="ac-action-owner">' + esc(action._owner_name) + '</div>';
+      // C-11: data-owner-id + data-action="percolate-owner" on the
+      // owner div makes the chip itself the click target for percolate.
+      html += '<div class="ac-action-owner" data-owner-id="' +
+              esc(action._owner_resource_id || '') +
+              '" data-action="percolate-owner">' +
+              esc(action._owner_name) + '</div>';
     }
 
     if (slack !== null) {
@@ -6457,6 +6671,7 @@
     _wireColumnHandles();
     _wireFilmstripHandle();
     document.addEventListener('keydown', _onIntelKey);
+    _wirePercolateEsc();   // C-11: ESC clears percolate filter
 
     // ── CMD-ACCORD-SETUP-BRIEFING-TABS-1: left column tab bar ────
     _renderLeftTabBar(meeting);

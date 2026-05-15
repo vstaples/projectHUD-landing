@@ -2433,7 +2433,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   align-items: center;
   gap: 6px;
   font-family: var(--ac-font-mono);
-  font-size: 9px;
+  font-size: 10px;   /* C-11: bumped from 9px to satisfy IR70 (min 10px) */
   color: var(--ac-cyan);
   background: var(--ac-cyan-dim);
   border: 1px solid rgba(94, 234, 212, 0.25);
@@ -2461,6 +2461,29 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 
 /* Hidden owner anchor span inside .ac-agenda-item (C-11 D1) */
 .ac-percolate-owner { display: none; }
+
+/* C-11: visible owner spans in briefing column + decisions tab.
+   Small muted tag look; clickable cursor signals percolate trigger. */
+.ac-briefing-owner,
+.ac-dec-owner {
+  display: inline-block;
+  font-family: var(--ac-font-mono);
+  font-size: 10px;
+  color: var(--ac-cyan);
+  background: rgba(94, 234, 212, 0.08);
+  border: 1px solid rgba(94, 234, 212, 0.18);
+  border-radius: 10px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  cursor: pointer;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.ac-briefing-owner:hover,
+.ac-dec-owner:hover {
+  background: rgba(94, 234, 212, 0.16);
+  border-color: rgba(94, 234, 212, 0.35);
+}
 
 /* ──────────────────────────────────────────────────────────── */
 /* CMD-ACCORD-SETUP-GATHERING-1 (C-12) — §11 visual layer       */
