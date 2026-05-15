@@ -80,7 +80,7 @@
 
 /* §4 — Zone placement */
 .ac-setup-header    { grid-area: header;    }
-.ac-setup-columns   { grid-area: columns;   min-height: 0; overflow: hidden; }
+.ac-setup-columns   { grid-area: columns;   min-height: 0; overflow: hidden; padding: 0 10px; background: #0a0e14; }
 .ac-setup-filmstrip { grid-area: filmstrip; background: var(--ac-bg-pane); }
 .ac-setup-footer    { grid-area: footer;    border-top: 1px solid var(--ac-border-subtle); }
 
@@ -271,6 +271,7 @@
   display: grid;
   grid-template-columns: var(--col-left-w, 360px) 1fr var(--col-right-w, 380px);
   grid-template-areas: "col-left col-center col-right";
+  gap: 10px;
   height: 100%;
   overflow: hidden;
 }
