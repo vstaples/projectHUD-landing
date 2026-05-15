@@ -5102,27 +5102,25 @@
     var isIdle = meeting.state === 'idle';
     var html   = '';
 
-    // X-40: dissent banner moved OUT of the agenda container and appended
-    // directly to the center tab body as its last child so position:sticky
-    // bottom:0 actually works. Build it separately and inject after innerHTML.
+    // X-40/X-43: render dissent prompts as a named UNRESOLVED ITEMS section
+    // appended directly to the center tab body below the agenda container.
+    // Replaces the floating amber banner with a structured section matching
+    // the Outcomes / Agenda section language.
     var bannerHtml = '';
     if (prompts.length && isIdle) {
-      var p = prompts[0];
-      bannerHtml += '<div class="ac-prep-prompt-strip" id="ac-prep-prompt-strip">';
-      bannerHtml += '<div class="ac-prep-prompt" data-prompt-idx="0">';
-      bannerHtml += '<span class="ac-prep-glyph">\u26a1</span>';
-      bannerHtml += '<span class="ac-prep-text">' + p.text + '</span>';
-      bannerHtml += '<button class="ac-prep-action" data-action="prep-action" ' +
-              (p.nodeId ? 'data-node-id="' + esc(p.nodeId) + '"' : '') + '>' +
-              esc(p.action) + '</button>';
-      bannerHtml += '<button class="ac-prep-dismiss" data-action="dismiss-prompt" ' +
-              'data-prompt-idx="0" title="Dismiss">\u00d7</button>';
-      bannerHtml += '</div>';
-      if (prompts.length > 1) {
-        bannerHtml += '<div class="ac-prep-more ac-muted">' +
-                (prompts.length - 1) + ' more insight' +
-                (prompts.length > 2 ? 's' : '') + '</div>';
-      }
+      bannerHtml += '<div class="ac-unresolved-section" id="ac-prep-prompt-strip">';
+      bannerHtml += '<div class="ac-unresolved-label">UNRESOLVED ITEMS</div>';
+      prompts.forEach(function(p, idx) {
+        bannerHtml += '<div class="ac-unresolved-row" data-prompt-idx="' + idx + '">';
+        bannerHtml += '<span class="ac-unresolved-glyph">\u26a1</span>';
+        bannerHtml += '<span class="ac-unresolved-text">' + p.text + '</span>';
+        bannerHtml += '<button class="ac-unresolved-action" data-action="prep-action" ' +
+                (p.nodeId ? 'data-node-id="' + esc(p.nodeId) + '"' : '') + '>' +
+                esc(p.action) + '</button>';
+        bannerHtml += '<button class="ac-unresolved-dismiss" data-action="dismiss-prompt" ' +
+                'data-prompt-idx="' + idx + '" title="Dismiss">\u00d7</button>';
+        bannerHtml += '</div>';
+      });
       bannerHtml += '</div>';
     }
 

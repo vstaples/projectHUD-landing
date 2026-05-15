@@ -1349,33 +1349,37 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 }
 
 /* Prep prompt */
-/* X-40: dissent banner sticky to bottom of center column tab body.
-   Sits above the agenda composer so it doesn't interrupt the
-   Outcomes → Agenda reading flow. */
-.ac-prep-prompt-strip {
-  padding: 0 18px 10px 18px;
-  position: sticky;
-  bottom: 0;
-  background: var(--ac-bg-pane);
-  z-index: 5;
+/* X-43: UNRESOLVED ITEMS section — replaces floating amber banner */
+.ac-unresolved-section {
+  border-top: 1px solid var(--ac-border-subtle);
+  margin-top: 8px;
+  padding: 12px 18px 16px;
 }
-.ac-prep-prompt {
+.ac-unresolved-label {
+  font-family: var(--ac-font-mono); font-size: 11px;
+  letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--ac-text-secondary); margin-bottom: 10px;
+}
+.ac-unresolved-row {
   display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; margin-bottom: 6px;
   background: var(--ac-amber-dim);
   border: 1px solid rgba(251,191,119,0.3);
-  border-radius: 5px; padding: 9px 12px;
+  border-radius: 5px;
 }
-.ac-prep-glyph { font-size: 13px; flex-shrink: 0; }
-.ac-prep-text { flex: 1; font-size: 12px; color: var(--ac-amber); line-height: 1.4; }
-.ac-prep-action {
+.ac-unresolved-glyph { font-size: 13px; flex-shrink: 0; }
+.ac-unresolved-text  { flex: 1; font-size: 12px; color: var(--ac-amber); line-height: 1.4; }
+.ac-unresolved-action {
   font-family: var(--ac-font-mono); font-size: 9px; color: var(--ac-amber);
   background: none; border: none; cursor: pointer; padding: 0;
   letter-spacing: 0.8px; white-space: nowrap; flex-shrink: 0;
 }
-.ac-prep-action:hover { text-decoration: underline; }
-.ac-prep-dismiss { font-size: 13px; color: var(--ac-text-tertiary); background: none; border: none; cursor: pointer; padding: 0 2px; flex-shrink: 0; }
-.ac-prep-dismiss:hover { color: var(--ac-amber); }
-.ac-prep-more { font-family: var(--ac-font-mono); font-size: 9px; margin-top: 4px; padding-left: 4px; }
+.ac-unresolved-action:hover { text-decoration: underline; }
+.ac-unresolved-dismiss {
+  font-size: 13px; color: var(--ac-text-tertiary);
+  background: none; border: none; cursor: pointer; padding: 0 2px; flex-shrink: 0;
+}
+.ac-unresolved-dismiss:hover { color: var(--ac-amber); }
 
 /* Agenda header — X-40: top border acts as section separator between
    Outcomes and Agenda regions. 16px vertical breathing room on each side. */
