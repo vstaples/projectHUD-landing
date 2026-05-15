@@ -5038,25 +5038,28 @@
     var isIdle = meeting.state === 'idle';
     var html   = '';
 
-    // Prep prompt strip
+    // X-40: dissent banner moved OUT of the agenda container and appended
+    // directly to the center tab body as its last child so position:sticky
+    // bottom:0 actually works. Build it separately and inject after innerHTML.
+    var bannerHtml = '';
     if (prompts.length && isIdle) {
-      html += '<div class="ac-prep-prompt-strip">';
       var p = prompts[0];
-      html += '<div class="ac-prep-prompt" data-prompt-idx="0">';
-      html += '<span class="ac-prep-glyph">\u26a1</span>';
-      html += '<span class="ac-prep-text">' + p.text + '</span>';
-      html += '<button class="ac-prep-action" data-action="prep-action" ' +
+      bannerHtml += '<div class="ac-prep-prompt-strip" id="ac-prep-prompt-strip">';
+      bannerHtml += '<div class="ac-prep-prompt" data-prompt-idx="0">';
+      bannerHtml += '<span class="ac-prep-glyph">\u26a1</span>';
+      bannerHtml += '<span class="ac-prep-text">' + p.text + '</span>';
+      bannerHtml += '<button class="ac-prep-action" data-action="prep-action" ' +
               (p.nodeId ? 'data-node-id="' + esc(p.nodeId) + '"' : '') + '>' +
               esc(p.action) + '</button>';
-      html += '<button class="ac-prep-dismiss" data-action="dismiss-prompt" ' +
+      bannerHtml += '<button class="ac-prep-dismiss" data-action="dismiss-prompt" ' +
               'data-prompt-idx="0" title="Dismiss">\u00d7</button>';
-      html += '</div>';
+      bannerHtml += '</div>';
       if (prompts.length > 1) {
-        html += '<div class="ac-prep-more ac-muted">' +
+        bannerHtml += '<div class="ac-prep-more ac-muted">' +
                 (prompts.length - 1) + ' more insight' +
                 (prompts.length > 2 ? 's' : '') + '</div>';
       }
-      html += '</div>';
+      bannerHtml += '</div>';
     }
 
     // Agenda header
@@ -5091,6 +5094,24 @@
     _initDragToReorder(container, items, meeting);
     _wirePercolateOnAgenda(container);
     if (_percolateResourceId) _applyPercolate();
+
+    // X-40: inject dissent banner into center tab body as last child so
+    // position:sticky bottom:0 works. Remove any prior instance first.
+    var tabBody = document.querySelector('.ac-col-tabbody[data-col="center"]');
+    if (tabBody) {
+      var prior = document.getElementById('ac-prep-prompt-strip');
+      if (prior) prior.remove();
+      if (bannerHtml) {
+        var bannerEl = document.createElement('div');
+        bannerEl.innerHTML = bannerHtml;
+        var bannerNode = bannerEl.firstElementChild;
+        tabBody.appendChild(bannerNode);
+        // Wire dismiss on the relocated banner
+        bannerNode.querySelector('[data-action="dismiss-prompt"]')
+          && bannerNode.querySelector('[data-action="dismiss-prompt"]')
+             .addEventListener('click', function() { bannerNode.style.display = 'none'; });
+      }
+    }
   }
 
   function _agendaStats(items) {
@@ -5219,7 +5240,8 @@
       }
 
       if (action === 'dismiss-prompt') {
-        var strip = container.querySelector('.ac-prep-prompt-strip');
+        var strip = document.getElementById('ac-prep-prompt-strip') ||
+                    container.querySelector('.ac-prep-prompt-strip');
         if (strip) strip.style.display = 'none';
         return;
       }
@@ -6583,6 +6605,15 @@
         buckets[col].push(a);
       });
 
+      // X-41: merge unscheduled into past-due column — no separate column.
+      // Unscheduled items are flagged with _unscheduled so _kanbanCol can
+      // render a sub-label divider between past-due and unscheduled cards.
+      buckets['unscheduled'].forEach(function(a) {
+        a._unscheduled = true;
+        buckets['past-due'].push(a);
+      });
+      buckets['unscheduled'] = [];
+
       var DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
       var html = '<div class="ac-actions-toolbar">';
@@ -6605,10 +6636,6 @@
       }
 
       html += _kanbanCol('NEXT WEEK', buckets['next-week'], 'next-week', false, false);
-
-      if (buckets['unscheduled'].length) {
-        html += _kanbanCol('UNSCHEDULED', buckets['unscheduled'], 'unscheduled', false, false);
-      }
 
       html += '</div>';
       tabbody.innerHTML = html;
@@ -6639,7 +6666,20 @@
     if (!items.length) {
       html += '<div class="ac-kanban-empty">\u2014</div>';
     } else {
-      items.forEach(function(a) { html += _actionCardHtml(a); });
+      // X-41: if this is the past-due column and contains merged unscheduled
+      // items, insert a sub-label divider between the two groups.
+      var pastDueItems    = items.filter(function(a) { return !a._unscheduled; });
+      var unscheduledItems = items.filter(function(a) { return  a._unscheduled; });
+
+      if (colId === 'past-due' && unscheduledItems.length) {
+        if (pastDueItems.length) {
+          pastDueItems.forEach(function(a) { html += _actionCardHtml(a); });
+          html += '<div class="ac-kanban-sub-label">UNSCHEDULED</div>';
+        }
+        unscheduledItems.forEach(function(a) { html += _actionCardHtml(a); });
+      } else {
+        items.forEach(function(a) { html += _actionCardHtml(a); });
+      }
     }
 
     html += '</div></div>';
