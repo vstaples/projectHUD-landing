@@ -921,7 +921,8 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   flex-shrink: 0;
   align-self: stretch;
   aspect-ratio: 1 / 1;
-  min-width: 60px;
+  /* X-38: bumped min-width 60px → 75px (+25%) for better default readability */
+  min-width: 75px;
   /* X-35/X-38: min-height ensures compact tier (≥90px) always fires even
      if the filmstrip zone is dragged very short or localStorage is stale. */
   min-height: 90px;
