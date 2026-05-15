@@ -58,6 +58,7 @@
   /* §4 — 4-zone grid host */
   display: grid;
   grid-template-rows: auto 1fr 102px 54px;
+  row-gap: 0;
   grid-template-areas:
     "header"
     "columns"
@@ -79,9 +80,9 @@
 
 /* §4 — Zone placement */
 .ac-setup-header    { grid-area: header;    }
-.ac-setup-columns   { grid-area: columns;   min-height: 0; overflow: hidden; }
-.ac-setup-filmstrip { grid-area: filmstrip; }
-.ac-setup-footer    { grid-area: footer;    }
+.ac-setup-columns   { grid-area: columns;   min-height: 0; overflow: hidden; border-bottom: 10px solid var(--ac-border-mid); }
+.ac-setup-filmstrip { grid-area: filmstrip; border-top: 10px solid var(--ac-border-mid); background: var(--ac-bg-pane); }
+.ac-setup-footer    { grid-area: footer;    border-top: 1px solid var(--ac-border-subtle); }
 
 /* Zone-level placeholders (header / filmstrip-content / footer this CMD).
    Successor CMDs replace placeholder children with real content. */
