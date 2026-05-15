@@ -278,7 +278,7 @@
   position: relative;
   overflow-y: auto;
   border-right: 1px solid var(--ac-border-subtle);
-  background: var(--ac-bg-pane);
+  background: var(--ac-bg-elevated);
   display: flex;
   flex-direction: column;
 }
@@ -286,16 +286,18 @@
   grid-area: col-center;
   position: relative;
   overflow-y: auto;
-  background: var(--ac-bg-deep);
+  background: var(--ac-bg-pane);
   display: flex;
   flex-direction: column;
+  border-left: 1px solid var(--ac-border-subtle);
+  border-right: 1px solid var(--ac-border-subtle);
 }
 .ac-setup-col-right {
   grid-area: col-right;
   position: relative;
   overflow-y: auto;
   border-left: 1px solid var(--ac-border-subtle);
-  background: var(--ac-bg-pane);
+  background: var(--ac-bg-elevated);
   display: flex;
   flex-direction: column;
 }
