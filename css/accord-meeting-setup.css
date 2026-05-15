@@ -921,11 +921,12 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   flex-shrink: 0;
   align-self: stretch;
   /* X-38: width 200px per operator preference. aspect-ratio removed so
-     card height is governed by the filmstrip zone (FILM_DEFAULT 130px)
-     independently of width. */
+     card height is governed by the filmstrip zone (FILM_DEFAULT 150px)
+     independently of width. min-height 140px matches full-tier threshold
+     so summary text always displays at default height. */
   width: 200px;
   min-width: 200px;
-  min-height: 90px;
+  min-height: 140px;
   background: var(--ac-bg-pane);
   border: 1px solid var(--ac-border-subtle);
   border-radius: 4px;
@@ -1243,6 +1244,9 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-risk-score--low  { color: var(--ac-text-tertiary); }
 .ac-risk-desc { font-size: 12px; color: var(--ac-text-secondary); line-height: 1.4; }
 .ac-risk-status { font-size: 10px; margin-top: 2px; }
+/* X-37: summary + owner for the live _fetchPriorRisks render */
+.ac-risk-summary { font-size: 12px; color: var(--ac-text-secondary); line-height: 1.4; flex: 1; }
+.ac-risk-owner   { font-size: 10px; color: var(--ac-cyan); flex-shrink: 0; cursor: pointer; }
 
 /* Shared */
 .ac-muted { color: var(--ac-text-tertiary); }

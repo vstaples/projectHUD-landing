@@ -58,12 +58,9 @@
   var COL_MAX_W    = 1400;
   var FILM_MIN_H   = 48;
   var FILM_MAX_H   = 350;
-  // X-35/X-38: raised from 102 → 130 so cards reach ≥90px height on first
-  // load and the compact tier (seq IDs visible) fires without a drag gesture.
-  // At 102px the header consumed ~24px leaving ~78px card height — just under
-  // the 90px threshold, so _initFilmCardTiers never applied --compact and
-  // node text stayed hidden.
-  var FILM_DEFAULT = 130;
+  // X-35/X-38: raised to 150 — cards reach full tier (≥140px) on first
+  // load so node seq IDs + summary text display without a drag gesture.
+  var FILM_DEFAULT = 150;
   var FOOTER_H     = 54;
   var LS_KEY_LEFT  = 'accord-setup-col-left-w';
   var LS_KEY_RIGHT = 'accord-setup-col-right-w';
@@ -4618,18 +4615,43 @@
       tabbody.innerHTML = '<div class="ac-risks-empty">No workstream context.</div>';
       return;
     }
-    // V6: workstream→project join absent — render empty state
-    tabbody.innerHTML = [
-      '<div class="ac-risks-wrap">',
-        '<div class="ac-risks-header">',
-          '<span class="ac-risks-count">RISK REGISTER</span>',
-          '<span class="ac-risks-note ac-muted">CPM surface coming in Track F</span>',
-        '</div>',
-        '<div class="ac-risks-empty">',
-          'No project linked to this workstream. Risk register will appear here once a project is associated.',
-        '</div>',
-      '</div>'
-    ].join('');
+    var myToken = ++_risksToken;
+    tabbody.innerHTML = '<div class="ac-risks-wrap"><div class="ac-muted">Loading risks\u2026</div></div>';
+
+    // X-37: was a stub (V6 project-linkage guard). _fetchPriorRisks already
+    // queries accord_nodes directly — no project join required. Re-use it here
+    // so Risks tab shows the same data visible in the Briefing column's risk block.
+    _fetchPriorRisks(meeting.workstream_id).then(function(risks) {
+      if (_risksToken !== myToken) return;
+      if (!tabbody.isConnected) return;
+      risks = risks || [];
+
+      var html = '<div class="ac-risks-wrap">';
+      html += '<div class="ac-risks-header">';
+      html += '<span class="ac-risks-count">RISK REGISTER \u00b7 ' + risks.length + '</span>';
+      html += '</div>';
+
+      if (!risks.length) {
+        html += '<div class="ac-risks-empty">No risks flagged in this workstream yet.</div>';
+      } else {
+        risks.forEach(function(r) {
+          html += '<div class="ac-risk-row">';
+          html += '<span class="ac-briefing-risk-seq">' + esc(r.seq_id || '') + '</span>';
+          html += '<span class="ac-risk-summary">' + esc(r.summary || '') + '</span>';
+          if (r._ownerName) {
+            html += '<span class="ac-risk-owner" data-owner-id="' + esc(r.created_by || '') + '"' +
+                    ' data-action="percolate-owner">' + esc(r._ownerName) + '</span>';
+          }
+          html += '</div>';
+        });
+      }
+      html += '</div>';
+      tabbody.innerHTML = html;
+    }).catch(function() {
+      if (tabbody.isConnected) {
+        tabbody.innerHTML = '<div class="ac-risks-empty">Could not load risks.</div>';
+      }
+    });
   }
 
   // ══════════════════════════════════════════════════════════════
