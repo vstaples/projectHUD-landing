@@ -3639,8 +3639,8 @@
       return API.get(
         'accord_nodes?meeting_id=in.(' + ids + ')' +
         '&tag=in.(action,note)' +
-        '&select=node_id,summary,due_date,created_by,status,seq_id' +
-        '&order=due_date.asc.nullslast'
+        '&select=node_id,summary,due_date,created_by,status,seq_id,seq_number,tag' +
+        '&order=seq_number.asc'
       ).then(function(nodes) {
         nodes = nodes || [];
         // C-11: resolve owner names so prior action rows can render
@@ -3649,13 +3649,15 @@
           var now = Date.now();
           var weekMs = 7 * 24 * 60 * 60 * 1000;
           var overdue = 0, dueThisWeek = 0;
+          // Stats apply to action nodes only — not notes
           enriched.forEach(function(n) {
-            if (!n.due_date) return;
+            if (n.tag !== 'action' || !n.due_date) return;
             var due = new Date(n.due_date).getTime();
             if (due < now) overdue++;
             else if (due < now + weekMs) dueThisWeek++;
           });
-          return { total: enriched.length, overdue: overdue, dueThisWeek: dueThisWeek, nodes: enriched };
+          var actions = enriched.filter(function(n) { return n.tag === 'action'; });
+          return { total: enriched.length, actionCount: actions.length, overdue: overdue, dueThisWeek: dueThisWeek, nodes: enriched };
         });
       });
     }).catch(function() { return { total: 0, overdue: 0, dueThisWeek: 0, nodes: [] }; });
@@ -3672,8 +3674,8 @@
       return API.get(
         'accord_nodes?meeting_id=in.(' + ids + ')' +
         '&tag=eq.decision' +
-        '&select=node_id,summary,seq_id,created_at,status,created_by' +
-        '&order=created_at.desc' +
+        '&select=node_id,summary,seq_id,seq_number,created_at,status,created_by' +
+        '&order=seq_number.asc' +
         '&limit=12'
       ).then(function(nodes) {
         // C-11: resolve owner names for percolate-owner spans on decision rows.
@@ -3761,16 +3763,20 @@
       html += '</div>';
     }
 
-    // Prior actions summary
+    // Prior actions + notes — split into two blocks
+    var actionNodes = actionsSummary.nodes.filter(function(n) { return n.tag === 'action'; });
+    var noteNodes   = actionsSummary.nodes.filter(function(n) { return n.tag === 'note'; });
+
+    // ── PRIOR ACTIONS ──
     html += '<div class="ac-briefing-actions">';
     html += '<div class="ac-briefing-section-label">PRIOR ACTIONS</div>';
-    if (actionsSummary.total === 0) {
+    if (!actionNodes.length) {
       html += '<div class="ac-muted">No prior actions in this workstream.</div>';
     } else {
       var overdueCls = actionsSummary.overdue > 0 ? ' ac-briefing-actions-count--alert' : '';
       html += '<div class="ac-briefing-actions-summary" data-action="toggle-actions-detail">';
       html += '<span class="ac-briefing-actions-count' + overdueCls + '">' +
-              actionsSummary.total + ' tracked</span>';
+              actionNodes.length + ' tracked</span>';
       if (actionsSummary.overdue > 0) {
         html += '<span class="ac-briefing-actions-count ac-briefing-actions-count--alert"> \u00b7 ' +
                 actionsSummary.overdue + ' overdue</span>';
@@ -3782,13 +3788,12 @@
       html += ' <span class="ac-briefing-actions-expand">\u25b8</span>';
       html += '</div>';
       html += '<div class="ac-briefing-actions-detail" id="ac-briefing-actions-detail" style="display:none;">';
-      actionsSummary.nodes.slice(0, 10).forEach(function(n) {
+      actionNodes.slice(0, 10).forEach(function(n) {
         var overdue = n.due_date && new Date(n.due_date) < new Date();
         html += '<div class="ac-briefing-action-row' + (overdue ? ' ac-briefing-action-row--overdue' : '') + '">';
         html += '<span class="ac-briefing-action-seq">' + esc(n.seq_id || 'A') + '</span>';
         html += '<span class="ac-briefing-action-summary">' +
                 esc((n.summary || '').slice(0, 80)) + '</span>';
-        // C-11: owner span — percolate trigger source #5
         if (n._owner_name && n._owner_resource_id) {
           html += '<span class="ac-briefing-owner" data-owner-id="' +
                   esc(n._owner_resource_id) +
@@ -3802,9 +3807,41 @@
         }
         html += '</div>';
       });
-      if (actionsSummary.nodes.length > 10) {
+      if (actionNodes.length > 10) {
         html += '<div class="ac-muted ac-briefing-more">+' +
-                (actionsSummary.nodes.length - 10) + ' more</div>';
+                (actionNodes.length - 10) + ' more</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // ── PRIOR NOTES ──
+    html += '<div class="ac-briefing-notes">';
+    html += '<div class="ac-briefing-section-label">PRIOR NOTES</div>';
+    if (!noteNodes.length) {
+      html += '<div class="ac-muted">No prior notes in this workstream.</div>';
+    } else {
+      html += '<div class="ac-briefing-notes-summary" data-action="toggle-notes-detail">';
+      html += '<span class="ac-briefing-actions-count">' + noteNodes.length + ' notes</span>';
+      html += ' <span class="ac-briefing-actions-expand">\u25b8</span>';
+      html += '</div>';
+      html += '<div class="ac-briefing-notes-detail" id="ac-briefing-notes-detail" style="display:none;">';
+      noteNodes.slice(0, 10).forEach(function(n) {
+        html += '<div class="ac-briefing-action-row">';
+        html += '<span class="ac-briefing-action-seq">' + esc(n.seq_id || 'N') + '</span>';
+        html += '<span class="ac-briefing-action-summary">' +
+                esc((n.summary || '').slice(0, 80)) + '</span>';
+        if (n._owner_name && n._owner_resource_id) {
+          html += '<span class="ac-briefing-owner" data-owner-id="' +
+                  esc(n._owner_resource_id) +
+                  '" data-action="percolate-owner">' +
+                  esc(n._owner_name) + '</span>';
+        }
+        html += '</div>';
+      });
+      if (noteNodes.length > 10) {
+        html += '<div class="ac-muted ac-briefing-more">+' +
+                (noteNodes.length - 10) + ' more</div>';
       }
       html += '</div>';
     }
@@ -3885,11 +3922,21 @@
 
       if (action === 'toggle-actions-detail') {
         var detail = tabbody.querySelector('#ac-briefing-actions-detail');
-        var arrow  = tabbody.querySelector('.ac-briefing-actions-expand');
+        var arrow  = tabbody.querySelector('.ac-briefing-actions-summary .ac-briefing-actions-expand');
         if (!detail) return;
         var visible = detail.style.display !== 'none';
         detail.style.display = visible ? 'none' : '';
         if (arrow) arrow.textContent = visible ? '\u25b8' : '\u25be';
+        return;
+      }
+
+      if (action === 'toggle-notes-detail') {
+        var notesDetail = tabbody.querySelector('#ac-briefing-notes-detail');
+        var notesArrow  = tabbody.querySelector('.ac-briefing-notes-summary .ac-briefing-actions-expand');
+        if (!notesDetail) return;
+        var notesVisible = notesDetail.style.display !== 'none';
+        notesDetail.style.display = notesVisible ? 'none' : '';
+        if (notesArrow) notesArrow.textContent = notesVisible ? '\u25b8' : '\u25be';
         return;
       }
 
