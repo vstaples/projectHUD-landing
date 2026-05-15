@@ -3638,7 +3638,7 @@
       var ids = meetings.map(function(m) { return m.meeting_id; }).join(',');
       return API.get(
         'accord_nodes?meeting_id=in.(' + ids + ')' +
-        '&tag=eq.action' +
+        '&tag=in.(action,note)' +
         '&select=node_id,summary,due_date,created_by,status,seq_id' +
         '&order=due_date.asc.nullslast'
       ).then(function(nodes) {
