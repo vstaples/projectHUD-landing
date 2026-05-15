@@ -921,14 +921,20 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 3px;
-  background: var(--ac-cyan);
-  opacity: 0.7;
-  border-radius: 2px;
+  width: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--ac-amber) 0px,
+    var(--ac-amber) 6px,
+    transparent 6px,
+    transparent 10px
+  );
+  opacity: 0.8;
+  border-radius: 0;
   cursor: ew-resize;
   z-index: 20;
   transform: translateX(-50%);
-  transition: opacity 120ms, width 120ms;
+  transition: opacity 120ms;
   pointer-events: all;
 }
 .ac-film-scrub-handle::before {
@@ -947,15 +953,14 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%) rotate(45deg);
-  width: 8px;
-  height: 8px;
-  background: var(--ac-cyan);
+  width: 9px;
+  height: 9px;
+  background: var(--ac-amber);
   border-radius: 1px;
 }
 .ac-film-scrub-handle:hover,
 .ac-film-scrub-handle.dragging {
   opacity: 1;
-  width: 4px;
 }
 /* Track must be position:relative for handle absolute positioning */
 .ac-film-track { position: relative; }
