@@ -1273,7 +1273,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-briefing-note-seq   { font-family: var(--ac-font-mono); font-size: 10px; color: #00B0F0; flex-shrink: 0; }
 .ac-briefing-risk-seq   { font-family: var(--ac-font-mono); font-size: 10px; color: var(--ac-rose); flex-shrink: 0; }
 .ac-briefing-action-summary { flex: 1; font-size: 12px; color: var(--ac-text-secondary); }
-.ac-briefing-action-due { font-family: var(--ac-font-mono); font-size: 10px; color: var(--ac-text-tertiary); }
+.ac-briefing-action-due { font-family: var(--ac-font-mono); font-size: 10px; color: var(--ac-amber); }
 .ac-overdue { color: var(--ac-rose) !important; }
 .ac-briefing-more { font-size: 10px; padding: 4px 0; }
 .ac-briefing-decision-row { display: flex; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--ac-border-subtle); align-items: baseline; }
@@ -1622,7 +1622,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   background: var(--ac-bg-tile); color: var(--ac-text-secondary);
   border-radius: 8px; padding: 0 5px; font-size: 9px;
 }
-.ac-kanban-cards { display: flex; flex-direction: column; gap: 5px; min-height: 40px; }
+.ac-kanban-cards { display: flex; flex-direction: column; gap: 5px; min-height: 120px; flex: 1; }
 .ac-kanban-cards--drag-over { background: var(--ac-bg-tile); border-radius: 4px; }
 .ac-kanban-empty { font-size: 10px; color: var(--ac-text-faint); padding: 6px 0; }
 /* X-41: sub-label divider between past-due and merged unscheduled items */
