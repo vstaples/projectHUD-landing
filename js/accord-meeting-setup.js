@@ -3062,9 +3062,14 @@
 
     // Header
     html += '<div class="ac-film-header">';
-    html += '<span class="ac-film-label">WORKSTREAM TIMELINE \u00b7 ';
+    html += '<span class="ac-film-label ac-film-label--toggle" data-action="film-collapse-toggle">';
+    html += 'WORKSTREAM TIMELINE \u00b7 ';
     html += priorCount + ' PRIOR MEETING' + (priorCount !== 1 ? 'S' : '');
-    html += ' \u00b7 CLICK ANY FRAME TO SCRUB</span>';
+    html += ' \u00b7 CLICK ANY FRAME TO SCRUB';
+    // Collapse arrow — ▾ expanded, ▸ collapsed
+    var filmCollapsed = localStorage.getItem('accord-film-collapsed') === '1';
+    html += ' <span class="ac-film-collapse-arrow">' + (filmCollapsed ? '\u25b8' : '\u25be') + '</span>';
+    html += '</span>';
     html += '<div class="ac-film-controls">';
     html += '<span class="ac-film-ctrl" data-action="scrub-first">\u23ee FIRST</span>';
     html += '<span class="ac-film-ctrl ac-film-ctrl--active" data-action="scrub-today">\u2299 TODAY</span>';
@@ -3104,6 +3109,13 @@
     html += '</div>'; // .ac-film-track
 
     content.innerHTML = html;
+
+    // Apply collapsed state on render
+    var track = content.querySelector('#ac-film-track');
+    if (track && localStorage.getItem('accord-film-collapsed') === '1') {
+      track.style.display = 'none';
+    }
+
     _wireFilmstripEvents(content, meetings, currentMeeting, workstreamId);
     _scrollToCurrentFrame(content);
   }
@@ -3323,6 +3335,33 @@
                    (ev.target.closest('[data-action]') &&
                     ev.target.closest('[data-action]').dataset.action);
       if (!action) return;
+
+      // Filmstrip collapse toggle
+      if (action === 'film-collapse-toggle') {
+        var filmTrack  = content.querySelector('#ac-film-track');
+        var arrow      = content.querySelector('.ac-film-collapse-arrow');
+        var shell      = document.querySelector('.ac-setup-shell');
+        var collapsed  = localStorage.getItem('accord-film-collapsed') === '1';
+        if (collapsed) {
+          // Expand
+          localStorage.removeItem('accord-film-collapsed');
+          if (filmTrack) filmTrack.style.display = '';
+          if (arrow) arrow.textContent = '\u25be';
+          // Restore saved height
+          var savedH = parseInt(localStorage.getItem(LS_KEY_FILM), 10);
+          if (shell) _setShellFilmstripRow(shell, (savedH >= FILM_MIN_H && savedH <= FILM_MAX_H) ? savedH : FILM_DEFAULT);
+        } else {
+          // Collapse — save current height first
+          var strip = document.querySelector('.ac-setup-filmstrip');
+          if (strip) localStorage.setItem(LS_KEY_FILM, String(strip.offsetHeight));
+          localStorage.setItem('accord-film-collapsed', '1');
+          if (filmTrack) filmTrack.style.display = 'none';
+          if (arrow) arrow.textContent = '\u25b8';
+          // Shrink grid row to header-only height
+          if (shell) _setShellFilmstripRow(shell, 32);
+        }
+        return;
+      }
 
       var priorMeetings = meetings.filter(function(m) {
         return m.state === 'closed' || m.state === 'sealed';
