@@ -7499,7 +7499,8 @@
     }
 
     // ── CMD-ACCORD-SETUP-SLIDESHOW-1: rotation engine init ───────
-    _initSlideshow(meeting, workstreamId);
+    // X-47: auto-rotate slideshow removed — tab switching is manual only.
+    // _initSlideshow(meeting, workstreamId);
 
     // Breadcrumb async resolve — also caches _workstreamName for briefing
     // CMD-ACCORD-SETUP-LAYOUT-1: breadcrumb element no longer in shell;
