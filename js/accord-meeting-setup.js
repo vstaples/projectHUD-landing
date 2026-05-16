@@ -2903,6 +2903,16 @@
     var footer = document.querySelector('.ac-setup-footer');
     if (!footer) return;
 
+    // Non-organizers see no footer — Save & Invite and Begin Meeting
+    // are organizer-only controls.
+    var me = window.Accord && window.Accord.state && window.Accord.state.me;
+    var isOrganizer = me && (me.id === meeting.organizer_id);
+    if (!isOrganizer) {
+      footer.style.display = 'none';
+      return;
+    }
+    footer.style.display = '';
+
     footer.innerHTML = _footerLoadingHtml();
 
     Promise.all([
@@ -2965,19 +2975,15 @@
 
     // Action buttons (right)
     html += '<div class="ac-footer-right">';
-    // Only the organizer sees Save & Invite and Begin Meeting
-    var me = window.Accord && window.Accord.state && window.Accord.state.me;
-    var isOrganizer = me && (me.id === meeting.organizer_id);
-    if (isOrganizer) {
-      if (meeting.scheduled_for) {
-        html += '<button class="ac-btn-secondary" data-action="save-invite"' +
-                ' title="Send invitations to pending attendees">Save &amp; invite</button>';
-      } else {
-        html += '<button class="ac-btn-secondary" data-action="save-invite" disabled' +
-                ' title="Set a meeting date before sending invitations">Save &amp; invite</button>';
-      }
-      html += '<button class="ac-btn-primary" data-action="begin-meeting">Begin Meeting \u2192</button>';
+    // E-Phase: Save & invite button — enabled only when meeting.scheduled_for is set.
+    if (meeting.scheduled_for) {
+      html += '<button class="ac-btn-secondary" data-action="save-invite"' +
+              ' title="Send invitations to pending attendees">Save &amp; invite</button>';
+    } else {
+      html += '<button class="ac-btn-secondary" data-action="save-invite" disabled' +
+              ' title="Set a meeting date before sending invitations">Save &amp; invite</button>';
     }
+    html += '<button class="ac-btn-primary" data-action="begin-meeting">Begin Meeting \u2192</button>';
     html += '</div>';
 
     return html;
