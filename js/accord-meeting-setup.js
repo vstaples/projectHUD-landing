@@ -7155,6 +7155,14 @@
               esc(action._owner_name) + '</div>';
     }
 
+    // × button to clear due_date — only shown when card is in a date column
+    if (action.due_date && !action._unscheduled) {
+      html += '<button class="ac-action-clear-due" ' +
+              'data-action="action-clear-due" ' +
+              'data-node-id="' + esc(action.node_id) + '" ' +
+              'title="Clear due date — move back to unscheduled">×</button>';
+    }
+
     html += '</div>';
     return html;
   }
@@ -7228,6 +7236,28 @@
         var view = btn && btn.dataset.view;
         if (view === 'kanban' && currentView !== 'kanban') { onKanban(); return; }
         if (view === 'grid'   && currentView !== 'grid')   { onGrid();   return; }
+        return;
+      }
+
+      if (action === 'action-clear-due') {
+        ev.stopPropagation(); // prevent action-card-click from firing
+        var clearBtn = ev.target.closest('[data-action="action-clear-due"]');
+        if (!clearBtn) return;
+        var nodeId = clearBtn.dataset.nodeId;
+        if (!nodeId) return;
+        // Optimistic update
+        var a = actions.find(function(x) { return x.node_id === nodeId; });
+        if (a) a.due_date = null;
+        var liveBody = document.querySelector('.ac-col-tabbody[data-col="right"]');
+        if (liveBody) _paintActionItems(liveBody, actions, meeting);
+        // PATCH due_date to null
+        API.patch('accord_nodes?node_id=eq.' + nodeId, { due_date: null })
+          .catch(function(e) {
+            console.error('[AccordMeetingSetup] clear due_date failed', e);
+            // Revert if PATCH fails — re-fetch to get true state
+            var revertBody = document.querySelector('.ac-col-tabbody[data-col="right"]');
+            if (revertBody) _paintActionItems(revertBody, actions, meeting);
+          });
         return;
       }
 

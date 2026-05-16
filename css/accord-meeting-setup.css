@@ -3558,3 +3558,15 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
   font-size: 9px; letter-spacing: 0.08em; padding: 6px; cursor: pointer;
 }
 .ac-dp-btn:hover { border-color: #5eead4; color: #5eead4; }
+
+/* × clear due-date button on action cards */
+.ac-action-clear-due {
+  position: absolute; top: 4px; right: 4px;
+  background: none; border: none;
+  color: var(--ac-text-tertiary); font-size: 13px;
+  cursor: pointer; padding: 0 3px; line-height: 1;
+  opacity: 0; transition: opacity 120ms, color 120ms;
+}
+.ac-action-card { position: relative; }
+.ac-action-card:hover .ac-action-clear-due { opacity: 1; }
+.ac-action-clear-due:hover { color: #ff4d6d; }
