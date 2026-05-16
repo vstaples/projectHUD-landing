@@ -2965,16 +2965,19 @@
 
     // Action buttons (right)
     html += '<div class="ac-footer-right">';
-    // E-Phase: Save & invite button — enabled only when meeting.scheduled_for is set.
-    // D-S3 hard guard: an invitation without a date is meaningless.
-    if (meeting.scheduled_for) {
-      html += '<button class="ac-btn-secondary" data-action="save-invite"' +
-              ' title="Send invitations to pending attendees">Save &amp; invite</button>';
-    } else {
-      html += '<button class="ac-btn-secondary" data-action="save-invite" disabled' +
-              ' title="Set a meeting date before sending invitations">Save &amp; invite</button>';
+    // Only the organizer sees Save & Invite and Begin Meeting
+    var me = window.Accord && window.Accord.state && window.Accord.state.me;
+    var isOrganizer = me && (me.id === meeting.organizer_id);
+    if (isOrganizer) {
+      if (meeting.scheduled_for) {
+        html += '<button class="ac-btn-secondary" data-action="save-invite"' +
+                ' title="Send invitations to pending attendees">Save &amp; invite</button>';
+      } else {
+        html += '<button class="ac-btn-secondary" data-action="save-invite" disabled' +
+                ' title="Set a meeting date before sending invitations">Save &amp; invite</button>';
+      }
+      html += '<button class="ac-btn-primary" data-action="begin-meeting">Begin Meeting \u2192</button>';
     }
-    html += '<button class="ac-btn-primary" data-action="begin-meeting">Begin Meeting \u2192</button>';
     html += '</div>';
 
     return html;
