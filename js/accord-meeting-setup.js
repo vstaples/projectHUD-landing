@@ -62,6 +62,7 @@
   // load so node seq IDs + summary text display without a drag gesture.
   var FILM_DEFAULT = 150;
   var FOOTER_H     = 54;
+  var _hideFooter  = false;  // X: set true for non-organizers; collapses footer grid row
   var LS_KEY_LEFT  = 'accord-setup-col-left-w';
   var LS_KEY_RIGHT = 'accord-setup-col-right-w';
   var LS_KEY_FILM  = 'accord-setup-filmstrip-h';
@@ -1704,8 +1705,8 @@
   }
 
   function _setShellFilmstripRow(shell, h) {
-    // Header is auto, columns is 1fr, filmstrip is the variable, footer is 54px.
-    shell.style.gridTemplateRows = 'auto 1fr ' + h + 'px ' + FOOTER_H + 'px';
+    // Header is auto, columns is 1fr, filmstrip is the variable, footer is 54px (or 0 for non-organizer).
+    shell.style.gridTemplateRows = 'auto 1fr ' + h + 'px ' + (_hideFooter ? '0px' : FOOTER_H + 'px');
   }
 
   // ── Filmstrip drag handlers ──────────────────────────────────
@@ -2909,14 +2910,13 @@
     var isOrganizer = _isCurrentUserOrganizer(meeting) ||
                       (me && me.id === meeting.organizer_id);
     if (!isOrganizer) {
+      _hideFooter = true;
       footer.style.display = 'none';
       var shell = document.querySelector('.ac-setup-shell');
-      if (shell) {
-        var current = shell.style.gridTemplateRows || getComputedStyle(shell).gridTemplateRows;
-        shell.style.gridTemplateRows = current.trim().replace(/\S+$/, '0px');
-      }
+      if (shell) _setShellFilmstripRow(shell, parseInt(shell.style.gridTemplateRows.split(' ')[2]) || FILM_DEFAULT);
       return;
     }
+    _hideFooter = false;
     footer.style.display = '';
 
     footer.innerHTML = _footerLoadingHtml();
