@@ -1,0 +1,383 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.ws-root {
+  font-family: 'IBM Plex Mono', 'SF Mono', monospace;
+  background: #0d1117; color: #e6edf3;
+  border-radius: 8px; overflow: hidden;
+}
+.ws-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.10);
+  background: #0a0e14;
+}
+.ws-breadcrumb { font-size: 12px; letter-spacing: 0.08em; color: #6a8aaa; text-transform: uppercase; }
+.ws-breadcrumb span { color: #aab8c8; }
+.ws-btn {
+  font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 5px 12px; border-radius: 4px;
+  background: rgba(255,255,255,0.07); color: #aab8c8;
+  border: 1px solid rgba(255,255,255,0.15); cursor: pointer; margin-left: 8px;
+}
+.ws-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px 12px; border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.ws-title { font-size: 24px; font-weight: 700; color: #f0f6fc; letter-spacing: -0.01em; }
+
+/* STAT TILES */
+.stat-tiles { display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid rgba(255,255,255,0.08); }
+.stat-tile { display: flex; flex-direction: column; padding: 13px 16px 12px; border-right: 1px solid rgba(255,255,255,0.07); gap: 4px; }
+.stat-tile:last-child { border-right: none; }
+.stat-label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #6a7a8a; }
+.stat-value { font-size: 22px; font-weight: 700; color: #f0f6fc; line-height: 1; }
+.stat-sub { font-size: 12px; color: #7a8a9a; }
+.tile-warn .stat-value { color: #ffbb22; }
+.tile-cyan .stat-value { color: #33ddff; }
+.tile-rose .stat-value { color: #ff6688; }
+
+/* SECTION */
+.section-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px 8px; }
+.section-label { font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase; color: #aab8c8; }
+.new-btn {
+  font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 5px 14px; border-radius: 4px;
+  background: rgba(0,210,255,0.12); color: #33ddff;
+  border: 1px solid rgba(0,210,255,0.30); cursor: pointer;
+}
+.col-headers { display: grid; grid-template-columns: 1fr 210px 130px; padding: 7px 16px 5px 20px; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.col-hdr { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #4a5a6a; }
+.col-hdr.right { text-align: right; }
+
+/* CARDS */
+.cards-list { display: flex; flex-direction: column; gap: 6px; padding: 6px 14px 18px; }
+.mcard {
+  background: #161c26; border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 6px; position: relative; overflow: hidden; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.mcard:hover { border-color: rgba(255,255,255,0.22); background: #1c2430; }
+.mcard::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.state-idle::before { background: #ffbb22; }
+.state-pending::before { background: #ff6688; }
+.state-live::before { background: #33ddff; }
+.state-closed::before { background: #3d5070; }
+
+.card-grid { display: grid; grid-template-columns: 1fr 210px 130px; gap: 12px; padding: 12px 14px 12px 20px; align-items: start; }
+
+/* COL 1 */
+.card-col1 { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.card-row1 { display: flex; align-items: center; gap: 9px; }
+.state-badge { font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; font-weight: 700; padding: 3px 8px; border-radius: 3px; flex-shrink: 0; }
+.badge-idle { background: rgba(255,187,34,0.16); color: #ffbb22; border: 1px solid rgba(255,187,34,0.32); }
+.badge-pending { background: rgba(255,102,136,0.16); color: #ff6688; border: 1px solid rgba(255,102,136,0.35); }
+.badge-live { background: rgba(51,221,255,0.14); color: #33ddff; border: 1px solid rgba(51,221,255,0.34); animation: pulse 1.4s infinite; }
+.badge-closed { background: rgba(255,255,255,0.07); color: #7a8a9a; border: 1px solid rgba(255,255,255,0.12); }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.5} }
+.card-title { font-size: 14px; font-weight: 600; color: #f0f6fc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.state-closed .card-title { color: #b0bac8; }
+.card-stakes { font-size: 12px; color: #c0c8d0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; border-left: 3px solid rgba(255,255,255,0.14); padding-left: 8px; }
+.state-idle .card-stakes { border-left-color: rgba(255,187,34,0.40); }
+.state-pending .card-stakes { border-left-color: rgba(255,102,136,0.35); }
+.card-signals { display: flex; gap: 5px; flex-wrap: wrap; }
+.sig { font-size: 12px; padding: 3px 8px; border-radius: 3px; background: rgba(255,255,255,0.06); color: #8a9aaa; }
+.sig.s-warn { background: rgba(255,187,34,0.11); color: #ffbb22; }
+.sig.s-ok { background: rgba(0,229,160,0.10); color: #22ddaa; }
+.sig.s-rose { background: rgba(255,102,136,0.11); color: #ff6688; }
+.sig.s-dim { color: #5a6a7a; background: rgba(255,255,255,0.04); }
+
+/* COL 2 */
+.card-col2 { display: flex; flex-direction: column; gap: 8px; }
+.meta-row { display: flex; align-items: center; gap: 7px; }
+.meta-text { font-size: 12px; color: #8a9aaa; }
+.meta-date { font-size: 12px; color: #c0c8d0; font-weight: 500; }
+.meta-sub { font-size: 12px; color: #6a7a8a; }
+.org-avatar { width: 22px; height: 22px; border-radius: 50%; background: #1a3a5c; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; color: #33ddff; flex-shrink: 0; }
+
+/* RSVP avatar rings */
+.att-row { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+.att-wrap { position: relative; width: 24px; height: 24px; margin-right: 2px; }
+.att-av {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 7px; font-weight: 700;
+  position: absolute; top: 1px; left: 1px;
+}
+.att-ring {
+  position: absolute; top: 0; left: 0;
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid transparent;
+}
+.ring-accepted { border-color: #22ddaa; }
+.ring-pending { border-color: #ffbb22; }
+.ring-declined { border-color: #ff6688; }
+.ring-none { border-color: transparent; }
+.att-count { font-size: 12px; color: #7a8a9a; margin-left: 6px; }
+
+/* RSVP summary row */
+.rsvp-summary { display: flex; gap: 8px; align-items: center; }
+.rsvp-chip { font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.rsvp-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dot-accepted { background: #22ddaa; }
+.dot-pending { background: #ffbb22; }
+.dot-declined { background: #ff6688; }
+.rsvp-chip span { color: #8a9aaa; }
+
+/* COL 3 */
+.card-col3 { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.action-btn { font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 600; padding: 5px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+.btn-prepare { background: rgba(255,187,34,0.14); color: #ffbb22; border: 1px solid rgba(255,187,34,0.32); }
+.btn-pending { background: rgba(255,102,136,0.14); color: #ff6688; border: 1px solid rgba(255,102,136,0.32); }
+.btn-view { background: rgba(255,255,255,0.06); color: #8a9aaa; border: 1px solid rgba(255,255,255,0.13); }
+.btn-resend { font-size: 11px; color: #6a7a8a; background: none; border: none; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.countdown { font-size: 12px; color: #ffbb22; text-align: right; }
+.state-pending .countdown { color: #ff6688; }
+</style>
+
+<div class="ws-root">
+
+  <div class="ws-topbar">
+    <span class="ws-breadcrumb">Constellation › <span>C-11 Test Workstream</span></span>
+    <div>
+      <button class="ws-btn">Rename</button>
+      <button class="ws-btn">Archive</button>
+    </div>
+  </div>
+
+  <div class="ws-title-row">
+    <span class="ws-title">C-11 Test Workstream</span>
+  </div>
+
+  <div class="stat-tiles">
+    <div class="stat-tile">
+      <span class="stat-label">Meetings</span>
+      <span class="stat-value">6</span>
+      <span class="stat-sub">1 preparing · 1 pending · 4 closed</span>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-label">Nodes captured</span>
+      <span class="stat-value">14</span>
+      <span class="stat-sub">3 decisions · 4 actions · 5 notes</span>
+    </div>
+    <div class="stat-tile tile-warn">
+      <span class="stat-label">Open actions</span>
+      <span class="stat-value">4</span>
+      <span class="stat-sub">1 due this week</span>
+    </div>
+    <div class="stat-tile tile-rose">
+      <span class="stat-label">RSVPs pending</span>
+      <span class="stat-value">2</span>
+      <span class="stat-sub">across 1 meeting · 3 days old</span>
+    </div>
+    <div class="stat-tile tile-cyan">
+      <span class="stat-label">Next meeting</span>
+      <span class="stat-value" style="font-size:17px;padding-top:3px;">May 18</span>
+      <span class="stat-sub">Mon · 2:00 PM · in 2 days</span>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <span class="section-label">Direct meetings</span>
+    <button class="new-btn">+ New meeting</button>
+  </div>
+
+  <div class="col-headers">
+    <span class="col-hdr">Meeting · Stakes · Signals</span>
+    <span class="col-hdr">When · Who · Attending</span>
+    <span class="col-hdr right">Action</span>
+  </div>
+
+  <div class="cards-list">
+
+    <!-- PREPARING -->
+    <div class="mcard state-idle">
+      <div class="card-grid">
+        <div class="card-col1">
+          <div class="card-row1">
+            <span class="state-badge badge-idle">Preparing</span>
+            <span class="card-title">C-11 Percolate Smoke Test Meeting</span>
+          </div>
+          <div class="card-stakes">Must complete endoscope prototype by 8/11; ratify vendor selection ASAP</div>
+          <div class="card-signals">
+            <span class="sig">2 outcomes set</span>
+            <span class="sig">2 agenda items</span>
+            <span class="sig s-warn">4 actions open</span>
+            <span class="sig s-warn">1 unresolved dissent</span>
+            <span class="sig s-ok">3 of 3 accepted</span>
+          </div>
+        </div>
+        <div class="card-col2">
+          <div class="meta-row"><span class="meta-date">Mon May 18 · 2:00 PM</span><span class="meta-sub">· 60 min</span></div>
+          <div class="meta-row">
+            <div class="org-avatar">VS</div>
+            <span class="meta-text">Vaughn Staples</span>
+          </div>
+          <div class="att-row">
+            <div class="att-wrap"><div class="att-av av-vs">VS</div><div class="att-ring ring-accepted"></div></div>
+            <div class="att-wrap"><div class="att-av av-ak">AK</div><div class="att-ring ring-accepted"></div></div>
+            <div class="att-wrap"><div class="att-av av-rw">RW</div><div class="att-ring ring-accepted"></div></div>
+            <span class="att-count">3 attending</span>
+          </div>
+          <div class="rsvp-summary">
+            <div class="rsvp-chip"><span class="rsvp-dot dot-accepted"></span><span>3 accepted</span></div>
+          </div>
+        </div>
+        <div class="card-col3">
+          <span class="countdown">in 2 days</span>
+          <button class="action-btn btn-prepare">Prepare →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PENDING -->
+    <div class="mcard state-pending">
+      <div class="card-grid">
+        <div class="card-col1">
+          <div class="card-row1">
+            <span class="state-badge badge-pending">Pending RSVPs</span>
+            <span class="card-title">C-11 Phase 2 Planning · Scope Review</span>
+          </div>
+          <div class="card-stakes">Define Phase 2 deliverables; confirm resource availability for Q3 build</div>
+          <div class="card-signals">
+            <span class="sig">1 outcome set</span>
+            <span class="sig s-rose">2 RSVPs outstanding</span>
+            <span class="sig s-dim">Invited 3 days ago</span>
+            <span class="sig s-warn">No agenda yet</span>
+          </div>
+        </div>
+        <div class="card-col2">
+          <div class="meta-row"><span class="meta-date">Wed May 21 · 10:00 AM</span><span class="meta-sub">· 45 min</span></div>
+          <div class="meta-row">
+            <div class="org-avatar">VS</div>
+            <span class="meta-text">Vaughn Staples</span>
+          </div>
+          <div class="att-row">
+            <div class="att-wrap"><div class="att-av av-vs">VS</div><div class="att-ring ring-accepted"></div></div>
+            <div class="att-wrap"><div class="att-av av-ak">AK</div><div class="att-ring ring-pending"></div></div>
+            <div class="att-wrap"><div class="att-av av-rw">RW</div><div class="att-ring ring-pending"></div></div>
+            <div class="att-wrap"><div class="att-av av-jm">JM</div><div class="att-ring ring-declined"></div></div>
+            <span class="att-count">4 invited</span>
+          </div>
+          <div class="rsvp-summary">
+            <div class="rsvp-chip"><span class="rsvp-dot dot-accepted"></span><span>1 accepted</span></div>
+            <div class="rsvp-chip"><span class="rsvp-dot dot-pending"></span><span>2 pending</span></div>
+            <div class="rsvp-chip"><span class="rsvp-dot dot-declined"></span><span>1 declined</span></div>
+          </div>
+        </div>
+        <div class="card-col3">
+          <span class="countdown">in 5 days</span>
+          <button class="action-btn btn-pending">Manage invites →</button>
+          <button class="btn-resend">Resend to pending</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLOSED 4 -->
+    <div class="mcard state-closed">
+      <div class="card-grid">
+        <div class="card-col1">
+          <div class="card-row1">
+            <span class="state-badge badge-closed">Closed</span>
+            <span class="card-title">C-11 Prior Meeting 4 · Action Review</span>
+          </div>
+          <div class="card-stakes">Vendor API confirmation pending; Phase 1 spec 80% complete</div>
+          <div class="card-signals">
+            <span class="sig s-ok">3 decisions sealed</span>
+            <span class="sig">4 actions assigned</span>
+            <span class="sig s-dim">60 min · 14 threads</span>
+          </div>
+        </div>
+        <div class="card-col2">
+          <div class="meta-row"><span class="meta-date">Apr 30, 2026</span><span class="meta-sub">· 60 min</span></div>
+          <div class="meta-row">
+            <div class="org-avatar">VS</div>
+            <span class="meta-text">Vaughn Staples</span>
+          </div>
+          <div class="att-row">
+            <div class="att-wrap"><div class="att-av av-vs">VS</div><div class="att-ring ring-none"></div></div>
+            <div class="att-wrap"><div class="att-av av-ak">AK</div><div class="att-ring ring-none"></div></div>
+            <span class="att-count">2 attended</span>
+          </div>
+        </div>
+        <div class="card-col3">
+          <button class="action-btn btn-view">View record →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLOSED 3 -->
+    <div class="mcard state-closed">
+      <div class="card-grid">
+        <div class="card-col1">
+          <div class="card-row1">
+            <span class="state-badge badge-closed">Closed</span>
+            <span class="card-title">C-11 Prior Meeting 3 · Decision Gate</span>
+          </div>
+          <div class="card-stakes">Adopt revised component spec as Phase 1 baseline — pending Angela sign-off</div>
+          <div class="card-signals">
+            <span class="sig s-ok">2 decisions sealed</span>
+            <span class="sig">2 actions assigned</span>
+            <span class="sig s-dim">45 min · 8 threads</span>
+          </div>
+        </div>
+        <div class="card-col2">
+          <div class="meta-row"><span class="meta-date">Apr 14, 2026</span><span class="meta-sub">· 45 min</span></div>
+          <div class="meta-row">
+            <div class="org-avatar">VS</div>
+            <span class="meta-text">Vaughn Staples</span>
+          </div>
+          <div class="att-row">
+            <div class="att-wrap"><div class="att-av av-vs">VS</div><div class="att-ring ring-none"></div></div>
+            <div class="att-wrap"><div class="att-av av-ak">AK</div><div class="att-ring ring-none"></div></div>
+            <div class="att-wrap"><div class="att-av av-rw">RW</div><div class="att-ring ring-none"></div></div>
+            <span class="att-count">3 attended</span>
+          </div>
+        </div>
+        <div class="card-col3">
+          <button class="action-btn btn-view">View record →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLOSED 1 -->
+    <div class="mcard state-closed">
+      <div class="card-grid">
+        <div class="card-col1">
+          <div class="card-row1">
+            <span class="state-badge badge-closed">Closed</span>
+            <span class="card-title">C-11 Prior Meeting 1 · Kickoff</span>
+          </div>
+          <div class="card-stakes">Workstream objectives confirmed; engineering capacity aligned with stakeholders</div>
+          <div class="card-signals">
+            <span class="sig s-ok">1 decision sealed</span>
+            <span class="sig">2 actions assigned</span>
+            <span class="sig s-dim">60 min · 10 threads</span>
+          </div>
+        </div>
+        <div class="card-col2">
+          <div class="meta-row"><span class="meta-date">Mar 15, 2026</span><span class="meta-sub">· 60 min</span></div>
+          <div class="meta-row">
+            <div class="org-avatar">VS</div>
+            <span class="meta-text">Vaughn Staples</span>
+          </div>
+          <div class="att-row">
+            <div class="att-wrap"><div class="att-av av-vs">VS</div><div class="att-ring ring-none"></div></div>
+            <div class="att-wrap"><div class="att-av av-ak">AK</div><div class="att-ring ring-none"></div></div>
+            <div class="att-wrap"><div class="att-av av-rw">RW</div><div class="att-ring ring-none"></div></div>
+            <span class="att-count">3 attended</span>
+          </div>
+        </div>
+        <div class="card-col3">
+          <button class="action-btn btn-view">View record →</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<style>
+.av-vs { background: #1a3a5c; color: #33ddff; }
+.av-ak { background: #1a3a2a; color: #22ddaa; }
+.av-rw { background: #3a2a1a; color: #ffbb22; }
+.av-jm { background: #3a1a2a; color: #ff6688; }
+</style>

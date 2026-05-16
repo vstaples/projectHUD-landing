@@ -1,0 +1,525 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.shell {
+  font-family: 'IBM Plex Mono', 'SF Mono', monospace;
+  background: #0a0e14;
+  color: #e6edf3;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 680px;
+}
+
+/* ── TOP NAV ── */
+.topnav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 18px;
+  background: #060a0f;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+.topnav-left { font-size: 12px; color: #5a7a9a; letter-spacing: 0.06em; }
+.topnav-left b { color: #aab8c8; }
+.topnav-badge {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; padding: 3px 10px; border-radius: 3px;
+  background: rgba(255,187,34,0.14); color: #ffbb22;
+  border: 1px solid rgba(255,187,34,0.30);
+}
+.back-btn { font-size: 12px; color: #6a8aaa; cursor: pointer; }
+
+/* ── HEADER / INVITATION FORM ── */
+.invite-header {
+  background: #0d1420;
+  border-bottom: 2px solid rgba(255,187,34,0.20);
+  padding: 16px 20px 14px;
+  flex-shrink: 0;
+}
+.invite-label {
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #ffbb22; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+}
+.invite-label::after { content: ''; flex: 1; height: 1px; background: rgba(255,187,34,0.18); }
+.title-field {
+  font-size: 22px; font-weight: 700; color: #f0f6fc;
+  border: none; background: transparent;
+  border-bottom: 1px dashed rgba(255,255,255,0.18);
+  width: 100%; padding-bottom: 4px; margin-bottom: 10px;
+  letter-spacing: -0.01em; outline: none;
+}
+.stakes-field {
+  font-size: 13px; color: #c0c8d4; font-style: italic;
+  border: none; background: transparent;
+  border-bottom: 1px dashed rgba(255,255,255,0.10);
+  width: 100%; padding-bottom: 3px; margin-bottom: 12px; outline: none;
+}
+.meta-row {
+  display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+}
+.meta-field {
+  display: flex; align-items: center; gap: 6px;
+}
+.meta-field-label { font-size: 11px; color: #4a6a8a; text-transform: uppercase; letter-spacing: 0.08em; }
+.meta-field-val {
+  font-size: 12px; color: #aab8c8;
+  border-bottom: 1px dashed rgba(255,255,255,0.12);
+  padding-bottom: 1px; cursor: pointer; min-width: 80px;
+}
+.meta-field-val.empty { color: #4a5a6a; font-style: italic; }
+.badge-followup {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 3px;
+  background: rgba(0,210,255,0.12); color: #33ddff;
+  border: 1px solid rgba(0,210,255,0.25);
+}
+
+/* ── READINESS BAR ── */
+.readiness {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 20px;
+  background: #0a0e14;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.readiness-label { font-size: 12px; color: #6a7a8a; white-space: nowrap; }
+.readiness-track {
+  flex: 1; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden;
+}
+.readiness-fill { height: 100%; width: 62%; background: #ffbb22; border-radius: 2px; }
+.readiness-pct { font-size: 12px; color: #ffbb22; font-weight: 600; white-space: nowrap; }
+.readiness-items { display: flex; gap: 10px; }
+.r-item { font-size: 11px; color: #5a6a7a; display: flex; align-items: center; gap: 4px; }
+.r-dot { width: 6px; height: 6px; border-radius: 50%; }
+.r-done { background: #22ddaa; }
+.r-todo { background: #3a4a5a; }
+
+/* ── THREE COLUMNS ── */
+.columns {
+  display: grid;
+  grid-template-columns: 240px 1fr 220px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* LEFT — CONTEXT PANEL */
+.col-context {
+  background: #0a0d13;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px 7px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.panel-label { font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase; color: #4a5a6a; }
+.panel-tabs { display: flex; gap: 0; }
+.ptab {
+  font-size: 11px; color: #4a5a6a; padding: 2px 8px; cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.ptab.active { color: #8a9aaa; border-bottom-color: #5a6a7a; }
+.context-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.ctx-section-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #3a4a5a; margin-bottom: 4px; }
+.ctx-card {
+  background: #0d1117; border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 4px; padding: 8px 10px;
+}
+.ctx-card-title { font-size: 12px; color: #8a9aaa; margin-bottom: 3px; }
+.ctx-card-sub { font-size: 11px; color: #4a5a6a; }
+.ctx-node {
+  display: flex; gap: 6px; align-items: flex-start;
+  padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.ctx-node:last-child { border-bottom: none; }
+.ctx-tag {
+  font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 2px; flex-shrink: 0; margin-top: 1px;
+}
+.tag-ax { background: rgba(255,187,34,0.14); color: #ffbb22; }
+.tag-dc { background: rgba(51,221,255,0.12); color: #33ddff; }
+.tag-rk { background: rgba(255,102,136,0.12); color: #ff6688; }
+.ctx-node-text { font-size: 11px; color: #7a8a9a; line-height: 1.4; }
+.ctx-owner { font-size: 10px; color: #4a5a6a; margin-top: 2px; }
+
+/* CENTER — COMPOSER */
+.col-compose {
+  background: #111820;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.compose-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 16px 7px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: #131c28;
+}
+.compose-label { font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase; color: #33ddff; }
+.compose-tabs { display: flex; gap: 0; }
+.ctab {
+  font-size: 11px; color: #5a7a9a; padding: 2px 10px; cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.ctab.active { color: #33ddff; border-bottom-color: #33ddff; }
+.compose-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; flex: 1; overflow: hidden; }
+
+.compose-section { display: flex; flex-direction: column; gap: 8px; }
+.compose-section-label {
+  font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase; color: #5a7a9a;
+  display: flex; align-items: center; gap: 8px;
+}
+.compose-section-label::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
+
+.outcome-row {
+  display: flex; align-items: center; gap: 8px;
+  background: #0d1420; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px; padding: 8px 10px;
+}
+.outcome-verb {
+  font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 3px; flex-shrink: 0;
+  background: rgba(51,221,255,0.12); color: #33ddff;
+}
+.outcome-text { font-size: 12px; color: #c0c8d4; flex: 1; }
+.outcome-owner {
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  background: rgba(51,221,255,0.08); color: #5a9aaa; flex-shrink: 0;
+}
+.add-row {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px dashed rgba(255,255,255,0.10); border-radius: 4px;
+  padding: 7px 10px; cursor: pointer;
+}
+.add-row:hover { border-color: rgba(255,255,255,0.20); background: rgba(255,255,255,0.02); }
+.add-label { font-size: 12px; color: #3a4a5a; font-style: italic; }
+
+.agenda-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: #0d1420; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px; padding: 8px 10px;
+}
+.agenda-type {
+  font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 3px; flex-shrink: 0; margin-top: 1px;
+}
+.type-decide { background: rgba(51,221,255,0.12); color: #33ddff; }
+.type-assign { background: rgba(255,187,34,0.12); color: #ffbb22; }
+.agenda-text { font-size: 12px; color: #c0c8d4; flex: 1; line-height: 1.4; }
+.agenda-dur { font-size: 11px; color: #4a5a6a; flex-shrink: 0; align-self: flex-end; }
+
+.unresolved-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: rgba(255,102,136,0.06); border: 1px solid rgba(255,102,136,0.18);
+  border-radius: 4px; padding: 8px 10px;
+}
+.unresolved-icon { font-size: 14px; color: #ff6688; flex-shrink: 0; }
+.unresolved-text { font-size: 12px; color: #c0a0a8; flex: 1; line-height: 1.4; }
+.pull-btn {
+  font-size: 11px; color: #ff6688; border: 1px solid rgba(255,102,136,0.25);
+  background: rgba(255,102,136,0.08); padding: 2px 8px; border-radius: 3px; cursor: pointer; flex-shrink: 0;
+}
+
+/* RIGHT — ATTENDEES */
+.col-attendees {
+  background: #0c1018;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.att-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px 7px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.att-label { font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase; color: #4a5a6a; }
+.att-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+
+.attendee-card {
+  background: #111820; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px; padding: 8px 10px;
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.att-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+}
+.av-vs { background: #1a3a5c; color: #33ddff; }
+.av-ak { background: #1a3a2a; color: #22ddaa; }
+.av-rw { background: #3a2a1a; color: #ffbb22; }
+.att-info { flex: 1; min-width: 0; }
+.att-name { font-size: 12px; color: #d0d8e4; font-weight: 600; }
+.att-role { font-size: 11px; color: #4a5a6a; margin-top: 1px; }
+.att-signal { font-size: 11px; color: #5a7a9a; margin-top: 3px; }
+.att-signal.warn { color: #ffbb22; }
+.rsvp-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; flex-shrink: 0;
+}
+.rsvp-accepted { background: rgba(34,221,170,0.14); color: #22ddaa; }
+.rsvp-pending { background: rgba(255,187,34,0.14); color: #ffbb22; }
+.add-att {
+  display: flex; align-items: center; gap: 6px;
+  border: 1px dashed rgba(255,255,255,0.10); border-radius: 4px;
+  padding: 7px 10px; cursor: pointer;
+}
+.add-att-label { font-size: 12px; color: #3a4a5a; font-style: italic; }
+
+.chat-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0; }
+.chat-label { font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase; color: #3a4a5a; padding: 4px 12px 6px; }
+.chat-empty { font-size: 12px; color: #2a3a4a; font-style: italic; padding: 6px 12px; }
+.chat-input {
+  margin: 4px 12px 10px;
+  background: #0a0e14; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px; padding: 7px 10px;
+  font-size: 12px; color: #4a5a6a; font-style: italic;
+  font-family: inherit;
+}
+
+/* ── FILMSTRIP BAR ── */
+.filmstrip-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 18px;
+  background: #080c10;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0; cursor: pointer;
+}
+.filmstrip-bar:hover { background: #0d1117; }
+.filmstrip-label { font-size: 12px; color: #4a5a6a; letter-spacing: 0.06em; text-transform: uppercase; }
+.filmstrip-label b { color: #6a7a8a; }
+.filmstrip-expand { font-size: 12px; color: #3a4a5a; }
+
+/* ── FOOTER ── */
+.footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px;
+  background: #060a0f;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+.footer-left { display: flex; align-items: center; gap: 12px; }
+.time-label { font-size: 12px; color: #4a5a6a; }
+.time-bar { width: 120px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.time-fill { height: 100%; width: 65%; background: #33ddff; border-radius: 2px; }
+.time-val { font-size: 12px; color: #5a8aaa; }
+.footer-warning { font-size: 12px; color: #ffbb22; }
+.footer-right { display: flex; gap: 10px; }
+.footer-btn {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 7px 16px; border-radius: 4px; cursor: pointer;
+}
+.btn-save { background: rgba(255,255,255,0.07); color: #aab8c8; border: 1px solid rgba(255,255,255,0.15); }
+.btn-begin { background: rgba(34,221,170,0.16); color: #22ddaa; border: 1px solid rgba(34,221,170,0.30); }
+</style>
+
+<div class="shell">
+
+  <div class="topnav">
+    <span class="topnav-left">PREPARING · <b>C-11 Percolate Smoke Test Meeting</b></span>
+    <span class="topnav-badge">● Composing invitation</span>
+    <span class="back-btn">← Back</span>
+  </div>
+
+  <div class="invite-header">
+    <div class="invite-label">Meeting invitation draft</div>
+    <input class="title-field" value="C-11 Percolate Smoke Test Meeting" />
+    <input class="stakes-field" value="Must complete endoscope prototype by 8/11; need to ratify materials vendor selection ASAP" />
+    <div class="meta-row">
+      <div class="meta-field">
+        <span class="meta-field-label">When</span>
+        <span class="meta-field-val">Mon May 18 · 2:00–3:00 PM</span>
+      </div>
+      <div class="meta-field">
+        <span class="meta-field-label">Where</span>
+        <span class="meta-field-val empty">add location or link</span>
+      </div>
+      <div class="meta-field">
+        <span class="meta-field-label">Workstream</span>
+        <span class="meta-field-val">C-11 Test Workstream</span>
+      </div>
+      <span class="badge-followup">↩ Follow-up</span>
+    </div>
+  </div>
+
+  <div class="readiness">
+    <span class="readiness-label">Draft readiness</span>
+    <div class="readiness-track"><div class="readiness-fill"></div></div>
+    <span class="readiness-pct">62%</span>
+    <div class="readiness-items">
+      <div class="r-item"><span class="r-dot r-done"></span>Title</div>
+      <div class="r-item"><span class="r-dot r-done"></span>Stakes</div>
+      <div class="r-item"><span class="r-dot r-done"></span>When</div>
+      <div class="r-item"><span class="r-dot r-todo"></span>Where</div>
+      <div class="r-item"><span class="r-dot r-done"></span>Outcomes</div>
+      <div class="r-item"><span class="r-dot r-todo"></span>Agenda</div>
+      <div class="r-item"><span class="r-dot r-todo"></span>Attendees ✓</div>
+    </div>
+  </div>
+
+  <div class="columns">
+
+    <div class="col-context">
+      <div class="panel-header">
+        <span class="panel-label">Context</span>
+        <div class="panel-tabs">
+          <span class="ptab active">Briefing</span>
+          <span class="ptab">Decisions</span>
+          <span class="ptab">Risks</span>
+        </div>
+      </div>
+      <div class="context-body">
+        <div>
+          <div class="ctx-section-label">Last meeting</div>
+          <div class="ctx-card">
+            <div class="ctx-card-title">Apr 30 · Action Review</div>
+            <div class="ctx-card-sub">60 min · 14 threads · 16 days ago</div>
+          </div>
+        </div>
+        <div>
+          <div class="ctx-section-label">Prior actions open</div>
+          <div class="ctx-node">
+            <span class="ctx-tag tag-ax">AX</span>
+            <div><div class="ctx-node-text">Obtain written confirmation from vendor on delivery timeline.</div><div class="ctx-owner">Angela Kim</div></div>
+          </div>
+          <div class="ctx-node">
+            <span class="ctx-tag tag-ax">AX</span>
+            <div><div class="ctx-node-text">Schedule vendor alignment call and circulate agenda.</div><div class="ctx-owner">Vaughn · due May 20</div></div>
+          </div>
+          <div class="ctx-node">
+            <span class="ctx-tag tag-ax">AX</span>
+            <div><div class="ctx-node-text">Deliver completed component spec to engineering.</div><div class="ctx-owner">Angela Kim</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="ctx-section-label">Prior decisions</div>
+          <div class="ctx-node">
+            <span class="ctx-tag tag-dc">DC</span>
+            <div><div class="ctx-node-text">Adopt phased delivery model — Phase 1 scope frozen.</div><div class="ctx-owner">Apr 14</div></div>
+          </div>
+          <div class="ctx-node">
+            <span class="ctx-tag tag-dc">DC</span>
+            <div><div class="ctx-node-text">Proceed with internal spec pending vendor confirmation.</div><div class="ctx-owner">Mar 30</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-compose">
+      <div class="compose-header">
+        <span class="compose-label">Composing</span>
+        <div class="compose-tabs">
+          <span class="ctab active">Agenda</span>
+          <span class="ctab">Minute Notes</span>
+        </div>
+      </div>
+      <div class="compose-body">
+
+        <div class="compose-section">
+          <div class="compose-section-label">Intended outcomes</div>
+          <div class="outcome-row">
+            <span class="outcome-verb">RESOLVE</span>
+            <span class="outcome-text">Resolve open spec dissent — Angela to confirm or escalate</span>
+            <span class="outcome-owner">Angela Kim</span>
+          </div>
+          <div class="outcome-row">
+            <span class="outcome-verb">DECIDE</span>
+            <span class="outcome-text">Decide on vendor selection — Vaughn to present recommendation</span>
+            <span class="outcome-owner">Vaughn Staples</span>
+          </div>
+          <div class="add-row">
+            <span class="add-label">+ add outcome…</span>
+          </div>
+        </div>
+
+        <div class="compose-section">
+          <div class="compose-section-label">Agenda</div>
+          <div class="agenda-item">
+            <span class="agenda-type type-decide">DECIDE</span>
+            <span class="agenda-text">Resolve Angela dissent on component timeline (C-11 test)</span>
+            <span class="agenda-dur">15 min</span>
+          </div>
+          <div class="agenda-item">
+            <span class="agenda-type type-decide">DECIDE</span>
+            <span class="agenda-text">Review vendor shortlist and select final candidate (C-11 test)</span>
+            <span class="agenda-dur">20 min</span>
+          </div>
+          <div class="add-row">
+            <span class="add-label">+ add agenda item… (Accord will infer NRA shape)</span>
+          </div>
+        </div>
+
+        <div class="compose-section">
+          <div class="compose-section-label">Unresolved items</div>
+          <div class="unresolved-item">
+            <span class="unresolved-icon">⚡</span>
+            <span class="unresolved-text">Unresolved dissent DS-005 in workstream. Angela dissents on Phase 1 timeline; vendor dependency not resolved.</span>
+            <button class="pull-btn">Pull as thread</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="col-attendees">
+      <div class="att-header">
+        <span class="att-label">Attendees</span>
+        <span style="font-size:12px;color:#3a5a3a;cursor:pointer;">+ add</span>
+      </div>
+      <div class="att-body">
+        <div class="attendee-card">
+          <div class="att-avatar av-vs">VS</div>
+          <div class="att-info">
+            <div class="att-name">Vaughn Staples</div>
+            <div class="att-role">Organizer</div>
+            <div class="att-signal">Owns 2 actions this workstream</div>
+          </div>
+        </div>
+        <div class="attendee-card">
+          <div class="att-avatar av-ak">AK</div>
+          <div class="att-info">
+            <div class="att-name">Angela Kim</div>
+            <div class="att-role">Participant</div>
+            <div class="att-signal warn">Owns 2 open actions · dissent open</div>
+          </div>
+          <span class="rsvp-badge rsvp-accepted">Accepted</span>
+        </div>
+        <div class="attendee-card">
+          <div class="att-avatar av-rw">RW</div>
+          <div class="att-info">
+            <div class="att-name">Ron White</div>
+            <div class="att-role">Participant</div>
+            <div class="att-signal warn">No recent activity</div>
+          </div>
+          <span class="rsvp-badge rsvp-pending">Pending</span>
+        </div>
+        <div class="add-att">
+          <span class="add-att-label">+ add attendee…</span>
+        </div>
+      </div>
+      <div class="chat-divider"></div>
+      <div class="chat-label">Team chat</div>
+      <div class="chat-empty">No messages yet.</div>
+      <div class="chat-input">Message the meeting…</div>
+    </div>
+
+  </div>
+
+  <div class="filmstrip-bar">
+    <span class="filmstrip-label"><b>4 prior meetings</b> · click to expand timeline</span>
+    <span class="filmstrip-expand">▼</span>
+  </div>
+
+  <div class="footer">
+    <div class="footer-left">
+      <span class="time-label">Time budget</span>
+      <div class="time-bar"><div class="time-fill"></div></div>
+      <span class="time-val">39 min of 60 min planned</span>
+    </div>
+    <span class="footer-warning">● Ron White — no recent activity</span>
+    <div class="footer-right">
+      <button class="footer-btn btn-save">Save &amp; Invite</button>
+      <button class="footer-btn btn-begin">Begin Meeting →</button>
+    </div>
+  </div>
+
+</div>

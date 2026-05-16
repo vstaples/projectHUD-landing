@@ -1,0 +1,515 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.shell {
+  font-family: 'IBM Plex Mono','SF Mono',monospace;
+  background: #0a0e14; color: #e6edf3;
+  border-radius: 8px; overflow: hidden;
+  display: flex; flex-direction: column; height: 780px;
+  user-select: none;
+}
+/* TOPNAV */
+.topnav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 18px; background: #060a0f; height: 46px;
+  border-bottom: 1px solid rgba(255,255,255,0.09); flex-shrink: 0;
+}
+.tn-left { display: flex; align-items: center; gap: 12px; }
+.tn-logo { font-size: 14px; font-weight: 700; color: #f0f6fc; }
+.tn-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.14); }
+.in-session-badge {
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(255,77,109,0.16); border: 1px solid rgba(255,77,109,0.34);
+  border-radius: 4px; padding: 4px 11px;
+}
+.session-pulse { width: 8px; height: 8px; border-radius: 50%; background: #ff4d6d; animation: sp 1.2s ease-in-out infinite; }
+@keyframes sp { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.85)} }
+.session-label { font-size: 12px; font-weight: 700; color: #ff6688; letter-spacing: 0.08em; text-transform: uppercase; }
+.tn-title { font-size: 13px; color: #c0c8d4; font-weight: 600; }
+.tn-right { display: flex; align-items: center; gap: 16px; }
+.timer-wrap { display: flex; flex-direction: column; align-items: center; }
+.elapsed-timer { font-size: 22px; font-weight: 700; color: #f0f6fc; letter-spacing: 0.05em; font-variant-numeric: tabular-nums; line-height: 1; }
+.elapsed-label { font-size: 10px; color: #6a7a8a; text-transform: uppercase; letter-spacing: 0.09em; margin-top: 2px; }
+.end-btn {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 8px 18px; border-radius: 4px; cursor: pointer;
+  background: rgba(255,77,109,0.16); color: #ff6688; border: 1px solid rgba(255,77,109,0.35);
+}
+.end-btn:hover { background: rgba(255,77,109,0.26); }
+.user-chip { display: flex; align-items: center; gap: 7px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); border-radius: 20px; padding: 4px 11px 4px 5px; }
+.user-av { width: 26px; height: 26px; border-radius: 50%; background: #1a3a5c; border: 2px solid #33ddff; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #33ddff; }
+.user-name { font-size: 12px; color: #b0bac8; }
+
+/* CAPTURE CONTEXT BAR */
+.ctx-bar {
+  display: flex; align-items: center; gap: 10px; padding: 8px 18px;
+  background: rgba(51,221,255,0.06); border-bottom: 1px solid rgba(51,221,255,0.16);
+  flex-shrink: 0;
+}
+.ctx-lbl { font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em; color: #5a8aaa; }
+.ctx-item { font-size: 13px; color: #33ddff; font-weight: 600; }
+.ctx-sp { flex: 1; }
+.ctx-cnt { font-size: 12px; color: #4a7a9a; }
+
+/* PANE LAYOUT — resizable */
+.panes-wrapper { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.pane-agenda {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: #0a0e14; flex-shrink: 0;
+  width: 230px; min-width: 160px; max-width: 340px;
+  position: relative;
+}
+.resize-handle {
+  position: absolute; right: -3px; top: 0; bottom: 0; width: 6px;
+  cursor: col-resize; z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+}
+.resize-handle::after {
+  content: ''; width: 2px; height: 40px; border-radius: 1px;
+  background: rgba(255,255,255,0.15); transition: background 0.15s;
+}
+.resize-handle:hover::after { background: rgba(51,221,255,0.6); }
+.pane-capture {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  background: #0d1117; border-left: 1px solid rgba(255,255,255,0.07);
+  border-right: 1px solid rgba(255,255,255,0.07);
+}
+.pane-live { width: 230px; flex-shrink: 0; background: #0c1018; display: flex; flex-direction: column; overflow: hidden; }
+
+/* AGENDA PANE INTERNALS */
+.pane-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.07); flex-shrink: 0;
+}
+.ph-label { font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: #7a8a9a; }
+.ph-action { font-size: 12px; color: #4a7a4a; cursor: pointer; }
+.ph-action:hover { color: #22ddaa; }
+
+.agenda-scroll { overflow-y: auto; flex: 1; }
+.ag-section { border-bottom: 1px solid rgba(255,255,255,0.05); }
+.ag-sec-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 12px; cursor: pointer; background: rgba(255,255,255,0.02);
+}
+.ag-sec-hdr:hover { background: rgba(255,255,255,0.04); }
+.ag-sec-left { display: flex; align-items: center; gap: 6px; }
+.ag-sec-arrow { font-size: 11px; color: #6a7a8a; }
+.ag-sec-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #7a8a9a; font-weight: 600; }
+.ag-sec-badge { font-size: 10px; padding: 1px 6px; border-radius: 10px; background: rgba(255,255,255,0.07); color: #6a7a8a; }
+.ag-sec-badge.warn { background: rgba(255,102,136,0.14); color: #ff8899; }
+.ag-sec-body { padding: 6px 10px; display: flex; flex-direction: column; gap: 4px; }
+
+/* STATUS CHECK items */
+.sc-item { display: flex; align-items: flex-start; gap: 6px; padding: 5px 7px; border-radius: 3px; background: rgba(255,255,255,0.02); }
+.sc-tag { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 2px; background: rgba(255,187,34,0.18); color: #ffcc44; flex-shrink: 0; margin-top: 1px; }
+.sc-text { font-size: 12px; color: #9aaabb; line-height: 1.35; flex: 1; }
+.sc-ov { font-size: 10px; color: #ff8899; font-weight: 700; flex-shrink: 0; }
+
+/* OUTCOME items */
+.oc-item { display: flex; align-items: flex-start; gap: 6px; padding: 5px 7px; border-radius: 3px; }
+.oc-verb { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 2px; flex-shrink: 0; }
+.oc-verb.resolve { background: rgba(255,187,34,0.16); color: #ffcc44; }
+.oc-verb.decide { background: rgba(51,221,255,0.14); color: #33ddff; }
+.oc-text { font-size: 12px; color: #9aaabb; line-height: 1.35; flex: 1; }
+.oc-done { font-size: 11px; color: #22ddaa; flex-shrink: 0; }
+
+/* AGENDA items */
+.ag-item {
+  display: flex; align-items: flex-start; gap: 6px;
+  padding: 8px 9px; border-radius: 4px; cursor: pointer;
+  border: 1px solid transparent; margin-bottom: 3px; transition: all 0.15s;
+}
+.ag-item:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.09); }
+.ag-item.capturing { background: rgba(51,221,255,0.08); border-color: rgba(51,221,255,0.28); }
+.ag-item.done { opacity: 0.55; }
+.ag-arrow { font-size: 12px; color: #33ddff; flex-shrink: 0; margin-top: 2px; }
+.ag-num { font-size: 12px; color: #6a7a8a; flex-shrink: 0; min-width: 14px; margin-top: 2px; }
+.ag-inner { flex: 1; min-width: 0; }
+.ag-type { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 2px; display: inline-block; margin-bottom: 3px; }
+.agt-decide { background: rgba(51,221,255,0.14); color: #33ddff; }
+.agt-resolve { background: rgba(255,187,34,0.14); color: #ffcc44; }
+.agt-assign { background: rgba(34,221,170,0.12); color: #22ddaa; }
+.ag-title { font-size: 12px; color: #c0c8d4; line-height: 1.35; }
+.ag-item.capturing .ag-title { color: #e6edf3; font-weight: 600; }
+.ag-item.done .ag-title { text-decoration: line-through; color: #6a7a8a; }
+.ag-sub { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.ag-dur { font-size: 11px; color: #5a6a7a; }
+.ag-count { font-size: 11px; color: #33ddff; }
+.ag-done-mark { font-size: 11px; color: #22ddaa; }
+
+/* CENTER PANE */
+.composer-area { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; }
+.composer-input {
+  width: 100%; background: #131e2c; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 5px; padding: 12px 14px; font-size: 13px; color: #e6edf3;
+  font-family: inherit; resize: none; outline: none; line-height: 1.5; min-height: 76px;
+}
+.composer-input:focus { border-color: rgba(51,221,255,0.40); }
+.composer-input::placeholder { color: #3a4a5a; }
+.tag-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.tag-lbl { font-size: 12px; color: #7a8a9a; text-transform: uppercase; letter-spacing: 0.08em; }
+.tag-btn {
+  display: flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 4px;
+  cursor: pointer; font-size: 12px; font-weight: 600; border: 1px solid; transition: filter 0.12s;
+}
+.tag-btn:hover { filter: brightness(1.25); }
+.tag-btn kbd { font-size: 10px; font-weight: 700; padding: 1px 4px; border-radius: 2px; background: rgba(255,255,255,0.12); font-family: inherit; }
+.tb-note { color: #8aaac8; border-color: rgba(138,170,200,0.30); background: rgba(138,170,200,0.09); }
+.tb-dec { color: #33ddff; border-color: rgba(51,221,255,0.32); background: rgba(51,221,255,0.09); }
+.tb-act { color: #ffcc44; border-color: rgba(255,204,68,0.32); background: rgba(255,204,68,0.09); }
+.tb-rsk { color: #ff8899; border-color: rgba(255,136,153,0.30); background: rgba(255,136,153,0.09); }
+.tb-qst { color: #c084fc; border-color: rgba(192,132,252,0.28); background: rgba(192,132,252,0.08); }
+.stream-hdr {
+  display: flex; align-items: center; gap: 12px; padding: 8px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+}
+.stab { font-size: 12px; color: #6a7a8a; cursor: pointer; padding-bottom: 3px; border-bottom: 2px solid transparent; }
+.stab.active { color: #c0c8d4; border-bottom-color: #33ddff; }
+.stab-cnt { font-size: 11px; background: rgba(51,221,255,0.12); color: #33ddff; padding: 1px 7px; border-radius: 10px; }
+.stream-body { overflow-y: auto; flex: 1; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; }
+.node-card {
+  display: flex; align-items: flex-start; gap: 9px;
+  background: #161c26; border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 5px; padding: 9px 11px; position: relative; overflow: hidden;
+}
+.node-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.nc-note::before { background: #7aaac8; }
+.nc-dec::before { background: #33ddff; }
+.nc-act::before { background: #ffcc44; }
+.nc-rsk::before { background: #ff8899; }
+.ntag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 2px; flex-shrink: 0; margin-top: 1px; }
+.ntag-note { background: rgba(122,170,200,0.18); color: #8aaac8; }
+.ntag-dec { background: rgba(51,221,255,0.16); color: #33ddff; }
+.ntag-act { background: rgba(255,204,68,0.18); color: #ffcc44; }
+.ntag-rsk { background: rgba(255,136,153,0.16); color: #ff8899; }
+.nbody { flex: 1; min-width: 0; }
+.nid { font-size: 10px; color: #4a5a6a; margin-bottom: 3px; }
+.ntext { font-size: 12px; color: #c8d0dc; line-height: 1.45; }
+.nmeta { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
+.ntime { font-size: 11px; color: #5a6a7a; }
+.nauthor { font-size: 11px; color: #5a8aaa; }
+.nsealed { font-size: 10px; color: #3a5a3a; }
+.nra-badge { font-size: 10px; padding: 2px 7px; border-radius: 3px; background: rgba(192,132,252,0.13); color: #c084fc; border: 1px solid rgba(192,132,252,0.24); cursor: pointer; margin-top: 5px; display: inline-block; }
+.add-nra { font-size: 11px; color: #4a5a6a; cursor: pointer; margin-top: 5px; display: inline-block; }
+.add-nra:hover { color: #7a8a9a; }
+.agenda-divider { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.ad-line { flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
+.ad-label { font-size: 11px; color: #4a5a6a; white-space: nowrap; }
+
+/* RIGHT PANE */
+.live-hdr { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; }
+.live-label { display: flex; align-items: center; gap: 7px; font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: #ff8899; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #ff4d6d; animation: sp 1.2s infinite; }
+.live-invited { font-size: 12px; color: #5a6a7a; }
+.att-list { padding: 8px 11px; display: flex; flex-direction: column; gap: 5px; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+.att-card { display: flex; align-items: center; gap: 8px; padding: 6px 9px; background: #111820; border: 1px solid rgba(255,255,255,0.08); border-radius: 5px; }
+.att-pres { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.att-pres.on { background: #22ddaa; animation: sp 1.8s infinite; }
+.att-pres.off { background: #2a3a4a; }
+.att-av { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; flex-shrink: 0; }
+.av-vs { background: #1a3a5c; color: #33ddff; }
+.av-ak { background: #1a3a2a; color: #22ddaa; }
+.av-rw { background: #3a2a1a; color: #ffbb22; }
+.att-info { flex: 1; min-width: 0; }
+.att-nm { font-size: 12px; color: #c0c8d4; }
+.att-rl { font-size: 11px; color: #5a6a7a; }
+.att-you { font-size: 10px; color: #3a6a8a; padding: 1px 5px; border-radius: 2px; background: rgba(51,221,255,0.08); }
+.att-away { font-size: 11px; color: #5a6a7a; font-style: italic; }
+.actions-list { padding: 8px 11px; display: flex; flex-direction: column; gap: 5px; flex: 1; overflow-y: auto; }
+.al-lbl { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #6a7a8a; margin-bottom: 3px; }
+.al-item { padding: 6px 9px; background: #111820; border-radius: 4px; border-left: 3px solid #ffcc44; border: 1px solid rgba(255,204,68,0.14); border-left-width: 3px; }
+.al-tag { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 2px; background: rgba(255,204,68,0.18); color: #ffcc44; display: inline-block; margin-bottom: 3px; }
+.al-dec-tag { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 2px; background: rgba(51,221,255,0.16); color: #33ddff; display: inline-block; margin-bottom: 3px; }
+.al-text { font-size: 12px; color: #a0aab8; line-height: 1.35; }
+.al-meta { font-size: 11px; color: #5a6a7a; margin-top: 3px; }
+.chat-section { display: flex; flex-direction: column; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+.chat-hdr { padding: 7px 12px; }
+.chat-lbl { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #5a6a7a; }
+.chat-msgs { padding: 6px 12px; display: flex; flex-direction: column; gap: 5px; }
+.chat-msg { font-size: 12px; }
+.chat-msg .cm-a { color: #33ddff; margin-right: 5px; font-weight: 600; }
+.chat-msg .cm-t { color: #8a9aaa; }
+.chat-msg.me { text-align: right; }
+.chat-msg.me .cm-a { color: #22ddaa; }
+.chat-row { display: flex; gap: 6px; padding: 7px 10px; border-top: 1px solid rgba(255,255,255,0.05); }
+.chat-inp { flex: 1; background: #0a0e14; border: 1px solid rgba(255,255,255,0.10); border-radius: 4px; padding: 6px 10px; font-size: 12px; color: #c0c8d4; font-family: inherit; outline: none; }
+.chat-snd { font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 4px; background: rgba(51,221,255,0.12); color: #33ddff; border: 1px solid rgba(51,221,255,0.28); cursor: pointer; }
+/* FILMSTRIP */
+.fs-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px; background: #080c10; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; cursor: pointer; }
+.fs-bar:hover { background: #0c1018; }
+.fs-lbl { font-size: 12px; color: #5a6a7a; text-transform: uppercase; letter-spacing: 0.06em; }
+.fs-lbl b { color: #7a8a9a; }
+.fs-chips { display: flex; gap: 5px; }
+.fs-chip { font-size: 11px; background: #111820; border: 1px solid rgba(255,255,255,0.08); border-radius: 3px; padding: 2px 8px; color: #5a6a7a; }
+.fs-exp { font-size: 12px; color: #4a5a6a; }
+</style>
+
+<div class="shell">
+  <div class="topnav">
+    <div class="tn-left">
+      <span class="tn-logo">Accord</span>
+      <div class="tn-sep"></div>
+      <div class="in-session-badge"><div class="session-pulse"></div><span class="session-label">In Session</span></div>
+      <span class="tn-title">C-11 Percolate Smoke Test Meeting</span>
+    </div>
+    <div class="tn-right">
+      <div class="timer-wrap">
+        <div class="elapsed-timer" id="timer">00:00</div>
+        <div class="elapsed-label">elapsed</div>
+      </div>
+      <button class="end-btn">End Meeting</button>
+      <div class="user-chip"><div class="user-av">VS</div><span class="user-name">Vaughn Staples</span></div>
+    </div>
+  </div>
+
+  <div class="ctx-bar">
+    <span class="ctx-lbl">Capturing under</span>
+    <span class="ctx-item">Review vendor shortlist — select final candidate</span>
+    <span class="ctx-sp"></span>
+    <span class="ctx-cnt">2 nodes captured</span>
+  </div>
+
+  <div class="panes-wrapper">
+
+    <!-- AGENDA -->
+    <div class="pane-agenda" id="agendaPane">
+      <div class="pane-hdr">
+        <span class="ph-label">Agenda</span>
+        <span class="ph-action">+ New item</span>
+      </div>
+      <div class="agenda-scroll">
+
+        <div class="ag-section">
+          <div class="ag-sec-hdr" onclick="toggleSec(this)">
+            <div class="ag-sec-left">
+              <span class="ag-sec-arrow">►</span>
+              <span class="ag-sec-label">Status check</span>
+            </div>
+            <span class="ag-sec-badge warn">1 overdue</span>
+          </div>
+          <div class="ag-sec-body" style="display:none;">
+            <div class="sc-item"><span class="sc-tag">AX-007</span><span class="sc-text">Angela: Obtain vendor confirmation on delivery timeline</span><span class="sc-ov">OVR</span></div>
+            <div class="sc-item"><span class="sc-tag">AX-008</span><span class="sc-text">Vaughn: Schedule vendor alignment call</span></div>
+            <div class="sc-item"><span class="sc-tag">AX-009</span><span class="sc-text">Angela: Deliver component spec to engineering</span></div>
+          </div>
+        </div>
+
+        <div class="ag-section">
+          <div class="ag-sec-hdr" onclick="toggleSec(this)">
+            <div class="ag-sec-left">
+              <span class="ag-sec-arrow">►</span>
+              <span class="ag-sec-label">Outcomes</span>
+            </div>
+            <span class="ag-sec-badge">1 resolved</span>
+          </div>
+          <div class="ag-sec-body" style="display:none;">
+            <div class="oc-item"><span class="oc-verb resolve">RESOLVE</span><span class="oc-text">Resolve open spec dissent — Angela to confirm or escalate</span><span class="oc-done">✓</span></div>
+            <div class="oc-item"><span class="oc-verb decide">DECIDE</span><span class="oc-text">Decide on vendor selection — Vaughn to present</span></div>
+          </div>
+        </div>
+
+        <div class="ag-section">
+          <div class="ag-sec-hdr" onclick="toggleSec(this)">
+            <div class="ag-sec-left">
+              <span class="ag-sec-arrow">▼</span>
+              <span class="ag-sec-label">Agenda items</span>
+            </div>
+            <span class="ag-sec-badge">3 items</span>
+          </div>
+          <div class="ag-sec-body">
+            <div class="ag-item done">
+              <span class="ag-num">1</span>
+              <div class="ag-inner">
+                <span class="ag-type agt-resolve">RESOLVE</span>
+                <div class="ag-title">Angela dissent on component timeline</div>
+                <div class="ag-sub"><span class="ag-dur">15m</span><span class="ag-done-mark">✓ 3 nodes</span></div>
+              </div>
+            </div>
+            <div class="ag-item capturing">
+              <span class="ag-arrow">→</span>
+              <div class="ag-inner">
+                <span class="ag-type agt-decide">DECIDE</span>
+                <div class="ag-title">Review vendor shortlist — select final candidate</div>
+                <div class="ag-sub"><span class="ag-dur">20m</span><span class="ag-count">2 nodes</span></div>
+              </div>
+            </div>
+            <div class="ag-item">
+              <span class="ag-num">3</span>
+              <div class="ag-inner">
+                <span class="ag-type agt-assign">ASSIGN</span>
+                <div class="ag-title">Assign follow-up actions to team members</div>
+                <div class="ag-sub"><span class="ag-dur">10m</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="resize-handle" id="resizeHandle"></div>
+    </div>
+
+    <!-- CAPTURE -->
+    <div class="pane-capture">
+      <div class="composer-area">
+        <textarea class="composer-input" placeholder="Type what's being said…" rows="3"></textarea>
+        <div class="tag-row">
+          <span class="tag-lbl">Commit as</span>
+          <button class="tag-btn tb-note">Note <kbd>N</kbd></button>
+          <button class="tag-btn tb-dec">Decision <kbd>D</kbd></button>
+          <button class="tag-btn tb-act">Action <kbd>A</kbd></button>
+          <button class="tag-btn tb-rsk">Risk <kbd>R</kbd></button>
+          <button class="tag-btn tb-qst">Question <kbd>Q</kbd></button>
+        </div>
+      </div>
+      <div class="stream-hdr">
+        <span class="stab active">Captured this meeting</span>
+        <span class="stab-cnt">5</span>
+        <span class="stab" style="margin-left:8px;">Thread history</span>
+      </div>
+      <div class="stream-body">
+        <div class="node-card nc-dec">
+          <span class="ntag ntag-dec">DC</span>
+          <div class="nbody">
+            <div class="nid">DC-018</div>
+            <div class="ntext">Nimbletronics selected as primary vendor for Phase 1 component supply. Vaughn to execute NDA by May 22.</div>
+            <div class="nmeta"><span class="ntime">2:31 PM</span><span class="nauthor">Vaughn Staples</span><span class="nsealed">· sealed</span></div>
+            <span class="nra-badge">NRA: draft vendor NDA →</span>
+          </div>
+        </div>
+        <div class="node-card nc-note">
+          <span class="ntag ntag-note">NT</span>
+          <div class="nbody">
+            <div class="nid">NT-032</div>
+            <div class="ntext">Angela confirmed Nimbletronics prototype passed thermal validation at 5% above spec. No concerns flagged.</div>
+            <div class="nmeta"><span class="ntime">2:28 PM</span><span class="nauthor">Angela Kim</span><span class="nsealed">· sealed</span></div>
+          </div>
+        </div>
+        <div class="agenda-divider"><div class="ad-line"></div><span class="ad-label">Agenda item 1 · Angela dissent on component timeline</span><div class="ad-line"></div></div>
+        <div class="node-card nc-dec">
+          <span class="ntag ntag-dec">DC</span>
+          <div class="nbody">
+            <div class="nid">DC-017</div>
+            <div class="ntext">Angela withdraws dissent DS-005. Vendor confirmation received; Phase 1 timeline accepted by all parties.</div>
+            <div class="nmeta"><span class="ntime">2:18 PM</span><span class="nauthor">Angela Kim</span><span class="nsealed">· sealed</span></div>
+          </div>
+        </div>
+        <div class="node-card nc-act">
+          <span class="ntag ntag-act">AX</span>
+          <div class="nbody">
+            <div class="nid">AX-011</div>
+            <div class="ntext">Vaughn: Circulate vendor shortlist with evaluation matrix to all attendees before 5/20.</div>
+            <div class="nmeta"><span class="ntime">2:14 PM</span><span class="nauthor">Vaughn Staples</span><span class="nsealed">· sealed</span></div>
+            <span class="add-nra">+ Add NRA</span>
+          </div>
+        </div>
+        <div class="node-card nc-note">
+          <span class="ntag ntag-note">NT</span>
+          <div class="nbody">
+            <div class="nid">NT-031</div>
+            <div class="ntext">Ron White not yet joined. Angela flagged that Ron's sign-off may be needed for vendor selection.</div>
+            <div class="nmeta"><span class="ntime">2:05 PM</span><span class="nauthor">Vaughn Staples</span><span class="nsealed">· sealed</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVE PANEL -->
+    <div class="pane-live">
+      <div class="live-hdr">
+        <div class="live-label"><div class="live-dot"></div>Live</div>
+        <span class="live-invited">3 invited</span>
+      </div>
+      <div class="att-list">
+        <div class="att-card">
+          <div class="att-pres on"></div>
+          <div class="att-av av-vs">VS</div>
+          <div class="att-info"><div class="att-nm">Vaughn Staples</div><div class="att-rl">Organizer</div></div>
+          <span class="att-you">you</span>
+        </div>
+        <div class="att-card">
+          <div class="att-pres on"></div>
+          <div class="att-av av-ak">AK</div>
+          <div class="att-info"><div class="att-nm">Angela Kim</div><div class="att-rl">Participant</div></div>
+        </div>
+        <div class="att-card" style="opacity:0.5;">
+          <div class="att-pres off"></div>
+          <div class="att-av av-rw">RW</div>
+          <div class="att-info"><div class="att-nm">Ron White</div><div class="att-away">Not joined</div></div>
+        </div>
+      </div>
+      <div class="actions-list">
+        <div class="al-lbl">Actions assigned this meeting</div>
+        <div class="al-item">
+          <span class="al-tag">AX-011</span>
+          <div class="al-text">Circulate vendor shortlist with evaluation matrix</div>
+          <div class="al-meta">Vaughn · due May 20</div>
+        </div>
+        <div class="al-item" style="border-left-color:#33ddff;border-color:rgba(51,221,255,0.16);background:rgba(51,221,255,0.03);">
+          <span class="al-dec-tag">DC-018</span>
+          <div class="al-text">Nimbletronics selected as primary vendor</div>
+          <div class="al-meta">Sealed decision · 2:31 PM</div>
+        </div>
+      </div>
+      <div class="chat-section">
+        <div class="chat-hdr"><span class="chat-lbl">Team chat</span></div>
+        <div class="chat-msgs">
+          <div class="chat-msg"><span class="cm-a">Angela</span><span class="cm-t">Thermal results look good — confident in Nimbletronics</span></div>
+          <div class="chat-msg me"><span class="cm-a">You</span><span class="cm-t">Agreed. Moving to vendor selection vote</span></div>
+        </div>
+        <div class="chat-row">
+          <input class="chat-inp" placeholder="Message the meeting…" />
+          <button class="chat-snd">Send</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="fs-bar">
+    <span class="fs-lbl"><b>Workstream timeline · 4 prior meetings</b></span>
+    <div class="fs-chips">
+      <span class="fs-chip">Mar 15 · Kickoff</span>
+      <span class="fs-chip">Mar 30 · Review</span>
+      <span class="fs-chip">Apr 14 · Decision Gate</span>
+      <span class="fs-chip">Apr 30 · Action Review</span>
+    </div>
+    <span class="fs-exp">▼ expand</span>
+  </div>
+</div>
+
+<script>
+var start = Date.now() - (42*60+17)*1000;
+function tick() {
+  var el = document.getElementById('timer');
+  if (!el) return;
+  var s = Math.floor((Date.now()-start)/1000);
+  var m = Math.floor(s/60); s = s%60;
+  el.textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+tick(); setInterval(tick,1000);
+
+function toggleSec(hdr) {
+  var arrow = hdr.querySelector('.ag-sec-arrow');
+  var body = hdr.nextElementSibling;
+  var open = arrow.textContent === '▼';
+  arrow.textContent = open ? '►' : '▼';
+  body.style.display = open ? 'none' : '';
+}
+
+var handle = document.getElementById('resizeHandle');
+var pane = document.getElementById('agendaPane');
+var dragging = false, startX, startW;
+handle.addEventListener('mousedown', function(e) {
+  dragging = true; startX = e.clientX; startW = pane.offsetWidth;
+  document.body.style.cursor = 'col-resize';
+  e.preventDefault();
+});
+document.addEventListener('mousemove', function(e) {
+  if (!dragging) return;
+  var w = Math.max(160, Math.min(340, startW + (e.clientX - startX)));
+  pane.style.width = w + 'px';
+});
+document.addEventListener('mouseup', function() {
+  dragging = false; document.body.style.cursor = '';
+});
+</script>

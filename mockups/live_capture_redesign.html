@@ -1,0 +1,508 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.shell {
+  font-family: 'IBM Plex Mono','SF Mono',monospace;
+  background: #0a0e14; color: #e6edf3;
+  border-radius: 8px; overflow: hidden;
+  display: flex; flex-direction: column; height: 780px;
+}
+
+/* TOPNAV */
+.topnav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 18px; background: #060a0f; height: 44px;
+  border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;
+}
+.tn-left { display: flex; align-items: center; gap: 14px; }
+.tn-logo { font-size: 14px; font-weight: 700; color: #f0f6fc; letter-spacing: -0.01em; }
+.tn-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.12); }
+.in-session-badge {
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(255,77,109,0.14); border: 1px solid rgba(255,77,109,0.30);
+  border-radius: 4px; padding: 4px 10px;
+}
+.session-pulse {
+  width: 8px; height: 8px; border-radius: 50%; background: #ff4d6d;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.85)} }
+.session-label { font-size: 12px; font-weight: 700; color: #ff6688; letter-spacing: 0.08em; text-transform: uppercase; }
+.tn-title { font-size: 12px; color: #aab8c8; }
+.tn-right { display: flex; align-items: center; gap: 14px; }
+.elapsed-timer {
+  font-size: 20px; font-weight: 700; color: #f0f6fc; letter-spacing: 0.04em; font-variant-numeric: tabular-nums;
+}
+.elapsed-label { font-size: 11px; color: #4a5a6a; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 1px; text-align: center; }
+.timer-wrap { display: flex; flex-direction: column; align-items: center; }
+.end-btn {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 7px 16px; border-radius: 4px; cursor: pointer;
+  background: rgba(255,77,109,0.14); color: #ff6688;
+  border: 1px solid rgba(255,77,109,0.32);
+}
+.end-btn:hover { background: rgba(255,77,109,0.22); }
+.user-chip {
+  display: flex; align-items: center; gap: 7px;
+  background: #1a3a5c; border-radius: 20px; padding: 4px 10px 4px 5px;
+}
+.user-av { width: 24px; height: 24px; border-radius: 50%; background: #1a3a5c; border: 2px solid #33ddff; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #33ddff; }
+.user-name { font-size: 12px; color: #aab8c8; }
+
+/* THREE PANES */
+.panes { display: grid; grid-template-columns: 240px 1fr 230px; flex: 1; overflow: hidden; min-height: 0; }
+.pane { display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid rgba(255,255,255,0.07); }
+.pane:last-child { border-right: none; }
+.pane-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 13px; border-bottom: 1px solid rgba(255,255,255,0.07);
+  background: #0a0e14; flex-shrink: 0;
+}
+.pane-label { font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: #5a6a7a; }
+.pane-label.live { color: #ff6688; }
+.pane-label.active { color: #33ddff; }
+.pane-action { font-size: 11px; color: #3a5a3a; cursor: pointer; }
+
+/* AGENDA PANE */
+.agenda-body { overflow-y: auto; display: flex; flex-direction: column; gap: 0; flex: 1; }
+.status-section {
+  padding: 8px 11px; border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: rgba(255,187,34,0.03);
+}
+.ss-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #4a5a6a; margin-bottom: 5px; }
+.status-item { display: flex; align-items: flex-start; gap: 6px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.status-item:last-child { border-bottom: none; }
+.si-tag { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 2px; background: rgba(255,187,34,0.16); color: #ffbb22; flex-shrink: 0; margin-top: 1px; }
+.si-text { font-size: 11px; color: #7a8a9a; line-height: 1.4; flex: 1; }
+.si-ov { font-size: 10px; color: #ff6688; flex-shrink: 0; font-weight: 600; }
+.agenda-section { padding: 8px 11px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.ag-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #4a5a6a; margin-bottom: 6px; }
+.ag-item {
+  display: flex; align-items: flex-start; gap: 7px;
+  padding: 8px 9px; border-radius: 4px; cursor: pointer;
+  border: 1px solid transparent; margin-bottom: 4px;
+  transition: all 0.15s;
+}
+.ag-item:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
+.ag-item.capturing { background: rgba(51,221,255,0.07); border-color: rgba(51,221,255,0.25); }
+.ag-item.done { opacity: 0.45; }
+.ag-num { font-size: 11px; color: #3a4a5a; flex-shrink: 0; min-width: 16px; margin-top: 2px; }
+.ag-content { flex: 1; min-width: 0; }
+.ag-type { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 2px; flex-shrink: 0; margin-bottom: 3px; display: inline-block; }
+.agt-decide { background: rgba(51,221,255,0.14); color: #33ddff; }
+.agt-resolve { background: rgba(255,187,34,0.14); color: #ffbb22; }
+.agt-assign { background: rgba(34,221,170,0.12); color: #22ddaa; }
+.ag-title { font-size: 12px; color: #c0c8d4; line-height: 1.35; }
+.ag-item.capturing .ag-title { color: #e6edf3; }
+.ag-dur { font-size: 11px; color: #3a4a5a; flex-shrink: 0; margin-top: 2px; }
+.ag-count { font-size: 10px; color: #33ddff; margin-top: 3px; }
+.ag-item.done .ag-title { text-decoration: line-through; color: #4a5a6a; }
+.capturing-arrow { font-size: 11px; color: #33ddff; flex-shrink: 0; margin-top: 3px; }
+
+/* CENTER — CAPTURE */
+.capture-pane { background: #0d1117; }
+.capture-context {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px; border-bottom: 1px solid rgba(51,221,255,0.15);
+  background: rgba(51,221,255,0.05); flex-shrink: 0;
+}
+.cc-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: #4a7a9a; }
+.cc-item { font-size: 12px; color: #33ddff; font-weight: 600; }
+.cc-spacer { flex: 1; }
+.cc-count { font-size: 11px; color: #3a5a7a; }
+.composer-area { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; }
+.composer-input {
+  width: 100%; background: #111820; border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 5px; padding: 12px 14px; font-size: 13px; color: #e6edf3;
+  font-family: inherit; resize: none; outline: none; line-height: 1.5;
+  min-height: 80px;
+}
+.composer-input:focus { border-color: rgba(51,221,255,0.35); background: #131e2c; }
+.composer-input::placeholder { color: #2a3a4a; }
+.tag-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+}
+.tag-label { font-size: 11px; color: #4a5a6a; text-transform: uppercase; letter-spacing: 0.08em; }
+.tag-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 4px; cursor: pointer;
+  font-size: 12px; font-weight: 600; border: 1px solid;
+  transition: all 0.12s;
+}
+.tag-btn:hover { filter: brightness(1.2); }
+.tag-btn kbd {
+  font-size: 10px; font-weight: 700; padding: 1px 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.10); color: inherit; font-family: inherit;
+}
+.tag-note { color: #7aaac8; border-color: rgba(122,170,200,0.28); background: rgba(122,170,200,0.08); }
+.tag-decision { color: #33ddff; border-color: rgba(51,221,255,0.30); background: rgba(51,221,255,0.09); }
+.tag-action { color: #ffbb22; border-color: rgba(255,187,34,0.30); background: rgba(255,187,34,0.09); }
+.tag-risk { color: #ff6688; border-color: rgba(255,102,136,0.28); background: rgba(255,102,136,0.08); }
+.tag-question { color: #a855f7; border-color: rgba(168,85,247,0.28); background: rgba(168,85,247,0.08); }
+
+/* CAPTURE STREAM */
+.stream-hdr {
+  display: flex; align-items: center; gap: 14px;
+  padding: 8px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+}
+.stream-tab {
+  font-size: 12px; color: #4a5a6a; cursor: pointer; padding-bottom: 4px;
+  border-bottom: 2px solid transparent;
+}
+.stream-tab.active { color: #c0c8d4; border-bottom-color: #33ddff; }
+.stream-count { font-size: 11px; background: rgba(51,221,255,0.10); color: #33ddff; padding: 1px 7px; border-radius: 10px; }
+.stream-body { overflow-y: auto; flex: 1; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; }
+.node-card {
+  display: flex; align-items: flex-start; gap: 9px;
+  background: #161c26; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px; padding: 9px 11px; position: relative; overflow: hidden;
+}
+.node-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.node-card.n-note::before { background: #5a8aaa; }
+.node-card.n-decision::before { background: #33ddff; }
+.node-card.n-action::before { background: #ffbb22; }
+.node-card.n-risk::before { background: #ff6688; }
+.node-tag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 2px; flex-shrink: 0; margin-top: 1px; }
+.nt-note { background: rgba(90,138,170,0.18); color: #7aaac8; }
+.nt-decision { background: rgba(51,221,255,0.14); color: #33ddff; }
+.nt-action { background: rgba(255,187,34,0.16); color: #ffbb22; }
+.nt-risk { background: rgba(255,102,136,0.14); color: #ff6688; }
+.node-body { flex: 1; min-width: 0; }
+.node-id { font-size: 10px; color: #3a4a5a; margin-bottom: 2px; }
+.node-text { font-size: 12px; color: #c0c8d4; line-height: 1.45; }
+.node-meta { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.node-time { font-size: 11px; color: #3a4a5a; }
+.node-author { font-size: 11px; color: #4a7a9a; }
+.node-sealed { font-size: 10px; color: #2a4a2a; }
+.nra-badge {
+  font-size: 10px; padding: 1px 6px; border-radius: 2px;
+  background: rgba(168,85,247,0.12); color: #a855f7; border: 1px solid rgba(168,85,247,0.22);
+  cursor: pointer; margin-top: 4px; display: inline-block;
+}
+.add-nra { font-size: 11px; color: #3a4a5a; cursor: pointer; margin-top: 4px; display: inline-block; }
+.add-nra:hover { color: #6a7a9a; }
+
+/* RIGHT — LIVE PANEL */
+.live-panel { background: #0c1018; }
+.att-body { padding: 9px 12px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.att-card { display: flex; align-items: center; gap: 8px; padding: 6px 9px; background: #111820; border: 1px solid rgba(255,255,255,0.07); border-radius: 5px; }
+.att-presence { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.att-presence.live { background: #22ddaa; animation: pulse 1.8s infinite; }
+.att-presence.away { background: #2a3a4a; }
+.att-av-sm { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; flex-shrink: 0; }
+.av-vs { background: #1a3a5c; color: #33ddff; }
+.av-ak { background: #1a3a2a; color: #22ddaa; }
+.av-rw { background: #3a2a1a; color: #ffbb22; }
+.att-info { flex: 1; min-width: 0; }
+.att-name-sm { font-size: 12px; color: #c0c8d4; }
+.att-role-sm { font-size: 11px; color: #3a4a5a; }
+.att-you { font-size: 10px; color: #3a5a7a; padding: 1px 5px; border-radius: 2px; background: rgba(51,221,255,0.07); }
+
+/* ACTION ITEMS live */
+.live-actions { padding: 9px 12px; display: flex; flex-direction: column; gap: 5px; flex: 1; overflow-y: auto; }
+.la-label { font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: #4a5a6a; margin-bottom: 3px; }
+.la-item { display: flex; align-items: flex-start; gap: 6px; padding: 6px 9px; background: #111820; border: 1px solid rgba(255,187,34,0.14); border-radius: 4px; border-left: 3px solid #ffbb22; }
+.la-tag { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 2px; background: rgba(255,187,34,0.16); color: #ffbb22; flex-shrink: 0; margin-top: 1px; }
+.la-text { font-size: 11px; color: #a0a8b4; flex: 1; line-height: 1.4; }
+.la-owner { font-size: 10px; color: #5a7a9a; margin-top: 2px; }
+
+/* CHAT */
+.chat-area { display: flex; flex-direction: column; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+.chat-hdr { padding: 7px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.chat-label { font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: #3a4a5a; }
+.chat-msgs { padding: 8px 12px; min-height: 60px; display: flex; flex-direction: column; gap: 5px; }
+.chat-msg { font-size: 12px; }
+.chat-msg .cm-author { color: #33ddff; margin-right: 5px; }
+.chat-msg .cm-text { color: #8a9aaa; }
+.chat-msg.me { text-align: right; }
+.chat-msg.me .cm-author { color: #22ddaa; }
+.chat-input-row { display: flex; gap: 6px; padding: 7px 10px; border-top: 1px solid rgba(255,255,255,0.05); }
+.chat-input { flex: 1; background: #0a0e14; border: 1px solid rgba(255,255,255,0.09); border-radius: 4px; padding: 6px 10px; font-size: 12px; color: #c0c8d4; font-family: inherit; outline: none; }
+.chat-send { font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 4px; background: rgba(51,221,255,0.10); color: #33ddff; border: 1px solid rgba(51,221,255,0.25); cursor: pointer; }
+
+/* FILMSTRIP */
+.filmstrip-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 16px; background: #080c10;
+  border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; cursor: pointer;
+}
+.fs-label { font-size: 12px; color: #3a4a5a; text-transform: uppercase; letter-spacing: 0.06em; }
+.fs-label b { color: #5a6a7a; }
+.fs-chips { display: flex; gap: 5px; }
+.fs-chip { font-size: 11px; background: #111820; border: 1px solid rgba(255,255,255,0.07); border-radius: 3px; padding: 2px 8px; color: #3a4a5a; }
+.fs-expand { font-size: 11px; color: #2a3a4a; }
+</style>
+
+<div class="shell">
+
+  <div class="topnav">
+    <div class="tn-left">
+      <span class="tn-logo">Accord</span>
+      <div class="tn-sep"></div>
+      <div class="in-session-badge">
+        <div class="session-pulse"></div>
+        <span class="session-label">In Session</span>
+      </div>
+      <span class="tn-title">C-11 Percolate Smoke Test Meeting</span>
+    </div>
+    <div class="tn-right">
+      <div class="timer-wrap">
+        <div class="elapsed-timer" id="timer">00:42:17</div>
+        <div class="elapsed-label">elapsed</div>
+      </div>
+      <button class="end-btn">End Meeting</button>
+      <div class="user-chip">
+        <div class="user-av">VS</div>
+        <span class="user-name">Vaughn Staples</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panes">
+
+    <!-- AGENDA PANE -->
+    <div class="pane">
+      <div class="pane-hdr">
+        <span class="pane-label">Agenda</span>
+        <span class="pane-action">+ New item</span>
+      </div>
+      <div class="agenda-body">
+        <div class="status-section">
+          <div class="ss-label">Status check · from Apr 30</div>
+          <div class="status-item">
+            <span class="si-tag">AX-007</span>
+            <span class="si-text">Angela: Obtain vendor confirmation on delivery timeline</span>
+            <span class="si-ov">Overdue</span>
+          </div>
+          <div class="status-item">
+            <span class="si-tag">AX-008</span>
+            <span class="si-text">Vaughn: Schedule vendor alignment call</span>
+          </div>
+          <div class="status-item">
+            <span class="si-tag">AX-009</span>
+            <span class="si-text">Angela: Deliver component spec to engineering</span>
+          </div>
+        </div>
+        <div class="agenda-section">
+          <div class="ag-label">Intended outcomes</div>
+          <div class="ag-item done">
+            <span class="ag-num">·</span>
+            <div class="ag-content">
+              <span class="ag-type agt-resolve">RESOLVE</span>
+              <div class="ag-title">Resolve open spec dissent — Angela to confirm or escalate</div>
+              <div class="ag-count">✓ resolved</div>
+            </div>
+          </div>
+          <div class="ag-item">
+            <span class="ag-num">·</span>
+            <div class="ag-content">
+              <span class="ag-type agt-decide">DECIDE</span>
+              <div class="ag-title">Decide on vendor selection — Vaughn to present</div>
+            </div>
+          </div>
+        </div>
+        <div class="agenda-section">
+          <div class="ag-label">Agenda items</div>
+          <div class="ag-item done">
+            <span class="ag-num">1</span>
+            <div class="ag-content">
+              <span class="ag-type agt-resolve">RESOLVE</span>
+              <div class="ag-title">Angela dissent on component timeline (DS-005)</div>
+              <div class="ag-count">✓ 3 nodes captured</div>
+            </div>
+            <span class="ag-dur">15m</span>
+          </div>
+          <div class="ag-item capturing">
+            <span class="capturing-arrow">→</span>
+            <div class="ag-content">
+              <span class="ag-type agt-decide">DECIDE</span>
+              <div class="ag-title">Review vendor shortlist — select final candidate</div>
+              <div class="ag-count">2 nodes captured</div>
+            </div>
+            <span class="ag-dur">20m</span>
+          </div>
+          <div class="ag-item">
+            <span class="ag-num">3</span>
+            <div class="ag-content">
+              <span class="ag-type agt-assign">ASSIGN</span>
+              <div class="ag-title">Assign follow-up actions to team members</div>
+            </div>
+            <span class="ag-dur">10m</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPTURE PANE -->
+    <div class="pane capture-pane">
+      <div class="capture-context">
+        <span class="cc-label">Capturing under</span>
+        <span class="cc-item">Review vendor shortlist — select final candidate</span>
+        <span class="cc-spacer"></span>
+        <span class="cc-count">2 nodes</span>
+      </div>
+      <div class="composer-area">
+        <textarea class="composer-input" placeholder="Type what's being said…" rows="3"></textarea>
+        <div class="tag-row">
+          <span class="tag-label">Commit as</span>
+          <button class="tag-btn tag-note">Note <kbd>N</kbd></button>
+          <button class="tag-btn tag-decision">Decision <kbd>D</kbd></button>
+          <button class="tag-btn tag-action">Action <kbd>A</kbd></button>
+          <button class="tag-btn tag-risk">Risk <kbd>R</kbd></button>
+          <button class="tag-btn tag-question">Question <kbd>Q</kbd></button>
+        </div>
+      </div>
+      <div class="stream-hdr">
+        <span class="stream-tab active">Captured this meeting</span>
+        <span class="stream-count">5</span>
+        <span class="stream-tab" style="margin-left:8px;">Thread history</span>
+      </div>
+      <div class="stream-body">
+        <div class="node-card n-decision">
+          <span class="node-tag nt-decision">DC</span>
+          <div class="node-body">
+            <div class="node-id">DC-018</div>
+            <div class="node-text">Nimbletronics selected as primary vendor for Phase 1 component supply. Vaughn to execute NDA by May 22.</div>
+            <div class="node-meta">
+              <span class="node-time">2:31 PM</span>
+              <span class="node-author">Vaughn Staples</span>
+              <span class="node-sealed">· sealed</span>
+            </div>
+            <span class="nra-badge">NRA: draft vendor NDA</span>
+          </div>
+        </div>
+        <div class="node-card n-note">
+          <span class="node-tag nt-note">NT</span>
+          <div class="node-body">
+            <div class="node-id">NT-032</div>
+            <div class="node-text">Angela confirmed Nimbletronics prototype passed thermal validation at 5% above spec. No concerns flagged.</div>
+            <div class="node-meta">
+              <span class="node-time">2:28 PM</span>
+              <span class="node-author">Angela Kim</span>
+              <span class="node-sealed">· sealed</span>
+            </div>
+          </div>
+        </div>
+        <div style="height:1px;background:rgba(255,255,255,0.05);margin:4px 0;"></div>
+        <div style="font-size:11px;color:#3a4a5a;text-align:center;padding:3px 0;">Agenda item 1 · Angela dissent on component timeline</div>
+        <div style="height:1px;background:rgba(255,255,255,0.05);margin:4px 0;"></div>
+        <div class="node-card n-decision">
+          <span class="node-tag nt-decision">DC</span>
+          <div class="node-body">
+            <div class="node-id">DC-017</div>
+            <div class="node-text">Angela withdraws dissent DS-005. Vendor confirmation received; Phase 1 timeline accepted by all parties.</div>
+            <div class="node-meta">
+              <span class="node-time">2:18 PM</span>
+              <span class="node-author">Angela Kim</span>
+              <span class="node-sealed">· sealed</span>
+            </div>
+          </div>
+        </div>
+        <div class="node-card n-action">
+          <span class="node-tag nt-action">AX</span>
+          <div class="node-body">
+            <div class="node-id">AX-011</div>
+            <div class="node-text">Vaughn: Circulate vendor shortlist with evaluation matrix to all attendees before 5/20.</div>
+            <div class="node-meta">
+              <span class="node-time">2:14 PM</span>
+              <span class="node-author">Vaughn Staples</span>
+              <span class="node-sealed">· sealed</span>
+            </div>
+            <span class="add-nra">+ Add NRA</span>
+          </div>
+        </div>
+        <div class="node-card n-note">
+          <span class="node-tag nt-note">NT</span>
+          <div class="node-body">
+            <div class="node-id">NT-031</div>
+            <div class="node-text">Ron White not yet joined. Angela flagged that Ron's sign-off may be needed for vendor selection.</div>
+            <div class="node-meta">
+              <span class="node-time">2:05 PM</span>
+              <span class="node-author">Vaughn Staples</span>
+              <span class="node-sealed">· sealed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVE PANEL -->
+    <div class="pane live-panel">
+      <div class="pane-hdr">
+        <span class="pane-label live">● Live</span>
+        <span style="font-size:12px;color:#3a5a7a;">3 invited</span>
+      </div>
+      <div class="att-body">
+        <div class="att-card">
+          <div class="att-presence live"></div>
+          <div class="att-av-sm av-vs">VS</div>
+          <div class="att-info"><div class="att-name-sm">Vaughn Staples</div><div class="att-role-sm">Organizer</div></div>
+          <span class="att-you">you</span>
+        </div>
+        <div class="att-card">
+          <div class="att-presence live"></div>
+          <div class="att-av-sm av-ak">AK</div>
+          <div class="att-info"><div class="att-name-sm">Angela Kim</div><div class="att-role-sm">Participant</div></div>
+        </div>
+        <div class="att-card" style="opacity:0.5;">
+          <div class="att-presence away"></div>
+          <div class="att-av-sm av-rw">RW</div>
+          <div class="att-info"><div class="att-name-sm">Ron White</div><div class="att-role-sm">Not yet joined</div></div>
+        </div>
+      </div>
+      <div class="live-actions">
+        <div class="la-label">Actions assigned this meeting</div>
+        <div class="la-item">
+          <span class="la-tag">AX-011</span>
+          <div>
+            <div class="la-text">Circulate vendor shortlist with evaluation matrix</div>
+            <div class="la-owner">Vaughn · due May 20</div>
+          </div>
+        </div>
+        <div class="la-item" style="border-left-color:#33ddff;border-color:rgba(51,221,255,0.14);background:rgba(51,221,255,0.03);">
+          <span class="la-tag" style="background:rgba(51,221,255,0.14);color:#33ddff;">DC-018</span>
+          <div>
+            <div class="la-text" style="color:#8aaab8;">Nimbletronics selected as primary vendor</div>
+            <div class="la-owner">Sealed decision · 2:31 PM</div>
+          </div>
+        </div>
+      </div>
+      <div class="chat-area">
+        <div class="chat-hdr"><span class="chat-label">Team chat</span></div>
+        <div class="chat-msgs">
+          <div class="chat-msg"><span class="cm-author">Angela</span><span class="cm-text">Thermal results look good — confident in Nimbletronics</span></div>
+          <div class="chat-msg me"><span class="cm-author">You</span><span class="cm-text">Agreed. Let's move to vendor selection vote</span></div>
+        </div>
+        <div class="chat-input-row">
+          <input class="chat-input" placeholder="Message the meeting…" />
+          <button class="chat-send">Send</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="filmstrip-bar">
+    <span class="fs-label"><b>Workstream timeline · 4 prior meetings</b></span>
+    <div class="fs-chips">
+      <span class="fs-chip">Mar 15 · Kickoff</span>
+      <span class="fs-chip">Mar 30 · Review</span>
+      <span class="fs-chip">Apr 14 · Decision Gate</span>
+      <span class="fs-chip">Apr 30 · Action Review</span>
+    </div>
+    <span class="fs-expand">▼ expand</span>
+  </div>
+
+</div>
+
+<script>
+var start = Date.now() - (42*60+17)*1000;
+function tick() {
+  var el = document.getElementById('timer');
+  if (!el) return;
+  var s = Math.floor((Date.now()-start)/1000);
+  var m = Math.floor(s/60); s = s%60;
+  el.textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+tick(); setInterval(tick,1000);
+</script>

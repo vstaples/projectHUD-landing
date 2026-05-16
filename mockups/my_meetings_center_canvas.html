@@ -1,0 +1,506 @@
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .mm-root {
+    font-family: 'IBM Plex Mono', 'SF Mono', monospace;
+    background: #0a0e14;
+    color: #c9d1d9;
+    padding: 0;
+    min-height: 600px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .mm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .mm-header-label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: #8892a0;
+    text-transform: uppercase;
+  }
+  .mm-header-counts {
+    display: flex;
+    gap: 16px;
+    font-size: 10px;
+    color: #8892a0;
+  }
+  .mm-header-counts span b {
+    font-weight: 600;
+    color: #c9d1d9;
+  }
+  .week-strip {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: #0d1117;
+  }
+  .week-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 6px 8px;
+    cursor: pointer;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    transition: background 0.15s;
+    gap: 4px;
+  }
+  .week-day:last-child { border-right: none; }
+  .week-day:hover { background: rgba(255,255,255,0.04); }
+  .week-day.today { background: rgba(0,210,255,0.06); border-bottom: 2px solid #00d2ff; }
+  .week-day.active { background: rgba(0,210,255,0.10); }
+  .wd-name {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: #8892a0;
+    text-transform: uppercase;
+  }
+  .week-day.today .wd-name { color: #00d2ff; }
+  .wd-num {
+    font-size: 15px;
+    font-weight: 600;
+    color: #c9d1d9;
+    line-height: 1;
+  }
+  .week-day.today .wd-num { color: #00d2ff; }
+  .wd-dots {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    min-height: 8px;
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+  .dot.live { background: #00d2ff; box-shadow: 0 0 4px #00d2ff88; animation: pulse 1.4s infinite; }
+  .dot.today-mtg { background: #ffaa00; }
+  .dot.upcoming { background: #3d4d5a; }
+  .dot.ended { background: #2a3440; }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+  .lanes-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    min-height: 460px;
+  }
+  .lane {
+    border-right: 1px solid rgba(255,255,255,0.07);
+    display: flex;
+    flex-direction: column;
+  }
+  .lane:last-child { border-right: none; }
+  .lane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .lane-label {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .lane-now .lane-label { color: #00d2ff; }
+  .lane-attention .lane-label { color: #ffaa00; }
+  .lane-upcoming .lane-label { color: #8892a0; }
+  .lane-count {
+    font-size: 10px;
+    color: #8892a0;
+    background: rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 1px 7px;
+  }
+  .lane-now .lane-count { background: rgba(0,210,255,0.12); color: #00d2ff; }
+  .lane-attention .lane-count { background: rgba(255,170,0,0.12); color: #ffaa00; }
+  .lane-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 10px;
+    flex: 1;
+  }
+  .mcard {
+    background: #161c26;
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    position: relative;
+    overflow: hidden;
+  }
+  .mcard::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+  .mcard.card-live::before { background: #00d2ff; }
+  .mcard.card-warn::before { background: #ffaa00; }
+  .mcard.card-rsvp::before { background: #ff4d6d; }
+  .mcard.card-upcoming::before { background: #3d5070; }
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #e6edf3;
+    line-height: 1.3;
+    flex: 1;
+  }
+  .card-live-badge {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: rgba(0,210,255,0.15);
+    color: #00d2ff;
+    border: 1px solid rgba(0,210,255,0.3);
+    border-radius: 3px;
+    padding: 2px 5px;
+    white-space: nowrap;
+  }
+  .card-warn-badge {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: rgba(255,170,0,0.12);
+    color: #ffaa00;
+    border: 1px solid rgba(255,170,0,0.25);
+    border-radius: 3px;
+    padding: 2px 5px;
+    white-space: nowrap;
+  }
+  .card-meta {
+    font-size: 9px;
+    color: #5a6a7a;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .card-meta .ws { color: #4a7a9b; }
+  .card-signal {
+    font-size: 9px;
+    border-radius: 3px;
+    padding: 3px 7px;
+    background: rgba(255,255,255,0.04);
+    color: #8892a0;
+  }
+  .card-signal.sig-warn { background: rgba(255,170,0,0.08); color: #ffaa00; }
+  .card-signal.sig-ok { background: rgba(0,229,160,0.08); color: #00e5a0; }
+  .card-signal.sig-err { background: rgba(255,77,109,0.10); color: #ff4d6d; }
+  .card-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .avatars {
+    display: flex;
+    gap: -4px;
+  }
+  .avatar {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 7px;
+    font-weight: 700;
+    border: 1px solid #0a0e14;
+    margin-right: -5px;
+  }
+  .av-vs { background: #1a3a5c; color: #00d2ff; }
+  .av-ak { background: #1a3a2a; color: #00e5a0; }
+  .av-rw { background: #3a2a1a; color: #ffaa00; }
+  .av-jm { background: #3a1a2a; color: #ff4d6d; }
+  .card-btn {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-join {
+    background: rgba(0,210,255,0.18);
+    color: #00d2ff;
+    border: 1px solid rgba(0,210,255,0.35);
+  }
+  .btn-open {
+    background: rgba(255,255,255,0.06);
+    color: #8892a0;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn-rsvp {
+    background: rgba(255,77,109,0.15);
+    color: #ff4d6d;
+    border: 1px solid rgba(255,77,109,0.3);
+  }
+  .elapsed {
+    font-size: 9px;
+    color: #00d2ff;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .rsvp-row {
+    display: flex;
+    gap: 5px;
+  }
+  .btn-accept {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: rgba(0,229,160,0.15);
+    color: #00e5a0;
+    border: 1px solid rgba(0,229,160,0.3);
+    cursor: pointer;
+  }
+  .btn-decline {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.05);
+    color: #8892a0;
+    border: 1px solid rgba(255,255,255,0.1);
+    cursor: pointer;
+  }
+  .invited-by {
+    font-size: 9px;
+    color: #5a6a7a;
+  }
+  .divider-label {
+    font-size: 9px;
+    color: #3a4a5a;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 6px 10px 2px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    margin-top: 4px;
+  }
+</style>
+
+<div class="mm-root">
+  <div class="mm-header">
+    <span class="mm-header-label">My Meetings · Sat May 16</span>
+    <div class="mm-header-counts">
+      <span><b>1</b> live now</span>
+      <span><b>2</b> need attention</span>
+      <span><b>4</b> upcoming this week</span>
+    </div>
+  </div>
+
+  <div class="week-strip">
+    <div class="week-day">
+      <span class="wd-name">Sun</span>
+      <span class="wd-num">10</span>
+      <div class="wd-dots"><span class="dot ended"></span></div>
+    </div>
+    <div class="week-day">
+      <span class="wd-name">Mon</span>
+      <span class="wd-num">11</span>
+      <div class="wd-dots"><span class="dot ended"></span><span class="dot ended"></span></div>
+    </div>
+    <div class="week-day">
+      <span class="wd-name">Tue</span>
+      <span class="wd-num">12</span>
+      <div class="wd-dots"><span class="dot ended"></span></div>
+    </div>
+    <div class="week-day">
+      <span class="wd-name">Wed</span>
+      <span class="wd-num">13</span>
+      <div class="wd-dots"></div>
+    </div>
+    <div class="week-day">
+      <span class="wd-name">Thu</span>
+      <span class="wd-num">14</span>
+      <div class="wd-dots"><span class="dot ended"></span></div>
+    </div>
+    <div class="week-day">
+      <span class="wd-name">Fri</span>
+      <span class="wd-num">15</span>
+      <div class="wd-dots"><span class="dot ended"></span><span class="dot ended"></span></div>
+    </div>
+    <div class="week-day today active">
+      <span class="wd-name">Sat</span>
+      <span class="wd-num">16</span>
+      <div class="wd-dots">
+        <span class="dot live"></span>
+        <span class="dot today-mtg"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="lanes-container">
+
+    <div class="lane lane-now">
+      <div class="lane-header">
+        <span class="lane-label">Needs you now</span>
+        <span class="lane-count">1</span>
+      </div>
+      <div class="lane-cards">
+        <div class="mcard card-live">
+          <div class="card-top">
+            <span class="card-title">C-11 Percolate Smoke Test Meeting</span>
+            <span class="card-live-badge">● live</span>
+          </div>
+          <div class="card-meta">
+            <span class="ws">C-11 Test Workstream</span>
+            <span class="elapsed">42 min in</span>
+          </div>
+          <div class="card-signal sig-ok">3 nodes captured · 2 decisions sealed</div>
+          <div class="card-bottom">
+            <div class="avatars">
+              <div class="avatar av-vs">VS</div>
+              <div class="avatar av-ak">AK</div>
+              <div class="avatar av-rw">RW</div>
+            </div>
+            <button class="card-btn btn-join">Join →</button>
+          </div>
+        </div>
+
+        <div class="divider-label">Starting within 2 hrs</div>
+
+        <div class="mcard card-warn">
+          <div class="card-top">
+            <span class="card-title">Vendor Alignment Call</span>
+            <span class="card-warn-badge">in 38 min</span>
+          </div>
+          <div class="card-meta">
+            <span class="ws">Control Adapter</span>
+            <span>2:00 PM</span>
+          </div>
+          <div class="card-signal sig-warn">No agenda items set</div>
+          <div class="card-bottom">
+            <div class="avatars">
+              <div class="avatar av-vs">VS</div>
+              <div class="avatar av-jm">JM</div>
+            </div>
+            <button class="card-btn btn-open">Prepare →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lane lane-attention">
+      <div class="lane-header">
+        <span class="lane-label">Needs attention</span>
+        <span class="lane-count">2</span>
+      </div>
+      <div class="lane-cards">
+        <div class="mcard card-rsvp">
+          <div class="card-top">
+            <span class="card-title">CCCC Test Meeting #3 · Milestone Review</span>
+          </div>
+          <div class="card-meta">
+            <span class="ws">CCCC Test Workstream</span>
+            <span>Mon May 18</span>
+          </div>
+          <div class="card-signal sig-err">Pending your RSVP</div>
+          <div class="invited-by" style="margin-top:2px">Invited by Angela Kim · 2 days ago</div>
+          <div class="rsvp-row">
+            <button class="btn-accept">✓ Accept</button>
+            <button class="btn-decline">✕ Decline</button>
+          </div>
+        </div>
+
+        <div class="mcard card-warn">
+          <div class="card-top">
+            <span class="card-title">Energy Adapter · Phase 2 Kickoff</span>
+          </div>
+          <div class="card-meta">
+            <span class="ws">Energy Adapter</span>
+            <span>Tue May 19 · 10:00 AM</span>
+          </div>
+          <div class="card-signal sig-warn">4 prior actions unresolved · no outcomes set</div>
+          <div class="card-bottom">
+            <div class="avatars">
+              <div class="avatar av-vs">VS</div>
+              <div class="avatar av-ak">AK</div>
+              <div class="avatar av-rw">RW</div>
+            </div>
+            <button class="card-btn btn-open">Prep →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lane lane-upcoming">
+      <div class="lane-header">
+        <span class="lane-label">Upcoming · next 14 days</span>
+        <span class="lane-count">4</span>
+      </div>
+      <div class="lane-cards">
+        <div class="mcard card-upcoming">
+          <div class="card-top">
+            <span class="card-title">Control Adapter · Weekly Sync</span>
+          </div>
+          <div class="card-meta">
+            <span class="ws">Control Adapter</span>
+            <span>Mon May 18 · 9:00 AM</span>
+          </div>
+          <div class="card-signal">Organizer · 2 outcomes set</div>
+          <div class="card-bottom">
+            <div class="avatars">
+              <div class="avatar av-vs">VS</div>
+              <div class="avatar av-ak">AK</div>
+            </div>
+            <button class="card-btn btn-open">Open →</button>
+          </div>
+        </div>
+
+        <div class="mcard card-upcoming">
+          <div class="card-top">
+            <span class="card-title">Base · Quarterly Decision Review</span>
+          </div>
+          <div class="card-meta">
+            <span class="ws">Base</span>
+            <span>Wed May 20 · 1:00 PM</span>
+          </div>
+          <div class="card-signal sig-ok">Participant · RSVP accepted</div>
+          <div class="card-bottom">
+            <div class="avatars">
+              <div class="avatar av-vs">VS</div>
+              <div class="avatar av-jm">JM</div>
+              <div class="avatar av-rw">RW</div>
+            </div>
+            <button class="card-btn btn-open">Open →</button>
+          </div>
+        </div>
+
+        <div class="mcard card-upcoming">
+          <div class="card-top">
+            <span class="card-title">C-11 · Vendor Final Selection</span>
+          </div>
+          <div class="card-meta">
+            <span class="ws">C-11 Test Workstream</span>
+            <span>Fri May 22 · 3:00 PM</span>
+          </div>
+          <div class="card-signal">Organizer · draft</div>
+          <div class="card-bottom">
+            <div class="avatars">
+              <div class="avatar av-vs">VS</div>
+              <div class="avatar av-ak">AK</div>
+            </div>
+            <button class="card-btn btn-open">Open →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

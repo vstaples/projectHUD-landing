@@ -1,0 +1,432 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.shell {
+  font-family: 'IBM Plex Mono','SF Mono',monospace;
+  background: #0a0e14; color: #e6edf3;
+  border-radius: 8px; overflow: hidden;
+  display: flex; flex-direction: column; min-height: 720px;
+}
+/* TOPNAV */
+.topnav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 18px; background: #060a0f;
+  border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;
+}
+.topnav-left { font-size: 12px; color: #5a7a9a; letter-spacing: 0.05em; }
+.topnav-left b { color: #aab8c8; }
+.topnav-right { font-size: 12px; color: #6a8aaa; }
+
+/* TWIN TABS */
+.twin-tabs {
+  display: flex; align-items: stretch;
+  background: #060a0f; border-bottom: 2px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+.twin-tab {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.10em;
+  text-transform: uppercase; padding: 11px 28px;
+  cursor: pointer; color: #4a5a6a;
+  border-bottom: 3px solid transparent; margin-bottom: -2px;
+}
+.twin-tab.active { color: #f0f6fc; border-bottom-color: #33ddff; }
+.twin-tab.inactive { color: #4a5a6a; }
+.twin-tab.inactive:hover { color: #8a9aaa; }
+.tab-spacer { flex: 1; }
+.readiness-inline {
+  display: flex; align-items: center; gap: 10px; padding: 0 18px;
+}
+.ri-label { font-size: 12px; color: #4a5a6a; }
+.ri-track { width: 80px; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.ri-fill { height: 100%; width: 62%; background: #ffbb22; border-radius: 2px; }
+.ri-pct { font-size: 12px; color: #ffbb22; font-weight: 600; }
+
+/* INVITE HEADER (compact) */
+.invite-bar {
+  background: #0d1420; border-bottom: 1px solid rgba(255,187,34,0.18);
+  padding: 10px 20px; flex-shrink: 0;
+}
+.invite-title { font-size: 18px; font-weight: 700; color: #f0f6fc; margin-bottom: 4px; }
+.invite-meta { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.im-item { font-size: 12px; color: #7a8a9a; }
+.im-item b { color: #aab8c8; }
+.im-badge {
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 3px;
+  background: rgba(51,221,255,0.12); color: #33ddff; border: 1px solid rgba(51,221,255,0.25);
+}
+.stakes-line { font-size: 12px; color: #8a9aaa; font-style: italic; margin-bottom: 6px; border-left: 3px solid rgba(255,187,34,0.35); padding-left: 8px; }
+
+/* PERSON FILTER */
+.person-filter {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px; background: #0a0e14;
+  border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+}
+.pf-label { font-size: 12px; color: #4a5a6a; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
+.pf-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px 4px 6px; border-radius: 20px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10);
+  cursor: pointer; transition: all 0.15s;
+}
+.pf-chip:hover { border-color: rgba(255,255,255,0.20); background: rgba(255,255,255,0.08); }
+.pf-chip.all-chip { padding: 4px 12px; }
+.pf-chip.active { border-color: rgba(51,221,255,0.40); background: rgba(51,221,255,0.08); }
+.pf-av {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; font-weight: 700;
+}
+.av-vs { background: #1a3a5c; color: #33ddff; }
+.av-ak { background: #1a3a2a; color: #22ddaa; }
+.av-rw { background: #3a2a1a; color: #ffbb22; }
+.pf-name { font-size: 12px; color: #8a9aaa; }
+.pf-chip.active .pf-name { color: #c0d0e0; }
+.pf-divider { width: 1px; height: 22px; background: rgba(255,255,255,0.08); }
+
+/* COL HEADERS */
+.col-headers {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.ch {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; border-right: 1px solid rgba(255,255,255,0.06);
+}
+.ch:last-child { border-right: none; }
+.ch-label { font-size: 12px; letter-spacing: 0.10em; text-transform: uppercase; }
+.ch-label.amber { color: #ffbb22; }
+.ch-label.cyan { color: #33ddff; }
+.ch-label.mixed { color: #8a9aaa; }
+.ch-count {
+  font-size: 11px; padding: 1px 7px; border-radius: 10px;
+  background: rgba(255,255,255,0.06); color: #6a7a8a;
+}
+.ch-count.amber { background: rgba(255,187,34,0.12); color: #ffbb22; }
+.ch-count.cyan { background: rgba(51,221,255,0.10); color: #33ddff; }
+
+/* CONTENT COLUMNS */
+.content-area {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  flex: 1; overflow: hidden; min-height: 0;
+}
+.content-col {
+  overflow-y: auto; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 7px;
+  border-right: 1px solid rgba(255,255,255,0.05);
+}
+.content-col:last-child { border-right: none; }
+
+/* CARDS */
+.hcard {
+  background: #161c26; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px; padding: 9px 11px; position: relative;
+  overflow: hidden; display: flex; flex-direction: column; gap: 5px;
+}
+.hcard::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.hcard.amber::before { background: #ffbb22; }
+.hcard.amber-dim::before { background: rgba(255,187,34,0.4); }
+.hcard.cyan::before { background: #33ddff; }
+.hcard.rose::before { background: #ff6688; }
+.hcard.steel::before { background: #5a8aaa; }
+.hcard.overdue { border-color: rgba(255,102,136,0.25); background: rgba(255,102,136,0.04); }
+
+.hcard-top { display: flex; align-items: flex-start; gap: 7px; }
+.hcard-tag {
+  font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 2px; flex-shrink: 0; margin-top: 1px;
+}
+.tag-ax { background: rgba(255,187,34,0.16); color: #ffbb22; }
+.tag-dc { background: rgba(51,221,255,0.14); color: #33ddff; }
+.tag-nt { background: rgba(90,138,170,0.18); color: #7aaac8; }
+.tag-rk { background: rgba(255,102,136,0.14); color: #ff6688; }
+.hcard-text { font-size: 12px; color: #c0c8d4; line-height: 1.4; flex: 1; }
+.hcard-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hcard-owner { font-size: 11px; color: #5a6a7a; }
+.hcard-date { font-size: 11px; color: #4a5a6a; }
+.hcard-overdue { font-size: 11px; color: #ff6688; font-weight: 600; }
+.pull-btn {
+  font-size: 11px; color: #5a8aaa; border: 1px solid rgba(90,138,170,0.25);
+  background: rgba(90,138,170,0.08); padding: 2px 8px; border-radius: 3px;
+  cursor: pointer; white-space: nowrap; align-self: flex-end;
+}
+.pull-btn:hover { color: #33ddff; border-color: rgba(51,221,255,0.35); background: rgba(51,221,255,0.08); }
+.overdue-label {
+  font-size: 11px; color: #ff6688; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; margin-top: 3px;
+}
+.section-divider {
+  font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase;
+  color: #3a4a5a; padding: 6px 0 2px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4px;
+}
+
+/* FILMSTRIP BAR */
+.filmstrip-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 18px; background: #080c10;
+  border-top: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; cursor: pointer;
+}
+.filmstrip-bar:hover { background: #0d1117; }
+.film-label { font-size: 12px; color: #5a6a7a; letter-spacing: 0.06em; text-transform: uppercase; }
+.film-label b { color: #7a8a9a; }
+.film-cards { display: flex; gap: 6px; align-items: center; }
+.film-chip {
+  font-size: 11px; background: #111820; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 3px; padding: 3px 9px; color: #5a6a7a;
+}
+.film-expand { font-size: 12px; color: #3a4a5a; }
+
+/* FOOTER */
+.footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px; background: #060a0f;
+  border-top: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;
+}
+.footer-left { display: flex; align-items: center; gap: 12px; }
+.time-label { font-size: 12px; color: #4a5a6a; }
+.time-bar { width: 100px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.time-fill { height: 100%; width: 65%; background: #33ddff; border-radius: 2px; }
+.time-val { font-size: 12px; color: #5a8aaa; }
+.footer-warn { font-size: 12px; color: #ffbb22; }
+.footer-right { display: flex; gap: 10px; }
+.footer-btn {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 7px 16px; border-radius: 4px; cursor: pointer;
+}
+.btn-save { background: rgba(255,255,255,0.07); color: #aab8c8; border: 1px solid rgba(255,255,255,0.15); }
+.btn-begin { background: rgba(34,221,170,0.16); color: #22ddaa; border: 1px solid rgba(34,221,170,0.30); }
+</style>
+
+<div class="shell">
+
+  <div class="topnav">
+    <span class="topnav-left">PREPARING · <b>C-11 Percolate Smoke Test Meeting</b> · Mon May 18 · 2:00 PM</span>
+    <span class="topnav-right">← Back</span>
+  </div>
+
+  <div class="twin-tabs">
+    <div class="twin-tab active">⊞ History</div>
+    <div class="twin-tab inactive">✎ Composer</div>
+    <div class="tab-spacer"></div>
+    <div class="readiness-inline">
+      <span class="ri-label">Draft readiness</span>
+      <div class="ri-track"><div class="ri-fill"></div></div>
+      <span class="ri-pct">62%</span>
+    </div>
+  </div>
+
+  <div class="invite-bar">
+    <div class="stakes-line">Must complete endoscope prototype by 8/11; need to ratify materials vendor selection ASAP</div>
+    <div class="invite-meta">
+      <div class="im-item"><b>Workstream</b> C-11 Test Workstream</div>
+      <div class="im-item"><b>Last met</b> Apr 30 · 16 days ago</div>
+      <div class="im-item"><b>Prior meetings</b> 4</div>
+      <div class="im-item"><b>Open actions</b> 4</div>
+      <span class="im-badge">↩ Follow-up</span>
+    </div>
+  </div>
+
+  <div class="person-filter">
+    <span class="pf-label">Filter by</span>
+    <div class="pf-chip all-chip active"><span class="pf-name">All</span></div>
+    <div class="pf-divider"></div>
+    <div class="pf-chip">
+      <div class="pf-av av-vs">VS</div>
+      <span class="pf-name">Vaughn Staples</span>
+    </div>
+    <div class="pf-chip">
+      <div class="pf-av av-ak">AK</div>
+      <span class="pf-name">Angela Kim</span>
+    </div>
+    <div class="pf-chip">
+      <div class="pf-av av-rw">RW</div>
+      <span class="pf-name">Ron White</span>
+    </div>
+  </div>
+
+  <div class="col-headers">
+    <div class="ch">
+      <span class="ch-label amber">Open Actions</span>
+      <span class="ch-count amber">4 open · 1 overdue</span>
+    </div>
+    <div class="ch">
+      <span class="ch-label cyan">Decisions</span>
+      <span class="ch-count cyan">3 active</span>
+    </div>
+    <div class="ch">
+      <span class="ch-label mixed">Notes &amp; Risks</span>
+      <span class="ch-count">5 notes · 1 risk</span>
+    </div>
+  </div>
+
+  <div class="content-area">
+
+    <!-- OPEN ACTIONS -->
+    <div class="content-col">
+      <div class="hcard amber overdue">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-ax">AX-007</span>
+          <span class="hcard-text">Obtain written confirmation from vendor on delivery timeline.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">Angela Kim</span>
+          <span class="hcard-overdue">↑ Overdue · no due date set</span>
+        </div>
+        <button class="pull-btn">Pull to agenda →</button>
+      </div>
+      <div class="hcard amber">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-ax">AX-008</span>
+          <span class="hcard-text">Schedule vendor alignment call and circulate agenda in advance.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">Vaughn Staples</span>
+          <span class="hcard-date">Due May 20</span>
+        </div>
+        <button class="pull-btn">Pull to agenda →</button>
+      </div>
+      <div class="hcard amber">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-ax">AX-009</span>
+          <span class="hcard-text">Deliver completed component spec to engineering for review.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">Angela Kim</span>
+          <span class="hcard-date">No due date</span>
+        </div>
+        <button class="pull-btn">Pull to agenda →</button>
+      </div>
+      <div class="hcard amber-dim">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-ax">AX-010</span>
+          <span class="hcard-text">Follow up with vendor on API documentation release date.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">Vaughn Staples</span>
+          <span class="hcard-date">No due date</span>
+        </div>
+        <button class="pull-btn">Pull to agenda →</button>
+      </div>
+    </div>
+
+    <!-- DECISIONS -->
+    <div class="content-col">
+      <div class="hcard cyan">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-dc">DC-015</span>
+          <span class="hcard-text">Adopt phased delivery model — Phase 1 scope frozen. Vaughn accountable.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">Vaughn Staples</span>
+          <span class="hcard-date">Apr 14</span>
+        </div>
+        <button class="pull-btn">Pull to agenda →</button>
+      </div>
+      <div class="hcard cyan">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-dc">DC-016</span>
+          <span class="hcard-text">Proceed with internal spec pending vendor API confirmation. Angela to track.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">Angela Kim</span>
+          <span class="hcard-date">Mar 30</span>
+        </div>
+        <button class="pull-btn">Pull to agenda →</button>
+      </div>
+      <div class="hcard cyan">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-dc">DC-017</span>
+          <span class="hcard-text">Adopt revised component spec as Phase 1 baseline — pending Angela sign-off.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">All</span>
+          <span class="hcard-date">Apr 14</span>
+        </div>
+        <button class="pull-btn">Pull to agenda →</button>
+      </div>
+    </div>
+
+    <!-- NOTES + RISKS -->
+    <div class="content-col">
+      <div class="section-divider">Risks</div>
+      <div class="hcard rose">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-rk">DS-005</span>
+          <span class="hcard-text">Angela dissents on Phase 1 timeline — vendor dependency not resolved. Open dissent.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">Angela Kim</span>
+          <span class="hcard-date">Apr 14 · unresolved</span>
+        </div>
+        <button class="pull-btn">Pull to agenda →</button>
+      </div>
+      <div class="section-divider">Notes</div>
+      <div class="hcard steel">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-nt">NT-027</span>
+          <span class="hcard-text">Workstream objectives confirmed with all stakeholders present. Engineering capacity aligned.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">Vaughn Staples</span>
+          <span class="hcard-date">Mar 15</span>
+        </div>
+      </div>
+      <div class="hcard steel">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-nt">NT-028</span>
+          <span class="hcard-text">Angela flagged dependency on external vendor confirmation before Phase 1 can begin.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">Angela Kim</span>
+          <span class="hcard-date">Mar 30</span>
+        </div>
+      </div>
+      <div class="hcard steel">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-nt">NT-029</span>
+          <span class="hcard-text">Angela confirmed spec is 80% complete. Remaining 20% blocked on vendor API documentation.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">Angela Kim</span>
+          <span class="hcard-date">Apr 14</span>
+        </div>
+      </div>
+      <div class="hcard steel">
+        <div class="hcard-top">
+          <span class="hcard-tag tag-nt">NT-030</span>
+          <span class="hcard-text">Vendor confirmed API docs will be released by end of week. Angela unblocked to complete spec.</span>
+        </div>
+        <div class="hcard-meta">
+          <span class="hcard-owner">Vaughn Staples</span>
+          <span class="hcard-date">Apr 30</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="filmstrip-bar">
+    <span class="film-label"><b>Workstream timeline · 4 prior meetings</b></span>
+    <div class="film-cards">
+      <span class="film-chip">Mar 15 · Kickoff</span>
+      <span class="film-chip">Mar 30 · Review</span>
+      <span class="film-chip">Apr 14 · Decision Gate</span>
+      <span class="film-chip">Apr 30 · Action Review</span>
+    </div>
+    <span class="film-expand">▼ expand</span>
+  </div>
+
+  <div class="footer">
+    <div class="footer-left">
+      <span class="time-label">Time budget</span>
+      <div class="time-bar"><div class="time-fill"></div></div>
+      <span class="time-val">39 of 60 min planned</span>
+    </div>
+    <span class="footer-warn">● Ron White — no recent activity</span>
+    <div class="footer-right">
+      <button class="footer-btn btn-save">Save &amp; Invite</button>
+      <button class="footer-btn btn-begin">Begin Meeting →</button>
+    </div>
+  </div>
+
+</div>

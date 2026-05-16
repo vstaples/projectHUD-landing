@@ -1,0 +1,440 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.ws-root {
+  font-family: 'IBM Plex Mono', 'SF Mono', monospace;
+  background: #0d1117;
+  color: #c9d1d9;
+  padding: 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ws-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: #0a0e14;
+}
+.ws-breadcrumb {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #4a6a8a;
+  text-transform: uppercase;
+}
+.ws-breadcrumb span { color: #8892a0; }
+.ws-actions { display: flex; gap: 8px; }
+.ws-btn {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.05);
+  color: #8892a0;
+  border: 1px solid rgba(255,255,255,0.1);
+  cursor: pointer;
+}
+.ws-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 18px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.ws-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #e6edf3;
+  letter-spacing: -0.01em;
+}
+.ws-meta {
+  font-size: 9px;
+  color: #5a6a7a;
+  display: flex;
+  gap: 14px;
+}
+.ws-meta b { color: #8892a0; font-weight: 600; }
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px 8px;
+}
+.section-label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8892a0;
+}
+.new-btn {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 3px;
+  background: rgba(0,210,255,0.1);
+  color: #00d2ff;
+  border: 1px solid rgba(0,210,255,0.25);
+  cursor: pointer;
+}
+.cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 14px 16px;
+}
+.mcard {
+  background: #161c26;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.mcard:hover {
+  border-color: rgba(255,255,255,0.16);
+  background: #1a2230;
+}
+.mcard::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+}
+.mcard.state-idle::before { background: #ffaa00; }
+.mcard.state-live::before { background: #00d2ff; }
+.mcard.state-closed::before { background: #3d5070; }
+.card-inner {
+  padding: 10px 12px 10px 14px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+.card-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.card-row1 { display: flex; align-items: center; gap: 8px; }
+.state-badge {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.badge-idle { background: rgba(255,170,0,0.14); color: #ffaa00; border: 1px solid rgba(255,170,0,0.25); }
+.badge-live { background: rgba(0,210,255,0.14); color: #00d2ff; border: 1px solid rgba(0,210,255,0.3); animation: pulse 1.4s infinite; }
+.badge-closed { background: rgba(255,255,255,0.06); color: #5a6a7a; border: 1px solid rgba(255,255,255,0.08); }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.55; } }
+.card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e6edf3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mcard.state-closed .card-title { color: #8892a0; }
+.card-stakes {
+  font-size: 9px;
+  color: #6a7a8a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: italic;
+  padding-left: 1px;
+  border-left: 2px solid rgba(255,255,255,0.1);
+  padding-left: 6px;
+}
+.mcard.state-idle .card-stakes { border-left-color: rgba(255,170,0,0.3); color: #8892a0; }
+.card-signals {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.sig {
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.05);
+  color: #6a7a8a;
+}
+.sig.s-warn { background: rgba(255,170,0,0.08); color: #ffaa00; }
+.sig.s-ok { background: rgba(0,229,160,0.08); color: #00e5a0; }
+.sig.s-dim { color: #4a5a6a; }
+.card-date {
+  font-size: 9px;
+  color: #5a6a7a;
+  text-align: right;
+  white-space: nowrap;
+}
+.mcard.state-live .card-date { color: #00d2ff; }
+.card-organizer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.org-avatar {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #1a3a5c;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 6px;
+  font-weight: 700;
+  color: #00d2ff;
+  flex-shrink: 0;
+}
+.org-name { font-size: 9px; color: #6a7a8a; }
+.attendees-row {
+  display: flex;
+  align-items: center;
+  gap: -3px;
+}
+.att-av {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 6px;
+  font-weight: 700;
+  border: 1px solid #0d1117;
+  margin-right: -4px;
+}
+.att-count { font-size: 9px; color: #4a5a6a; margin-left: 7px; }
+.av-vs { background: #1a3a5c; color: #00d2ff; }
+.av-ak { background: #1a3a2a; color: #00e5a0; }
+.av-rw { background: #3a2a1a; color: #ffaa00; }
+.action-btn {
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-prepare { background: rgba(255,170,0,0.12); color: #ffaa00; border: 1px solid rgba(255,170,0,0.25); }
+.btn-join { background: rgba(0,210,255,0.14); color: #00d2ff; border: 1px solid rgba(0,210,255,0.3); }
+.btn-view { background: rgba(255,255,255,0.05); color: #5a6a7a; border: 1px solid rgba(255,255,255,0.09); }
+.sub-ws-section {
+  padding: 8px 14px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.sub-ws-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.sub-ws-chip {
+  font-size: 9px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  color: #6a7a8a;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+</style>
+
+<div class="ws-root">
+  <div class="ws-topbar">
+    <span class="ws-breadcrumb">Constellation › <span>C-11 Test Workstream</span></span>
+    <div class="ws-actions">
+      <button class="ws-btn">Rename</button>
+      <button class="ws-btn">Archive</button>
+    </div>
+  </div>
+
+  <div class="ws-title-row">
+    <span class="ws-title">C-11 Test Workstream</span>
+    <div class="ws-meta">
+      <span><b>5</b> meetings</span>
+      <span><b>14</b> nodes</span>
+      <span><b>4</b> open actions</span>
+    </div>
+  </div>
+
+  <div class="sub-ws-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span class="section-label">Sub-workstreams</span>
+      <button class="ws-btn">+ New sub-workstream</button>
+    </div>
+    <div class="sub-ws-row">
+      <span style="font-size:9px;color:#3a4a5a;font-style:italic;">No sub-workstreams.</span>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <span class="section-label">Direct meetings</span>
+    <button class="new-btn">+ New meeting</button>
+  </div>
+
+  <div class="cards-list">
+
+    <div class="mcard state-idle">
+      <div class="card-inner">
+        <div class="card-left">
+          <div class="card-row1">
+            <span class="state-badge badge-idle">Preparing</span>
+            <span class="card-title">C-11 Percolate Smoke Test Meeting</span>
+          </div>
+          <div class="card-stakes">Must complete endoscope prototype by 8/11; ratify materials vendor selection ASAP</div>
+          <div class="card-signals">
+            <span class="sig">2 outcomes set</span>
+            <span class="sig">2 agenda items</span>
+            <span class="sig s-warn">4 prior actions open</span>
+            <span class="sig s-warn">1 unresolved dissent</span>
+          </div>
+        </div>
+        <div class="card-right">
+          <span class="card-date">Mon May 18 · 2:00 PM</span>
+          <div class="card-organizer">
+            <div class="org-avatar">VS</div>
+            <span class="org-name">Vaughn Staples</span>
+          </div>
+          <div class="attendees-row">
+            <div class="att-av av-vs">VS</div>
+            <div class="att-av av-ak">AK</div>
+            <div class="att-av av-rw">RW</div>
+            <span class="att-count">3 attending</span>
+          </div>
+          <button class="action-btn btn-prepare">Prepare →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mcard state-closed">
+      <div class="card-inner">
+        <div class="card-left">
+          <div class="card-row1">
+            <span class="state-badge badge-closed">Closed</span>
+            <span class="card-title">C-11 Prior Meeting 4 · Action Review</span>
+          </div>
+          <div class="card-stakes">Vendor API confirmation pending; Phase 1 spec 80% complete</div>
+          <div class="card-signals">
+            <span class="sig s-ok">3 decisions sealed</span>
+            <span class="sig">4 actions assigned</span>
+            <span class="sig s-dim">60 min · 14 threads</span>
+          </div>
+        </div>
+        <div class="card-right">
+          <span class="card-date">Apr 30, 2026</span>
+          <div class="card-organizer">
+            <div class="org-avatar">VS</div>
+            <span class="org-name">Vaughn Staples</span>
+          </div>
+          <div class="attendees-row">
+            <div class="att-av av-vs">VS</div>
+            <div class="att-av av-ak">AK</div>
+            <span class="att-count">2 attended</span>
+          </div>
+          <button class="action-btn btn-view">View record →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mcard state-closed">
+      <div class="card-inner">
+        <div class="card-left">
+          <div class="card-row1">
+            <span class="state-badge badge-closed">Closed</span>
+            <span class="card-title">C-11 Prior Meeting 3 · Decision Gate</span>
+          </div>
+          <div class="card-stakes">Adopt revised component spec as Phase 1 baseline — pending Angela sign-off</div>
+          <div class="card-signals">
+            <span class="sig s-ok">2 decisions sealed</span>
+            <span class="sig">2 actions assigned</span>
+            <span class="sig s-dim">45 min · 8 threads</span>
+          </div>
+        </div>
+        <div class="card-right">
+          <span class="card-date">Apr 14, 2026</span>
+          <div class="card-organizer">
+            <div class="org-avatar">VS</div>
+            <span class="org-name">Vaughn Staples</span>
+          </div>
+          <div class="attendees-row">
+            <div class="att-av av-vs">VS</div>
+            <div class="att-av av-ak">AK</div>
+            <div class="att-av av-rw">RW</div>
+            <span class="att-count">3 attended</span>
+          </div>
+          <button class="action-btn btn-view">View record →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mcard state-closed">
+      <div class="card-inner">
+        <div class="card-left">
+          <div class="card-row1">
+            <span class="state-badge badge-closed">Closed</span>
+            <span class="card-title">C-11 Prior Meeting 2 · Review</span>
+          </div>
+          <div class="card-stakes">Internal spec review; Angela flagged vendor dependency</div>
+          <div class="card-signals">
+            <span class="sig s-ok">1 decision sealed</span>
+            <span class="sig">3 actions assigned</span>
+            <span class="sig s-dim">30 min · 6 threads</span>
+          </div>
+        </div>
+        <div class="card-right">
+          <span class="card-date">Mar 30, 2026</span>
+          <div class="card-organizer">
+            <div class="org-avatar">VS</div>
+            <span class="org-name">Vaughn Staples</span>
+          </div>
+          <div class="attendees-row">
+            <div class="att-av av-vs">VS</div>
+            <div class="att-av av-ak">AK</div>
+            <span class="att-count">2 attended</span>
+          </div>
+          <button class="action-btn btn-view">View record →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mcard state-closed">
+      <div class="card-inner">
+        <div class="card-left">
+          <div class="card-row1">
+            <span class="state-badge badge-closed">Closed</span>
+            <span class="card-title">C-11 Prior Meeting 1 · Kickoff</span>
+          </div>
+          <div class="card-stakes">Workstream objectives confirmed; engineering capacity aligned</div>
+          <div class="card-signals">
+            <span class="sig s-ok">1 decision sealed</span>
+            <span class="sig">2 actions assigned</span>
+            <span class="sig s-dim">60 min · 10 threads</span>
+          </div>
+        </div>
+        <div class="card-right">
+          <span class="card-date">Mar 15, 2026</span>
+          <div class="card-organizer">
+            <div class="org-avatar">VS</div>
+            <span class="org-name">Vaughn Staples</span>
+          </div>
+          <div class="attendees-row">
+            <div class="att-av av-vs">VS</div>
+            <div class="att-av av-ak">AK</div>
+            <div class="att-av av-rw">RW</div>
+            <span class="att-count">3 attended</span>
+          </div>
+          <button class="action-btn btn-view">View record →</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
