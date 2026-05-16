@@ -1257,6 +1257,7 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 .ac-briefing-last {
   background: var(--ac-bg-tile);
   border: 1px solid var(--ac-border-subtle);
+  border-left: 3px solid #00B0F0;
   border-radius: 6px;
   padding: 10px 12px;
 }
@@ -3495,11 +3496,11 @@ body.accord-setup-fullpage .minutes-history { display: none !important; }
 /* X-46: Display tuning button + panel */
 .ac-display-btn {
   background: none; border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 5px; color: var(--ac-text-tertiary);
-  cursor: pointer; padding: 5px 7px; display: flex;
+  border-radius: 4px; color: var(--ac-text-tertiary);
+  cursor: pointer; padding: 3px 6px; display: inline-flex;
   align-items: center; justify-content: center;
   transition: color 120ms, border-color 120ms;
-  margin-left: 10px; flex-shrink: 0;
+  margin-right: 6px; flex-shrink: 0; vertical-align: middle;
 }
 .ac-display-btn:hover { color: var(--ac-amber); border-color: var(--ac-amber); }
 #ac-display-panel {
