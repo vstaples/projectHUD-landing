@@ -2531,8 +2531,8 @@
       if (empty) empty.remove();
       var row = document.createElement('div');
       row.className = 'ac-setup-chat-msg' + (isMe ? ' ac-setup-chat-msg--me' : '');
-      row.innerHTML = '<span class="ac-setup-chat-name">' + _esc(name) + '</span>' +
-                      '<span class="ac-setup-chat-text">' + _esc(text) + '</span>';
+      row.innerHTML = '<span class="ac-setup-chat-name">' + esc(name) + '</span>' +
+                      '<span class="ac-setup-chat-text">' + esc(text) + '</span>';
       stream.appendChild(row);
       stream.scrollTop = stream.scrollHeight;
     }
