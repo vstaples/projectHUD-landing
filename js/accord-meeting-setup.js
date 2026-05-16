@@ -2909,12 +2909,12 @@
     var isOrganizer = me && (me.id === meeting.organizer_id);
     if (!isOrganizer) {
       footer.style.display = 'none';
-      // Collapse the footer grid row so the space is reclaimed
+      // Collapse the footer grid row to reclaim the space
       var shell = document.querySelector('.ac-setup-shell');
       if (shell) {
-        var rows = getComputedStyle(shell).gridTemplateRows.split(' ');
-        if (rows.length >= 4) { rows[rows.length - 1] = '0px'; }
-        shell.style.gridTemplateRows = rows.join(' ');
+        var current = shell.style.gridTemplateRows || getComputedStyle(shell).gridTemplateRows;
+        // Replace last token with 0px
+        shell.style.gridTemplateRows = current.trim().replace(/\S+$/, '0px');
       }
       return;
     }
