@@ -2909,6 +2909,13 @@
     var isOrganizer = me && (me.id === meeting.organizer_id);
     if (!isOrganizer) {
       footer.style.display = 'none';
+      // Collapse the footer grid row so the space is reclaimed
+      var shell = document.querySelector('.ac-setup-shell');
+      if (shell) {
+        var rows = getComputedStyle(shell).gridTemplateRows.split(' ');
+        if (rows.length >= 4) { rows[rows.length - 1] = '0px'; }
+        shell.style.gridTemplateRows = rows.join(' ');
+      }
       return;
     }
     footer.style.display = '';
