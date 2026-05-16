@@ -2906,14 +2906,13 @@
     // Non-organizers see no footer — Save & Invite and Begin Meeting
     // are organizer-only controls.
     var me = window.Accord && window.Accord.state && window.Accord.state.me;
-    var isOrganizer = me && (me.id === meeting.organizer_id);
+    var isOrganizer = _isCurrentUserOrganizer(meeting) ||
+                      (me && me.id === meeting.organizer_id);
     if (!isOrganizer) {
       footer.style.display = 'none';
-      // Collapse the footer grid row to reclaim the space
       var shell = document.querySelector('.ac-setup-shell');
       if (shell) {
         var current = shell.style.gridTemplateRows || getComputedStyle(shell).gridTemplateRows;
-        // Replace last token with 0px
         shell.style.gridTemplateRows = current.trim().replace(/\S+$/, '0px');
       }
       return;
