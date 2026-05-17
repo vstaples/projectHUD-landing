@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accord · Workstream Detail</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Outfit',system-ui,sans-serif;font-size:14px;background:#0b0d14;color:#dce6f5;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:2px}
+:root{
+  --void:#0b0d14;--surface:#10131e;--raised:#171c2e;--hover:#1d2338;
+  --b0:#1e2438;--b1:#252d44;--b2:#313d5e;
+  --hi:#dce6f5;--md:#8899b2;--lo:#4a5670;
+  --dec:#4a8cf5;--dec-bg:rgba(74,140,245,.09);--dec-bd:rgba(74,140,245,.24);
+  --act:#e89430;--act-bg:rgba(232,148,48,.08);--act-bd:rgba(232,148,48,.24);
+  --rsk:#e05252;--rsk-bg:rgba(224,82,82,.09);--rsk-bd:rgba(224,82,82,.24);
+  --nt:#48aa88;--nt-bg:rgba(72,170,136,.08);--nt-bd:rgba(72,170,136,.22);
+  --live:#34d499;
+}
+.shell{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:var(--void)}
+
+/* TOPBAR */
+.topbar{height:50px;flex-shrink:0;display:flex;align-items:center;background:var(--void);border-bottom:1px solid var(--b0);padding:0 20px;gap:12px}
+.tb-logo{font-size:16px;font-weight:600;color:var(--hi)}.tb-logo-dot{color:var(--dec)}
+.tb-sep{width:1px;height:20px;background:var(--b1)}
+.tb-crumb{font-size:12px;color:var(--lo);letter-spacing:.06em;text-transform:uppercase}
+.tb-crumb span{color:var(--md)}
+.tb-actions{margin-left:auto;display:flex;gap:7px}
+.tb-btn{font-size:12px;padding:5px 11px;border-radius:4px;background:rgba(255,255,255,.06);color:var(--md);border:1px solid var(--b1);cursor:pointer}
+
+/* TITLE ROW */
+.title-row{display:flex;align-items:center;justify-content:space-between;padding:16px 22px 12px;border-bottom:1px solid var(--b0);flex-shrink:0}
+.ws-title{font-size:22px;font-weight:600;color:var(--hi)}
+
+/* STAT TILES */
+.stat-tiles{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--b0);flex-shrink:0}
+.stat-tile{display:flex;flex-direction:column;padding:12px 16px 11px;border-right:1px solid var(--b0);gap:3px}
+.stat-tile:last-child{border-right:none}
+.stat-lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--lo)}
+.stat-val{font-size:21px;font-weight:700;color:var(--hi);line-height:1}
+.stat-sub{font-size:11px;color:var(--md)}
+.tv-warn .stat-val{color:var(--rsk)}
+.tv-cyan .stat-val{color:var(--dec)}
+
+/* SECTION HDR */
+.section-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 22px 8px;flex-shrink:0}
+.sec-lbl{font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:var(--md)}
+.new-btn{font-size:12px;font-weight:600;padding:5px 13px;border-radius:4px;background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd);cursor:pointer}
+
+/* COL HEADERS */
+.col-hdrs{display:grid;grid-template-columns:1fr 230px;padding:6px 22px 5px;border-bottom:1px solid var(--b0);flex-shrink:0}
+.ch{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--lo)}
+.ch.r{text-align:right}
+
+/* CARDS LIST */
+.cards-list{overflow-y:auto;flex:1;padding:6px 14px 16px;display:flex;flex-direction:column;gap:6px}
+
+/* MEETING CARD — 3 column grid */
+.mcard{background:var(--raised);border:1px solid var(--b1);border-left:3px solid var(--b1);border-radius:7px;overflow:hidden;cursor:pointer;transition:border-color .13s}
+.mcard:hover{border-color:var(--b2)}
+.mcard.st-idle{border-left-color:var(--act)}
+.mcard.st-pending{border-left-color:var(--rsk)}
+.mcard.st-closed{border-left-color:var(--b2)}
+.card-grid{display:grid;grid-template-columns:1fr 230px;gap:12px;padding:11px 14px 11px 16px;align-items:start}
+/* Col 1 */
+.c1{display:flex;flex-direction:column;gap:6px;min-width:0}
+.c1-row1{display:flex;align-items:center;gap:8px}
+.state-badge{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:3px;flex-shrink:0}
+.sb-idle{background:var(--act-bg);color:var(--act);border:1px solid var(--act-bd)}
+.sb-pending{background:var(--rsk-bg);color:var(--rsk);border:1px solid var(--rsk-bd)}
+.sb-closed{background:rgba(255,255,255,.06);color:var(--md);border:1px solid var(--b1)}
+.card-title{font-size:14px;font-weight:500;color:var(--hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mcard.st-closed .card-title{color:var(--md)}
+.card-stakes{font-size:12px;color:var(--md);font-style:italic;border-left:3px solid rgba(255,255,255,.12);padding-left:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mcard.st-idle .card-stakes{border-left-color:rgba(232,148,48,.4)}
+.mcard.st-pending .card-stakes{border-left-color:rgba(224,82,82,.35)}
+.signals{display:flex;gap:5px;flex-wrap:wrap}
+.sig{font-size:11px;padding:2px 8px;border-radius:3px;background:rgba(255,255,255,.05);color:var(--md)}
+.sig.ok{background:var(--nt-bg);color:var(--nt)}
+.sig.warn{background:var(--act-bg);color:var(--act)}
+.sig.err{background:var(--rsk-bg);color:var(--rsk)}
+.sig.dim{color:var(--lo)}
+/* Col 2 */
+.c2{display:flex;flex-direction:column;gap:7px}
+.c2-date{font-size:13px;color:var(--md)}
+.mcard.st-idle .c2-date,.mcard.st-pending .c2-date{color:var(--hi);font-weight:500}
+.c2-org{display:flex;align-items:center;gap:6px}
+.org-av{width:20px;height:20px;border-radius:50%;background:#152c54;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:var(--dec)}
+.org-name{font-size:12px;color:var(--md)}
+.c2-atts{display:flex;align-items:center}
+.av-sm{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:700;border:1px solid var(--raised);margin-right:-4px}
+.av-a{background:#152c54;color:#4a8cf5}.av-b{background:#103028;color:#34d499}.av-c{background:#2e1e0c;color:#e89430}
+.att-cnt{font-size:11px;color:var(--lo);margin-left:8px}
+/* RSVP rings on pending */
+.av-wrap{position:relative;width:22px;height:22px;margin-right:-2px}
+.av-inner{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:700;position:absolute;top:1px;left:1px}
+.av-ring{position:absolute;top:0;left:0;width:22px;height:22px;border-radius:50%;border:2px solid transparent}
+.ring-ok{border-color:var(--nt)}.ring-pending{border-color:var(--act)}.ring-declined{border-color:var(--rsk)}
+.rsvp-summary{display:flex;gap:8px}
+.rsvp-chip{font-size:11px;display:flex;align-items:center;gap:4px;color:var(--md)}
+.rdot{width:6px;height:6px;border-radius:50%}
+.rdot-ok{background:var(--nt)}.rdot-p{background:var(--act)}.rdot-d{background:var(--rsk)}
+.resend-lbl{font-size:11px;color:var(--lo);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.resend-lbl:hover{color:var(--md)}
+.countdown{font-size:11px;color:var(--act)}
+
+.ws-page-tabs{display:flex;align-items:stretch;background:var(--surface);border-bottom:1px solid var(--b0);padding:0 22px;flex-shrink:0}
+.wpt{font-size:13px;font-weight:600;padding:10px 18px;cursor:pointer;color:var(--md);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .13s}
+.wpt:hover{color:var(--hi)}
+.wpt.wpt-active{color:var(--hi);border-bottom-color:var(--dec)}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="tb-logo">accord<span class="tb-logo-dot">.</span></div>
+    <div class="tb-sep"></div>
+    <div class="tb-crumb">Constellation › <span>C-11 Test Workstream</span></div>
+    <div class="tb-actions"><button class="tb-btn">Rename</button><button class="tb-btn">Archive</button></div>
+  </div>
+
+  <div class="ws-page-tabs">
+    <div class="wpt wpt-active">Meetings</div>
+    <div class="wpt">Knowledge Base</div>
+  </div>
+  <div class="title-row">
+    <div class="ws-title">C-11 Test Workstream</div>
+  </div>
+
+  <div class="stat-tiles">
+    <div class="stat-tile">
+      <span class="stat-lbl">Meetings</span>
+      <span class="stat-val">6</span>
+      <span class="stat-sub">1 preparing · 1 pending · 4 closed</span>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-lbl">Nodes captured</span>
+      <span class="stat-val">14</span>
+      <span class="stat-sub">3 decisions · 4 actions · 5 notes</span>
+    </div>
+    <div class="stat-tile tv-warn">
+      <span class="stat-lbl">Open actions</span>
+      <span class="stat-val">4</span>
+      <span class="stat-sub">1 due this week</span>
+    </div>
+    <div class="stat-tile tv-warn">
+      <span class="stat-lbl">RSVPs pending</span>
+      <span class="stat-val">2</span>
+      <span class="stat-sub">across 1 meeting · 3 days old</span>
+    </div>
+    <div class="stat-tile tv-cyan">
+      <span class="stat-lbl">Next meeting</span>
+      <span class="stat-val" style="font-size:16px;padding-top:3px">May 18</span>
+      <span class="stat-sub">Mon · 2:00 PM · in 2 days</span>
+    </div>
+  </div>
+
+  <div class="section-hdr">
+    <span class="sec-lbl">Direct meetings</span>
+    <button class="new-btn">+ New meeting</button>
+  </div>
+
+  <div class="col-hdrs">
+    <span class="ch">Meeting · Stakes · Signals</span>
+    <span class="ch r">When · Who · Attending</span>
+  </div>
+
+  <div class="cards-list">
+
+    <!-- PREPARING -->
+    <div class="mcard st-idle">
+      <div class="card-grid">
+        <div class="c1">
+          <div class="c1-row1"><span class="state-badge sb-idle">Preparing</span><span class="card-title">C-11 Percolate Smoke Test Meeting</span></div>
+          <div class="card-stakes">Must complete endoscope prototype by 8/11; ratify vendor selection ASAP</div>
+          <div class="signals"><span class="sig">2 outcomes set</span><span class="sig">2 agenda items</span><span class="sig warn">4 actions open</span><span class="sig warn">1 unresolved dissent</span><span class="sig ok">3 of 3 accepted</span></div>
+        </div>
+        <div class="c2">
+          <div class="c2-date">Mon May 18 · 2:00 PM · 60 min</div>
+          <div class="c2-org"><div class="org-av">VS</div><span class="org-name">Vaughn Staples</span></div>
+          <div class="c2-atts"><div class="av-sm av-a">VS</div><div class="av-sm av-b">AK</div><div class="av-sm av-c">RW</div><span class="att-cnt">3 attending · in 2 days</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PENDING -->
+    <div class="mcard st-pending">
+      <div class="card-grid">
+        <div class="c1">
+          <div class="c1-row1"><span class="state-badge sb-pending">Pending RSVPs</span><span class="card-title">C-11 Phase 2 Planning · Scope Review</span></div>
+          <div class="card-stakes">Define Phase 2 deliverables; confirm resource availability for Q3 build</div>
+          <div class="signals"><span class="sig">1 outcome set</span><span class="sig err">2 RSVPs outstanding</span><span class="sig dim">Invited 3 days ago</span><span class="sig warn">No agenda yet</span></div>
+        </div>
+        <div class="c2">
+          <div class="c2-date">Wed May 21 · 10:00 AM · 45 min</div>
+          <div class="c2-org"><div class="org-av">VS</div><span class="org-name">Vaughn Staples</span></div>
+          <div class="c2-atts">
+            <div class="av-wrap"><div class="av-inner av-a">VS</div><div class="av-ring ring-ok"></div></div>
+            <div class="av-wrap"><div class="av-inner av-b">AK</div><div class="av-ring ring-pending"></div></div>
+            <div class="av-wrap"><div class="av-inner av-c">RW</div><div class="av-ring ring-pending"></div></div>
+            <span class="att-cnt" style="margin-left:10px">4 invited · in 5 days</span>
+          </div>
+          <div class="rsvp-summary">
+            <div class="rsvp-chip"><span class="rdot rdot-ok"></span>1 accepted</div>
+            <div class="rsvp-chip"><span class="rdot rdot-p"></span>2 pending</div>
+            <div class="rsvp-chip"><span class="rdot rdot-d"></span>1 declined</div>
+          </div>
+          <span class="resend-lbl">Resend to pending</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLOSED 4 -->
+    <div class="mcard st-closed">
+      <div class="card-grid">
+        <div class="c1">
+          <div class="c1-row1"><span class="state-badge sb-closed">Closed</span><span class="card-title">C-11 Prior Meeting 4 · Action Review</span></div>
+          <div class="card-stakes">Vendor API confirmation pending; Phase 1 spec 80% complete</div>
+          <div class="signals"><span class="sig ok">3 decisions sealed</span><span class="sig">4 actions assigned</span><span class="sig dim">60 min · 14 threads</span></div>
+        </div>
+        <div class="c2">
+          <div class="c2-date">Apr 30, 2026 · 60 min</div>
+          <div class="c2-org"><div class="org-av">VS</div><span class="org-name">Vaughn Staples</span></div>
+          <div class="c2-atts"><div class="av-sm av-a">VS</div><div class="av-sm av-b">AK</div><span class="att-cnt">2 attended</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLOSED 3 -->
+    <div class="mcard st-closed">
+      <div class="card-grid">
+        <div class="c1">
+          <div class="c1-row1"><span class="state-badge sb-closed">Closed</span><span class="card-title">C-11 Prior Meeting 3 · Decision Gate</span></div>
+          <div class="card-stakes">Adopt revised component spec as Phase 1 baseline — pending Angela sign-off</div>
+          <div class="signals"><span class="sig ok">2 decisions sealed</span><span class="sig">2 actions assigned</span><span class="sig dim">45 min · 8 threads</span></div>
+        </div>
+        <div class="c2">
+          <div class="c2-date">Apr 14, 2026 · 45 min</div>
+          <div class="c2-org"><div class="org-av">VS</div><span class="org-name">Vaughn Staples</span></div>
+          <div class="c2-atts"><div class="av-sm av-a">VS</div><div class="av-sm av-b">AK</div><div class="av-sm av-c">RW</div><span class="att-cnt">3 attended</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLOSED 1 -->
+    <div class="mcard st-closed">
+      <div class="card-grid">
+        <div class="c1">
+          <div class="c1-row1"><span class="state-badge sb-closed">Closed</span><span class="card-title">C-11 Prior Meeting 1 · Kickoff</span></div>
+          <div class="card-stakes">Workstream objectives confirmed; engineering capacity aligned with stakeholders</div>
+          <div class="signals"><span class="sig ok">1 decision sealed</span><span class="sig">2 actions assigned</span><span class="sig dim">60 min · 10 threads</span></div>
+        </div>
+        <div class="c2">
+          <div class="c2-date">Mar 15, 2026 · 60 min</div>
+          <div class="c2-org"><div class="org-av">VS</div><span class="org-name">Vaughn Staples</span></div>
+          <div class="c2-atts"><div class="av-sm av-a">VS</div><div class="av-sm av-b">AK</div><div class="av-sm av-c">RW</div><span class="att-cnt">3 attended</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

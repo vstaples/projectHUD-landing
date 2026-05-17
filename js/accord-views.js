@@ -413,6 +413,41 @@
       return;
     }
 
+    // CMD-ACCORD-LIVE-CAPTURE-1 Phase 3: running → Live Capture shell.
+    // Surface host is made visible directly (no tab-body relocation needed —
+    // the Live Capture shell renders full-panel into the host without the
+    // 5-tab wrapper). _mountSurfaceHostInTabBody() is guarded below so it
+    // only fires for closed/sealed meetings that still use the 5-tab shell.
+    if (meeting.state === 'running') {
+      _detachSurfaceHost();
+      // loadMeeting populates Accord.state.meeting, resolves thread,
+      // subscribes the meeting Realtime channel, and starts the presence
+      // heartbeat — all required by the Live Capture shell.
+      if (window.Accord && window.Accord.loadMeeting && meeting.meeting_id) {
+        try { await window.Accord.loadMeeting(meeting.meeting_id); }
+        catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure (running)', e); }
+      }
+      var _sfHostR = document.getElementById('ac-meeting-surface-host');
+      if (_sfHostR) {
+        _sfHostR.classList.remove('idle', 'running', 'closed', 'sealed');
+        _sfHostR.classList.add('running');
+        // Make host visible — it is parked at document.body (display:none by default CSS).
+        // Append it into the view host so it participates in the layout.
+        if (_sfHostR.parentElement !== host) host.appendChild(_sfHostR);
+        _sfHostR.classList.add('active');
+        _sfHostR.style.display = '';
+      }
+      var _sfCenterR = document.querySelector('.ac-center');
+      if (_sfCenterR) {
+        _sfCenterR.classList.remove('meeting-idle', 'meeting-running', 'meeting-closed');
+        _sfCenterR.classList.add('meeting-running');
+      }
+      if (window.AccordLiveCapture && window.AccordLiveCapture.render) {
+        window.AccordLiveCapture.render(meeting);
+      }
+      return;
+    }
+
     await _loadIfNeeded();
     const owningWsId = workstreamId || meeting.workstream_id;
     const ws = owningWsId ? cache.workstreams.find(w => w.workstream_id === owningWsId) : null;
@@ -499,6 +534,8 @@
     _wireMeetingView(host, meeting);
 
     // Mount host BEFORE loadMeeting so DOM elements exist when meeting-loaded fires.
+    // CMD-ACCORD-LIVE-CAPTURE-1: guard — running meetings use AccordLiveCapture
+    // and do not go through the tab-body relocation path.
     _mountSurfaceHostInTabBody();
     _activateMeetingTab(host, 'capture');
     if (window.Accord?.loadMeeting && meeting.meeting_id) {

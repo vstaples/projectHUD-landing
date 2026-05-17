@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accord · My Meetings</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Outfit',system-ui,sans-serif;font-size:14px;background:#0b0d14;color:#dce6f5;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:2px}
+:root{
+  --void:#0b0d14;--surface:#10131e;--raised:#171c2e;--hover:#1d2338;
+  --b0:#1e2438;--b1:#252d44;--b2:#313d5e;
+  --hi:#dce6f5;--md:#8899b2;--lo:#4a5670;
+  --dec:#4a8cf5;--dec-bg:rgba(74,140,245,.09);--dec-bd:rgba(74,140,245,.24);
+  --act:#e89430;--act-bg:rgba(232,148,48,.08);--act-bd:rgba(232,148,48,.24);
+  --rsk:#e05252;--rsk-bg:rgba(224,82,82,.09);--rsk-bd:rgba(224,82,82,.24);
+  --nt:#48aa88;--nt-bg:rgba(72,170,136,.08);--nt-bd:rgba(72,170,136,.22);
+  --live:#34d499;
+}
+.shell{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOPBAR */
+.topbar{height:50px;flex-shrink:0;display:flex;align-items:center;background:var(--void);border-bottom:1px solid var(--b0);padding:0 20px;gap:12px}
+.tb-logo{font-size:16px;font-weight:600;color:var(--hi)}.tb-logo-dot{color:var(--dec)}
+.tb-sep{width:1px;height:20px;background:var(--b1)}
+.tb-title{font-size:13px;font-weight:500;color:var(--md)}
+
+/* TWIN TABS */
+.tabs{display:flex;align-items:stretch;background:var(--surface);border-bottom:1px solid var(--b0);padding:0 20px;flex-shrink:0}
+.tab{font-size:13px;font-weight:600;padding:12px 16px;cursor:pointer;color:var(--md);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.active{color:var(--hi);border-bottom-color:var(--dec)}
+
+/* HEADER ROW */
+.mm-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 20px 10px;border-bottom:1px solid var(--b0);flex-shrink:0;background:var(--void)}
+.mm-hdr-label{font-size:13px;font-weight:600;color:var(--md);text-transform:uppercase;letter-spacing:.06em}
+.mm-hdr-counts{display:flex;gap:18px}
+.mm-hdr-counts span{font-size:13px;color:var(--md)}
+.mm-hdr-counts b{color:var(--hi);font-weight:600}
+
+/* WEEK STRIP */
+.week-strip{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--b0);flex-shrink:0;background:var(--surface)}
+.week-day{display:flex;flex-direction:column;align-items:center;padding:10px 6px 8px;cursor:pointer;border-right:1px solid var(--b0);gap:4px;transition:background .13s}
+.week-day:last-child{border-right:none}
+.week-day:hover{background:var(--hover)}
+.week-day.today{background:rgba(74,140,245,.06);border-bottom:2px solid var(--dec)}
+.wd-name{font-size:10px;letter-spacing:.09em;color:var(--md);text-transform:uppercase}
+.week-day.today .wd-name{color:var(--dec)}
+.wd-num{font-size:16px;font-weight:600;color:var(--hi);line-height:1}
+.week-day.today .wd-num{color:var(--dec)}
+.wd-dots{display:flex;gap:3px;align-items:center;min-height:8px}
+.dot{width:6px;height:6px;border-radius:50%}
+.dot-live{background:var(--dec);animation:dp 1.4s infinite}
+@keyframes dp{0%,100%{opacity:1}50%{opacity:.4}}
+.dot-today{background:var(--act)}
+.dot-past{background:#2a3440}
+
+/* THREE LANES */
+.lanes{display:grid;grid-template-columns:1fr 1fr 1fr;flex:1;overflow:hidden;min-height:0}
+.lane{display:flex;flex-direction:column;border-right:1px solid var(--b0);overflow:hidden}
+.lane:last-child{border-right:none}
+.lane-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;border-bottom:1px solid var(--b0);flex-shrink:0}
+.lane-lbl{font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase}
+.lane-now .lane-lbl{color:var(--dec)}
+.lane-att .lane-lbl{color:var(--act)}
+.lane-up .lane-lbl{color:var(--md)}
+.lane-cnt{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--raised);color:var(--md);border:1px solid var(--b1)}
+.lane-now .lane-cnt{background:var(--dec-bg);color:var(--dec);border-color:var(--dec-bd)}
+.lane-att .lane-cnt{background:var(--act-bg);color:var(--act);border-color:var(--act-bd)}
+.lane-cards{overflow-y:auto;padding:10px 10px;display:flex;flex-direction:column;gap:8px}
+
+/* CARDS */
+.mcard{background:var(--raised);border:1px solid var(--b1);border-radius:7px;padding:11px 13px;display:flex;flex-direction:column;gap:7px;position:relative;overflow:hidden;cursor:pointer;transition:border-color .13s}
+.mcard:hover{border-color:var(--b2)}
+.mcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
+.mc-live::before{background:var(--dec)}
+.mc-warn::before{background:var(--act)}
+.mc-rsvp::before{background:var(--rsk)}
+.mc-up::before{background:var(--b2)}
+.card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.card-title{font-size:13px;font-weight:600;color:var(--hi);flex:1;line-height:1.3}
+.badge{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:2px 8px;border-radius:3px;white-space:nowrap;flex-shrink:0}
+.badge-live{background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd);animation:dp 1.4s infinite}
+.badge-soon{background:var(--act-bg);color:var(--act);border:1px solid var(--act-bd)}
+.card-ws{font-size:12px;color:var(--lo)}
+.card-signal{font-size:12px;padding:3px 9px;border-radius:4px;background:rgba(255,255,255,.05);color:var(--md)}
+.card-signal.sig-warn{background:var(--act-bg);color:var(--act)}
+.card-signal.sig-ok{background:var(--nt-bg);color:var(--nt)}
+.card-signal.sig-err{background:var(--rsk-bg);color:var(--rsk)}
+.card-elapsed{font-size:12px;color:var(--dec)}
+.card-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:2px}
+.avatars{display:flex}
+.av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;border:1px solid var(--void);margin-right:-4px}
+.av-a{background:#152c54;color:#4a8cf5}.av-b{background:#103028;color:#34d499}.av-c{background:#2e1e0c;color:#e89430}
+.att-lbl{font-size:11px;color:var(--lo);margin-left:8px}
+.card-btn{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:5px 11px;border-radius:4px;cursor:pointer;border:1px solid;transition:all .13s}
+.btn-join{background:var(--dec-bg);color:var(--dec);border-color:var(--dec-bd)}
+.btn-prep{background:var(--act-bg);color:var(--act);border-color:var(--act-bd)}
+.btn-open{background:rgba(255,255,255,.05);color:var(--md);border-color:var(--b1)}
+/* RSVP inline */
+.rsvp-row{display:flex;gap:6px;align-items:center}
+.invited-by{font-size:11px;color:var(--lo)}
+.btn-accept{font-size:11px;font-weight:600;padding:4px 10px;border-radius:4px;background:var(--nt-bg);color:var(--nt);border:1px solid var(--nt-bd);cursor:pointer}
+.btn-decline{font-size:11px;font-weight:600;padding:4px 10px;border-radius:4px;background:rgba(255,255,255,.05);color:var(--md);border:1px solid var(--b1);cursor:pointer}
+.divider-lbl{font-size:11px;color:var(--lo);letter-spacing:.08em;text-transform:uppercase;padding:4px 0 2px;border-top:1px solid var(--b0);margin-top:2px}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="tb-logo">accord<span class="tb-logo-dot">.</span></div>
+    <div class="tb-sep"></div>
+    <div class="tb-title">My Meetings</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab">Workstreams</div>
+    <div class="tab active">My Meetings</div>
+  </div>
+
+  <div class="mm-hdr">
+    <span class="mm-hdr-label">Sat May 17</span>
+    <div class="mm-hdr-counts">
+      <span><b>1</b> live now</span>
+      <span><b>2</b> need attention</span>
+      <span><b>4</b> upcoming this week</span>
+    </div>
+  </div>
+
+  <div class="week-strip">
+    <div class="week-day"><span class="wd-name">Sun</span><span class="wd-num">11</span><div class="wd-dots"><span class="dot dot-past"></span></div></div>
+    <div class="week-day"><span class="wd-name">Mon</span><span class="wd-num">12</span><div class="wd-dots"><span class="dot dot-past"></span><span class="dot dot-past"></span></div></div>
+    <div class="week-day"><span class="wd-name">Tue</span><span class="wd-num">13</span><div class="wd-dots"><span class="dot dot-past"></span></div></div>
+    <div class="week-day"><span class="wd-name">Wed</span><span class="wd-num">14</span><div class="wd-dots"></div></div>
+    <div class="week-day"><span class="wd-name">Thu</span><span class="wd-num">15</span><div class="wd-dots"><span class="dot dot-past"></span></div></div>
+    <div class="week-day"><span class="wd-name">Fri</span><span class="wd-num">16</span><div class="wd-dots"><span class="dot dot-past"></span><span class="dot dot-past"></span></div></div>
+    <div class="week-day today"><span class="wd-name">Sat</span><span class="wd-num">17</span><div class="wd-dots"><span class="dot dot-live"></span><span class="dot dot-today"></span></div></div>
+  </div>
+
+  <div class="lanes">
+
+    <div class="lane lane-now">
+      <div class="lane-hdr"><span class="lane-lbl">Needs you now</span><span class="lane-cnt">1</span></div>
+      <div class="lane-cards">
+        <div class="mcard mc-live">
+          <div class="card-top"><span class="card-title">C-11 Percolate Smoke Test Meeting</span><span class="badge badge-live">● live</span></div>
+          <div class="card-ws">C-11 Test Workstream</div>
+          <div class="card-signal sig-ok">3 nodes captured · 2 decisions sealed</div>
+          <span class="card-elapsed">42 min in</span>
+          <div class="card-bottom">
+            <div class="avatars"><div class="av av-a">VS</div><div class="av av-b">AK</div><div class="av av-c">RW</div><span class="att-lbl">3 attending</span></div>
+            <button class="card-btn btn-join">Join →</button>
+          </div>
+        </div>
+
+        <div class="divider-lbl">Starting within 2 hrs</div>
+
+        <div class="mcard mc-warn">
+          <div class="card-top"><span class="card-title">Vendor Alignment Call</span><span class="badge badge-soon">in 38 min</span></div>
+          <div class="card-ws">Control Adapter · 2:00 PM</div>
+          <div class="card-signal sig-warn">No agenda items set</div>
+          <div class="card-bottom">
+            <div class="avatars"><div class="av av-a">VS</div><div class="av av-c">JM</div><span class="att-lbl">2 attending</span></div>
+            <button class="card-btn btn-prep">Prepare →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lane lane-att">
+      <div class="lane-hdr"><span class="lane-lbl">Needs attention</span><span class="lane-cnt">2</span></div>
+      <div class="lane-cards">
+        <div class="mcard mc-rsvp">
+          <div class="card-top"><span class="card-title">CCCC Test Meeting #3 · Milestone Review</span></div>
+          <div class="card-ws">CCCC Test Workstream · Mon May 18</div>
+          <div class="card-signal sig-err">Pending your RSVP</div>
+          <div class="invited-by">Invited by Angela Kim · 2 days ago</div>
+          <div class="rsvp-row"><button class="btn-accept">✓ Accept</button><button class="btn-decline">✕ Decline</button></div>
+        </div>
+        <div class="mcard mc-warn">
+          <div class="card-top"><span class="card-title">Energy Adapter · Phase 2 Kickoff</span></div>
+          <div class="card-ws">Energy Adapter · Tue May 19 · 10:00 AM</div>
+          <div class="card-signal sig-warn">4 prior actions unresolved · no outcomes set</div>
+          <div class="card-bottom">
+            <div class="avatars"><div class="av av-a">VS</div><div class="av av-b">AK</div><div class="av av-c">RW</div><span class="att-lbl">3 attending</span></div>
+            <button class="card-btn btn-prep">Prep →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lane lane-up">
+      <div class="lane-hdr"><span class="lane-lbl">Upcoming · next 14 days</span><span class="lane-cnt">4</span></div>
+      <div class="lane-cards">
+        <div class="mcard mc-up">
+          <div class="card-top"><span class="card-title">Control Adapter · Weekly Sync</span></div>
+          <div class="card-ws">Control Adapter · Mon May 18 · 9:00 AM</div>
+          <div class="card-signal">Organizer · 2 outcomes set</div>
+          <div class="card-bottom"><div class="avatars"><div class="av av-a">VS</div><div class="av av-b">AK</div><span class="att-lbl">2 attending</span></div><button class="card-btn btn-open">Open →</button></div>
+        </div>
+        <div class="mcard mc-up">
+          <div class="card-top"><span class="card-title">Base · Quarterly Decision Review</span></div>
+          <div class="card-ws">Base · Wed May 20 · 1:00 PM</div>
+          <div class="card-signal sig-ok">Participant · RSVP accepted</div>
+          <div class="card-bottom"><div class="avatars"><div class="av av-a">VS</div><div class="av av-b">AK</div><div class="av av-c">RW</div><span class="att-lbl">3 attending</span></div><button class="card-btn btn-open">Open →</button></div>
+        </div>
+        <div class="mcard mc-up">
+          <div class="card-top"><span class="card-title">C-11 · Vendor Final Selection</span></div>
+          <div class="card-ws">C-11 Test Workstream · Fri May 22 · 3:00 PM</div>
+          <div class="card-signal">Organizer · draft</div>
+          <div class="card-bottom"><div class="avatars"><div class="av av-a">VS</div><div class="av av-b">AK</div><span class="att-lbl">2 attending</span></div><button class="card-btn btn-open">Open →</button></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accord · Meeting Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.10);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.20)}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'DM Sans','Segoe UI',system-ui,-apple-system,sans-serif;
+  font-size:14px;line-height:1.5;
+  background:#07090f;color:#dde6f0;
+  -webkit-font-smoothing:antialiased;
+}
+button{cursor:pointer;border:none;background:none;font-family:inherit;font-size:inherit}
+input,textarea{font-family:inherit;font-size:inherit}
+
+/* ── TOKENS ── */
+:root{
+  --void:#07090f;
+  --base:#0d1420;
+  --panel:#111926;
+  --raised:#18253a;
+  --hover:#1d2f47;
+  --active-bg:#172440;
+
+  --b0:#151f30;
+  --b1:#1e2e44;
+  --b2:#2a3f5f;
+
+  --hi:#dde6f0;
+  --md:#8899b0;
+  --lo:#4e5e76;
+
+  --dec:#5a9af5;
+  --dec-bg:rgba(90,154,245,.09);
+  --dec-bd:rgba(90,154,245,.22);
+
+  --act:#e8a230;
+  --act-bg:rgba(232,162,48,.08);
+  --act-bd:rgba(232,162,48,.22);
+
+  --rsk:#e86060;
+  --rsk-bg:rgba(232,96,96,.09);
+  --rsk-bd:rgba(232,96,96,.22);
+
+  --nt:#55b89e;
+  --nt-bg:rgba(85,184,158,.08);
+  --nt-bd:rgba(85,184,158,.20);
+
+  --qst:#a07de8;
+  --qst-bg:rgba(160,125,232,.09);
+  --qst-bd:rgba(160,125,232,.22);
+
+  --live:#34d499;
+  --live-bg:rgba(52,212,153,.12);
+}
+
+/* ── SHELL ── */
+.app{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:var(--void)}
+
+/* ── TOP BAR ── */
+.topbar{
+  height:54px;flex-shrink:0;
+  display:flex;align-items:center;gap:0;
+  background:var(--void);
+  border-bottom:1px solid var(--b0);
+  padding:0 18px;
+  position:relative;z-index:20;
+}
+
+.tb-brand{
+  display:flex;align-items:center;gap:9px;
+  padding-right:18px;border-right:1px solid var(--b0);flex-shrink:0;
+}
+.tb-logo{
+  font-family:'Fraunces',Georgia,serif;
+  font-size:16px;font-weight:400;color:var(--hi);
+  letter-spacing:-.01em;
+}
+.tb-logo-dot{color:var(--dec)}
+
+.tb-meta{
+  display:flex;align-items:center;gap:10px;
+  padding:0 18px;
+  border-right:1px solid var(--b0);flex-shrink:0;min-width:0;max-width:320px;
+}
+.tb-meeting-name{
+  font-size:13px;font-weight:500;color:var(--hi);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.tb-project{
+  font-size:11px;padding:3px 9px;border-radius:100px;
+  background:var(--raised);color:var(--md);border:1px solid var(--b1);
+  flex-shrink:0;white-space:nowrap;
+}
+
+/* Agenda stepper */
+.tb-stepper{
+  display:flex;align-items:center;gap:0;
+  padding:0 22px;border-right:1px solid var(--b0);flex-shrink:0;
+}
+.tb-step{display:flex;align-items:center;gap:7px;cursor:default}
+.tb-step+.tb-step::before{
+  content:'';width:26px;height:1px;
+  background:var(--b1);margin:0 6px;flex-shrink:0;
+}
+.tb-step.s-done+.tb-step::before{background:rgba(85,184,158,.3)}
+.s-dot{
+  width:21px;height:21px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:600;flex-shrink:0;
+}
+.tb-step.s-done .s-dot{background:var(--nt-bg);border:1px solid var(--nt-bd);color:var(--nt)}
+.tb-step.s-active .s-dot{
+  background:var(--dec-bg);border:1px solid var(--dec-bd);color:var(--dec);
+  animation:step-breathe 2.8s ease-in-out infinite;
+}
+@keyframes step-breathe{
+  0%,100%{box-shadow:0 0 0 0 rgba(90,154,245,.25)}
+  50%{box-shadow:0 0 0 4px rgba(90,154,245,.08)}
+}
+.tb-step.s-todo .s-dot{background:var(--raised);border:1px solid var(--b1);color:var(--lo)}
+.s-lbl{
+  font-size:12px;color:var(--lo);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;
+}
+.tb-step.s-done .s-lbl{color:var(--nt)}
+.tb-step.s-active .s-lbl{color:var(--md);font-weight:500}
+
+/* Right cluster */
+.tb-right{
+  display:flex;align-items:center;gap:15px;
+  padding-left:18px;margin-left:auto;flex-shrink:0;
+}
+.tb-timer{display:flex;flex-direction:column;align-items:center;line-height:1}
+.tb-elapsed{
+  font-size:21px;font-weight:600;color:var(--hi);
+  letter-spacing:.04em;font-variant-numeric:tabular-nums;
+}
+.tb-elapsed-lbl{font-size:10px;color:var(--lo);letter-spacing:.1em;text-transform:uppercase;margin-top:1px}
+
+.live-pill{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 12px;border-radius:100px;
+  background:var(--live-bg);border:1px solid rgba(52,212,153,.22);
+}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--live);animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.8)}}
+.live-pill span{font-size:12px;font-weight:600;color:var(--live);letter-spacing:.04em}
+
+.tb-avatars{display:flex;align-items:center}
+.tb-av{
+  width:27px;height:27px;border-radius:50%;
+  border:2px solid var(--void);
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:700;
+  margin-left:-5px;
+}
+.tb-av:first-child{margin-left:0}
+.av-vs{background:#152d54;color:#5a9af5}
+.av-ak{background:#123028;color:#34d499}
+.av-rw{background:#2a1e0e;color:#e8a230}
+
+.btn-end{
+  font-size:12px;font-weight:600;padding:7px 15px;border-radius:5px;
+  background:rgba(232,96,96,.10);color:var(--rsk);
+  border:1px solid rgba(232,96,96,.22);
+  letter-spacing:.02em;transition:all .15s;
+}
+.btn-end:hover{background:rgba(232,96,96,.18);border-color:rgba(232,96,96,.38)}
+
+/* ── WORKSPACE ── */
+.workspace{flex:1;display:flex;overflow:hidden;min-height:0}
+
+/* Resize handles */
+.rh{
+  width:5px;flex-shrink:0;cursor:col-resize;
+  background:transparent;position:relative;z-index:5;
+}
+.rh::after{
+  content:'';position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:1px;height:40px;border-radius:1px;
+  background:var(--b0);transition:all .15s;
+}
+.rh:hover::after,.rh.dragging::after{background:var(--dec);height:60px}
+
+/* ── PANEL COMMONS ── */
+.panel{display:flex;flex-direction:column;overflow:hidden;min-width:220px;height:100%}
+.panel-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 17px;border-bottom:1px solid var(--b0);flex-shrink:0;
+  background:var(--void);
+}
+.panel-lbl{font-size:11px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:var(--lo)}
+.panel-btn{
+  font-size:12px;color:var(--dec);opacity:.75;cursor:pointer;
+  display:flex;align-items:center;gap:3px;transition:opacity .15s;
+}
+.panel-btn:hover{opacity:1}
+
+/* ── LEFT: AGENDA ── */
+.panel-agenda{width:430px;flex-shrink:0;background:var(--base);border-right:1px solid var(--b0)}
+
+.agenda-body{flex:1;overflow-y:auto;padding:13px 13px 24px;display:flex;flex-direction:column;gap:5px}
+
+/* Prior actions banner */
+.prior-banner{
+  border:1px solid var(--act-bd);background:rgba(232,162,48,.04);
+  border-radius:8px;overflow:hidden;flex-shrink:0;margin-bottom:5px;
+}
+.prior-hdr{
+  display:flex;align-items:center;gap:9px;padding:10px 14px;
+  cursor:pointer;user-select:none;transition:background .12s;
+}
+.prior-hdr:hover{background:rgba(232,162,48,.04)}
+.prior-icon{font-size:15px;flex-shrink:0;color:var(--act);opacity:.8}
+.prior-title{font-size:13px;font-weight:600;color:#c08020;flex:1}
+.prior-pills{display:flex;gap:5px}
+.pp{font-size:11px;padding:2px 8px;border-radius:100px;font-weight:600}
+.pp-ov{background:rgba(232,96,96,.14);color:var(--rsk)}
+.pp-op{background:var(--act-bg);color:var(--act)}
+.pp-ok{background:var(--nt-bg);color:var(--nt)}
+.prior-arr{font-size:13px;color:var(--lo);transition:transform .18s;flex-shrink:0}
+.prior-arr.open{transform:rotate(90deg)}
+.prior-items{display:none;border-top:1px solid var(--act-bd)}
+.prior-items.open{display:flex;flex-direction:column}
+.prior-item{
+  display:flex;align-items:flex-start;gap:9px;
+  padding:9px 14px;border-bottom:1px solid rgba(232,162,48,.07);
+}
+.prior-item:last-child{border-bottom:none}
+.pi-code{
+  font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;
+  background:var(--act-bg);color:var(--act);flex-shrink:0;margin-top:2px;
+}
+.pi-text{font-size:13px;color:var(--md);flex:1;line-height:1.45}
+.pi-st{font-size:11px;font-weight:600;flex-shrink:0;margin-top:3px}
+.pi-st.ov{color:var(--rsk)}
+.pi-st.op{color:var(--act)}
+.pi-st.ok{color:var(--nt)}
+
+/* Agenda cards */
+.ag-card{
+  border:1px solid var(--b0);border-radius:8px;overflow:hidden;
+  flex-shrink:0;background:var(--panel);transition:border-color .2s;
+}
+.ag-card.ag-active{
+  border-color:var(--dec-bd);background:#0f1927;
+  animation:card-breathe 3.5s ease-in-out infinite;
+}
+@keyframes card-breathe{
+  0%,100%{box-shadow:0 0 0 0 rgba(90,154,245,.0),0 3px 14px rgba(0,0,0,.2)}
+  50%{box-shadow:0 0 0 1px rgba(90,154,245,.12),0 3px 20px rgba(90,154,245,.07)}
+}
+.ag-card.ag-done{opacity:.5}
+
+.ag-hdr{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 15px;cursor:pointer;user-select:none;
+  transition:background .13s;
+}
+.ag-hdr:hover{background:var(--hover)}
+.ag-card.ag-active .ag-hdr:hover{background:rgba(90,154,245,.04)}
+
+.ag-num{
+  width:21px;height:21px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;flex-shrink:0;
+}
+.ag-card.ag-done .ag-num{background:var(--nt-bg);color:var(--nt)}
+.ag-card.ag-active .ag-num{background:var(--dec-bg);color:var(--dec)}
+.ag-card.ag-todo .ag-num{background:var(--raised);color:var(--lo)}
+
+.ag-title{font-size:13px;color:var(--hi);flex:1;line-height:1.35}
+.ag-card.ag-done .ag-title{text-decoration:line-through;color:var(--lo)}
+
+.ag-badge-active{
+  font-size:11px;font-weight:600;padding:3px 9px;border-radius:100px;
+  background:var(--dec-bg);color:var(--dec);letter-spacing:.04em;flex-shrink:0;
+}
+.ag-badge-done{font-size:13px;color:var(--nt);flex-shrink:0}
+.ag-chevron{font-size:13px;color:var(--lo);flex-shrink:0;transition:transform .15s}
+.ag-chevron.open{transform:rotate(90deg)}
+
+/* Agenda body (expanded) */
+.ag-body{display:none;border-top:1px solid var(--dec-bd)}
+.ag-body.open{display:flex;flex-direction:column}
+
+/* History section */
+.hist-wrap{background:rgba(0,0,0,.2)}
+.hist-hdr{
+  display:flex;align-items:center;gap:8px;padding:9px 15px;
+  cursor:pointer;user-select:none;border-bottom:1px solid var(--b0);
+  transition:background .12s;
+}
+.hist-hdr:hover{background:rgba(255,255,255,.02)}
+.hist-lbl{
+  font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  font-weight:600;color:var(--lo);flex:1;
+}
+.hist-count{font-size:12px;color:var(--lo)}
+.hist-chevron{font-size:11px;color:var(--lo);transition:transform .15s}
+.hist-chevron.open{transform:rotate(90deg)}
+.hist-entries{display:none;padding:8px 15px 12px;flex-direction:column;gap:0}
+.hist-entries.open{display:flex}
+.he{
+  display:flex;gap:11px;padding:9px 0;
+  border-bottom:1px solid var(--b0);
+}
+.he:last-child{border-bottom:none}
+.he-left{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;min-width:54px}
+.he-tag{font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px}
+.he-dc{background:var(--dec-bg);color:var(--dec)}
+.he-nt{background:var(--nt-bg);color:var(--nt)}
+.he-ax{background:var(--act-bg);color:var(--act)}
+.he-rk{background:var(--rsk-bg);color:var(--rsk)}
+.he-date{font-size:11px;color:var(--lo)}
+.he-body{flex:1;min-width:0}
+.he-text{font-size:12px;color:var(--md);line-height:1.5}
+.he-author{font-size:11px;color:var(--lo);margin-top:3px}
+
+/* Captured this meeting */
+.cap-section{padding:11px 15px;display:flex;flex-direction:column;gap:7px;border-bottom:1px solid var(--b0)}
+.cap-sec-lbl{
+  font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  font-weight:600;color:var(--lo);margin-bottom:2px;
+}
+.e-card{
+  display:flex;gap:9px;
+  background:var(--raised);border:1px solid var(--b1);border-radius:6px;
+  padding:9px 12px;position:relative;overflow:hidden;
+}
+.e-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.e-dec::before{background:var(--dec)}
+.e-nt::before{background:var(--nt)}
+.e-act::before{background:var(--act)}
+.e-rsk::before{background:var(--rsk)}
+
+.e-badge{
+  font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;
+  flex-shrink:0;cursor:pointer;margin-top:2px;
+  border:1px solid;transition:filter .12s;
+}
+.e-badge:hover{filter:brightness(1.3)}
+.eb-dec{background:var(--dec-bg);color:var(--dec);border-color:var(--dec-bd)}
+.eb-nt{background:var(--nt-bg);color:var(--nt);border-color:var(--nt-bd)}
+.eb-act{background:var(--act-bg);color:var(--act);border-color:var(--act-bd)}
+.eb-rsk{background:var(--rsk-bg);color:var(--rsk);border-color:var(--rsk-bd)}
+
+.e-body{flex:1;min-width:0}
+.e-text{font-size:13px;color:var(--hi);line-height:1.5}
+.e-meta{display:flex;align-items:center;gap:7px;margin-top:4px}
+.e-time,.e-author{font-size:11px;color:var(--lo)}
+.e-sealed{font-size:11px;color:var(--nt);opacity:.7}
+.nra-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;padding:3px 9px;border-radius:3px;
+  background:rgba(160,125,232,.09);color:var(--qst);
+  border:1px solid rgba(160,125,232,.20);cursor:pointer;
+  margin-top:6px;transition:background .12s;
+}
+.nra-chip:hover{background:rgba(160,125,232,.16)}
+
+/* Capture input zone */
+.cap-zone{
+  padding:13px 15px 15px;
+  background:rgba(232,162,48,.028);
+  border-top:1px solid rgba(232,162,48,.13);
+}
+.cap-type-strip{display:flex;gap:5px;margin-bottom:9px;align-items:center}
+.ctype-btn{
+  font-size:12px;font-weight:500;padding:5px 11px;
+  border-radius:5px;border:1px solid var(--b1);
+  background:var(--raised);color:var(--lo);
+  cursor:pointer;transition:all .12s;
+}
+.ctype-btn:hover{border-color:var(--b2);color:var(--md)}
+.ctype-btn.t-nt{background:var(--nt-bg);border-color:var(--nt-bd);color:var(--nt)}
+.ctype-btn.t-dec{background:var(--dec-bg);border-color:var(--dec-bd);color:var(--dec)}
+.ctype-btn.t-act{background:var(--act-bg);border-color:var(--act-bd);color:var(--act)}
+.ctype-btn.t-rsk{background:var(--rsk-bg);border-color:var(--rsk-bd);color:var(--rsk)}
+.ctype-btn.t-qst{background:var(--qst-bg);border-color:var(--qst-bd);color:var(--qst)}
+.cap-keys{
+  margin-left:auto;display:flex;align-items:center;gap:3px;
+}
+.ckey{
+  font-size:10px;padding:1px 5px;border-radius:3px;
+  background:var(--raised);border:1px solid var(--b1);
+  color:var(--lo);font-weight:600;
+}
+
+.cap-ta{
+  width:100%;background:var(--raised);
+  border:1px solid rgba(232,162,48,.22);border-radius:5px;
+  padding:10px 12px;color:var(--hi);resize:vertical;
+  min-height:68px;outline:none;line-height:1.6;display:block;
+  transition:border-color .15s,box-shadow .15s;
+}
+.cap-ta:focus{border-color:rgba(232,162,48,.48);box-shadow:0 0 0 3px rgba(232,162,48,.06)}
+.cap-ta::placeholder{color:var(--lo)}
+
+.cap-footer{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+.cap-hint{font-size:11px;color:var(--lo)}
+.cap-add{
+  font-size:12px;font-weight:600;padding:8px 17px;border-radius:5px;
+  background:var(--nt-bg);color:var(--nt);border:1px solid var(--nt-bd);
+  transition:all .15s;
+}
+.cap-add:hover{background:rgba(85,184,158,.16)}
+
+/* ── CENTER: MINUTES ── */
+.panel-minutes{flex:1;background:var(--panel);border-right:1px solid var(--b0)}
+
+.min-top{
+  display:flex;flex-direction:column;
+  border-bottom:1px solid var(--b0);flex-shrink:0;
+  background:var(--void);
+}
+.min-toprow{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px 0;
+}
+.min-counts{display:flex;gap:14px}
+.mcount{font-size:12px;font-weight:600}
+.mc-dec{color:var(--dec)}
+.mc-act{color:var(--act)}
+.mc-rsk{color:var(--rsk)}
+
+.min-tabs{display:flex;gap:0;padding:10px 18px 0}
+.mtab{
+  font-size:12px;font-weight:500;padding:6px 14px;
+  border-radius:5px 5px 0 0;color:var(--lo);cursor:pointer;
+  border:1px solid transparent;border-bottom:none;
+  margin-bottom:-1px;transition:all .12s;user-select:none;
+}
+.mtab:hover{color:var(--md)}
+.mtab.active{color:var(--hi);background:var(--panel);border-color:var(--b0);border-bottom-color:var(--panel)}
+
+.min-scroll{flex:1;overflow-y:auto;padding:14px 18px 24px;display:flex;flex-direction:column;gap:5px}
+
+.grp-label{
+  display:flex;align-items:center;gap:8px;padding:12px 0 5px;
+}
+.grp-label:first-child{padding-top:0}
+.grp-num{
+  width:17px;height:17px;border-radius:50%;
+  background:var(--raised);color:var(--lo);
+  font-size:9px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.grp-text{font-size:12px;color:var(--lo);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grp-line{flex:1;height:1px;background:var(--b0);flex-shrink:0}
+
+.rec-card{
+  display:flex;gap:11px;padding:11px 13px;
+  border:1px solid var(--b0);border-radius:8px;background:var(--raised);
+  position:relative;overflow:hidden;transition:border-color .15s;cursor:default;
+}
+.rec-card:hover{border-color:var(--b2)}
+.rec-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.rc-d::before{background:var(--dec)}
+.rc-n::before{background:var(--nt)}
+.rc-a::before{background:var(--act)}
+.rc-r::before{background:var(--rsk)}
+
+.rec-badge{
+  font-size:10px;font-weight:700;padding:3px 7px;border-radius:3px;
+  flex-shrink:0;margin-top:2px;cursor:pointer;white-space:nowrap;
+  border:1px solid;transition:filter .12s;
+}
+.rec-badge:hover{filter:brightness(1.3)}
+.rb-d{background:var(--dec-bg);color:var(--dec);border-color:var(--dec-bd)}
+.rb-n{background:var(--nt-bg);color:var(--nt);border-color:var(--nt-bd)}
+.rb-a{background:var(--act-bg);color:var(--act);border-color:var(--act-bd)}
+.rb-r{background:var(--rsk-bg);color:var(--rsk);border-color:var(--rsk-bd)}
+
+.rec-body{flex:1;min-width:0}
+.rec-text{font-size:13px;color:var(--hi);line-height:1.55}
+.rec-meta{display:flex;align-items:center;gap:0;margin-top:5px;flex-wrap:wrap}
+.rec-meta-item{font-size:11px;color:var(--lo)}
+.rec-meta-item+.rec-meta-item::before{content:'·';margin:0 6px;color:var(--lo)}
+
+.rec-aside{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;min-width:70px}
+.ra-who{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--md)}
+.ra-av{width:16px;height:16px;border-radius:50%;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.ra-due{font-size:11px;color:var(--act);font-weight:500}
+.ra-due.ov{color:var(--rsk)}
+
+/* ── RIGHT: PEOPLE + NEXT ── */
+.panel-right{width:278px;flex-shrink:0;background:var(--base);display:flex;flex-direction:column;overflow:hidden}
+
+/* Attendees */
+.att-wrap{flex-shrink:0;border-bottom:1px solid var(--b0)}
+.att-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 15px;
+}
+.att-head-lbl{font-size:11px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:var(--lo)}
+.att-head-invite{font-size:12px;color:var(--dec);opacity:.7;cursor:pointer;transition:opacity .12s}
+.att-head-invite:hover{opacity:1}
+
+.att-list{padding:2px 11px 11px;display:flex;flex-direction:column;gap:3px}
+.att-row{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 8px;border-radius:5px;transition:background .12s;
+}
+.att-row:hover{background:var(--hover)}
+.att-pres{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.att-pres.on{background:var(--live)}
+.att-pres.off{background:var(--b2)}
+.att-av{
+  width:27px;height:27px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:700;flex-shrink:0;
+}
+.att-info{flex:1;min-width:0}
+.att-name{font-size:13px;color:var(--hi);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att-role{font-size:11px;color:var(--lo)}
+.att-you{
+  font-size:10px;padding:2px 5px;border-radius:3px;
+  background:var(--dec-bg);color:var(--dec);flex-shrink:0;
+}
+.att-count{font-size:11px;color:var(--act);font-weight:600;flex-shrink:0}
+
+/* Chat */
+.chat-wrap{
+  flex-shrink:0;border-bottom:1px solid var(--b0);
+  display:flex;flex-direction:column;min-height:0;max-height:190px;
+}
+.chat-head{
+  padding:9px 15px;font-size:11px;letter-spacing:.11em;
+  text-transform:uppercase;font-weight:600;color:var(--lo);
+  border-bottom:1px solid var(--b0);flex-shrink:0;
+}
+.chat-msgs{
+  flex:1;overflow-y:auto;padding:9px 11px;
+  display:flex;flex-direction:column;gap:7px;min-height:0;
+}
+.chat-msg{display:flex;flex-direction:column;gap:2px}
+.chat-msg.me{align-items:flex-end}
+.chat-who{font-size:11px;font-weight:600;color:var(--lo)}
+.chat-bubble{
+  font-size:12px;padding:6px 10px;max-width:88%;line-height:1.45;
+}
+.chat-msg:not(.me) .chat-bubble{
+  background:var(--raised);color:var(--md);
+  border-radius:3px 9px 9px 9px;
+}
+.chat-msg.me .chat-bubble{
+  background:var(--dec-bg);color:var(--dec);
+  border-radius:9px 3px 9px 9px;
+  border:1px solid var(--dec-bd);
+}
+.chat-row{
+  display:flex;gap:5px;padding:8px 9px;
+  border-top:1px solid var(--b0);flex-shrink:0;
+}
+.chat-inp{
+  flex:1;background:var(--raised);border:1px solid var(--b1);
+  border-radius:5px;padding:6px 9px;color:var(--hi);outline:none;
+  transition:border-color .15s;
+}
+.chat-inp:focus{border-color:var(--b2)}
+.chat-inp::placeholder{color:var(--lo)}
+.chat-send{
+  font-size:12px;font-weight:600;padding:6px 11px;border-radius:5px;
+  background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd);
+  transition:all .15s;
+}
+.chat-send:hover{background:rgba(90,154,245,.16)}
+
+/* Next meeting section */
+.next-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.next-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 15px;border-bottom:1px solid var(--b0);flex-shrink:0;
+}
+.next-head-lbl{font-size:11px;letter-spacing:.11em;text-transform:uppercase;font-weight:600;color:var(--lo)}
+.next-sched-btn{
+  font-size:11px;padding:4px 10px;border-radius:5px;
+  background:var(--raised);border:1px solid var(--b1);color:var(--md);
+  cursor:pointer;transition:all .12s;
+}
+.next-sched-btn:hover{border-color:var(--dec);color:var(--dec)}
+
+.next-scroll{flex:1;overflow-y:auto;padding:11px 13px 16px;display:flex;flex-direction:column;gap:9px}
+
+.next-date{
+  display:flex;align-items:center;gap:8px;padding:9px 11px;
+  background:var(--raised);border:1px solid var(--b1);border-radius:6px;
+}
+.next-date-icon{font-size:15px;color:var(--md);flex-shrink:0}
+.next-date-val{font-size:13px;font-weight:500;color:var(--hi);flex:1}
+.next-date-chg{font-size:11px;color:var(--dec);cursor:pointer;opacity:.7}
+.next-date-chg:hover{opacity:1}
+
+.next-sub{
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+  font-weight:600;color:var(--lo);
+}
+.next-sub-add{
+  font-size:11px;color:var(--dec);opacity:.7;cursor:pointer;
+  font-weight:400;letter-spacing:0;text-transform:none;
+}
+.next-sub-add:hover{opacity:1}
+
+.next-item{
+  display:flex;align-items:flex-start;gap:7px;
+  padding:7px 10px;background:var(--raised);
+  border:1px solid var(--b0);border-radius:5px;
+  font-size:12px;color:var(--md);line-height:1.45;
+}
+.ni-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.next-item.deferred .ni-dot{background:var(--act)}
+.next-item.prep .ni-dot{background:var(--dec)}
+
+.next-save{
+  font-size:12px;font-weight:600;padding:9px 12px;border-radius:5px;
+  background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd);
+  cursor:pointer;width:100%;text-align:center;transition:all .15s;
+}
+.next-save:hover{background:rgba(90,154,245,.16)}
+
+/* ── HISTORY BAR ── */
+.hist-bar{
+  height:37px;flex-shrink:0;background:var(--void);
+  border-top:1px solid var(--b0);
+  display:flex;align-items:center;gap:12px;padding:0 18px;overflow:hidden;
+}
+.hbar-lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--lo);flex-shrink:0}
+.hbar-chips{display:flex;gap:5px;flex:1;overflow:hidden}
+.hbar-chip{
+  font-size:12px;padding:4px 11px;border-radius:100px;
+  background:var(--panel);border:1px solid var(--b0);color:var(--lo);
+  cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .12s;
+}
+.hbar-chip:hover{border-color:var(--b2);color:var(--md)}
+.hbar-exp{font-size:12px;color:var(--lo);cursor:pointer;flex-shrink:0;white-space:nowrap;transition:color .12s}
+.hbar-exp:hover{color:var(--md)}
+
+/* ── POPUP ── */
+.popup-bg{
+  position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;
+  display:none;align-items:center;justify-content:center;
+  backdrop-filter:blur(2px);
+}
+.popup-bg.open{display:flex}
+.popup-box{
+  background:var(--raised);border:1px solid var(--b2);border-radius:12px;
+  padding:20px;width:310px;
+  box-shadow:0 20px 60px rgba(0,0,0,.75);
+  animation:popin .14s ease-out;
+}
+@keyframes popin{from{opacity:0;transform:scale(.95) translateY(5px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.popup-title{
+  font-size:12px;font-weight:600;color:var(--hi);
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;
+}
+.popup-types{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px}
+.popup-type{
+  padding:9px 10px;border-radius:5px;cursor:pointer;
+  border:1px solid var(--b1);font-size:12px;font-weight:600;
+  text-align:center;color:var(--lo);background:var(--panel);transition:all .12s;
+}
+.popup-type:hover{border-color:var(--b2);color:var(--md)}
+.popup-type.sel-nt{background:var(--nt-bg);border-color:var(--nt-bd);color:var(--nt)}
+.popup-type.sel-dec{background:var(--dec-bg);border-color:var(--dec-bd);color:var(--dec)}
+.popup-type.sel-act{background:var(--act-bg);border-color:var(--act-bd);color:var(--act)}
+.popup-type.sel-rsk{background:var(--rsk-bg);border-color:var(--rsk-bd);color:var(--rsk)}
+.popup-type.sel-qst{background:var(--qst-bg);border-color:var(--qst-bd);color:var(--qst)}
+.popup-fields{display:flex;flex-direction:column;gap:9px;margin-bottom:14px}
+.pf-label{font-size:12px;color:var(--lo);margin-bottom:4px;font-weight:500}
+.pf-input{
+  width:100%;background:var(--panel);border:1px solid var(--b1);
+  border-radius:5px;padding:8px 10px;color:var(--hi);outline:none;
+  transition:border-color .15s;
+}
+.pf-input:focus{border-color:var(--dec)}
+.popup-actions{display:flex;gap:7px}
+.popup-cancel{
+  font-size:13px;padding:9px 14px;border-radius:5px;flex:1;
+  background:var(--panel);border:1px solid var(--b1);color:var(--md);
+  cursor:pointer;transition:all .12s;
+}
+.popup-cancel:hover{border-color:var(--b2)}
+.popup-confirm{
+  font-size:13px;font-weight:600;padding:9px 14px;border-radius:5px;flex:1;
+  background:var(--dec-bg);border:1px solid var(--dec-bd);color:var(--dec);
+  cursor:pointer;transition:all .15s;
+}
+.popup-confirm:hover{background:rgba(90,154,245,.18)}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="tb-brand">
+      <div class="tb-logo">accord<span class="tb-logo-dot">.</span></div>
+    </div>
+    <div class="tb-meta">
+      <div class="tb-meeting-name">Vendor Selection &amp; Phase 1 Planning</div>
+      <span class="tb-project">Nimbletronics</span>
+    </div>
+    <div class="tb-stepper">
+      <div class="tb-step s-done">
+        <div class="s-dot">✓</div>
+        <span class="s-lbl">Angela Dissent</span>
+      </div>
+      <div class="tb-step s-active">
+        <div class="s-dot">●</div>
+        <span class="s-lbl">Vendor Selection</span>
+      </div>
+      <div class="tb-step s-todo">
+        <div class="s-dot">3</div>
+        <span class="s-lbl">Follow-ups</span>
+      </div>
+    </div>
+    <div class="tb-right">
+      <div class="tb-timer">
+        <div class="tb-elapsed" id="timer">42:17</div>
+        <div class="tb-elapsed-lbl">elapsed</div>
+      </div>
+      <div class="live-pill">
+        <div class="live-dot"></div>
+        <span>Live</span>
+      </div>
+      <div class="tb-avatars">
+        <div class="tb-av av-vs" title="Vaughn Staples">VS</div>
+        <div class="tb-av av-ak" title="Angela Kim">AK</div>
+        <div class="tb-av av-rw" title="Ron White (not joined)" style="opacity:.45">RW</div>
+      </div>
+      <button class="btn-end">End Meeting</button>
+    </div>
+  </header>
+
+  <!-- WORKSPACE -->
+  <div class="workspace">
+
+    <!-- LEFT: AGENDA -->
+    <div class="panel panel-agenda" id="panelLeft">
+      <div class="panel-hdr">
+        <span class="panel-lbl">Agenda</span>
+        <span class="panel-btn">+ Add item</span>
+      </div>
+      <div class="agenda-body">
+
+        <!-- Prior actions -->
+        <div class="prior-banner">
+          <div class="prior-hdr" onclick="togglePrior(this)">
+            <span class="prior-icon">⏱</span>
+            <span class="prior-title">Prior Actions · Apr 30</span>
+            <div class="prior-pills">
+              <span class="pp pp-ov">1 overdue</span>
+              <span class="pp pp-op">2 open</span>
+            </div>
+            <span class="prior-arr" id="priorArr">›</span>
+          </div>
+          <div class="prior-items" id="priorItems">
+            <div class="prior-item">
+              <span class="pi-code">AX-007</span>
+              <span class="pi-text">Angela: Obtain vendor confirmation on delivery timeline</span>
+              <span class="pi-st ov">Overdue</span>
+            </div>
+            <div class="prior-item">
+              <span class="pi-code">AX-008</span>
+              <span class="pi-text">Vaughn: Schedule vendor alignment call</span>
+              <span class="pi-st op">May 20</span>
+            </div>
+            <div class="prior-item">
+              <span class="pi-code">AX-009</span>
+              <span class="pi-text">Angela: Deliver component spec to engineering</span>
+              <span class="pi-st op">Open</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 1: done -->
+        <div class="ag-card ag-done">
+          <div class="ag-hdr" onclick="toggleAg(this)">
+            <div class="ag-num">✓</div>
+            <span class="ag-title">Angela dissent on component timeline</span>
+            <span class="ag-badge-done">✓ done</span>
+          </div>
+        </div>
+
+        <!-- Item 2: ACTIVE, expanded -->
+        <div class="ag-card ag-active">
+          <div class="ag-hdr" onclick="toggleAg(this)">
+            <div class="ag-num">2</div>
+            <span class="ag-title">Review vendor shortlist — select final candidate</span>
+            <span class="ag-badge-active">● Active</span>
+            <span class="ag-chevron open" id="ag2chev">›</span>
+          </div>
+          <div class="ag-body open" id="ag2body">
+
+            <!-- History thread -->
+            <div class="hist-wrap">
+              <div class="hist-hdr" onclick="toggleHist(this)">
+                <span class="hist-chevron" id="histChev">›</span>
+                <span class="hist-lbl">Thread history</span>
+                <span class="hist-count">4 entries · 2 meetings</span>
+              </div>
+              <div class="hist-entries" id="histEntries">
+                <div class="he">
+                  <div class="he-left"><span class="he-tag he-dc">DC-015</span><span class="he-date">Apr 14</span></div>
+                  <div class="he-body">
+                    <div class="he-text">Adopt phased delivery model — Phase 1 scope frozen. Vendor decision deferred pending thermal validation.</div>
+                    <div class="he-author">Vaughn Staples</div>
+                  </div>
+                </div>
+                <div class="he">
+                  <div class="he-left"><span class="he-tag he-ax">AX-009</span><span class="he-date">Apr 14</span></div>
+                  <div class="he-body">
+                    <div class="he-text">Angela: Deliver completed component spec to engineering before vendor selection meeting.</div>
+                    <div class="he-author">Angela Kim · open</div>
+                  </div>
+                </div>
+                <div class="he">
+                  <div class="he-left"><span class="he-tag he-nt">NT-022</span><span class="he-date">Apr 14</span></div>
+                  <div class="he-body">
+                    <div class="he-text">Vendor shortlist narrowed to Nimbletronics and ProtoFab. Decision deferred pending thermal validation.</div>
+                    <div class="he-author">Vaughn Staples</div>
+                  </div>
+                </div>
+                <div class="he">
+                  <div class="he-left"><span class="he-tag he-rk">RK-005</span><span class="he-date">Mar 30</span></div>
+                  <div class="he-body">
+                    <div class="he-text">ProtoFab lead time flagged as risk — 14-week delivery may conflict with Phase 1 deadline.</div>
+                    <div class="he-author">Angela Kim</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Captured this meeting -->
+            <div class="cap-section" id="capSection">
+              <div class="cap-sec-lbl">Captured this meeting</div>
+              <div class="e-card e-nt">
+                <span class="e-badge eb-nt" onclick="openPopup(event,'NT-032')">NT-032</span>
+                <div class="e-body">
+                  <div class="e-text">Angela confirmed Nimbletronics prototype passed thermal validation at 5% above spec. No concerns flagged.</div>
+                  <div class="e-meta"><span class="e-time">2:28 PM</span><span class="e-author">Angela Kim</span><span class="e-sealed">· sealed</span></div>
+                </div>
+              </div>
+              <div class="e-card e-dec">
+                <span class="e-badge eb-dec" onclick="openPopup(event,'DC-018')">DC-018</span>
+                <div class="e-body">
+                  <div class="e-text">Nimbletronics selected as primary vendor for Phase 1 component supply. Vaughn to execute NDA by May 22.</div>
+                  <div class="e-meta"><span class="e-time">2:31 PM</span><span class="e-author">Vaughn Staples</span><span class="e-sealed">· sealed</span></div>
+                  <span class="nra-chip">→ Draft vendor NDA</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Capture zone -->
+            <div class="cap-zone">
+              <div class="cap-type-strip">
+                <button class="ctype-btn t-nt" onclick="setType(this,'nt')">Note</button>
+                <button class="ctype-btn" onclick="setType(this,'dec')">Decision</button>
+                <button class="ctype-btn" onclick="setType(this,'act')">Action</button>
+                <button class="ctype-btn" onclick="setType(this,'rsk')">Risk</button>
+                <button class="ctype-btn" onclick="setType(this,'qst')">Question</button>
+                <div class="cap-keys">
+                  <span class="ckey">N</span><span class="ckey">D</span>
+                  <span class="ckey">A</span><span class="ckey">R</span><span class="ckey">Q</span>
+                </div>
+              </div>
+              <textarea class="cap-ta" id="capTa" placeholder="Type a note, decision, action item, or observation…" rows="3"></textarea>
+              <div class="cap-footer">
+                <span class="cap-hint">↵ Add · Shift+↵ New line</span>
+                <button class="cap-add" onclick="addEntry()">+ Capture</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Item 3: pending -->
+        <div class="ag-card ag-todo">
+          <div class="ag-hdr" onclick="toggleAg(this)">
+            <div class="ag-num">3</div>
+            <span class="ag-title">Assign follow-up actions to team members</span>
+            <span class="ag-chevron" id="ag3chev">›</span>
+          </div>
+          <div class="ag-body" id="ag3body">
+            <div class="cap-zone">
+              <div class="cap-type-strip" style="margin-bottom:7px">
+                <button class="ctype-btn t-nt" style="font-size:11px;padding:4px 9px">Note</button>
+                <button class="ctype-btn" style="font-size:11px;padding:4px 9px">Action</button>
+              </div>
+              <textarea class="cap-ta" placeholder="Start capturing notes for this item…" rows="2" style="min-height:52px"></textarea>
+              <div class="cap-footer"><span class="cap-hint">Item not yet started</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="rh" id="rh1"></div>
+
+    <!-- CENTER: MINUTES -->
+    <div class="panel panel-minutes" id="panelCenter">
+      <div class="min-top">
+        <div class="min-toprow">
+          <span class="panel-lbl">Meeting minutes</span>
+          <div class="min-counts">
+            <span class="mcount mc-dec" id="cntDec">2 decisions</span>
+            <span class="mcount mc-act" id="cntAct">1 action</span>
+            <span class="mcount mc-rsk" id="cntRsk">0 risks</span>
+          </div>
+        </div>
+        <div class="min-tabs">
+          <div class="mtab active" onclick="filterTab(this,'all')">All</div>
+          <div class="mtab" onclick="filterTab(this,'dec')">Decisions</div>
+          <div class="mtab" onclick="filterTab(this,'act')">Actions</div>
+          <div class="mtab" onclick="filterTab(this,'rsk')">Risks</div>
+          <div class="mtab" onclick="filterTab(this,'nt')">Notes</div>
+          <div class="mtab" onclick="filterTab(this,'qst')">Questions</div>
+        </div>
+      </div>
+      <div class="min-scroll" id="minScroll">
+
+        <!-- Group 1 -->
+        <div class="grp-label">
+          <div class="grp-num">1</div>
+          <div class="grp-text">Angela dissent on component timeline</div>
+          <div class="grp-line"></div>
+        </div>
+        <div class="rec-card rc-d" data-type="dec">
+          <span class="rec-badge rb-d" onclick="openPopup(event,'DC-017')">DC-017</span>
+          <div class="rec-body">
+            <div class="rec-text">Angela's dissent on timeline formally recorded and marked resolved. Phase 1 deadline maintained at original date.</div>
+            <div class="rec-meta">
+              <span class="rec-meta-item">2:18 PM</span>
+              <span class="rec-meta-item">Vaughn Staples</span>
+              <span class="rec-meta-item">Item 1</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Group 2 -->
+        <div class="grp-label">
+          <div class="grp-num">2</div>
+          <div class="grp-text">Review vendor shortlist — select final candidate</div>
+          <div class="grp-line"></div>
+        </div>
+        <div class="rec-card rc-n" data-type="nt">
+          <span class="rec-badge rb-n" onclick="openPopup(event,'NT-032')">NT-032</span>
+          <div class="rec-body">
+            <div class="rec-text">Angela confirmed Nimbletronics prototype passed thermal validation at 5% above spec. No concerns flagged.</div>
+            <div class="rec-meta">
+              <span class="rec-meta-item">2:28 PM</span>
+              <span class="rec-meta-item">Angela Kim</span>
+              <span class="rec-meta-item">Item 2</span>
+            </div>
+          </div>
+        </div>
+        <div class="rec-card rc-d" data-type="dec">
+          <span class="rec-badge rb-d" onclick="openPopup(event,'DC-018')">DC-018</span>
+          <div class="rec-body">
+            <div class="rec-text">Nimbletronics selected as primary vendor for Phase 1 component supply. Vaughn to execute NDA by May 22.</div>
+            <div class="rec-meta">
+              <span class="rec-meta-item">2:31 PM</span>
+              <span class="rec-meta-item">Vaughn Staples</span>
+              <span class="rec-meta-item">Item 2</span>
+            </div>
+          </div>
+        </div>
+        <div class="rec-card rc-a" data-type="act">
+          <span class="rec-badge rb-a" onclick="openPopup(event,'AX-011')">AX-011</span>
+          <div class="rec-body">
+            <div class="rec-text">Circulate vendor shortlist with evaluation matrix to all stakeholders before next meeting.</div>
+            <div class="rec-meta">
+              <span class="rec-meta-item">2:31 PM</span>
+              <span class="rec-meta-item">Vaughn Staples</span>
+              <span class="rec-meta-item">Item 2</span>
+            </div>
+          </div>
+          <div class="rec-aside">
+            <div class="ra-who"><div class="ra-av av-vs">VS</div>Vaughn</div>
+            <div class="ra-due">May 20</div>
+          </div>
+        </div>
+
+        <!-- New entries injected here -->
+        <div id="newRecs"></div>
+
+      </div>
+    </div>
+
+    <div class="rh" id="rh2"></div>
+
+    <!-- RIGHT: PEOPLE + NEXT -->
+    <div class="panel panel-right" id="panelRight">
+
+      <!-- Attendees -->
+      <div class="att-wrap">
+        <div class="att-head">
+          <span class="att-head-lbl">Attendees · 2 of 3</span>
+          <span class="att-head-invite">+ Invite</span>
+        </div>
+        <div class="att-list">
+          <div class="att-row">
+            <div class="att-pres on"></div>
+            <div class="att-av av-vs">VS</div>
+            <div class="att-info">
+              <div class="att-name">Vaughn Staples</div>
+              <div class="att-role">Organizer</div>
+            </div>
+            <span class="att-you">you</span>
+            <span class="att-count">1 action</span>
+          </div>
+          <div class="att-row">
+            <div class="att-pres on"></div>
+            <div class="att-av av-ak">AK</div>
+            <div class="att-info">
+              <div class="att-name">Angela Kim</div>
+              <div class="att-role">Participant</div>
+            </div>
+            <span class="att-count">2 actions</span>
+          </div>
+          <div class="att-row" style="opacity:.48">
+            <div class="att-pres off"></div>
+            <div class="att-av av-rw">RW</div>
+            <div class="att-info">
+              <div class="att-name">Ron White</div>
+              <div class="att-role" style="font-style:italic">Not joined</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat -->
+      <div class="chat-wrap">
+        <div class="chat-head">Thread</div>
+        <div class="chat-msgs" id="chatMsgs">
+          <div class="chat-msg">
+            <div class="chat-who">Angela</div>
+            <div class="chat-bubble">Thermal results look good — Nimbletronics all the way</div>
+          </div>
+          <div class="chat-msg me">
+            <div class="chat-who">You</div>
+            <div class="chat-bubble">Agreed. Moving to vendor vote now</div>
+          </div>
+          <div class="chat-msg">
+            <div class="chat-who">Angela</div>
+            <div class="chat-bubble">Ready when you are</div>
+          </div>
+        </div>
+        <div class="chat-row">
+          <input class="chat-inp" id="chatInp" placeholder="Message…">
+          <button class="chat-send" onclick="sendChat()">Send</button>
+        </div>
+      </div>
+
+      <!-- Next meeting -->
+      <div class="next-wrap">
+        <div class="next-head">
+          <span class="next-head-lbl">Next meeting</span>
+          <button class="next-sched-btn">Schedule →</button>
+        </div>
+        <div class="next-scroll">
+
+          <div class="next-date">
+            <span class="next-date-icon">📅</span>
+            <span class="next-date-val">Thu, May 28 · 2:00 PM</span>
+            <span class="next-date-chg">Change</span>
+          </div>
+
+          <div class="next-sub">
+            Deferred items
+            <span class="next-sub-add">+ Add</span>
+          </div>
+          <div class="next-item deferred">
+            <div class="ni-dot"></div>
+            <div>Review NDA draft with legal team</div>
+          </div>
+          <div class="next-item deferred">
+            <div class="ni-dot"></div>
+            <div>Confirm Nimbletronics delivery timeline vs Phase 1 milestone</div>
+          </div>
+
+          <div class="next-sub">
+            Prep actions
+            <span class="next-sub-add">+ Add</span>
+          </div>
+          <div class="next-item prep">
+            <div class="ni-dot"></div>
+            <div>AX-011: Vaughn circulates vendor evaluation matrix</div>
+          </div>
+          <div class="next-item prep">
+            <div class="ni-dot"></div>
+            <div>Angela: Confirm Phase 1 component spec final</div>
+          </div>
+
+          <button class="next-save">Save &amp; share summary →</button>
+
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- end workspace -->
+
+  <!-- HISTORY BAR -->
+  <div class="hist-bar">
+    <span class="hbar-lbl">4 prior meetings</span>
+    <div class="hbar-chips">
+      <span class="hbar-chip">Mar 15 · Kickoff</span>
+      <span class="hbar-chip">Mar 30 · Review</span>
+      <span class="hbar-chip">Apr 14 · Decision Gate</span>
+      <span class="hbar-chip">Apr 30 · Action Review</span>
+    </div>
+    <span class="hbar-exp">↑ Full timeline</span>
+  </div>
+
+</div><!-- end app -->
+
+<!-- RECLASSIFY POPUP -->
+<div class="popup-bg" id="popupBg" onclick="closePopup(event)">
+  <div class="popup-box" onclick="event.stopPropagation()">
+    <div class="popup-title">Reclassify entry</div>
+    <div class="popup-types">
+      <div class="popup-type" onclick="selPType(this,'nt')">Note</div>
+      <div class="popup-type sel-dec" onclick="selPType(this,'dec')">Decision</div>
+      <div class="popup-type" onclick="selPType(this,'act')">Action item</div>
+      <div class="popup-type" onclick="selPType(this,'rsk')">Risk</div>
+      <div class="popup-type" onclick="selPType(this,'qst')">Question</div>
+    </div>
+    <div class="popup-fields" id="popupFields">
+      <div><div class="pf-label">Effective date</div><input class="pf-input" placeholder="Optional"></div>
+    </div>
+    <div class="popup-actions">
+      <button class="popup-cancel" onclick="closePopup()">Cancel</button>
+      <button class="popup-confirm" onclick="closePopup()">Confirm →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Timer ──
+var t0 = Date.now() - (42*60+17)*1000;
+function tick(){
+  var el=document.getElementById('timer');
+  if(!el)return;
+  var s=Math.floor((Date.now()-t0)/1000),m=Math.floor(s/60);
+  el.textContent=String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+}
+tick();setInterval(tick,1000);
+
+// ── Prior actions toggle ──
+function togglePrior(hdr){
+  var b=document.getElementById('priorItems'),a=document.getElementById('priorArr');
+  var o=b.classList.toggle('open');
+  a.classList.toggle('open',o);
+}
+
+// ── Agenda item toggle ──
+function toggleAg(hdr){
+  var card=hdr.parentElement;
+  var body=card.querySelector('.ag-body');
+  var chev=card.querySelector('.ag-chevron');
+  if(!body)return;
+  var o=body.classList.toggle('open');
+  if(chev)chev.classList.toggle('open',o);
+}
+
+// ── History thread toggle ──
+function toggleHist(hdr){
+  var c=document.getElementById('histChev'),e=document.getElementById('histEntries');
+  var o=e.classList.toggle('open');
+  c.classList.toggle('open',o);
+}
+
+// ── Capture type ──
+var curType='nt';
+function setType(btn,t){
+  document.querySelectorAll('.cap-type-strip .ctype-btn').forEach(function(b){
+    b.className='ctype-btn';
+  });
+  btn.classList.add('t-'+t);
+  curType=t;
+}
+
+// Keyboard type shortcuts when textarea empty
+document.getElementById('capTa').addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addEntry();return;}
+  if(this.value.length===0){
+    var map={n:'nt',d:'dec',a:'act',r:'rsk',q:'qst'};
+    var k=e.key.toLowerCase();
+    if(map[k]){
+      var btns=document.querySelectorAll('.cap-type-strip .ctype-btn');
+      var idx=['nt','dec','act','rsk','qst'].indexOf(map[k]);
+      if(btns[idx])setType(btns[idx],map[k]);
+      e.preventDefault();
+    }
+  }
+});
+
+// ── Add entry ──
+var entryN=19;
+var decCnt=2,actCnt=1,rskCnt=0;
+
+function addEntry(){
+  var ta=document.getElementById('capTa');
+  var txt=ta.value.trim();if(!txt)return;
+  entryN++;
+  var now=new Date();
+  var h=now.getHours()%12||12,m=String(now.getMinutes()).padStart(2,'0');
+  var ts=h+':'+m+' '+(now.getHours()>=12?'PM':'AM');
+  var prefMap={nt:'NT',dec:'DC',act:'AX',rsk:'RK',qst:'QS'};
+  var id=prefMap[curType]+'-'+String(entryN).padStart(3,'0');
+
+  var clsMap={
+    nt:{ec:'e-nt',eb:'eb-nt',rc:'rc-n',rb:'rb-n'},
+    dec:{ec:'e-dec',eb:'eb-dec',rc:'rc-d',rb:'rb-d'},
+    act:{ec:'e-act',eb:'eb-act',rc:'rc-a',rb:'rb-a'},
+    rsk:{ec:'e-rsk',eb:'eb-rsk',rc:'rc-r',rb:'rb-r'},
+    qst:{ec:'e-nt',eb:'eb-nt',rc:'rc-n',rb:'rb-n'},
+  };
+  var c=clsMap[curType]||clsMap.nt;
+
+  // Left panel card
+  var div=document.createElement('div');
+  div.className='e-card '+c.ec;
+  div.innerHTML='<span class="e-badge '+c.eb+'" onclick="openPopup(event,\''+id+'\')">'+id+'</span>'
+    +'<div class="e-body"><div class="e-text">'+esc(txt)+'</div>'
+    +'<div class="e-meta"><span class="e-time">'+ts+'</span><span class="e-author">Vaughn Staples</span></div></div>';
+  document.getElementById('capSection').appendChild(div);
+
+  // Record column card
+  var rec=document.createElement('div');
+  rec.className='rec-card '+c.rc;
+  rec.setAttribute('data-type',curType);
+  rec.innerHTML='<span class="rec-badge '+c.rb+'" onclick="openPopup(event,\''+id+'\')">'+id+'</span>'
+    +'<div class="rec-body"><div class="rec-text">'+esc(txt)+'</div>'
+    +'<div class="rec-meta"><span class="rec-meta-item">'+ts+'</span>'
+    +'<span class="rec-meta-item">Vaughn Staples</span>'
+    +'<span class="rec-meta-item">Item 2</span></div></div>';
+  document.getElementById('newRecs').appendChild(rec);
+
+  // Update counts
+  if(curType==='dec')decCnt++;
+  else if(curType==='act')actCnt++;
+  else if(curType==='rsk')rskCnt++;
+  document.getElementById('cntDec').textContent=decCnt+' decision'+(decCnt!==1?'s':'');
+  document.getElementById('cntAct').textContent=actCnt+' action'+(actCnt!==1?'s':'');
+  document.getElementById('cntRsk').textContent=rskCnt+' risk'+(rskCnt!==1?'s':'');
+
+  ta.value='';
+  var ms=document.getElementById('minScroll');
+  ms.scrollTop=ms.scrollHeight;
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// ── Filter tabs ──
+function filterTab(tab,f){
+  document.querySelectorAll('.mtab').forEach(function(t){t.classList.remove('active')});
+  tab.classList.add('active');
+  document.querySelectorAll('.rec-card').forEach(function(c){
+    if(f==='all'){c.style.display='';return;}
+    var t=c.getAttribute('data-type')||'';
+    c.style.display=(t===f)?'':'none';
+  });
+}
+
+// ── Popup ──
+function openPopup(e,code){
+  e.stopPropagation();
+  var prefix=code.split('-')[0];
+  var typeMap={DC:'dec',NT:'nt',AX:'act',RK:'rsk',QS:'qst'};
+  var t=typeMap[prefix]||'nt';
+  document.querySelectorAll('.popup-type').forEach(function(p){p.className='popup-type'});
+  var order=['nt','dec','act','rsk','qst'];
+  var btns=document.querySelectorAll('.popup-type');
+  var idx=order.indexOf(t);
+  if(btns[idx])btns[idx].classList.add('sel-'+t);
+  setPopupFields(t);
+  document.getElementById('popupBg').classList.add('open');
+}
+function closePopup(e){
+  if(!e||e.target===document.getElementById('popupBg'))
+    document.getElementById('popupBg').classList.remove('open');
+}
+function selPType(el,t){
+  document.querySelectorAll('.popup-type').forEach(function(p){p.className='popup-type'});
+  el.classList.add('sel-'+t);
+  setPopupFields(t);
+}
+function setPopupFields(t){
+  var f=document.getElementById('popupFields');
+  if(t==='act'){
+    f.innerHTML='<div><div class="pf-label">Assignee</div><input class="pf-input" value="Vaughn Staples"></div>'
+      +'<div><div class="pf-label">Due date</div><input class="pf-input" value="May 22, 2026"></div>';
+  }else if(t==='dec'){
+    f.innerHTML='<div><div class="pf-label">Effective date</div><input class="pf-input" placeholder="Optional"></div>';
+  }else if(t==='rsk'){
+    f.innerHTML='<div><div class="pf-label">Severity</div><input class="pf-input" placeholder="Low / Medium / High"></div>';
+  }else{f.innerHTML=''}
+}
+
+// ── Chat ──
+function sendChat(){
+  var inp=document.getElementById('chatInp');
+  var txt=inp.value.trim();if(!txt)return;
+  var msgs=document.getElementById('chatMsgs');
+  var m=document.createElement('div');
+  m.className='chat-msg me';
+  m.innerHTML='<div class="chat-who">You</div><div class="chat-bubble">'+esc(txt)+'</div>';
+  msgs.appendChild(m);msgs.scrollTop=msgs.scrollHeight;
+  inp.value='';
+}
+document.getElementById('chatInp').addEventListener('keydown',function(e){
+  if(e.key==='Enter')sendChat();
+});
+
+// ── Panel resize ──
+function makeResizable(rhId,panelId,side){
+  var rh=document.getElementById(rhId),pn=document.getElementById(panelId);
+  var drag=false,sx,sw;
+  rh.addEventListener('mousedown',function(e){
+    drag=true;sx=e.clientX;sw=pn.offsetWidth;
+    rh.classList.add('dragging');
+    document.body.style.userSelect='none';
+    document.body.style.cursor='col-resize';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove',function(e){
+    if(!drag)return;
+    var delta=side==='right'?(sx-e.clientX):(e.clientX-sx);
+    var w=Math.max(220,Math.min(620,sw+delta));
+    pn.style.width=w+'px';pn.style.flex='none';
+  });
+  document.addEventListener('mouseup',function(){
+    if(!drag)return;drag=false;
+    rh.classList.remove('dragging');
+    document.body.style.userSelect='';
+    document.body.style.cursor='';
+  });
+}
+makeResizable('rh1','panelLeft','left');
+makeResizable('rh2','panelRight','right');
+</script>
+</body>
+</html>

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accord · Knowledge Base</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Outfit',system-ui,sans-serif;font-size:14px;background:#0b0d14;color:#dce6f5;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:2px}
+:root{
+  --void:#0b0d14;--surface:#10131e;--raised:#171c2e;--hover:#1d2338;
+  --b0:#1e2438;--b1:#252d44;--b2:#313d5e;
+  --hi:#dce6f5;--md:#8899b2;--lo:#7a8a9a;
+  --dec:#4a8cf5;--dec-bg:rgba(74,140,245,.09);--dec-bd:rgba(74,140,245,.24);
+  --dcn:#8b6ef5;--dcn-bg:rgba(139,110,245,.09);--dcn-bd:rgba(139,110,245,.24);
+  --act:#e89430;--act-bg:rgba(232,148,48,.08);--act-bd:rgba(232,148,48,.24);
+  --rsk:#e05252;--rsk-bg:rgba(224,82,82,.09);--rsk-bd:rgba(224,82,82,.24);
+  --nt:#48aa88;--nt-bg:rgba(72,170,136,.08);--nt-bd:rgba(72,170,136,.22);
+  --prk:#9478e0;--prk-bg:rgba(148,120,224,.09);--prk-bd:rgba(148,120,224,.24);
+}
+.app{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOPBAR */
+.topbar{height:50px;flex-shrink:0;display:flex;align-items:center;background:var(--void);border-bottom:1px solid var(--b0)}
+.tb-brand{display:flex;align-items:center;gap:8px;width:260px;flex-shrink:0;padding:0 16px;border-right:1px solid var(--b0)}
+.tb-logo{font-size:16px;font-weight:600;color:var(--hi)}.tb-logo-dot{color:var(--dec)}
+.tb-crumb{display:flex;align-items:center;gap:7px;padding:0 18px;flex:1;font-size:12px;color:var(--lo)}
+.tb-crumb span{color:var(--md)}.tb-crumb b{color:var(--hi);font-weight:600}
+.tb-crumb .sep{color:var(--b2)}
+.tb-right{padding:0 18px;flex-shrink:0;display:flex;align-items:center;gap:10px}
+.u-chip{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.05);border:1px solid var(--b1);border-radius:20px;padding:4px 12px 4px 5px}
+.u-av{width:26px;height:26px;border-radius:50%;background:#152c54;border:2px solid var(--dec);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--dec)}
+.u-name{font-size:12px;color:var(--md)}
+
+/* BODY */
+.body{flex:1;display:flex;overflow:hidden;min-height:0}
+
+/* RAIL */
+.rail{width:260px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--b0);display:flex;flex-direction:column;overflow:hidden;position:relative;min-width:180px;max-width:380px}
+.rail-hdr{padding:12px 16px 10px;border-bottom:1px solid var(--b0);flex-shrink:0}
+.rail-title{font-size:15px;font-weight:600;color:var(--hi);margin-bottom:3px}
+.rail-sub{font-size:11px;color:var(--md)}
+.rail-search{padding:8px 12px;flex-shrink:0;border-bottom:1px solid var(--b0)}
+.rail-search input{width:100%;background:var(--raised);border:1px solid var(--b1);border-radius:5px;padding:6px 11px;font-size:12px;color:var(--hi);outline:none;font-family:inherit}
+.rail-search input::placeholder{color:var(--lo)}
+.rail-list{flex:1;overflow-y:auto;padding:6px 0}
+
+/* Topic nav rows */
+.disc-hdr{display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;transition:background .12s;user-select:none}
+.disc-hdr:hover{background:var(--hover)}
+.disc-hdr.active{background:var(--hover);border-left:2px solid var(--dec)}
+.dh-arrow{font-size:11px;color:var(--lo);width:12px;flex-shrink:0}
+.dh-name{font-size:13px;font-weight:600;color:var(--hi);flex:1}
+.dh-cnt{font-size:11px;color:var(--md)}
+.topic-nav{padding-left:20px;display:flex;flex-direction:column}
+.tn-row{display:flex;align-items:center;gap:7px;padding:4px 12px 4px 8px;cursor:pointer;transition:background .12s;border-left:2px solid transparent;user-select:none}
+.tn-row:hover{background:var(--hover)}
+.tn-row.active{border-left-color:var(--dec);background:rgba(74,140,245,.06)}
+.tn-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--b2)}
+.tn-row.active .tn-dot{background:var(--dec)}
+.tn-name{font-size:12px;color:var(--md);flex:1}
+.tn-row.active .tn-name{color:var(--hi)}
+.tn-cnt{font-size:11px;color:var(--md)}
+.rail-sep{height:1px;background:var(--b0);margin:6px 0}
+
+/* CANVAS */
+.canvas{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* FILTER BAR */
+.filter-bar{display:flex;align-items:center;gap:0;background:var(--surface);border-bottom:1px solid var(--b0);flex-shrink:0;padding:0 20px}
+.fb-lbl{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--lo);margin-right:12px;white-space:nowrap}
+.filter-pill{font-size:12px;font-weight:600;padding:8px 14px;cursor:pointer;color:var(--lo);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .12s;white-space:nowrap}
+.filter-pill:hover{color:var(--md)}
+.filter-pill.active{color:var(--hi);border-bottom-color:var(--dec)}
+.filter-pill.fp-dc.active{color:var(--dcn);border-bottom-color:var(--dcn)}
+.filter-pill.fp-ax.active{color:var(--act);border-bottom-color:var(--act)}
+.filter-pill.fp-rk.active{color:var(--rsk);border-bottom-color:var(--rsk)}
+.filter-pill.fp-nt.active{color:var(--nt);border-bottom-color:var(--nt)}
+.fb-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.mtg-filter{font-size:12px;color:var(--md);padding:5px 10px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid var(--b1);cursor:pointer}
+.mtg-filter:hover{color:var(--md)}
+
+/* WORKSPACE HEADER */
+.ws-hdr{padding:16px 32px 14px;border-bottom:1px solid var(--b0);flex-shrink:0;display:flex;align-items:flex-start;justify-content:space-between}
+.ws-hdr-left{display:flex;flex-direction:column;gap:4px}
+.ws-hdr-title{font-size:20px;font-weight:600;color:var(--hi)}
+.ws-hdr-sub{font-size:12px;color:var(--lo)}
+.ws-stats{display:flex;gap:18px}
+.ws-stat{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.ws-stat-val{font-size:18px;font-weight:700;color:var(--hi);line-height:1}
+.ws-stat-lbl{font-size:11px;color:var(--lo)}
+.ws-stat-val.dec{color:var(--dcn)}.ws-stat-val.act{color:var(--act)}.ws-stat-val.rsk{color:var(--rsk)}
+
+/* CONTENT AREA */
+.content{flex:1;overflow-y:auto;padding:0}
+
+/* DISCIPLINE BLOCK */
+.disc-block{border:1px solid var(--b0);border-radius:7px;overflow:hidden;margin:12px 20px}
+.disc-row{display:flex;align-items:center;gap:10px;padding:11px 28px 11px 20px;background:var(--surface);cursor:pointer;position:sticky;top:0;z-index:5;border-bottom:1px solid var(--b0);transition:background .12s;user-select:none;border-left:4px solid var(--b2)}
+.disc-row:hover{background:var(--hover);border-left-color:var(--b2)}
+.dr-arrow{font-size:12px;color:var(--md);width:14px;flex-shrink:0}
+.dr-name{font-size:14px;font-weight:600;color:var(--hi);flex:1}
+.dr-stats{display:flex;gap:10px}
+.dr-stat{font-size:12px;padding:2px 9px;border-radius:10px;background:var(--raised);color:var(--md);border:1px solid var(--b0)}
+.disc-topics{padding:0 0 8px}
+
+/* TOPIC BLOCK */
+.topic-block{border-bottom:1px solid rgba(255,255,255,.04)}
+.topic-block:last-child{border-bottom:none}
+.topic-row{display:flex;align-items:center;gap:10px;padding:8px 28px 8px 34px;cursor:pointer;transition:background .12s;user-select:none;border-left:3px solid transparent;margin-left:0}
+.topic-row:hover{background:var(--raised);border-left-color:var(--b2)}
+.tr-arrow{font-size:11px;color:var(--lo);width:12px;flex-shrink:0}
+.tr-name{font-size:13px;font-weight:600;color:var(--hi);flex:1}
+.tr-meta{display:flex;align-items:center;gap:10px}
+.tr-cnt{font-size:11px;color:var(--lo)}
+.tr-last{font-size:11px;color:var(--lo)}
+.tr-mtg{font-size:12px;padding:2px 8px;border-radius:10px;background:var(--raised);color:var(--md);border:1px solid var(--b0)}
+
+/* ENTRIES */
+.entry-list{padding:0 28px 10px 50px;display:flex;flex-direction:column;gap:0;margin-left:24px;position:relative;}
+.entry-list::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;background:var(--b0);border-radius:2px}
+.entry{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);transition:background .1s}
+.entry:last-child{border-bottom:none}
+.entry:hover{background:rgba(255,255,255,.015);margin:0 -52px;padding:7px 52px}
+.e-date{font-size:12px;color:var(--md);flex-shrink:0;min-width:48px;padding-top:2px;white-space:nowrap}
+.e-tag{font-size:10px;font-weight:700;padding:0 5px;border-radius:2px;flex-shrink:0;white-space:nowrap;line-height:1.4;border:1px solid;margin-top:2px}
+.et-dc{background:var(--dcn-bg);color:var(--dcn);border-color:var(--dcn-bd)}
+.et-nt{background:var(--nt-bg);color:var(--nt);border-color:var(--nt-bd)}
+.et-ax{background:var(--act-bg);color:var(--act);border-color:var(--act-bd)}
+.et-rk{background:var(--rsk-bg);color:var(--rsk);border-color:var(--rsk-bd)}
+.e-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.e-text{font-size:13px;color:var(--hi);line-height:1.5}
+.e-meta{display:flex;align-items:center;gap:10px}
+.e-author{font-size:11px;color:var(--lo)}
+.e-mtg{font-size:11px;color:var(--lo);padding:1px 7px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--b0)}
+.e-status{font-size:11px;font-weight:600}
+.es-open{color:var(--act)}.es-done{color:var(--nt)}.es-ov{color:var(--rsk)}.es-unres{color:var(--rsk)}
+.e-right{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.e-actions{display:flex;gap:5px}
+.ea-btn{font-size:11px;padding:2px 8px;border-radius:3px;background:rgba(255,255,255,.04);color:var(--lo);border:1px solid var(--b0);cursor:pointer;transition:all .12s;white-space:nowrap}
+.ea-btn:hover{color:var(--dec);border-color:var(--dec-bd);background:var(--dec-bg)}
+
+/* DECISION FILTER VIEW */
+.flat-list{padding:16px 24px;display:flex;flex-direction:column;gap:6px}
+.flat-entry{display:flex;align-items:flex-start;gap:12px;padding:10px 14px;background:var(--raised);border:1px solid var(--b0);border-left:3px solid var(--b2);border-radius:6px;transition:border-color .12s}
+.flat-entry:hover{border-color:var(--b1)}
+.fe-num{font-size:10px;font-weight:700;padding:0 6px;border-radius:2px;flex-shrink:0;border:1px solid;margin-top:2px;cursor:pointer;transition:filter .12s;line-height:1.4}
+.fe-num:hover{filter:brightness(1.25)}
+.fe-dc{background:var(--dcn-bg);color:var(--dcn);border-color:var(--dcn-bd)}
+.flat-entry:has(.fe-dc){border-left-color:var(--dcn)}
+.fe-ax{background:var(--act-bg);color:var(--act);border-color:var(--act-bd)}
+.flat-entry:has(.fe-ax){border-left-color:var(--act)}
+.fe-rk{background:var(--rsk-bg);color:var(--rsk);border-color:var(--rsk-bd)}
+.flat-entry:has(.fe-rk){border-left-color:var(--rsk)}
+.fe-body{flex:1;min-width:0}
+.fe-text{font-size:13px;color:var(--hi);line-height:1.5;margin-bottom:5px}
+.fe-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fe-author{font-size:11px;color:var(--lo)}
+.fe-date{font-size:11px;color:var(--lo)}
+.fe-mtg{font-size:12px;padding:1px 7px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--b0);color:var(--md)}
+.fe-status{font-size:11px;font-weight:600}
+.fe-dissent{margin-top:6px;padding:6px 10px;background:rgba(224,82,82,.06);border:1px solid rgba(224,82,82,.18);border-radius:4px;font-size:12px;color:var(--md)}
+.fe-dissent b{color:var(--rsk)}
+.fe-aside{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+
+/* SECTION LABEL (for flat views) */
+.flat-sec{font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:var(--lo);padding:14px 24px 6px;display:flex;align-items:center;gap:10px}
+.flat-sec::after{content:'';flex:1;height:1px;background:var(--b0)}
+
+/* STATUS BAR */
+.statusbar{height:36px;flex-shrink:0;background:var(--surface);border-top:1px solid var(--b0);display:flex;align-items:center;gap:11px;padding:0 18px}
+.sb-lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--md);flex-shrink:0}
+.sb-chips{display:flex;gap:5px;flex:1;overflow:hidden}
+.sb-chip{font-size:11px;padding:3px 10px;border-radius:100px;background:var(--raised);border:1px solid var(--b0);color:var(--md);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .12s}
+.sb-chip:hover{border-color:var(--b1);color:var(--hi)}
+.sb-chip.active{border-color:var(--dec-bd);color:var(--dec);background:var(--dec-bg)}
+
+.rail-resize{position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:20;display:flex;align-items:center;justify-content:center}
+.rail-resize::after{content:'';width:2px;height:48px;border-radius:1px;background:rgba(255,255,255,.12);transition:background .15s}
+.rail-resize:hover::after{background:rgba(74,140,245,.7)}
+.rail-resize.dragging::after{background:var(--dec)}
+
+.ws-tabs{display:flex;align-items:stretch;background:var(--surface);border-bottom:2px solid var(--b0);flex-shrink:0;padding:0 20px}
+.ws-tab{font-size:13px;font-weight:600;letter-spacing:.05em;padding:10px 18px;cursor:pointer;color:var(--md);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .13s}
+.ws-tab:hover{color:var(--hi)}
+.ws-tab.active{color:var(--hi);border-bottom-color:var(--dec)}
+
+.disc-block[data-disc="ee"] .disc-row{border-left-color:var(--dec)}
+.disc-block[data-disc="vm"] .disc-row{border-left-color:var(--dcn)}
+.disc-block[data-disc="me"] .disc-row{border-left-color:var(--act)}
+.disc-block[data-disc="si"] .disc-row{border-left-color:var(--nt)}
+/* 4. Expanded inner panel colored left border */
+.disc-block[data-disc="ee"] .entry-list::before{background:rgba(74,140,245,.70)}
+.disc-block[data-disc="vm"] .entry-list::before{background:rgba(139,110,245,.70)}
+.disc-block[data-disc="me"] .entry-list::before{background:rgba(232,148,48,.70)}
+.disc-block[data-disc="si"] .entry-list::before{background:rgba(72,170,136,.70)}
+/* Topic rows colored accent on hover/active per discipline */
+.disc-block[data-disc="ee"] .topic-row:hover{border-left-color:var(--dec)}
+.disc-block[data-disc="vm"] .topic-row:hover{border-left-color:var(--dcn)}
+.disc-block[data-disc="me"] .topic-row:hover{border-left-color:var(--act)}
+.disc-block[data-disc="si"] .topic-row:hover{border-left-color:var(--nt)}
+/* 2. Card offset from left bar — add left padding inside sec-body equivalent */
+.disc-topics{padding:0 0 6px 0}
+.topic-block{border-bottom:1px solid rgba(255,255,255,.04)}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header class="topbar">
+  <div class="tb-brand"><div class="tb-logo">accord<span class="tb-logo-dot">.</span></div></div>
+  <div class="tb-crumb">
+    <span>Constellation</span><span class="sep">›</span>
+    <span>C-11 Test Workstream</span>
+  </div>
+  <div class="tb-right"><div class="u-chip"><div class="u-av">VS</div><span class="u-name">Vaughn Staples</span></div></div>
+</header>
+<div class="ws-tabs">
+  <div class="ws-tab" onclick="">Meetings</div>
+  <div class="ws-tab active">Knowledge Base</div>
+</div>
+
+<div class="body">
+
+  <!-- CANVAS -->
+  <div class="canvas">
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+      <span class="fb-lbl">Filter</span>
+      <div class="filter-pill active" id="fp-all" onclick="setFilter('all')">All</div>
+      <div class="filter-pill fp-dc" id="fp-dc" onclick="setFilter('dc')">Decisions</div>
+      <div class="filter-pill fp-ax" id="fp-ax" onclick="setFilter('ax')">Action Items</div>
+      <div class="filter-pill fp-rk" id="fp-rk" onclick="setFilter('rk')">Risks</div>
+      <div class="filter-pill fp-nt" id="fp-nt" onclick="setFilter('nt')">Notes</div>
+      <div class="fb-right">
+        <div class="mtg-filter">All meetings ▾</div>
+      </div>
+    </div>
+
+    <!-- ALL VIEW -->
+    <div id="view-all" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0">
+
+      <div class="ws-hdr">
+        <div class="ws-hdr-left">
+          <div class="ws-hdr-title">C-11 Test Workstream</div>
+          <div class="ws-hdr-sub">Knowledge accumulated across 5 meetings · Mar 15 – May 17, 2026</div>
+        </div>
+        <div class="ws-stats">
+          <div class="ws-stat"><span class="ws-stat-val dec">3</span><span class="ws-stat-lbl">Decisions</span></div>
+          <div class="ws-stat"><span class="ws-stat-val act">4</span><span class="ws-stat-lbl">Actions open</span></div>
+          <div class="ws-stat"><span class="ws-stat-val rsk">1</span><span class="ws-stat-lbl">Risk / Dissent</span></div>
+          <div class="ws-stat"><span class="ws-stat-val" style="color:var(--md)">9</span><span class="ws-stat-lbl">Notes</span></div>
+        </div>
+      </div>
+
+      <div class="content" id="content-all">
+
+        <!-- ELECTRICAL ENGINEERING -->
+        <div class="disc-block" data-disc="ee">
+          <div class="disc-row" onclick="toggleBlock(this)">
+            <span class="dr-arrow">▼</span>
+            <span class="dr-name">Electrical Engineering</span>
+            <div class="dr-stats">
+              <span class="dr-stat">3 topics</span>
+              <span class="dr-stat">6 entries</span>
+              <span class="dr-stat" style="color:var(--nt);border-color:var(--nt-bd);background:var(--nt-bg)">last: May 29</span>
+            </div>
+          </div>
+          <div class="disc-topics">
+
+            <div class="topic-block" id="topic-thermal">
+              <div class="topic-row" onclick="toggleTopic(this)">
+                <span class="tr-arrow">▼</span>
+                <span class="tr-name">Adapter Board Thermal Constraints</span>
+                <div class="tr-meta">
+                  <span class="tr-cnt">3 entries</span>
+                  <span class="tr-last">last: May 29</span>
+                  <span class="tr-mtg">3 meetings</span>
+                </div>
+              </div>
+              <div class="entry-list">
+                <div class="entry">
+                  <span class="e-date">May 29</span>
+                  <span class="e-tag et-nt">NT-037</span>
+                  <div class="e-body">
+                    <div class="e-text">Thin strand wire confirmed; Ben working with Nimbletronics to test prototype. Ships 6/10.</div>
+                    <div class="e-meta"><span class="e-author">Vaughn Staples</span><span class="e-mtg">C-11 Smoke Test</span></div>
+                  </div>
+                </div>
+                <div class="entry">
+                  <span class="e-date">May 22</span>
+                  <span class="e-tag et-nt">NT-028</span>
+                  <div class="e-body">
+                    <div class="e-text">Cable width beyond max limit — researching thin-strand wire as alternative.</div>
+                    <div class="e-meta"><span class="e-author">Angela Kim</span><span class="e-mtg">Prior Meeting 4</span></div>
+                  </div>
+                </div>
+                <div class="entry">
+                  <span class="e-date">May 15</span>
+                  <span class="e-tag et-nt">NT-003</span>
+                  <div class="e-body">
+                    <div class="e-text">Ben Roy to investigate copper mesh cable to connect to motherboard.</div>
+                    <div class="e-meta"><span class="e-author">Vaughn Staples</span><span class="e-mtg">Prior Meeting 3</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="topic-block" id="topic-pcb">
+              <div class="topic-row" onclick="toggleTopic(this)">
+                <span class="tr-arrow">▼</span>
+                <span class="tr-name">PCB Layout Sign-off</span>
+                <div class="tr-meta"><span class="tr-cnt">1 entry</span><span class="tr-last">last: May 15</span><span class="tr-mtg">1 meeting</span></div>
+              </div>
+              <div class="entry-list">
+                <div class="entry">
+                  <span class="e-date">May 15</span>
+                  <span class="e-tag et-nt">NT-004</span>
+                  <div class="e-body">
+                    <div class="e-text">Layout review scheduled for May 22. Sandra to confirm component placement before sign-off.</div>
+                    <div class="e-meta"><span class="e-author">Vaughn Staples</span><span class="e-mtg">Prior Meeting 3</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="topic-block" id="topic-power">
+              <div class="topic-row" onclick="toggleTopic(this)">
+                <span class="tr-arrow">▼</span>
+                <span class="tr-name">Power Budget Review</span>
+                <div class="tr-meta"><span class="tr-cnt">2 entries</span><span class="tr-last">last: May 22</span><span class="tr-mtg">2 meetings</span></div>
+              </div>
+              <div class="entry-list">
+                <div class="entry">
+                  <span class="e-date">May 22</span>
+                  <span class="e-tag et-nt">NT-019</span>
+                  <div class="e-body">
+                    <div class="e-text">Budget revised — thermal headroom now 12% above spec. No further action needed.</div>
+                    <div class="e-meta"><span class="e-author">Angela Kim</span><span class="e-mtg">Prior Meeting 4</span></div>
+                  </div>
+                </div>
+                <div class="entry">
+                  <span class="e-date">May 15</span>
+                  <span class="e-tag et-nt">NT-005</span>
+                  <div class="e-body">
+                    <div class="e-text">Power budget under review; 8% margin. Ben to verify against final BOM.</div>
+                    <div class="e-meta"><span class="e-author">Ben Roy</span><span class="e-mtg">Prior Meeting 3</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- VENDOR MANAGEMENT -->
+        <div class="disc-block" data-disc="vm">
+          <div class="disc-row" onclick="toggleBlock(this)">
+            <span class="dr-arrow">▼</span>
+            <span class="dr-name">Vendor Management</span>
+            <div class="dr-stats">
+              <span class="dr-stat">2 topics</span>
+              <span class="dr-stat">6 entries</span>
+              <span class="dr-stat" style="color:var(--dcn);border-color:var(--dcn-bd);background:var(--dcn-bg)">3 decisions</span>
+            </div>
+          </div>
+          <div class="disc-topics">
+
+            <div class="topic-block" id="topic-sel">
+              <div class="topic-row" onclick="toggleTopic(this)">
+                <span class="tr-arrow">▼</span>
+                <span class="tr-name">Vendor Selection</span>
+                <div class="tr-meta"><span class="tr-cnt">4 entries</span><span class="tr-last">last: May 17</span><span class="tr-mtg">3 meetings</span></div>
+              </div>
+              <div class="entry-list">
+                <div class="entry">
+                  <span class="e-date">May 17</span>
+                  <span class="e-tag et-dc">DC-018</span>
+                  <div class="e-body">
+                    <div class="e-text">Nimbletronics selected as primary vendor for Phase 1 component supply. NDA execution target May 22.</div>
+                    <div class="e-meta"><span class="e-author">Vaughn Staples</span><span class="e-mtg">C-11 Smoke Test</span><span class="e-status es-open">Active</span></div>
+                  </div>
+                </div>
+                <div class="entry">
+                  <span class="e-date">Apr 14</span>
+                  <span class="e-tag et-nt">NT-022</span>
+                  <div class="e-body">
+                    <div class="e-text">Shortlist narrowed to Nimbletronics and ProtoFab. Decision deferred pending thermal validation results.</div>
+                    <div class="e-meta"><span class="e-author">Vaughn Staples</span><span class="e-mtg">Prior Meeting 3</span></div>
+                  </div>
+                </div>
+                <div class="entry">
+                  <span class="e-date">Apr 14</span>
+                  <span class="e-tag et-dc">DC-015</span>
+                  <div class="e-body">
+                    <div class="e-text">Adopt phased delivery model — Phase 1 scope frozen. Vendor decision deferred to next meeting.</div>
+                    <div class="e-meta"><span class="e-author">Vaughn Staples</span><span class="e-mtg">Prior Meeting 3</span><span class="e-status es-open">Active</span></div>
+                  </div>
+                </div>
+                <div class="entry">
+                  <span class="e-date">Mar 30</span>
+                  <span class="e-tag et-rk">RK-005</span>
+                  <div class="e-body">
+                    <div class="e-text">ProtoFab 14-week lead time flagged as risk — conflicts with Phase 1 milestone.</div>
+                    <div class="e-meta"><span class="e-author">Angela Kim</span><span class="e-mtg">Prior Meeting 2</span><span class="e-status es-done">Mitigated</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="topic-block" id="topic-nda">
+              <div class="topic-row" onclick="toggleTopic(this)">
+                <span class="tr-arrow">▼</span>
+                <span class="tr-name">NDA + Contracts</span>
+                <div class="tr-meta"><span class="tr-cnt">2 entries</span><span class="tr-last">last: May 17</span><span class="tr-mtg">1 meeting</span></div>
+              </div>
+              <div class="entry-list">
+                <div class="entry">
+                  <span class="e-date">May 17</span>
+                  <span class="e-tag et-ax">AX-011</span>
+                  <div class="e-body">
+                    <div class="e-text">Vaughn: Execute NDA with Nimbletronics by May 22.</div>
+                    <div class="e-meta"><span class="e-author">Vaughn Staples</span><span class="e-mtg">C-11 Smoke Test</span><span class="e-status es-open">Open · due May 22</span></div>
+                  </div>
+                </div>
+                <div class="entry">
+                  <span class="e-date">May 17</span>
+                  <span class="e-tag et-nt">NT-033</span>
+                  <div class="e-body">
+                    <div class="e-text">Review NDA terms with legal counsel before execution — parking lot item flagged by Vaughn.</div>
+                    <div class="e-meta"><span class="e-author">Vaughn Staples</span><span class="e-mtg">C-11 Smoke Test</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MECHANICAL -->
+        <div class="disc-block" data-disc="me">
+          <div class="disc-row" onclick="toggleBlock(this)">
+            <span class="dr-arrow">▼</span>
+            <span class="dr-name">Mechanical Engineering</span>
+            <div class="dr-stats"><span class="dr-stat">2 topics</span><span class="dr-stat">3 entries</span><span class="dr-stat" style="color:var(--md)">last: May 9</span></div>
+          </div>
+          <div class="disc-topics">
+            <div class="topic-block" id="topic-encl">
+              <div class="topic-row" onclick="toggleTopic(this)">
+                <span class="tr-arrow">▼</span><span class="tr-name">Enclosure Fit Check</span>
+                <div class="tr-meta"><span class="tr-cnt">2 entries</span><span class="tr-last">last: May 9</span></div>
+              </div>
+              <div class="entry-list">
+                <div class="entry"><span class="e-date">May 9</span><span class="e-tag et-nt">NT-025</span><div class="e-body"><div class="e-text">Enclosure tolerance verified at ±0.3mm — within spec. No revision needed.</div><div class="e-meta"><span class="e-author">Angela Kim</span><span class="e-mtg">Prior Meeting 4</span></div></div></div>
+                <div class="entry"><span class="e-date">Apr 14</span><span class="e-tag et-ax">AX-006</span><div class="e-body"><div class="e-text">Angela: Submit enclosure drawings to manufacturing for tolerance check.</div><div class="e-meta"><span class="e-author">Angela Kim</span><span class="e-mtg">Prior Meeting 3</span><span class="e-status es-done">✓ Closed May 9</span></div></div></div>
+              </div>
+            </div>
+            <div class="topic-block" id="topic-mount">
+              <div class="topic-row" onclick="toggleTopic(this)">
+                <span class="tr-arrow">▼</span><span class="tr-name">Mounting Bracket Spec</span>
+                <div class="tr-meta"><span class="tr-cnt">1 entry</span><span class="tr-last">last: Apr 14</span></div>
+              </div>
+              <div class="entry-list">
+                <div class="entry"><span class="e-date">Apr 14</span><span class="e-tag et-nt">NT-012</span><div class="e-body"><div class="e-text">Bracket spec to be finalized after enclosure tolerance confirmed. Deferred.</div><div class="e-meta"><span class="e-author">Vaughn Staples</span><span class="e-mtg">Prior Meeting 3</span></div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SOFTWARE -->
+        <div class="disc-block" data-disc="si">
+          <div class="disc-row" onclick="toggleBlock(this)">
+            <span class="dr-arrow">▼</span>
+            <span class="dr-name">Software Integration</span>
+            <div class="dr-stats"><span class="dr-stat">1 topic</span><span class="dr-stat">1 entry</span><span class="dr-stat" style="color:var(--md)">last: Apr 14</span></div>
+          </div>
+          <div class="disc-topics">
+            <div class="topic-block" id="topic-api">
+              <div class="topic-row" onclick="toggleTopic(this)">
+                <span class="tr-arrow">▼</span><span class="tr-name">Firmware API Handshake</span>
+                <div class="tr-meta"><span class="tr-cnt">1 entry</span><span class="tr-last">last: Apr 14</span></div>
+              </div>
+              <div class="entry-list">
+                <div class="entry"><span class="e-date">Apr 14</span><span class="e-tag et-ax">AX-010</span><div class="e-body"><div class="e-text">Vaughn: Follow up with vendor on API documentation release date before firmware integration begins.</div><div class="e-meta"><span class="e-author">Vaughn Staples</span><span class="e-mtg">Prior Meeting 3</span><span class="e-status es-open">Open · no due date</span></div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:40px"></div>
+      </div>
+    </div>
+
+    <!-- FLAT FILTER VIEW (decisions, actions, risks) -->
+    <div id="view-flat" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0">
+      <div style="flex:1;overflow-y:auto" id="flat-content"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- STATUS BAR: meeting timeline -->
+<div class="statusbar">
+  <span class="sb-lbl">Meetings</span>
+  <div class="sb-chips">
+    <span class="sb-chip">Mar 15 · Kickoff</span>
+    <span class="sb-chip">Mar 30 · Vendor Review</span>
+    <span class="sb-chip">Apr 14 · Decision Gate</span>
+    <span class="sb-chip">Apr 30 · Action Review</span>
+    <span class="sb-chip active">May 17 · Smoke Test</span>
+  </div>
+</div>
+
+</div>
+
+<script>
+function toggleDisc(hdr){
+  var arrow=hdr.querySelector('.dh-arrow'),nav=hdr.nextElementSibling;
+  if(!nav)return;var open=arrow.textContent==='▼';
+  arrow.textContent=open?'►':'▼';nav.style.display=open?'none':'';
+}
+function toggleBlock(hdr){
+  var arrow=hdr.querySelector('.dr-arrow'),body=hdr.nextElementSibling;
+  if(!body)return;var open=arrow.textContent==='▼';
+  arrow.textContent=open?'►':'▼';body.style.display=open?'none':'';
+}
+function toggleTopic(row){
+  var arrow=row.querySelector('.tr-arrow'),list=row.nextElementSibling;
+  if(!list)return;var open=arrow.textContent==='▼';
+  arrow.textContent=open?'►':'▼';list.style.display=open?'none':'';
+}
+
+var flatData={
+  dc:{
+    label:'Decisions',color:'var(--dcn)',
+    sections:[{name:'Active',entries:[
+      {id:'DC-018',cls:'fe-dc',text:'Nimbletronics selected as primary vendor for Phase 1 component supply. NDA execution target May 22.',author:'Vaughn Staples',date:'May 17',mtg:'C-11 Smoke Test',status:'Active',statusCls:'es-open',dissent:null},
+      {id:'DC-015',cls:'fe-dc',text:'Adopt phased delivery model — Phase 1 scope frozen. Vendor decision deferred to next meeting.',author:'Vaughn Staples',date:'Apr 14',mtg:'Prior Meeting 3',status:'Active',statusCls:'es-open',dissent:null},
+      {id:'DC-016',cls:'fe-dc',text:'Proceed with internal spec pending vendor API confirmation.',author:'Angela Kim',date:'Mar 30',mtg:'Prior Meeting 2',status:'Active',statusCls:'es-open',dissent:null},
+    ]},{name:'With dissent',entries:[
+      {id:'DS-005',cls:'fe-dc',text:'Adopt revised component spec as Phase 1 baseline — pending sign-off.',author:'All',date:'Apr 14',mtg:'Prior Meeting 3',status:'Dissent open',statusCls:'es-unres',dissent:'Angela Kim dissents — vendor dependency blocks Phase 1 timeline commitment. Unresolved as of Apr 14.'},
+    ]}]
+  },
+  ax:{
+    label:'Action Items',color:'var(--act)',
+    sections:[{name:'Overdue',entries:[
+      {id:'AX-007',cls:'fe-ax',text:'Angela: Obtain written confirmation from vendor on delivery timeline.',author:'Angela Kim',date:'Apr 30',mtg:'Prior Meeting 4',status:'Overdue',statusCls:'es-ov',dissent:null},
+    ]},{name:'Open',entries:[
+      {id:'AX-008',cls:'fe-ax',text:'Vaughn: Schedule vendor alignment call and circulate agenda.',author:'Vaughn Staples',date:'Apr 30',mtg:'Prior Meeting 4',status:'Open · due May 20',statusCls:'es-open',dissent:null},
+      {id:'AX-009',cls:'fe-ax',text:'Angela: Deliver completed component spec to engineering for review.',author:'Angela Kim',date:'Apr 30',mtg:'Prior Meeting 4',status:'Open · no date',statusCls:'es-open',dissent:null},
+      {id:'AX-010',cls:'fe-ax',text:'Vaughn: Follow up with vendor on API documentation release date.',author:'Vaughn Staples',date:'Apr 14',mtg:'Prior Meeting 3',status:'Open · no date',statusCls:'es-open',dissent:null},
+      {id:'AX-011',cls:'fe-ax',text:'Vaughn: Execute NDA with Nimbletronics by May 22.',author:'Vaughn Staples',date:'May 17',mtg:'C-11 Smoke Test',status:'Open · due May 22',statusCls:'es-open',dissent:null},
+    ]},{name:'Closed',entries:[
+      {id:'AX-005',cls:'fe-ax',text:'Angela: Submit Phase 1 component list to procurement.',author:'Angela Kim',date:'Apr 14',mtg:'Prior Meeting 3',status:'✓ Closed May 14',statusCls:'es-done',dissent:null},
+      {id:'AX-006',cls:'fe-ax',text:'Vaughn: Confirm engineering headcount for Phase 1.',author:'Vaughn Staples',date:'Apr 14',mtg:'Prior Meeting 3',status:'✓ Closed May 13',statusCls:'es-done',dissent:null},
+    ]}]
+  },
+  rk:{
+    label:'Risks & Dissents',color:'var(--rsk)',
+    sections:[{name:'Open',entries:[
+      {id:'DS-005',cls:'fe-rk',text:'Angela dissents on Phase 1 timeline — vendor dependency not resolved.',author:'Angela Kim',date:'Apr 14',mtg:'Prior Meeting 3',status:'Unresolved',statusCls:'es-unres',dissent:null},
+    ]},{name:'Mitigated',entries:[
+      {id:'RK-005',cls:'fe-rk',text:'ProtoFab 14-week lead time conflicts with Phase 1 milestone.',author:'Angela Kim',date:'Mar 30',mtg:'Prior Meeting 2',status:'Mitigated · Nimbletronics selected',statusCls:'es-done',dissent:null},
+    ]}]
+  }
+};
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function buildFlat(type){
+  var d=flatData[type],html='';
+  d.sections.forEach(function(sec){
+    html+='<div class="flat-sec">'+esc(sec.name)+'</div>';
+    html+='<div class="flat-list">';
+    sec.entries.forEach(function(e){
+      html+='<div class="flat-entry"><span class="fe-num '+e.cls+'">'+esc(e.id)+'</span><div class="fe-body"><div class="fe-text">'+esc(e.text)+'</div><div class="fe-meta"><span class="fe-author">'+esc(e.author)+'</span><span class="fe-date">'+esc(e.date)+'</span><span class="fe-mtg">'+esc(e.mtg)+'</span><span class="fe-status '+e.statusCls+'">'+esc(e.status)+'</span></div>'+(e.dissent?'<div class="fe-dissent"><b>Dissent:</b> '+esc(e.dissent)+'</div>':'')+'</div></div>';
+    });
+    html+='</div>';
+  });
+  return html;
+}
+
+function setFilter(f){
+  ['all','dc','ax','rk','nt'].forEach(function(id){
+    document.getElementById('fp-'+id).classList.toggle('active',id===f);
+  });
+  var allView=document.getElementById('view-all');
+  var flatView=document.getElementById('view-flat');
+  if(f==='all'||f==='nt'){
+    allView.style.display='flex';flatView.style.display='none';
+  } else {
+    allView.style.display='none';flatView.style.display='flex';
+    document.getElementById('flat-content').innerHTML=buildFlat(f);
+  }
+}
+
+// Rail resize — Iron Rule
+var railResize=document.getElementById('railResize');
+var rail=document.querySelector('.rail');
+var rDrag=false,rStartX,rStartW;
+if(railResize&&rail){
+  railResize.addEventListener('mousedown',function(e){rDrag=true;rStartX=e.clientX;rStartW=rail.offsetWidth;railResize.classList.add('dragging');document.body.style.cursor='col-resize';e.preventDefault();});
+  document.addEventListener('mousemove',function(e){if(!rDrag)return;var w=Math.max(180,Math.min(380,rStartW+(e.clientX-rStartX)));rail.style.width=w+'px';});
+  document.addEventListener('mouseup',function(){if(!rDrag)return;rDrag=false;railResize.classList.remove('dragging');document.body.style.cursor='';});
+}
+</script>
+</body>
+</html>

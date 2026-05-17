@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accord · Meeting Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Outfit',system-ui,sans-serif;font-size:14px;line-height:1.5;background:#0b0d14;color:#dce6f5;-webkit-font-smoothing:antialiased}
+button{cursor:pointer;border:none;background:none;font-family:inherit;font-size:inherit}
+input,textarea,select{font-family:inherit;font-size:inherit}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.24)}
+
+:root{
+  --void:#0b0d14;
+  --surface:#10131e;
+  --raised:#171c2e;
+  --hover:#1d2338;
+  --b0:#1e2438;--b1:#252d44;--b2:#313d5e;
+  --hi:#dce6f5;
+  --md:#8899b2;
+  --lo:#4a5670;   /* placeholders only */
+  --dec:#4a8cf5;--dec-bg:rgba(74,140,245,.09);--dec-bd:rgba(74,140,245,.24);
+  --act:#e89430;--act-bg:rgba(232,148,48,.08);--act-bd:rgba(232,148,48,.24);
+  --rsk:#e05252;--rsk-bg:rgba(224,82,82,.09);--rsk-bd:rgba(224,82,82,.24);
+  --nt:#48aa88;--nt-bg:rgba(72,170,136,.08);--nt-bd:rgba(72,170,136,.22);
+  --prk:#9478e0;--prk-bg:rgba(148,120,224,.09);--prk-bd:rgba(148,120,224,.24);
+  --live:#34d499;
+}
+
+.app{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:var(--void)}
+
+/* ══ TOPBAR ══ */
+.topbar{height:50px;flex-shrink:0;display:flex;align-items:center;background:var(--void);border-bottom:1px solid var(--b0);padding:0}
+.tb-brand{display:flex;align-items:center;width:192px;flex-shrink:0;padding:0 16px;border-right:1px solid var(--b0)}
+.tb-logo{font-size:15px;font-weight:600;color:var(--hi);letter-spacing:.02em}
+.tb-logo-dot{color:var(--dec)}
+.tb-meeting{display:flex;align-items:center;gap:9px;padding:0 18px;border-right:1px solid var(--b0);flex:1;min-width:0}
+.tb-title{font-size:13px;font-weight:500;color:var(--hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-chip{font-size:11px;padding:3px 9px;border-radius:100px;background:var(--raised);color:var(--md);border:1px solid var(--b1);flex-shrink:0;white-space:nowrap}
+.tb-progress{display:flex;align-items:center;gap:8px;padding:0 18px;border-right:1px solid var(--b0);flex-shrink:0}
+.tb-prog-lbl{font-size:11px;color:var(--md);white-space:nowrap}
+.tb-segs{display:flex;gap:3px;width:84px}
+.seg{height:4px;border-radius:2px;flex:1}
+.seg-done{background:var(--nt);opacity:.6}
+.seg-active{background:var(--dec);animation:sa 2s ease-in-out infinite}
+@keyframes sa{0%,100%{opacity:1}50%{opacity:.5}}
+.seg-todo{background:var(--b1)}
+.tb-prog-txt{font-size:11px;color:var(--md);white-space:nowrap}
+.tb-right{display:flex;align-items:center;gap:14px;padding:0 16px;flex-shrink:0;margin-left:auto}
+.tb-timer{display:flex;flex-direction:column;align-items:center;line-height:1}
+.tb-elapsed{font-size:20px;font-weight:600;color:var(--hi);letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.tb-elapsed-lbl{font-size:10px;color:var(--md);letter-spacing:.1em;text-transform:uppercase;margin-top:1px}
+.live-pill{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:100px;background:rgba(52,212,153,.10);border:1px solid rgba(52,212,153,.20)}
+.ld{width:6px;height:6px;border-radius:50%;background:var(--live);animation:ld 1.8s ease-in-out infinite}
+@keyframes ld{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.7)}}
+.live-pill span{font-size:12px;font-weight:600;color:var(--live);letter-spacing:.04em}
+.avs{display:flex}
+.av{width:26px;height:26px;border-radius:50%;border:2px solid var(--void);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;margin-left:-5px}
+.av:first-child{margin-left:0}
+.av-a{background:#152c54;color:#4a8cf5}.av-b{background:#103028;color:#34d499}.av-c{background:#2e1e0c;color:#e89430}
+.btn-end{font-size:12px;font-weight:600;padding:7px 13px;border-radius:5px;background:rgba(224,82,82,.09);color:var(--rsk);border:1px solid rgba(224,82,82,.20);transition:all .13s}
+.btn-end:hover{background:rgba(224,82,82,.16);border-color:rgba(224,82,82,.36)}
+
+/* ══ QUICK-ADD BAR ══ */
+.quickbar{height:38px;flex-shrink:0;display:flex;align-items:center;gap:5px;background:var(--surface);border-bottom:1px solid var(--b1);padding:0 16px 0 208px}
+.qb-lbl{font-size:11px;color:var(--md);margin-right:3px;flex-shrink:0}
+.qb-btn{font-size:12px;font-weight:500;padding:5px 12px;border-radius:4px;border:1px solid var(--b1);color:var(--md);background:transparent;cursor:pointer;transition:all .12s;white-space:nowrap}
+.qb-btn:hover{border-color:var(--b2);color:var(--hi);background:var(--hover)}
+.qb-dec:hover{border-color:var(--dec-bd);color:var(--dec);background:var(--dec-bg)}
+.qb-act:hover{border-color:var(--act-bd);color:var(--act);background:var(--act-bg)}
+.qb-rsk:hover{border-color:var(--rsk-bd);color:var(--rsk);background:var(--rsk-bg)}
+.qb-prk:hover{border-color:var(--prk-bd);color:var(--prk);background:var(--prk-bg)}
+.qb-sep{width:1px;height:18px;background:var(--b1);margin:0 4px;flex-shrink:0}
+.qb-hint{margin-left:auto;font-size:11px;color:var(--lo);flex-shrink:0;font-style:italic}
+
+/* ══ BODY ══ */
+.body{flex:1;display:flex;overflow:hidden;min-height:0}
+
+/* ══ SIDEBAR ══ */
+.sidebar{width:192px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--b0);display:flex;flex-direction:column;overflow:hidden}
+.sb-nav{flex-shrink:0;padding:10px 0 8px}
+.sb-nav-hdr{font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--md);padding:0 16px 7px}
+.sb-link{display:flex;align-items:center;gap:8px;padding:6px 16px;font-size:13px;color:var(--md);border-left:2px solid transparent;cursor:pointer;transition:all .12s;user-select:none}
+.sb-link:hover{background:var(--raised);color:var(--hi)}
+.sb-link.active{color:var(--hi);background:var(--hover);border-left-color:var(--dec)}
+.sb-link-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sb-link-cnt{margin-left:auto;font-size:11px;font-weight:600;color:var(--md)}
+.sb-link.active .sb-link-cnt{color:var(--dec)}
+.sb-divider{height:1px;background:var(--b0);margin:4px 0}
+.sb-atts{flex:1;overflow-y:auto;padding:10px 0}
+.sb-atts-hdr{font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--md);padding:0 16px 7px}
+.att-row{display:flex;align-items:center;gap:7px;padding:5px 16px;transition:background .1s}
+.att-row:hover{background:var(--raised)}
+.att-pres{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.att-pres.on{background:var(--live)}.att-pres.off{background:var(--b1)}
+.att-mini-av{width:22px;height:22px;border-radius:50%;font-size:8px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.att-mini-name{font-size:12px;color:var(--md);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att-mini-name.you{color:var(--hi)}
+
+/* ══ DOCUMENT CANVAS ══ */
+.canvas{flex:1;overflow-y:auto;background:var(--void)}
+
+/* ── SECTION STRUCTURE ── */
+.doc-sec{border-bottom:none}
+.sec-hdr{
+  display:flex;align-items:stretch;
+  background:var(--surface);border-top:2px solid var(--b1);border-bottom:1px solid var(--b0);
+  cursor:pointer;user-select:none;position:sticky;top:0;z-index:8;transition:background .12s;
+}
+.sec-hdr:hover{background:var(--hover)}
+.doc-sec:first-child .sec-hdr{border-top:none}
+.sec-bar{width:5px;flex-shrink:0}
+.bar-dec{background:var(--dec)}.bar-act{background:var(--act)}.bar-notes{background:var(--nt)}
+.bar-rsk{background:var(--rsk)}.bar-prk{background:var(--prk)}.bar-next{background:var(--md)}
+.sec-hdr-inner{display:flex;align-items:center;gap:12px;padding:11px 20px;flex:1;min-width:0}
+.sec-title{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--hi);flex-shrink:0}
+.sec-badge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:100px;background:var(--raised);color:var(--md);border:1px solid var(--b1);flex-shrink:0}
+.sec-spacer{flex:1}
+.sec-toggle{
+  display:flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:5px;border:1px solid var(--b1);
+  background:var(--raised);color:var(--md);font-size:15px;
+  cursor:pointer;flex-shrink:0;transition:all .12s;margin-right:4px;
+}
+.sec-toggle:hover{background:var(--hover);border-color:var(--b2);color:var(--hi)}
+.sec-toggle.collapsed{color:var(--md)}
+.sec-body{background:var(--void);padding:0 22px 18px 25px}
+.sec-body.gone{display:none}
+
+/* ══════════════════════════════════════════════════════
+   AGENDA ITEMS
+   
+   Each item:  [header row]
+   Expanded:   ┌─ Thread History toggle (collapsed ›) ──┐
+               │  Prior meeting entries (hidden)         │
+               └─────────────────────────────────────────┘
+               [current meeting captures, if any]
+               [note textarea at bottom]
+══════════════════════════════════════════════════════ */
+.ag-rows{display:flex;flex-direction:column;gap:5px;padding-top:12px}
+
+.ag-item{
+  border:1px solid var(--b1);
+  border-radius:8px;
+  overflow:hidden;
+  transition:border-color .13s;
+}
+.ag-item:hover{border-color:var(--b2)}
+.ag-item.has-open-body{border-color:var(--b2)}
+
+/* ── Header row ── */
+.ag-hdr{
+  display:flex;align-items:center;gap:12px;
+  padding:13px 16px;cursor:pointer;
+  transition:background .12s;user-select:none;
+}
+.ag-hdr:hover{background:var(--raised)}
+
+.ag-chev{
+  font-size:13px;color:var(--md);
+  flex-shrink:0;width:16px;text-align:center;line-height:1;
+  transition:color .12s;
+}
+.ag-hdr:hover .ag-chev{color:var(--hi)}
+
+.ag-num{
+  width:26px;height:26px;border-radius:50%;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.14);
+  color:var(--hi);font-size:12px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+
+.ag-title{font-size:14px;font-weight:500;color:var(--hi);flex:1;line-height:1.35}
+
+/* ── Expanded body ── */
+.ag-body{display:none;flex-direction:column;border-top:1px solid var(--b1)}
+.ag-body.open{display:flex}
+
+/* ════════════════════════════════════
+   1. THREAD HISTORY toggle row (TOP)
+   Past: reference material, collapsed by default
+════════════════════════════════════ */
+.ag-hist-row{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 16px;
+  background:rgba(0,0,0,.18);
+  cursor:pointer;user-select:none;
+  transition:background .12s;
+  border-bottom:1px solid var(--b0);
+}
+.ag-hist-row:hover{background:rgba(0,0,0,.28)}
+
+.ag-hist-chev{
+  font-size:12px;color:var(--md);flex-shrink:0;
+  width:14px;text-align:center;line-height:1;
+}
+.ag-hist-label{
+  font-size:11px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--md);flex:1;
+}
+.ag-hist-pill{
+  font-size:11px;padding:3px 11px;border-radius:100px;
+  background:var(--raised);color:var(--md);
+  border:1px solid var(--b1);white-space:nowrap;flex-shrink:0;
+}
+
+/* History entries (hidden by default) */
+.ag-hist-entries{
+  display:none;flex-direction:column;
+  background:rgba(0,0,0,.22);
+  border-bottom:1px solid var(--b0);
+}
+.ag-hist-entries.open{display:flex}
+
+.he{
+  display:flex;align-items:flex-start;gap:11px;
+  padding:10px 16px;border-top:1px solid rgba(255,255,255,.04);
+  transition:background .1s;
+}
+.he:first-child{border-top:none}
+.he:hover{background:rgba(255,255,255,.02)}
+.he-date{font-size:12px;color:var(--md);flex-shrink:0;min-width:48px;padding-top:2px;white-space:nowrap}
+.he-tag{font-size:10px;font-weight:700;padding:3px 8px;border-radius:3px;flex-shrink:0;margin-top:1px;white-space:nowrap}
+.he-dc{background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd)}
+.he-ax{background:var(--act-bg);color:var(--act);border:1px solid var(--act-bd)}
+.he-nt{background:var(--nt-bg);color:var(--nt);border:1px solid var(--nt-bd)}
+.he-rk{background:var(--rsk-bg);color:var(--rsk);border:1px solid var(--rsk-bd)}
+.he-body{flex:1;min-width:0}
+.he-text{font-size:13px;color:var(--hi);line-height:1.5}
+.he-author{font-size:11px;color:var(--md);margin-top:3px}
+
+/* ════════════════════════════════════
+   2. CURRENT MEETING CAPTURES (middle)
+   Present: what's been noted in this meeting
+════════════════════════════════════ */
+.ag-captures{
+  display:flex;flex-direction:column;gap:3px;
+  padding:7px 14px 8px;
+  border-bottom:1px solid var(--b0);
+}
+.ag-captures:empty{display:none}
+
+/* Entry card — single row: [badge] [text flex:1] [author · time right-anchored] */
+.cap-entry{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:5px 10px 5px 16px;   /* slim vertical padding */
+  border-radius:5px;
+  background:var(--raised);
+  border:1px solid var(--b0);
+  position:relative;overflow:hidden;
+  transition:border-color .12s;
+}
+.cap-entry:hover{border-color:var(--b1)}
+
+/* Left color bar */
+.cap-entry::before{
+  content:'';position:absolute;
+  left:0;top:0;bottom:0;width:4px;
+}
+.ce-nt::before{background:var(--nt)}
+.ce-dc::before{background:var(--dec)}
+.ce-ax::before{background:var(--act)}
+.ce-rk::before{background:var(--rsk)}
+.ce-prk::before{background:var(--prk)}
+
+/* Type badge — slim, click to reclassify */
+.cap-badge{
+  font-size:10px;font-weight:700;
+  padding:1px 6px;border-radius:3px;  /* slim — minimal vertical padding */
+  flex-shrink:0;cursor:pointer;
+  border:1px solid;
+  margin-top:3px;  /* nudge to align with text cap height */
+  transition:filter .12s, transform .1s;
+  white-space:nowrap;line-height:1.4;
+}
+.cap-badge:hover{filter:brightness(1.25);transform:scale(1.04)}
+.ce-nt .cap-badge{background:var(--nt-bg);color:var(--nt);border-color:var(--nt-bd)}
+.ce-dc .cap-badge{background:var(--dec-bg);color:var(--dec);border-color:var(--dec-bd)}
+.ce-ax .cap-badge{background:var(--act-bg);color:var(--act);border-color:var(--act-bd)}
+.ce-rk .cap-badge{background:var(--rsk-bg);color:var(--rsk);border-color:var(--rsk-bd)}
+.ce-prk .cap-badge{background:var(--prk-bg);color:var(--prk);border-color:var(--prk-bd)}
+
+/* Text column — fills available space */
+.cap-text{
+  font-size:13px;color:var(--hi);
+  line-height:1.5;flex:1;min-width:0;
+}
+
+/* Meta column — right-anchored, top-aligned, stacked author then time */
+.cap-meta{
+  flex-shrink:0;
+  display:flex;flex-direction:column;
+  align-items:flex-end;gap:1px;
+  padding-top:3px;  /* aligns with text cap height */
+}
+.cap-author{font-size:11px;color:var(--md);white-space:nowrap}
+.cap-time{font-size:11px;color:var(--lo);white-space:nowrap}
+
+/* ════════════════════════════════════
+   3. NOTE TEXTAREA (bottom)
+   Future: next capture to be added
+════════════════════════════════════ */
+.ag-note{
+  padding:8px 14px 10px;
+  background:rgba(72,170,136,.025);
+  border-top:1px solid rgba(72,170,136,.08);
+}
+.ag-note-ta{
+  width:100%;
+  background:var(--raised);
+  border:1px solid var(--b1);
+  border-radius:6px;
+  padding:12px 14px;
+  color:var(--hi);
+  resize:vertical;
+  min-height:80px;
+  outline:none;
+  line-height:1.7;
+  font-size:13px;
+  display:block;
+  transition:border-color .15s, box-shadow .15s;
+}
+.ag-note-ta:focus{
+  border-color:var(--nt-bd);
+  box-shadow:0 0 0 3px rgba(72,170,136,.07);
+}
+.ag-note-ta::placeholder{color:var(--lo)}
+
+/* ── DECISIONS ── */
+.dec-list{display:flex;flex-direction:column;gap:5px;padding-top:12px}
+.dec-row{display:flex;align-items:flex-start;gap:11px;padding:11px 13px;border-radius:7px;background:var(--raised);border:1px solid var(--b0);transition:border-color .12s}
+.dec-row:hover{border-color:var(--b1)}
+.dec-id{font-size:11px;font-weight:700;padding:3px 8px;border-radius:3px;background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd);flex-shrink:0;cursor:pointer;transition:filter .12s;margin-top:1px}
+.dec-id:hover{filter:brightness(1.25)}
+.dec-text{font-size:13px;color:var(--hi);flex:1;line-height:1.55}
+.dec-aside{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;min-width:82px}
+.dec-author,.dec-time{font-size:11px;color:var(--md)}
+.dec-add-row{display:flex;gap:7px;margin-top:9px}
+.dec-inp{flex:1;background:var(--raised);border:1px solid var(--b1);border-radius:5px;padding:10px 13px;color:var(--hi);outline:none;font-size:13px;line-height:1.5;transition:border-color .15s}
+.dec-inp:focus{border-color:var(--dec-bd);box-shadow:0 0 0 3px rgba(74,140,245,.07)}
+.dec-inp::placeholder{color:var(--lo)}
+.dec-add-btn{font-size:12px;font-weight:600;padding:10px 16px;border-radius:5px;background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd);cursor:pointer;transition:all .13s;white-space:nowrap}
+.dec-add-btn:hover{background:rgba(74,140,245,.16)}
+
+/* ── ACTION ITEMS ── */
+.act-wrap{padding-top:12px;overflow-x:auto}
+.act-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+.act-tbl th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--md);padding:0 13px 9px;text-align:left;border-bottom:1px solid var(--b1)}
+.act-tbl td{padding:10px 13px;vertical-align:middle;border-bottom:1px solid var(--b0);color:var(--hi)}
+.act-tbl tr:last-child td{border-bottom:none}
+.act-tbl tbody tr:hover td{background:var(--raised)}
+.act-owner{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.act-av{width:22px;height:22px;border-radius:50%;font-size:8px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.status-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px}
+.sc-open{background:var(--act-bg);color:var(--act);border:1px solid var(--act-bd)}
+.sc-done{background:var(--nt-bg);color:var(--nt);border:1px solid var(--nt-bd)}
+.sc-ov{background:var(--rsk-bg);color:var(--rsk);border:1px solid var(--rsk-bd)}
+.sc-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.sc-open .sc-dot{background:var(--act)}.sc-done .sc-dot{background:var(--nt)}.sc-ov .sc-dot{background:var(--rsk)}
+.act-add-row{display:flex;gap:6px;align-items:center;padding-top:9px;flex-wrap:wrap}
+.act-inp{flex:1;min-width:180px;background:var(--raised);border:1px solid var(--b1);border-radius:5px;padding:8px 12px;color:var(--hi);outline:none;transition:border-color .15s}
+.act-inp:focus{border-color:var(--act-bd)}.act-inp::placeholder{color:var(--lo)}
+.act-sel{background:var(--raised);border:1px solid var(--b1);border-radius:5px;padding:8px 9px;color:var(--md);outline:none;cursor:pointer}
+.act-add-btn{font-size:12px;font-weight:600;padding:8px 15px;border-radius:5px;background:var(--act-bg);color:var(--act);border:1px solid var(--act-bd);cursor:pointer;white-space:nowrap;transition:all .13s}
+.act-add-btn:hover{background:rgba(232,148,48,.15)}
+
+/* ── MEETING NOTES ── */
+.notes-area{padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.notes-ctx{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--md)}
+.notes-ctx-val{color:var(--nt);font-weight:500;cursor:pointer}
+.notes-ctx-val:hover{text-decoration:underline}
+.notes-ta{width:100%;background:var(--raised);border:1px solid var(--b0);border-radius:6px;padding:13px 15px;color:var(--hi);resize:vertical;min-height:96px;outline:none;line-height:1.75;font-size:13px;display:block;transition:border-color .15s}
+.notes-ta:focus{border-color:var(--nt-bd);box-shadow:0 0 0 3px rgba(72,170,136,.06)}
+.notes-ta::placeholder{color:var(--lo)}
+.notes-hint{font-size:12px;color:var(--md)}
+
+/* ── RISKS ── */
+.rsk-list{display:flex;flex-direction:column;gap:5px;padding-top:12px}
+.rsk-row{display:flex;align-items:flex-start;gap:10px;padding:10px 13px;border-radius:7px;background:rgba(224,82,82,.06);border:1px solid var(--rsk-bd)}
+.rsk-id{font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;background:var(--rsk-bg);color:var(--rsk);border:1px solid var(--rsk-bd);flex-shrink:0;margin-top:2px}
+.rsk-text{font-size:13px;color:var(--hi);flex:1;line-height:1.5}
+.rsk-sev{font-size:11px;font-weight:600;color:var(--rsk);padding:2px 9px;border-radius:100px;background:var(--rsk-bg);border:1px solid var(--rsk-bd);flex-shrink:0}
+.rsk-add-row{display:flex;gap:6px;margin-top:9px}
+.rsk-inp{flex:1;background:var(--raised);border:1px solid var(--b1);border-radius:5px;padding:8px 12px;color:var(--hi);outline:none;transition:border-color .15s}
+.rsk-inp:focus{border-color:var(--rsk-bd)}.rsk-inp::placeholder{color:var(--lo)}
+.rsk-add-btn{font-size:12px;font-weight:600;padding:8px 14px;border-radius:5px;background:var(--rsk-bg);color:var(--rsk);border:1px solid var(--rsk-bd);cursor:pointer;white-space:nowrap;transition:all .13s}
+.rsk-add-btn:hover{background:rgba(224,82,82,.14)}
+
+/* ── PARKING LOT ── */
+.prk-list{display:flex;flex-direction:column;gap:5px;padding-top:12px}
+.prk-row{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--raised);border:1px solid var(--b0);border-radius:6px}
+.prk-dot{width:7px;height:7px;border-radius:50%;background:var(--prk);flex-shrink:0;opacity:.8}
+.prk-text{font-size:13px;color:var(--md);flex:1;line-height:1.4}
+.prk-src{font-size:12px;color:var(--md);flex-shrink:0}
+.prk-add-row{display:flex;gap:6px;margin-top:9px}
+.prk-inp{flex:1;background:var(--raised);border:1px solid var(--b1);border-radius:5px;padding:8px 12px;color:var(--hi);outline:none;transition:border-color .15s}
+.prk-inp:focus{border-color:var(--prk-bd)}.prk-inp::placeholder{color:var(--lo)}
+.prk-add-btn{font-size:12px;font-weight:600;padding:8px 14px;border-radius:5px;background:var(--prk-bg);color:var(--prk);border:1px solid var(--prk-bd);cursor:pointer;white-space:nowrap;transition:all .13s}
+.prk-add-btn:hover{background:rgba(148,120,224,.14)}
+
+/* ── NEXT MEETING ── */
+.next-inner{padding-top:12px;display:flex;flex-direction:column;gap:9px}
+.next-date-row{display:flex;align-items:center;gap:9px;padding:10px 13px;background:var(--raised);border:1px solid var(--b1);border-radius:6px}
+.next-date-lbl{font-size:12px;color:var(--md);flex-shrink:0}
+.next-date-val{font-size:13px;font-weight:500;color:var(--hi);flex:1}
+.next-date-edit{font-size:11px;color:var(--dec);cursor:pointer;opacity:.8}
+.next-date-edit:hover{opacity:1}
+.next-sub{font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:600;color:var(--md)}
+.next-items{display:flex;flex-direction:column;gap:4px}
+.next-item{display:flex;align-items:flex-start;gap:7px;padding:7px 11px;background:var(--raised);border:1px solid var(--b0);border-radius:5px;font-size:13px;color:var(--md);line-height:1.45}
+.ni-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:6px}
+.next-save{font-size:12px;font-weight:600;padding:10px 15px;border-radius:5px;background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd);cursor:pointer;width:100%;text-align:center;transition:all .13s;margin-top:2px}
+.next-save:hover{background:rgba(74,140,245,.16)}
+
+/* ══ STATUS BAR ══ */
+.statusbar{height:36px;flex-shrink:0;background:var(--surface);border-top:1px solid var(--b0);display:flex;align-items:center;gap:11px;padding:0 18px;overflow:hidden}
+.sb-lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--md);flex-shrink:0}
+.sb-chips{display:flex;gap:5px;flex:1;overflow:hidden}
+.sb-chip{font-size:11px;padding:3px 10px;border-radius:100px;background:var(--raised);border:1px solid var(--b0);color:var(--md);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .12s}
+.sb-chip:hover{border-color:var(--b1);color:var(--hi)}
+.sb-right{font-size:11px;color:var(--md);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.sb-right:hover{color:var(--hi)}
+
+/* ══ RECLASSIFY POPUP ══ */
+.popup-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.popup-overlay.open{display:flex}
+.popup-box{background:var(--raised);border:1px solid var(--b2);border-radius:10px;padding:22px;width:320px;box-shadow:0 24px 60px rgba(0,0,0,.85);animation:popin .13s ease-out}
+@keyframes popin{from{opacity:0;transform:scale(.95) translateY(4px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.pu-title{font-size:13px;font-weight:600;color:var(--hi);margin-bottom:4px}
+.pu-sub{font-size:12px;color:var(--md);margin-bottom:16px}
+.pu-types{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:16px}
+.pu-type{padding:10px;border-radius:6px;cursor:pointer;border:1px solid var(--b1);font-size:13px;font-weight:600;text-align:center;color:var(--md);background:var(--surface);transition:all .12s}
+.pu-type:hover{border-color:var(--b2);color:var(--hi)}
+.pu-type.sel-nt{background:var(--nt-bg);border-color:var(--nt-bd);color:var(--nt)}
+.pu-type.sel-dec{background:var(--dec-bg);border-color:var(--dec-bd);color:var(--dec)}
+.pu-type.sel-act{background:var(--act-bg);border-color:var(--act-bd);color:var(--act)}
+.pu-type.sel-rsk{background:var(--rsk-bg);border-color:var(--rsk-bd);color:var(--rsk)}
+.pu-type.sel-prk{background:var(--prk-bg);border-color:var(--prk-bd);color:var(--prk)}
+.pu-fields{display:flex;flex-direction:column;gap:9px;margin-bottom:16px}
+.pu-field-lbl{font-size:12px;color:var(--md);margin-bottom:4px;font-weight:500}
+.pu-field-inp{width:100%;background:var(--surface);border:1px solid var(--b1);border-radius:5px;padding:8px 10px;color:var(--hi);outline:none;font-family:inherit;transition:border-color .14s}
+.pu-field-inp:focus{border-color:var(--dec)}
+.pu-actions{display:flex;gap:7px}
+.pu-cancel{flex:1;padding:10px;border-radius:5px;font-size:13px;background:var(--surface);border:1px solid var(--b1);color:var(--md);cursor:pointer;font-family:inherit;transition:all .12s}
+.pu-cancel:hover{border-color:var(--b2)}
+.pu-confirm{flex:1;padding:10px;border-radius:5px;font-size:13px;font-weight:600;background:var(--dec-bg);border:1px solid var(--dec-bd);color:var(--dec);cursor:pointer;font-family:inherit;transition:all .13s}
+.pu-confirm:hover{background:rgba(74,140,245,.16)}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ══ TOPBAR ══ -->
+<header class="topbar">
+  <div class="tb-brand"><div class="tb-logo">accord<span class="tb-logo-dot">.</span></div></div>
+  <div class="tb-meeting">
+    <div class="tb-title">Phase 1 Vendor Selection &amp; Planning</div>
+    <span class="tb-chip">Nimbletronics</span>
+  </div>
+  <div class="tb-progress">
+    <span class="tb-prog-lbl">Agenda</span>
+    <div class="tb-segs"><div class="seg seg-done"></div><div class="seg seg-active"></div><div class="seg seg-todo"></div></div>
+    <span class="tb-prog-txt">Item 2 of 3</span>
+  </div>
+  <div class="tb-right">
+    <div class="tb-timer">
+      <div class="tb-elapsed" id="timer">42:17</div>
+      <div class="tb-elapsed-lbl">elapsed</div>
+    </div>
+    <div class="live-pill"><div class="ld"></div><span>Live</span></div>
+    <div class="avs">
+      <div class="av av-a" title="Vaughn Staples">VS</div>
+      <div class="av av-b" title="Angela Kim">AK</div>
+      <div class="av av-c" title="Ron White — not joined" style="opacity:.4">RW</div>
+    </div>
+    <button class="btn-end">End Meeting</button>
+  </div>
+</header>
+
+<!-- ══ QUICK-ADD BAR ══ -->
+<div class="quickbar">
+  <span class="qb-lbl">Add directly to:</span>
+  <button class="qb-btn qb-dec" onclick="jumpTo('dec-inp')">Decisions</button>
+  <button class="qb-btn qb-act" onclick="jumpTo('act-task')">Actions</button>
+  <button class="qb-btn" onclick="jumpTo('notes-ta')">Notes</button>
+  <button class="qb-btn qb-rsk" onclick="jumpTo('rsk-inp')">Risks</button>
+  <button class="qb-btn qb-prk" onclick="jumpTo('prk-inp')">Parking Lot</button>
+  <div class="qb-sep"></div>
+  <span class="qb-hint">or expand an agenda item → type a note → ↵ to commit as NT → click badge to reclassify</span>
+</div>
+
+<!-- ══ BODY ══ -->
+<div class="body">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-nav">
+      <div class="sb-nav-hdr">Sections</div>
+      <div class="sb-link" onclick="scrollToSec('sec-agenda')"><div class="sb-link-dot" style="background:var(--dec)"></div>Agenda<span class="sb-link-cnt">3</span></div>
+      <div class="sb-link" onclick="scrollToSec('sec-dec')"><div class="sb-link-dot" style="background:var(--dec)"></div>Decisions<span class="sb-link-cnt" id="sbDecCnt">2</span></div>
+      <div class="sb-link" onclick="scrollToSec('sec-act')"><div class="sb-link-dot" style="background:var(--act)"></div>Action Items<span class="sb-link-cnt" id="sbActCnt">2</span></div>
+      <div class="sb-link" onclick="scrollToSec('sec-notes')"><div class="sb-link-dot" style="background:var(--nt)"></div>Notes<span class="sb-link-cnt"></span></div>
+      <div class="sb-link" onclick="scrollToSec('sec-rsk')"><div class="sb-link-dot" style="background:var(--rsk)"></div>Risks<span class="sb-link-cnt" id="sbRskCnt">1</span></div>
+      <div class="sb-link" onclick="scrollToSec('sec-prk')"><div class="sb-link-dot" style="background:var(--prk)"></div>Parking Lot<span class="sb-link-cnt" id="sbPrkCnt">2</span></div>
+      <div class="sb-link" onclick="scrollToSec('sec-next')"><div class="sb-link-dot" style="background:var(--md)"></div>Next Meeting<span class="sb-link-cnt"></span></div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-atts">
+      <div class="sb-atts-hdr">Attendees</div>
+      <div class="att-row"><div class="att-pres on"></div><div class="att-mini-av av-a">VS</div><div class="att-mini-name you">Vaughn Staples</div></div>
+      <div class="att-row"><div class="att-pres on"></div><div class="att-mini-av av-b">AK</div><div class="att-mini-name">Angela Kim</div></div>
+      <div class="att-row" style="opacity:.42"><div class="att-pres off"></div><div class="att-mini-av av-c">RW</div><div class="att-mini-name">Ron White</div></div>
+    </div>
+  </div>
+
+  <!-- DOCUMENT CANVAS -->
+  <div class="canvas" id="canvas">
+
+    <!-- ══ AGENDA ══ -->
+    <div class="doc-sec" id="sec-agenda">
+      <div class="sec-hdr" style="border-top:none" onclick="toggleSec('ag-body','ag-tog')">
+        <div class="sec-bar bar-dec"></div>
+        <div class="sec-hdr-inner">
+          <span class="sec-title">Agenda</span>
+          <span class="sec-badge">3 items</span>
+          <div class="sec-spacer"></div>
+          <button class="sec-toggle open" id="ag-tog" onclick="event.stopPropagation();toggleSec('ag-body','ag-tog')">▾</button>
+        </div>
+      </div>
+      <div class="sec-body" id="ag-body">
+        <div class="ag-rows">
+
+          <!-- ════ ITEM 1 ════ -->
+          <div class="ag-item">
+            <div class="ag-hdr" onclick="toggleAg('ag1-body','ag1-chev')">
+              <span class="ag-chev" id="ag1-chev">›</span>
+              <div class="ag-num">1</div>
+              <div class="ag-title">Identify &amp; resolve outstanding items from prior meeting</div>
+            </div>
+            <div class="ag-body" id="ag1-body">
+              <!-- 1. Thread history (top) -->
+              <div class="ag-hist-row" onclick="toggleHist(this)">
+                <span class="ag-hist-chev">›</span>
+                <span class="ag-hist-label">Thread History</span>
+                <span class="ag-hist-pill">2 entries · 1 prior meeting</span>
+              </div>
+              <div class="ag-hist-entries">
+                <div class="he">
+                  <span class="he-date">Apr 30</span>
+                  <span class="he-tag he-ax">AX-007</span>
+                  <div class="he-body">
+                    <div class="he-text">Obtain vendor delivery timeline confirmation from Nimbletronics. Resolved this meeting.</div>
+                    <div class="he-author">Angela Kim · resolved</div>
+                  </div>
+                </div>
+                <div class="he">
+                  <span class="he-date">Apr 30</span>
+                  <span class="he-tag he-ax">AX-008</span>
+                  <div class="he-body">
+                    <div class="he-text">Schedule vendor alignment call with Nimbletronics and ProtoFab leads before selection meeting.</div>
+                    <div class="he-author">Vaughn Staples · completed</div>
+                  </div>
+                </div>
+              </div>
+              <!-- 2. Captures (none for item 1) -->
+              <div class="ag-captures" id="ag1-captures"></div>
+              <!-- 3. Note textarea (bottom) -->
+              <div class="ag-note">
+                <textarea class="ag-note-ta" data-captures="ag1-captures" placeholder="Type a note… ↵ Enter to add as NT · Shift+↵ new line" rows="3"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- ════ ITEM 2 — starts expanded ════ -->
+          <div class="ag-item has-open-body">
+            <div class="ag-hdr" onclick="toggleAg('ag2-body','ag2-chev')">
+              <span class="ag-chev" id="ag2-chev">▾</span>
+              <div class="ag-num">2</div>
+              <div class="ag-title">Review vendor shortlist — select final candidate</div>
+            </div>
+            <div class="ag-body open" id="ag2-body">
+              <!-- 1. Thread history (top, collapsed) -->
+              <div class="ag-hist-row" onclick="toggleHist(this)">
+                <span class="ag-hist-chev">›</span>
+                <span class="ag-hist-label">Thread History</span>
+                <span class="ag-hist-pill">4 entries · 2 prior meetings</span>
+              </div>
+              <div class="ag-hist-entries">
+                <div class="he">
+                  <span class="he-date">Apr 14</span>
+                  <span class="he-tag he-dc">DC-015</span>
+                  <div class="he-body">
+                    <div class="he-text">Adopt phased delivery model — Phase 1 scope frozen. Vendor decision deferred pending thermal validation.</div>
+                    <div class="he-author">Vaughn Staples</div>
+                  </div>
+                </div>
+                <div class="he">
+                  <span class="he-date">Apr 14</span>
+                  <span class="he-tag he-ax">AX-009</span>
+                  <div class="he-body">
+                    <div class="he-text">Deliver completed component spec to engineering for review before vendor selection meeting.</div>
+                    <div class="he-author">Angela Kim · open</div>
+                  </div>
+                </div>
+                <div class="he">
+                  <span class="he-date">Apr 14</span>
+                  <span class="he-tag he-nt">NT-022</span>
+                  <div class="he-body">
+                    <div class="he-text">Vendor shortlist narrowed to Nimbletronics and ProtoFab. Decision deferred pending thermal validation results.</div>
+                    <div class="he-author">Vaughn Staples</div>
+                  </div>
+                </div>
+                <div class="he">
+                  <span class="he-date">Mar 30</span>
+                  <span class="he-tag he-rk">RK-005</span>
+                  <div class="he-body">
+                    <div class="he-text">ProtoFab 14-week lead time flagged as risk — conflicts with Phase 1 milestone deadline.</div>
+                    <div class="he-author">Angela Kim</div>
+                  </div>
+                </div>
+              </div>
+              <!-- 2. Captures this meeting -->
+              <div class="ag-captures" id="ag2-captures">
+                <div class="cap-entry ce-nt">
+                  <span class="cap-badge" onclick="openPopup(event,'NT-032','nt')">NT-032</span>
+                  <div class="cap-text">Angela confirmed Nimbletronics prototype passed thermal validation at 5% above spec. No concerns flagged.</div>
+                  <div class="cap-meta"><span class="cap-author">Angela Kim</span><span class="cap-time">2:28 PM</span></div>
+                </div>
+                <div class="cap-entry ce-dc">
+                  <span class="cap-badge" onclick="openPopup(event,'DC-018','dec')">DC-018</span>
+                  <div class="cap-text">Nimbletronics selected as primary vendor for Phase 1 component supply. NDA execution target: May 22.</div>
+                  <div class="cap-meta"><span class="cap-author">Vaughn Staples</span><span class="cap-time">2:31 PM</span></div>
+                </div>
+              </div>
+              <!-- 3. Note textarea (bottom) -->
+              <div class="ag-note">
+                <textarea class="ag-note-ta" data-captures="ag2-captures" placeholder="Type a note… ↵ Enter to add as NT · Shift+↵ new line" rows="3"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- ════ ITEM 3 ════ -->
+          <div class="ag-item">
+            <div class="ag-hdr" onclick="toggleAg('ag3-body','ag3-chev')">
+              <span class="ag-chev" id="ag3-chev">›</span>
+              <div class="ag-num">3</div>
+              <div class="ag-title">Assign follow-up actions &amp; confirm next meeting date</div>
+            </div>
+            <div class="ag-body" id="ag3-body">
+              <!-- 1. Thread history (none) -->
+              <div class="ag-hist-row" style="cursor:default">
+                <span class="ag-hist-chev" style="visibility:hidden">›</span>
+                <span class="ag-hist-label">Thread History</span>
+                <span class="ag-hist-pill" style="color:var(--lo);border-color:var(--b0)">No prior history</span>
+              </div>
+              <!-- 2. Captures (empty) -->
+              <div class="ag-captures" id="ag3-captures"></div>
+              <!-- 3. Note textarea (bottom) -->
+              <div class="ag-note">
+                <textarea class="ag-note-ta" data-captures="ag3-captures" placeholder="Type a note… ↵ Enter to add as NT · Shift+↵ new line" rows="3"></textarea>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- ag-rows -->
+      </div>
+    </div>
+
+    <!-- ══ DECISIONS ══ -->
+    <div class="doc-sec" id="sec-dec">
+      <div class="sec-hdr" onclick="toggleSec('dec-body','dec-tog')">
+        <div class="sec-bar bar-dec"></div>
+        <div class="sec-hdr-inner">
+          <span class="sec-title">Decisions</span>
+          <span class="sec-badge" id="dec-badge">2 recorded</span>
+          <div class="sec-spacer"></div>
+          <button class="sec-toggle open" id="dec-tog" onclick="event.stopPropagation();toggleSec('dec-body','dec-tog')">▾</button>
+        </div>
+      </div>
+      <div class="sec-body" id="dec-body">
+        <div class="dec-list" id="dec-list">
+          <div class="dec-row">
+            <span class="dec-id" onclick="openPopup(event,'DC-018','dec')">DC-018</span>
+            <div class="dec-text">Nimbletronics selected as primary vendor for Phase 1 component supply. NDA execution target: May 22.</div>
+            <div class="dec-aside"><span class="dec-author">Vaughn Staples</span><span class="dec-time">2:31 PM</span></div>
+          </div>
+          <div class="dec-row">
+            <span class="dec-id" onclick="openPopup(event,'DC-017','dec')">DC-017</span>
+            <div class="dec-text">Phase 1 milestone schedule confirmed — no timeline adjustments.</div>
+            <div class="dec-aside"><span class="dec-author">Vaughn Staples</span><span class="dec-time">2:18 PM</span></div>
+          </div>
+        </div>
+        <div class="dec-add-row">
+          <input class="dec-inp" id="dec-inp" placeholder="Describe a decision made in this meeting…">
+          <button class="dec-add-btn" onclick="addDecision()">Record →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ACTION ITEMS ══ -->
+    <div class="doc-sec" id="sec-act">
+      <div class="sec-hdr" onclick="toggleSec('act-body','act-tog')">
+        <div class="sec-bar bar-act"></div>
+        <div class="sec-hdr-inner">
+          <span class="sec-title">Action Items</span>
+          <span class="sec-badge" id="act-badge">2 assigned · 1 overdue</span>
+          <div class="sec-spacer"></div>
+          <button class="sec-toggle open" id="act-tog" onclick="event.stopPropagation();toggleSec('act-body','act-tog')">▾</button>
+        </div>
+      </div>
+      <div class="sec-body" id="act-body">
+        <div class="act-wrap">
+          <table class="act-tbl">
+            <thead>
+              <tr>
+                <th style="width:155px">Owner</th>
+                <th>Task</th>
+                <th style="width:88px">Due</th>
+                <th style="width:98px">Status</th>
+              </tr>
+            </thead>
+            <tbody id="act-tbody">
+              <tr>
+                <td><div class="act-owner"><div class="act-av av-b">AK</div>Angela Kim</div></td>
+                <td>Deliver component spec to engineering for final review</td>
+                <td style="color:var(--rsk);font-weight:500">Overdue</td>
+                <td><span class="status-chip sc-ov"><span class="sc-dot"></span>Overdue</span></td>
+              </tr>
+              <tr>
+                <td><div class="act-owner"><div class="act-av av-a">VS</div>Vaughn Staples</div></td>
+                <td>Circulate vendor shortlist with full evaluation matrix</td>
+                <td>May 20</td>
+                <td><span class="status-chip sc-open"><span class="sc-dot"></span>Open</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="act-add-row">
+          <input class="act-inp" id="act-task" placeholder="Describe the action item…">
+          <select class="act-sel" id="act-owner">
+            <option value="VS">Vaughn Staples</option>
+            <option value="AK">Angela Kim</option>
+            <option value="RW">Ron White</option>
+          </select>
+          <input class="act-inp" id="act-due" placeholder="Due date" style="max-width:110px;min-width:88px">
+          <button class="act-add-btn" onclick="addAction()">+ Assign</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MEETING NOTES ══ -->
+    <div class="doc-sec" id="sec-notes">
+      <div class="sec-hdr" onclick="toggleSec('notes-body','notes-tog')">
+        <div class="sec-bar bar-notes"></div>
+        <div class="sec-hdr-inner">
+          <span class="sec-title">Meeting Notes</span>
+          <span class="sec-badge">Free-form</span>
+          <div class="sec-spacer"></div>
+          <button class="sec-toggle open" id="notes-tog" onclick="event.stopPropagation();toggleSec('notes-body','notes-tog')">▾</button>
+        </div>
+      </div>
+      <div class="sec-body" id="notes-body">
+        <div class="notes-area">
+          <div class="notes-ctx"><span>For:</span><span class="notes-ctx-val">Item 2 — Vendor shortlist</span></div>
+          <textarea class="notes-ta" id="notes-ta" rows="5" placeholder="Free-form notes…">Nimbletronics prototype confirmed passing thermal validation at 5% above spec — Angela's lab report.
+
+ProtoFab flagged: 14-week lead time is incompatible with Phase 1 deadline. Risk logged.
+
+Consensus vote: Nimbletronics unanimous. NDA process to begin immediately.</textarea>
+          <div class="notes-hint">Use agenda item capture above for structured per-item notes.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ RISKS — collapsed ══ -->
+    <div class="doc-sec" id="sec-rsk">
+      <div class="sec-hdr" onclick="toggleSec('rsk-body','rsk-tog')">
+        <div class="sec-bar bar-rsk"></div>
+        <div class="sec-hdr-inner">
+          <span class="sec-title">Risks &amp; Issues</span>
+          <span class="sec-badge" id="rsk-badge">1 flagged</span>
+          <div class="sec-spacer"></div>
+          <button class="sec-toggle collapsed" id="rsk-tog" onclick="event.stopPropagation();toggleSec('rsk-body','rsk-tog')">›</button>
+        </div>
+      </div>
+      <div class="sec-body gone" id="rsk-body">
+        <div class="rsk-list" id="rsk-list">
+          <div class="rsk-row">
+            <span class="rsk-id">RK-005</span>
+            <div class="rsk-text">ProtoFab 14-week lead time incompatible with Phase 1 milestone. Mitigated by Nimbletronics selection.</div>
+            <span class="rsk-sev">Med · Mitigated</span>
+          </div>
+        </div>
+        <div class="rsk-add-row">
+          <input class="rsk-inp" id="rsk-inp" placeholder="Describe a risk or issue raised in this meeting…">
+          <button class="rsk-add-btn" onclick="addRisk()">+ Flag Risk</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PARKING LOT — collapsed ══ -->
+    <div class="doc-sec" id="sec-prk">
+      <div class="sec-hdr" onclick="toggleSec('prk-body','prk-tog')">
+        <div class="sec-bar bar-prk"></div>
+        <div class="sec-hdr-inner">
+          <span class="sec-title">Parking Lot</span>
+          <span class="sec-badge" id="prk-badge">2 deferred</span>
+          <div class="sec-spacer"></div>
+          <button class="sec-toggle collapsed" id="prk-tog" onclick="event.stopPropagation();toggleSec('prk-body','prk-tog')">›</button>
+        </div>
+      </div>
+      <div class="sec-body gone" id="prk-body">
+        <div class="prk-list" id="prk-list">
+          <div class="prk-row"><div class="prk-dot"></div><div class="prk-text">Evaluate secondary vendor for Phase 2 — Nimbletronics capacity may not scale</div><span class="prk-src">Item 2</span></div>
+          <div class="prk-row"><div class="prk-dot"></div><div class="prk-text">Review NDA terms with legal counsel before execution</div><span class="prk-src">Item 2</span></div>
+        </div>
+        <div class="prk-add-row">
+          <input class="prk-inp" id="prk-inp" placeholder="Defer an item to the parking lot…">
+          <button class="prk-add-btn" onclick="addParking()">+ Defer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ NEXT MEETING — collapsed ══ -->
+    <div class="doc-sec" id="sec-next">
+      <div class="sec-hdr" onclick="toggleSec('next-body','next-tog')">
+        <div class="sec-bar bar-next"></div>
+        <div class="sec-hdr-inner">
+          <span class="sec-title">Next Meeting</span>
+          <span class="sec-badge">Thu, May 28 · 2:00 PM</span>
+          <div class="sec-spacer"></div>
+          <button class="sec-toggle collapsed" id="next-tog" onclick="event.stopPropagation();toggleSec('next-body','next-tog')">›</button>
+        </div>
+      </div>
+      <div class="sec-body gone" id="next-body">
+        <div class="next-inner">
+          <div class="next-date-row">
+            <span class="next-date-lbl">Scheduled:</span>
+            <span class="next-date-val">Thursday, May 28 · 2:00 PM</span>
+            <span class="next-date-edit">Change</span>
+          </div>
+          <div class="next-sub">Carry forward</div>
+          <div class="next-items">
+            <div class="next-item"><div class="ni-dot" style="background:var(--prk)"></div><div>Evaluate secondary vendor capacity for Phase 2</div></div>
+            <div class="next-item"><div class="ni-dot" style="background:var(--prk)"></div><div>Review NDA with legal before execution</div></div>
+          </div>
+          <div class="next-sub" style="padding-top:2px">Pre-meeting prep</div>
+          <div class="next-items">
+            <div class="next-item"><div class="ni-dot" style="background:var(--act)"></div><div>Vaughn — circulate vendor shortlist &amp; evaluation matrix (due May 20)</div></div>
+            <div class="next-item"><div class="ni-dot" style="background:var(--act)"></div><div>Angela Kim — confirm Phase 1 component spec is finalized</div></div>
+          </div>
+          <button class="next-save">Save summary &amp; share with attendees →</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:48px"></div>
+  </div><!-- canvas -->
+</div><!-- body -->
+
+<!-- ══ STATUS BAR ══ -->
+<div class="statusbar">
+  <span class="sb-lbl">Prior meetings</span>
+  <div class="sb-chips">
+    <span class="sb-chip">Mar 15 · Kickoff</span>
+    <span class="sb-chip">Mar 30 · Vendor Review</span>
+    <span class="sb-chip">Apr 14 · Decision Gate</span>
+    <span class="sb-chip">Apr 30 · Action Review</span>
+  </div>
+  <span class="sb-right">↑ Full history</span>
+</div>
+
+</div><!-- app -->
+
+<!-- ══ RECLASSIFY POPUP ══ -->
+<div class="popup-overlay" id="popup-overlay" onclick="if(event.target===this)closePopup()">
+  <div class="popup-box">
+    <div class="pu-title">Reclassify entry</div>
+    <div class="pu-sub">Currently: <strong id="pu-current">NT-032 · Note</strong></div>
+    <div class="pu-types">
+      <div class="pu-type" id="pu-nt" onclick="selPType('nt')">Note</div>
+      <div class="pu-type" id="pu-dec" onclick="selPType('dec')">Decision</div>
+      <div class="pu-type" id="pu-act" onclick="selPType('act')">Action Item</div>
+      <div class="pu-type" id="pu-rsk" onclick="selPType('rsk')">Risk</div>
+      <div class="pu-type" id="pu-prk" onclick="selPType('prk')" style="grid-column:span 2">Parking Lot</div>
+    </div>
+    <div class="pu-fields" id="pu-fields"></div>
+    <div class="pu-actions">
+      <button class="pu-cancel" onclick="closePopup()">Cancel</button>
+      <button class="pu-confirm" onclick="confirmReclassify()">Reclassify →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Timer ──
+var t0=Date.now()-(42*60+17)*1000;
+function tick(){var el=document.getElementById('timer');if(!el)return;var s=Math.floor((Date.now()-t0)/1000),m=Math.floor(s/60);el.textContent=String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+tick();setInterval(tick,1000);
+
+// ── Section toggle ──
+function toggleSec(bodyId,togId){
+  var b=document.getElementById(bodyId),t=document.getElementById(togId);
+  var gone=b.classList.toggle('gone');
+  t.textContent=gone?'›':'▾';
+  t.classList.toggle('collapsed',gone);
+  t.classList.toggle('open',!gone);
+}
+
+// ── Agenda item expand/collapse ──
+function toggleAg(bodyId,chevId){
+  var b=document.getElementById(bodyId),c=document.getElementById(chevId);
+  var open=b.classList.toggle('open');
+  c.textContent=open?'▾':'›';
+  // Toggle border on parent item
+  var item=b.parentElement;
+  if(item)item.classList.toggle('has-open-body',open);
+}
+
+// ── History thread sub-toggle ──
+function toggleHist(row){
+  var entries=row.nextElementSibling;
+  var chev=row.querySelector('.ag-hist-chev');
+  if(!entries||!entries.classList.contains('ag-hist-entries'))return;
+  var open=entries.classList.toggle('open');
+  chev.textContent=open?'▾':'›';
+}
+
+// ── Scroll to section ──
+function scrollToSec(id){
+  var el=document.getElementById(id);if(!el)return;
+  var c=document.getElementById('canvas');
+  c.scrollTo({top:el.offsetTop,behavior:'smooth'});
+  document.querySelectorAll('.sb-link').forEach(function(l){l.classList.remove('active')});
+  if(event&&event.currentTarget)event.currentTarget.classList.add('active');
+}
+
+// ── Jump to section input ──
+function jumpTo(id){
+  var el=document.getElementById(id);if(!el)return;
+  var sec=el.closest('.doc-sec');
+  var body=sec.querySelector('.sec-body');
+  var tog=sec.querySelector('.sec-toggle');
+  if(body&&body.classList.contains('gone')){
+    body.classList.remove('gone');
+    if(tog){tog.textContent='▾';tog.classList.remove('collapsed');tog.classList.add('open')}
+  }
+  var c=document.getElementById('canvas');
+  setTimeout(function(){c.scrollTo({top:sec.offsetTop,behavior:'smooth'});setTimeout(function(){el.focus()},200)},50);
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function nowTime(){var d=new Date(),h=d.getHours()%12||12,m=String(d.getMinutes()).padStart(2,'0');return h+':'+m+' '+(d.getHours()>=12?'PM':'AM')}
+
+// ── Note counter ──
+var ntSeq=32;
+
+// Enter key → commit note
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&!e.shiftKey&&e.target.classList.contains('ag-note-ta')){
+    e.preventDefault();
+    commitNote(e.target);
+  }
+});
+
+function commitNote(ta){
+  var txt=ta.value.trim();if(!txt)return;
+  ntSeq++;
+  var id='NT-0'+String(ntSeq).padStart(2,'0');
+  var ts=nowTime();
+  var capturesId=ta.getAttribute('data-captures');
+  var captures=document.getElementById(capturesId);
+  if(!captures)return;
+
+  var entry=document.createElement('div');
+  entry.className='cap-entry ce-nt';
+  entry.innerHTML='<span class="cap-badge" onclick="openPopup(event,\''+id+'\',\'nt\')">'+id+'</span>'
+    +'<div class="cap-text">'+esc(txt)+'</div>'
+    +'<div class="cap-meta"><span class="cap-author">Vaughn Staples</span><span class="cap-time">'+ts+'</span></div>';
+  captures.appendChild(entry);
+  ta.value='';
+  ta.focus();
+}
+
+// ── Section-level adds ──
+var decSeq=18,actSeq=11,rskSeq=5,prkSeq=2;
+
+function addDecision(){
+  var inp=document.getElementById('dec-inp'),txt=inp.value.trim();if(!txt)return;
+  decSeq++;
+  var id='DC-0'+String(decSeq).padStart(2,'0');
+  var row=document.createElement('div');row.className='dec-row';
+  row.innerHTML='<span class="dec-id" onclick="openPopup(event,\''+id+'\',\'dec\')">'+id+'</span>'
+    +'<div class="dec-text">'+esc(txt)+'</div>'
+    +'<div class="dec-aside"><span class="dec-author">Vaughn Staples</span><span class="dec-time">'+nowTime()+'</span></div>';
+  document.getElementById('dec-list').appendChild(row);
+  inp.value='';
+  document.getElementById('dec-badge').textContent=(decSeq-16)+' recorded';
+}
+document.getElementById('dec-inp').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey)addDecision()});
+
+function addAction(){
+  var task=document.getElementById('act-task'),txt=task.value.trim();if(!txt)return;
+  var ownVal=document.getElementById('act-owner').value;
+  var due=document.getElementById('act-due').value||'TBD';
+  var names={VS:'Vaughn Staples',AK:'Angela Kim',RW:'Ron White'};
+  var avCls={VS:'av-a',AK:'av-b',RW:'av-c'};
+  var row=document.createElement('tr');
+  row.innerHTML='<td><div class="act-owner"><div class="act-av '+avCls[ownVal]+'">'+ownVal+'</div>'+esc(names[ownVal])+'</div></td>'
+    +'<td>'+esc(txt)+'</td><td>'+esc(due)+'</td>'
+    +'<td><span class="status-chip sc-open"><span class="sc-dot"></span>Open</span></td>';
+  document.getElementById('act-tbody').appendChild(row);
+  task.value='';document.getElementById('act-due').value='';
+  actSeq++;document.getElementById('act-badge').textContent=(actSeq-9)+' assigned';
+}
+document.getElementById('act-task').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey)addAction()});
+
+function addRisk(){
+  var inp=document.getElementById('rsk-inp'),txt=inp.value.trim();if(!txt)return;
+  var body=document.getElementById('rsk-body'),tog=document.getElementById('rsk-tog');
+  if(body.classList.contains('gone')){body.classList.remove('gone');tog.textContent='▾';tog.classList.remove('collapsed');tog.classList.add('open')}
+  rskSeq++;
+  var row=document.createElement('div');row.className='rsk-row';
+  row.innerHTML='<span class="rsk-id">RK-00'+rskSeq+'</span><div class="rsk-text">'+esc(txt)+'</div><span class="rsk-sev">Med · Open</span>';
+  document.getElementById('rsk-list').appendChild(row);
+  inp.value='';document.getElementById('rsk-badge').textContent=rskSeq+' flagged';
+}
+document.getElementById('rsk-inp').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey)addRisk()});
+
+function addParking(){
+  var inp=document.getElementById('prk-inp'),txt=inp.value.trim();if(!txt)return;
+  var body=document.getElementById('prk-body'),tog=document.getElementById('prk-tog');
+  if(body.classList.contains('gone')){body.classList.remove('gone');tog.textContent='▾';tog.classList.remove('collapsed');tog.classList.add('open')}
+  prkSeq++;
+  var row=document.createElement('div');row.className='prk-row';
+  row.innerHTML='<div class="prk-dot"></div><div class="prk-text">'+esc(txt)+'</div><span class="prk-src">Live</span>';
+  document.getElementById('prk-list').appendChild(row);
+  inp.value='';document.getElementById('prk-badge').textContent=prkSeq+' deferred';
+}
+document.getElementById('prk-inp').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey)addParking()});
+
+// ── Reclassify popup ──
+var popupBadge=null,popupCurrentType='nt';
+var typeLabel={nt:'Note',dec:'Decision',act:'Action Item',rsk:'Risk',prk:'Parking Lot'};
+var typeCls={nt:'ce-nt',dec:'ce-dc',act:'ce-ax',rsk:'ce-rk',prk:'ce-prk'};
+var typePre={nt:'NT',dec:'DC',act:'AX',rsk:'RK',prk:'PRK'};
+var typeSeqs={nt:function(){return ++ntSeq},dec:function(){return ++decSeq},act:function(){return ++actSeq},rsk:function(){return ++rskSeq},prk:function(){return ++prkSeq}};
+
+function openPopup(event,id,type){
+  event.stopPropagation();
+  popupBadge=event.target;
+  popupCurrentType=type;
+  document.getElementById('pu-current').textContent=id+' · '+typeLabel[type];
+  ['nt','dec','act','rsk','prk'].forEach(function(t){
+    var el=document.getElementById('pu-'+t);
+    if(el)el.className='pu-type'+(t===type?' sel-'+t:'');
+  });
+  setPopupFields(type);
+  document.getElementById('popup-overlay').classList.add('open');
+}
+function closePopup(){document.getElementById('popup-overlay').classList.remove('open')}
+function selPType(type){
+  ['nt','dec','act','rsk','prk'].forEach(function(t){var el=document.getElementById('pu-'+t);if(el)el.className='pu-type'});
+  var el=document.getElementById('pu-'+type);if(el)el.classList.add('sel-'+type);
+  setPopupFields(type);
+}
+function setPopupFields(type){
+  var f=document.getElementById('pu-fields');
+  if(type==='act')f.innerHTML='<div><div class="pu-field-lbl">Assignee</div><input class="pu-field-inp" value="Vaughn Staples"></div><div><div class="pu-field-lbl">Due date</div><input class="pu-field-inp" placeholder="e.g. May 25, 2026"></div>';
+  else if(type==='dec')f.innerHTML='<div><div class="pu-field-lbl">Effective date</div><input class="pu-field-inp" placeholder="Optional"></div>';
+  else if(type==='rsk')f.innerHTML='<div><div class="pu-field-lbl">Severity</div><input class="pu-field-inp" placeholder="Low / Medium / High"></div>';
+  else f.innerHTML='';
+}
+function confirmReclassify(){
+  var newType=null;
+  ['nt','dec','act','rsk','prk'].forEach(function(t){
+    var el=document.getElementById('pu-'+t);if(el&&el.classList.contains('sel-'+t))newType=t;
+  });
+  if(!newType||!popupBadge){closePopup();return;}
+  if(newType===popupCurrentType){closePopup();return;}
+  var n=typeSeqs[newType]();
+  var newId=typePre[newType]+'-0'+String(n).padStart(2,'0');
+  popupBadge.textContent=newId;
+  popupBadge.onclick=function(ev){openPopup(ev,newId,newType)};
+  var entry=popupBadge.closest('.cap-entry');
+  if(entry){
+    Object.values(typeCls).forEach(function(c){entry.classList.remove(c)});
+    entry.classList.add(typeCls[newType]);
+  }
+  closePopup();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accord · Minutes</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Outfit',system-ui,sans-serif;font-size:14px;background:#0b0d14;color:#dce6f5;-webkit-font-smoothing:antialiased}
+button{cursor:pointer;border:none;background:none;font-family:inherit;font-size:inherit}
+input,textarea,select{font-family:inherit;font-size:inherit}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:2px}
+:root{
+  --void:#0b0d14;--surface:#10131e;--raised:#171c2e;--hover:#1d2338;
+  --b0:#1e2438;--b1:#252d44;--b2:#313d5e;
+  --hi:#dce6f5;--md:#8899b2;--lo:#7a8a9a;
+  --dec:#4a8cf5;--dec-bg:rgba(74,140,245,.09);--dec-bd:rgba(74,140,245,.24);
+  --dcn:#8b6ef5;--dcn-bg:rgba(139,110,245,.09);--dcn-bd:rgba(139,110,245,.24);
+  --act:#e89430;--act-bg:rgba(232,148,48,.08);--act-bd:rgba(232,148,48,.24);
+  --rsk:#e05252;--rsk-bg:rgba(224,82,82,.09);--rsk-bd:rgba(224,82,82,.24);
+  --nt:#48aa88;--nt-bg:rgba(72,170,136,.08);--nt-bd:rgba(72,170,136,.22);
+}
+.app{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOPBAR */
+.topbar{height:50px;flex-shrink:0;display:flex;align-items:center;background:var(--void);border-bottom:1px solid var(--b0);padding:0}
+.tb-brand{display:flex;align-items:center;gap:8px;width:240px;flex-shrink:0;padding:0 16px;border-right:1px solid var(--b0)}
+.tb-logo{font-size:16px;font-weight:600;color:var(--hi)}.tb-logo-dot{color:var(--dec)}
+.tb-middle{flex:1;display:flex;align-items:center;gap:8px;padding:0 18px}
+.tb-state{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:3px;background:rgba(232,148,48,.10);color:var(--act);border:1px solid rgba(232,148,48,.22)}
+.tb-state.ready{background:var(--nt-bg);color:var(--nt);border-color:var(--nt-bd)}
+.tb-state.sent{background:var(--dec-bg);color:var(--dec);border-color:var(--dec-bd)}
+.tb-title{font-size:13px;font-weight:500;color:var(--hi)}
+.tb-right{display:flex;align-items:center;gap:10px;padding:0 18px;flex-shrink:0;margin-left:auto}
+.btn-send{font-size:13px;font-weight:600;padding:8px 20px;border-radius:5px;background:var(--nt-bg);color:var(--nt);border:1px solid var(--nt-bd);cursor:pointer;transition:all .14s}
+.btn-send.disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+.btn-preview{font-size:12px;font-weight:600;padding:7px 14px;border-radius:5px;background:rgba(255,255,255,.05);color:var(--md);border:1px solid var(--b1);cursor:pointer}
+.u-chip{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.05);border:1px solid var(--b1);border-radius:20px;padding:4px 12px 4px 5px}
+.u-av{width:26px;height:26px;border-radius:50%;background:#152c54;border:2px solid var(--dec);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--dec)}
+.u-name{font-size:12px;color:var(--md)}
+
+.body{flex:1;display:flex;overflow:hidden;min-height:0}
+
+/* SIDEBAR */
+.sidebar{width:240px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--b0);display:flex;flex-direction:column;overflow:hidden}
+.sb-sec-lbl{font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:var(--hi)}
+.sb-checklist{padding:12px 16px 10px;border-bottom:1px solid var(--b0);flex-shrink:0}
+.review-progress{display:flex;flex-direction:column;gap:5px;padding-top:8px}
+.rp-row{display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer}
+.rp-check{width:16px;height:16px;border-radius:50%;border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .13s}
+.rp-check.done{background:var(--nt);border-color:var(--nt)}
+.rp-check.done::after{content:'✓';font-size:9px;color:white;font-weight:700}
+.rp-lbl{font-size:12px;color:var(--md)}
+.rp-row.done .rp-lbl{color:var(--nt)}
+.sb-nav{flex-shrink:0;padding:10px 0 8px;border-bottom:1px solid var(--b0)}
+.sb-nav-pad{padding:0 16px 6px}
+.sn-link{display:flex;align-items:center;gap:8px;padding:6px 16px;font-size:12px;color:var(--md);cursor:pointer;border-left:2px solid transparent;transition:all .12s}
+.sn-link:hover{background:var(--raised);color:var(--hi)}
+.sn-link.active{border-left-color:var(--dec);background:rgba(74,140,245,.06);color:var(--hi)}
+.sn-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.sn-cnt{margin-left:auto;font-size:11px;font-weight:600;color:var(--lo)}
+.recipients{padding:10px 14px;flex-shrink:0}
+.rec-list{display:flex;flex-direction:column;gap:5px;margin:8px 0}
+.rec-row{display:flex;align-items:center;gap:7px}
+.rec-av{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;flex-shrink:0}
+.av-a{background:#152c54;color:#4a8cf5}.av-b{background:#103028;color:#34d499}.av-c{background:#2e1e0c;color:#e89430}
+.rec-name{font-size:12px;color:var(--md);flex:1}
+.rec-check{width:14px;height:14px;border-radius:3px;border:1px solid var(--b2);background:var(--nt-bg);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.rec-check::after{content:'✓';font-size:8px;color:var(--nt);font-weight:700}
+.rec-add{font-size:11px;color:var(--lo);cursor:pointer;padding:3px 0}
+.rec-add:hover{color:var(--md)}
+
+/* CANVAS */
+.canvas{flex:1;overflow-y:auto;background:var(--void)}
+.doc{max-width:800px;margin:0 auto;padding:32px 40px 60px}
+
+/* MEETING HEADER — unchanged from original */
+.doc-header{padding-bottom:24px;border-bottom:2px solid var(--b1);margin-bottom:28px}
+.doc-meeting-title{font-size:26px;font-weight:600;color:var(--hi);margin-bottom:8px;line-height:1.2}
+.doc-stakes{font-size:13px;color:var(--md);font-style:italic;border-left:3px solid var(--b2);padding-left:10px;margin-bottom:16px;line-height:1.5}
+.doc-meta-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin-bottom:16px}
+.dm-lbl{font-size:12px;color:var(--lo);font-weight:600;white-space:nowrap}
+.dm-val{font-size:13px;color:var(--md)}
+.dm-val b{color:var(--hi);font-weight:500}
+.att-block{display:flex;flex-direction:column;gap:6px;margin-bottom:4px}
+.att-group-lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lo);margin-bottom:3px}
+.att-chips{display:flex;gap:6px;flex-wrap:wrap}
+.att-chip{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 5px;border-radius:20px;background:var(--raised);border:1px solid var(--b1)}
+.ac-av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700}
+.ac-name{font-size:12px;color:var(--hi)}
+.ac-role{font-size:11px;color:var(--lo)}
+.att-chip.absent{opacity:.45}
+
+/* SECTION HEADERS — original style, collapse icon added */
+.doc-sec{margin-bottom:28px}
+.doc-sec-hdr{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:12px;padding-bottom:7px;
+  border-bottom:1px solid var(--b1);
+  cursor:pointer;user-select:none;
+  transition:opacity .12s;
+}
+.doc-sec-hdr:hover{opacity:.85}
+.doc-sec-bar{width:4px;height:18px;border-radius:2px;flex-shrink:0}
+.bar-oc{background:var(--dec)}.bar-ag{background:var(--md)}
+.bar-dc{background:var(--dcn)}.bar-ax{background:var(--act)}
+.bar-rk{background:var(--rsk)}.bar-pk{background:#9478e0}
+.doc-sec-title{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--hi);flex:1}
+.doc-sec-cnt{font-size:12px;color:var(--lo);margin-left:auto}
+/* Large, visible collapse chevron */
+.sec-chevron{
+  font-size:20px;
+  color:var(--md);
+  flex-shrink:0;
+  line-height:1;
+  width:24px;
+  text-align:center;
+  transition:transform .2s,color .12s;
+}
+.doc-sec-hdr:hover .sec-chevron{color:var(--hi)}
+.sec-chevron.collapsed{transform:rotate(-90deg)}
+
+/* OUTCOMES */
+.outcome-list{display:flex;flex-direction:column;gap:6px}
+.outcome-row{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;background:var(--raised);border:1px solid var(--b0);border-radius:5px}
+.oc-flag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:3px;flex-shrink:0;white-space:nowrap;margin-top:1px}
+.oc-met{background:var(--nt-bg);color:var(--nt);border:1px solid var(--nt-bd)}
+.oc-partial{background:var(--act-bg);color:var(--act);border:1px solid var(--act-bd)}
+.oc-unmet{background:var(--rsk-bg);color:var(--rsk);border:1px solid var(--rsk-bd)}
+.oc-text{font-size:13px;color:var(--hi);flex:1;line-height:1.4}
+.oc-owner{font-size:11px;color:var(--lo);flex-shrink:0;margin-top:2px}
+
+/* AGENDA */
+.agenda-sec{margin-bottom:14px;border:1px solid var(--b1);border-left:3px solid var(--b2);border-radius:6px;overflow:hidden}
+.agenda-sec-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--raised);border-bottom:1px solid var(--b0);cursor:pointer;user-select:none}
+.as-num{width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);color:var(--hi);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.as-title{font-size:14px;font-weight:500;color:var(--hi);flex:1}
+.as-dur{font-size:12px;color:var(--lo)}
+.as-chevron{font-size:18px;color:var(--md);flex-shrink:0;line-height:1;transition:transform .2s}
+.as-chevron.collapsed{transform:rotate(-90deg)}
+.agenda-entries{padding:8px 14px;display:flex;flex-direction:column;gap:0}
+.ae{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ae:last-child{border-bottom:none}
+.ae:hover .ae-exclude{opacity:1}
+.ae-tag{font-size:10px;font-weight:700;padding:0 5px;border-radius:2px;flex-shrink:0;border:1px solid;white-space:nowrap;margin-top:3px;line-height:1.5}
+.ae-dc{background:var(--dcn-bg);color:var(--dcn);border-color:var(--dcn-bd)}
+.ae-nt{background:var(--nt-bg);color:var(--nt);border-color:var(--nt-bd)}
+.ae-ax{background:var(--act-bg);color:var(--act);border-color:var(--act-bd)}
+.ae-rk{background:var(--rsk-bg);color:var(--rsk);border-color:var(--rsk-bd)}
+.ae-text{font-size:13px;color:var(--hi);line-height:1.5;flex:1}
+.ae-meta{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.ae-author{font-size:11px;color:var(--lo)}
+.ae-time{font-size:11px;color:var(--lo)}
+.ae-exclude{font-size:11px;padding:2px 7px;border-radius:3px;background:rgba(224,82,82,.08);color:var(--rsk);border:1px solid rgba(224,82,82,.20);cursor:pointer;opacity:0;transition:opacity .12s;flex-shrink:0;align-self:center}
+.ae-exclude.excluded{opacity:1;background:rgba(224,82,82,.18)}
+.ae.excluded-row{opacity:.35}
+.ae.excluded-row .ae-text{text-decoration:line-through}
+
+/* CONSOLIDATED */
+.cons-list{display:flex;flex-direction:column;gap:5px}
+.cons-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--raised);border:1px solid var(--b0);border-radius:5px;transition:border-color .12s}
+.cons-row:hover{border-color:var(--b1)}
+.cons-id{font-size:10px;font-weight:700;padding:0 6px;border-radius:2px;flex-shrink:0;border:1px solid;margin-top:3px;line-height:1.5}
+.cid-dc{background:var(--dcn-bg);color:var(--dcn);border-color:var(--dcn-bd)}
+.cid-ax{background:var(--act-bg);color:var(--act);border-color:var(--act-bd)}
+.cid-rk{background:var(--rsk-bg);color:var(--rsk);border-color:var(--rsk-bd)}
+.cons-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.cons-text{font-size:13px;color:var(--hi);line-height:1.5}
+.cons-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cons-owner{font-size:11px;color:var(--lo)}
+.cons-due{font-size:11px;color:var(--act)}
+.cons-status{font-size:11px;font-weight:600;color:var(--nt)}
+
+/* SEND MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--raised);border:1px solid var(--b2);border-radius:10px;padding:24px;width:460px;box-shadow:0 24px 60px rgba(0,0,0,.8);animation:popin .13s ease-out}
+@keyframes popin{from{opacity:0;transform:scale(.95) translateY(6px)}to{opacity:1;transform:none}}
+.modal-title{font-size:16px;font-weight:600;color:var(--hi);margin-bottom:4px}
+.modal-sub{font-size:12px;color:var(--lo);margin-bottom:20px}
+.modal-sec{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--md);margin-bottom:8px}
+.modal-recipients{display:flex;flex-direction:column;gap:5px;margin-bottom:16px}
+.mr-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface);border:1px solid var(--b1);border-radius:5px}
+.mr-av{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0}
+.mr-name{font-size:13px;color:var(--hi);flex:1}
+.mr-role{font-size:11px;color:var(--lo)}
+.mr-toggle{width:18px;height:18px;border-radius:4px;border:1px solid var(--nt-bd);background:var(--nt-bg);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mr-toggle::after{content:'✓';font-size:9px;color:var(--nt);font-weight:700}
+.mr-toggle.off{background:rgba(255,255,255,.04);border-color:var(--b1)}
+.mr-toggle.off::after{display:none}
+.modal-inp{width:100%;background:var(--surface);border:1px solid var(--b1);border-radius:5px;padding:9px 12px;color:var(--hi);outline:none;font-family:inherit;font-size:13px;margin-top:4px}
+.modal-inp::placeholder{color:var(--lo)}
+.modal-note{font-size:12px;color:var(--lo);margin:12px 0 18px;font-style:italic;border-left:2px solid var(--b2);padding-left:8px;line-height:1.5}
+.modal-actions{display:flex;gap:8px}
+.m-cancel{flex:1;padding:10px;border-radius:5px;font-size:13px;background:var(--surface);border:1px solid var(--b1);color:var(--md);cursor:pointer;font-family:inherit}
+.m-send{flex:2;padding:10px;border-radius:5px;font-size:13px;font-weight:600;background:var(--nt-bg);border:1px solid var(--nt-bd);color:var(--nt);cursor:pointer;font-family:inherit}
+
+.sec-add-btn{font-size:12px;font-weight:600;padding:3px 11px;border-radius:4px;background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd);cursor:pointer;flex-shrink:0;transition:all .13s;margin-left:auto}
+.sec-add-btn:hover{background:rgba(74,140,245,.16)}
+
+.agenda-add-btn{font-size:12px;font-weight:600;padding:3px 11px;border-radius:4px;background:var(--act-bg);color:var(--act);border:1px solid var(--act-bd);cursor:pointer;flex-shrink:0;transition:all .13s;margin-left:auto}
+.agenda-add-btn:hover{background:rgba(232,148,48,.16)}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header class="topbar">
+  <div class="tb-brand"><div class="tb-logo">accord<span class="tb-logo-dot">.</span></div></div>
+  <div class="tb-middle">
+    <div class="tb-state" id="reviewState">Under Review</div>
+    <div class="tb-title">C-11 Percolate Smoke Test Meeting · Minutes</div>
+  </div>
+  <div class="tb-right">
+    <button class="btn-preview">Preview →</button>
+    <button class="btn-send disabled" id="sendBtn" onclick="openSend()">Route + Send ↑</button>
+    <div class="u-chip"><div class="u-av">VS</div><span class="u-name">Vaughn Staples</span></div>
+  </div>
+</header>
+
+<div class="body">
+
+  <div class="sidebar">
+    <div class="sb-checklist">
+      <span class="sb-sec-lbl">Review Checklist</span>
+      <div class="review-progress">
+        <div class="rp-row done" onclick="checkItem(this)"><div class="rp-check done"></div><span class="rp-lbl">Meeting header</span></div>
+        <div class="rp-row done" onclick="checkItem(this)"><div class="rp-check done"></div><span class="rp-lbl">Attendance confirmed</span></div>
+        <div class="rp-row done" onclick="checkItem(this)"><div class="rp-check done"></div><span class="rp-lbl">Outcomes reviewed</span></div>
+        <div class="rp-row" onclick="checkItem(this)"><div class="rp-check"></div><span class="rp-lbl">Agenda entries checked</span></div>
+        <div class="rp-row" onclick="checkItem(this)"><div class="rp-check"></div><span class="rp-lbl">Decisions verified</span></div>
+        <div class="rp-row" onclick="checkItem(this)"><div class="rp-check"></div><span class="rp-lbl">Actions confirmed</span></div>
+      </div>
+    </div>
+    <div class="sb-nav">
+      <div class="sb-nav-pad"><span class="sb-sec-lbl">Sections</span></div>
+      <div class="sn-link active" onclick="scrollDoc('sec-header')"><span class="sn-dot" style="background:var(--md)"></span>Meeting Header</div>
+      <div class="sn-link" onclick="scrollDoc('sec-outcomes')"><span class="sn-dot" style="background:var(--dec)"></span>Intended Outcomes<span class="sn-cnt">2</span></div>
+      <div class="sn-link" onclick="scrollDoc('sec-agenda')"><span class="sn-dot" style="background:var(--md)"></span>Agenda &amp; Captures<span class="sn-cnt">3</span></div>
+      <div class="sn-link" onclick="scrollDoc('sec-decisions')"><span class="sn-dot" style="background:var(--dcn)"></span>Decisions<span class="sn-cnt">2</span></div>
+      <div class="sn-link" onclick="scrollDoc('sec-actions')"><span class="sn-dot" style="background:var(--act)"></span>Action Items<span class="sn-cnt">3</span></div>
+      <div class="sn-link" onclick="scrollDoc('sec-risks')"><span class="sn-dot" style="background:var(--rsk)"></span>Risks &amp; Dissents<span class="sn-cnt">1</span></div>
+      <div class="sn-link" onclick="scrollDoc('sec-parking')"><span class="sn-dot" style="background:#9478e0"></span>Parking Lot<span class="sn-cnt">2</span></div>
+    </div>
+    <div class="recipients">
+      <span class="sb-sec-lbl">Recipients</span>
+      <div class="rec-list">
+        <div class="rec-row"><div class="rec-av av-a">VS</div><span class="rec-name">Vaughn Staples</span><div class="rec-check"></div></div>
+        <div class="rec-row"><div class="rec-av av-b">AK</div><span class="rec-name">Angela Kim</span><div class="rec-check"></div></div>
+        <div class="rec-row"><div class="rec-av av-c">RW</div><span class="rec-name">Ron White</span><div class="rec-check"></div></div>
+      </div>
+      <div class="rec-add">+ Add external recipient…</div>
+    </div>
+  </div>
+
+  <div class="canvas" id="canvas">
+  <div class="doc">
+
+    <!-- MEETING HEADER -->
+    <div id="sec-header" class="doc-sec">
+      <div class="doc-meeting-title">C-11 Percolate Smoke Test Meeting</div>
+      <div class="doc-stakes">Must complete endoscope prototype by 8/11; need to ratify materials vendor selection ASAP.</div>
+      <div class="doc-sec-hdr" onclick="toggleSec('hdr-body','hdr-chev')" style="margin-top:4px">
+        <div class="doc-sec-bar bar-hdr" style="background:var(--md)"></div>
+        <span class="doc-sec-title">Meeting Details</span>
+        <button class="sec-add-btn" onclick="event.stopPropagation()">Edit</button>
+        <span class="sec-chevron" id="hdr-chev">▾</span>
+      </div>
+      <div id="hdr-body">
+      <div class="doc-header" style="border-bottom:none;padding-bottom:0">
+        <div class="doc-meta-grid">
+          <span class="dm-lbl">Date</span><span class="dm-val"><b>Saturday, May 17, 2026</b></span>
+          <span class="dm-lbl">Duration</span><span class="dm-val">60 minutes · 1:28 PM – 2:31 PM</span>
+          <span class="dm-lbl">Organizer</span><span class="dm-val"><b>Vaughn Staples</b></span>
+          <span class="dm-lbl">Workstream</span><span class="dm-val">C-11 Test Workstream</span>
+        </div>
+        <div class="att-block">
+          <div class="att-group-lbl">Attended</div>
+          <div class="att-chips">
+            <div class="att-chip"><div class="ac-av av-a">VS</div><span class="ac-name">Vaughn Staples</span><span class="ac-role">· Organizer</span></div>
+            <div class="att-chip"><div class="ac-av av-b">AK</div><span class="ac-name">Angela Kim</span></div>
+          </div>
+        </div>
+        <div class="att-block" style="margin-top:8px">
+          <div class="att-group-lbl">Invited · did not join</div>
+          <div class="att-chips"><div class="att-chip absent"><div class="ac-av av-c">RW</div><span class="ac-name">Ron White</span></div></div>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- INTENDED OUTCOMES -->
+    <div class="doc-sec" id="sec-outcomes">
+      <div class="doc-sec-hdr" onclick="toggleSec('oc-body','oc-chev')">
+        <div class="doc-sec-bar bar-oc"></div>
+        <span class="doc-sec-title">Intended Outcomes</span>
+        <button class="sec-add-btn" onclick="event.stopPropagation()">+ Add</button>
+        <span class="sec-chevron" id="oc-chev">▾</span>
+      </div>
+      <div id="oc-body">
+        <div class="outcome-list">
+          <div class="outcome-row"><span class="oc-flag oc-met">✓ Met</span><div class="oc-text">Resolve Angela's dissent on Phase 1 timeline — confirm or escalate the vendor dependency risk.</div><span class="oc-owner">Angela Kim</span></div>
+          <div class="outcome-row"><span class="oc-flag oc-met">✓ Met</span><div class="oc-text">Decide on vendor selection — present evaluation and ratify Nimbletronics as primary vendor.</div><span class="oc-owner">Vaughn Staples</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AGENDA -->
+    <div class="doc-sec" id="sec-agenda">
+      <div class="doc-sec-hdr" onclick="toggleSec('ag-body','ag-chev')">
+        <div class="doc-sec-bar bar-ag"></div>
+        <span class="doc-sec-title">Agenda &amp; Captures</span>
+        <button class="sec-add-btn" onclick="event.stopPropagation()">+ Add item</button>
+        <span class="sec-chevron" id="ag-chev">▾</span>
+      </div>
+      <div id="ag-body">
+        <div class="agenda-sec">
+          <div class="agenda-sec-hdr" onclick="toggleAgenda(this)">
+            <div class="as-num">1</div>
+            <div class="as-title">Identify &amp; resolve outstanding items from prior meeting</div>
+            <button class="agenda-add-btn" onclick="event.stopPropagation()">+ Add</button>
+            <span class="as-chevron">▾</span>
+          </div>
+          <div class="agenda-entries">
+            <div class="ae"><span class="ae-tag ae-nt">NT-029</span><div class="ae-text">Angela confirmed AX-007 resolved — written vendor confirmation received prior to meeting start.</div><div class="ae-meta"><span class="ae-author">Angela Kim</span><span class="ae-time">1:29 PM</span></div><span class="ae-exclude" onclick="toggleExclude(this)">Exclude</span></div>
+            <div class="ae"><span class="ae-tag ae-nt">NT-030</span><div class="ae-text">AX-008 complete — vendor alignment call circulated and held on May 15.</div><div class="ae-meta"><span class="ae-author">Vaughn Staples</span><span class="ae-time">1:31 PM</span></div><span class="ae-exclude" onclick="toggleExclude(this)">Exclude</span></div>
+            <div class="ae"><span class="ae-tag ae-ax">AX-009</span><div class="ae-text">Angela: Deliver completed component spec to engineering — still open, due this week.</div><div class="ae-meta"><span class="ae-author">Vaughn Staples</span><span class="ae-time">1:33 PM</span></div><span class="ae-exclude" onclick="toggleExclude(this)">Exclude</span></div>
+          </div>
+        </div>
+        <div class="agenda-sec" style="border-left-color:var(--nt)">
+          <div class="agenda-sec-hdr" onclick="toggleAgenda(this)">
+            <div class="as-num" style="background:var(--nt-bg);border-color:var(--nt-bd);color:var(--nt)">2</div>
+            <div class="as-title">Review vendor shortlist — select final candidate</div>
+            <button class="agenda-add-btn" onclick="event.stopPropagation()">+ Add</button>
+            <span class="as-chevron">▾</span>
+          </div>
+          <div class="agenda-entries">
+            <div class="ae"><span class="ae-tag ae-nt">NT-031</span><div class="ae-text">Angela confirmed Nimbletronics prototype passed thermal validation at 5% above spec. No concerns flagged.</div><div class="ae-meta"><span class="ae-author">Angela Kim</span><span class="ae-time">2:28 PM</span></div><span class="ae-exclude" onclick="toggleExclude(this)">Exclude</span></div>
+            <div class="ae"><span class="ae-tag ae-dc">DC-018</span><div class="ae-text">Nimbletronics selected as primary vendor for Phase 1 component supply. NDA execution target: May 22.</div><div class="ae-meta"><span class="ae-author">Vaughn Staples</span><span class="ae-time">2:31 PM</span></div><span class="ae-exclude" onclick="toggleExclude(this)">Exclude</span></div>
+            <div class="ae"><span class="ae-tag ae-nt">NT-032</span><div class="ae-text">Angela dissent DS-005 resolved — timeline dependency confirmed as mitigated by Nimbletronics selection.</div><div class="ae-meta"><span class="ae-author">Angela Kim</span><span class="ae-time">2:31 PM</span></div><span class="ae-exclude" onclick="toggleExclude(this)">Exclude</span></div>
+          </div>
+        </div>
+        <div class="agenda-sec">
+          <div class="agenda-sec-hdr" onclick="toggleAgenda(this)">
+            <div class="as-num">3</div>
+            <div class="as-title">Assign follow-up actions &amp; confirm next meeting date</div>
+            <button class="agenda-add-btn" onclick="event.stopPropagation()">+ Add</button>
+            <span class="as-chevron">▾</span>
+          </div>
+          <div class="agenda-entries">
+            <div class="ae"><span class="ae-tag ae-ax">AX-011</span><div class="ae-text">Vaughn: Execute NDA with Nimbletronics by May 22.</div><div class="ae-meta"><span class="ae-author">Vaughn Staples</span><span class="ae-time">2:38 PM</span></div><span class="ae-exclude" onclick="toggleExclude(this)">Exclude</span></div>
+            <div class="ae"><span class="ae-tag ae-nt">NT-033</span><div class="ae-text">Next meeting: C-11 Vendor Final Selection · Fri May 22 · 3:00 PM. Vaughn to send invite.</div><div class="ae-meta"><span class="ae-author">Vaughn Staples</span><span class="ae-time">2:41 PM</span></div><span class="ae-exclude" onclick="toggleExclude(this)">Exclude</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DECISIONS -->
+    <div class="doc-sec" id="sec-decisions">
+      <div class="doc-sec-hdr" onclick="toggleSec('dc-body','dc-chev')">
+        <div class="doc-sec-bar bar-dc"></div>
+        <span class="doc-sec-title">Decisions</span>
+        <button class="sec-add-btn" onclick="event.stopPropagation()">+ Add</button>
+        <span class="sec-chevron" id="dc-chev">▾</span>
+      </div>
+      <div id="dc-body">
+        <div class="cons-list">
+          <div class="cons-row"><span class="cons-id cid-dc">DC-017</span><div class="cons-body"><div class="cons-text">Phase 1 milestone schedule confirmed — no timeline adjustments required following thermal validation.</div><div class="cons-meta"><span class="cons-owner">Vaughn Staples · 2:18 PM</span></div></div></div>
+          <div class="cons-row"><span class="cons-id cid-dc">DC-018</span><div class="cons-body"><div class="cons-text">Nimbletronics selected as primary vendor for Phase 1 component supply. NDA execution target: May 22.</div><div class="cons-meta"><span class="cons-owner">Vaughn Staples · 2:31 PM</span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTION ITEMS -->
+    <div class="doc-sec" id="sec-actions">
+      <div class="doc-sec-hdr" onclick="toggleSec('ax-body','ax-chev')">
+        <div class="doc-sec-bar bar-ax"></div>
+        <span class="doc-sec-title">Action Items</span>
+        <button class="sec-add-btn" onclick="event.stopPropagation()">+ Add</button>
+        <span class="sec-chevron" id="ax-chev">▾</span>
+      </div>
+      <div id="ax-body">
+        <div class="cons-list">
+          <div class="cons-row"><span class="cons-id cid-ax">AX-009</span><div class="cons-body"><div class="cons-text">Deliver completed component spec to engineering for review.</div><div class="cons-meta"><span class="cons-owner">Angela Kim</span><span class="cons-due">Carried forward · no due date</span></div></div></div>
+          <div class="cons-row"><span class="cons-id cid-ax">AX-011</span><div class="cons-body"><div class="cons-text">Execute NDA with Nimbletronics — review terms with legal counsel before signing.</div><div class="cons-meta"><span class="cons-owner">Vaughn Staples</span><span class="cons-due">Due May 22, 2026</span></div></div></div>
+          <div class="cons-row"><span class="cons-id cid-ax">AX-012</span><div class="cons-body"><div class="cons-text">Send invite and agenda for C-11 Vendor Final Selection meeting on May 22 at 3:00 PM.</div><div class="cons-meta"><span class="cons-owner">Vaughn Staples</span><span class="cons-due">Due May 19, 2026</span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RISKS -->
+    <div class="doc-sec" id="sec-risks">
+      <div class="doc-sec-hdr" onclick="toggleSec('rk-body','rk-chev')">
+        <div class="doc-sec-bar bar-rk"></div>
+        <span class="doc-sec-title">Risks &amp; Dissents</span>
+        <button class="sec-add-btn" onclick="event.stopPropagation()">+ Add</button>
+        <span class="sec-chevron" id="rk-chev">▾</span>
+      </div>
+      <div id="rk-body">
+        <div class="cons-list">
+          <div class="cons-row" style="border-color:var(--nt-bd);background:var(--nt-bg)"><span class="cons-id cid-rk">DS-005</span><div class="cons-body"><div class="cons-text">Angela dissent on Phase 1 timeline — vendor dependency blocks commitment. <span style="color:var(--nt);font-weight:500">Resolved this meeting</span> following Nimbletronics selection and thermal validation confirmation.</div><div class="cons-meta"><span class="cons-owner">Angela Kim · originally Apr 14</span><span class="cons-status">✓ Resolved May 17</span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PARKING LOT -->
+    <div class="doc-sec" id="sec-parking">
+      <div class="doc-sec-hdr" onclick="toggleSec('pk-body','pk-chev')">
+        <div class="doc-sec-bar bar-pk"></div>
+        <span class="doc-sec-title">Parking Lot</span>
+        <button class="sec-add-btn" onclick="event.stopPropagation()">+ Add</button>
+        <span class="sec-chevron" id="pk-chev">▾</span>
+      </div>
+      <div id="pk-body">
+        <div class="cons-list">
+          <div class="cons-row"><div class="cons-body"><div class="cons-text">Evaluate secondary vendor for Phase 2 — Nimbletronics capacity may not scale to full production volume.</div><div class="cons-meta"><span class="cons-owner">Deferred from Item 2</span></div></div></div>
+          <div class="cons-row"><div class="cons-body"><div class="cons-text">Review NDA terms with legal counsel before execution — flagged as important prior to signing.</div><div class="cons-meta"><span class="cons-owner">Deferred from Item 3</span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="sendModal" onclick="if(event.target===this)closeSend()">
+  <div class="modal">
+    <div class="modal-title">Route + Send Minutes</div>
+    <div class="modal-sub">C-11 Percolate Smoke Test Meeting · May 17, 2026</div>
+    <div class="modal-sec">Sending to</div>
+    <div class="modal-recipients">
+      <div class="mr-row"><div class="mr-av av-a">VS</div><span class="mr-name">Vaughn Staples</span><span class="mr-role">Organizer</span><div class="mr-toggle" onclick="this.classList.toggle('off')"></div></div>
+      <div class="mr-row"><div class="mr-av av-b">AK</div><span class="mr-name">Angela Kim</span><span class="mr-role">Attended</span><div class="mr-toggle" onclick="this.classList.toggle('off')"></div></div>
+      <div class="mr-row"><div class="mr-av av-c">RW</div><span class="mr-name">Ron White</span><span class="mr-role">Invited · absent</span><div class="mr-toggle" onclick="this.classList.toggle('off')"></div></div>
+    </div>
+    <div class="modal-sec">Add external recipients</div>
+    <input class="modal-inp" placeholder="email@example.com — separate with commas">
+    <div class="modal-note">Recipients receive a clean formatted minutes document. Excluded entries will not appear.</div>
+    <div class="modal-actions">
+      <button class="m-cancel" onclick="closeSend()">Cancel</button>
+      <button class="m-send" onclick="confirmSend()">Send Minutes ↑</button>
+    </div>
+  </div>
+</div>
+
+</div>
+<script>
+function toggleSec(bodyId,chevId){
+  var body=document.getElementById(bodyId),chev=document.getElementById(chevId);
+  var open=body.style.display!=='none';
+  body.style.display=open?'none':'';
+  chev.classList.toggle('collapsed',open);
+}
+function toggleAgenda(hdr){
+  var entries=hdr.nextElementSibling,chev=hdr.querySelector('.as-chevron');
+  var open=entries.style.display!=='none';
+  entries.style.display=open?'none':'';
+  chev.classList.toggle('collapsed',open);
+}
+function toggleExclude(btn){
+  btn.classList.toggle('excluded');
+  btn.closest('.ae').classList.toggle('excluded-row');
+}
+function scrollDoc(id){
+  var el=document.getElementById(id),cv=document.getElementById('canvas');
+  if(el&&cv)cv.scrollTo({top:el.offsetTop-20,behavior:'smooth'});
+}
+function checkItem(row){
+  var check=row.querySelector('.rp-check');
+  var done=check.classList.toggle('done');
+  row.classList.toggle('done',done);
+  var total=document.querySelectorAll('.rp-check').length;
+  var checked=document.querySelectorAll('.rp-check.done').length;
+  var btn=document.getElementById('sendBtn'),state=document.getElementById('reviewState');
+  if(checked===total){btn.classList.remove('disabled');state.className='tb-state ready';state.textContent='Ready to Send';}
+  else{btn.classList.add('disabled');state.className='tb-state';state.textContent='Under Review';}
+}
+function openSend(){if(!document.getElementById('sendBtn').classList.contains('disabled'))document.getElementById('sendModal').classList.add('open');}
+function closeSend(){document.getElementById('sendModal').classList.remove('open');}
+function confirmSend(){
+  closeSend();
+  var s=document.getElementById('reviewState');s.className='tb-state sent';s.textContent='Sent · May 17 2:52 PM';
+  var b=document.getElementById('sendBtn');b.textContent='Sent ✓';b.style.opacity='.5';b.style.pointerEvents='none';
+}
+</script>
+</body>
+</html>

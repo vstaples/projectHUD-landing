@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accord · Meeting Setup</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Outfit',system-ui,sans-serif;font-size:14px;background:#0b0d14;color:#dce6f5;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:2px}
+:root{
+  --void:#0b0d14;--surface:#10131e;--raised:#171c2e;--hover:#1d2338;
+  --b0:#1e2438;--b1:#252d44;--b2:#313d5e;
+  --hi:#dce6f5;--md:#8899b2;--lo:#4a5670;
+  --dec:#4a8cf5;--dec-bg:rgba(74,140,245,.09);--dec-bd:rgba(74,140,245,.24);
+  --act:#e89430;--act-bg:rgba(232,148,48,.08);--act-bd:rgba(232,148,48,.24);
+  --rsk:#e05252;--rsk-bg:rgba(224,82,82,.09);--rsk-bd:rgba(224,82,82,.24);
+  --nt:#48aa88;--nt-bg:rgba(72,170,136,.08);--nt-bd:rgba(72,170,136,.22);
+  --dcn:#8b6ef5;--dcn-bg:rgba(139,110,245,.09);--dcn-bd:rgba(139,110,245,.24);
+}
+.shell{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOPBAR */
+.topbar{height:46px;flex-shrink:0;display:flex;align-items:center;background:var(--void);border-bottom:1px solid var(--b0);padding:0 18px;gap:12px}
+.tb-logo{font-size:15px;font-weight:600;color:var(--hi)}.tb-logo-dot{color:var(--dec)}
+.tb-sep{width:1px;height:18px;background:var(--b1)}
+.tb-state{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:3px 10px;border-radius:3px;background:var(--act-bg);color:var(--act);border:1px solid var(--act-bd)}
+.tb-title{font-size:13px;font-weight:500;color:var(--md)}
+.tb-back{margin-left:auto;font-size:12px;color:var(--lo);cursor:pointer}
+
+/* INVITE BAR */
+.invite-bar{background:#0d1420;border-bottom:1px solid rgba(232,148,48,.18);padding:10px 18px 9px;flex-shrink:0}
+.invite-title{font-size:18px;font-weight:600;color:var(--hi);margin-bottom:5px}
+.stakes-line{font-size:12px;color:var(--md);font-style:italic;border-left:3px solid rgba(232,148,48,.38);padding-left:8px;margin-bottom:7px}
+.invite-meta{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.im{font-size:12px;color:var(--lo)}.im b{color:var(--md)}
+.im-badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:3px;background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd)}
+
+/* TWIN TABS */
+.twin-tabs{display:flex;align-items:stretch;background:var(--void);border-bottom:2px solid var(--b0);flex-shrink:0}
+.ttab{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:10px 26px;cursor:pointer;color:var(--lo);border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .13s}
+.ttab.active{color:var(--hi);border-bottom-color:var(--dec)}
+.ttab:hover:not(.active){color:var(--md)}
+.tab-spacer{flex:1}
+.readiness-bar{display:flex;align-items:center;gap:8px;padding:0 18px}
+.rb-lbl{font-size:12px;color:var(--lo)}
+.rb-items{display:flex;gap:7px}
+.rb-item{font-size:11px;display:flex;align-items:center;gap:3px}
+.rb-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:2px}
+.rb-done{background:var(--nt)}.rb-todo{background:var(--b2)}
+.rb-item.done{color:var(--nt)}.rb-item.todo{color:var(--lo)}
+.rb-pct{font-size:12px;color:var(--act);font-weight:700;margin-left:4px}
+
+/* TAB PANELS */
+.tab-panel{display:none;flex:1;flex-direction:column;overflow:hidden;min-height:0}
+.tab-panel.active{display:flex}
+
+/* ── HISTORY TAB ── */
+.person-filter{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--b0);flex-shrink:0}
+.pf-lbl{font-size:11px;font-weight:700;color:var(--lo);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+.pf-chip{display:flex;align-items:center;gap:5px;padding:3px 10px 3px 5px;border-radius:20px;background:rgba(255,255,255,.04);border:1px solid var(--b1);cursor:pointer}
+.pf-chip.all{padding:3px 12px}
+.pf-chip.active{border-color:rgba(74,140,245,.35);background:var(--dec-bg)}
+.pf-av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700}
+.pf-av-a{background:#152c54;color:#4a8cf5}.pf-av-b{background:#103028;color:#34d499}.pf-av-c{background:#2e1e0c;color:#e89430}
+.pf-name{font-size:12px;color:var(--md)}
+.pf-chip.active .pf-name{color:var(--hi)}
+
+.col-headers{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--b0);flex-shrink:0}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:7px 13px;border-right:1px solid var(--b0)}
+.ch:last-child{border-right:none}
+.ch-lbl{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.c-amber{color:var(--act)}.c-cyan{color:var(--dec)}.c-muted{color:var(--md)}
+.ch-cnt{font-size:11px;padding:1px 7px;border-radius:10px;background:rgba(255,255,255,.05);color:var(--lo)}
+.ch-cnt.amber{background:var(--act-bg);color:var(--act)}
+.ch-cnt.cyan{background:var(--dec-bg);color:var(--dec)}
+
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;flex:1;overflow:hidden;min-height:0}
+.content-col{overflow-y:auto;padding:8px 11px;display:flex;flex-direction:column;gap:5px;border-right:1px solid var(--b0)}
+.content-col:last-child{border-right:none}
+
+.sec-div{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--lo);padding:6px 0 3px;border-top:1px solid var(--b0);margin-top:2px;display:flex;align-items:center;justify-content:space-between}
+.sec-div:first-child{border-top:none;margin-top:0;padding-top:2px}
+
+/* History cards */
+.hcard{background:var(--raised);border:1px solid var(--b0);border-radius:5px;padding:8px 10px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:5px}
+.hcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.ha::before{background:var(--act)}.ha-dim::before{background:rgba(232,148,48,.35)}.hc::before{background:var(--dec)}.hr::before{background:var(--rsk)}.hs::before{background:var(--b2);opacity:.6}.hd{opacity:.55}
+.ov-card{border-color:rgba(224,82,82,.22);background:rgba(224,82,82,.03)}
+.hcard-row{display:flex;align-items:flex-start;gap:7px}
+.htag{font-size:10px;font-weight:700;padding:2px 5px;border-radius:2px;flex-shrink:0;margin-top:1px}
+.htag-ax{background:var(--act-bg);color:var(--act);border:1px solid var(--act-bd)}
+.htag-dc{background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd)}
+.htag-ds{background:var(--rsk-bg);color:var(--rsk);border:1px solid var(--rsk-bd)}
+.htag-nt{background:rgba(90,138,170,.18);color:#7aaac8;border:1px solid rgba(90,138,170,.25)}
+.hcard-text{font-size:12px;color:var(--md);line-height:1.4;flex:1}
+.hcard-text.struck{text-decoration:line-through;color:var(--lo)}
+.hcard-meta{display:flex;align-items:center;justify-content:space-between}
+.hcard-owner{font-size:11px;color:var(--lo)}
+.hcard-ov{font-size:11px;color:var(--rsk);font-weight:600}
+.hcard-done{font-size:11px;color:var(--nt)}
+.hcard-date{font-size:11px;color:var(--lo)}
+.pull-btn{font-size:11px;color:var(--lo);border:1px solid rgba(90,138,170,.20);background:rgba(90,138,170,.07);padding:2px 8px;border-radius:3px;cursor:pointer;align-self:flex-end;transition:all .12s}
+.pull-btn:hover{color:var(--dec);border-color:var(--dec-bd);background:var(--dec-bg)}
+
+/* Notes tree */
+.disc-row{display:flex;align-items:center;justify-content:space-between;padding:7px 9px;border-radius:4px;cursor:pointer;background:rgba(255,255,255,.03);border:1px solid var(--b1);margin-bottom:2px}
+.disc-row:hover{background:rgba(255,255,255,.06)}
+.disc-left{display:flex;align-items:center;gap:6px}
+.disc-arrow{font-size:11px;color:var(--md);width:12px;flex-shrink:0}
+.disc-name{font-size:13px;font-weight:600;color:var(--hi)}
+.disc-right{font-size:11px;color:var(--lo)}
+.topic-group{padding-left:16px;display:flex;flex-direction:column;gap:2px;margin-bottom:3px}
+.topic-row{display:flex;align-items:center;justify-content:space-between;padding:5px 9px;border-radius:4px;cursor:pointer;background:rgba(255,255,255,.02);border:1px solid var(--b0)}
+.topic-row:hover{background:rgba(255,255,255,.05)}
+.topic-left{display:flex;align-items:center;gap:6px;min-width:0}
+.topic-arrow{font-size:11px;color:var(--lo);width:12px;flex-shrink:0}
+.topic-name{font-size:12px;color:var(--md);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topic-meta{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.topic-cnt{font-size:11px;color:var(--lo);white-space:nowrap}
+.pull-thread{font-size:11px;color:var(--lo);border:1px solid rgba(90,138,170,.18);background:rgba(90,138,170,.06);padding:2px 7px;border-radius:3px;cursor:pointer;white-space:nowrap}
+.pull-thread:hover{color:var(--dec);border-color:var(--dec-bd);background:var(--dec-bg)}
+.entries{padding-left:16px;display:flex;flex-direction:column;gap:0;margin-bottom:3px}
+.entries.hidden{display:none}
+.entry-row{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);position:relative}
+.entry-row:last-child{border-bottom:none}
+.entry-row::before{content:'';position:absolute;left:-1px;top:0;bottom:0;width:2px;background:rgba(90,138,170,.22)}
+.entry-date{font-size:11px;color:var(--lo);flex-shrink:0;min-width:32px;margin-top:1px}
+.entry-id{font-size:10px;color:var(--b2);flex-shrink:0;min-width:44px;margin-top:2px;font-style:italic}
+.entry-text{font-size:12px;color:var(--md);line-height:1.4;flex:1}
+.entry-row.latest .entry-text{color:var(--hi)}
+.entry-row.latest .entry-date{color:var(--md)}
+
+/* Filmstrip */
+.fs-bar{display:flex;align-items:center;justify-content:space-between;padding:7px 16px;background:var(--surface);border-top:1px solid var(--b0);flex-shrink:0;cursor:pointer}
+.fs-bar:hover{background:var(--hover)}
+.fs-lbl{font-size:12px;color:var(--md);text-transform:uppercase;letter-spacing:.06em}
+.fs-lbl b{color:var(--hi)}
+.fs-chips{display:flex;gap:5px}
+.fs-chip{font-size:11px;background:var(--raised);border:1px solid var(--b0);border-radius:3px;padding:2px 8px;color:var(--lo)}
+.fs-exp{font-size:12px;color:var(--lo)}
+
+/* ── COMPOSER TAB ── */
+.clone-banner{display:flex;align-items:center;gap:10px;padding:7px 13px;background:var(--dec-bg);border-bottom:1px solid var(--dec-bd);flex-shrink:0}
+.clone-text{font-size:12px;color:var(--md);flex:1}
+.clone-text b{color:var(--dec)}
+.clone-btn{font-size:11px;font-weight:700;padding:3px 10px;border-radius:3px;background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd);cursor:pointer}
+.clone-skip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:3px;background:transparent;color:var(--lo);border:1px solid var(--b1);cursor:pointer}
+.composer-cols{display:grid;grid-template-columns:220px 1fr 220px;flex:1;overflow:hidden;min-height:0}
+.comp-col{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--b0)}
+.comp-col:last-child{border-right:none}
+.comp-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 13px;border-bottom:1px solid var(--b0);flex-shrink:0}
+.comp-hdr-lbl{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lo)}
+.comp-hdr-lbl.cyan{color:var(--dec)}
+.comp-body{overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;flex:1}
+.ctx-card{background:var(--raised);border:1px solid var(--b0);border-radius:5px;padding:9px 11px;display:flex;flex-direction:column;gap:5px}
+.ctx-title{font-size:12px;font-weight:600;color:var(--md);margin-bottom:2px}
+.ctx-sub{font-size:12px;color:var(--lo)}
+.ctx-highlight{font-size:12px;color:var(--md);line-height:1.5;font-style:italic;border-left:2px solid var(--b2);padding-left:8px}
+.compose-sec{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--lo);display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.compose-sec::after{content:'';flex:1;height:1px;background:var(--b0)}
+.outcome-row{display:flex;align-items:center;gap:8px;background:#0d1420;border:1px solid var(--b1);border-radius:4px;padding:8px 10px}
+.ov{font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;flex-shrink:0}
+.ov-resolve{background:var(--act-bg);color:var(--act)}
+.ov-decide{background:var(--dec-bg);color:var(--dec)}
+.outcome-text{font-size:12px;color:var(--md);flex:1}
+.outcome-owner{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--dec-bg);color:var(--lo);flex-shrink:0}
+.add-row{display:flex;align-items:center;border:1px dashed var(--b1);border-radius:4px;padding:6px 10px;cursor:pointer}
+.add-row:hover{border-color:var(--b2)}
+.add-lbl{font-size:12px;color:var(--b2);font-style:italic}
+.status-card{background:var(--act-bg);border:1px solid rgba(232,148,48,.20);border-radius:5px;padding:9px 11px;display:flex;flex-direction:column;gap:4px}
+.status-hdr{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--act);margin-bottom:3px}
+.status-row{display:flex;align-items:flex-start;gap:7px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.status-row:last-child{border-bottom:none}
+.sax{font-size:10px;font-weight:700;padding:1px 5px;border-radius:2px;background:var(--act-bg);color:var(--act);flex-shrink:0;margin-top:1px}
+.s-text{font-size:12px;color:var(--md);flex:1}
+.s-ov{font-size:11px;color:var(--rsk);font-weight:600;flex-shrink:0}
+.s-date{font-size:11px;color:var(--lo);flex-shrink:0}
+.agenda-card{background:#0d1420;border:1px solid var(--b1);border-radius:5px;overflow:hidden}
+.agenda-hdr{display:flex;align-items:center;gap:8px;padding:9px 11px;cursor:pointer;border-bottom:1px solid var(--b0)}
+.agenda-hdr:hover{background:rgba(255,255,255,.02)}
+.atype{font-size:11px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0}
+.atype-d{background:var(--dec-bg);color:var(--dec)}
+.atype-r{background:var(--act-bg);color:var(--act)}
+.agenda-title{font-size:12px;color:var(--md);flex:1}
+.agenda-dur{font-size:11px;color:var(--lo);flex-shrink:0}
+.thread-toggle{font-size:11px;color:var(--lo);flex-shrink:0}
+.thread-history{padding:0 11px 8px;display:flex;flex-direction:column;gap:0}
+.t-entry{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--b0)}
+.t-entry:last-child{border-bottom:none}
+.t-date{font-size:11px;color:var(--lo);flex-shrink:0;margin-top:1px}
+.t-text{font-size:12px;color:var(--lo);line-height:1.4;flex:1}
+.t-new{display:flex;align-items:center;padding:6px 11px;border-top:1px dashed var(--b1);font-size:12px;color:var(--b2);font-style:italic;cursor:pointer}
+/* Attendees col */
+.att-card{background:var(--raised);border:1px solid var(--b0);border-radius:5px;padding:8px 10px;display:flex;align-items:flex-start;gap:8px}
+.att-wrap{position:relative;width:28px;height:28px;flex-shrink:0}
+.att-av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;position:absolute;top:1px;left:1px}
+.att-av-a{background:#152c54;color:var(--dec)}.att-av-b{background:#103028;color:var(--nt)}.att-av-c{background:#2e1e0c;color:var(--act)}
+.att-ring{position:absolute;top:0;left:0;width:28px;height:28px;border-radius:50%;border:2px solid transparent}
+.ring-ok{border-color:var(--nt)}.ring-p{border-color:var(--act)}
+.att-info{flex:1;min-width:0}
+.att-nm{font-size:12px;color:var(--hi);font-weight:600}
+.att-rl{font-size:11px;color:var(--lo)}
+.att-sig{font-size:11px;color:var(--lo);margin-top:2px}
+.att-sig.w{color:var(--act)}
+.rsvp-pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;flex-shrink:0}
+.rsvp-ok{background:var(--nt-bg);color:var(--nt)}
+.rsvp-p{background:var(--act-bg);color:var(--act)}
+.add-att{border:1px dashed var(--b1);border-radius:5px;padding:7px 10px;cursor:pointer;font-size:12px;color:var(--b2);font-style:italic}
+.chat-empty{font-size:12px;color:var(--b2);font-style:italic;padding:8px 12px}
+.chat-box{margin:4px 12px 10px;background:var(--raised);border:1px solid var(--b1);border-radius:4px;padding:7px 10px;font-size:12px;color:var(--b2);font-style:italic;font-family:inherit}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="tb-logo">accord<span class="tb-logo-dot">.</span></div>
+    <div class="tb-sep"></div>
+    <div class="tb-state">Preparing</div>
+    <div class="tb-title">C-11 Percolate Smoke Test Meeting</div>
+    <div class="tb-back">← Back</div>
+  </div>
+
+  <div class="invite-bar">
+    <div class="invite-title">C-11 Percolate Smoke Test Meeting</div>
+    <div class="stakes-line">Must complete endoscope prototype by 8/11; need to ratify materials vendor selection ASAP</div>
+    <div class="invite-meta">
+      <span class="im"><b>When</b> Mon May 18 · 2:00–3:00 PM</span>
+      <span class="im"><b>Where</b> <span style="color:var(--b2);font-style:italic">add location</span></span>
+      <span class="im"><b>Workstream</b> C-11 Test Workstream</span>
+      <span class="im"><b>Last met</b> Apr 30 · 16d ago</span>
+      <span class="im-badge">↩ Follow-up</span>
+    </div>
+  </div>
+
+  <div class="twin-tabs">
+    <div class="ttab active" id="tab-h" onclick="sw('h')">⊞ History</div>
+    <div class="ttab" id="tab-c" onclick="sw('c')">✎ Composer</div>
+    <div class="tab-spacer"></div>
+    <div class="readiness-bar">
+      <span class="rb-lbl">Readiness</span>
+      <div class="rb-items">
+        <span class="rb-item done"><span class="rb-dot rb-done"></span>Title</span>
+        <span class="rb-item done"><span class="rb-dot rb-done"></span>Stakes</span>
+        <span class="rb-item done"><span class="rb-dot rb-done"></span>When</span>
+        <span class="rb-item todo"><span class="rb-dot rb-todo"></span>Where</span>
+        <span class="rb-item done"><span class="rb-dot rb-done"></span>Outcomes</span>
+        <span class="rb-item todo"><span class="rb-dot rb-todo"></span>Agenda</span>
+      </div>
+      <span class="rb-pct">62%</span>
+    </div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div class="tab-panel active" id="panel-h">
+    <div class="person-filter">
+      <span class="pf-lbl">Filter by</span>
+      <div class="pf-chip all active"><span class="pf-name">All</span></div>
+      <div class="pf-chip"><div class="pf-av pf-av-a">VS</div><span class="pf-name">Vaughn Staples</span></div>
+      <div class="pf-chip"><div class="pf-av pf-av-b">AK</div><span class="pf-name">Angela Kim</span></div>
+      <div class="pf-chip"><div class="pf-av pf-av-c">RW</div><span class="pf-name">Ron White</span></div>
+    </div>
+    <div class="col-headers">
+      <div class="ch"><span class="ch-lbl c-amber">Action Items</span><span class="ch-cnt amber">4 open · 1 overdue</span></div>
+      <div class="ch"><span class="ch-lbl c-cyan">Decisions + Risks</span><span class="ch-cnt cyan">3 decisions · 1 risk</span></div>
+      <div class="ch"><span class="ch-lbl c-muted">Notes</span><span class="ch-cnt">3 topics · 6 entries</span></div>
+    </div>
+    <div class="three-col">
+
+      <!-- ACTION ITEMS -->
+      <div class="content-col">
+        <div class="sec-div"><span style="color:var(--rsk)">Overdue</span></div>
+        <div class="hcard ha ov-card">
+          <div class="hcard-row"><span class="htag htag-ax">AX-007</span><span class="hcard-text">Angela: Obtain written confirmation from vendor on delivery timeline.</span></div>
+          <div class="hcard-meta"><span class="hcard-owner">Angela Kim</span><span class="hcard-ov">↑ Overdue</span></div>
+          <button class="pull-btn">Pull to agenda →</button>
+        </div>
+        <div class="sec-div"><span style="color:var(--act)">Open</span></div>
+        <div class="hcard ha">
+          <div class="hcard-row"><span class="htag htag-ax">AX-008</span><span class="hcard-text">Vaughn: Schedule vendor alignment call and circulate agenda.</span></div>
+          <div class="hcard-meta"><span class="hcard-owner">Vaughn Staples</span><span class="hcard-date">Due May 20</span></div>
+          <button class="pull-btn">Pull to agenda →</button>
+        </div>
+        <div class="hcard ha">
+          <div class="hcard-row"><span class="htag htag-ax">AX-009</span><span class="hcard-text">Angela: Deliver completed component spec to engineering.</span></div>
+          <div class="hcard-meta"><span class="hcard-owner">Angela Kim</span><span class="hcard-date">No due date</span></div>
+          <button class="pull-btn">Pull to agenda →</button>
+        </div>
+        <div class="hcard ha-dim">
+          <div class="hcard-row"><span class="htag htag-ax">AX-010</span><span class="hcard-text">Vaughn: Follow up with vendor on API documentation release date.</span></div>
+          <div class="hcard-meta"><span class="hcard-owner">Vaughn Staples</span><span class="hcard-date">No due date</span></div>
+          <button class="pull-btn">Pull to agenda →</button>
+        </div>
+        <div class="sec-div"><span style="color:var(--nt)">Completed this week</span></div>
+        <div class="hcard hs hd">
+          <div class="hcard-row"><span class="htag htag-ax">AX-005</span><span class="hcard-text struck">Angela: Submit Phase 1 component list to procurement.</span></div>
+          <div class="hcard-meta"><span class="hcard-owner">Angela Kim</span><span class="hcard-done">✓ Closed May 14</span></div>
+        </div>
+        <div class="hcard hs hd">
+          <div class="hcard-row"><span class="htag htag-ax">AX-006</span><span class="hcard-text struck">Vaughn: Confirm engineering headcount for Phase 1.</span></div>
+          <div class="hcard-meta"><span class="hcard-owner">Vaughn Staples</span><span class="hcard-done">✓ Closed May 13</span></div>
+        </div>
+      </div>
+
+      <!-- DECISIONS + RISKS -->
+      <div class="content-col">
+        <div class="sec-div"><span style="color:var(--dec)">Decisions</span></div>
+        <div class="hcard hc">
+          <div class="hcard-row"><span class="htag htag-dc">DC-015</span><span class="hcard-text">Adopt phased delivery model — Phase 1 scope frozen. Vaughn accountable.</span></div>
+          <div class="hcard-meta"><span class="hcard-owner">Vaughn Staples</span><span class="hcard-date">Apr 14</span></div>
+          <button class="pull-btn">Pull to agenda →</button>
+        </div>
+        <div class="hcard hc">
+          <div class="hcard-row"><span class="htag htag-dc">DC-016</span><span class="hcard-text">Proceed with internal spec pending vendor API confirmation.</span></div>
+          <div class="hcard-meta"><span class="hcard-owner">Angela Kim</span><span class="hcard-date">Mar 30</span></div>
+          <button class="pull-btn">Pull to agenda →</button>
+        </div>
+        <div class="hcard hc">
+          <div class="hcard-row"><span class="htag htag-dc">DC-017</span><span class="hcard-text">Adopt revised component spec as Phase 1 baseline — pending sign-off.</span></div>
+          <div class="hcard-meta"><span class="hcard-owner">All</span><span class="hcard-date">Apr 14</span></div>
+          <button class="pull-btn">Pull to agenda →</button>
+        </div>
+        <div class="sec-div"><span style="color:var(--rsk)">Risks + Dissents</span></div>
+        <div class="hcard hr">
+          <div class="hcard-row"><span class="htag htag-ds">DS-005</span><span class="hcard-text">Angela dissents on Phase 1 timeline — vendor dependency not resolved.</span></div>
+          <div class="hcard-meta"><span class="hcard-owner">Angela Kim</span><span class="hcard-ov">Unresolved · Apr 14</span></div>
+          <button class="pull-btn">Pull to agenda →</button>
+        </div>
+      </div>
+
+      <!-- NOTES — hierarchical tree -->
+      <div class="content-col">
+        <div class="disc-row" onclick="toggleDisc(this)">
+          <div class="disc-left"><span class="disc-arrow">▼</span><span class="disc-name">Electrical Engineering</span></div>
+          <span class="disc-right">3 sub-topics</span>
+        </div>
+        <div class="topic-group">
+          <div class="topic-row" onclick="toggleTopic(this)">
+            <div class="topic-left"><span class="topic-arrow">▼</span><span class="topic-name">Adapter Board Thermal Constraints</span></div>
+            <div class="topic-meta"><span class="topic-cnt">3 entries · last: 5/29</span><button class="pull-thread" onclick="event.stopPropagation()">Pull thread →</button></div>
+          </div>
+          <div class="entries">
+            <div class="entry-row latest"><span class="entry-date">5/29</span><span class="entry-id">NT-031</span><span class="entry-text">Thin strand wire confirmed; Ben working with Nimbletronics to test prototype. Ships 6/10.</span></div>
+            <div class="entry-row"><span class="entry-date">5/22</span><span class="entry-id">NT-028</span><span class="entry-text">Cable width beyond max limit; researching thin-strand wire instead.</span></div>
+            <div class="entry-row"><span class="entry-date">5/15</span><span class="entry-id">NT-003</span><span class="entry-text">Ben Roy to investigate copper mesh cable to connect to mother board.</span></div>
+          </div>
+          <div class="topic-row" onclick="toggleTopic(this)">
+            <div class="topic-left"><span class="topic-arrow">►</span><span class="topic-name">PCB Layout Sign-off</span></div>
+            <div class="topic-meta"><span class="topic-cnt">1 entry · last: 5/15</span><button class="pull-thread" onclick="event.stopPropagation()">Pull thread →</button></div>
+          </div>
+          <div class="entries hidden">
+            <div class="entry-row latest"><span class="entry-date">5/15</span><span class="entry-id">NT-004</span><span class="entry-text">Layout review scheduled for 5/22. Sandra to confirm component placement.</span></div>
+          </div>
+          <div class="topic-row" onclick="toggleTopic(this)">
+            <div class="topic-left"><span class="topic-arrow">►</span><span class="topic-name">Power Budget Review</span></div>
+            <div class="topic-meta"><span class="topic-cnt">2 entries · last: 5/22</span><button class="pull-thread" onclick="event.stopPropagation()">Pull thread →</button></div>
+          </div>
+          <div class="entries hidden">
+            <div class="entry-row latest"><span class="entry-date">5/22</span><span class="entry-id">NT-019</span><span class="entry-text">Budget revised; thermal headroom now 12% above spec.</span></div>
+            <div class="entry-row"><span class="entry-date">5/15</span><span class="entry-id">NT-005</span><span class="entry-text">Power budget under review; 8% margin. Ben to verify against final BOM.</span></div>
+          </div>
+        </div>
+        <div class="disc-row" onclick="toggleDisc(this)">
+          <div class="disc-left"><span class="disc-arrow">►</span><span class="disc-name">Mechanical Engineering</span></div>
+          <span class="disc-right">2 sub-topics</span>
+        </div>
+        <div class="topic-group" style="display:none">
+          <div class="topic-row"><div class="topic-left"><span class="topic-arrow">►</span><span class="topic-name">Enclosure Fit Check</span></div><div class="topic-meta"><span class="topic-cnt">2 entries</span><button class="pull-thread">Pull thread →</button></div></div>
+          <div class="entries hidden"></div>
+        </div>
+        <div class="disc-row" onclick="toggleDisc(this)">
+          <div class="disc-left"><span class="disc-arrow">►</span><span class="disc-name">Software Integration</span></div>
+          <span class="disc-right">1 sub-topic</span>
+        </div>
+        <div class="topic-group" style="display:none">
+          <div class="topic-row"><div class="topic-left"><span class="topic-arrow">►</span><span class="topic-name">Firmware API Handshake</span></div><div class="topic-meta"><span class="topic-cnt">1 entry</span><button class="pull-thread">Pull thread →</button></div></div>
+          <div class="entries hidden"></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="fs-bar">
+      <span class="fs-lbl"><b>Workstream timeline · 4 prior meetings</b></span>
+      <div class="fs-chips"><span class="fs-chip">Mar 15 · Kickoff</span><span class="fs-chip">Mar 30 · Review</span><span class="fs-chip">Apr 14 · Decision Gate</span><span class="fs-chip">Apr 30 · Action Review</span></div>
+      <span class="fs-exp">▼ expand</span>
+    </div>
+  </div>
+
+  <!-- COMPOSER TAB -->
+  <div class="tab-panel" id="panel-c">
+    <div class="clone-banner">
+      <span class="clone-text">Prior meeting available — <b>Apr 30 · Action Review</b>. Start composer from that agenda?</span>
+      <button class="clone-btn">Clone &amp; modify →</button>
+      <button class="clone-skip">Start fresh</button>
+    </div>
+    <div class="composer-cols">
+      <div class="comp-col">
+        <div class="comp-hdr"><span class="comp-hdr-lbl">Context</span></div>
+        <div class="comp-body">
+          <div class="ctx-card"><div class="ctx-title">AI Highlights</div><div class="ctx-highlight">Last 3 meetings drove vendor spec progress; 4 actions remain open. Dissent DS-005 unresolved — vendor dependency is the critical blocker.</div></div>
+          <div class="ctx-card"><div class="ctx-title">Last meeting</div><div class="ctx-sub">Apr 30 · Action Review</div><div class="ctx-sub" style="margin-top:3px">60 min · 14 nodes · 3 decisions sealed</div><div style="font-size:11px;color:var(--dec);cursor:pointer;margin-top:5px">Read full minutes →</div></div>
+          <div class="ctx-card"><div class="ctx-title" style="margin-bottom:4px">Action item summary</div><div style="font-size:12px;color:var(--rsk)">1 overdue</div><div style="font-size:12px;color:var(--act)">3 open · 1 due this week</div><div style="font-size:12px;color:var(--nt);margin-top:2px">2 closed this week</div></div>
+        </div>
+      </div>
+      <div class="comp-col">
+        <div class="comp-hdr"><span class="comp-hdr-lbl cyan">Composing</span><span style="font-size:11px;color:var(--lo)">Agenda · Minute Notes</span></div>
+        <div class="comp-body">
+          <div class="compose-sec">Intended outcomes</div>
+          <div class="outcome-row"><span class="ov ov-resolve">RESOLVE</span><span class="outcome-text">Resolve open spec dissent — Angela to confirm or escalate</span><span class="outcome-owner">Angela Kim</span></div>
+          <div class="outcome-row"><span class="ov ov-decide">DECIDE</span><span class="outcome-text">Decide on vendor selection — Vaughn to present recommendation</span><span class="outcome-owner">Vaughn Staples</span></div>
+          <div class="add-row"><span class="add-lbl">+ add outcome…</span></div>
+          <div class="compose-sec" style="margin-top:4px">Status check · carried from Apr 30</div>
+          <div class="status-card">
+            <div class="status-hdr">Open action items</div>
+            <div class="status-row"><span class="sax">AX-007</span><span class="s-text">Angela: Obtain written confirmation from vendor</span><span class="s-ov">Overdue</span></div>
+            <div class="status-row"><span class="sax">AX-008</span><span class="s-text">Vaughn: Schedule vendor alignment call</span><span class="s-date">Due May 20</span></div>
+            <div class="status-row"><span class="sax">AX-009</span><span class="s-text">Angela: Deliver completed component spec</span><span class="s-date">No date</span></div>
+          </div>
+          <div class="compose-sec" style="margin-top:4px">Agenda</div>
+          <div class="agenda-card">
+            <div class="agenda-hdr"><span class="atype atype-r">RESOLVE</span><span class="agenda-title">Angela dissent on component timeline (DS-005)</span><span class="agenda-dur">15 min</span><span class="thread-toggle">▼ 2 entries</span></div>
+            <div class="thread-history">
+              <div class="t-entry"><span class="t-date">Apr 14</span><span class="t-text">Angela dissents — vendor dependency blocks Phase 1 timeline commitment.</span></div>
+              <div class="t-entry"><span class="t-date">Mar 30</span><span class="t-text">Angela flagged dependency on external vendor before Phase 1 can begin.</span></div>
+            </div>
+            <div class="t-new">+ capture note for this meeting…</div>
+          </div>
+          <div class="agenda-card"><div class="agenda-hdr"><span class="atype atype-d">DECIDE</span><span class="agenda-title">Review vendor shortlist and select final candidate</span><span class="agenda-dur">20 min</span><span class="thread-toggle">► 1 entry</span></div></div>
+          <div class="add-row"><span class="add-lbl">+ add agenda item…</span></div>
+        </div>
+      </div>
+      <div class="comp-col">
+        <div class="comp-hdr"><span class="comp-hdr-lbl">Attendees</span><span style="font-size:12px;color:var(--lo);cursor:pointer">+ add</span></div>
+        <div class="comp-body">
+          <div class="att-card"><div class="att-wrap"><div class="att-av att-av-a">VS</div><div class="att-ring"></div></div><div class="att-info"><div class="att-nm">Vaughn Staples</div><div class="att-rl">Organizer</div><div class="att-sig">Owns 2 actions this workstream</div></div></div>
+          <div class="att-card"><div class="att-wrap"><div class="att-av att-av-b">AK</div><div class="att-ring ring-ok"></div></div><div class="att-info"><div class="att-nm">Angela Kim</div><div class="att-rl">Participant</div><div class="att-sig w">2 open actions · dissent open</div></div><span class="rsvp-pill rsvp-ok">Accepted</span></div>
+          <div class="att-card"><div class="att-wrap"><div class="att-av att-av-c">RW</div><div class="att-ring ring-p"></div></div><div class="att-info"><div class="att-nm">Ron White</div><div class="att-rl">Participant</div><div class="att-sig w">No recent activity</div></div><span class="rsvp-pill rsvp-p">Pending</span></div>
+          <div class="add-att">+ add attendee…</div>
+        </div>
+        <div style="border-top:1px solid var(--b0)">
+          <div class="comp-hdr" style="padding:7px 13px"><span class="comp-hdr-lbl">Team chat</span></div>
+          <div class="chat-empty">No messages yet.</div>
+          <div class="chat-box">Message the meeting…</div>
+        </div>
+      </div>
+    </div>
+    <div class="fs-bar">
+      <span class="fs-lbl"><b>Workstream timeline · 4 prior meetings</b></span>
+      <div class="fs-chips"><span class="fs-chip">Mar 15 · Kickoff</span><span class="fs-chip">Mar 30 · Review</span><span class="fs-chip">Apr 14 · Decision Gate</span><span class="fs-chip">Apr 30 · Action Review</span></div>
+      <span class="fs-exp">▼ expand</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function sw(t){['h','c'].forEach(function(id){document.getElementById('tab-'+id).classList.toggle('active',id===t);document.getElementById('panel-'+id).classList.toggle('active',id===t);});}
+function toggleDisc(row){var a=row.querySelector('.disc-arrow'),g=row.nextElementSibling;if(!g)return;var open=a.textContent==='▼';a.textContent=open?'►':'▼';g.style.display=open?'none':'';}
+function toggleTopic(row){var a=row.querySelector('.topic-arrow'),e=row.nextElementSibling;if(!e||!e.classList.contains('entries'))return;var open=a.textContent==='▼';a.textContent=open?'►':'▼';e.classList.toggle('hidden',open);}
+</script>
+</body>
+</html>

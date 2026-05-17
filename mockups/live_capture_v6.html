@@ -1,0 +1,612 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.shell {
+  font-family: 'IBM Plex Mono','SF Mono',monospace;
+  background: #0a0e14; color: #e6edf3;
+  border-radius: 8px; overflow: hidden;
+  display: flex; flex-direction: column; height: 820px;
+  position: relative; user-select: none;
+}
+/* TOPNAV */
+.topnav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 18px; background: #060a0f; height: 50px;
+  border-bottom: 1px solid rgba(255,255,255,0.10); flex-shrink: 0;
+}
+.tn-left { display: flex; align-items: center; gap: 14px; }
+.tn-logo { font-size: 16px; font-weight: 700; color: #f0f6fc; }
+.tn-sep { width: 1px; height: 22px; background: rgba(255,255,255,0.15); }
+.badge-live { display: flex; align-items: center; gap: 8px; background: rgba(255,77,109,0.18); border: 1px solid rgba(255,77,109,0.38); border-radius: 4px; padding: 5px 13px; }
+.pd { width: 9px; height: 9px; border-radius: 50%; background: #ff4d6d; animation: blink 1.2s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.82)} }
+.badge-live span { font-size: 13px; font-weight: 700; color: #ff8899; letter-spacing: 0.08em; text-transform: uppercase; }
+.tn-title { font-size: 14px; color: #d0d8e4; font-weight: 600; }
+.tn-right { display: flex; align-items: center; gap: 18px; }
+.timer-wrap { display: flex; flex-direction: column; align-items: center; }
+.elapsed { font-size: 24px; font-weight: 700; color: #f0f6fc; letter-spacing: 0.05em; font-variant-numeric: tabular-nums; line-height: 1; }
+.elapsed-lbl { font-size: 11px; color: #8a9aaa; text-transform: uppercase; letter-spacing: 0.09em; margin-top: 2px; }
+.end-btn { font-size: 13px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 9px 20px; border-radius: 4px; cursor: pointer; background: rgba(255,77,109,0.18); color: #ff8899; border: 1px solid rgba(255,77,109,0.38); }
+.u-chip { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 5px 13px 5px 6px; }
+.u-av { width: 28px; height: 28px; border-radius: 50%; background: #1a3a5c; border: 2px solid #33ddff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #33ddff; }
+.u-name { font-size: 13px; color: #c0c8d4; }
+
+/* PROGRESS */
+.progress-bar { display: flex; align-items: center; gap: 14px; padding: 8px 18px; background: #080c10; border-bottom: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; }
+.pb-lbl { font-size: 13px; color: #9aaabb; }
+.pb-track { display: flex; gap: 5px; flex: 1; }
+.pb-seg { height: 5px; border-radius: 3px; flex: 1; }
+.pb-done { background: #22ddaa; }
+.pb-active { background: #33ddff; animation: glow 2s ease-in-out infinite; }
+@keyframes glow { 0%,100%{opacity:1} 50%{opacity:0.55} }
+.pb-todo { background: rgba(255,255,255,0.12); }
+.pb-status { font-size: 13px; color: #7a9aaa; white-space: nowrap; }
+
+/* BODY */
+.body { display: flex; flex: 1; overflow: hidden; min-height: 0; position: relative; }
+
+/* ── RESIZE HANDLES ── */
+.resize-handle {
+  width: 6px; flex-shrink: 0; cursor: col-resize;
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+}
+.resize-handle::after {
+  content: ''; width: 2px; height: 48px; border-radius: 1px;
+  background: rgba(255,255,255,0.14); transition: background 0.15s;
+}
+.resize-handle:hover::after { background: rgba(51,221,255,0.7); }
+.resize-handle.dragging::after { background: #33ddff; }
+
+/* CAPTURE COLUMN */
+.col-capture { display: flex; flex-direction: column; overflow: hidden; min-width: 280px; background: #0d1117; }
+.col-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.09); background: #0a0e14; flex-shrink: 0; }
+.col-hdr-lbl { font-size: 13px; letter-spacing: 0.09em; text-transform: uppercase; color: #9aaabb; font-weight: 600; }
+.col-hdr-act { font-size: 13px; color: #4a8a4a; cursor: pointer; }
+.col-hdr-act:hover { color: #22ddaa; }
+.capture-scroll { flex: 1; overflow-y: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+
+/* STATUS STRIP */
+.status-strip { display: flex; align-items: center; gap: 10px; background: rgba(255,187,34,0.06); border: 1px solid rgba(255,187,34,0.18); border-radius: 6px; padding: 10px 14px; cursor: pointer; flex-shrink: 0; }
+.status-strip:hover { background: rgba(255,187,34,0.10); }
+.ss-arr { font-size: 12px; color: #aab870; }
+.ss-lbl { font-size: 13px; font-weight: 700; color: #cccc88; letter-spacing: 0.05em; text-transform: uppercase; flex: 1; }
+.ss-pills { display: flex; gap: 6px; }
+.ss-pill { font-size: 12px; padding: 2px 9px; border-radius: 10px; }
+.pill-ov { background: rgba(255,102,136,0.18); color: #ff9aaa; }
+.pill-op { background: rgba(255,187,34,0.16); color: #ffcc44; }
+.ss-body { padding: 6px 4px 8px; display: none; flex-direction: column; gap: 4px; }
+.ss-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 10px; }
+.ss-tag { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 3px; background: rgba(255,187,34,0.20); color: #ffcc44; flex-shrink: 0; margin-top: 1px; }
+.ss-text { font-size: 13px; color: #b0bac8; flex: 1; line-height: 1.4; }
+.ss-ov { font-size: 12px; color: #ff9aaa; font-weight: 700; flex-shrink: 0; }
+.ss-date { font-size: 12px; color: #8a9aaa; flex-shrink: 0; }
+
+/* ── AGENDA ITEM ── */
+.ag-item {
+  border: 1px solid rgba(255,255,255,0.09); border-radius: 7px;
+  overflow: hidden; flex-shrink: 0;
+  display: flex; flex-direction: column;
+}
+.ag-item.is-active { border-color: rgba(51,221,255,0.35); }
+.ag-item.is-done { opacity: 0.60; }
+
+.ag-hdr {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 16px; cursor: pointer; background: #161c26;
+  transition: background 0.15s; flex-shrink: 0;
+}
+.ag-hdr:hover { background: #1c2430; }
+.ag-item.is-active .ag-hdr { background: #0f1e2e; }
+.ag-item.is-done .ag-hdr { background: #111620; }
+.ag-arr { font-size: 13px; color: #7a8a9a; flex-shrink: 0; }
+.ag-item.is-active .ag-arr { color: #33ddff; }
+.ag-title { font-size: 14px; color: #d0d8e4; flex: 1; line-height: 1.3; }
+.ag-item.is-active .ag-title { color: #f0f6fc; font-weight: 600; }
+.ag-item.is-done .ag-title { text-decoration: line-through; color: #8a9aaa; }
+.ag-meta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.ag-dur { font-size: 13px; color: #7a8a9a; }
+.ag-done { font-size: 13px; color: #22ddaa; }
+.ag-nodes { font-size: 13px; color: #33ddff; }
+.ag-live-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; padding: 3px 10px; border-radius: 3px; background: rgba(51,221,255,0.18); color: #33ddff; border: 1px solid rgba(51,221,255,0.35); animation: glow 2s infinite; }
+
+/* AGENDA BODY — the work surface */
+.ag-body {
+  background: #0b1520;
+  border-top: 2px solid rgba(51,221,255,0.18);
+  display: flex; flex-direction: column;
+}
+
+/* THREAD HISTORY sub-section */
+.thread-section { border-bottom: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; }
+.thread-hdr {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 16px; cursor: pointer;
+  background: rgba(255,255,255,0.02);
+}
+.thread-hdr:hover { background: rgba(255,255,255,0.05); }
+.th-arr { font-size: 12px; color: #5a7a9a; }
+.th-lbl { font-size: 12px; color: #6a9aaa; letter-spacing: 0.07em; text-transform: uppercase; flex: 1; font-weight: 600; }
+.th-meta { font-size: 12px; color: #5a7a9a; }
+.thread-entries { display: none; flex-direction: column; gap: 0; padding: 4px 16px 10px; background: rgba(0,0,0,0.15); }
+.te {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.te:last-child { border-bottom: none; }
+.te-left { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; flex-shrink: 0; min-width: 56px; }
+.te-tag { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
+.te-tag-dc { background: rgba(51,221,255,0.18); color: #33ddff; }
+.te-tag-nt { background: rgba(122,170,200,0.20); color: #9abacf; }
+.te-tag-ax { background: rgba(255,204,68,0.20); color: #ffcc44; }
+.te-tag-rk { background: rgba(255,136,153,0.18); color: #ff8899; }
+.te-date { font-size: 12px; color: #5a7a9a; }
+.te-body { flex: 1; min-width: 0; }
+.te-text { font-size: 13px; color: #9aaabb; line-height: 1.5; }
+.te-author { font-size: 12px; color: #5a7a9a; margin-top: 4px; }
+
+/* CAPTURED THIS MEETING sub-section */
+.captured-section { flex-shrink: 0; }
+.captured-lbl {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 16px 7px;
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #4a7a9a; font-weight: 600;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.captured-lbl::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.05); }
+.captured-entries { padding: 8px 14px; display: flex; flex-direction: column; gap: 7px; }
+
+.entry-card {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: #131e2e; border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 5px; padding: 11px 13px;
+  position: relative; overflow: hidden;
+}
+.entry-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.ec-note::before { background: #7aaac8; }
+.ec-dec::before { background: #33ddff; }
+.ec-act::before { background: #ffcc44; }
+.entry-badge {
+  font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 3px;
+  flex-shrink: 0; cursor: pointer; margin-top: 2px; border: 1px solid;
+  transition: filter 0.15s;
+}
+.entry-badge:hover { filter: brightness(1.3); }
+.eb-note { background: rgba(122,170,200,0.18); color: #9abacf; border-color: rgba(122,170,200,0.32); }
+.eb-dec { background: rgba(51,221,255,0.16); color: #33ddff; border-color: rgba(51,221,255,0.32); }
+.eb-act { background: rgba(255,204,68,0.18); color: #ffcc44; border-color: rgba(255,204,68,0.32); }
+.entry-body { flex: 1; min-width: 0; }
+.entry-text { font-size: 13px; color: #d0d8e4; line-height: 1.55; user-select: text; }
+.entry-meta { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.entry-time { font-size: 12px; color: #7a8a9a; }
+.entry-author { font-size: 12px; color: #6a9aaa; }
+.entry-sealed { font-size: 12px; color: #4a7a4a; }
+.nra-badge { font-size: 12px; padding: 3px 10px; border-radius: 3px; background: rgba(192,132,252,0.15); color: #c084fc; border: 1px solid rgba(192,132,252,0.30); cursor: pointer; margin-top: 7px; display: inline-block; }
+
+/* ADD NOTE — always visible, 4-line textarea */
+.add-section {
+  padding: 10px 14px 14px;
+  border-top: 1px dashed rgba(51,221,255,0.18);
+  background: rgba(51,221,255,0.03);
+  flex-shrink: 0;
+}
+.add-lbl { font-size: 12px; color: #3a6a8a; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 7px; font-weight: 600; }
+.add-textarea {
+  width: 100%; background: #0d1828;
+  border: 1px solid rgba(51,221,255,0.22);
+  border-radius: 5px; padding: 11px 13px;
+  font-size: 13px; color: #e6edf3;
+  font-family: inherit; resize: vertical; outline: none;
+  line-height: 1.6; min-height: 88px;
+  display: block;
+}
+.add-textarea:focus { border-color: rgba(51,221,255,0.50); background: #0f1e32; }
+.add-textarea::placeholder { color: #3a5a6a; }
+.add-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.add-hint { font-size: 12px; color: #3a5a6a; }
+.add-btn { font-size: 13px; font-weight: 700; padding: 8px 18px; border-radius: 5px; background: rgba(34,221,170,0.18); color: #22ddaa; border: 1px solid rgba(34,221,170,0.35); cursor: pointer; }
+.add-btn:hover { background: rgba(34,221,170,0.28); }
+
+/* COLLECTIBLES */
+.col-collect { display: flex; flex-direction: column; overflow: hidden; min-width: 200px; background: #0c1018; }
+.collect-summary { display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+.cs-tile { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px 6px; border-right: 1px solid rgba(255,255,255,0.07); }
+.cs-tile:last-child { border-right: none; }
+.cs-val { font-size: 22px; font-weight: 700; line-height: 1; }
+.cs-lbl { font-size: 12px; color: #7a8a9a; text-transform: uppercase; letter-spacing: 0.07em; margin-top: 3px; }
+.cv-dec { color: #33ddff; }
+.cv-act { color: #ffcc44; }
+.cv-rsk { color: #ff8899; }
+.collect-scroll { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+.collect-sec-lbl { font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: #7a8a9a; padding: 5px 0 3px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: 2px; font-weight: 600; }
+.collect-sec-lbl:first-child { border-top: none; margin-top: 0; }
+.ccard { background: #161c26; border: 1px solid rgba(255,255,255,0.09); border-radius: 5px; padding: 10px 12px; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 5px; }
+.ccard::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.cc-dec::before { background: #33ddff; }
+.cc-act::before { background: #ffcc44; }
+.cc-pulled::before { background: #5a8a6a; }
+.cc-tag { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 3px; display: inline-block; margin-bottom: 2px; }
+.cct-dec { background: rgba(51,221,255,0.16); color: #33ddff; }
+.cct-act { background: rgba(255,204,68,0.18); color: #ffcc44; }
+.cct-pull { background: rgba(100,160,110,0.18); color: #8abf9a; }
+.cc-text { font-size: 13px; color: #c8d0dc; line-height: 1.4; }
+.cc-meta { font-size: 12px; color: #7a8a9a; }
+.cc-owner { font-size: 12px; color: #7a9aaa; }
+
+/* LIVE PANEL */
+.col-live { display: flex; flex-direction: column; overflow: hidden; min-width: 180px; background: #0a0e14; }
+.live-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 13px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+.live-lbl { display: flex; align-items: center; gap: 7px; font-size: 13px; letter-spacing: 0.09em; text-transform: uppercase; color: #ff8899; font-weight: 700; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4d6d; animation: blink 1.2s infinite; }
+.live-cnt { font-size: 13px; color: #7a8a9a; }
+.att-list { padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; }
+.att-c { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: #131c26; border: 1px solid rgba(255,255,255,0.09); border-radius: 5px; }
+.att-p { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.att-p.on { background: #22ddaa; animation: blink 1.8s infinite; }
+.att-p.off { background: #2a3a4a; }
+.att-av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; }
+.av-vs { background: #1a3a5c; color: #33ddff; }
+.av-ak { background: #1a3a2a; color: #22ddaa; }
+.av-rw { background: #3a2a1a; color: #ffbb22; }
+.att-info { flex: 1; min-width: 0; }
+.att-nm { font-size: 13px; color: #d0d8e4; font-weight: 600; }
+.att-rl { font-size: 12px; color: #7a8a9a; }
+.att-you { font-size: 11px; color: #4a8aaa; padding: 2px 6px; border-radius: 3px; background: rgba(51,221,255,0.09); }
+.chat-sec { display: flex; flex-direction: column; flex: 1; overflow: hidden; border-top: 1px solid rgba(255,255,255,0.07); }
+.chat-h { padding: 9px 13px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: #7a8a9a; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+.chat-msgs { padding: 8px 11px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.cm { font-size: 13px; line-height: 1.5; }
+.cm .cma { font-weight: 700; margin-right: 5px; }
+.cm .cmt { color: #9aaabb; }
+.cm.me { text-align: right; }
+.cma-vs { color: #33ddff; }
+.cma-ak { color: #22ddaa; }
+.chat-row { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+.chat-inp { flex: 1; background: #0d1420; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 7px 10px; font-size: 13px; color: #d0d8e4; font-family: inherit; outline: none; }
+.chat-snd { font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 4px; background: rgba(51,221,255,0.14); color: #33ddff; border: 1px solid rgba(51,221,255,0.30); cursor: pointer; }
+
+.fs-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 18px; background: #080c10; border-top: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; cursor: pointer; }
+.fs-lbl { font-size: 12px; color: #7a8a9a; text-transform: uppercase; letter-spacing: 0.06em; }
+.fs-lbl b { color: #9aaabb; }
+.fs-chips { display: flex; gap: 5px; }
+.fs-chip { font-size: 12px; background: #131c26; border: 1px solid rgba(255,255,255,0.09); border-radius: 3px; padding: 3px 9px; color: #7a8a9a; }
+.fs-exp { font-size: 12px; color: #5a6a7a; }
+
+/* POPUP */
+.popup-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.65); z-index: 50; display: flex; align-items: center; justify-content: center; }
+.popup { background: #1a2230; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; padding: 20px; width: 300px; box-shadow: 0 12px 40px rgba(0,0,0,0.7); }
+.popup-title { font-size: 13px; font-weight: 700; color: #d0d8e4; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 14px; }
+.popup-types { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 14px; }
+.pt { padding: 9px 10px; border-radius: 5px; cursor: pointer; border: 1px solid; font-size: 13px; font-weight: 700; text-align: center; transition: filter 0.12s; }
+.pt:hover { filter: brightness(1.2); }
+.pt.selected { outline: 2px solid rgba(255,255,255,0.4); outline-offset: 1px; }
+.pt-note { color: #9abacf; border-color: rgba(154,186,207,0.30); background: rgba(154,186,207,0.09); }
+.pt-dec { color: #33ddff; border-color: rgba(51,221,255,0.32); background: rgba(51,221,255,0.09); }
+.pt-act { color: #ffcc44; border-color: rgba(255,204,68,0.32); background: rgba(255,204,68,0.09); }
+.pt-rsk { color: #ff8899; border-color: rgba(255,136,153,0.30); background: rgba(255,136,153,0.09); }
+.pt-qst { color: #c084fc; border-color: rgba(192,132,252,0.28); background: rgba(192,132,252,0.08); }
+.popup-fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; padding: 12px; background: rgba(255,204,68,0.06); border: 1px solid rgba(255,204,68,0.16); border-radius: 5px; }
+.pf-label { font-size: 12px; color: #aabb88; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px; font-weight: 600; }
+.pf-input { width: 100%; background: #0d1117; border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; padding: 8px 11px; font-size: 13px; color: #d0d8e4; font-family: inherit; outline: none; }
+.popup-actions { display: flex; gap: 9px; justify-content: flex-end; }
+.pa-cancel { font-size: 13px; padding: 7px 14px; border-radius: 4px; background: transparent; color: #8a9aaa; border: 1px solid rgba(255,255,255,0.12); cursor: pointer; }
+.pa-confirm { font-size: 13px; font-weight: 700; padding: 7px 16px; border-radius: 4px; background: rgba(34,221,170,0.16); color: #22ddaa; border: 1px solid rgba(34,221,170,0.32); cursor: pointer; }
+</style>
+
+<div class="shell">
+  <div class="topnav">
+    <div class="tn-left">
+      <span class="tn-logo">Accord</span>
+      <div class="tn-sep"></div>
+      <div class="badge-live"><div class="pd"></div><span>In Session</span></div>
+      <span class="tn-title">C-11 Percolate Smoke Test Meeting</span>
+    </div>
+    <div class="tn-right">
+      <div class="timer-wrap">
+        <div class="elapsed" id="timer">42:17</div>
+        <div class="elapsed-lbl">elapsed</div>
+      </div>
+      <button class="end-btn">End Meeting</button>
+      <div class="u-chip"><div class="u-av">VS</div><span class="u-name">Vaughn Staples</span></div>
+    </div>
+  </div>
+
+  <div class="progress-bar">
+    <span class="pb-lbl">Progress</span>
+    <div class="pb-track">
+      <div class="pb-seg pb-done"></div>
+      <div class="pb-seg pb-active"></div>
+      <div class="pb-seg pb-todo"></div>
+    </div>
+    <span class="pb-status">Item 2 of 3 · 5 nodes captured · 39 of 45 min planned</span>
+  </div>
+
+  <div class="body" id="body">
+
+    <!-- CAPTURE COLUMN -->
+    <div class="col-capture" id="colCapture">
+      <div class="col-hdr">
+        <span class="col-hdr-lbl">Agenda</span>
+        <span class="col-hdr-act">+ New item</span>
+      </div>
+      <div class="capture-scroll">
+
+        <!-- STATUS STRIP -->
+        <div class="status-strip" onclick="toggleStatus(this)">
+          <span class="ss-arr">►</span>
+          <span class="ss-lbl">Status check · Apr 30</span>
+          <div class="ss-pills">
+            <span class="ss-pill pill-ov">1 overdue</span>
+            <span class="ss-pill pill-op">2 open</span>
+          </div>
+        </div>
+        <div class="ss-body" id="ssBody">
+          <div class="ss-item"><span class="ss-tag">AX-007</span><span class="ss-text">Angela: Obtain vendor confirmation on delivery timeline</span><span class="ss-ov">Overdue</span></div>
+          <div class="ss-item"><span class="ss-tag">AX-008</span><span class="ss-text">Vaughn: Schedule vendor alignment call</span><span class="ss-date">May 20</span></div>
+          <div class="ss-item"><span class="ss-tag">AX-009</span><span class="ss-text">Angela: Deliver component spec to engineering</span><span class="ss-date">—</span></div>
+        </div>
+
+        <!-- ITEM 1 — DONE -->
+        <div class="ag-item is-done">
+          <div class="ag-hdr" onclick="toggleAg(this)">
+            <span class="ag-arr">►</span>
+            <span class="ag-title">Angela dissent on component timeline</span>
+            <div class="ag-meta"><span class="ag-dur">15m</span><span class="ag-done">✓ 3 nodes</span></div>
+          </div>
+        </div>
+
+        <!-- ITEM 2 — ACTIVE -->
+        <div class="ag-item is-active">
+          <div class="ag-hdr" onclick="toggleAg(this)">
+            <span class="ag-arr">▼</span>
+            <span class="ag-title">Review vendor shortlist — select final candidate</span>
+            <div class="ag-meta"><span class="ag-dur">20m</span><span class="ag-nodes">2 nodes</span><span class="ag-live-tag">● Active</span></div>
+          </div>
+          <div class="ag-body">
+
+            <!-- THREAD HISTORY — collapsible sub-section only -->
+            <div class="thread-section">
+              <div class="thread-hdr" onclick="toggleThread(this)">
+                <span class="th-arr">►</span>
+                <span class="th-lbl">Thread history from prior meetings</span>
+                <span class="th-meta">4 entries · 2 meetings</span>
+              </div>
+              <div class="thread-entries" id="te1">
+                <div class="te">
+                  <div class="te-left"><span class="te-tag te-tag-dc">DC-015</span><span class="te-date">Apr 14</span></div>
+                  <div class="te-body"><div class="te-text">Adopt phased delivery model — Phase 1 scope frozen. Vendor decision deferred to next meeting.</div><div class="te-author">Vaughn Staples</div></div>
+                </div>
+                <div class="te">
+                  <div class="te-left"><span class="te-tag te-tag-ax">AX-009</span><span class="te-date">Apr 14</span></div>
+                  <div class="te-body"><div class="te-text">Angela: Deliver completed component spec to engineering for review before vendor selection.</div><div class="te-author">Angela Kim · open</div></div>
+                </div>
+                <div class="te">
+                  <div class="te-left"><span class="te-tag te-tag-nt">NT-022</span><span class="te-date">Apr 14</span></div>
+                  <div class="te-body"><div class="te-text">Vendor shortlist narrowed to Nimbletronics and ProtoFab. Decision deferred pending thermal validation.</div><div class="te-author">Vaughn Staples</div></div>
+                </div>
+                <div class="te">
+                  <div class="te-left"><span class="te-tag te-tag-rk">RK-005</span><span class="te-date">Mar 30</span></div>
+                  <div class="te-body"><div class="te-text">ProtoFab lead time flagged as risk — 14-week delivery may conflict with Phase 1 deadline.</div><div class="te-author">Angela Kim</div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CAPTURED THIS MEETING — always visible -->
+            <div class="captured-section">
+              <div class="captured-lbl">Captured this meeting</div>
+              <div class="captured-entries">
+                <div class="entry-card ec-dec">
+                  <span class="entry-badge eb-dec" onclick="openPopup(event)">DC-018</span>
+                  <div class="entry-body">
+                    <div class="entry-text">Nimbletronics selected as primary vendor for Phase 1 component supply. Vaughn to execute NDA by May 22.</div>
+                    <div class="entry-meta"><span class="entry-time">2:31 PM</span><span class="entry-author">Vaughn Staples</span><span class="entry-sealed">· sealed</span></div>
+                    <span class="nra-badge">NRA: draft vendor NDA →</span>
+                  </div>
+                </div>
+                <div class="entry-card ec-note">
+                  <span class="entry-badge eb-note" onclick="openPopup(event)">NT-032</span>
+                  <div class="entry-body">
+                    <div class="entry-text">Angela confirmed Nimbletronics prototype passed thermal validation at 5% above spec. No concerns flagged.</div>
+                    <div class="entry-meta"><span class="entry-time">2:28 PM</span><span class="entry-author">Angela Kim</span><span class="entry-sealed">· sealed</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ADD NOTE — always visible, 4-line textarea -->
+            <div class="add-section">
+              <div class="add-lbl">Add to this item</div>
+              <textarea class="add-textarea" placeholder="Type a note, decision, action, or observation…&#10;&#10;Click + ADD or use keyboard shortcuts:&#10;N = Note · D = Decision · A = Action · R = Risk"></textarea>
+              <div class="add-footer">
+                <span class="add-hint">N · D · A · R · Q to commit</span>
+                <button class="add-btn">+ ADD</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ITEM 3 — UPCOMING -->
+        <div class="ag-item">
+          <div class="ag-hdr" onclick="toggleAg(this)">
+            <span class="ag-arr">►</span>
+            <span class="ag-title">Assign follow-up actions to team members</span>
+            <div class="ag-meta"><span class="ag-dur">10m</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- RESIZE 1 -->
+    <div class="resize-handle" id="rh1"></div>
+
+    <!-- COLLECTIBLES -->
+    <div class="col-collect" id="colCollect">
+      <div class="col-hdr">
+        <span class="col-hdr-lbl">Collectibles</span>
+      </div>
+      <div class="collect-summary">
+        <div class="cs-tile"><span class="cs-val cv-dec">2</span><span class="cs-lbl">Decisions</span></div>
+        <div class="cs-tile"><span class="cs-val cv-act">1</span><span class="cs-lbl">Actions</span></div>
+        <div class="cs-tile"><span class="cs-val cv-rsk">0</span><span class="cs-lbl">Risks</span></div>
+      </div>
+      <div class="collect-scroll">
+        <div class="collect-sec-lbl">Created this meeting</div>
+        <div class="ccard cc-dec">
+          <span class="cc-tag cct-dec">DC-018</span>
+          <div class="cc-text">Nimbletronics selected as primary vendor for Phase 1.</div>
+          <div class="cc-meta">Vaughn · 2:31 PM</div>
+        </div>
+        <div class="ccard cc-act">
+          <span class="cc-tag cct-act">AX-011</span>
+          <div class="cc-text">Circulate vendor shortlist with evaluation matrix.</div>
+          <div class="cc-owner">Vaughn · due May 20</div>
+        </div>
+        <div class="collect-sec-lbl">Pulled into this meeting</div>
+        <div class="ccard cc-pulled">
+          <span class="cc-tag cct-pull">DC-015 ↗</span>
+          <div class="cc-text">Adopt phased delivery model — Phase 1 scope frozen.</div>
+          <div class="cc-meta">From Apr 14 · still active</div>
+        </div>
+        <div class="ccard cc-pulled">
+          <span class="cc-tag cct-pull">DS-005 ↗</span>
+          <div class="cc-text">Angela dissent on Phase 1 timeline.</div>
+          <div class="cc-meta" style="color:#22ddaa;">✓ Resolved 2:18 PM</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESIZE 2 -->
+    <div class="resize-handle" id="rh2"></div>
+
+    <!-- LIVE PANEL -->
+    <div class="col-live" id="colLive">
+      <div class="live-hdr">
+        <div class="live-lbl"><div class="live-dot"></div>Live</div>
+        <span class="live-cnt">3 invited</span>
+      </div>
+      <div class="att-list">
+        <div class="att-c">
+          <div class="att-p on"></div>
+          <div class="att-av av-vs">VS</div>
+          <div class="att-info"><div class="att-nm">Vaughn Staples</div><div class="att-rl">Organizer</div></div>
+          <span class="att-you">you</span>
+        </div>
+        <div class="att-c">
+          <div class="att-p on"></div>
+          <div class="att-av av-ak">AK</div>
+          <div class="att-info"><div class="att-nm">Angela Kim</div><div class="att-rl">Participant</div></div>
+        </div>
+        <div class="att-c" style="opacity:0.55;">
+          <div class="att-p off"></div>
+          <div class="att-av av-rw">RW</div>
+          <div class="att-info"><div class="att-nm">Ron White</div><div class="att-rl" style="font-style:italic;">Not joined</div></div>
+        </div>
+      </div>
+      <div class="chat-sec">
+        <div class="chat-h">Team chat</div>
+        <div class="chat-msgs">
+          <div class="cm"><span class="cma cma-ak">Angela</span><span class="cmt">Thermal results look good — confident in Nimbletronics</span></div>
+          <div class="cm me"><span class="cma cma-vs">You</span><span class="cmt">Agreed. Moving to vendor vote</span></div>
+          <div class="cm"><span class="cma cma-ak">Angela</span><span class="cmt">Ready when you are</span></div>
+        </div>
+        <div class="chat-row">
+          <input class="chat-inp" placeholder="Message…" />
+          <button class="chat-snd">Send</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="fs-bar">
+    <span class="fs-lbl"><b>4 prior meetings</b></span>
+    <div class="fs-chips">
+      <span class="fs-chip">Mar 15 · Kickoff</span>
+      <span class="fs-chip">Mar 30 · Review</span>
+      <span class="fs-chip">Apr 14 · Decision Gate</span>
+      <span class="fs-chip">Apr 30 · Action Review</span>
+    </div>
+    <span class="fs-exp">▼ expand</span>
+  </div>
+
+  <!-- POPUP -->
+  <div class="popup-overlay" id="popup" style="display:none;" onclick="closePopup(event)">
+    <div class="popup" onclick="event.stopPropagation()">
+      <div class="popup-title">Reclassify entry</div>
+      <div class="popup-types">
+        <div class="pt pt-note" onclick="selType(this,'note')">Note</div>
+        <div class="pt pt-dec" onclick="selType(this,'dec')">Decision</div>
+        <div class="pt pt-act selected" onclick="selType(this,'act')">Action Item</div>
+        <div class="pt pt-rsk" onclick="selType(this,'rsk')">Risk</div>
+        <div class="pt pt-qst" onclick="selType(this,'qst')">Question</div>
+      </div>
+      <div class="popup-fields" id="pf">
+        <div><div class="pf-label">Assignee</div><input class="pf-input" value="Vaughn Staples" /></div>
+        <div><div class="pf-label">Due date</div><input class="pf-input" value="May 22, 2026" /></div>
+      </div>
+      <div class="popup-actions">
+        <button class="pa-cancel" onclick="closePopup()">Cancel</button>
+        <button class="pa-confirm" onclick="closePopup()">Confirm →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Timer
+var s0=Date.now()-(42*60+17)*1000;
+function tick(){var e=document.getElementById('timer');if(!e)return;var s=Math.floor((Date.now()-s0)/1000),m=Math.floor(s/60);s=s%60;e.textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
+tick();setInterval(tick,1000);
+
+// Toggles
+function toggleStatus(el){var b=document.getElementById('ssBody'),a=el.querySelector('.ss-arr'),o=a.textContent==='▼';a.textContent=o?'►':'▼';b.style.display=o?'none':'flex';}
+function toggleAg(hdr){var card=hdr.parentElement,body=card.querySelector('.ag-body'),arr=hdr.querySelector('.ag-arr');if(!body)return;var o=arr.textContent==='▼';arr.textContent=o?'►':'▼';body.style.display=o?'none':'';}
+function toggleThread(el){var arr=el.querySelector('.th-arr'),body=el.nextElementSibling,o=arr.textContent==='▼';arr.textContent=o?'►':'▼';body.style.display=o?'none':'flex';}
+
+// Popup
+function openPopup(e){e.stopPropagation();document.getElementById('popup').style.display='flex';}
+function closePopup(e){if(!e||e.target===document.getElementById('popup'))document.getElementById('popup').style.display='none';}
+function selType(el,type){
+  document.querySelectorAll('.pt').forEach(function(p){p.classList.remove('selected');});
+  el.classList.add('selected');
+  var f=document.getElementById('pf');
+  if(type==='act'){f.innerHTML='<div><div class="pf-label">Assignee</div><input class="pf-input" value="Vaughn Staples"/></div><div><div class="pf-label">Due date</div><input class="pf-input" value="May 22, 2026"/></div>';f.style.display='flex';}
+  else if(type==='dec'){f.innerHTML='<div><div class="pf-label">Effective date</div><input class="pf-input" placeholder="Optional"/></div>';f.style.display='flex';}
+  else if(type==='rsk'){f.innerHTML='<div><div class="pf-label">Severity</div><input class="pf-input" placeholder="Low / Medium / High"/></div>';f.style.display='flex';}
+  else{f.style.display='none';}
+}
+
+// Resize handles — Iron Rule
+function makeResizable(handleId, leftColId, rightColId) {
+  var handle = document.getElementById(handleId);
+  var leftCol = document.getElementById(leftColId);
+  var dragging = false, startX, startW;
+  handle.addEventListener('mousedown', function(e) {
+    dragging = true;
+    startX = e.clientX;
+    startW = leftCol.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    var delta = e.clientX - startX;
+    var newW = Math.max(200, startW + delta);
+    leftCol.style.width = newW + 'px';
+    leftCol.style.flex = 'none';
+  });
+  document.addEventListener('mouseup', function() {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+  });
+}
+makeResizable('rh1', 'colCapture', 'colCollect');
+makeResizable('rh2', 'colCollect', 'colLive');
+</script>
