@@ -589,9 +589,7 @@ var AccordLiveCapture = (function () {
         if (lastAuthorId !== null) html += '</div>';
         html += '<div class="ac-lc-chat-msg-group">';
         html += '<div class="ac-lc-chat-msg-header' + cls + '">';
-        if (!isMe) {
-          html += '<span class="ac-lc-chat-msg-author">' + _esc(msg._author_name || '') + '</span>';
-        }
+        html += '<span class="ac-lc-chat-msg-author">' + _esc(msg._author_name || '') + '</span>';
         html += '<span style="font-size:10px;color:var(--lo)">' + _esc(_fmtChatTime(msg.created_at)) + '</span>';
         html += '</div>';
         lastAuthorId = msg.author_resource_id;
@@ -624,7 +622,7 @@ var AccordLiveCapture = (function () {
     wrap.className = 'ac-lc-chat-msg-group';
     wrap.innerHTML =
       '<div class="ac-lc-chat-msg-header' + cls + '">' +
-        (!isMe ? '<span class="ac-lc-chat-msg-author">' + _esc(msg._author_name || '') + '</span>' : '') +
+        '<span class="ac-lc-chat-msg-author">' + _esc(msg._author_name || '') + '</span>' +
         '<span style="font-size:10px;color:var(--lo)">' + _esc(_fmtChatTime(msg.created_at)) + '</span>' +
       '</div>' +
       '<div class="ac-lc-chat-msg-row' + cls + '">' +
