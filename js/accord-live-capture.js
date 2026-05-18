@@ -37,7 +37,7 @@ var AccordLiveCapture = (function () {
   var _agendaExpanded      = {};
   var _agendaHistCollapsed = {};
   var _agendaNewCounts     = {};
-  var _agendaEventsWired   = false;  // guard: wire click handler only once
+  var _agendaClickHandler  = null;  // named handler ref for remove/re-add
   var _agendaSectionOpen   = true;
 
   // Phase 5 section state
@@ -576,15 +576,14 @@ var AccordLiveCapture = (function () {
         '</div>';
     });
     container.innerHTML = html;
-    if (!_agendaEventsWired) {
-      _wireAgendaItemEvents(container);
-      _agendaEventsWired = true;
-    }
+    if (_agendaClickHandler) container.removeEventListener('click', _agendaClickHandler);
+    _agendaClickHandler = _makeAgendaClickHandler(container);
+    container.addEventListener('click', _agendaClickHandler);
     items.forEach(function(item) { if (_agendaExpanded[item.agenda_item_id]) _loadItemBody(item); });
   }
 
-  function _wireAgendaItemEvents(container) {
-    container.addEventListener('click', function(ev) {
+  function _makeAgendaClickHandler(container) {
+    return function(ev) {
       // Check specific button actions FIRST — before toggle-item — because
       // status buttons live inside the header div that carries data-action="toggle-item".
       // IR47 finding: accord_agenda_items_status_check constraint allows
@@ -607,7 +606,7 @@ var AccordLiveCapture = (function () {
       // Toggle item last
       var t = ev.target.closest('[data-action="toggle-item"]');
       if (t) { var id=t.dataset.itemId; _agendaExpanded[id]=!_agendaExpanded[id]; if(_agendaExpanded[id]) _agendaNewCounts[id]=0; _renderAgendaSection(); return; }
-    });
+    };
   }
 
   function _loadItemBody(item) {
@@ -1609,7 +1608,7 @@ var AccordLiveCapture = (function () {
   function _teardown() {
     _stopTimer(); _stopPresencePoll(); _unsubscribeChatRealtime();
     if (_intersectionObs) { _intersectionObs.disconnect(); _intersectionObs=null; }
-    _chatMessages=[]; _agendaItems=[]; _agendaExpanded={}; _agendaHistCollapsed={}; _agendaNewCounts={}; _agendaEventsWired=false;
+    _chatMessages=[]; _agendaItems=[]; _agendaExpanded={}; _agendaHistCollapsed={}; _agendaNewCounts={}; _agendaClickHandler=null;
     _sectionNodes={decision:[],action:[],risk:[],question:[]}; _sectionAttendees=[]; _actionAssignee=null;
     _meeting=null; _myResourceId=null; _attendeeNameMap={};
     var host = document.getElementById('ac-meeting-surface-host'); if (host) host.innerHTML='';
