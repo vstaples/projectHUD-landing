@@ -463,7 +463,7 @@ var AccordLiveCapture = (function () {
         var body = document.getElementById('ac-lc-agenda-body'); var chev = document.getElementById('ac-lc-agenda-chev');
         if (body) body.style.display = _agendaSectionOpen ? '' : 'none';
         if (chev) chev.classList.toggle('open', _agendaSectionOpen);
-        if (_updateNavActive) setTimeout(_updateNavActive, 50);
+        _setNavActive('agenda');
         return;
       }
       var bEl = document.getElementById('ac-lc-' + key + '-body'); var cEl = hdr.querySelector('.ac-lc-sec-chevron');
@@ -471,7 +471,14 @@ var AccordLiveCapture = (function () {
       var open = bEl.style.display !== 'none';
       bEl.style.display = open ? 'none' : '';
       if (cEl) cEl.classList.toggle('open', !open);
-      if (_updateNavActive) setTimeout(_updateNavActive, 50);
+      _setNavActive(key);
+    });
+  }
+
+  // Set nav active item directly by section key
+  function _setNavActive(key) {
+    document.querySelectorAll('.ac-lc-nav-item').forEach(function(link) {
+      link.classList.toggle('active', link.dataset.section === key);
     });
   }
 
