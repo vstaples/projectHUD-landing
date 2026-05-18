@@ -1191,10 +1191,15 @@ var AccordLiveCapture = (function () {
         window.Accord.state.meeting.state = 'closed';
       }
       // IR72: dispatch level-changed — accord-transitions.js routes to closed view
+      // Detail shape confirmed from accord-core.js:313 — { level, context }
       window.dispatchEvent(new CustomEvent('accord:level-changed', {
-        detail: window.Accord && window.Accord.state && window.Accord.state.levelContext
-          ? window.Accord.state.levelContext
-          : {}
+        detail: {
+          level:   'meeting',
+          context: {
+            meetingId:     _meeting.meeting_id,
+            workstreamId:  _meeting.workstream_id
+          }
+        }
       }));
     }).catch(function(err) {
       console.error('[AccordLiveCapture] _endMeeting PATCH failed', err);
