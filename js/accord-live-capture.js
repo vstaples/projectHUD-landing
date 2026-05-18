@@ -39,6 +39,11 @@ var AccordLiveCapture = (function () {
   var _agendaNewCounts     = {};
   var _agendaSectionOpen   = true;
 
+  // Phase 5 section state
+  var _sectionNodes = { decision: [], action: [], risk: [], question: [] };
+  var _sectionAttendees = [];   // meeting attendees for PersonPicker in Actions
+  var _actionAssignee = null;   // pending assignee from PersonPicker in add row
+
   // Sidebar resize
   var _sidebarDragging   = false;
   var _sidebarStartX     = 0;
@@ -122,7 +127,68 @@ var AccordLiveCapture = (function () {
     '.ac-lc-captured-label{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--lo);padding:8px 0 5px}.ac-lc-captured-row{display:flex;align-items:baseline;gap:8px;padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.03)}.ac-lc-captured-row:last-child{border-bottom:none}.ac-lc-captured-badge{font-size:9px;font-weight:700;border-radius:3px;padding:1px 5px;flex-shrink:0;cursor:pointer;transition:opacity .1s}.ac-lc-captured-badge:hover{opacity:.75}.ac-lc-captured-text{flex:1;color:var(--md)}.ac-lc-captured-time{color:var(--lo);flex-shrink:0;font-size:10px}' +
     '.ac-lc-add-zone{margin-top:10px;position:relative}.ac-lc-add-textarea{width:100%;box-sizing:border-box;background:rgba(232,148,48,.025);border:1px solid rgba(232,148,48,.28);border-radius:6px;padding:8px 10px 32px;font-size:12px;font-family:inherit;color:var(--hi);resize:vertical;min-height:72px;outline:none;transition:background .15s,border-color .15s}.ac-lc-add-textarea:focus{background:rgba(232,148,48,.05);border-color:rgba(232,148,48,.5)}.ac-lc-add-btn{position:absolute;bottom:8px;right:8px;font-size:11px;font-weight:600;color:var(--nt);background:var(--nt-bg);border:1px solid var(--nt-bd);border-radius:5px;padding:3px 10px;cursor:pointer;transition:opacity .1s}.ac-lc-add-btn:hover{opacity:.8}' +
     '.ac-lc-reclassify-backdrop{position:fixed;inset:0;z-index:200}.ac-lc-reclassify-popup{position:fixed;z-index:201;background:var(--raised);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:14px;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.5)}.ac-lc-reclassify-title{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--lo);margin-bottom:10px}.ac-lc-reclassify-types{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.ac-lc-reclassify-type{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:500;transition:background .1s}.ac-lc-reclassify-type:hover,.ac-lc-reclassify-type.selected{background:var(--hover)}.ac-lc-reclassify-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}.ac-lc-reclassify-fields{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}.ac-lc-reclassify-field{display:flex;flex-direction:column;gap:3px}.ac-lc-reclassify-field label{font-size:10px;color:var(--lo)}.ac-lc-reclassify-field input{background:var(--b0);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:4px 8px;font-size:12px;font-family:inherit;color:var(--hi);outline:none}.ac-lc-reclassify-field input:focus{border-color:rgba(74,140,245,.4)}.ac-lc-reclassify-actions{display:flex;gap:6px;justify-content:flex-end}.ac-lc-reclassify-cancel{font-size:11px;color:var(--lo);background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:4px 10px;cursor:pointer}.ac-lc-reclassify-confirm{font-size:11px;font-weight:600;color:var(--hi);background:var(--dec);border:none;border-radius:5px;padding:4px 12px;cursor:pointer}.ac-lc-reclassify-confirm:hover{opacity:.88}' +
-    '.ac-lc-empty-agenda{font-size:12px;color:var(--lo);font-style:italic;padding:16px 0}';
+    '.ac-lc-empty-agenda{font-size:12px;color:var(--lo);font-style:italic;padding:16px 0}' +
+
+    // Phase 5 section components
+    '.ac-lc-sec-count{font-size:10px;color:var(--lo);margin-right:6px}' +
+    '.ac-lc-sec-count--alert{color:var(--rsk)!important}' +
+    '.ac-lc-sec-body-inner{padding:12px 20px 16px}' +
+    '.ac-lc-sec-add-row{display:flex;gap:6px;padding:10px 0 2px;align-items:center}' +
+    '.ac-lc-sec-add-input{flex:1;background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:6px;padding:7px 10px;font-size:12px;font-family:inherit;color:var(--hi);outline:none;transition:border-color .15s}' +
+    '.ac-lc-sec-add-input:focus{border-color:rgba(74,140,245,.4)}' +
+    '.ac-lc-sec-add-btn{font-size:11px;font-weight:600;border-radius:6px;padding:6px 12px;cursor:pointer;flex-shrink:0;border:none;transition:opacity .1s}' +
+    '.ac-lc-sec-add-btn:hover{opacity:.8}' +
+    '.ac-lc-sec-empty{font-size:12px;color:var(--lo);font-style:italic;padding:8px 0 4px}' +
+    // Decisions
+    '.ac-lc-dec-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}' +
+    '.ac-lc-dec-row:last-child{border-bottom:none}' +
+    '.ac-lc-dec-badge{font-size:9px;font-weight:700;border-radius:2px;padding:2px 5px;flex-shrink:0;cursor:pointer;margin-top:2px;color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd)}' +
+    '.ac-lc-dec-text{flex:1;font-size:13px;color:var(--hi);line-height:1.4}' +
+    '.ac-lc-dec-meta{font-size:11px;color:var(--lo);white-space:nowrap;flex-shrink:0;padding-top:2px}' +
+    // Actions table
+    '.ac-lc-act-table{width:100%;border-collapse:collapse;font-size:12px}' +
+    '.ac-lc-act-thead th{font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--lo);text-align:left;padding:2px 8px 8px}' +
+    '.ac-lc-act-row{border-top:1px solid rgba(255,255,255,.04)}' +
+    '.ac-lc-act-row td{padding:7px 8px;vertical-align:middle}' +
+    '.ac-lc-act-owner{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--md)}' +
+    '.ac-lc-act-avatar{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;color:var(--dec);background:var(--dec-bg)}' +
+    '.ac-lc-act-task{font-size:12px;color:var(--hi)}' +
+    '.ac-lc-act-badge{font-size:9px;font-weight:700;border-radius:2px;padding:2px 5px;flex-shrink:0;cursor:pointer;color:var(--act);background:var(--act-bg);border:1px solid var(--act-bd)}' +
+    '.ac-lc-status-chip{font-size:10px;font-weight:600;border-radius:10px;padding:2px 8px;cursor:pointer}' +
+    '.ac-lc-status-chip--open{color:var(--act);background:var(--act-bg);border:1px solid var(--act-bd)}' +
+    '.ac-lc-status-chip--overdue{color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd)}' +
+    '.ac-lc-status-chip--done{color:var(--nt);background:var(--nt-bg);border:1px solid var(--nt-bd)}' +
+    '.ac-lc-act-add-row{display:flex;gap:6px;padding:10px 0 2px;align-items:center;flex-wrap:wrap}' +
+    '.ac-lc-assignee-btn{display:flex;align-items:center;gap:6px;background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:6px;padding:5px 10px;font-size:12px;font-family:inherit;color:var(--md);cursor:pointer;flex-shrink:0;transition:border-color .15s}' +
+    '.ac-lc-assignee-btn:hover{border-color:rgba(74,140,245,.3)}' +
+    '.ac-lc-date-input{background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit;color:var(--hi);outline:none;flex-shrink:0;width:130px;color-scheme:dark}' +
+    // Risks
+    '.ac-lc-rsk-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}' +
+    '.ac-lc-rsk-row:last-child{border-bottom:none}' +
+    '.ac-lc-rsk-badge{font-size:9px;font-weight:700;border-radius:2px;padding:2px 5px;flex-shrink:0;cursor:pointer;margin-top:2px;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd)}' +
+    '.ac-lc-ds-badge{font-size:9px;font-weight:700;border-radius:2px;padding:2px 5px;flex-shrink:0;cursor:pointer;margin-top:2px;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd)}' +
+    '.ac-lc-rsk-text{flex:1;font-size:12px;color:var(--hi)}' +
+    '.ac-lc-severity-chip{font-size:9px;font-weight:600;border-radius:10px;padding:1px 7px;flex-shrink:0}' +
+    '.ac-lc-severity-chip--low{color:var(--act);background:var(--act-bg);border:1px solid var(--act-bd)}' +
+    '.ac-lc-severity-chip--medium{color:var(--act);background:var(--act-bg);border:1px solid var(--act-bd)}' +
+    '.ac-lc-severity-chip--high{color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd)}' +
+    '.ac-lc-sev-select{background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;color:var(--hi);cursor:pointer;flex-shrink:0}' +
+    // Parking lot
+    '.ac-lc-park-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}' +
+    '.ac-lc-park-row:last-child{border-bottom:none}' +
+    '.ac-lc-park-dot{width:8px;height:8px;border-radius:50%;background:#9478e0;flex-shrink:0;margin-top:4px}' +
+    '.ac-lc-park-text{flex:1;font-size:12px;color:var(--hi)}' +
+    '.ac-lc-park-source{font-size:10px;color:var(--lo);margin-top:2px}' +
+    // Edit popup (shared with reclassify)
+    '.ac-lc-edit-popup{position:fixed;z-index:201;background:var(--raised);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:14px;min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.5)}' +
+    '.ac-lc-edit-title{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--lo);margin-bottom:10px}' +
+    '.ac-lc-edit-field{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}' +
+    '.ac-lc-edit-field label{font-size:10px;color:var(--lo)}' +
+    '.ac-lc-edit-field textarea,.ac-lc-edit-field input{background:var(--b0);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;color:var(--hi);outline:none;resize:vertical}' +
+    '.ac-lc-edit-field textarea:focus,.ac-lc-edit-field input:focus{border-color:rgba(74,140,245,.4)}' +
+    '.ac-lc-edit-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:10px}' +
+    '.ac-lc-edit-cancel{font-size:11px;color:var(--lo);background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:4px 10px;cursor:pointer}' +
+    '.ac-lc-edit-save{font-size:11px;font-weight:600;color:var(--hi);background:var(--dec);border:none;border-radius:5px;padding:4px 12px;cursor:pointer}'
   }
 
   // Shell HTML
@@ -170,10 +236,10 @@ var AccordLiveCapture = (function () {
             '<div id="ac-lc-agenda-items"><div style="padding:20px;font-size:12px;color:var(--lo)">Loading agenda\u2026</div></div>' +
           '</div></div>' +
         '</div>' +
-        '<div id="ac-lc-sec-decisions"><div class="ac-lc-sec-header" data-section-toggle="decisions"><span class="ac-lc-sec-bar ac-lc-sec-bar--decisions"></span><span class="ac-lc-sec-title">Decisions</span><span class="ac-lc-sec-chevron">\u25b6</span></div><div id="ac-lc-decisions-body" style="display:none"><div class="ac-lc-sec-placeholder">Decisions \u2014 Phase 5</div></div></div>' +
-        '<div id="ac-lc-sec-actions"><div class="ac-lc-sec-header" data-section-toggle="actions"><span class="ac-lc-sec-bar ac-lc-sec-bar--actions"></span><span class="ac-lc-sec-title">Action Items</span><span class="ac-lc-sec-chevron">\u25b6</span></div><div id="ac-lc-actions-body" style="display:none"><div class="ac-lc-sec-placeholder">Action Items \u2014 Phase 5</div></div></div>' +
-        '<div id="ac-lc-sec-risks"><div class="ac-lc-sec-header" data-section-toggle="risks"><span class="ac-lc-sec-bar ac-lc-sec-bar--risks"></span><span class="ac-lc-sec-title">Risks &amp; Issues</span><span class="ac-lc-sec-chevron">\u25b6</span></div><div id="ac-lc-risks-body" style="display:none"><div class="ac-lc-sec-placeholder">Risks &amp; Issues \u2014 Phase 5</div></div></div>' +
-        '<div id="ac-lc-sec-parking"><div class="ac-lc-sec-header" data-section-toggle="parking"><span class="ac-lc-sec-bar ac-lc-sec-bar--parking"></span><span class="ac-lc-sec-title">Parking Lot</span><span class="ac-lc-sec-chevron">\u25b6</span></div><div id="ac-lc-parking-body" style="display:none"><div class="ac-lc-sec-placeholder">Parking Lot \u2014 Phase 5</div></div></div>' +
+        '<div id="ac-lc-sec-decisions"><div class="ac-lc-sec-header" data-section-toggle="decisions"><span class="ac-lc-sec-bar ac-lc-sec-bar--decisions"></span><span class="ac-lc-sec-title">Decisions</span><span class="ac-lc-sec-count" id="ac-lc-count-decisions"></span><span class="ac-lc-sec-chevron">\u25b6</span></div><div id="ac-lc-decisions-body" style="display:none"></div></div>' +
+        '<div id="ac-lc-sec-actions"><div class="ac-lc-sec-header" data-section-toggle="actions"><span class="ac-lc-sec-bar ac-lc-sec-bar--actions"></span><span class="ac-lc-sec-title">Action Items</span><span class="ac-lc-sec-count" id="ac-lc-count-actions"></span><span class="ac-lc-sec-chevron">\u25b6</span></div><div id="ac-lc-actions-body" style="display:none"></div></div>' +
+        '<div id="ac-lc-sec-risks"><div class="ac-lc-sec-header" data-section-toggle="risks"><span class="ac-lc-sec-bar ac-lc-sec-bar--risks"></span><span class="ac-lc-sec-title">Risks &amp; Issues</span><span class="ac-lc-sec-count" id="ac-lc-count-risks"></span><span class="ac-lc-sec-chevron">\u25b6</span></div><div id="ac-lc-risks-body" style="display:none"></div></div>' +
+        '<div id="ac-lc-sec-parking"><div class="ac-lc-sec-header" data-section-toggle="parking"><span class="ac-lc-sec-bar ac-lc-sec-bar--parking"></span><span class="ac-lc-sec-title">Parking Lot</span><span class="ac-lc-sec-count" id="ac-lc-count-parking"></span><span class="ac-lc-sec-chevron">\u25b6</span></div><div id="ac-lc-parking-body" style="display:none"></div></div>' +
       '</div>' +
     '</div></div>';
   }
@@ -764,9 +830,575 @@ var AccordLiveCapture = (function () {
   }
 
   // Remote events
+
+  // ── Phase 5: Four consolidated canvas sections ──────────────────────────
+  // IR47 findings (surfaced):
+  //   1. Prefer: return=representation — confirmed present in API layer.
+  //      Phase 4 INSERTs returned seq_id (NT-032 etc.) confirming full row
+  //      is returned on POST. PATCH responses also return full row.
+  //   2. tag: 'question' for Parking Lot — confirmed valid from
+  //      accord-capture.js TAG_KEYS = { q: 'question' }. Operator to
+  //      run SQL verification query per §5 of handoff to double-confirm.
+
+  function _loadSectionNodes(meetingId) {
+    API.get(
+      'accord_nodes?meeting_id=eq.'+meetingId+
+      '&tag=in.(decision,action,risk,dissent,question)'+
+      '&select=node_id,seq_id,tag,summary,body,created_by,created_at,due_date,status,effective_date'+
+      '&order=created_at.asc'
+    ).then(function(rows) {
+      rows = rows || [];
+      _sectionNodes.decision = rows.filter(function(n){return n.tag==='decision';});
+      _sectionNodes.action   = rows.filter(function(n){return n.tag==='action';});
+      _sectionNodes.risk     = rows.filter(function(n){return n.tag==='risk'||n.tag==='dissent';});
+      _sectionNodes.question = rows.filter(function(n){return n.tag==='question';});
+      _paintDecisions();
+      _paintActions();
+      _paintRisks();
+      _paintParking();
+    }).catch(function(e) { console.warn('[AccordLiveCapture] section nodes load failed', e); });
+  }
+
+  function _updateSectionCount(key, nodes) {
+    var idMap = { decision: 'ac-lc-count-decisions', action: 'ac-lc-count-actions', risk: 'ac-lc-count-risks', question: 'ac-lc-count-parking' };
+    var el = document.getElementById(idMap[key]); if (!el) return;
+    if (key==='action') {
+      var today = Date.now();
+      var overdue = nodes.filter(function(n){return n.due_date&&new Date(n.due_date).getTime()<today&&n.status!=='complete';});
+      el.innerHTML = nodes.length+' assigned' + (overdue.length?' &middot; <span class="ac-lc-sec-count--alert">'+overdue.length+' overdue</span>':'');
+    } else {
+      var labels = { decision: 'recorded', risk: 'flagged', question: 'deferred' };
+      el.textContent = nodes.length+' '+(labels[key]||'');
+    }
+  }
+
+  // ── Decisions ────────────────────────────────────────────────────────────
+  function _paintDecisions() {
+    var body = document.getElementById('ac-lc-decisions-body'); if (!body) return;
+    var nodes = _sectionNodes.decision;
+    _updateSectionCount('decision', nodes);
+    var html = '<div class="ac-lc-sec-body-inner">';
+    if (nodes.length) {
+      html += '<div id="ac-lc-dec-list">';
+      nodes.forEach(function(n) { html += _decisionRowHtml(n); });
+      html += '</div>';
+    } else {
+      html += '<div class="ac-lc-sec-empty">No decisions recorded yet.</div><div id="ac-lc-dec-list"></div>';
+    }
+    html += '<div class="ac-lc-sec-add-row">' +
+      '<input class="ac-lc-sec-add-input" id="ac-lc-dec-input" placeholder="Describe a decision made in this meeting\u2026"/>' +
+      '<button class="ac-lc-sec-add-btn" id="ac-lc-dec-btn" style="color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd)">Record \u2192</button>' +
+    '</div></div>';
+    body.innerHTML = html;
+    _wireDecisionAdd(body);
+    _wireDecisionClicks(body);
+  }
+
+  function _decisionRowHtml(n) {
+    var me = window.Accord&&window.Accord.state&&window.Accord.state.me;
+    var authorId = n.created_by;
+    var authorName = '';
+    // Try to resolve from attendees name map
+    Object.keys(_attendeeNameMap).forEach(function(rid) {
+      // _attendeeNameMap is resource_id -> name; created_by is user_id
+      // Best effort display
+    });
+    var timeStr = _fmtTime(n.created_at);
+    return '<div class="ac-lc-dec-row" data-node-id="'+_esc(n.node_id)+'">' +
+      '<span class="ac-lc-dec-badge" data-action="edit-section-node" data-node-id="'+_esc(n.node_id)+'" data-tag="decision">'+_esc(n.seq_id||'DC')+'</span>' +
+      '<span class="ac-lc-dec-text">'+_esc(n.summary||'')+'</span>' +
+      '<span class="ac-lc-dec-meta">'+_esc(timeStr)+'</span>' +
+    '</div>';
+  }
+
+  function _wireDecisionAdd(body) {
+    var input = body.querySelector('#ac-lc-dec-input');
+    var btn   = body.querySelector('#ac-lc-dec-btn');
+    if (!input||!btn) return;
+    function commit() {
+      var text = input.value.trim(); if (!text) return;
+      if (input.dataset.committing) return;
+      input.dataset.committing = '1';
+      _insertSectionNode('decision', text, {}).then(function(node) {
+        if (!node) { delete input.dataset.committing; return; }
+        input.value = ''; delete input.dataset.committing;
+        _sectionNodes.decision.push(node);
+        _updateSectionCount('decision', _sectionNodes.decision);
+        var list = document.getElementById('ac-lc-dec-list');
+        if (list) { var d=document.createElement('div'); d.innerHTML=_decisionRowHtml(node); list.appendChild(d.firstChild); }
+        var empty = body.querySelector('.ac-lc-sec-empty'); if (empty) empty.remove();
+      }).catch(function() { delete input.dataset.committing; });
+    }
+    input.addEventListener('keydown', function(ev) { if (ev.key==='Enter') { ev.preventDefault(); commit(); } });
+    btn.addEventListener('click', commit);
+  }
+
+  function _wireDecisionClicks(body) {
+    body.addEventListener('click', function(ev) {
+      var b = ev.target.closest('[data-action="edit-section-node"]');
+      if (!b) return;
+      var nodeId = b.dataset.nodeId; var tag = b.dataset.tag;
+      var node = _sectionNodes.decision.find(function(n){return n.node_id===nodeId;});
+      if (node) _openSectionEditPopup(nodeId, tag, node, b);
+    });
+  }
+
+  // ── Action Items ─────────────────────────────────────────────────────────
+  function _paintActions() {
+    var body = document.getElementById('ac-lc-actions-body'); if (!body) return;
+    var nodes = _sectionNodes.action;
+    _updateSectionCount('action', nodes);
+    var today = Date.now();
+    var html = '<div class="ac-lc-sec-body-inner">';
+    if (nodes.length) {
+      html += '<table class="ac-lc-act-table">' +
+        '<thead class="ac-lc-act-thead"><tr><th>Owner</th><th>Task</th><th>Due</th><th>Status</th></tr></thead><tbody id="ac-lc-act-tbody">';
+      nodes.forEach(function(n) { html += _actionRowHtml(n, today); });
+      html += '</tbody></table>';
+    } else {
+      html += '<div class="ac-lc-sec-empty">No action items assigned yet.</div><table class="ac-lc-act-table"><tbody id="ac-lc-act-tbody"></tbody></table>';
+    }
+    html += '<div class="ac-lc-act-add-row">' +
+      '<input class="ac-lc-sec-add-input" id="ac-lc-act-input" placeholder="Task description\u2026" style="flex:2"/>' +
+      '<button class="ac-lc-assignee-btn" id="ac-lc-act-assignee-btn">\u{1F464} Assignee</button>' +
+      '<input type="date" class="ac-lc-date-input" id="ac-lc-act-due"/>' +
+      '<button class="ac-lc-sec-add-btn" id="ac-lc-act-btn" style="color:var(--act);background:var(--act-bg);border:1px solid var(--act-bd)">+ Assign</button>' +
+    '</div></div>';
+    body.innerHTML = html;
+    _actionAssignee = null;
+    _wireActionAdd(body);
+    _wireActionClicks(body);
+  }
+
+  function _actionRowHtml(n, today) {
+    today = today || Date.now();
+    var bodyData = {};
+    try { bodyData = JSON.parse(n.body||'{}'); } catch(e) {}
+    var assigneeName = bodyData.assignee_name || bodyData.assignee || '';
+    var initials = assigneeName ? assigneeName.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase() : '?';
+    var dueStr   = n.due_date ? _fmtDate(n.due_date) : '\u2014';
+    var isOverdue = n.due_date && new Date(n.due_date).getTime() < today && n.status !== 'complete';
+    var isDone    = n.status === 'complete';
+    var statusCls = isDone ? 'ac-lc-status-chip--done' : isOverdue ? 'ac-lc-status-chip--overdue' : 'ac-lc-status-chip--open';
+    var statusLbl = isDone ? 'Done' : isOverdue ? 'Overdue' : 'Open';
+    return '<tr class="ac-lc-act-row" data-node-id="'+_esc(n.node_id)+'">' +
+      '<td><div class="ac-lc-act-owner"><div class="ac-lc-act-avatar">'+_esc(initials)+'</div>'+_esc(assigneeName||'\u2014')+'</div></td>' +
+      '<td><span class="ac-lc-act-badge" data-action="edit-section-node" data-node-id="'+_esc(n.node_id)+'" data-tag="action">'+_esc(n.seq_id||'AX')+'</span> <span class="ac-lc-act-task">'+_esc((n.summary||'').slice(0,80))+'</span></td>' +
+      '<td class="ac-lc-act-due">'+_esc(dueStr)+'</td>' +
+      '<td><span class="ac-lc-status-chip '+statusCls+'" data-action="toggle-action-status" data-node-id="'+_esc(n.node_id)+'">'+statusLbl+'</span></td>' +
+    '</tr>';
+  }
+
+  function _wireActionAdd(body) {
+    var input   = body.querySelector('#ac-lc-act-input');
+    var asnBtn  = body.querySelector('#ac-lc-act-assignee-btn');
+    var dueIn   = body.querySelector('#ac-lc-act-due');
+    var addBtn  = body.querySelector('#ac-lc-act-btn');
+    if (!input||!asnBtn||!addBtn) return;
+
+    asnBtn.addEventListener('click', function() {
+      var resources = _sectionAttendees.length ? _sectionAttendees : (_inviteResourcesFromAttendees());
+      window.PersonPicker && window.PersonPicker.show(asnBtn, function(r) {
+        _actionAssignee = { id: r.id, name: r.name };
+        asnBtn.textContent = r.name;
+        asnBtn.style.color = 'var(--hi)';
+      }, { resources: resources });
+    });
+
+    function commit() {
+      var text = input.value.trim(); if (!text) return;
+      if (input.dataset.committing) return;
+      input.dataset.committing = '1';
+      var extras = {};
+      if (_actionAssignee) extras.assignee = _actionAssignee;
+      if (dueIn && dueIn.value) extras.due_date = dueIn.value;
+      _insertSectionNode('action', text, extras).then(function(node) {
+        if (!node) { delete input.dataset.committing; return; }
+        input.value = ''; if (dueIn) dueIn.value = '';
+        _actionAssignee = null;
+        asnBtn.textContent = '\u{1F464} Assignee'; asnBtn.style.color = '';
+        delete input.dataset.committing;
+        _sectionNodes.action.push(node);
+        _updateSectionCount('action', _sectionNodes.action);
+        var tbody = document.getElementById('ac-lc-act-tbody');
+        if (tbody) { var d=document.createElement('tbody'); d.innerHTML=_actionRowHtml(node); tbody.appendChild(d.firstChild); }
+        var empty = body.querySelector('.ac-lc-sec-empty'); if (empty) empty.remove();
+      }).catch(function() { delete input.dataset.committing; });
+    }
+    input.addEventListener('keydown', function(ev) { if (ev.key==='Enter') { ev.preventDefault(); commit(); } });
+    addBtn.addEventListener('click', commit);
+  }
+
+  function _wireActionClicks(body) {
+    body.addEventListener('click', function(ev) {
+      var b = ev.target.closest('[data-action="edit-section-node"]');
+      if (b) {
+        var node = _sectionNodes.action.find(function(n){return n.node_id===b.dataset.nodeId;});
+        if (node) _openSectionEditPopup(b.dataset.nodeId, b.dataset.tag, node, b);
+        return;
+      }
+      var s = ev.target.closest('[data-action="toggle-action-status"]');
+      if (s) {
+        var nodeId = s.dataset.nodeId;
+        var node2 = _sectionNodes.action.find(function(n){return n.node_id===nodeId;});
+        if (!node2) return;
+        var newStatus = node2.status==='complete' ? 'pending' : 'complete';
+        // IR71: wait for server before updating DOM
+        API.patch('accord_nodes?node_id=eq.'+nodeId+'&meeting_id=eq.'+_meeting.meeting_id, { status: newStatus })
+          .then(function() {
+            node2.status = newStatus;
+            _updateSectionCount('action', _sectionNodes.action);
+            var tbody = document.getElementById('ac-lc-act-tbody'); if (!tbody) return;
+            var row = tbody.querySelector('[data-node-id="'+nodeId+'"]');
+            if (row) { var d=document.createElement('tbody'); d.innerHTML=_actionRowHtml(node2); row.parentNode.replaceChild(d.firstChild, row); }
+          }).catch(function(e) { console.error('[AccordLiveCapture] action status PATCH failed', e); });
+      }
+    });
+  }
+
+  function _inviteResourcesFromAttendees() {
+    // Build PersonPicker-compatible resource list from loaded attendees
+    return Object.keys(_attendeeNameMap).map(function(rid) {
+      return { id: rid, name: _attendeeNameMap[rid], user_id: null, department: null, is_external: false, title: null };
+    });
+  }
+
+  // ── Risks & Issues ────────────────────────────────────────────────────────
+  function _paintRisks() {
+    var body = document.getElementById('ac-lc-risks-body'); if (!body) return;
+    var nodes = _sectionNodes.risk;
+    _updateSectionCount('risk', nodes);
+    var html = '<div class="ac-lc-sec-body-inner">';
+    if (nodes.length) {
+      html += '<div id="ac-lc-rsk-list">';
+      nodes.forEach(function(n) { html += _riskRowHtml(n); });
+      html += '</div>';
+    } else {
+      html += '<div class="ac-lc-sec-empty">No risks or issues flagged yet.</div><div id="ac-lc-rsk-list"></div>';
+    }
+    html += '<div class="ac-lc-sec-add-row">' +
+      '<input class="ac-lc-sec-add-input" id="ac-lc-rsk-input" placeholder="Describe a risk or issue\u2026"/>' +
+      '<select class="ac-lc-sev-select" id="ac-lc-rsk-sev">' +
+        '<option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option>' +
+      '</select>' +
+      '<button class="ac-lc-sec-add-btn" id="ac-lc-rsk-btn" style="color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd)">+ Flag</button>' +
+    '</div></div>';
+    body.innerHTML = html;
+    _wireRiskAdd(body);
+    _wireRiskClicks(body);
+  }
+
+  function _riskRowHtml(n) {
+    var bodyData = {};
+    try { bodyData = JSON.parse(n.body||'{}'); } catch(e) {}
+    var sev = bodyData.severity || '';
+    var sevCls = sev==='High'?'--high':sev==='Low'?'--low':'--medium';
+    var badgeCls = n.tag==='dissent' ? 'ac-lc-ds-badge' : 'ac-lc-rsk-badge';
+    return '<div class="ac-lc-rsk-row" data-node-id="'+_esc(n.node_id)+'">' +
+      '<span class="'+badgeCls+'" data-action="edit-section-node" data-node-id="'+_esc(n.node_id)+'" data-tag="'+_esc(n.tag)+'">'+_esc(n.seq_id||(n.tag==='dissent'?'DS':'RK'))+'</span>' +
+      '<span class="ac-lc-rsk-text">'+_esc((n.summary||'').slice(0,100))+'</span>' +
+      (sev?'<span class="ac-lc-severity-chip ac-lc-severity-chip'+sevCls+'">'+_esc(sev)+'</span>':'') +
+    '</div>';
+  }
+
+  function _wireRiskAdd(body) {
+    var input  = body.querySelector('#ac-lc-rsk-input');
+    var selSev = body.querySelector('#ac-lc-rsk-sev');
+    var btn    = body.querySelector('#ac-lc-rsk-btn');
+    if (!input||!btn) return;
+    function commit() {
+      var text = input.value.trim(); if (!text) return;
+      if (input.dataset.committing) return;
+      input.dataset.committing = '1';
+      var sev = selSev ? selSev.value : 'Medium';
+      _insertSectionNode('risk', text, { severity: sev }).then(function(node) {
+        if (!node) { delete input.dataset.committing; return; }
+        input.value = ''; delete input.dataset.committing;
+        _sectionNodes.risk.push(node);
+        _updateSectionCount('risk', _sectionNodes.risk);
+        var list = document.getElementById('ac-lc-rsk-list');
+        if (list) { var d=document.createElement('div'); d.innerHTML=_riskRowHtml(node); list.appendChild(d.firstChild); }
+        var empty = body.querySelector('.ac-lc-sec-empty'); if (empty) empty.remove();
+      }).catch(function() { delete input.dataset.committing; });
+    }
+    input.addEventListener('keydown', function(ev) { if (ev.key==='Enter') { ev.preventDefault(); commit(); } });
+    btn.addEventListener('click', commit);
+  }
+
+  function _wireRiskClicks(body) {
+    body.addEventListener('click', function(ev) {
+      var b = ev.target.closest('[data-action="edit-section-node"]');
+      if (!b) return;
+      var node = _sectionNodes.risk.find(function(n){return n.node_id===b.dataset.nodeId;});
+      if (node) _openSectionEditPopup(b.dataset.nodeId, b.dataset.tag, node, b);
+    });
+  }
+
+  // ── Parking Lot ───────────────────────────────────────────────────────────
+  function _paintParking() {
+    var body = document.getElementById('ac-lc-parking-body'); if (!body) return;
+    var nodes = _sectionNodes.question;
+    _updateSectionCount('question', nodes);
+    var html = '<div class="ac-lc-sec-body-inner">';
+    if (nodes.length) {
+      html += '<div id="ac-lc-park-list">';
+      nodes.forEach(function(n) { html += _parkRowHtml(n); });
+      html += '</div>';
+    } else {
+      html += '<div class="ac-lc-sec-empty">No deferred items yet.</div><div id="ac-lc-park-list"></div>';
+    }
+    html += '<div class="ac-lc-sec-add-row">' +
+      '<input class="ac-lc-sec-add-input" id="ac-lc-park-input" placeholder="Defer an item to the parking lot\u2026"/>' +
+      '<button class="ac-lc-sec-add-btn" id="ac-lc-park-btn" style="color:#9478e0;background:rgba(148,120,224,.09);border:1px solid rgba(148,120,224,.25)">+ Defer</button>' +
+    '</div></div>';
+    body.innerHTML = html;
+    _wireParkingAdd(body);
+    _wireParkingClicks(body);
+  }
+
+  function _parkRowHtml(n) {
+    return '<div class="ac-lc-park-row" data-node-id="'+_esc(n.node_id)+'">' +
+      '<div class="ac-lc-park-dot"></div>' +
+      '<div><div class="ac-lc-park-text" data-action="edit-section-node" data-node-id="'+_esc(n.node_id)+'" data-tag="question" style="cursor:pointer">'+_esc((n.summary||'').slice(0,100))+'</div></div>' +
+    '</div>';
+  }
+
+  function _wireParkingAdd(body) {
+    var input = body.querySelector('#ac-lc-park-input');
+    var btn   = body.querySelector('#ac-lc-park-btn');
+    if (!input||!btn) return;
+    function commit() {
+      var text = input.value.trim(); if (!text) return;
+      if (input.dataset.committing) return;
+      input.dataset.committing = '1';
+      _insertSectionNode('question', text, {}).then(function(node) {
+        if (!node) { delete input.dataset.committing; return; }
+        input.value = ''; delete input.dataset.committing;
+        _sectionNodes.question.push(node);
+        _updateSectionCount('question', _sectionNodes.question);
+        var list = document.getElementById('ac-lc-park-list');
+        if (list) { var d=document.createElement('div'); d.innerHTML=_parkRowHtml(node); list.appendChild(d.firstChild); }
+        var empty = body.querySelector('.ac-lc-sec-empty'); if (empty) empty.remove();
+      }).catch(function() { delete input.dataset.committing; });
+    }
+    input.addEventListener('keydown', function(ev) { if (ev.key==='Enter') { ev.preventDefault(); commit(); } });
+    btn.addEventListener('click', commit);
+  }
+
+  function _wireParkingClicks(body) {
+    body.addEventListener('click', function(ev) {
+      var b = ev.target.closest('[data-action="edit-section-node"]');
+      if (!b) return;
+      var node = _sectionNodes.question.find(function(n){return n.node_id===b.dataset.nodeId;});
+      if (node) _openSectionEditPopup(b.dataset.nodeId, b.dataset.tag, node, b);
+    });
+  }
+
+  // ── Shared section INSERT ─────────────────────────────────────────────────
+  // IR47: Prefer: return=representation confirmed — API layer returns full row.
+  // IR73: No meeting_id in accord_nodes WHERE (it's the INSERT row, not a PATCH).
+  function _insertSectionNode(tag, summary, extras) {
+    var m  = _meeting;
+    var me = window.Accord && window.Accord.state && window.Accord.state.me;
+    if (!m || !me) return Promise.reject(new Error('no meeting/me'));
+
+    // Use Accord.state.thread as thread_id (same pattern as _commitNote)
+    var stateThread = window.Accord && window.Accord.state && window.Accord.state.thread;
+    var threadId = (stateThread && stateThread.thread_id) || null;
+
+    var row = {
+      firm_id:        me.firm_id,
+      meeting_id:     m.meeting_id,
+      agenda_item_id: null,
+      tag:            tag,
+      summary:        summary.slice(0, 280),
+      body:           null,
+      created_by:     me.id,
+      // discipline, topic: intentionally omitted (Knowledge Base CMD)
+    };
+    if (threadId) row.thread_id = threadId;
+
+    if (tag === 'action' && extras.assignee) {
+      row.body = JSON.stringify({ assignee_resource_id: extras.assignee.id, assignee_name: extras.assignee.name });
+      if (extras.due_date) row.due_date = extras.due_date;
+    } else if (tag === 'decision' && extras.effective_date) {
+      row.effective_date = extras.effective_date;
+    } else if ((tag === 'risk' || tag === 'question') && extras.severity) {
+      row.body = JSON.stringify({ severity: extras.severity });
+    }
+
+    return API.post('accord_nodes', row).then(function(created) {
+      var node = Array.isArray(created) ? created[0] : created;
+      // IR72: broadcast to meeting channel
+      if (window.Accord && window.Accord.broadcast) {
+        window.Accord.broadcast('accord.node.committed', {
+          node_id:    node.node_id,
+          thread_id:  node.thread_id,
+          meeting_id: node.meeting_id,
+          tag:        node.tag,
+          summary:    node.summary,
+          created_by: node.created_by,
+          created_at: node.created_at,
+        });
+      }
+      return node;
+    });
+  }
+
+  // ── Section edit popup ────────────────────────────────────────────────────
+  function _openSectionEditPopup(nodeId, tag, node, anchorEl) {
+    var old = document.getElementById('ac-lc-edit-popup'); if (old&&old.parentElement) old.parentElement.removeChild(old);
+    var bodyData = {};
+    try { bodyData = JSON.parse(node.body||'{}'); } catch(e) {}
+
+    var extraFields = '';
+    if (tag==='decision') {
+      extraFields = '<div class="ac-lc-edit-field"><label>Effective date (optional)</label>' +
+        '<input type="date" id="ac-lc-ep-effdate" value="'+_esc(node.effective_date||'')+'"/></div>';
+    } else if (tag==='action') {
+      var assigneeName = bodyData.assignee_name||bodyData.assignee||'';
+      var assigneeId   = bodyData.assignee_resource_id||'';
+      extraFields = '<div class="ac-lc-edit-field"><label>Assignee</label>' +
+        '<button class="ac-lc-assignee-btn" id="ac-lc-ep-asn-btn" data-assignee-id="'+_esc(assigneeId)+'">'+_esc(assigneeName||'\u{1F464} Select assignee')+'</button></div>' +
+        '<div class="ac-lc-edit-field"><label>Due date</label>' +
+        '<input type="date" id="ac-lc-ep-duedate" value="'+_esc(node.due_date||'')+'"/></div>';
+    } else if (tag==='risk') {
+      var sev = bodyData.severity||'Medium';
+      extraFields = '<div class="ac-lc-edit-field"><label>Severity</label>' +
+        '<select id="ac-lc-ep-severity" style="background:var(--b0);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:5px 8px;font-size:12px;font-family:inherit;color:var(--hi)">' +
+          ['Low','Medium','High'].map(function(v){return '<option value="'+v+'"'+(v===sev?' selected':'')+'>'+v+'</option>';}).join('') +
+        '</select></div>';
+    }
+
+    var popup = document.createElement('div');
+    popup.id = 'ac-lc-edit-popup';
+    popup.className = 'ac-lc-edit-popup';
+    popup.innerHTML =
+      '<div class="ac-lc-edit-title">Edit '+tag+'</div>' +
+      '<div class="ac-lc-edit-field"><label>Summary</label>' +
+        '<textarea id="ac-lc-ep-summary" rows="3">'+_esc(node.summary||'')+'</textarea></div>' +
+      extraFields +
+      '<div class="ac-lc-edit-actions">' +
+        '<button class="ac-lc-edit-cancel" id="ac-lc-ep-cancel">Cancel</button>' +
+        '<button class="ac-lc-edit-save" id="ac-lc-ep-save">Save</button>' +
+      '</div>';
+
+    var shell = document.getElementById('ac-lc-shell') || document.body;
+    shell.appendChild(popup);
+
+    // Position
+    var rect = anchorEl.getBoundingClientRect();
+    var shellRect = shell.getBoundingClientRect();
+    var top = rect.bottom - shellRect.top + 6;
+    var left = rect.left - shellRect.left;
+    if (top + 280 > shell.offsetHeight) top = rect.top - shellRect.top - 280;
+    if (left + 270 > shell.offsetWidth)  left = shell.offsetWidth - 275;
+    popup.style.top = top+'px'; popup.style.left = left+'px';
+
+    // Backdrop
+    var backdrop = document.createElement('div');
+    backdrop.className = 'ac-lc-reclassify-backdrop';
+    backdrop.addEventListener('click', function() {
+      if (popup.parentElement) popup.parentElement.removeChild(popup);
+      if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop);
+    });
+    shell.insertBefore(backdrop, popup);
+
+    // Wire assignee picker for action
+    var asnBtn = popup.querySelector('#ac-lc-ep-asn-btn');
+    var _editAssignee = asnBtn ? { id: asnBtn.dataset.assigneeId, name: asnBtn.textContent } : null;
+    if (asnBtn) {
+      asnBtn.addEventListener('click', function() {
+        var resources = _inviteResourcesFromAttendees();
+        window.PersonPicker && window.PersonPicker.show(asnBtn, function(r) {
+          _editAssignee = { id: r.id, name: r.name };
+          asnBtn.textContent = r.name;
+        }, { resources: resources });
+      });
+    }
+
+    popup.querySelector('#ac-lc-ep-cancel').addEventListener('click', function() {
+      if (popup.parentElement) popup.parentElement.removeChild(popup);
+      if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop);
+    });
+
+    popup.querySelector('#ac-lc-ep-save').addEventListener('click', function() {
+      var summaryEl = popup.querySelector('#ac-lc-ep-summary');
+      var newSummary = summaryEl ? summaryEl.value.trim() : node.summary;
+      if (!newSummary) return;
+
+      var patch = { summary: newSummary };
+      // IR73: meeting_id guard on PATCH
+      var patchUrl = 'accord_nodes?node_id=eq.'+nodeId+'&meeting_id=eq.'+_meeting.meeting_id;
+
+      if (tag==='decision') {
+        var ed = popup.querySelector('#ac-lc-ep-effdate'); if (ed&&ed.value) patch.effective_date = ed.value;
+      } else if (tag==='action') {
+        var dd = popup.querySelector('#ac-lc-ep-duedate'); if (dd) patch.due_date = dd.value||null;
+        if (_editAssignee && _editAssignee.id) patch.body = JSON.stringify({ assignee_resource_id: _editAssignee.id, assignee_name: _editAssignee.name });
+      } else if (tag==='risk') {
+        var sv = popup.querySelector('#ac-lc-ep-severity'); if (sv) patch.body = JSON.stringify({ severity: sv.value });
+      }
+
+      if (popup.parentElement) popup.parentElement.removeChild(popup);
+      if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop);
+
+      // IR71: update DOM only after PATCH confirms
+      API.patch(patchUrl, patch).then(function(result) {
+        var updated = Array.isArray(result) ? result[0] : result;
+        if (!updated) return;
+        // Update node in local array
+        var arr = null;
+        if (tag==='decision') arr = _sectionNodes.decision;
+        else if (tag==='action') arr = _sectionNodes.action;
+        else if (tag==='risk'||tag==='dissent') arr = _sectionNodes.risk;
+        else if (tag==='question') arr = _sectionNodes.question;
+        if (arr) {
+          for (var i=0;i<arr.length;i++) {
+            if (arr[i].node_id===nodeId) { arr[i]=Object.assign(arr[i],patch,{seq_id:updated.seq_id||arr[i].seq_id}); break; }
+          }
+        }
+        // Update badge seq_id
+        var badgeEl = document.querySelector('[data-action="edit-section-node"][data-node-id="'+nodeId+'"]');
+        if (badgeEl && updated.seq_id) badgeEl.textContent = updated.seq_id;
+        // Update summary in DOM
+        var rowEl = document.querySelector('[data-node-id="'+nodeId+'"]');
+        if (rowEl) {
+          var textEl = rowEl.querySelector('.ac-lc-dec-text,.ac-lc-act-task,.ac-lc-rsk-text,.ac-lc-park-text');
+          if (textEl) textEl.textContent = newSummary.slice(0,100);
+        }
+      }).catch(function(e) { console.error('[AccordLiveCapture] section edit PATCH failed', e); });
+    });
+  }
+
   function _onRemoteNode(ev) {
     var node = ev.detail||{}; if (!node.node_id||!node.meeting_id) return;
     if (!_meeting||node.meeting_id!==_meeting.meeting_id) return;
+
+    // Route to correct section by tag (Phase 5)
+    var sectionTags = ['decision','action','risk','dissent','question'];
+    if (sectionTags.indexOf(node.tag) !== -1) {
+      var sKey = (node.tag==='dissent') ? 'risk' : node.tag;
+      if (_sectionNodes[sKey]) {
+        if (!_sectionNodes[sKey].find(function(n){return n.node_id===node.node_id;})) {
+          _sectionNodes[sKey].push(node);
+          _updateSectionCount(sKey, _sectionNodes[sKey]);
+          // If section body is visible, append row
+          var bodyMap = { decision: 'ac-lc-dec-list', action: 'ac-lc-act-tbody', risk: 'ac-lc-rsk-list', question: 'ac-lc-park-list' };
+          var listEl = document.getElementById(bodyMap[sKey]);
+          if (listEl) {
+            var d = document.createElement('div');
+            if (sKey==='decision') d.innerHTML = _decisionRowHtml(node);
+            else if (sKey==='action') { d=document.createElement('tbody'); d.innerHTML = _actionRowHtml(node); }
+            else if (sKey==='risk') d.innerHTML = _riskRowHtml(node);
+            else if (sKey==='question') d.innerHTML = _parkRowHtml(node);
+            listEl.appendChild(d.firstChild);
+          }
+        }
+      }
+      return; // don't fall through to agenda routing
+    }
+
     var aid = node.agenda_item_id; if (!aid) return;
     if (_agendaExpanded[aid]) {
       var cEl = document.getElementById('ac-lc-captured-'+aid);
@@ -805,6 +1437,7 @@ var AccordLiveCapture = (function () {
     _stopTimer(); _stopPresencePoll(); _unsubscribeChatRealtime();
     if (_intersectionObs) { _intersectionObs.disconnect(); _intersectionObs=null; }
     _chatMessages=[]; _agendaItems=[]; _agendaExpanded={}; _agendaHistCollapsed={}; _agendaNewCounts={};
+    _sectionNodes={decision:[],action:[],risk:[],question:[]}; _sectionAttendees=[]; _actionAssignee=null;
     _meeting=null; _myResourceId=null; _attendeeNameMap={};
     var host = document.getElementById('ac-meeting-surface-host'); if (host) host.innerHTML='';
   }
@@ -836,6 +1469,10 @@ var AccordLiveCapture = (function () {
     _subscribeChatRealtime(meeting.meeting_id);
     _loadAgenda(meeting.meeting_id);
     _loadPriorActionStrip(meeting.workstream_id, meeting.meeting_id);
+    _loadSectionNodes(meeting.meeting_id);
+    // Phase 5: pre-populate _sectionAttendees for PersonPicker
+    // Done after _loadAttendees resolves via _attendeeNameMap
+    setTimeout(function() { _sectionAttendees = _inviteResourcesFromAttendees(); }, 1000);
 
     var ci = document.getElementById('ac-lc-chat-input'); var cs = document.getElementById('ac-lc-chat-send');
     if (ci) ci.addEventListener('keydown', function(ev) { if (ev.key==='Enter'&&!ev.shiftKey) { ev.preventDefault(); _sendChatMessage(meeting); } });
