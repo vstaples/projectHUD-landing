@@ -626,6 +626,7 @@ var AccordLiveCapture = (function () {
 
   function _makeAgendaClickHandler(container) {
     return function(ev) {
+      _setNavActive('agenda');
       // Check specific button actions FIRST — before toggle-item — because
       // status buttons live inside the header div that carries data-action="toggle-item".
       // IR47 finding: accord_agenda_items_status_check constraint allows
@@ -1255,6 +1256,7 @@ var AccordLiveCapture = (function () {
   }
 
   function _wireDecisionClicks(body) {
+    body.addEventListener('click', function() { _setNavActive('decisions'); }, true);
     body.addEventListener('click', function(ev) {
       var row = ev.target.closest('.ac-lc-dec-row[data-node-id]');
       if (!row) return;
@@ -1351,6 +1353,7 @@ var AccordLiveCapture = (function () {
   }
 
   function _wireActionClicks(body) {
+    body.addEventListener('click', function() { _setNavActive('actions'); }, true);
     body.addEventListener('click', function(ev) {
       var b = ev.target.closest('[data-action="edit-section-node"]');
       if (b) {
@@ -1447,6 +1450,7 @@ var AccordLiveCapture = (function () {
   }
 
   function _wireRiskClicks(body) {
+    body.addEventListener('click', function() { _setNavActive('risks'); }, true);
     body.addEventListener('click', function(ev) {
       var row = ev.target.closest('.ac-lc-rsk-row[data-node-id]');
       if (!row) return;
@@ -1508,6 +1512,7 @@ var AccordLiveCapture = (function () {
   }
 
   function _wireParkingClicks(body) {
+    body.addEventListener('click', function() { _setNavActive('parking'); }, true);
     body.addEventListener('click', function(ev) {
       var row = ev.target.closest('.ac-lc-park-row[data-node-id]');
       if (!row) return;
