@@ -115,7 +115,7 @@ var AccordLiveCapture = (function () {
     '.ac-lc-resize-handle{position:absolute;top:0;right:-3px;bottom:0;width:6px;cursor:col-resize;z-index:10;transition:background .15s}.ac-lc-resize-handle:hover,.ac-lc-resize-handle.dragging{background:rgba(74,140,245,.3)}' +
     '.ac-lc-sidebar-inner{flex:1;overflow-y:auto;display:flex;flex-direction:column}' +
     '.ac-lc-section-label{font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--hi);padding:14px 14px 6px}' +
-    '.ac-lc-nav{padding:0 8px 10px}.ac-lc-nav-item{display:block;padding:5px 8px;border-radius:5px;font-size:12px;color:var(--md);text-decoration:none;cursor:pointer;transition:background .1s,color .1s}.ac-lc-nav-item:hover{background:var(--raised);color:var(--hi)}.ac-lc-nav-item.active{background:var(--b1);color:var(--hi);font-weight:600;box-shadow:-2px 0 0 0 var(--dec)}' +
+    '.ac-lc-nav{padding:0 8px 10px}.ac-lc-nav-item{display:block;padding:5px 8px;border-radius:5px;font-size:12px;color:var(--md);text-decoration:none;cursor:pointer;transition:background .1s,color .1s}.ac-lc-nav-item:hover{background:var(--raised);color:var(--hi)}.ac-lc-nav-item.active{background:var(--b1);color:var(--hi);font-weight:600}.ac-lc-nav-item.active[data-section="agenda"]{box-shadow:-2px 0 0 0 var(--nt)}.ac-lc-nav-item.active[data-section="decisions"]{box-shadow:-2px 0 0 0 var(--dec)}.ac-lc-nav-item.active[data-section="actions"]{box-shadow:-2px 0 0 0 var(--act)}.ac-lc-nav-item.active[data-section="risks"]{box-shadow:-2px 0 0 0 var(--rsk)}.ac-lc-nav-item.active[data-section="parking"]{box-shadow:-2px 0 0 0 #9478e0}' +
     '.ac-lc-attendees{padding:0 8px 10px}.ac-lc-attendee-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:5px;font-size:12px;transition:opacity .2s}.ac-lc-attendee-row.absent{opacity:.45}.ac-lc-presence-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:rgba(255,255,255,.18)}.ac-lc-presence-dot.present{background:var(--live)}.ac-lc-attendee-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ac-lc-you-tag{font-size:9px;font-weight:600;letter-spacing:.5px;color:var(--dec);text-transform:uppercase;flex-shrink:0}' +
     '.ac-lc-chat{display:flex;flex-direction:column;flex:1;min-height:0;border-top:1px solid rgba(255,255,255,.06)}.ac-lc-chat-viewport{flex:1;overflow-y:auto;padding:10px 10px 6px;background:#060a12;border:1px solid rgba(255,255,255,.08);margin:6px 8px 0;border-radius:8px 8px 0 0;display:flex;flex-direction:column;gap:2px;box-shadow:inset 0 2px 8px rgba(0,0,0,.4)}.ac-lc-chat-msg-group{display:flex;flex-direction:column;margin-bottom:6px}.ac-lc-chat-msg-header{display:flex;gap:6px;align-items:baseline;font-size:10px;color:var(--lo);margin-bottom:2px;padding:0 2px}.ac-lc-chat-msg-header.me{justify-content:flex-end}.ac-lc-chat-msg-author{font-weight:500;color:var(--md)}.ac-lc-chat-msg-row{display:flex}.ac-lc-chat-msg-row.me{justify-content:flex-end}.ac-lc-chat-msg-row.other{justify-content:flex-start}.ac-lc-chat-bubble{max-width:82%;border-radius:10px;font-size:12px;line-height:1.45;padding:6px 10px;word-break:break-word}.ac-lc-chat-msg-row.me .ac-lc-chat-bubble{background:var(--dec-bg);border:1px solid var(--dec-bd);color:var(--hi);border-radius:10px 10px 2px 10px}.ac-lc-chat-msg-row.other .ac-lc-chat-bubble{background:var(--raised);border:1px solid rgba(255,255,255,.06);color:var(--hi);border-radius:10px 10px 10px 2px}.ac-lc-chat-input-row{display:flex;gap:6px;padding:6px 8px 10px}.ac-lc-chat-input{flex:1;background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit;color:var(--hi);resize:none;min-height:32px;max-height:80px;outline:none;transition:border-color .15s,background .15s}.ac-lc-chat-input:hover{border-color:rgba(255,255,255,.22);background:var(--hover)}.ac-lc-chat-input:focus{border-color:rgba(74,140,245,.5);background:var(--hover)}.ac-lc-chat-send{font-size:11px;font-weight:600;color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd);border-radius:6px;padding:6px 12px;cursor:pointer;flex-shrink:0;transition:background .15s}.ac-lc-chat-send:hover{background:rgba(74,140,245,.16)}.ac-lc-chat-empty{flex:1;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--lo);font-style:italic}' +
     '.ac-lc-canvas{flex:1;min-width:0;overflow-y:auto;padding:0}' +
@@ -482,11 +482,16 @@ var AccordLiveCapture = (function () {
     var sections = ['agenda','decisions','actions','risks','parking'];
 
     _updateNavActive = function() {
-      var canvasTop = canvas.scrollTop;
-      var active    = sections[0];
+      var canvasRect = canvas.getBoundingClientRect();
+      var active = sections[0];
       sections.forEach(function(sec) {
         var el = document.getElementById('ac-lc-sec-' + sec);
-        if (el && el.offsetTop - canvas.offsetTop <= canvasTop + 60) active = sec;
+        if (!el) return;
+        var distFromTop = el.getBoundingClientRect().top - canvasRect.top;
+        if (distFromTop <= 10) {
+          var cur = document.getElementById('ac-lc-sec-' + active);
+          if (el.offsetTop > (cur ? cur.offsetTop : -1)) active = sec;
+        }
       });
       document.querySelectorAll('.ac-lc-nav-item').forEach(function(link) {
         link.classList.toggle('active', link.dataset.section === active);
