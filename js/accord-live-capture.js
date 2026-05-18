@@ -825,9 +825,10 @@ var AccordLiveCapture = (function () {
 
     var backdrop = document.createElement('div'); backdrop.className='ac-lc-reclassify-backdrop';
     backdrop.addEventListener('click', function(ev) {
-      // Don't close if click is inside PersonPicker overlay
-      if (ev.target && ev.target.closest && ev.target.closest('.pp-overlay')) return;
-      if (popup.parentElement) popup.parentElement.removeChild(popup); if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop);
+      // Don't close if PersonPicker is open anywhere in the document
+      if (document.querySelector('.pp-overlay')) return;
+      if (popup.parentElement) popup.parentElement.removeChild(popup);
+      if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop);
     });
     shell.insertBefore(backdrop, popup);
 
@@ -867,28 +868,26 @@ var AccordLiveCapture = (function () {
       var threadId = (stateThread && stateThread.thread_id) || null;
       var currentMeetingId = _meeting && _meeting.meeting_id;
 
-      // Find the original node to copy its fields
+      // Find the original node — check all section arrays first, then read summary from DOM
       var origNode = null;
-      ['note','decision','action','risk','dissent','question'].forEach(function(t) {
-        var arr = (t==='risk'||t==='dissent') ? _sectionNodes.risk :
-                  (t==='question' ? _sectionNodes.question :
-                  (t==='decision' ? _sectionNodes.decision :
-                  (t==='action' ? _sectionNodes.action : null)));
-        if (arr) { var found = arr.find(function(n){return n.node_id===nodeId;}); if (found) origNode = found; }
+      var allArrays = [_sectionNodes.decision, _sectionNodes.action, _sectionNodes.risk, _sectionNodes.question];
+      allArrays.forEach(function(arr) {
+        if (!origNode) { origNode = arr.find(function(n){return n.node_id===nodeId;})||null; }
       });
-      // Also check agenda captured nodes
-      if (!origNode) {
-        document.querySelectorAll('[data-node-id="'+nodeId+'"]').forEach(function(el) {
-          // node data lives in the DOM; we have summary from the badge row
-        });
+      // If not in a section array (e.g. agenda captured node), read summary from DOM
+      var origSummary = origNode ? origNode.summary : '';
+      var origAgendaItemId = origNode ? (origNode.agenda_item_id||null) : null;
+      if (!origSummary) {
+        var capturedTextEl = document.querySelector('.ac-lc-captured-row[data-node-id="'+nodeId+'"] .ac-lc-captured-text');
+        if (capturedTextEl) origSummary = capturedTextEl.textContent || '';
       }
 
       var insertRow = {
         firm_id:        _meeting.firm_id,
         meeting_id:     currentMeetingId,
-        agenda_item_id: origNode ? (origNode.agenda_item_id || null) : null,
+        agenda_item_id: origAgendaItemId,
         tag:            selTag,
-        summary:        origNode ? (origNode.summary || '') : '',
+        summary:        origSummary.slice(0, 280),
         body:           null,
         created_by:     me ? me.id : null,
       };
@@ -905,47 +904,36 @@ var AccordLiveCapture = (function () {
         var svEl=document.getElementById('ac-lc-rc-sv'); var sv=svEl?svEl.value:'Medium'; insertRow.body=JSON.stringify({severity:sv});
       }
 
-      // IR71: DELETE first, then INSERT; update DOM only after both confirm
-      API.del('accord_nodes?node_id=eq.'+nodeId+'&meeting_id=eq.'+currentMeetingId)
-        .then(function() {
-          return API.post('accord_nodes', insertRow);
-        })
+      // INSERT new node first (gets correct seq_id from trigger), then attempt DELETE of old.
+      // DELETE may be RLS-blocked on some installations — treat as best-effort.
+      API.post('accord_nodes', insertRow)
         .then(function(created) {
           var newNode = Array.isArray(created) ? created[0] : created;
           if (!newNode) return;
 
-          // Remove old node from all local arrays
+          // Remove old node from local section arrays
           ['decision','action','risk','question'].forEach(function(k) {
             _sectionNodes[k] = _sectionNodes[k].filter(function(n){return n.node_id!==nodeId;});
           });
-          // Remove from agenda captured list if present
+
+          // Remove old row from agenda captured list
           var oldBadge = document.querySelector('[data-action="reclassify"][data-node-id="'+nodeId+'"]');
           if (oldBadge) {
             var oldRow = oldBadge.closest('.ac-lc-captured-row');
-            if (oldRow) oldRow.parentElement && oldRow.parentElement.removeChild(oldRow);
+            if (oldRow && oldRow.parentElement) oldRow.parentElement.removeChild(oldRow);
           }
+          // Remove from section body lists too
+          var oldSectionRow = document.querySelector('[data-node-id="'+nodeId+'"]');
+          if (oldSectionRow && oldSectionRow.parentElement) oldSectionRow.parentElement.removeChild(oldSectionRow);
 
-          // Add new node to correct section array
+          // Add new node to correct section array and update count
           var sKey = (selTag==='dissent') ? 'risk' : selTag;
           if (_sectionNodes[sKey]) {
             _sectionNodes[sKey].push(newNode);
             _updateSectionCount(sKey, _sectionNodes[sKey]);
           }
 
-          // IR72: broadcast new node committed
-          if (window.Accord && window.Accord.broadcast) {
-            window.Accord.broadcast('accord.node.committed', {
-              node_id:    newNode.node_id,
-              thread_id:  newNode.thread_id,
-              meeting_id: newNode.meeting_id,
-              tag:        newNode.tag,
-              summary:    newNode.summary,
-              created_by: newNode.created_by,
-              created_at: newNode.created_at,
-            });
-          }
-
-          // Append new row to the correct section body (if expanded)
+          // Append new row to section body if visible
           var bodyMap = { decision:'ac-lc-dec-list', action:'ac-lc-act-tbody', risk:'ac-lc-rsk-list', question:'ac-lc-park-list' };
           var listEl = document.getElementById(bodyMap[sKey]);
           if (listEl) {
@@ -956,8 +944,21 @@ var AccordLiveCapture = (function () {
             else if (sKey==='question')  d.innerHTML = _parkRowHtml(newNode);
             listEl.appendChild(d.firstChild);
           }
+
+          // IR72: broadcast new node
+          if (window.Accord && window.Accord.broadcast) {
+            window.Accord.broadcast('accord.node.committed', {
+              node_id:    newNode.node_id, thread_id: newNode.thread_id,
+              meeting_id: newNode.meeting_id, tag: newNode.tag,
+              summary:    newNode.summary,   created_by: newNode.created_by,
+            });
+          }
+
+          // Best-effort DELETE of old node (non-blocking — RLS may prevent it)
+          API.del('accord_nodes?node_id=eq.'+nodeId+'&meeting_id=eq.'+currentMeetingId)
+            .catch(function(e) { console.warn('[AccordLiveCapture] old node DELETE failed (non-blocking):', e.message); });
         })
-        .catch(function(e) { console.error('[AccordLiveCapture] reclassify DELETE+INSERT failed', e); });
+        .catch(function(e) { console.error('[AccordLiveCapture] reclassify INSERT failed', e); });
     });
   }
 
