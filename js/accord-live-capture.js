@@ -148,7 +148,7 @@ var AccordLiveCapture = (function () {
     // Actions table
     '.ac-lc-act-table{width:100%;border-collapse:collapse;font-size:12px}' +
     '.ac-lc-act-thead th{font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--lo);text-align:left;padding:2px 8px 8px}' +
-    '.ac-lc-act-table{margin-left:8px;width:calc(100% - 8px)}' +'.ac-lc-act-row{border-bottom:2px solid var(--void)}' +'.ac-lc-act-row td{background:#13172a;padding:5px 8px;border-top:none;vertical-align:middle}' +'.ac-lc-act-row td:first-child{border-left:2px solid var(--act);padding-left:10px}' +
+    '.ac-lc-act-table{margin-left:8px;width:calc(100% - 8px);border-spacing:0 4px;border-collapse:separate}' +'.ac-lc-act-row td{background:#13172a;padding:5px 8px;vertical-align:middle}' +'.ac-lc-act-row td:first-child{border-left:2px solid var(--act);border-radius:4px 0 0 4px;padding-left:10px}' +'.ac-lc-act-row td:last-child{border-radius:0 4px 4px 0}' +
     '.ac-lc-act-row td{padding:7px 8px;vertical-align:middle}' +
     '.ac-lc-act-owner{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--md)}' +
     '.ac-lc-act-avatar{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;color:var(--dec);background:var(--dec-bg)}' +
