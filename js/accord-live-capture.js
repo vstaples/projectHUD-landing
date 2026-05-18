@@ -129,6 +129,12 @@ var AccordLiveCapture = (function () {
     '.ac-lc-add-zone{margin-top:6px;margin-left:8px;position:relative}.ac-lc-add-textarea{width:100%;box-sizing:border-box;background:rgba(232,148,48,.025);border:1px solid rgba(232,148,48,.28);border-radius:6px;padding:8px 10px 32px;font-size:12px;font-family:inherit;color:var(--hi);resize:vertical;min-height:72px;outline:none;transition:background .15s,border-color .15s}.ac-lc-add-textarea:focus{background:rgba(232,148,48,.05);border-color:rgba(232,148,48,.5)}.ac-lc-add-btn{position:absolute;bottom:8px;right:8px;font-size:11px;font-weight:600;color:var(--nt);background:var(--nt-bg);border:1px solid var(--nt-bd);border-radius:5px;padding:3px 10px;cursor:pointer;transition:opacity .1s}.ac-lc-add-btn:hover{opacity:.8}' +
     '.ac-lc-reclassify-backdrop{position:fixed;inset:0;z-index:200}.ac-lc-reclassify-popup{position:fixed;z-index:201;background:var(--raised);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:14px;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.5)}.ac-lc-reclassify-title{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--lo);margin-bottom:10px}.ac-lc-reclassify-types{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.ac-lc-reclassify-type{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:500;transition:background .1s}.ac-lc-reclassify-type:hover,.ac-lc-reclassify-type.selected{background:var(--hover)}.ac-lc-reclassify-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}.ac-lc-reclassify-fields{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}.ac-lc-reclassify-field{display:flex;flex-direction:column;gap:3px}.ac-lc-reclassify-field label{font-size:10px;color:var(--lo)}.ac-lc-reclassify-field input{background:var(--b0);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:4px 8px;font-size:12px;font-family:inherit;color:var(--hi);outline:none}.ac-lc-reclassify-field input:focus{border-color:rgba(74,140,245,.4)}.ac-lc-reclassify-actions{display:flex;gap:6px;justify-content:flex-end}.ac-lc-reclassify-cancel{font-size:11px;color:var(--lo);background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:4px 10px;cursor:pointer}.ac-lc-reclassify-confirm{font-size:11px;font-weight:600;color:var(--hi);background:var(--dec);border:none;border-radius:5px;padding:4px 12px;cursor:pointer}.ac-lc-reclassify-confirm:hover{opacity:.88}' +
     '.ac-lc-empty-agenda{font-size:12px;color:var(--lo);font-style:italic;padding:16px 0}' +
+    '.ac-lc-captured-row{position:relative}' +
+    '.ac-lc-captured-row:hover{background:rgba(72,170,136,.16);cursor:pointer}' +
+    '.ac-lc-captured-row.selected{background:rgba(72,170,136,.20);outline:1px solid var(--nt)}' +
+    '.ac-lc-note-delete{display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd);border-radius:3px;padding:0 5px;cursor:pointer;line-height:18px;z-index:10}' +
+    '.ac-lc-captured-row:hover .ac-lc-note-delete{display:block}' +
+    '.ac-lc-note-edit-popup{position:fixed;z-index:201;background:var(--raised);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:14px;min-width:280px;box-shadow:0 8px 32px rgba(0,0,0,.5)}' +
 
     // Phase 5 section components
     '.ac-lc-sec-count{font-size:10px;color:var(--lo);margin-right:6px}' +
@@ -604,6 +610,20 @@ var AccordLiveCapture = (function () {
       if (a) { ev.stopPropagation(); _commitNote(a.dataset.itemId, a.dataset.threadId); return; }
 
       // Toggle item last
+      // Delete note
+      var del = ev.target.closest('[data-action="delete-note"]');
+      if (del) { ev.stopPropagation(); _deleteNote(del.dataset.nodeId); return; }
+
+      // Note row click → edit popup
+      var nr = ev.target.closest('[data-action="note-row"]');
+      if (nr && !ev.target.closest('[data-action="reclassify"]')) {
+        document.querySelectorAll('.ac-lc-captured-row.selected').forEach(function(el){el.classList.remove('selected');});
+        nr.classList.add('selected');
+        _openNoteEditPopup(nr.dataset.nodeId, nr);
+        return;
+      }
+
+      // Toggle item last
       var t = ev.target.closest('[data-action="toggle-item"]');
       if (t) { var id=t.dataset.itemId; _agendaExpanded[id]=!_agendaExpanded[id]; if(_agendaExpanded[id]) _agendaNewCounts[id]=0; _renderAgendaSection(); return; }
     };
@@ -666,10 +686,11 @@ var AccordLiveCapture = (function () {
   }
 
   function _capturedRowHtml(n) {
-    return '<div class="ac-lc-captured-row" data-node-id="'+_esc(n.node_id)+'">' +
+    return '<div class="ac-lc-captured-row" data-node-id="'+_esc(n.node_id)+'" data-action="note-row">' +
       '<span class="ac-lc-captured-badge" style="color:'+_tagColor(n.tag)+';background:'+_tagBg(n.tag)+';border:1px solid rgba(255,255,255,.18)" data-action="reclassify" data-node-id="'+_esc(n.node_id)+'" data-current-tag="'+_esc(n.tag)+'">'+_esc(n.seq_id||_tagLabel(n.tag))+'</span>' +
       '<span class="ac-lc-captured-text">'+_esc((n.summary||'').slice(0,100))+'</span>' +
       '<span class="ac-lc-captured-time">'+_esc(_fmtTime(n.created_at))+'</span>' +
+      '<span class="ac-lc-note-delete" data-action="delete-note" data-node-id="'+_esc(n.node_id)+'">×</span>' +
     '</div>';
   }
 
@@ -737,6 +758,85 @@ var AccordLiveCapture = (function () {
   // accord-capture.js:147 (filters on 'archived') — the schema constraint
   // accepted 'pending','discussed','skipped','archived' at Phase 1 investigation.
   // IR73: WHERE includes meeting_id for disjoint per-transition RLS guard.
+  // ── Note delete ────────────────────────────────────────────────────────
+  function _deleteNote(nodeId) {
+    if (!_meeting) return;
+    if (!confirm('Delete this note? This cannot be undone.')) return;
+    API.del('accord_nodes?node_id=eq.' + nodeId + '&meeting_id=eq.' + _meeting.meeting_id)
+      .then(function() {
+        var rowEl = document.querySelector('[data-action="note-row"][data-node-id="' + nodeId + '"]');
+        if (rowEl && rowEl.parentElement) rowEl.parentElement.removeChild(rowEl);
+      })
+      .catch(function(e) { console.error('[AccordLiveCapture] note DELETE failed', e); });
+  }
+
+  // ── Note edit popup ────────────────────────────────────────────────────
+  function _openNoteEditPopup(nodeId, anchorEl) {
+    var old = document.getElementById('ac-lc-note-edit-popup');
+    if (old && old.parentElement) old.parentElement.removeChild(old);
+
+    // Read current summary from DOM
+    var textEl = anchorEl.querySelector('.ac-lc-captured-text');
+    var currentText = textEl ? textEl.textContent : '';
+
+    var popup = document.createElement('div');
+    popup.id = 'ac-lc-note-edit-popup';
+    popup.className = 'ac-lc-note-edit-popup';
+    popup.innerHTML =
+      '<div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--lo);margin-bottom:8px">Edit note</div>' +
+      '<textarea id="ac-lc-nep-text" style="width:100%;box-sizing:border-box;background:var(--b0);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;color:var(--hi);resize:vertical;min-height:60px;outline:none;display:block" rows="3">'+_esc(currentText)+'</textarea>' +
+      '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:8px">' +
+        '<button id="ac-lc-nep-cancel" style="font-size:11px;color:var(--lo);background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:4px 10px;cursor:pointer">Cancel</button>' +
+        '<button id="ac-lc-nep-save" style="font-size:11px;font-weight:600;color:var(--hi);background:var(--dec);border:none;border-radius:5px;padding:4px 12px;cursor:pointer">Save</button>' +
+      '</div>';
+
+    var shell = document.getElementById('ac-lc-shell') || document.body;
+    shell.appendChild(popup);
+
+    // Position below anchor
+    var shellRect = shell.getBoundingClientRect();
+    var rect = anchorEl.getBoundingClientRect();
+    var top  = rect.bottom - shellRect.top + 4;
+    var left = rect.left   - shellRect.left;
+    if (left + 290 > shell.offsetWidth) left = shell.offsetWidth - 295;
+    if (top  + 160 > shell.offsetHeight) top = rect.top - shellRect.top - 160;
+    popup.style.top  = top  + 'px';
+    popup.style.left = left + 'px';
+
+    // Focus textarea
+    var ta = popup.querySelector('#ac-lc-nep-text');
+    if (ta) { setTimeout(function(){ ta.focus(); ta.select(); }, 0); }
+
+    function _close() {
+      if (popup.parentElement) popup.parentElement.removeChild(popup);
+      document.querySelectorAll('.ac-lc-captured-row.selected').forEach(function(el){ el.classList.remove('selected'); });
+    }
+
+    popup.querySelector('#ac-lc-nep-cancel').addEventListener('click', _close);
+
+    popup.querySelector('#ac-lc-nep-save').addEventListener('click', function() {
+      var newText = ta ? ta.value.trim() : '';
+      if (!newText) return;
+      API.patch('accord_nodes?node_id=eq.' + nodeId + '&meeting_id=eq.' + _meeting.meeting_id, { summary: newText })
+        .then(function() {
+          // IR71: update DOM only after confirm
+          if (textEl) textEl.textContent = newText.slice(0, 100);
+          _close();
+        })
+        .catch(function(e) { console.error('[AccordLiveCapture] note PATCH failed', e); });
+    });
+
+    // Close on outside click
+    setTimeout(function() {
+      document.addEventListener('mousedown', function _outsideClose(ev) {
+        if (!popup.contains(ev.target) && !anchorEl.contains(ev.target)) {
+          _close();
+          document.removeEventListener('mousedown', _outsideClose);
+        }
+      });
+    }, 0);
+  }
+
   function _patchAgendaStatus(agendaItemId, newStatus) {
     var m = _meeting; if (!m) return;
     API.patch('accord_agenda_items?agenda_item_id=eq.'+agendaItemId+'&meeting_id=eq.'+m.meeting_id, { status: newStatus })
