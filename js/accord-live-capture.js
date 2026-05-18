@@ -515,9 +515,8 @@ var AccordLiveCapture = (function () {
 
   function _wireAgendaItemEvents(container) {
     container.addEventListener('click', function(ev) {
-      var t = ev.target.closest('[data-action="toggle-item"]');
-      if (t) { var id=t.dataset.itemId; _agendaExpanded[id]=!_agendaExpanded[id]; if(_agendaExpanded[id]) _agendaNewCounts[id]=0; _renderAgendaSection(); return; }
-
+      // Check specific button actions FIRST — before toggle-item — because
+      // status buttons live inside the header div that carries data-action="toggle-item".
       var d = ev.target.closest('[data-action="mark-discussed"]');
       if (d) { ev.stopPropagation(); _patchAgendaStatus(d.dataset.itemId,'discussed'); return; }
 
@@ -529,6 +528,10 @@ var AccordLiveCapture = (function () {
 
       var a = ev.target.closest('[data-action="add-note"]');
       if (a) { ev.stopPropagation(); _commitNote(a.dataset.itemId, a.dataset.threadId); return; }
+
+      // Toggle item last
+      var t = ev.target.closest('[data-action="toggle-item"]');
+      if (t) { var id=t.dataset.itemId; _agendaExpanded[id]=!_agendaExpanded[id]; if(_agendaExpanded[id]) _agendaNewCounts[id]=0; _renderAgendaSection(); return; }
     });
   }
 
