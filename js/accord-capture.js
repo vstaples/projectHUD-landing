@@ -171,11 +171,16 @@
 
   // ── Agenda render + interactions ─────────────────────────────
   function _renderAgenda() {
-    const el = $('agendaList');
-    const filtered = local.agendaItems.filter(a =>
+    var el = $('agendaList');
+    // CMD-ACCORD-LIVE-CAPTURE-1 Phase 4: guard all DOM writes — elements
+    // only exist in the 5-tab shell (running state). When the Live Capture
+    // shell is active, these elements are absent. Do not throw; return silently.
+    if (!el) return;
+    var filtered = local.agendaItems.filter(a =>
       local.agendaFilter === 'all' ? true : a.status !== 'archived'
     );
-    $('agendaCount').textContent = `${local.agendaItems.length} item${local.agendaItems.length === 1 ? '' : 's'}`;
+    var countEl = $('agendaCount');
+    if (countEl) countEl.textContent = `${local.agendaItems.length} item${local.agendaItems.length === 1 ? '' : 's'}`;
     if (!filtered.length) {
       el.innerHTML = '<div style="color:var(--ink-faint);font-size:11px;padding:8px 4px">No agenda items yet. Use + New item.</div>';
       return;

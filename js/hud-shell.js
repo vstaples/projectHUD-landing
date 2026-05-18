@@ -64,6 +64,7 @@ const HUDShell = (() => {
   // Each entry: [text-A, text-B, aqua-position] where aqua-position is
   // 'first' or 'last'. Default = 'last' (white prefix, aqua suffix).
   const WORDMARK_SPLITS = {
+    'Accord':     ['Ac',      'cord',  'last'],
     'Compass':    ['Com',     'pass',  'last'],
     'Cadence':    ['Cad',     'ence',  'last'],
     'Pipeline':   ['Pipe',    'line',  'last'],
