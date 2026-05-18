@@ -1,7 +1,7 @@
 // ============================================================
 // accord-live-capture.js
-// CMD-ACCORD-LIVE-CAPTURE-1 · Phase 3 + Phase 4
-// 2026-05-17 · Operator: Vaughn Staples
+// CMD-ACCORD-LIVE-CAPTURE-1 · Phase 3 + Phase 4 + Phase 5 + Phase 6
+// 2026-05-18 · Operator: Vaughn Staples
 //
 // Live Capture surface — two-column (sidebar + canvas) running-
 // meeting shell. Replaces the 5-tab shell when meeting.state
@@ -12,6 +12,8 @@
 // Phase 4: Agenda canvas section — accordion, history, capture,
 //          reclassify popup, discussed/skipped status transitions,
 //          remote-node / remote-agenda fan-in.
+// Phase 5: Decisions, Actions, Risks, Parking Lot sections.
+// Phase 6: End Meeting flow + status bar.
 //
 // Iron Rules: 36, 40 section1, 47, 64, 71, 72, 73 in force.
 // var only — no let/const.
@@ -109,7 +111,7 @@ var AccordLiveCapture = (function () {
     '.ac-lc-progress{display:flex;gap:2px;height:4px;border-radius:2px;overflow:hidden;width:80px}' +
     '.ac-lc-seg{height:4px;flex:1;border-radius:1px}.ac-lc-seg--done{background:var(--dec)}.ac-lc-seg--active{background:rgba(74,140,245,.5)}.ac-lc-seg--todo{background:rgba(255,255,255,.12)}' +
     '.ac-lc-timer{font-size:12px;font-weight:500;font-family:"SF Mono","JetBrains Mono",monospace;color:var(--md);flex-shrink:0;min-width:44px;text-align:right}' +
-    '.ac-lc-end-btn{font-size:11px;font-weight:600;letter-spacing:.3px;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd);border-radius:6px;padding:4px 12px;cursor:not-allowed;opacity:.35;pointer-events:none;flex-shrink:0}' +
+    '.ac-lc-end-btn{font-size:11px;font-weight:600;letter-spacing:.3px;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd);border-radius:6px;padding:4px 12px;cursor:pointer;flex-shrink:0;transition:opacity .1s}.ac-lc-end-btn:hover{opacity:.8}.ac-lc-end-btn:disabled{opacity:.45;cursor:not-allowed}' +
     '.ac-lc-body{display:flex;flex:1;min-height:0;overflow:hidden}' +
     '.ac-lc-sidebar{display:flex;flex-direction:column;flex-shrink:0;position:relative;background:var(--surface);border-right:1px solid rgba(255,255,255,.06);overflow:hidden;min-width:160px;max-width:320px}' +
     '.ac-lc-resize-handle{position:absolute;top:0;right:-3px;bottom:0;width:6px;cursor:col-resize;z-index:10;transition:background .15s}.ac-lc-resize-handle:hover,.ac-lc-resize-handle.dragging{background:rgba(74,140,245,.3)}' +
@@ -129,7 +131,13 @@ var AccordLiveCapture = (function () {
     '.ac-lc-captured-label{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--lo);padding:4px 0 4px 8px}.ac-lc-captured-row{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:12px;margin-left:8px;margin-bottom:4px;border-radius:6px;box-shadow:-2px 0 0 0 var(--nt);background:rgba(72,170,136,.10);cursor:pointer;transition:background .1s}.ac-lc-captured-badge{font-size:9px;font-weight:700;border-radius:3px;padding:1px 5px;flex-shrink:0;cursor:pointer;transition:opacity .1s}.ac-lc-captured-badge:hover{opacity:.75}.ac-lc-captured-text{flex:1;color:var(--md)}.ac-lc-captured-time{color:var(--lo);flex-shrink:0;font-size:10px;margin-right:18px}' +
     '.ac-lc-add-zone{margin-top:6px;margin-left:8px;position:relative}.ac-lc-add-textarea{width:100%;box-sizing:border-box;background:rgba(232,148,48,.025);border:1px solid rgba(232,148,48,.28);border-radius:6px;padding:8px 10px 32px;font-size:12px;font-family:inherit;color:var(--hi);resize:vertical;min-height:72px;outline:none;transition:background .15s,border-color .15s}.ac-lc-add-textarea:focus{background:rgba(232,148,48,.05);border-color:rgba(232,148,48,.5)}.ac-lc-add-btn{position:absolute;bottom:8px;right:8px;font-size:11px;font-weight:600;color:var(--nt);background:var(--nt-bg);border:1px solid var(--nt-bd);border-radius:5px;padding:3px 10px;cursor:pointer;transition:opacity .1s}.ac-lc-add-btn:hover{opacity:.8}' +
     '.ac-lc-reclassify-backdrop{position:fixed;inset:0;z-index:200}.ac-lc-reclassify-popup{position:fixed;z-index:201;background:var(--raised);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:14px;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.5)}.ac-lc-reclassify-title{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--lo);margin-bottom:10px}.ac-lc-reclassify-types{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.ac-lc-reclassify-type{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:500;transition:background .1s}.ac-lc-reclassify-type:hover,.ac-lc-reclassify-type.selected{background:var(--hover)}.ac-lc-reclassify-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}.ac-lc-reclassify-fields{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}.ac-lc-reclassify-field{display:flex;flex-direction:column;gap:3px}.ac-lc-reclassify-field label{font-size:10px;color:var(--lo)}.ac-lc-reclassify-field input{background:var(--b0);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:4px 8px;font-size:12px;font-family:inherit;color:var(--hi);outline:none}.ac-lc-reclassify-field input:focus{border-color:rgba(74,140,245,.4)}.ac-lc-reclassify-actions{display:flex;gap:6px;justify-content:flex-end}.ac-lc-reclassify-cancel{font-size:11px;color:var(--lo);background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:4px 10px;cursor:pointer}.ac-lc-reclassify-confirm{font-size:11px;font-weight:600;color:var(--hi);background:var(--dec);border:none;border-radius:5px;padding:4px 12px;cursor:pointer}.ac-lc-reclassify-confirm:hover{opacity:.88}' +
-    '.ac-lc-timeline,.ac-ws-timeline,.ac-filmstrip,.ac-status-bar,.ac-live-filmstrip{display:none!important}' +
+    '.ac-lc-timeline,.ac-ws-timeline,.ac-filmstrip,.ac-status-bar{display:none!important}' +
+    // Phase 6: Status bar chips
+    '.ac-lc-filmstrip-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 10px;border-radius:100px;background:var(--raised);border:1px solid var(--b0);color:var(--md);white-space:nowrap;cursor:default;flex-shrink:0}' +
+    '.ac-lc-filmstrip-chip--current{border-color:var(--dec-bd);color:var(--dec);background:var(--dec-bg)}' +
+    '.ac-lc-filmstrip-badge{font-size:9px;font-weight:700;border-radius:8px;padding:1px 6px;flex-shrink:0}' +
+    '.ac-lc-filmstrip-badge--dec{color:var(--dcn,#9478e0);background:rgba(148,120,224,.12);border:1px solid rgba(148,120,224,.25)}' +
+    '.ac-lc-filmstrip-badge--act{color:var(--act);background:var(--act-bg);border:1px solid var(--act-bd)}' +
     '.ac-lc-empty-agenda{font-size:12px;color:var(--lo);font-style:italic;padding:16px 0}' +'.ac-lc-dec-row:hover{background:#1a2035}' +'.ac-lc-rsk-row:hover{background:#1a2035}' +'.ac-lc-park-row:hover{background:#1a2035}' +
     '.ac-lc-captured-row{position:relative}' +
     '.ac-lc-captured-row:hover{background:rgba(72,170,136,.22)}' +
@@ -1154,6 +1162,171 @@ var AccordLiveCapture = (function () {
     });
   }
 
+  // ── Phase 6: End Meeting flow ────────────────────────────────────────────
+
+  // Fill all progress segments visually (confirm-click, before PATCH)
+  function _fillProgressBarAll() {
+    var bar = document.getElementById('ac-lc-progress-bar');
+    if (!bar) return;
+    var total = _agendaItems.length || 3;
+    var html  = '';
+    for (var i = 0; i < total; i++) html += '<div class="ac-lc-seg ac-lc-seg--done"></div>';
+    bar.innerHTML = html;
+  }
+
+  // _endMeeting — IR71: local state only in .then(); IR73: AND state=eq.running guard
+  function _endMeeting() {
+    var btn = document.getElementById('ac-lc-end-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Ending\u2026'; }
+
+    // Visual fill before PATCH (spec §4.4)
+    _fillProgressBarAll();
+
+    API.patch(
+      'accord_meetings?meeting_id=eq.' + _meeting.meeting_id + '&state=eq.running',
+      { state: 'closed', ended_at: new Date().toISOString() }
+    ).then(function() {
+      // IR71: update local state only after server confirms
+      if (window.Accord && window.Accord.state && window.Accord.state.meeting) {
+        window.Accord.state.meeting.state = 'closed';
+      }
+      // IR72: dispatch level-changed — accord-transitions.js routes to closed view
+      window.dispatchEvent(new CustomEvent('accord:level-changed', {
+        detail: window.Accord && window.Accord.state && window.Accord.state.levelContext
+          ? window.Accord.state.levelContext
+          : {}
+      }));
+    }).catch(function(err) {
+      console.error('[AccordLiveCapture] _endMeeting PATCH failed', err);
+      if (btn) { btn.disabled = false; btn.textContent = 'END MEETING'; }
+      // Restore real progress bar on failure
+      _renderProgressBar(_agendaItems);
+    });
+  }
+
+  // Confirmation modal for End Meeting
+  function _showEndMeetingModal() {
+    var shell = document.getElementById('ac-lc-shell') || document.body;
+    var old   = document.getElementById('ac-lc-end-modal-backdrop');
+    if (old && old.parentElement) old.parentElement.removeChild(old);
+
+    var backdrop = document.createElement('div');
+    backdrop.id = 'ac-lc-end-modal-backdrop';
+    backdrop.style.cssText = 'position:fixed;inset:0;z-index:210;background:rgba(0,0,0,.7);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center';
+
+    var modal = document.createElement('div');
+    modal.style.cssText = 'background:var(--raised);border:1px solid var(--b2);border-radius:10px;padding:24px;width:400px;max-width:calc(100vw - 32px);font-family:"Outfit",system-ui,sans-serif;box-shadow:0 16px 48px rgba(0,0,0,.6)';
+    modal.innerHTML =
+      '<div style="font-size:15px;font-weight:600;color:var(--hi);margin-bottom:10px">End this meeting?</div>' +
+      '<div style="font-size:13px;color:var(--md);line-height:1.5;margin-bottom:22px">All captured nodes will be sealed. This cannot be undone.</div>' +
+      '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+        '<button id="ac-lc-end-modal-cancel" style="font-size:12px;font-weight:500;color:var(--md);background:transparent;border:1px solid var(--b2);border-radius:6px;padding:7px 18px;cursor:pointer;font-family:inherit">Cancel</button>' +
+        '<button id="ac-lc-end-modal-confirm" style="font-size:12px;font-weight:600;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd);border-radius:6px;padding:7px 18px;cursor:pointer;font-family:inherit">End Meeting \u2192</button>' +
+      '</div>';
+
+    backdrop.appendChild(modal);
+    shell.appendChild(backdrop);
+
+    function _close() {
+      if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop);
+    }
+
+    backdrop.addEventListener('click', function(ev) { if (ev.target === backdrop) _close(); });
+    document.getElementById('ac-lc-end-modal-cancel').addEventListener('click', _close);
+    document.getElementById('ac-lc-end-modal-confirm').addEventListener('click', function() {
+      _close();
+      _endMeeting();
+    });
+  }
+
+  // ── Phase 6: Status bar (workstream filmstrip) ───────────────────────────
+  // Non-blocking — shell mount does not wait for this data.
+  // IR47: uses API.get() — confirmed pattern.
+
+  function _fmtChipDate(iso) {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+    catch (e) { return ''; }
+  }
+
+  function _loadStatusBar(workstreamId, currentMeetingId) {
+    if (!workstreamId) return;
+    // Fetch prior closed/sealed meetings for this workstream (including counts via RPC-style join)
+    // Supabase supports computed columns via select — use subquery syntax via PostgREST embed.
+    // Phase 6: two-query approach — fetch meetings then counts per meeting.
+    API.get(
+      'accord_meetings?workstream_id=eq.' + workstreamId +
+      '&state=in.(closed,sealed)' +
+      '&select=meeting_id,title,scheduled_for,state' +
+      '&order=scheduled_for.desc' +
+      '&limit=8'
+    ).then(function(meetings) {
+      meetings = meetings || [];
+      if (!meetings.length) {
+        // Current meeting chip only
+        _paintStatusBar([{ meeting_id: currentMeetingId, title: (_meeting && _meeting.title) || 'Current', scheduled_for: _meeting && _meeting.scheduled_for, state: 'running', decision_count: 0, action_count: 0 }], currentMeetingId);
+        return;
+      }
+      // Fetch decision + action counts for each meeting via section nodes
+      var meetingIds = meetings.map(function(m) { return m.meeting_id; });
+      API.get(
+        'accord_nodes?meeting_id=in.(' + meetingIds.join(',') + ')' +
+        '&tag=in.(decision,action)' +
+        '&select=meeting_id,tag'
+      ).then(function(nodes) {
+        nodes = nodes || [];
+        // Build count map
+        var countMap = {};
+        meetingIds.forEach(function(id) { countMap[id] = { decision: 0, action: 0 }; });
+        nodes.forEach(function(n) {
+          if (!countMap[n.meeting_id]) countMap[n.meeting_id] = { decision: 0, action: 0 };
+          if (n.tag === 'decision') countMap[n.meeting_id].decision++;
+          else if (n.tag === 'action') countMap[n.meeting_id].action++;
+        });
+        var chips = meetings.map(function(m) {
+          var c = countMap[m.meeting_id] || { decision: 0, action: 0 };
+          return { meeting_id: m.meeting_id, title: m.title, scheduled_for: m.scheduled_for, state: m.state, decision_count: c.decision, action_count: c.action };
+        });
+        // Prepend current meeting chip
+        chips.unshift({ meeting_id: currentMeetingId, title: (_meeting && _meeting.title) || 'Current', scheduled_for: _meeting && _meeting.scheduled_for, state: 'running', decision_count: 0, action_count: 0 });
+        _paintStatusBar(chips, currentMeetingId);
+      }).catch(function() {
+        _paintStatusBar(meetings.map(function(m) { return Object.assign({ decision_count: 0, action_count: 0 }, m); }), currentMeetingId);
+      });
+    }).catch(function(e) {
+      console.warn('[AccordLiveCapture] status bar load failed', e);
+    });
+  }
+
+  function _paintStatusBar(chips, currentMeetingId) {
+    var filmstrip = document.querySelector('.ac-live-filmstrip');
+    if (!filmstrip) return;
+
+    var html = '<div style="display:flex;align-items:center;gap:6px;padding:0 16px;height:100%;overflow-x:auto;flex-wrap:nowrap">';
+    chips.forEach(function(chip) {
+      var isCurrent = chip.meeting_id === currentMeetingId;
+      var dateStr   = _fmtChipDate(chip.scheduled_for);
+      var label     = (dateStr ? dateStr + ' \u00b7 ' : '') + _esc((chip.title || 'Untitled').slice(0, 28));
+      var cls       = 'ac-lc-filmstrip-chip' + (isCurrent ? ' ac-lc-filmstrip-chip--current' : '');
+      var badges    = '';
+      if (chip.decision_count > 0) {
+        badges += '<span class="ac-lc-filmstrip-badge ac-lc-filmstrip-badge--dec">' + chip.decision_count + '</span>';
+      }
+      if (chip.action_count > 0) {
+        badges += '<span class="ac-lc-filmstrip-badge ac-lc-filmstrip-badge--act">' + chip.action_count + '</span>';
+      }
+      // Click deferred — Phase 7 / CMD-ACCORD-MEETING-SETUP-1
+      html += '<span class="' + cls + '">' + label + badges + '</span>';
+    });
+    html += '</div>';
+
+    filmstrip.innerHTML = html;
+    filmstrip.style.display = '';   // ensure element itself is not inline-hidden
+
+    // Remove the injected hide style tag so the bar becomes visible
+    _removeFilmstripHide();
+  }
+
   // Remote events
 
   // ── Phase 5: Four consolidated canvas sections ──────────────────────────
@@ -1801,6 +1974,7 @@ var AccordLiveCapture = (function () {
   }
 
   function _onLevelChanged() {
+    _removeFilmstripHide();
     _teardown();
     window.removeEventListener('accord:level-changed', _onLevelChanged);
     window.removeEventListener('accord:remote-node',   _onRemoteNode);
@@ -1832,10 +2006,16 @@ var AccordLiveCapture = (function () {
     // Phase 5: pre-populate _sectionAttendees for PersonPicker
     // Done after _loadAttendees resolves via _attendeeNameMap
     setTimeout(function() { _sectionAttendees = _inviteResourcesFromAttendees(); }, 1000);
+    // Phase 6: status bar — non-blocking, fires after shell mount
+    setTimeout(function() { _loadStatusBar(meeting.workstream_id, meeting.meeting_id); }, 0);
 
     var ci = document.getElementById('ac-lc-chat-input'); var cs = document.getElementById('ac-lc-chat-send');
     if (ci) ci.addEventListener('keydown', function(ev) { if (ev.key==='Enter'&&!ev.shiftKey) { ev.preventDefault(); _sendChatMessage(meeting); } });
     if (cs) cs.addEventListener('click', function() { _sendChatMessage(meeting); });
+
+    // Phase 6: End Meeting button
+    var endBtn = document.getElementById('ac-lc-end-btn');
+    if (endBtn) endBtn.addEventListener('click', function() { _showEndMeetingModal(); });
 
     _wireSidebarResize();
     _wireSectionToggles();
