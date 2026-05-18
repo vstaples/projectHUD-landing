@@ -38,6 +38,7 @@ var AccordLiveCapture = (function () {
   var _agendaHistCollapsed = {};
   var _agendaNewCounts     = {};
   var _agendaClickHandler  = null;  // named handler ref for remove/re-add
+  var _updateNavActive     = null;  // set by _wireNavObserver; called on expand/collapse
   var _agendaSectionOpen   = true;
 
   // Phase 5 section state
@@ -119,7 +120,7 @@ var AccordLiveCapture = (function () {
     '.ac-lc-chat{display:flex;flex-direction:column;flex:1;min-height:0;border-top:1px solid rgba(255,255,255,.06)}.ac-lc-chat-viewport{flex:1;overflow-y:auto;padding:10px 10px 6px;background:#060a12;border:1px solid rgba(255,255,255,.08);margin:6px 8px 0;border-radius:8px 8px 0 0;display:flex;flex-direction:column;gap:2px;box-shadow:inset 0 2px 8px rgba(0,0,0,.4)}.ac-lc-chat-msg-group{display:flex;flex-direction:column;margin-bottom:6px}.ac-lc-chat-msg-header{display:flex;gap:6px;align-items:baseline;font-size:10px;color:var(--lo);margin-bottom:2px;padding:0 2px}.ac-lc-chat-msg-header.me{justify-content:flex-end}.ac-lc-chat-msg-author{font-weight:500;color:var(--md)}.ac-lc-chat-msg-row{display:flex}.ac-lc-chat-msg-row.me{justify-content:flex-end}.ac-lc-chat-msg-row.other{justify-content:flex-start}.ac-lc-chat-bubble{max-width:82%;border-radius:10px;font-size:12px;line-height:1.45;padding:6px 10px;word-break:break-word}.ac-lc-chat-msg-row.me .ac-lc-chat-bubble{background:var(--dec-bg);border:1px solid var(--dec-bd);color:var(--hi);border-radius:10px 10px 2px 10px}.ac-lc-chat-msg-row.other .ac-lc-chat-bubble{background:var(--raised);border:1px solid rgba(255,255,255,.06);color:var(--hi);border-radius:10px 10px 10px 2px}.ac-lc-chat-input-row{display:flex;gap:6px;padding:6px 8px 10px}.ac-lc-chat-input{flex:1;background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit;color:var(--hi);resize:none;min-height:32px;max-height:80px;outline:none;transition:border-color .15s,background .15s}.ac-lc-chat-input:hover{border-color:rgba(255,255,255,.22);background:var(--hover)}.ac-lc-chat-input:focus{border-color:rgba(74,140,245,.5);background:var(--hover)}.ac-lc-chat-send{font-size:11px;font-weight:600;color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd);border-radius:6px;padding:6px 12px;cursor:pointer;flex-shrink:0;transition:background .15s}.ac-lc-chat-send:hover{background:rgba(74,140,245,.16)}.ac-lc-chat-empty{flex:1;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--lo);font-style:italic}' +
     '.ac-lc-canvas{flex:1;min-width:0;overflow-y:auto;padding:0}' +
     '.ac-lc-sec-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:10px 20px;background:var(--void);border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;user-select:none}' +
-    '.ac-lc-sec-bar{width:3px;height:16px;border-radius:2px;flex-shrink:0}.ac-lc-sec-bar--agenda{background:var(--nt)}.ac-lc-sec-bar--decisions{background:var(--dec)}.ac-lc-sec-bar--actions{background:var(--act)}.ac-lc-sec-bar--risks{background:var(--rsk)}.ac-lc-sec-bar--parking{background:var(--md)}' +
+    '.ac-lc-sec-bar{width:3px;height:16px;border-radius:2px;flex-shrink:0}.ac-lc-sec-bar--agenda{background:var(--nt)}.ac-lc-sec-bar--decisions{background:var(--dec)}.ac-lc-sec-bar--actions{background:var(--act)}.ac-lc-sec-bar--risks{background:var(--rsk)}.ac-lc-sec-bar--parking{background:#9478e0}' +
     '.ac-lc-sec-title{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--md);flex:1}.ac-lc-sec-meta{font-size:11px;color:var(--lo)}.ac-lc-sec-chevron{font-size:10px;color:var(--lo);transition:transform .15s}.ac-lc-sec-chevron.open{transform:rotate(90deg)}' +
     '.ac-lc-sec-body{padding:0 20px 16px}.ac-lc-sec-placeholder{font-size:12px;color:var(--lo);font-style:italic;padding:20px 20px 24px}' +
     '.ac-lc-prior-strip{margin-bottom:12px;border-radius:6px;border:1px solid var(--act-bd);overflow:hidden}.ac-lc-prior-strip-header{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--act-bg);cursor:pointer;font-size:11px;font-weight:600;color:var(--act)}.ac-lc-prior-pill{font-size:10px;font-weight:600;border-radius:10px;padding:1px 7px}.ac-lc-prior-pill--overdue{background:var(--rsk-bg);color:var(--rsk);border:1px solid var(--rsk-bd)}.ac-lc-prior-pill--open{background:var(--act-bg);color:var(--act);border:1px solid var(--act-bd)}.ac-lc-prior-strip-body{display:none}.ac-lc-prior-strip-body.open{display:block}.ac-lc-prior-row{display:flex;align-items:baseline;gap:8px;padding:5px 12px;border-top:1px solid rgba(255,255,255,.04);font-size:11px}.ac-lc-prior-seq{font-family:monospace;font-size:10px;color:var(--act);flex-shrink:0}.ac-lc-prior-summary{flex:1;color:var(--md)}.ac-lc-prior-overdue-dot{color:var(--rsk);font-size:9px;flex-shrink:0}' +
@@ -462,6 +463,7 @@ var AccordLiveCapture = (function () {
         var body = document.getElementById('ac-lc-agenda-body'); var chev = document.getElementById('ac-lc-agenda-chev');
         if (body) body.style.display = _agendaSectionOpen ? '' : 'none';
         if (chev) chev.classList.toggle('open', _agendaSectionOpen);
+        if (_updateNavActive) setTimeout(_updateNavActive, 50);
         return;
       }
       var bEl = document.getElementById('ac-lc-' + key + '-body'); var cEl = hdr.querySelector('.ac-lc-sec-chevron');
@@ -469,6 +471,7 @@ var AccordLiveCapture = (function () {
       var open = bEl.style.display !== 'none';
       bEl.style.display = open ? 'none' : '';
       if (cEl) cEl.classList.toggle('open', !open);
+      if (_updateNavActive) setTimeout(_updateNavActive, 50);
     });
   }
 
@@ -478,7 +481,7 @@ var AccordLiveCapture = (function () {
     if (!canvas) return;
     var sections = ['agenda','decisions','actions','risks','parking'];
 
-    function _updateActive() {
+    _updateNavActive = function() {
       var canvasTop = canvas.scrollTop;
       var active    = sections[0];
       sections.forEach(function(sec) {
@@ -488,10 +491,10 @@ var AccordLiveCapture = (function () {
       document.querySelectorAll('.ac-lc-nav-item').forEach(function(link) {
         link.classList.toggle('active', link.dataset.section === active);
       });
-    }
+    };
 
-    canvas.addEventListener('scroll', _updateActive, { passive: true });
-    _updateActive();
+    canvas.addEventListener('scroll', _updateNavActive, { passive: true });
+    _updateNavActive();
   }
 
   function _wireNavClicks() {
