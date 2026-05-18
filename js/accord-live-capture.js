@@ -147,10 +147,10 @@ var AccordLiveCapture = (function () {
     '.ac-lc-sec-add-btn:hover{opacity:.8}' +
     '.ac-lc-sec-empty{font-size:12px;color:var(--lo);font-style:italic;padding:8px 0 4px}' +
     // Decisions
-    '.ac-lc-dec-row{display:flex;align-items:flex-start;gap:10px;padding:5px 10px;margin-bottom:3px;border-radius:5px;border-left:3px solid var(--dec);background:var(--raised)}' +
+    '.ac-lc-dec-row{display:flex;align-items:flex-start;gap:10px;padding:5px 10px;margin-bottom:8px;margin-left:8px;border-radius:0 5px 5px 0;border-left:2px solid var(--dec);background:#13172a}' +
     
     '.ac-lc-dec-badge{font-size:9px;font-weight:700;border-radius:2px;padding:2px 5px;flex-shrink:0;cursor:pointer;margin-top:2px;color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd)}' +
-    '.ac-lc-dec-text{flex:1;font-size:13px;color:var(--hi);line-height:1.4}' +
+    '.ac-lc-dec-text{flex:1;font-size:12px;color:var(--hi);line-height:1.4}' +
     '.ac-lc-dec-meta{font-size:11px;color:var(--lo);white-space:nowrap;flex-shrink:0;padding-top:2px}' +
     // Actions table
     '.ac-lc-act-table{width:100%;border-collapse:collapse;font-size:12px}' +
@@ -1185,10 +1185,8 @@ var AccordLiveCapture = (function () {
     var effStr  = n.effective_date ? 'Effective ' + _fmtDate(n.effective_date) : '';
     return '<div class="ac-lc-dec-row" data-node-id="'+_esc(n.node_id)+'">' +
       '<span class="ac-lc-dec-badge" data-action="edit-section-node" data-node-id="'+_esc(n.node_id)+'" data-tag="decision">'+_esc(n.seq_id||'DC')+'</span>' +
-      '<div style="flex:1;min-width:0">' +
-        '<div class="ac-lc-dec-text">'+_esc(n.summary||'')+'</div>' +
-        (effStr?'<div style="font-size:10px;color:var(--dec);margin-top:2px">'+_esc(effStr)+'</div>':'') +
-      '</div>' +
+      '<span class="ac-lc-dec-text">'+_esc(n.summary||'')+'</span>' +
+      (effStr?'<span style="font-size:11px;color:var(--dec);flex-shrink:0;white-space:nowrap">'+_esc(effStr)+'</span>':'') +
       '<span class="ac-lc-dec-meta">'+_esc(timeStr)+'</span>' +
     '</div>';
   }
