@@ -125,7 +125,7 @@ var AccordLiveCapture = (function () {
     '.ac-lc-prior-strip{margin-bottom:12px;border-radius:6px;border:1px solid var(--act-bd);overflow:hidden}.ac-lc-prior-strip-header{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--act-bg);cursor:pointer;font-size:11px;font-weight:600;color:var(--act)}.ac-lc-prior-pill{font-size:10px;font-weight:600;border-radius:10px;padding:1px 7px}.ac-lc-prior-pill--overdue{background:var(--rsk-bg);color:var(--rsk);border:1px solid var(--rsk-bd)}.ac-lc-prior-pill--open{background:var(--act-bg);color:var(--act);border:1px solid var(--act-bd)}.ac-lc-prior-strip-body{display:none}.ac-lc-prior-strip-body.open{display:block}.ac-lc-prior-row{display:flex;align-items:baseline;gap:8px;padding:5px 12px;border-top:1px solid rgba(255,255,255,.04);font-size:11px}.ac-lc-prior-seq{font-family:monospace;font-size:10px;color:var(--act);flex-shrink:0}.ac-lc-prior-summary{flex:1;color:var(--md)}.ac-lc-prior-overdue-dot{color:var(--rsk);font-size:9px;flex-shrink:0}' +
     '.ac-lc-agenda-item{border-radius:5px;margin-bottom:8px;margin-left:8px;border:none;border-left:2px solid var(--nt);overflow:visible}.ac-lc-agenda-item-header{display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:pointer;background:#13172a;border-radius:0 5px 5px 0;transition:background .1s}.ac-lc-agenda-item-header:hover{background:var(--hover)}.ac-lc-agenda-item.expanded .ac-lc-agenda-item-header{border-radius:0 5px 0 0}.ac-lc-item-chevron{font-size:9px;color:var(--lo);transition:transform .15s;flex-shrink:0}.ac-lc-item-chevron.open{transform:rotate(90deg)}.ac-lc-item-num{font-size:11px;color:var(--lo);flex-shrink:0;min-width:18px}.ac-lc-item-title{flex:1;font-size:13px;font-weight:500;color:var(--hi)}.ac-lc-active-badge{font-size:10px;font-weight:600;color:var(--live);background:rgba(52,212,153,.10);border:1px solid rgba(52,212,153,.22);border-radius:10px;padding:1px 8px;flex-shrink:0}.ac-lc-new-badge{font-size:10px;font-weight:600;color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd);border-radius:10px;padding:1px 7px;flex-shrink:0}.ac-lc-item-status-btn{font-size:10px;font-weight:600;border-radius:5px;padding:2px 9px;cursor:pointer;border:none;flex-shrink:0;transition:opacity .1s}.ac-lc-item-status-btn:hover{opacity:.8}.ac-lc-item-status-btn--discuss{color:var(--nt);background:var(--nt-bg);border:1px solid var(--nt-bd)}.ac-lc-item-status-btn--skip{color:var(--lo);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10)}.ac-lc-item-status-btn--done{color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd);cursor:default}.ac-lc-item-status-btn--skipped{color:var(--lo);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);cursor:default;text-decoration:line-through}.ac-lc-agenda-item-body{padding:0 10px 8px;background:#13172a;border-top:1px solid rgba(255,255,255,.06);border-radius:0 0 5px 0}' +
     '.ac-lc-history-header{display:flex;align-items:center;gap:6px;padding:5px 0 4px;cursor:pointer;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--lo);user-select:none}.ac-lc-history-meta{margin-left:auto;font-size:10px;color:var(--lo);font-weight:400;text-transform:none;letter-spacing:0}.ac-lc-history-chevron{font-size:9px;transition:transform .12s}.ac-lc-history-chevron.open{transform:rotate(90deg)}.ac-lc-history-body{display:none}.ac-lc-history-body.open{display:block}.ac-lc-history-row{display:flex;align-items:baseline;gap:8px;padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.03)}.ac-lc-history-row:last-child{border-bottom:none}.ac-lc-history-date{color:var(--lo);flex-shrink:0}.ac-lc-history-badge{font-size:9px;font-weight:700;border-radius:3px;padding:1px 5px;flex-shrink:0}.ac-lc-history-text{flex:1;color:var(--md)}.ac-lc-no-history{font-size:11px;color:var(--lo);font-style:italic;padding:4px 0 8px}' +
-    '.ac-lc-captured-label{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--lo);padding:4px 0 4px 8px}.ac-lc-captured-row{display:flex;align-items:baseline;gap:8px;padding:4px 8px;font-size:12px;margin-left:8px;margin-bottom:4px;border-radius:4px;background:rgba(72,170,136,.10);border-left:2px solid var(--nt)}.ac-lc-captured-badge{font-size:9px;font-weight:700;border-radius:3px;padding:1px 5px;flex-shrink:0;cursor:pointer;transition:opacity .1s}.ac-lc-captured-badge:hover{opacity:.75}.ac-lc-captured-text{flex:1;color:var(--md)}.ac-lc-captured-time{color:var(--lo);flex-shrink:0;font-size:10px}' +
+    '.ac-lc-captured-label{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--lo);padding:4px 0 4px 8px}.ac-lc-captured-row{display:flex;align-items:baseline;gap:8px;padding:4px 8px;font-size:12px;margin-left:8px;margin-bottom:4px;border-radius:4px;background:rgba(72,170,136,.10);border-left:2px solid var(--nt)}.ac-lc-captured-badge{font-size:9px;font-weight:700;border-radius:3px;padding:1px 5px;flex-shrink:0;cursor:pointer;transition:opacity .1s}.ac-lc-captured-badge:hover{opacity:.75}.ac-lc-captured-text{flex:1;color:var(--md)}.ac-lc-captured-time{color:var(--lo);flex-shrink:0;font-size:10px;margin-right:18px}' +
     '.ac-lc-add-zone{margin-top:6px;margin-left:8px;position:relative}.ac-lc-add-textarea{width:100%;box-sizing:border-box;background:rgba(232,148,48,.025);border:1px solid rgba(232,148,48,.28);border-radius:6px;padding:8px 10px 32px;font-size:12px;font-family:inherit;color:var(--hi);resize:vertical;min-height:72px;outline:none;transition:background .15s,border-color .15s}.ac-lc-add-textarea:focus{background:rgba(232,148,48,.05);border-color:rgba(232,148,48,.5)}.ac-lc-add-btn{position:absolute;bottom:8px;right:8px;font-size:11px;font-weight:600;color:var(--nt);background:var(--nt-bg);border:1px solid var(--nt-bd);border-radius:5px;padding:3px 10px;cursor:pointer;transition:opacity .1s}.ac-lc-add-btn:hover{opacity:.8}' +
     '.ac-lc-reclassify-backdrop{position:fixed;inset:0;z-index:200}.ac-lc-reclassify-popup{position:fixed;z-index:201;background:var(--raised);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:14px;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.5)}.ac-lc-reclassify-title{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--lo);margin-bottom:10px}.ac-lc-reclassify-types{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.ac-lc-reclassify-type{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:500;transition:background .1s}.ac-lc-reclassify-type:hover,.ac-lc-reclassify-type.selected{background:var(--hover)}.ac-lc-reclassify-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}.ac-lc-reclassify-fields{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}.ac-lc-reclassify-field{display:flex;flex-direction:column;gap:3px}.ac-lc-reclassify-field label{font-size:10px;color:var(--lo)}.ac-lc-reclassify-field input{background:var(--b0);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:4px 8px;font-size:12px;font-family:inherit;color:var(--hi);outline:none}.ac-lc-reclassify-field input:focus{border-color:rgba(74,140,245,.4)}.ac-lc-reclassify-actions{display:flex;gap:6px;justify-content:flex-end}.ac-lc-reclassify-cancel{font-size:11px;color:var(--lo);background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:4px 10px;cursor:pointer}.ac-lc-reclassify-confirm{font-size:11px;font-weight:600;color:var(--hi);background:var(--dec);border:none;border-radius:5px;padding:4px 12px;cursor:pointer}.ac-lc-reclassify-confirm:hover{opacity:.88}' +
     '.ac-lc-empty-agenda{font-size:12px;color:var(--lo);font-style:italic;padding:16px 0}' +
@@ -761,13 +761,44 @@ var AccordLiveCapture = (function () {
   // ── Note delete ────────────────────────────────────────────────────────
   function _deleteNote(nodeId) {
     if (!_meeting) return;
-    if (!confirm('Delete this note? This cannot be undone.')) return;
-    API.del('accord_nodes?node_id=eq.' + nodeId + '&meeting_id=eq.' + _meeting.meeting_id)
-      .then(function() {
-        var rowEl = document.querySelector('[data-action="note-row"][data-node-id="' + nodeId + '"]');
-        if (rowEl && rowEl.parentElement) rowEl.parentElement.removeChild(rowEl);
-      })
-      .catch(function(e) { console.error('[AccordLiveCapture] note DELETE failed', e); });
+    var shell = document.getElementById('ac-lc-shell') || document.body;
+
+    // Remove any existing confirm popup
+    var old = document.getElementById('ac-lc-del-confirm'); if (old && old.parentElement) old.parentElement.removeChild(old);
+
+    var popup = document.createElement('div');
+    popup.id = 'ac-lc-del-confirm';
+    popup.style.cssText = 'position:fixed;z-index:202;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--raised);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:20px 22px;min-width:260px;box-shadow:0 8px 40px rgba(0,0,0,.6);font-family:inherit';
+    popup.innerHTML =
+      '<div style="font-size:13px;font-weight:600;color:var(--hi);margin-bottom:6px">Delete note?</div>' +
+      '<div style="font-size:12px;color:var(--md);margin-bottom:16px">This cannot be undone.</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+        '<button id="ac-lc-del-cancel" style="font-size:11px;color:var(--lo);background:transparent;border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:5px 14px;cursor:pointer;font-family:inherit">Cancel</button>' +
+        '<button id="ac-lc-del-confirm-btn" style="font-size:11px;font-weight:600;color:#fff;background:var(--rsk);border:none;border-radius:5px;padding:5px 14px;cursor:pointer;font-family:inherit">Delete</button>' +
+      '</div>';
+
+    var backdrop = document.createElement('div');
+    backdrop.style.cssText = 'position:fixed;inset:0;z-index:201;background:rgba(0,0,0,.4)';
+
+    shell.appendChild(backdrop);
+    shell.appendChild(popup);
+
+    function _close() {
+      if (popup.parentElement) popup.parentElement.removeChild(popup);
+      if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop);
+    }
+
+    backdrop.addEventListener('click', _close);
+    popup.querySelector('#ac-lc-del-cancel').addEventListener('click', _close);
+    popup.querySelector('#ac-lc-del-confirm-btn').addEventListener('click', function() {
+      _close();
+      API.del('accord_nodes?node_id=eq.' + nodeId + '&meeting_id=eq.' + _meeting.meeting_id)
+        .then(function() {
+          var rowEl = document.querySelector('[data-action="note-row"][data-node-id="' + nodeId + '"]');
+          if (rowEl && rowEl.parentElement) rowEl.parentElement.removeChild(rowEl);
+        })
+        .catch(function(e) { console.error('[AccordLiveCapture] note DELETE failed', e); });
+    });
   }
 
   // ── Note edit popup ────────────────────────────────────────────────────
