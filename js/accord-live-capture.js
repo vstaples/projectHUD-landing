@@ -198,8 +198,8 @@ var AccordLiveCapture = (function () {
     var bar = document.getElementById('ac-lc-progress-bar');
     if (!bar) return;
     if (!items || !items.length) { bar.innerHTML = '<div class="ac-lc-seg ac-lc-seg--todo" style="flex:1"></div>'; return; }
-    var done  = items.filter(function(r) { return r.status === 'discussed'; }).length;
-    var skip  = items.filter(function(r) { return r.status === 'skipped';   }).length;
+    var done  = items.filter(function(r) { return r.status === 'complete'; }).length;
+    var skip  = items.filter(function(r) { return r.status === 'in_progress'; }).length;
     var total = items.length;
     var act   = (total - done - skip) > 0 ? 1 : 0;
     var todo  = Math.max(0, total - done - skip - act);
@@ -485,10 +485,10 @@ var AccordLiveCapture = (function () {
       var isAct = item.agenda_item_id===actId;
       var nc    = _agendaNewCounts[item.agenda_item_id]||0;
       var sBtns = '';
-      if (item.status==='discussed') {
+      if (item.status==='complete') {
         sBtns = '<button class="ac-lc-item-status-btn ac-lc-item-status-btn--done" disabled>Discussed</button>';
-      } else if (item.status==='skipped') {
-        sBtns = '<button class="ac-lc-item-status-btn ac-lc-item-status-btn--skipped" disabled>Skipped</button>';
+      } else if (item.status==='in_progress') {
+        sBtns = '<button class="ac-lc-item-status-btn ac-lc-item-status-btn--skipped" disabled>In Progress</button>';
       } else if (isOrg && isAct) {
         sBtns = '<button class="ac-lc-item-status-btn ac-lc-item-status-btn--discuss" data-action="mark-discussed" data-item-id="'+_esc(item.agenda_item_id)+'">Mark discussed</button>' +
                 '<button class="ac-lc-item-status-btn ac-lc-item-status-btn--skip" data-action="skip-item" data-item-id="'+_esc(item.agenda_item_id)+'">Skip</button>';
@@ -517,11 +517,16 @@ var AccordLiveCapture = (function () {
     container.addEventListener('click', function(ev) {
       // Check specific button actions FIRST — before toggle-item — because
       // status buttons live inside the header div that carries data-action="toggle-item".
+      // IR47 finding: accord_agenda_items_status_check constraint allows
+      // 'pending', 'in_progress', 'complete' only. Brief specified 'discussed'
+      // and 'skipped' which do not exist. Using 'complete' for mark-discussed
+      // and 'in_progress' for skip as closest available values.
+      // Architect to confirm or add migration for 'discussed'/'skipped' values.
       var d = ev.target.closest('[data-action="mark-discussed"]');
-      if (d) { ev.stopPropagation(); _patchAgendaStatus(d.dataset.itemId,'discussed'); return; }
+      if (d) { ev.stopPropagation(); _patchAgendaStatus(d.dataset.itemId,'complete'); return; }
 
       var s = ev.target.closest('[data-action="skip-item"]');
-      if (s) { ev.stopPropagation(); _patchAgendaStatus(s.dataset.itemId,'skipped'); return; }
+      if (s) { ev.stopPropagation(); _patchAgendaStatus(s.dataset.itemId,'in_progress'); return; }
 
       var b = ev.target.closest('[data-action="reclassify"]');
       if (b) { ev.stopPropagation(); _openReclassifyPopup(b.dataset.nodeId, b.dataset.currentTag, b); return; }
