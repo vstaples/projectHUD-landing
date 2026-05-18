@@ -824,7 +824,11 @@ var AccordLiveCapture = (function () {
     });
 
     var backdrop = document.createElement('div'); backdrop.className='ac-lc-reclassify-backdrop';
-    backdrop.addEventListener('click', function() { if (popup.parentElement) popup.parentElement.removeChild(popup); if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop); });
+    backdrop.addEventListener('click', function(ev) {
+      // Don't close if click is inside PersonPicker overlay
+      if (ev.target && ev.target.closest && ev.target.closest('.pp-overlay')) return;
+      if (popup.parentElement) popup.parentElement.removeChild(popup); if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop);
+    });
     shell.insertBefore(backdrop, popup);
 
     popup.querySelector('#ac-lc-rc-cancel').addEventListener('click', function() { if (popup.parentElement) popup.parentElement.removeChild(popup); if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop); });
@@ -836,24 +840,124 @@ var AccordLiveCapture = (function () {
         var dd=ddEl?ddEl.value.trim():'';
         if (_rcAssignee||dd) patch.body = JSON.stringify({ assignee_resource_id: _rcAssignee?_rcAssignee.id:'', assignee: _rcAssignee?_rcAssignee.name:'', due_date: dd });
         if (dd) patch.due_date = dd;
+        patch.effective_date = null;  // clear decision scope field
       } else if (selTag==='decision') {
         var edEl=document.getElementById('ac-lc-rc-ed'); var ed=edEl?edEl.value.trim():''; if (ed) patch.effective_date=ed;
+        patch.due_date = null;   // clear action scope field
+        patch.body = null;
       } else if (selTag==='risk') {
         var svEl=document.getElementById('ac-lc-rc-sv'); var sv=svEl?svEl.value:'Medium'; patch.body=JSON.stringify({severity:sv});
+        patch.due_date = null; patch.effective_date = null;
+      } else {
+        // note, question — clear all scope fields
+        patch.due_date = null; patch.effective_date = null; patch.body = null;
       }
       if (popup.parentElement) popup.parentElement.removeChild(popup);
       if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop);
-      // IR71: DOM update only after PATCH confirms
-      API.patch('accord_nodes?node_id=eq.'+nodeId, patch).then(function(result) {
-        var updated = Array.isArray(result)?result[0]:result; if (!updated) return;
-        var badgeEl = document.querySelector('[data-action="reclassify"][data-node-id="'+nodeId+'"]');
-        if (badgeEl) {
-          badgeEl.style.color      = _tagColor(selTag);
-          badgeEl.style.background = _tagBg(selTag);
-          badgeEl.dataset.currentTag = selTag;
-          badgeEl.textContent = updated.seq_id || _tagLabel(selTag);
-        }
-      }).catch(function(e) { console.error('[AccordLiveCapture] reclassify PATCH failed', e); });
+
+      // Reclassify = DELETE old node + INSERT new node with correct tag.
+      // This is required because seq_id (e.g. NT-032, AX-019) is assigned
+      // by the allocate_node_seq() trigger at INSERT time only — a PATCH
+      // cannot reassign it. DELETE frees the old seq slot; INSERT triggers
+      // fresh allocation for the new tag class.
+      // IR73: DELETE and INSERT both scoped to current meeting_id.
+      var meeting = window.Accord && window.Accord.state && window.Accord.state.me;
+      var me = window.Accord && window.Accord.state && window.Accord.state.me;
+      var stateThread = window.Accord && window.Accord.state && window.Accord.state.thread;
+      var threadId = (stateThread && stateThread.thread_id) || null;
+      var currentMeetingId = _meeting && _meeting.meeting_id;
+
+      // Find the original node to copy its fields
+      var origNode = null;
+      ['note','decision','action','risk','dissent','question'].forEach(function(t) {
+        var arr = (t==='risk'||t==='dissent') ? _sectionNodes.risk :
+                  (t==='question' ? _sectionNodes.question :
+                  (t==='decision' ? _sectionNodes.decision :
+                  (t==='action' ? _sectionNodes.action : null)));
+        if (arr) { var found = arr.find(function(n){return n.node_id===nodeId;}); if (found) origNode = found; }
+      });
+      // Also check agenda captured nodes
+      if (!origNode) {
+        document.querySelectorAll('[data-node-id="'+nodeId+'"]').forEach(function(el) {
+          // node data lives in the DOM; we have summary from the badge row
+        });
+      }
+
+      var insertRow = {
+        firm_id:        _meeting.firm_id,
+        meeting_id:     currentMeetingId,
+        agenda_item_id: origNode ? (origNode.agenda_item_id || null) : null,
+        tag:            selTag,
+        summary:        origNode ? (origNode.summary || '') : '',
+        body:           null,
+        created_by:     me ? me.id : null,
+      };
+      if (threadId) insertRow.thread_id = threadId;
+
+      if (selTag==='action') {
+        var ddEl=document.getElementById('ac-lc-rc-dd');
+        var dd=ddEl?ddEl.value.trim():'';
+        if (_rcAssignee||dd) insertRow.body = JSON.stringify({ assignee_resource_id: _rcAssignee?_rcAssignee.id:'', assignee_name: _rcAssignee?_rcAssignee.name:'', due_date: dd });
+        if (dd) insertRow.due_date = dd;
+      } else if (selTag==='decision') {
+        var edEl=document.getElementById('ac-lc-rc-ed'); var ed=edEl?edEl.value.trim():''; if (ed) insertRow.effective_date=ed;
+      } else if (selTag==='risk') {
+        var svEl=document.getElementById('ac-lc-rc-sv'); var sv=svEl?svEl.value:'Medium'; insertRow.body=JSON.stringify({severity:sv});
+      }
+
+      // IR71: DELETE first, then INSERT; update DOM only after both confirm
+      API.del('accord_nodes?node_id=eq.'+nodeId+'&meeting_id=eq.'+currentMeetingId)
+        .then(function() {
+          return API.post('accord_nodes', insertRow);
+        })
+        .then(function(created) {
+          var newNode = Array.isArray(created) ? created[0] : created;
+          if (!newNode) return;
+
+          // Remove old node from all local arrays
+          ['decision','action','risk','question'].forEach(function(k) {
+            _sectionNodes[k] = _sectionNodes[k].filter(function(n){return n.node_id!==nodeId;});
+          });
+          // Remove from agenda captured list if present
+          var oldBadge = document.querySelector('[data-action="reclassify"][data-node-id="'+nodeId+'"]');
+          if (oldBadge) {
+            var oldRow = oldBadge.closest('.ac-lc-captured-row');
+            if (oldRow) oldRow.parentElement && oldRow.parentElement.removeChild(oldRow);
+          }
+
+          // Add new node to correct section array
+          var sKey = (selTag==='dissent') ? 'risk' : selTag;
+          if (_sectionNodes[sKey]) {
+            _sectionNodes[sKey].push(newNode);
+            _updateSectionCount(sKey, _sectionNodes[sKey]);
+          }
+
+          // IR72: broadcast new node committed
+          if (window.Accord && window.Accord.broadcast) {
+            window.Accord.broadcast('accord.node.committed', {
+              node_id:    newNode.node_id,
+              thread_id:  newNode.thread_id,
+              meeting_id: newNode.meeting_id,
+              tag:        newNode.tag,
+              summary:    newNode.summary,
+              created_by: newNode.created_by,
+              created_at: newNode.created_at,
+            });
+          }
+
+          // Append new row to the correct section body (if expanded)
+          var bodyMap = { decision:'ac-lc-dec-list', action:'ac-lc-act-tbody', risk:'ac-lc-rsk-list', question:'ac-lc-park-list' };
+          var listEl = document.getElementById(bodyMap[sKey]);
+          if (listEl) {
+            var d = document.createElement('div');
+            if (sKey==='decision')       d.innerHTML = _decisionRowHtml(newNode);
+            else if (sKey==='action')  { d=document.createElement('tbody'); d.innerHTML = _actionRowHtml(newNode); }
+            else if (sKey==='risk')      d.innerHTML = _riskRowHtml(newNode);
+            else if (sKey==='question')  d.innerHTML = _parkRowHtml(newNode);
+            listEl.appendChild(d.firstChild);
+          }
+        })
+        .catch(function(e) { console.error('[AccordLiveCapture] reclassify DELETE+INSERT failed', e); });
     });
   }
 
