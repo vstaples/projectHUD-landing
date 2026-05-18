@@ -140,15 +140,15 @@ var AccordLiveCapture = (function () {
     '.ac-lc-sec-add-btn:hover{opacity:.8}' +
     '.ac-lc-sec-empty{font-size:12px;color:var(--lo);font-style:italic;padding:8px 0 4px}' +
     // Decisions
-    '.ac-lc-dec-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}' +
-    '.ac-lc-dec-row:last-child{border-bottom:none}' +
+    '.ac-lc-dec-row{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;margin-bottom:4px;border-radius:6px;border-left:3px solid var(--dec);background:var(--raised)}' +
+    
     '.ac-lc-dec-badge{font-size:9px;font-weight:700;border-radius:2px;padding:2px 5px;flex-shrink:0;cursor:pointer;margin-top:2px;color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd)}' +
     '.ac-lc-dec-text{flex:1;font-size:13px;color:var(--hi);line-height:1.4}' +
     '.ac-lc-dec-meta{font-size:11px;color:var(--lo);white-space:nowrap;flex-shrink:0;padding-top:2px}' +
     // Actions table
     '.ac-lc-act-table{width:100%;border-collapse:collapse;font-size:12px}' +
     '.ac-lc-act-thead th{font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--lo);text-align:left;padding:2px 8px 8px}' +
-    '.ac-lc-act-row{border-top:1px solid rgba(255,255,255,.04)}' +
+    '.ac-lc-act-row{margin-bottom:4px}' +'.ac-lc-act-row td{background:var(--raised);padding:7px 8px;border-top:none}' +'.ac-lc-act-row td:first-child{border-left:3px solid var(--act);border-radius:6px 0 0 6px;padding-left:10px}' +'.ac-lc-act-row td:last-child{border-radius:0 6px 6px 0}' +
     '.ac-lc-act-row td{padding:7px 8px;vertical-align:middle}' +
     '.ac-lc-act-owner{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--md)}' +
     '.ac-lc-act-avatar{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;color:var(--dec);background:var(--dec-bg)}' +
@@ -163,8 +163,8 @@ var AccordLiveCapture = (function () {
     '.ac-lc-assignee-btn:hover{border-color:rgba(74,140,245,.3)}' +
     '.ac-lc-date-input{background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit;color:var(--hi);outline:none;flex-shrink:0;width:130px;color-scheme:dark}' +
     // Risks
-    '.ac-lc-rsk-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}' +
-    '.ac-lc-rsk-row:last-child{border-bottom:none}' +
+    '.ac-lc-rsk-row{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;margin-bottom:4px;border-radius:6px;border-left:3px solid var(--rsk);background:var(--raised)}' +
+    
     '.ac-lc-rsk-badge{font-size:9px;font-weight:700;border-radius:2px;padding:2px 5px;flex-shrink:0;cursor:pointer;margin-top:2px;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd)}' +
     '.ac-lc-ds-badge{font-size:9px;font-weight:700;border-radius:2px;padding:2px 5px;flex-shrink:0;cursor:pointer;margin-top:2px;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd)}' +
     '.ac-lc-rsk-text{flex:1;font-size:12px;color:var(--hi)}' +
@@ -174,8 +174,8 @@ var AccordLiveCapture = (function () {
     '.ac-lc-severity-chip--high{color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd)}' +
     '.ac-lc-sev-select{background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;color:var(--hi);cursor:pointer;flex-shrink:0}' +
     // Parking lot
-    '.ac-lc-park-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}' +
-    '.ac-lc-park-row:last-child{border-bottom:none}' +
+    '.ac-lc-park-row{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;margin-bottom:4px;border-radius:6px;border-left:3px solid #9478e0;background:var(--raised)}' +
+    
     '.ac-lc-park-dot{width:8px;height:8px;border-radius:50%;background:#9478e0;flex-shrink:0;margin-top:4px}' +
     '.ac-lc-park-text{flex:1;font-size:12px;color:var(--hi)}' +
     '.ac-lc-park-source{font-size:10px;color:var(--lo);margin-top:2px}' +
@@ -1514,14 +1514,27 @@ var AccordLiveCapture = (function () {
             if (arr[i].node_id===nodeId) { arr[i]=Object.assign(arr[i],patch,{seq_id:updated.seq_id||arr[i].seq_id}); break; }
           }
         }
-        // Update badge seq_id
-        var badgeEl = document.querySelector('[data-action="edit-section-node"][data-node-id="'+nodeId+'"]');
-        if (badgeEl && updated.seq_id) badgeEl.textContent = updated.seq_id;
-        // Update summary in DOM
-        var rowEl = document.querySelector('[data-node-id="'+nodeId+'"]');
-        if (rowEl) {
-          var textEl = rowEl.querySelector('.ac-lc-dec-text,.ac-lc-act-task,.ac-lc-rsk-text,.ac-lc-park-text');
-          if (textEl) textEl.textContent = newSummary.slice(0,100);
+        // Re-render full row for action items (assignee/due/status all change).
+        // For other types, targeted text update is sufficient.
+        if (tag==='action') {
+          var updatedNode = arr ? arr.find(function(n){return n.node_id===nodeId;}) : null;
+          if (updatedNode) {
+            var oldRow = document.querySelector('tr.ac-lc-act-row[data-node-id="'+nodeId+'"]');
+            if (oldRow) {
+              var d = document.createElement('tbody');
+              d.innerHTML = _actionRowHtml(updatedNode);
+              oldRow.parentNode.replaceChild(d.firstChild, oldRow);
+              _updateSectionCount('action', _sectionNodes.action);
+            }
+          }
+        } else {
+          var badgeEl = document.querySelector('[data-action="edit-section-node"][data-node-id="'+nodeId+'"]');
+          if (badgeEl && updated.seq_id) badgeEl.textContent = updated.seq_id;
+          var rowEl = document.querySelector('[data-node-id="'+nodeId+'"]');
+          if (rowEl) {
+            var textEl = rowEl.querySelector('.ac-lc-dec-text,.ac-lc-act-task,.ac-lc-rsk-text,.ac-lc-park-text');
+            if (textEl) textEl.textContent = newSummary.slice(0,100);
+          }
         }
       }).catch(function(e) { console.error('[AccordLiveCapture] section edit PATCH failed', e); });
     });
