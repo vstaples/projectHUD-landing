@@ -793,11 +793,18 @@ var AccordLiveCapture = (function () {
           if (!asnBtn) return;
           asnBtn.addEventListener('click', function(ev) {
             ev.stopPropagation();
+            // Disable backdrop pointer-events so PersonPicker rows are clickable
+            // (backdrop may be in a higher stacking context than PersonPicker)
+            var bdEl = document.querySelector('.ac-lc-reclassify-backdrop');
+            if (bdEl) bdEl.style.pointerEvents = 'none';
             var resources = _inviteResourcesFromAttendees();
             window.PersonPicker && window.PersonPicker.show(asnBtn, function(r) {
               _rcAssignee = { id: r.id, name: r.name };
               asnBtn.textContent = r.name;
               asnBtn.style.color = 'var(--hi)';
+              // Restore backdrop pointer-events after selection
+              var bdEl2 = document.querySelector('.ac-lc-reclassify-backdrop');
+              if (bdEl2) bdEl2.style.pointerEvents = '';
             }, { resources: resources });
           });
         }, 0);
@@ -1456,9 +1463,12 @@ var AccordLiveCapture = (function () {
     if (asnBtn) {
       asnBtn.addEventListener('click', function() {
         var resources = _inviteResourcesFromAttendees();
+        var bdEl = backdrop;
+        if (bdEl) bdEl.style.pointerEvents = 'none';
         window.PersonPicker && window.PersonPicker.show(asnBtn, function(r) {
           _editAssignee = { id: r.id, name: r.name };
           asnBtn.textContent = r.name;
+          if (bdEl) bdEl.style.pointerEvents = '';
         }, { resources: resources });
       });
     }
