@@ -254,6 +254,19 @@ var AccordLiveCapture = (function () {
   }
 
   // Timer
+  function _injectFilmstripHide() {
+    if (document.getElementById('ac-lc-filmstrip-hide')) return;
+    var s = document.createElement('style');
+    s.id = 'ac-lc-filmstrip-hide';
+    s.textContent = '.ac-live-filmstrip{display:none!important}';
+    document.head.appendChild(s);
+  }
+
+  function _removeFilmstripHide() {
+    var s = document.getElementById('ac-lc-filmstrip-hide');
+    if (s) s.parentNode.removeChild(s);
+  }
+
   function _startTimer(startedAt) {
     _stopTimer();
     var origin = startedAt ? new Date(startedAt).getTime() : Date.now();
@@ -1807,6 +1820,7 @@ var AccordLiveCapture = (function () {
 
     if (window.Accord&&window.Accord.switchSurface) window.Accord.switchSurface('capture');
 
+    _injectFilmstripHide();
     _startTimer(meeting.started_at);
     _loadProgressBar(meeting.meeting_id);
     _loadAttendees(meeting.meeting_id);
@@ -1837,6 +1851,7 @@ var AccordLiveCapture = (function () {
   }
 
   function destroy() {
+    _removeFilmstripHide();
     _teardown();
     window.removeEventListener('accord:level-changed', _onLevelChanged);
     window.removeEventListener('accord:remote-node',   _onRemoteNode);
