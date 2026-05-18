@@ -802,8 +802,9 @@ var AccordLiveCapture = (function () {
           });
         }, 0);
       } else if (tag==='decision') {
+        var todayVal = new Date().toISOString().slice(0,10);
         f.innerHTML = '<div class="ac-lc-reclassify-field"><label>Effective date (optional)</label>' +
-          '<input type="date" id="ac-lc-rc-ed" class="ac-lc-date-input" style="width:100%;box-sizing:border-box"/></div>';
+          '<input type="date" id="ac-lc-rc-ed" class="ac-lc-date-input" style="width:100%;box-sizing:border-box" value="'+todayVal+'"/></div>';
       } else if (tag==='risk') {
         f.innerHTML = '<div class="ac-lc-reclassify-field"><label>Severity</label>' +
           '<select id="ac-lc-rc-sv" class="ac-lc-sev-select" style="width:100%">' +
@@ -914,9 +915,13 @@ var AccordLiveCapture = (function () {
     }
     html += '<div class="ac-lc-sec-add-row">' +
       '<input class="ac-lc-sec-add-input" id="ac-lc-dec-input" placeholder="Describe a decision made in this meeting\u2026"/>' +
+      '<input type="date" class="ac-lc-date-input" id="ac-lc-dec-effdate"/>' +
       '<button class="ac-lc-sec-add-btn" id="ac-lc-dec-btn" style="color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd)">Record \u2192</button>' +
     '</div></div>';
     body.innerHTML = html;
+    // Default effective date to today
+    var decEffInput = body.querySelector('#ac-lc-dec-effdate');
+    if (decEffInput) decEffInput.value = new Date().toISOString().slice(0,10);
     _wireDecisionAdd(body);
     _wireDecisionClicks(body);
   }
@@ -931,24 +936,33 @@ var AccordLiveCapture = (function () {
       // Best effort display
     });
     var timeStr = _fmtTime(n.created_at);
+    var effStr  = n.effective_date ? 'Effective ' + _fmtDate(n.effective_date) : '';
     return '<div class="ac-lc-dec-row" data-node-id="'+_esc(n.node_id)+'">' +
       '<span class="ac-lc-dec-badge" data-action="edit-section-node" data-node-id="'+_esc(n.node_id)+'" data-tag="decision">'+_esc(n.seq_id||'DC')+'</span>' +
-      '<span class="ac-lc-dec-text">'+_esc(n.summary||'')+'</span>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="ac-lc-dec-text">'+_esc(n.summary||'')+'</div>' +
+        (effStr?'<div style="font-size:10px;color:var(--dec);margin-top:2px">'+_esc(effStr)+'</div>':'') +
+      '</div>' +
       '<span class="ac-lc-dec-meta">'+_esc(timeStr)+'</span>' +
     '</div>';
   }
 
   function _wireDecisionAdd(body) {
-    var input = body.querySelector('#ac-lc-dec-input');
-    var btn   = body.querySelector('#ac-lc-dec-btn');
+    var input   = body.querySelector('#ac-lc-dec-input');
+    var effDate = body.querySelector('#ac-lc-dec-effdate');
+    var btn     = body.querySelector('#ac-lc-dec-btn');
     if (!input||!btn) return;
     function commit() {
       var text = input.value.trim(); if (!text) return;
       if (input.dataset.committing) return;
       input.dataset.committing = '1';
-      _insertSectionNode('decision', text, {}).then(function(node) {
+      var extras = {};
+      if (effDate && effDate.value) extras.effective_date = effDate.value;
+      _insertSectionNode('decision', text, extras).then(function(node) {
         if (!node) { delete input.dataset.committing; return; }
         input.value = ''; delete input.dataset.committing;
+        // Reset effective date to today
+        if (effDate) effDate.value = new Date().toISOString().slice(0,10);
         _sectionNodes.decision.push(node);
         _updateSectionCount('decision', _sectionNodes.decision);
         var list = document.getElementById('ac-lc-dec-list');
