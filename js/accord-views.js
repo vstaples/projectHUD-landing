@@ -431,8 +431,9 @@
       if (_sfHostR) {
         _sfHostR.classList.remove('idle', 'running', 'closed', 'sealed');
         _sfHostR.classList.add('running');
-        // Make host visible — it is parked at document.body (display:none by default CSS).
-        // Append it into the view host so it participates in the layout.
+        // Clear any prior view content (e.g. workstream view) before mounting.
+        host.innerHTML = '';
+        // Append surface host into the view host so it participates in layout.
         if (_sfHostR.parentElement !== host) host.appendChild(_sfHostR);
         _sfHostR.classList.add('active');
         _sfHostR.style.display = '';
