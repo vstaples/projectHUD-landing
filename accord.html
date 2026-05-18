@@ -154,12 +154,9 @@
   width: 32px;
   height: 32px;
 }
-#accord-app .brand-ac {
-  color: var(--ink-primary);
-}
-#accord-app .brand-cord {
-  color: #00D2FF;
-}
+#accord-app .brand-word { display: inline-flex; }
+#accord-app .brand-ac { color: var(--ink-primary); }
+#accord-app .brand-cord { color: #00D2FF; }
 #accord-app .brand-meta {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
@@ -2888,7 +2885,7 @@
 
   <!-- ── Top nav ──────────────────────────────────────────────── -->
   <nav class="topnav">
-    <div class="brand"><span class="brand-icon" id="accordBrandIcon"></span><span class="brand-ac">Acc</span><span class="brand-cord">ord</span><span class="brand-meta" id="brandMeta">— loading —</span></div>
+    <div class="brand"><span class="brand-icon" id="accordBrandIcon"></span><span class="brand-word"><span class="brand-ac">Acc</span><span class="brand-cord">ord</span></span><span class="brand-meta" id="brandMeta">— loading —</span></div>
 
     <button class="live-connect" id="liveConnectBtn" title="Subscribe to the meeting channel">
       <span class="lc-pulse"></span>

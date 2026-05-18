@@ -619,6 +619,18 @@ var AccordLiveCapture = (function () {
     var text = ta.value.trim(); if (!text) return;
     var m = _meeting; var me = window.Accord&&window.Accord.state&&window.Accord.state.me;
     if (!m||!me) return;
+
+    // Resolve thread_id: prefer agenda item's own thread, fall back to
+    // Accord.state.thread (meeting-level thread set by loadMeeting).
+    // accord_nodes.thread_id is NOT NULL — must always have a value.
+    if (!threadId) {
+      var stateThread = window.Accord && window.Accord.state && window.Accord.state.thread;
+      threadId = (stateThread && stateThread.thread_id) || '';
+    }
+    if (!threadId) {
+      console.error('[AccordLiveCapture] no thread_id available — cannot INSERT node');
+      return;
+    }
     ta.disabled = true;
     var row = { firm_id: me.firm_id, meeting_id: m.meeting_id, agenda_item_id: agendaItemId, tag: 'note', summary: text.slice(0,280), body: text.length>280?text:null, created_by: me.id };
     if (threadId) row.thread_id = threadId;
