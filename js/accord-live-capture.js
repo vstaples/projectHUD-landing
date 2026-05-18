@@ -695,7 +695,8 @@ var AccordLiveCapture = (function () {
       '<div class="ac-lc-reclassify-types" id="ac-lc-rc-types">'+tRows+'</div>' +
       '<div class="ac-lc-reclassify-fields" id="ac-lc-rc-fields"></div>' +
       '<div class="ac-lc-reclassify-actions"><button class="ac-lc-reclassify-cancel" id="ac-lc-rc-cancel">Cancel</button><button class="ac-lc-reclassify-confirm" id="ac-lc-rc-confirm">Confirm</button></div>';
-    document.body.appendChild(popup);
+    var shell = document.getElementById('ac-lc-shell') || document.body;
+    shell.appendChild(popup);
     var top = rect.bottom+6; var left = rect.left;
     if (top+280>window.innerHeight) top = rect.top-280;
     if (left+230>window.innerWidth)  left = window.innerWidth-240;
@@ -722,7 +723,7 @@ var AccordLiveCapture = (function () {
 
     var backdrop = document.createElement('div'); backdrop.className='ac-lc-reclassify-backdrop';
     backdrop.addEventListener('click', function() { if (popup.parentElement) popup.parentElement.removeChild(popup); if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop); });
-    document.body.insertBefore(backdrop, popup);
+    shell.insertBefore(backdrop, popup);
 
     popup.querySelector('#ac-lc-rc-cancel').addEventListener('click', function() { if (popup.parentElement) popup.parentElement.removeChild(popup); if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop); });
 
