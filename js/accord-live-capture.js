@@ -37,6 +37,7 @@ var AccordLiveCapture = (function () {
   var _agendaExpanded      = {};
   var _agendaHistCollapsed = {};
   var _agendaNewCounts     = {};
+  var _agendaEventsWired   = false;  // guard: wire click handler only once
   var _agendaSectionOpen   = true;
 
   // Phase 5 section state
@@ -575,7 +576,10 @@ var AccordLiveCapture = (function () {
         '</div>';
     });
     container.innerHTML = html;
-    _wireAgendaItemEvents(container);
+    if (!_agendaEventsWired) {
+      _wireAgendaItemEvents(container);
+      _agendaEventsWired = true;
+    }
     items.forEach(function(item) { if (_agendaExpanded[item.agenda_item_id]) _loadItemBody(item); });
   }
 
@@ -1605,7 +1609,7 @@ var AccordLiveCapture = (function () {
   function _teardown() {
     _stopTimer(); _stopPresencePoll(); _unsubscribeChatRealtime();
     if (_intersectionObs) { _intersectionObs.disconnect(); _intersectionObs=null; }
-    _chatMessages=[]; _agendaItems=[]; _agendaExpanded={}; _agendaHistCollapsed={}; _agendaNewCounts={};
+    _chatMessages=[]; _agendaItems=[]; _agendaExpanded={}; _agendaHistCollapsed={}; _agendaNewCounts={}; _agendaEventsWired=false;
     _sectionNodes={decision:[],action:[],risk:[],question:[]}; _sectionAttendees=[]; _actionAssignee=null;
     _meeting=null; _myResourceId=null; _attendeeNameMap={};
     var host = document.getElementById('ac-meeting-surface-host'); if (host) host.innerHTML='';
