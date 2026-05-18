@@ -776,15 +776,42 @@ var AccordLiveCapture = (function () {
     if (left+230>window.innerWidth)  left = window.innerWidth-240;
     popup.style.top=top+'px'; popup.style.left=left+'px';
 
+    var _rcAssignee = null;   // holds { id, name } selected via PersonPicker
+
     function _renderFields(tag) {
       var f = document.getElementById('ac-lc-rc-fields'); if (!f) return;
-      f.innerHTML = tag==='action'
-        ? '<div class="ac-lc-reclassify-field"><label>Assignee</label><input type="text" id="ac-lc-rc-as" placeholder="Name\u2026"/></div><div class="ac-lc-reclassify-field"><label>Due date</label><input type="text" id="ac-lc-rc-dd" placeholder="YYYY-MM-DD"/></div>'
-        : tag==='decision'
-          ? '<div class="ac-lc-reclassify-field"><label>Effective date (optional)</label><input type="text" id="ac-lc-rc-ed" placeholder="YYYY-MM-DD"/></div>'
-          : tag==='risk'
-            ? '<div class="ac-lc-reclassify-field"><label>Severity</label><input type="text" id="ac-lc-rc-sv" placeholder="Low / Medium / High"/></div>'
-            : '';
+      _rcAssignee = null;
+      if (tag==='action') {
+        f.innerHTML =
+          '<div class="ac-lc-reclassify-field"><label>Assignee</label>' +
+          '<button class="ac-lc-assignee-btn" id="ac-lc-rc-asn-btn" style="width:100%">\u{1F464} Select assignee</button></div>' +
+          '<div class="ac-lc-reclassify-field"><label>Due date</label>' +
+          '<input type="date" id="ac-lc-rc-dd" class="ac-lc-date-input" style="width:100%;box-sizing:border-box"/></div>';
+        // Wire PersonPicker
+        setTimeout(function() {
+          var asnBtn = document.getElementById('ac-lc-rc-asn-btn');
+          if (!asnBtn) return;
+          asnBtn.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            var resources = _inviteResourcesFromAttendees();
+            window.PersonPicker && window.PersonPicker.show(asnBtn, function(r) {
+              _rcAssignee = { id: r.id, name: r.name };
+              asnBtn.textContent = r.name;
+              asnBtn.style.color = 'var(--hi)';
+            }, { resources: resources });
+          });
+        }, 0);
+      } else if (tag==='decision') {
+        f.innerHTML = '<div class="ac-lc-reclassify-field"><label>Effective date (optional)</label>' +
+          '<input type="date" id="ac-lc-rc-ed" class="ac-lc-date-input" style="width:100%;box-sizing:border-box"/></div>';
+      } else if (tag==='risk') {
+        f.innerHTML = '<div class="ac-lc-reclassify-field"><label>Severity</label>' +
+          '<select id="ac-lc-rc-sv" class="ac-lc-sev-select" style="width:100%">' +
+            '<option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option>' +
+          '</select></div>';
+      } else {
+        f.innerHTML = '';
+      }
     }
     _renderFields(selTag);
 
@@ -804,14 +831,14 @@ var AccordLiveCapture = (function () {
     popup.querySelector('#ac-lc-rc-confirm').addEventListener('click', function() {
       var patch = { tag: selTag };
       if (selTag==='action') {
-        var asEl=document.getElementById('ac-lc-rc-as'); var ddEl=document.getElementById('ac-lc-rc-dd');
-        var as=asEl?asEl.value.trim():''; var dd=ddEl?ddEl.value.trim():'';
-        if (as||dd) patch.body = JSON.stringify({ assignee: as, due_date: dd });
+        var ddEl=document.getElementById('ac-lc-rc-dd');
+        var dd=ddEl?ddEl.value.trim():'';
+        if (_rcAssignee||dd) patch.body = JSON.stringify({ assignee_resource_id: _rcAssignee?_rcAssignee.id:'', assignee: _rcAssignee?_rcAssignee.name:'', due_date: dd });
         if (dd) patch.due_date = dd;
       } else if (selTag==='decision') {
         var edEl=document.getElementById('ac-lc-rc-ed'); var ed=edEl?edEl.value.trim():''; if (ed) patch.effective_date=ed;
       } else if (selTag==='risk') {
-        var svEl=document.getElementById('ac-lc-rc-sv'); var sv=svEl?svEl.value.trim():''; if (sv) patch.body=JSON.stringify({severity:sv});
+        var svEl=document.getElementById('ac-lc-rc-sv'); var sv=svEl?svEl.value:'Medium'; patch.body=JSON.stringify({severity:sv});
       }
       if (popup.parentElement) popup.parentElement.removeChild(popup);
       if (backdrop.parentElement) backdrop.parentElement.removeChild(backdrop);
