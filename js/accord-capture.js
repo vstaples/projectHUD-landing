@@ -261,6 +261,7 @@
 
   // ── Context strip ────────────────────────────────────────────
   function _updateContextStrip() {
+    if (!$('captureTarget')) return; // guard: absent in Live Capture shell
     const a = local.agendaItems.find(x => x.agenda_item_id === local.activeAgenda);
     if (a) {
       $('captureTarget').textContent = a.title;
@@ -273,6 +274,7 @@
 
   // ── Coverage meter ───────────────────────────────────────────
   function _updateCoverage() {
+    if (!$('coverageFill')) return; // guard: absent in Live Capture shell
     const total = local.agendaItems.filter(a => a.status !== 'archived').length;
     if (!total) {
       $('coverageFill').style.width = '0%';
@@ -582,6 +584,9 @@
   }
 
   function _renderStream() {
+    // CMD-ACCORD-LIVE-CAPTURE-1 Phase 4: guard — legacy stream elements absent
+    // in the Live Capture shell. Return silently when not in 5-tab shell.
+    if (!$('streamCountPresent')) return;
     $('streamCountPresent').textContent = String(local.captureNodes.length);
     $('streamCountHistory').textContent = String(local.historyNodes.length);
     $('captureStream').innerHTML       = _streamHtml(local.captureNodes);
