@@ -616,6 +616,7 @@ var AccordLiveCapture = (function () {
   // Note commit
   function _commitNote(agendaItemId, threadId) {
     var ta = document.getElementById('ac-lc-ta-' + agendaItemId); if (!ta) return;
+    if (ta.dataset.committing) return;   // guard: prevent double-fire
     var text = ta.value.trim(); if (!text) return;
     var m = _meeting; var me = window.Accord&&window.Accord.state&&window.Accord.state.me;
     if (!m||!me) return;
@@ -632,12 +633,13 @@ var AccordLiveCapture = (function () {
       return;
     }
     ta.disabled = true;
+    ta.dataset.committing = '1';
     var row = { firm_id: me.firm_id, meeting_id: m.meeting_id, agenda_item_id: agendaItemId, tag: 'note', summary: text.slice(0,280), body: text.length>280?text:null, created_by: me.id };
     if (threadId) row.thread_id = threadId;
     // discipline, topic intentionally omitted — Knowledge Base CMD writes them
     API.post('accord_nodes', row).then(function(created) {
       var node = Array.isArray(created)?created[0]:created;
-      ta.value = ''; ta.disabled = false;
+      ta.value = ''; ta.disabled = false; delete ta.dataset.committing;
       var cEl = document.getElementById('ac-lc-captured-'+agendaItemId);
       if (cEl) {
         if (!cEl.previousElementSibling||!cEl.previousElementSibling.classList.contains('ac-lc-captured-label')) {
@@ -650,7 +652,7 @@ var AccordLiveCapture = (function () {
       if (window.Accord&&window.Accord.broadcast) {
         window.Accord.broadcast('accord.node.committed', { node_id: node.node_id, thread_id: node.thread_id, meeting_id: node.meeting_id, agenda_item_id: node.agenda_item_id, tag: node.tag, summary: node.summary, created_by: node.created_by, created_at: node.created_at });
       }
-    }).catch(function(e) { console.error('[AccordLiveCapture] node INSERT failed', e); ta.disabled=false; });
+    }).catch(function(e) { console.error('[AccordLiveCapture] node INSERT failed', e); ta.disabled=false; delete ta.dataset.committing; });
   }
 
   // Agenda status PATCH
