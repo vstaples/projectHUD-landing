@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="90" height="90" viewBox="0 0 90 90" role="img" aria-labelledby="title desc">
+  <title id="title">Accord module icon</title>
+  <desc id="desc">A circular team-and-checkmark symbol in cyan and navy, without text.</desc>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#54F7FF" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#0AAED1" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#041022" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cyanFill" x1="24" y1="18" x2="66" y2="72" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7FFFFF"/>
+      <stop offset="45%" stop-color="#15DCEB"/>
+      <stop offset="100%" stop-color="#076D9F"/>
+    </linearGradient>
+    <linearGradient id="darkFill" x1="18" y1="30" x2="72" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0D355A"/>
+      <stop offset="100%" stop-color="#041022"/>
+    </linearGradient>
+    <filter id="softGlow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="1.4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="90" height="90" fill="#020814"/>
+  <circle cx="45" cy="45" r="42" fill="url(#glow)"/>
+
+  <!-- orbital identity ring -->
+  <circle cx="42.5" cy="45.5" r="31.5" fill="none" stroke="#12345A" stroke-width="2"/>
+  <path d="M15.5 50.5A31.7 31.7 0 0 1 68 22.5" fill="none" stroke="#24DDF0" stroke-width="2.4" stroke-linecap="round" opacity="0.95"/>
+  <path d="M70.8 31.3A31.8 31.8 0 0 1 25.3 74.8" fill="none" stroke="#0C7DB2" stroke-width="2.1" stroke-linecap="round" opacity="0.8"/>
+  <path d="M19.5 29.7A33.8 33.8 0 0 1 63.2 17.4" fill="none" stroke="#0C7DB2" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+
+  <!-- people / meeting group -->
+  <circle cx="43.5" cy="31.2" r="9.6" fill="url(#cyanFill)" stroke="#05182D" stroke-width="1.6"/>
+  <path d="M27.2 58.8c2.8-11.6 9-16.6 16.3-16.6 8.6 0 14.5 6.4 16.8 17.2-9.6 6.6-23.2 6.3-33.1-.6z" fill="url(#cyanFill)" stroke="#041022" stroke-width="1.6"/>
+
+  <circle cx="23.7" cy="39.2" r="7.5" fill="url(#darkFill)" stroke="#2BE7F4" stroke-width="1.2" opacity="0.92"/>
+  <path d="M12.8 61c2-10.6 6.6-15.7 13-15.7 4.7 0 8.7 2.7 11 7.7-5.3 6.5-13 9.1-24 8z" fill="url(#darkFill)" stroke="#05203A" stroke-width="1.4" opacity="0.92"/>
+
+  <circle cx="63.2" cy="39.2" r="7.5" fill="url(#cyanFill)" stroke="#041022" stroke-width="1.3" opacity="0.88"/>
+  <path d="M51.4 52.8c2.5-4.9 6.3-7.5 11-7.5 6.3 0 10.9 5.2 12.9 15.7-7.8 1.1-15.2-1.3-23.9-8.2z" fill="url(#cyanFill)" stroke="#041022" stroke-width="1.4" opacity="0.8"/>
+
+  <!-- accord check -->
+  <path d="M33 61.5 43.7 72 76.5 39.7" fill="none" stroke="#06152A" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.78"/>
+  <path d="M33 61.5 43.7 72 76.5 39.7" fill="none" stroke="#75FFFF" stroke-width="5.8" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)"/>
+  <path d="M33 61.5 43.7 72 76.5 39.7" fill="none" stroke="#0BBBD7" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+
+  <!-- small star accent -->
+  <path d="M70.8 21.2 73.4 27.1 79.3 29.7 73.4 32.2 70.8 38.2 68.3 32.2 62.3 29.7 68.3 27.1z" fill="#E9FFFF" opacity="0.95" filter="url(#softGlow)"/>
+</svg>
