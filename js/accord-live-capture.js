@@ -92,11 +92,11 @@ var AccordLiveCapture = (function () {
 
   // Tag helpers
   function _tagColor(tag) {
-    var m = { decision: 'var(--dec)', note: 'var(--nt)', action: 'var(--act)', risk: 'var(--rsk)', dissent: 'var(--rsk)', question: 'var(--md)' };
+    var m = { decision: '#6a5acd', note: '#2a9d6e', action: '#c97d1a', risk: '#c0392b', dissent: '#c0392b', question: '#6b7590' };
     return m[tag] || 'var(--md)';
   }
   function _tagBg(tag) {
-    var m = { decision: 'var(--dec-bg)', note: 'var(--nt-bg)', action: 'var(--act-bg)', risk: 'var(--rsk-bg)', dissent: 'var(--rsk-bg)', question: 'rgba(255,255,255,.06)' };
+    var m = { decision: '#ede9fb', note: '#e6f7f0', action: '#fdf3e3', risk: '#fdecea', dissent: '#fdecea', question: '#f0f2f7' };
     return m[tag] || 'rgba(255,255,255,.06)';
   }
   function _tagLabel(tag) {
@@ -242,33 +242,34 @@ var AccordLiveCapture = (function () {
     '.ac-lc-captured-row.excluded .ac-lc-captured-text{text-decoration:line-through;opacity:.4}' +
     '.ac-lc-captured-row.excluded{opacity:.6}' +
     '.ac-lc-captured-row.excluded .ac-lc-note-exclude{display:block;color:var(--lo);border-color:rgba(255,255,255,.12);background:transparent}' +
-    // Preview overlay
-    '.ac-lc-preview-overlay{position:fixed;inset:0;z-index:200;background:var(--void);display:none;flex-direction:column;overflow:hidden}' +
+    // Preview overlay — dark topbar, light document
+    '.ac-lc-preview-overlay{position:fixed;inset:0;z-index:200;background:#f4f5f7;display:none;flex-direction:column;overflow:hidden;font-family:"Outfit",system-ui,sans-serif}' +
     '.ac-lc-preview-overlay.open{display:flex}' +
-    '.ac-lc-preview-topbar{height:50px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--b0)}' +
-    '.ac-lc-preview-close{font-size:18px;color:var(--md);cursor:pointer;flex-shrink:0;transition:color .12s}.ac-lc-preview-close:hover{color:var(--hi)}' +
-    '.ac-lc-preview-title{font-size:13px;font-weight:500;color:var(--md)}' +
-    '.ac-lc-preview-doc{flex:1;overflow-y:auto;padding:40px;max-width:860px;margin:0 auto;width:100%;box-sizing:border-box}' +
-    // Preview document styles
-    '.ac-lc-preview-doc .pv-title{font-size:26px;font-weight:600;color:var(--hi);margin-bottom:8px}' +
-    '.ac-lc-preview-doc .pv-stakes{font-size:13px;color:var(--md);font-style:italic;border-left:3px solid var(--b2);padding-left:10px;margin-bottom:24px;line-height:1.5}' +
-    '.ac-lc-preview-doc .pv-sec-hdr{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--hi);border-bottom:1px solid var(--b1);padding-bottom:6px;margin:24px 0 12px;display:flex;align-items:center;gap:8px}' +
+    '.ac-lc-preview-topbar{height:50px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 24px;background:#10131e;border-bottom:1px solid #1e2438}' +
+    '.ac-lc-preview-close{font-size:18px;color:#8899b2;cursor:pointer;flex-shrink:0;transition:color .12s}.ac-lc-preview-close:hover{color:#dce6f5}' +
+    '.ac-lc-preview-title{font-size:13px;font-weight:500;color:#dce6f5}' +
+    '.ac-lc-preview-doc{flex:1;overflow-y:auto;padding:48px 56px;max-width:800px;margin:0 auto;width:100%;box-sizing:border-box;background:#ffffff}' +
+    // Preview document — light mode, print-ready
+    '.ac-lc-preview-doc .pv-title{font-size:26px;font-weight:600;color:#1a1f2e;margin-bottom:8px;line-height:1.2}' +
+    '.ac-lc-preview-doc .pv-stakes{font-size:13px;color:#555e70;font-style:italic;border-left:3px solid #d0d4df;padding-left:10px;margin-bottom:28px;line-height:1.6}' +
+    '.ac-lc-preview-doc .pv-divider{border:none;border-top:2px solid #e8eaf0;margin:0 0 24px}' +
+    '.ac-lc-preview-doc .pv-sec-hdr{font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:#6b7590;border-bottom:1px solid #e8eaf0;padding-bottom:7px;margin:28px 0 12px;display:flex;align-items:center;gap:8px}' +
     '.ac-lc-preview-doc .pv-sec-bar{width:4px;height:14px;border-radius:2px;flex-shrink:0}' +
-    '.ac-lc-preview-doc .pv-meta-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin-bottom:14px}' +
-    '.ac-lc-preview-doc .pv-meta-lbl{font-size:12px;color:var(--lo);font-weight:600}' +
-    '.ac-lc-preview-doc .pv-meta-val{font-size:13px;color:var(--hi)}' +
+    '.ac-lc-preview-doc .pv-meta-grid{display:grid;grid-template-columns:100px 1fr;gap:5px 12px;margin-bottom:16px}' +
+    '.ac-lc-preview-doc .pv-meta-lbl{font-size:12px;color:#8b95a8;font-weight:600}' +
+    '.ac-lc-preview-doc .pv-meta-val{font-size:13px;color:#2d3348;font-weight:500}' +
     '.ac-lc-preview-doc .pv-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}' +
-    '.ac-lc-preview-doc .pv-chip{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--raised);border:1px solid var(--b1);color:var(--md)}' +
-    '.ac-lc-preview-doc .pv-row{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}' +
+    '.ac-lc-preview-doc .pv-chip{font-size:12px;padding:3px 10px;border-radius:20px;background:#f0f2f7;border:1px solid #dde0ea;color:#3d4560}' +
+    '.ac-lc-preview-doc .pv-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f0f2f7}' +
     '.ac-lc-preview-doc .pv-row:last-child{border-bottom:none}' +
-    '.ac-lc-preview-doc .pv-badge{font-size:10px;font-weight:700;padding:0 5px;border-radius:2px;border:1px solid;white-space:nowrap;margin-top:2px;line-height:1.5;flex-shrink:0}' +
-    '.ac-lc-preview-doc .pv-text{font-size:13px;color:var(--hi);flex:1;line-height:1.5}' +
-    '.ac-lc-preview-doc .pv-meta-sm{font-size:11px;color:var(--lo);flex-shrink:0}' +
-    '.ac-lc-preview-doc .pv-empty{font-size:13px;color:var(--lo);font-style:italic;padding:6px 0}' +
-    '.ac-lc-preview-doc .pv-agenda-item{margin-bottom:16px}' +
-    '.ac-lc-preview-doc .pv-agenda-title{font-size:14px;font-weight:500;color:var(--hi);margin-bottom:6px;display:flex;align-items:center;gap:8px}' +
-    '.ac-lc-preview-doc .pv-agenda-num{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);font-size:11px;font-weight:600;color:var(--hi);display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
-    '.ac-lc-preview-doc .pv-outcome-flag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:2px}'
+    '.ac-lc-preview-doc .pv-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;border:1px solid;white-space:nowrap;margin-top:3px;line-height:1.5;flex-shrink:0;letter-spacing:.03em}' +
+    '.ac-lc-preview-doc .pv-text{font-size:13px;color:#2d3348;flex:1;line-height:1.6}' +
+    '.ac-lc-preview-doc .pv-meta-sm{font-size:11px;color:#9aa0b2;flex-shrink:0;padding-top:2px}' +
+    '.ac-lc-preview-doc .pv-empty{font-size:13px;color:#9aa0b2;font-style:italic;padding:6px 0}' +
+    '.ac-lc-preview-doc .pv-agenda-item{margin-bottom:18px}' +
+    '.ac-lc-preview-doc .pv-agenda-title{font-size:14px;font-weight:600;color:#1a1f2e;margin-bottom:8px;display:flex;align-items:center;gap:8px}' +
+    '.ac-lc-preview-doc .pv-agenda-num{width:22px;height:22px;border-radius:50%;background:#e8eaf0;border:1px solid #d0d4df;font-size:11px;font-weight:700;color:#6b7590;display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
+    '.ac-lc-preview-doc .pv-outcome-flag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:2px;letter-spacing:.03em}'
   }
 
   // Shell HTML
@@ -2345,7 +2346,7 @@ var AccordLiveCapture = (function () {
     }
 
     // ── MEETING DETAILS ──────────────────────────────────────────
-    html += _pvSectionHeader('Meeting Details', 'var(--b2)');
+    html += _pvSectionHeader('Meeting Details', '#9aa0b2');
     html += '<div class="pv-meta-grid">';
 
     var dateStr = _meeting.scheduled_for
@@ -2380,7 +2381,7 @@ var AccordLiveCapture = (function () {
     }
 
     // ── INTENDED OUTCOMES ────────────────────────────────────────
-    html += _pvSectionHeader('Intended Outcomes', 'var(--nt)');
+    html += _pvSectionHeader('Intended Outcomes', '#2a9d6e');
     if (!_outcomesCache.length) {
       html += '<div class="pv-empty">No outcomes recorded.</div>';
     } else {
@@ -2395,7 +2396,7 @@ var AccordLiveCapture = (function () {
     }
 
     // ── AGENDA & CAPTURES ────────────────────────────────────────
-    html += _pvSectionHeader('Agenda &amp; Captures', 'var(--nt)');
+    html += _pvSectionHeader('Agenda &amp; Captures', '#9aa0b2');
     if (!_agendaItems.length) {
       html += '<div class="pv-empty">No agenda items.</div>';
     } else {
@@ -2410,8 +2411,8 @@ var AccordLiveCapture = (function () {
         '</div>';
         if (nodes.length) {
           nodes.forEach(function(n) {
-            var tagColor = { decision: 'var(--dec)', note: 'var(--nt)', action: 'var(--act)', risk: 'var(--rsk)', dissent: 'var(--rsk)', question: 'var(--md)' }[n.tag] || 'var(--md)';
-            var tagBg    = { decision: 'var(--dec-bg)', note: 'var(--nt-bg)', action: 'var(--act-bg)', risk: 'var(--rsk-bg)', dissent: 'var(--rsk-bg)', question: 'rgba(255,255,255,.06)' }[n.tag] || 'rgba(255,255,255,.06)';
+            var tagColor = { decision: '#6a5acd', note: '#2a9d6e', action: '#c97d1a', risk: '#c0392b', dissent: '#c0392b', question: '#6b7590' }[n.tag] || 'var(--md)';
+            var tagBg    = { decision: '#ede9fb', note: '#e6f7f0', action: '#fdf3e3', risk: '#fdecea', dissent: '#fdecea', question: '#f0f2f7' }[n.tag] || 'rgba(255,255,255,.06)';
             var label    = { decision: 'DC', note: 'NT', action: 'AX', risk: 'RK', dissent: 'DS', question: 'Q' }[n.tag] || (n.tag||'').toUpperCase().slice(0,2);
             var authorName = (n.created_by && _attendeeNameMap[n.created_by]) || '';
             html += '<div class="pv-row">' +
@@ -2426,14 +2427,14 @@ var AccordLiveCapture = (function () {
     }
 
     // ── DECISIONS ────────────────────────────────────────────────
-    html += _pvSectionHeader('Decisions', 'var(--dec)');
+    html += _pvSectionHeader('Decisions', '#6a5acd');
     if (!_sectionNodes.decision.length) {
       html += '<div class="pv-empty">No decisions recorded.</div>';
     } else {
       _sectionNodes.decision.forEach(function(n) {
         var authorName = (n.created_by && _attendeeNameMap[n.created_by]) || '';
         html += '<div class="pv-row">' +
-          '<span class="pv-badge" style="color:var(--dec);background:var(--dec-bg);border-color:var(--dec)">' + _esc(n.seq_id || 'DC') + '</span>' +
+          '<span class="pv-badge" style="color:#6a5acd;background:#ede9fb;border-color:#9b8de8">' + _esc(n.seq_id || 'DC') + '</span>' +
           '<span class="pv-text">' + _esc((n.summary || '').slice(0, 200)) + '</span>' +
           '<span class="pv-meta-sm">' + (authorName ? _esc(authorName) + ' \u00b7 ' : '') + _esc(_fmtTime(n.created_at)) + '</span>' +
         '</div>';
@@ -2441,7 +2442,7 @@ var AccordLiveCapture = (function () {
     }
 
     // ── ACTION ITEMS ─────────────────────────────────────────────
-    html += _pvSectionHeader('Action Items', 'var(--act)');
+    html += _pvSectionHeader('Action Items', '#c97d1a');
     if (!_sectionNodes.action.length) {
       html += '<div class="pv-empty">No action items recorded.</div>';
     } else {
@@ -2449,7 +2450,7 @@ var AccordLiveCapture = (function () {
         var ownerName = (n.body && _attendeeNameMap[n.body]) || (n.created_by && _attendeeNameMap[n.created_by]) || '';
         var dueStr = n.due_date ? _fmtDate(n.due_date) : '';
         html += '<div class="pv-row">' +
-          '<span class="pv-badge" style="color:var(--act);background:var(--act-bg);border-color:var(--act)">' + _esc(n.seq_id || 'AX') + '</span>' +
+          '<span class="pv-badge" style="color:#c97d1a;background:#fdf3e3;border-color:#e8b86d">' + _esc(n.seq_id || 'AX') + '</span>' +
           '<span class="pv-text">' + _esc((n.summary || '').slice(0, 200)) + '</span>' +
           (ownerName ? '<span class="pv-meta-sm">' + _esc(ownerName) + '</span>' : '') +
           (dueStr ? '<span class="pv-meta-sm">' + _esc(dueStr) + '</span>' : '') +
@@ -2458,7 +2459,7 @@ var AccordLiveCapture = (function () {
     }
 
     // ── RISKS & DISSENTS ─────────────────────────────────────────
-    html += _pvSectionHeader('Risks &amp; Dissents', 'var(--rsk)');
+    html += _pvSectionHeader('Risks &amp; Dissents', '#c0392b');
     if (!_sectionNodes.risk.length) {
       html += '<div class="pv-empty">No risks recorded.</div>';
     } else {
@@ -2466,7 +2467,7 @@ var AccordLiveCapture = (function () {
         var label = (n.tag === 'dissent') ? 'DS' : 'RK';
         var authorName = (n.created_by && _attendeeNameMap[n.created_by]) || '';
         html += '<div class="pv-row">' +
-          '<span class="pv-badge" style="color:var(--rsk);background:var(--rsk-bg);border-color:var(--rsk)">' + _esc(n.seq_id || label) + '</span>' +
+          '<span class="pv-badge" style="color:#c0392b;background:#fdecea;border-color:#e88080">' + _esc(n.seq_id || label) + '</span>' +
           '<span class="pv-text">' + _esc((n.summary || '').slice(0, 200)) + '</span>' +
           (authorName ? '<span class="pv-meta-sm">' + _esc(authorName) + '</span>' : '') +
         '</div>';
@@ -2474,7 +2475,7 @@ var AccordLiveCapture = (function () {
     }
 
     // ── PARKING LOT ──────────────────────────────────────────────
-    html += _pvSectionHeader('Parking Lot', '#9478e0');
+    html += _pvSectionHeader('Parking Lot', '#7c5cbf');
     if (!_sectionNodes.question.length) {
       html += '<div class="pv-empty">No parking lot items.</div>';
     } else {
