@@ -1277,6 +1277,15 @@
       if (film)   film.style.background   = t.filmBg;
       // Corner radius — columns + all cards
       var rad = (t.radius !== undefined ? t.radius : 6) + 'px';
+      // Footer sticky fix — ensure Begin Meeting button is always visible
+      var footerFix = document.getElementById('ac-setup-footer-fix');
+      if (!footerFix) {
+        footerFix = document.createElement('style');
+        footerFix.id = 'ac-setup-footer-fix';
+        footerFix.textContent = '.ac-setup-footer{position:sticky;bottom:0;z-index:50;flex-shrink:0}';
+        document.head.appendChild(footerFix);
+      }
+
       var style = document.getElementById('ac-dp-radius-style');
       if (!style) {
         style = document.createElement('style');

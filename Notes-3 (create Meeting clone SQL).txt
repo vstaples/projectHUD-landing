@@ -1,0 +1,74 @@
+DO $$
+DECLARE
+  v_old_id UUID := 'c1100000-0000-0000-1111-000000000005';
+  v_new_id UUID := gen_random_uuid();
+  v_item   RECORD;
+  v_old_item_id UUID;
+  v_new_item_id UUID;
+BEGIN
+
+  -- 1. Clone the meeting row
+  INSERT INTO accord_meetings (
+    meeting_id, firm_id, project_id, workstream_id, title, stakes,
+    scheduled_for, duration_minutes, state, organizer_id,
+    briefing_text, location, agenda_locked, cloned_from_meeting_id
+  )
+  SELECT
+    v_new_id, firm_id, project_id, workstream_id, title || ' (Clone)', stakes,
+    scheduled_for, duration_minutes, 'idle', organizer_id,
+    briefing_text, location, false, v_old_id
+  FROM accord_meetings
+  WHERE meeting_id = v_old_id;
+
+  -- 2. Clone agenda items
+  FOR v_item IN
+    SELECT * FROM accord_agenda_items WHERE meeting_id = v_old_id ORDER BY position
+  LOOP
+    v_old_item_id := v_item.agenda_item_id;
+    v_new_item_id := gen_random_uuid();
+
+    INSERT INTO accord_agenda_items (
+      agenda_item_id, firm_id, meeting_id, position, title,
+      status, pulled_from_node_id, pulled_from_tag,
+      item_type, duration_minutes_estimate
+    ) VALUES (
+      v_new_item_id, v_item.firm_id, v_new_id, v_item.position, v_item.title,
+      'pending', v_item.pulled_from_node_id, v_item.pulled_from_tag,
+      v_item.item_type, v_item.duration_minutes_estimate
+    );
+
+    -- 3. Clone nodes for this agenda item
+    INSERT INTO accord_nodes (
+      node_id, firm_id, meeting_id, agenda_item_id, thread_id,
+      tag, summary, body, created_by,
+      effective_date, due_date, effective_date_basis,
+      discipline, topic
+    )
+    SELECT
+      gen_random_uuid(), firm_id, v_new_id, v_new_item_id, thread_id,
+      tag, summary, body, created_by,
+      effective_date, due_date, effective_date_basis,
+      discipline, topic
+    FROM accord_nodes
+    WHERE meeting_id = v_old_id AND agenda_item_id = v_old_item_id;
+
+  END LOOP;
+
+  -- 4. Clone meeting-level nodes (no agenda_item_id)
+  INSERT INTO accord_nodes (
+    node_id, firm_id, meeting_id, agenda_item_id, thread_id,
+    tag, summary, body, created_by,
+    effective_date, due_date, effective_date_basis,
+    discipline, topic
+  )
+  SELECT
+    gen_random_uuid(), firm_id, v_new_id, NULL, thread_id,
+    tag, summary, body, created_by,
+    effective_date, due_date, effective_date_basis,
+    discipline, topic
+  FROM accord_nodes
+  WHERE meeting_id = v_old_id AND agenda_item_id IS NULL;
+
+  RAISE NOTICE 'Cloned meeting ID: %', v_new_id;
+
+END $$;

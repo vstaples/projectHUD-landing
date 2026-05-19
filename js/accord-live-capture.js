@@ -2308,10 +2308,6 @@ var AccordLiveCapture = (function () {
     overlay.classList.add('open');
   }
 
-  AccordLiveCapture._closePreview = function() {
-    var overlay = document.getElementById('ac-lc-preview-overlay');
-    if (overlay) overlay.classList.remove('open');
-  };
 
   function _pvSectionHeader(label, barColor) {
     return '<div class="pv-sec-hdr">' +
@@ -2574,5 +2570,5 @@ var AccordLiveCapture = (function () {
     window.removeEventListener('accord:remote-agenda', _onRemoteAgenda);
   }
 
-  return { render: render, destroy: destroy, _toggleChecklist: _toggleChecklist, _enterReviewMode: _enterReviewMode, _closePreview: function() { AccordLiveCapture._closePreview(); } };
+  return { render: render, destroy: destroy, _toggleChecklist: _toggleChecklist, _enterReviewMode: _enterReviewMode, _closePreview: _closePreview };
 })();
