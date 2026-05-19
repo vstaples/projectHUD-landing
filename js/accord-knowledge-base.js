@@ -282,6 +282,7 @@
   function _entryHtml(n, nameMap, mtgTitleMap) {
     var tc  = TAG_COLORS[n.tag] || TAG_COLORS.note;
     var lbl = TAG_LABELS[n.tag] || (n.tag ? n.tag.toUpperCase().slice(0, 2) : 'NT');
+    if (n.seq_id) lbl = lbl + '-' + n.seq_id;
     var badgeStyle = 'color:' + tc.color + ';background:' + tc.bg + ';border-color:' + tc.bd;
 
     var dateStr = _fmtShortDate(n.created_at);
@@ -379,20 +380,26 @@
           }
           var topicMtgCount = Object.keys(topicMtgIds).length;
 
-          html += '<div class="ac-kb-topic-row" data-action="toggle-topic"' +
-                  ' data-disc="' + _esc(dk) + '" data-topic="' + _esc(tk) + '">';
-          html += '<span class="ac-kb-topic-chevron' + (tCollapsed ? ' collapsed' : '') + '">&#9660;</span>';
-          html += '<span class="ac-kb-topic-name">' + _esc(topic.label) + '</span>';
-          html += '<span class="ac-kb-topic-meta">' + topic.entries.length +
-                  ' entr' + (topic.entries.length === 1 ? 'y' : 'ies') + '</span>';
-          if (latestTopic) {
-            html += '<span class="ac-kb-topic-meta">\u00b7 last: ' + _esc(_fmtShortDate(latestTopic)) + '</span>';
-          }
-          html += '<span class="ac-kb-topic-meta">\u00b7 ' + topicMtgCount +
-                  ' mtg' + (topicMtgCount === 1 ? '' : 's') + '</span>';
-          html += '</div>';
+          // When both discipline and topic are null, skip the topic row entirely
+          // and render entries directly in the discipline block.
+          var skipTopicRow = (dk === '__ungrouped__' && tk === '__ungrouped__');
 
-          if (!tCollapsed) {
+          if (!skipTopicRow) {
+            html += '<div class="ac-kb-topic-row" data-action="toggle-topic"' +
+                    ' data-disc="' + _esc(dk) + '" data-topic="' + _esc(tk) + '">';
+            html += '<span class="ac-kb-topic-chevron' + (tCollapsed ? ' collapsed' : '') + '">&#9660;</span>';
+            html += '<span class="ac-kb-topic-name">' + _esc(topic.label) + '</span>';
+            html += '<span class="ac-kb-topic-meta">' + topic.entries.length +
+                    ' entr' + (topic.entries.length === 1 ? 'y' : 'ies') + '</span>';
+            if (latestTopic) {
+              html += '<span class="ac-kb-topic-meta">\u00b7 last: ' + _esc(_fmtShortDate(latestTopic)) + '</span>';
+            }
+            html += '<span class="ac-kb-topic-meta">\u00b7 ' + topicMtgCount +
+                    ' mtg' + (topicMtgCount === 1 ? '' : 's') + '</span>';
+            html += '</div>';
+          }
+
+          if (skipTopicRow || !tCollapsed) {
             html += '<div class="ac-kb-entry-list"' +
                     ' style="border-left:3px solid ' + _discBorderColor(dk) + '">';
             for (var ei2 = 0; ei2 < topic.entries.length; ei2++) {
@@ -550,7 +557,6 @@
 
     // ── Header ──
     html += '<div class="ac-kb-header">';
-    html += '<h2 class="ac-kb-ws-name">' + _esc(wsName) + '</h2>';
     html += '<p class="ac-kb-subtitle">'  + _esc(subtitle) + '</p>';
     html += '<div class="ac-kb-stats">';
     html += '<div class="ac-kb-stat ac-kb-stat--dec"><span class="ac-kb-stat-val">' + decCount     + '</span><span class="ac-kb-stat-lbl">Decisions</span></div>';
