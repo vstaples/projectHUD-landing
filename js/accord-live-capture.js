@@ -2466,7 +2466,7 @@ var AccordLiveCapture = (function () {
     }
 
     // ── RISKS & DISSENTS ─────────────────────────────────────────
-    html += _pvSectionHeader('Risks &amp; Dissents', '#c0392b');
+    html += _pvSectionHeader('Risks \u0026 Dissents', '#c0392b');
     if (!_sectionNodes.risk.length) {
       html += '<div class="pv-empty">No risks recorded.</div>';
     } else {
@@ -2583,5 +2583,5 @@ var AccordLiveCapture = (function () {
     window.removeEventListener('accord:remote-agenda', _onRemoteAgenda);
   }
 
-  return { render: render, destroy: destroy, _toggleChecklist: _toggleChecklist, _enterReviewMode: _enterReviewMode, _closePreview: _closePreview };
+  return { render: render, destroy: destroy, _toggleChecklist: _toggleChecklist, _enterReviewMode: _enterReviewMode, _closePreview: _closePreview, _openSendModal: _openSendModal };
 })();
