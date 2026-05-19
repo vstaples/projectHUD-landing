@@ -45,7 +45,7 @@ var AccordMinutes = (function () {
   // ── Canvas sections ──────────────────────────────────────────
   var _SECTIONS = [
     { id: 'sec-header',    title: 'Meeting Details',   bar: 'var(--md)',  edit: true,      open: false },
-    { id: 'sec-outcomes',  title: 'Intended Outcomes', bar: 'var(--dec)', add: true,       open: true  },
+    { id: 'sec-outcomes',  title: 'Intended Outcomes', bar: 'var(--dec)',                   open: true  },
     { id: 'sec-agenda',    title: 'Agenda & Captures', bar: 'var(--nt)',  agendaAdd: true, open: true  },
     { id: 'sec-decisions', title: 'Decisions',         bar: 'var(--dcn)', add: true,       open: false },
     { id: 'sec-actions',   title: 'Action Items',      bar: 'var(--act)', add: true,       open: false },
@@ -113,6 +113,12 @@ var AccordMinutes = (function () {
       question: 'color:var(--dcn);background:var(--dcn-bg);border-color:var(--dcn-bd)',
     };
     return s[tag] || 'color:var(--md);background:transparent;border-color:var(--b2)';
+  }
+
+  function _padSeq(n) {
+    var s = String(n || 0);
+    while (s.length < 3) s = '0' + s;
+    return s;
   }
 
   function _outcomeStatusHtml(status) {
@@ -705,15 +711,8 @@ var AccordMinutes = (function () {
     var listHtml = _outcomes.length
       ? '<div id="ac-min-outcomes-list">'+_outcomes.map(_outcomeRowHtml).join('')+'</div>'
       : '<div id="ac-min-outcomes-list"><div class="ac-min-sec-empty">No outcomes recorded.</div></div>';
-    body.innerHTML = '<div class="ac-min-sec-body-inner">'+listHtml+_outcomeAddHtml()+'</div>';
+    body.innerHTML = '<div class="ac-min-sec-body-inner">'+listHtml+'</div>';
     _wireOutcomeSection(body);
-  }
-
-  function _outcomeAddHtml() {
-    return '<div class="ac-min-outcome-add-row">' +
-      '<input type="text" class="ac-min-outcome-input" id="ac-min-outcome-inp" placeholder="Describe an intended outcome\u2026" />' +
-      '<button type="button" class="ac-min-outcome-add-btn" id="ac-min-outcome-add">Add \u2192</button>' +
-    '</div>';
   }
 
   function _wireOutcomeSection(body) {
@@ -916,7 +915,7 @@ var AccordMinutes = (function () {
   function _entryRowHtml(node, authorName) {
     var excluded = !!_excludedNodeIds[node.node_id];
     return '<div class="ac-min-entry-row'+(excluded?' excluded':'')+'" data-node-id="'+_esc(node.node_id)+'">' +
-      '<span class="ac-min-tag-badge" style="'+_tagBadgeStyle(node.tag)+'">'+_esc(_tagLabel(node.tag))+'</span>' +
+      '<span class="ac-min-tag-badge" style="'+_tagBadgeStyle(node.tag)+'">'+_esc(_tagLabel(node.tag)+'-'+_padSeq(node.seq_id))+'</span>' +
       '<span class="ac-min-entry-summary'+(excluded?' struck':'')+'">'+_esc((node.summary||'').slice(0,140))+'</span>' +
       (authorName ? '<span class="ac-min-entry-author">'+_esc(authorName)+'</span>' : '') +
       '<span class="ac-min-entry-time">'+_esc(_fmtTimePart(node.created_at))+'</span>' +
