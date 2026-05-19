@@ -2541,7 +2541,7 @@ var AccordLiveCapture = (function () {
           '<div id="ac-lc-modal-error" style="font-size:12px;color:#e05252;display:none;margin:6px 0"></div>' +
           '<div style="font-size:12px;color:#7a8a9a;margin:12px 0 18px;font-style:italic;border-left:2px solid #313d5e;padding-left:8px;line-height:1.5">Recipients receive a clean formatted minutes document.' + (_excludedNodeIds.size > 0 ? ' · ' + _excludedNodeIds.size + ' entries excluded.' : '') + '</div>' +
           '<div style="display:flex;gap:8px">' +
-            '<button onclick="document.getElementById('ac-lc-send-modal').remove()" style="flex:1;padding:10px;border-radius:5px;font-size:13px;background:#10131e;border:1px solid #252d44;color:#8899b2;cursor:pointer;font-family:inherit">Cancel</button>' +
+            '<button onclick="AccordLiveCapture._closeSendModal()" style="flex:1;padding:10px;border-radius:5px;font-size:13px;background:#10131e;border:1px solid #252d44;color:#8899b2;cursor:pointer;font-family:inherit">Cancel</button>' +
             '<button id="ac-lc-modal-send-btn" style="flex:2;padding:10px;border-radius:5px;font-size:13px;font-weight:600;background:rgba(72,170,136,.08);border:1px solid rgba(72,170,136,.22);color:#48aa88;cursor:pointer;font-family:inherit">Send Minutes ↑</button>' +
           '</div>' +
         '</div>';
@@ -2704,5 +2704,5 @@ var AccordLiveCapture = (function () {
     window.removeEventListener('accord:remote-agenda', _onRemoteAgenda);
   }
 
-  return { render: render, destroy: destroy, _toggleChecklist: _toggleChecklist, _enterReviewMode: _enterReviewMode, _closePreview: _closePreview, _openSendModal: _openSendModal };
+  return { render: render, destroy: destroy, _toggleChecklist: _toggleChecklist, _enterReviewMode: _enterReviewMode, _closePreview: _closePreview, _openSendModal: _openSendModal, _closeSendModal: function(){ var m=document.getElementById("ac-lc-send-modal"); if(m) m.remove(); } };
 })();
