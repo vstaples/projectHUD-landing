@@ -2516,7 +2516,7 @@ var AccordLiveCapture = (function () {
         rendered_at:    new Date().toISOString(),
         render_version: 'v1',
         storage_path:   'pending',
-        status:         'pending',
+        status:         'rendering',
         template_id:    'default'
       }, { prefer: 'return=representation' }).then(function(row) {
         return Array.isArray(row) ? row[0].render_id : row.render_id;
