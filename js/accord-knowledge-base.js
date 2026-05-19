@@ -1,8 +1,7 @@
 // ============================================================
 // ProjectHUD — accord-knowledge-base.js
-// CMD-ACCORD-KNOWLEDGE-BASE-1 · Phase 2
-// Shell + tab wiring + header + stats + filter pills + status bar.
-// Canvas placeholder only — Phase 3 adds discipline/topic hierarchy.
+// CMD-ACCORD-KNOWLEDGE-BASE-1 · Phase 3
+// Full discipline/topic hierarchy canvas with live data.
 //
 // Public API:
 //   AccordKnowledgeBase.render(workstreamId, host)
@@ -14,6 +13,47 @@
   'use strict';
 
   var API = window.API;
+
+  // ── Collapse state (persists within session across re-renders) ──
+  var _discCollapsed  = {};  // { disciplineKey: true|false }
+  var _topicCollapsed = {};  // { 'disciplineKey::topicKey': true|false }
+
+  // ── Cached data for collapse re-renders ────────────────────
+  var _lastNodes    = [];
+  var _lastMeetings = [];
+  var _lastNameMap  = {};
+
+  // ── Discipline colors ───────────────────────────────────────
+  var DISC_COLORS = {
+    'Electrical Engineering': 'var(--dec)',
+    'Mechanical Engineering': 'var(--act)',
+    'Software Integration':   'var(--nt)',
+    'Vendor Management':      'var(--dcn)',
+    '__ungrouped__':          'var(--b2)'
+  };
+
+  var DISC_BORDER_COLORS = {
+    'Electrical Engineering': 'rgba(74,140,245,.40)',
+    'Mechanical Engineering': 'rgba(232,148,48,.40)',
+    'Software Integration':   'rgba(72,170,136,.40)',
+    'Vendor Management':      'rgba(139,110,245,.40)',
+    '__ungrouped__':          'rgba(255,255,255,.12)'
+  };
+
+  // ── Tag badge colors / labels ───────────────────────────────
+  var TAG_COLORS = {
+    decision: { color:'var(--dcn)', bg:'var(--dcn-bg)', bd:'var(--dcn-bd)' },
+    note:     { color:'var(--nt)',  bg:'var(--nt-bg)',  bd:'var(--nt-bd)'  },
+    action:   { color:'var(--act)', bg:'var(--act-bg)', bd:'var(--act-bd)' },
+    risk:     { color:'var(--rsk)', bg:'var(--rsk-bg)', bd:'var(--rsk-bd)' },
+    dissent:  { color:'var(--rsk)', bg:'var(--rsk-bg)', bd:'var(--rsk-bd)' },
+    question: { color:'var(--dcn)', bg:'var(--dcn-bg)', bd:'var(--dcn-bd)' }
+  };
+
+  var TAG_LABELS = {
+    decision: 'DC', note: 'NT', action: 'AX',
+    risk: 'RK', dissent: 'DS', question: 'Q'
+  };
 
   // ── CSS injection (once per page load) ─────────────────────
   (function _injectStyles() {
@@ -35,7 +75,7 @@
       '.ac-ws-tab.active{color:var(--hi,#dce6f5);' +
         'border-bottom-color:var(--dec,#4a8cf5)}',
 
-      /* ── Workstream view layout — flex column so KB shell fills remaining height ── */
+      /* ── Workstream view layout ── */
       '.ac-view-workstream{display:flex;flex-direction:column;overflow:hidden}',
 
       /* ── KB shell container ── */
@@ -93,6 +133,56 @@
       '.ac-kb-placeholder{font-size:13px;color:var(--lo);' +
         'padding:40px 0;text-align:center}',
 
+      /* ── Discipline block ── */
+      '.ac-kb-disc-block{border:1px solid var(--b0);border-radius:7px;' +
+        'overflow:hidden;margin-bottom:12px}',
+      '.ac-kb-disc-row{display:flex;align-items:center;gap:10px;' +
+        'padding:11px 20px 11px 16px;background:var(--surface);' +
+        'cursor:pointer;user-select:none;' +
+        'border-bottom:1px solid var(--b0);' +
+        'transition:background .12s;' +
+        'position:sticky;top:0;z-index:5}',
+      '.ac-kb-disc-row:hover{background:var(--hover)}',
+      '.ac-kb-disc-name{font-size:14px;font-weight:600;color:var(--hi);flex:1}',
+      '.ac-kb-disc-chip{font-size:11px;padding:2px 9px;border-radius:10px;' +
+        'background:var(--raised);color:var(--lo);border:1px solid var(--b0)}',
+      '.ac-kb-disc-chevron{font-size:10px;color:var(--md);flex-shrink:0;' +
+        'transition:transform .2s;display:inline-block}',
+      '.ac-kb-disc-chevron.collapsed{transform:rotate(-90deg)}',
+
+      /* ── Topic row ── */
+      '.ac-kb-topic-row{display:flex;align-items:center;gap:10px;' +
+        'padding:8px 28px 8px 20px;' +
+        'cursor:pointer;user-select:none;' +
+        'border-left:3px solid transparent;' +
+        'transition:background .12s,border-color .12s;' +
+        'border-bottom:1px solid rgba(255,255,255,.04)}',
+      '.ac-kb-topic-row:hover{background:var(--raised);border-left-color:var(--b2)}',
+      '.ac-kb-topic-name{font-size:13px;font-weight:600;color:var(--hi);flex:1}',
+      '.ac-kb-topic-meta{font-size:11px;color:var(--lo)}',
+      '.ac-kb-topic-chevron{font-size:9px;color:var(--md);flex-shrink:0;' +
+        'transition:transform .2s;display:inline-block}',
+      '.ac-kb-topic-chevron.collapsed{transform:rotate(-90deg)}',
+
+      /* ── Entry list ── */
+      '.ac-kb-entry-list{padding:4px 28px 10px 50px;' +
+        'margin-left:24px;border-radius:6px 0 0 6px}',
+      '.ac-kb-entry{display:flex;align-items:flex-start;gap:10px;' +
+        'padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}',
+      '.ac-kb-entry:last-child{border-bottom:none}',
+      '.ac-kb-entry-date{font-size:12px;color:var(--md);flex-shrink:0;' +
+        'min-width:48px;padding-top:2px;white-space:nowrap}',
+      '.ac-kb-entry-badge{font-size:10px;font-weight:700;' +
+        'padding:0 5px;border-radius:2px;border:1px solid;' +
+        'white-space:nowrap;margin-top:2px;line-height:1.4;flex-shrink:0}',
+      '.ac-kb-entry-body{flex:1;min-width:0}',
+      '.ac-kb-entry-text{font-size:13px;color:var(--hi);line-height:1.5}',
+      '.ac-kb-entry-meta{display:flex;align-items:center;gap:8px;margin-top:3px}',
+      '.ac-kb-entry-author{font-size:11px;color:var(--lo)}',
+      '.ac-kb-entry-mtg{font-size:11px;color:var(--lo);' +
+        'padding:1px 7px;border-radius:10px;' +
+        'background:rgba(255,255,255,.04);border:1px solid var(--b0)}',
+
       /* ── Status bar ── */
       '.ac-kb-status-bar{display:flex;align-items:center;gap:12px;' +
         'padding:10px 22px;border-top:1px solid var(--b0);' +
@@ -110,7 +200,7 @@
         'background:var(--dec-bg)}',
     ].join('');
     document.head.appendChild(s);
-    console.log('%c[accord-knowledge-base.js] v20260519-CMD-ACCORD-KNOWLEDGE-BASE-1-P2 styles injected',
+    console.log('%c[accord-knowledge-base.js] v20260519-CMD-ACCORD-KNOWLEDGE-BASE-1-P3 styles injected',
       'background:#e89430;color:#fff;padding:2px 6px;border-radius:3px;font-weight:600');
   })();
 
@@ -122,10 +212,20 @@
   }
 
   function _fmtDate(iso) {
-    if (!iso) return '—';
+    if (!iso) return '\u2014';
     return new Date(iso).toLocaleDateString([], {
       year: 'numeric', month: 'short', day: 'numeric',
     });
+  }
+
+  function _fmtShortDate(iso) {
+    if (!iso) return '\u2014';
+    var d   = new Date(iso);
+    var now = new Date();
+    if (d.getFullYear() !== now.getFullYear()) {
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
   }
 
   function _fmtDateRange(firstIso, lastIso) {
@@ -141,24 +241,211 @@
     return _fmtDate(firstIso) + ' \u2013 ' + _fmtDate(lastIso);
   }
 
+  function _discColor(dk) {
+    return DISC_COLORS[dk] || 'var(--md)';
+  }
+
+  function _discBorderColor(dk) {
+    return DISC_BORDER_COLORS[dk] || 'rgba(136,153,178,.40)';
+  }
+
+  // ── Grouping ───────────────────────────────────────────────
+  function _groupNodes(nodes) {
+    var map = {};
+    for (var i = 0; i < nodes.length; i++) {
+      var n  = nodes[i];
+      var dk = (n.discipline && n.discipline.length) ? n.discipline : '__ungrouped__';
+      var tk = (n.topic      && n.topic.length)      ? n.topic      : '__ungrouped__';
+
+      if (!map[dk]) {
+        map[dk] = { label: dk === '__ungrouped__' ? 'Ungrouped' : dk, topics: {} };
+      }
+      if (!map[dk].topics[tk]) {
+        map[dk].topics[tk] = { label: tk === '__ungrouped__' ? 'Ungrouped' : tk, entries: [] };
+      }
+      map[dk].topics[tk].entries.push(n);
+    }
+    return map;
+  }
+
+  function _sortedKeys(map, ungroupedKey) {
+    var keys = Object.keys(map);
+    keys.sort(function (a, b) {
+      if (a === ungroupedKey) return 1;
+      if (b === ungroupedKey) return -1;
+      return a.localeCompare(b);
+    });
+    return keys;
+  }
+
+  // ── Entry HTML ─────────────────────────────────────────────
+  function _entryHtml(n, nameMap, mtgTitleMap) {
+    var tc  = TAG_COLORS[n.tag] || TAG_COLORS.note;
+    var lbl = TAG_LABELS[n.tag] || (n.tag ? n.tag.toUpperCase().slice(0, 2) : 'NT');
+    var badgeStyle = 'color:' + tc.color + ';background:' + tc.bg + ';border-color:' + tc.bd;
+
+    var dateStr = _fmtShortDate(n.created_at);
+
+    var authorTxt = '';
+    if (n.created_by) {
+      authorTxt = nameMap[n.created_by] || (String(n.created_by).slice(0, 8) + '\u2026');
+    }
+
+    var mtgTitle = '';
+    if (n.meeting_id && mtgTitleMap[n.meeting_id]) {
+      mtgTitle = mtgTitleMap[n.meeting_id];
+      if (mtgTitle.length > 28) mtgTitle = mtgTitle.slice(0, 25) + '\u2026';
+    }
+
+    var h = '';
+    h += '<div class="ac-kb-entry">';
+    h +=   '<span class="ac-kb-entry-date">' + _esc(dateStr) + '</span>';
+    h +=   '<span class="ac-kb-entry-badge" style="' + badgeStyle + '">' + _esc(lbl) + '</span>';
+    h +=   '<div class="ac-kb-entry-body">';
+    h +=     '<div class="ac-kb-entry-text">' + _esc(n.summary || '(no summary)') + '</div>';
+    h +=     '<div class="ac-kb-entry-meta">';
+    if (authorTxt) h += '<span class="ac-kb-entry-author">' + _esc(authorTxt) + '</span>';
+    if (mtgTitle)  h += '<span class="ac-kb-entry-mtg">'    + _esc(mtgTitle)  + '</span>';
+    h +=     '</div>';
+    h +=   '</div>';
+    h += '</div>';
+    return h;
+  }
+
+  // ── Canvas HTML ────────────────────────────────────────────
+  function _canvasHtml(nodes, meetings, nameMap) {
+    if (!nodes.length) {
+      return '<div class="ac-kb-placeholder">No captured nodes in this workstream yet.</div>';
+    }
+
+    var groupMap  = _groupNodes(nodes);
+    var discKeys  = _sortedKeys(groupMap, '__ungrouped__');
+
+    var mtgTitleMap = {};
+    for (var mi = 0; mi < meetings.length; mi++) {
+      mtgTitleMap[meetings[mi].meeting_id] = meetings[mi].title || '(untitled)';
+    }
+
+    var html = '';
+
+    for (var di = 0; di < discKeys.length; di++) {
+      var dk   = discKeys[di];
+      var disc = groupMap[dk];
+      var dCollapsed = !!_discCollapsed[dk];
+      var topicKeys  = _sortedKeys(disc.topics, '__ungrouped__');
+
+      // Aggregate counts and latest date
+      var totalEntries = 0;
+      var latestEntry  = null;
+      for (var ti2 = 0; ti2 < topicKeys.length; ti2++) {
+        var ents2 = disc.topics[topicKeys[ti2]].entries;
+        totalEntries += ents2.length;
+        for (var ei3 = 0; ei3 < ents2.length; ei3++) {
+          if (!latestEntry || ents2[ei3].created_at > latestEntry) latestEntry = ents2[ei3].created_at;
+        }
+      }
+
+      html += '<div class="ac-kb-disc-block">';
+
+      // Disc header
+      html += '<div class="ac-kb-disc-row" data-action="toggle-disc" data-disc="' + _esc(dk) + '"' +
+              ' style="border-left:4px solid ' + _discColor(dk) + '">';
+      html += '<span class="ac-kb-disc-chevron' + (dCollapsed ? ' collapsed' : '') + '">&#9660;</span>';
+      html += '<span class="ac-kb-disc-name">' + _esc(disc.label) + '</span>';
+      html += '<span class="ac-kb-disc-chip">' + topicKeys.length + ' topic' +
+              (topicKeys.length === 1 ? '' : 's') + '</span>';
+      html += '<span class="ac-kb-disc-chip">' + totalEntries + ' entr' +
+              (totalEntries === 1 ? 'y' : 'ies') + '</span>';
+      if (latestEntry) {
+        html += '<span class="ac-kb-disc-chip">last: ' + _esc(_fmtShortDate(latestEntry)) + '</span>';
+      }
+      html += '</div>';
+
+      if (!dCollapsed) {
+        html += '<div class="ac-kb-disc-body">';
+
+        for (var ti = 0; ti < topicKeys.length; ti++) {
+          var tk    = topicKeys[ti];
+          var topic = disc.topics[tk];
+          var tKey  = dk + '::' + tk;
+          var tCollapsed = !!_topicCollapsed[tKey];
+
+          var latestTopic  = null;
+          var topicMtgIds  = {};
+          for (var tei = 0; tei < topic.entries.length; tei++) {
+            var te = topic.entries[tei];
+            if (!latestTopic || te.created_at > latestTopic) latestTopic = te.created_at;
+            if (te.meeting_id) topicMtgIds[te.meeting_id] = true;
+          }
+          var topicMtgCount = Object.keys(topicMtgIds).length;
+
+          html += '<div class="ac-kb-topic-row" data-action="toggle-topic"' +
+                  ' data-disc="' + _esc(dk) + '" data-topic="' + _esc(tk) + '">';
+          html += '<span class="ac-kb-topic-chevron' + (tCollapsed ? ' collapsed' : '') + '">&#9660;</span>';
+          html += '<span class="ac-kb-topic-name">' + _esc(topic.label) + '</span>';
+          html += '<span class="ac-kb-topic-meta">' + topic.entries.length +
+                  ' entr' + (topic.entries.length === 1 ? 'y' : 'ies') + '</span>';
+          if (latestTopic) {
+            html += '<span class="ac-kb-topic-meta">\u00b7 last: ' + _esc(_fmtShortDate(latestTopic)) + '</span>';
+          }
+          html += '<span class="ac-kb-topic-meta">\u00b7 ' + topicMtgCount +
+                  ' mtg' + (topicMtgCount === 1 ? '' : 's') + '</span>';
+          html += '</div>';
+
+          if (!tCollapsed) {
+            html += '<div class="ac-kb-entry-list"' +
+                    ' style="border-left:3px solid ' + _discBorderColor(dk) + '">';
+            for (var ei2 = 0; ei2 < topic.entries.length; ei2++) {
+              html += _entryHtml(topic.entries[ei2], nameMap, mtgTitleMap);
+            }
+            html += '</div>';
+          }
+        }
+
+        html += '</div>'; // .ac-kb-disc-body
+      }
+
+      html += '</div>'; // .ac-kb-disc-block
+    }
+
+    return html;
+  }
+
+  // ── Canvas event delegation ─────────────────────────────────
+  function _wireCanvas(canvasEl) {
+    canvasEl.addEventListener('click', function (e) {
+      var discRow  = e.target.closest('[data-action="toggle-disc"]');
+      var topicRow = e.target.closest('[data-action="toggle-topic"]');
+
+      if (discRow) {
+        var dk = discRow.getAttribute('data-disc');
+        _discCollapsed[dk] = !_discCollapsed[dk];
+        canvasEl.innerHTML = _canvasHtml(_lastNodes, _lastMeetings, _lastNameMap);
+        return;
+      }
+      if (topicRow) {
+        var tdk = topicRow.getAttribute('data-disc');
+        var tk  = topicRow.getAttribute('data-topic');
+        _topicCollapsed[tdk + '::' + tk] = !_topicCollapsed[tdk + '::' + tk];
+        canvasEl.innerHTML = _canvasHtml(_lastNodes, _lastMeetings, _lastNameMap);
+      }
+    });
+  }
+
   // ── Render ─────────────────────────────────────────────────
   function render(workstreamId, host) {
     destroy();
 
-    // Workstream name from already-rendered header — no extra query needed
     var titleEl = host ? host.querySelector('.ac-view-title') : null;
     var wsName  = titleEl ? titleEl.textContent.trim() : 'Workstream';
 
-    // Append inside .ac-view-workstream so shell sits in the flex column
-    // after the tab bar — not as a sibling after the entire .ac-view wrapper.
     var viewEl = host.querySelector('.ac-view-workstream') || host;
-    var shell = document.createElement('div');
-    shell.id = 'ac-kb-shell';
+    var shell  = document.createElement('div');
+    shell.id   = 'ac-kb-shell';
     shell.className = 'ac-kb-shell';
     viewEl.appendChild(shell);
     shell.innerHTML = '<div class="ac-kb-placeholder">Loading knowledge base\u2026</div>';
 
-    // Load closed/sealed meetings for this workstream
     API.get(
       'accord_meetings' +
       '?workstream_id=eq.' + workstreamId +
@@ -169,28 +456,54 @@
       meetings = Array.isArray(meetings) ? meetings : [];
 
       if (!meetings.length) {
-        // No closed meetings yet — render shell with zero stats
-        _renderContent(shell, wsName, [], []);
+        _renderContent(shell, wsName, [], [], {});
         return;
       }
 
       var ids = meetings.map(function (m) { return m.meeting_id; }).join(',');
 
-      // Load nodes for those meetings
       return API.get(
         'accord_nodes' +
         '?meeting_id=in.(' + ids + ')' +
-        '&select=tag,status'
+        '&select=node_id,seq_id,tag,summary,discipline,topic,' +
+        'created_by,created_at,meeting_id,due_date,status,body' +
+        '&order=created_at.asc'
       ).then(function (nodes) {
         nodes = Array.isArray(nodes) ? nodes : [];
-        // Safe no-op guard — 'deleted' not in production per Phase 1
         nodes = nodes.filter(function (n) { return n.status !== 'deleted'; });
-        _renderContent(shell, wsName, meetings, nodes);
+
+        // Collect unique created_by values
+        var byIds = {};
+        for (var i = 0; i < nodes.length; i++) {
+          if (nodes[i].created_by) byIds[nodes[i].created_by] = true;
+        }
+        var byIdList = Object.keys(byIds);
+
+        if (!byIdList.length) {
+          _renderContent(shell, wsName, meetings, nodes, {});
+          return;
+        }
+
+        // IR47 — attempt resources?user_id=in.(...).
+        // Falls back to truncated ID if column absent (400 from Supabase).
+        return API.get(
+          'resources?user_id=in.(' + byIdList.join(',') + ')&select=user_id,name'
+        ).then(function (resources) {
+          var nameMap = {};
+          if (Array.isArray(resources)) {
+            for (var ri = 0; ri < resources.length; ri++) {
+              if (resources[ri].user_id) nameMap[resources[ri].user_id] = resources[ri].name || '';
+            }
+          }
+          _renderContent(shell, wsName, meetings, nodes, nameMap);
+        }).catch(function () {
+          console.warn('[AccordKB] IR47: resources.user_id query failed — showing truncated IDs for authors');
+          _renderContent(shell, wsName, meetings, nodes, {});
+        });
       });
 
     }).catch(function (e) {
       console.error('[AccordKB] load failed', e);
-      // Guard: shell may have been destroyed before async resolves
       if (document.getElementById('ac-kb-shell') === shell) {
         shell.innerHTML = '<div class="ac-kb-placeholder" style="color:var(--rsk)">' +
           'Failed to load knowledge base.</div>';
@@ -198,27 +511,26 @@
     });
   }
 
-  function _renderContent(shell, wsName, meetings, nodes) {
-    // Guard: shell may have been destroyed while async was in-flight
+  function _renderContent(shell, wsName, meetings, nodes, nameMap) {
     if (!shell || !shell.parentElement) return;
 
-    // ── Count stats ──
-    var decCount    = 0;
+    // Cache for collapse re-renders
+    _lastNodes    = nodes;
+    _lastMeetings = meetings;
+    _lastNameMap  = nameMap;
+
+    // ── Stats ──
+    var decCount     = 0;
     var actOpenCount = 0;
-    var rskCount    = 0;
-    var ntCount     = 0;
+    var rskCount     = 0;
+    var ntCount      = 0;
 
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
-      if (n.tag === 'decision') {
-        decCount++;
-      } else if (n.tag === 'action' && n.status !== 'committed') {
-        actOpenCount++;
-      } else if (n.tag === 'risk' || n.tag === 'dissent') {
-        rskCount++;
-      } else if (n.tag === 'note') {
-        ntCount++;
-      }
+      if      (n.tag === 'decision')                          decCount++;
+      else if (n.tag === 'action' && n.status !== 'committed') actOpenCount++;
+      else if (n.tag === 'risk' || n.tag === 'dissent')       rskCount++;
+      else if (n.tag === 'note')                              ntCount++;
     }
 
     // ── Date range ──
@@ -232,32 +544,22 @@
         (firstDate ? ' \u00b7 ' + _fmtDateRange(firstDate, lastDate) : '')
       : 'No closed meetings yet';
 
-    // Latest meeting chip (last in ASC order = most recent)
     var latestId = mtgCount ? meetings[mtgCount - 1].meeting_id : null;
 
     var html = '';
 
-    // ── Workspace header ──
+    // ── Header ──
     html += '<div class="ac-kb-header">';
     html += '<h2 class="ac-kb-ws-name">' + _esc(wsName) + '</h2>';
-    html += '<p class="ac-kb-subtitle">' + _esc(subtitle) + '</p>';
+    html += '<p class="ac-kb-subtitle">'  + _esc(subtitle) + '</p>';
     html += '<div class="ac-kb-stats">';
-    html += '<div class="ac-kb-stat ac-kb-stat--dec">' +
-              '<span class="ac-kb-stat-val">' + decCount + '</span>' +
-              '<span class="ac-kb-stat-lbl">Decisions</span></div>';
-    html += '<div class="ac-kb-stat ac-kb-stat--act">' +
-              '<span class="ac-kb-stat-val">' + actOpenCount + '</span>' +
-              '<span class="ac-kb-stat-lbl">Actions open</span></div>';
-    html += '<div class="ac-kb-stat ac-kb-stat--rsk">' +
-              '<span class="ac-kb-stat-val">' + rskCount + '</span>' +
-              '<span class="ac-kb-stat-lbl">Risk / Dissent</span></div>';
-    html += '<div class="ac-kb-stat ac-kb-stat--nt">' +
-              '<span class="ac-kb-stat-val">' + ntCount + '</span>' +
-              '<span class="ac-kb-stat-lbl">Notes</span></div>';
-    html += '</div>'; // .ac-kb-stats
-    html += '</div>'; // .ac-kb-header
+    html += '<div class="ac-kb-stat ac-kb-stat--dec"><span class="ac-kb-stat-val">' + decCount     + '</span><span class="ac-kb-stat-lbl">Decisions</span></div>';
+    html += '<div class="ac-kb-stat ac-kb-stat--act"><span class="ac-kb-stat-val">' + actOpenCount + '</span><span class="ac-kb-stat-lbl">Actions open</span></div>';
+    html += '<div class="ac-kb-stat ac-kb-stat--rsk"><span class="ac-kb-stat-val">' + rskCount     + '</span><span class="ac-kb-stat-lbl">Risk / Dissent</span></div>';
+    html += '<div class="ac-kb-stat ac-kb-stat--nt" ><span class="ac-kb-stat-val">' + ntCount      + '</span><span class="ac-kb-stat-lbl">Notes</span></div>';
+    html += '</div></div>';
 
-    // ── Filter pills (non-functional — Phase 4 wires) ──
+    // ── Filter pills ──
     html += '<div class="ac-kb-filter-bar">';
     html += '<span class="ac-kb-filter-label">Show</span>';
     html += '<div class="ac-kb-pills">';
@@ -266,53 +568,48 @@
     html += '<div class="ac-kb-pill" data-pill="actions">Action Items</div>';
     html += '<div class="ac-kb-pill" data-pill="risks">Risks</div>';
     html += '<div class="ac-kb-pill" data-pill="notes">Notes</div>';
-    html += '</div>'; // .ac-kb-pills
+    html += '</div>';
     html += '<div class="ac-kb-mtg-filter">All meetings &#9660;</div>';
-    html += '</div>'; // .ac-kb-filter-bar
-
-    // ── Canvas placeholder (Phase 3 replaces) ──
-    html += '<div class="ac-kb-canvas">';
-    html += '<div class="ac-kb-placeholder">Loading knowledge base\u2026</div>';
     html += '</div>';
 
-    // ── Status bar — meeting timeline chips ──
-    html += '<div class="ac-kb-status-bar">';
-    html += '<span class="ac-kb-status-label">Meetings</span>';
-    html += '<div class="ac-kb-chips">';
+    // ── Canvas ──
+    html += '<div class="ac-kb-canvas" id="ac-kb-canvas">';
+    html += _canvasHtml(nodes, meetings, nameMap);
+    html += '</div>';
 
+    // ── Status bar ──
+    html += '<div class="ac-kb-status-bar"><span class="ac-kb-status-label">Meetings</span>';
+    html += '<div class="ac-kb-chips">';
     if (mtgCount) {
       for (var j = 0; j < meetings.length; j++) {
         var m   = meetings[j];
         var lbl = m.title || '(untitled)';
         if (lbl.length > 28) lbl = lbl.slice(0, 25) + '\u2026';
-        var isLatest = (m.meeting_id === latestId);
-        html += '<div class="ac-kb-chip' + (isLatest ? ' ac-kb-chip--active' : '') +
+        html += '<div class="ac-kb-chip' + (m.meeting_id === latestId ? ' ac-kb-chip--active' : '') +
                 '">' + _esc(lbl) + '</div>';
       }
     } else {
-      html += '<div class="ac-kb-chip" style="color:var(--lo);font-style:italic">' +
-              'No closed meetings</div>';
+      html += '<div class="ac-kb-chip" style="color:var(--lo);font-style:italic">No closed meetings</div>';
     }
-
-    html += '</div>'; // .ac-kb-chips
-    html += '</div>'; // .ac-kb-status-bar
+    html += '</div></div>';
 
     shell.innerHTML = html;
+
+    var canvasEl = shell.querySelector('#ac-kb-canvas');
+    if (canvasEl) _wireCanvas(canvasEl);
   }
 
   // ── Destroy ────────────────────────────────────────────────
   function destroy() {
     var existing = document.getElementById('ac-kb-shell');
-    if (existing && existing.parentElement) {
-      existing.parentElement.removeChild(existing);
-    }
+    if (existing && existing.parentElement) existing.parentElement.removeChild(existing);
   }
 
   // ── Expose ─────────────────────────────────────────────────
   window.AccordKnowledgeBase = {
     render:     render,
     destroy:    destroy,
-    _activeTab: 'meetings',   // mutable — accord-views.js tab wiring sets this
+    _activeTab: 'meetings',
   };
 
 })();
