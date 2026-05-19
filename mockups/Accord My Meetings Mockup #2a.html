@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accord — Meeting Command Center</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --panel: #fbf9f4;
+      --paper: #fffdf8;
+      --ink: #2b2925;
+      --muted: #78716a;
+      --soft: #ded6ca;
+      --line: #d8cfc0;
+      --accent: #8b4f2f;
+      --accent-2: #244c5a;
+      --green: #58735f;
+      --gold: #b78a3b;
+      --red: #9b4a3d;
+      --shadow: 0 18px 50px rgba(60, 45, 30, 0.13);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(139,79,47,.14), transparent 33%),
+        radial-gradient(circle at 85% 12%, rgba(36,76,90,.12), transparent 30%),
+        linear-gradient(135deg, #f8f5ee 0%, var(--bg) 52%, #ece5d9 100%);
+      min-height: 100vh;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 88px minmax(980px, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      border-right: 1px solid rgba(120,113,106,.22);
+      background: rgba(251,249,244,.72);
+      backdrop-filter: blur(20px);
+      padding: 24px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+    }
+
+    .mark {
+      width: 50px;
+      height: 50px;
+      border-radius: 18px;
+      background: linear-gradient(145deg, var(--accent), #ba7a4d);
+      color: #fff7ed;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 24px;
+      box-shadow: 0 12px 26px rgba(139,79,47,.28);
+    }
+
+    .rail-btn {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      color: var(--muted);
+      font-size: 20px;
+      position: relative;
+    }
+
+    .rail-btn.active {
+      background: #efe5d8;
+      color: var(--accent);
+    }
+
+    .rail-btn.active::before {
+      content: "";
+      position: absolute;
+      left: -14px;
+      width: 4px;
+      height: 28px;
+      border-radius: 4px;
+      background: var(--accent);
+    }
+
+    main {
+      padding: 28px 34px 34px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .18em;
+      font-weight: 750;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.05;
+      letter-spacing: -.04em;
+      font-weight: 760;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .search {
+      height: 46px;
+      width: 310px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,253,248,.75);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+      color: var(--muted);
+      box-shadow: 0 8px 24px rgba(55,43,28,.06);
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      height: 46px;
+      padding: 0 18px;
+      color: white;
+      background: var(--accent-2);
+      font-weight: 720;
+      cursor: pointer;
+      box-shadow: 0 12px 24px rgba(36,76,90,.22);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(620px, 1.45fr) minmax(360px, .85fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .left-stack, .right-stack { display: flex; flex-direction: column; gap: 22px; }
+
+    .card {
+      background: rgba(255,253,248,.84);
+      border: 1px solid rgba(216,207,192,.88);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-head {
+      padding: 22px 24px 14px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .card h2 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: -.02em;
+      font-weight: 760;
+    }
+
+    .small-link { color: var(--accent-2); font-size: 13px; font-weight: 720; }
+
+    .now {
+      padding: 0 24px 24px;
+    }
+
+    .hero-meeting {
+      border-radius: 24px;
+      padding: 22px;
+      background: linear-gradient(145deg, #2b4f5d 0%, #1f3d48 50%, #18333c 100%);
+      color: #fff7ed;
+      position: relative;
+      overflow: hidden;
+      min-height: 246px;
+    }
+
+    .hero-meeting::after {
+      content: "";
+      position: absolute;
+      right: -80px;
+      top: -80px;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.09);
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.13);
+      font-size: 12px;
+      font-weight: 740;
+      letter-spacing: .02em;
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      background: #d8f0c1;
+      border-radius: 50%;
+      box-shadow: 0 0 0 6px rgba(216,240,193,.14);
+    }
+
+    .timer {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .timer strong { display:block; font-size: 34px; letter-spacing: -.04em; }
+    .timer span { color: rgba(255,247,237,.72); font-size: 12px; }
+
+    .meeting-title {
+      position: relative;
+      z-index: 1;
+      margin-top: 30px;
+      max-width: 560px;
+    }
+
+    .meeting-title h3 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.08;
+      letter-spacing: -.04em;
+      font-weight: 760;
+    }
+
+    .meeting-title p {
+      margin: 0;
+      color: rgba(255,247,237,.76);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .ghost, .join {
+      height: 42px;
+      border-radius: 999px;
+      padding: 0 15px;
+      font-weight: 740;
+    }
+
+    .join { background: #fff7ed; color: #1f3d48; box-shadow: none; }
+    .ghost { background: rgba(255,255,255,.12); color: #fff7ed; border: 1px solid rgba(255,255,255,.16); box-shadow: none; }
+
+    .prep-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .prep-chip {
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 16px;
+      padding: 12px;
+    }
+
+    .prep-chip b { display: block; font-size: 18px; }
+    .prep-chip span { color: rgba(255,247,237,.7); font-size: 12px; }
+
+    .timeline {
+      padding: 0 18px 22px;
+    }
+
+    .meeting-row {
+      display: grid;
+      grid-template-columns: 86px 1fr auto;
+      gap: 16px;
+      align-items: center;
+      padding: 15px 10px 15px 6px;
+      border-top: 1px solid rgba(216,207,192,.72);
+    }
+
+    .time {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .row-title b { display: block; font-size: 15px; margin-bottom: 4px; }
+    .row-title span { color: var(--muted); font-size: 13px; }
+
+    .tag {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 740;
+      background: #efe8dc;
+      color: #645b51;
+      white-space: nowrap;
+    }
+
+    .tag.warn { background: #f4e2bf; color: #7b5517; }
+    .tag.good { background: #dfe9dc; color: #3f6046; }
+    .tag.hot { background: #f0d4cd; color: #843c31; }
+
+    .queue { padding: 0 20px 22px; }
+
+    .queue-item {
+      display: grid;
+      grid-template-columns: 42px 1fr auto;
+      gap: 14px;
+      align-items: start;
+      padding: 15px 0;
+      border-top: 1px solid rgba(216,207,192,.72);
+    }
+
+    .badge {
+      width: 42px;
+      height: 42px;
+      border-radius: 15px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      background: #efe5d8;
+      color: var(--accent);
+    }
+
+    .queue-copy b { display:block; font-size: 15px; margin-bottom: 5px; }
+    .queue-copy p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .queue-meta { text-align: right; color: var(--muted); font-size: 12px; font-weight: 720; }
+
+    .briefing {
+      padding: 0 22px 22px;
+    }
+
+    .brief-box {
+      border-radius: 22px;
+      background: #f2eadf;
+      border: 1px solid rgba(216,207,192,.92);
+      padding: 18px;
+    }
+
+    .brief-box h3 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    .brief-line {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 10px;
+      padding: 10px 0;
+      border-top: 1px solid rgba(139,79,47,.12);
+      color: #514a43;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .brief-line:first-of-type { border-top: 0; }
+
+    .num {
+      width: 24px;
+      height: 24px;
+      border-radius: 8px;
+      background: var(--paper);
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 12px;
+    }
+
+    .archive-strip {
+      padding: 0 20px 22px;
+    }
+
+    .archive-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      border-top: 1px solid rgba(216,207,192,.72);
+      padding: 14px 0;
+    }
+
+    .archive-item b { display:block; font-size: 14px; }
+    .archive-item span { color: var(--muted); font-size: 12px; }
+
+    .health {
+      width: 66px;
+      height: 10px;
+      border-radius: 999px;
+      background: #e3d9cc;
+      overflow: hidden;
+    }
+
+    .health i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--green);
+    }
+
+    .health.risk i { background: var(--gold); }
+
+    .secretary {
+      position: fixed;
+      right: 30px;
+      bottom: 28px;
+      width: 430px;
+      background: rgba(43,41,37,.94);
+      color: #fff7ed;
+      border-radius: 26px;
+      box-shadow: 0 24px 70px rgba(43,41,37,.3);
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 14px;
+      backdrop-filter: blur(12px);
+    }
+
+    .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 17px;
+      background: linear-gradient(145deg, #fff7ed, #d6bf9d);
+      color: var(--accent);
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+    }
+
+    .secretary b { display: block; margin-bottom: 4px; }
+    .secretary p { margin: 0; color: rgba(255,247,237,.78); font-size: 13px; line-height: 1.45; }
+    .secretary a { color: #f5d8a7; font-weight: 750; text-decoration: none; }
+
+    @media (max-width: 1120px) {
+      .app { grid-template-columns: 1fr; }
+      aside { display:none; }
+      .layout { grid-template-columns: 1fr; }
+      .secretary { position: static; width: auto; margin: 0 34px 32px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="mark">A</div>
+      <div class="rail-btn active">⌂</div>
+      <div class="rail-btn">◷</div>
+      <div class="rail-btn">✎</div>
+      <div class="rail-btn">✓</div>
+      <div class="rail-btn">▦</div>
+      <div style="flex:1"></div>
+      <div class="rail-btn">⚙</div>
+    </aside>
+
+    <main>
+      <header>
+        <div>
+          <div class="eyebrow">Accord / Today</div>
+          <h1>Your meeting day, already organized.</h1>
+        </div>
+        <div class="top-actions">
+          <div class="search">⌕ Search minutes, decisions, owners…</div>
+          <button>+ New minutes</button>
+        </div>
+      </header>
+
+      <section class="layout">
+        <div class="left-stack">
+          <div class="card">
+            <div class="card-head">
+              <h2>Live meeting surface</h2>
+              <span class="small-link">Open editor →</span>
+            </div>
+            <div class="now">
+              <div class="hero-meeting">
+                <div class="status-row">
+                  <div class="pill"><i class="pulse"></i> In progress · you are host</div>
+                  <div class="timer"><strong>12:48</strong><span>elapsed</span></div>
+                </div>
+                <div class="meeting-title">
+                  <h3>Riverside Launch Readiness Review</h3>
+                  <p>Current agenda: supplier sign-off. Accord found 3 unresolved actions and 1 decision from the last meeting that should be closed before moving on.</p>
+                </div>
+                <div class="prep-grid">
+                  <div class="prep-chip"><b>3</b><span>open actions</span></div>
+                  <div class="prep-chip"><b>1</b><span>decision pending</span></div>
+                  <div class="prep-chip"><b>86%</b><span>confidence trend</span></div>
+                </div>
+                <div class="hero-actions">
+                  <button class="join">Join call</button>
+                  <button class="ghost">Open minutes</button>
+                  <button class="ghost">Show prior thread</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>Today’s run-of-show</h2>
+              <span class="small-link">Calendar sync live</span>
+            </div>
+            <div class="timeline">
+              <div class="meeting-row">
+                <div class="time">09:00</div>
+                <div class="row-title"><b>Weekly PMO Standup</b><span>Minutes circulated · no prep required</span></div>
+                <div class="tag good">Closed</div>
+              </div>
+              <div class="meeting-row">
+                <div class="time">11:30</div>
+                <div class="row-title"><b>Riverside Launch Readiness Review</b><span>Live now · supplier sign-off in discussion</span></div>
+                <div class="tag hot">Live</div>
+              </div>
+              <div class="meeting-row">
+                <div class="time">14:00</div>
+                <div class="row-title"><b>Change Control Board</b><span>Needs decision packet and risk notes</span></div>
+                <div class="tag warn">Prep 18 min</div>
+              </div>
+              <div class="meeting-row">
+                <div class="time">16:15</div>
+                <div class="row-title"><b>Vendor Escalation Sync</b><span>Prior minutes show two overdue commitments</span></div>
+                <div class="tag">Watch</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>Minutes awaiting circulation</h2>
+              <span class="small-link">Review batch →</span>
+            </div>
+            <div class="queue">
+              <div class="queue-item">
+                <div class="badge">M</div>
+                <div class="queue-copy"><b>Steering Committee — Draft ready</b><p>Accord extracted 6 decisions, 9 actions, and a proposed executive summary. Two owners need confirmation before release.</p></div>
+                <div class="queue-meta">Due today<br>15:30</div>
+              </div>
+              <div class="queue-item">
+                <div class="badge">A</div>
+                <div class="queue-copy"><b>Architecture Review — Needs cleanup</b><p>Three discussion threads were merged into one topic. Suggested split: security, data retention, deployment timing.</p></div>
+                <div class="queue-meta">Draft<br>72%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="right-stack">
+          <div class="card">
+            <div class="card-head">
+              <h2>Preparation queue</h2>
+              <span class="small-link">Prioritize →</span>
+            </div>
+            <div class="queue">
+              <div class="queue-item">
+                <div class="badge">1</div>
+                <div class="queue-copy"><b>Change Control Board</b><p>Read impact memo, confirm risk owner, prepare recommendation for CR-128.</p></div>
+                <div class="queue-meta">Starts<br>1h 12m</div>
+              </div>
+              <div class="queue-item">
+                <div class="badge">2</div>
+                <div class="queue-copy"><b>Vendor Escalation Sync</b><p>Bring last commitment trail. Accord flags a mismatch between vendor promise date and internal dependency plan.</p></div>
+                <div class="queue-meta">Starts<br>3h 27m</div>
+              </div>
+              <div class="queue-item">
+                <div class="badge">3</div>
+                <div class="queue-copy"><b>Tomorrow: Finance Review</b><p>Budget variance notes are missing from the packet. Owner: Dana.</p></div>
+                <div class="queue-meta">Prep<br>24 min</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>PM briefing</h2>
+              <span class="small-link">Explain →</span>
+            </div>
+            <div class="briefing">
+              <div class="brief-box">
+                <h3>What Accord thinks needs your attention</h3>
+                <div class="brief-line"><div class="num">1</div><div>Two actions are now blockers because their target dates sit before today’s readiness gate.</div></div>
+                <div class="brief-line"><div class="num">2</div><div>The supplier sign-off decision has been deferred twice. Recommend forcing owner, date, and consequence.</div></div>
+                <div class="brief-line"><div class="num">3</div><div>Three upcoming meetings reference the same risk. Consider consolidating notes into one decision thread.</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>Historical pulse</h2>
+              <span class="small-link">Archive →</span>
+            </div>
+            <div class="archive-strip">
+              <div class="archive-item"><div><b>Riverside project thread</b><span>18 meetings · 42 decisions · 109 actions</span></div><div class="health"><i style="width:86%"></i></div></div>
+              <div class="archive-item"><div><b>Vendor delivery record</b><span>6 slips detected across 90 days</span></div><div class="health risk"><i style="width:54%"></i></div></div>
+              <div class="archive-item"><div><b>Architecture decisions</b><span>Last updated yesterday</span></div><div class="health"><i style="width:78%"></i></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="secretary">
+    <div class="avatar">A</div>
+    <div>
+      <b>Secretary reminder</b>
+      <p>Your 2:00 PM Change Control Board starts in 1h 12m. You should review CR-128, confirm the risk owner, and bring the prior decision rationale. <a href="#">Open preparation packet →</a></p>
+    </div>
+  </div>
+</body>
+</html>

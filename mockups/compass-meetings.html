@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compass · Meetings — ProjectHUD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg0: #07090f;
+  --bg1: #0c1018;
+  --bg2: #111720;
+  --bg3: #16202c;
+  --bg4: #1b2636;
+  --bg5: #212e42;
+  --text-primary: #dde6f0;
+  --text-secondary: #85a0be;
+  --text-muted: #536a85;
+  --text-faint: #324056;
+  --cyan: #00cfc2;
+  --cyan-dim: rgba(0,207,194,0.09);
+  --cyan-glow: rgba(0,207,194,0.18);
+  --amber: #f0a020;
+  --amber-dim: rgba(240,160,32,0.09);
+  --amber-glow: rgba(240,160,32,0.18);
+  --rose: #e03855;
+  --rose-dim: rgba(224,56,85,0.09);
+  --green: #34c070;
+  --green-dim: rgba(52,192,112,0.09);
+  --border-faint: rgba(255,255,255,0.04);
+  --border-subtle: rgba(255,255,255,0.07);
+  --border-mid: rgba(255,255,255,0.12);
+  --font-ui: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  --font-serif: 'Georgia', 'Times New Roman', serif;
+  --r: 6px;
+  --r-sm: 4px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; }
+body {
+  font-family: var(--font-ui);
+  background: var(--bg0);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+button { font-family: var(--font-ui); cursor: pointer; }
+
+/* ── LABEL ── */
+.lbl {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--text-muted);
+}
+.mono { font-family: var(--font-mono); }
+
+/* ── PANEL FRAME (§4.5) ── */
+.pf {
+  background: var(--bg2);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--cyan);
+  border-radius: var(--r);
+  position: relative;
+  padding: 14px 16px;
+}
+.pf::before, .pf::after {
+  content: '';
+  position: absolute;
+  width: 8px; height: 8px;
+}
+.pf::before { top: -1px; right: -1px;
+  border-top: 1px solid var(--cyan); border-right: 1px solid var(--cyan); }
+.pf::after  { bottom: -1px; right: -1px;
+  border-bottom: 1px solid var(--cyan); border-right: 1px solid var(--cyan); }
+.pf-amber { border-left-color: var(--amber); }
+.pf-amber::before, .pf-amber::after { border-color: var(--amber); }
+.pf-rose  { border-left-color: var(--rose); }
+.pf-rose::before, .pf-rose::after   { border-color: var(--rose); }
+
+/* ── HEADER ── */
+.hdr {
+  display: flex; align-items: center; gap: 16px;
+  padding: 11px 20px; background: var(--bg1);
+  border-bottom: 1px solid var(--border-subtle); position: sticky; top: 0; z-index: 10;
+}
+.wordmark {
+  font-size: 11px; font-weight: 700; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--cyan);
+}
+.hdr-sep { width: 1px; height: 16px; background: var(--border-mid); }
+.page-title { font-size: 13px; font-weight: 600; letter-spacing: .02em; }
+.hdr-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.hdr-clock { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+.hdr-date  { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.avatar-hdr {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--cyan-dim); border: 1px solid rgba(0,207,194,.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: var(--cyan); letter-spacing: 0;
+}
+
+/* ── KPI STRIP ── */
+.kpi-strip {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 8px; padding: 10px 20px;
+  background: var(--bg1); border-bottom: 1px solid var(--border-faint);
+}
+.kpi {
+  background: var(--bg2); border: 1px solid var(--border-subtle);
+  border-radius: var(--r); padding: 9px 12px;
+  position: relative; overflow: hidden; cursor: pointer;
+  transition: border-color .15s;
+}
+.kpi:hover { border-color: var(--border-mid); }
+.kpi-bar { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.kpi-val {
+  font-size: 26px; font-weight: 700; line-height: 1; margin: 5px 0 2px;
+}
+.kpi-sub {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
+}
+
+/* ── MAIN GRID ── */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 330px;
+  gap: 10px; padding: 10px 20px;
+}
+.col-l { display: flex; flex-direction: column; gap: 10px; }
+.col-r { display: flex; flex-direction: column; gap: 10px; }
+
+/* ── LIVE PANEL (JOIN NOW) ── */
+.live-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--r);
+  position: relative; overflow: hidden;
+}
+.live-panel::before {
+  content: '';
+  position: absolute; top: -1px; right: -1px;
+  width: 8px; height: 8px;
+  border-top: 1px solid var(--amber); border-right: 1px solid var(--amber);
+}
+.live-panel::after {
+  content: '';
+  position: absolute; bottom: -1px; right: -1px;
+  width: 8px; height: 8px;
+  border-bottom: 1px solid var(--amber); border-right: 1px solid var(--amber);
+}
+.live-glow {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 15% 60%, rgba(240,160,32,.05) 0%, transparent 55%);
+}
+.live-hdr {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px 9px; border-bottom: 1px solid var(--border-faint);
+}
+.pulse-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--amber);
+  animation: pulse-ring 2.2s ease-in-out infinite;
+}
+@keyframes pulse-ring {
+  0%,100% { box-shadow: 0 0 0 0 rgba(240,160,32,.6); }
+  50%      { box-shadow: 0 0 0 5px rgba(240,160,32,0); }
+}
+.live-badge {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--amber);
+}
+.live-workstream {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+}
+.live-timer {
+  margin-left: auto; font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-secondary);
+}
+.live-timer .hi { color: var(--amber); font-weight: 600; }
+
+.live-body { padding: 16px 16px 14px; }
+
+.mtg-title-live {
+  font-family: var(--font-serif); font-size: 22px; font-weight: normal;
+  color: var(--text-primary); margin-bottom: 4px;
+}
+.mtg-meta {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.prog-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.prog-track {
+  flex: 1; height: 4px; background: var(--border-faint);
+  border-radius: 2px; overflow: hidden;
+}
+.prog-fill { height: 100%; background: var(--amber); border-radius: 2px; transition: width 1s linear; }
+.prog-lbl {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); white-space: nowrap;
+}
+
+.att-row {
+  display: flex; align-items: center; gap: 5px; margin-bottom: 12px;
+}
+.av {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; flex-shrink: 0;
+  border: 1.5px solid var(--border-mid);
+}
+.av-ok  { border-color: rgba(52,192,112,.5); background: var(--green-dim); color: var(--green); }
+.av-late{ border-color: rgba(240,160,32,.5); background: var(--amber-dim); color: var(--amber); }
+.av-more{ background: var(--bg3); color: var(--text-muted); border-color: var(--border-subtle); }
+.att-names { font-size: 11px; color: var(--text-muted); margin-left: 3px; }
+.conn-state {
+  margin-left: auto; display: flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
+}
+.conn-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+.flash {
+  background: var(--amber-dim); border: 1px solid rgba(240,160,32,.18);
+  border-radius: var(--r-sm); padding: 8px 10px;
+  display: flex; align-items: flex-start; gap: 6px; margin-bottom: 12px;
+}
+.flash-icon { font-size: 12px; color: var(--amber); flex-shrink: 0; margin-top: 1px; }
+.flash-text { font-size: 12px; color: var(--text-secondary); line-height: 1.4; flex: 1; }
+.flash-cta {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: .06em; color: var(--amber); cursor: pointer;
+  white-space: nowrap; align-self: center; flex-shrink: 0;
+  background: none; border: none; padding: 0;
+}
+.flash-cyan { background: var(--cyan-dim); border-color: rgba(0,207,194,.16); }
+.flash-cyan .flash-icon { color: var(--cyan); }
+.flash-cyan .flash-cta  { color: var(--cyan); }
+
+.join-btn {
+  display: block; width: 100%; padding: 11px;
+  background: var(--amber); color: #1a0c00;
+  font-size: 13px; font-weight: 700; letter-spacing: .04em;
+  text-align: center; border: none; border-radius: var(--r-sm); cursor: pointer;
+  transition: background .15s;
+}
+.join-btn:hover { background: #f5b030; }
+
+/* ── NEXT UP ── */
+.next-panel { /* extends .pf */ }
+.mtg-title-next {
+  font-family: var(--font-serif); font-size: 19px; font-weight: normal;
+  color: var(--text-primary); margin-bottom: 4px;
+}
+.next-actions { display: flex; gap: 8px; margin-top: 10px; }
+.outline-btn {
+  padding: 7px 12px; background: transparent;
+  border: 1px solid rgba(0,207,194,.28); border-radius: var(--r-sm);
+  font-size: 12px; font-weight: 600; color: var(--cyan); cursor: pointer;
+  transition: background .15s;
+}
+.outline-btn:hover { background: var(--cyan-dim); }
+.outline-btn-muted {
+  border-color: var(--border-mid); color: var(--text-secondary);
+}
+.outline-btn-muted:hover { background: var(--bg3); }
+
+/* ── PANEL HEADER ── */
+.ph {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.ph-count { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+
+/* ── OPEN ITEMS ── */
+.action-list { list-style: none; }
+.ai-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 9px 0; border-bottom: 1px solid var(--border-faint);
+}
+.ai-row:last-child { border-bottom: none; padding-bottom: 0; }
+.ai-bar { width: 3px; align-self: stretch; border-radius: 2px; flex-shrink: 0; margin-top: 2px; }
+.ai-id {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-faint);
+  flex-shrink: 0; padding-top: 1px; min-width: 32px;
+}
+.ai-body { flex: 1; min-width: 0; }
+.ai-text { font-size: 13px; color: var(--text-primary); margin-bottom: 3px; }
+.ai-tags { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.tag {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .03em; padding: 1px 5px; border-radius: 3px;
+  text-transform: uppercase;
+}
+.tag-cp     { background: rgba(240,160,32,.11); color: var(--amber); }
+.tag-due    { background: rgba(224,56,85,.11);  color: var(--rose); }
+.tag-block  { background: rgba(224,56,85,.11);  color: var(--rose); }
+.tag-dec    { background: rgba(0,207,194,.09);  color: var(--cyan); }
+.tag-float  { background: rgba(52,192,112,.09); color: var(--green); }
+.tag-owner  { font-family: var(--font-ui); font-size: 11px; color: var(--text-muted); font-weight: normal; }
+.ai-prov {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-faint);
+  margin-top: 2px; line-height: 1.3;
+}
+.ai-right { flex-shrink: 0; text-align: right; }
+.ai-due { font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+.ai-float { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); margin-top: 2px; }
+.more-link {
+  display: block; text-align: center; padding: 8px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+  cursor: pointer; border: 1px dashed var(--border-faint); border-radius: var(--r-sm);
+  margin-top: 4px; transition: border-color .15s, color .15s;
+}
+.more-link:hover { border-color: var(--border-mid); color: var(--text-secondary); }
+
+/* ── SCHEDULE TIMELINE ── */
+.timeline { padding-left: 0; }
+.t-row {
+  display: grid; grid-template-columns: 38px 16px 1fr;
+  align-items: stretch; gap: 0;
+}
+.t-time {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-faint);
+  padding-top: 9px; text-align: right; padding-right: 8px;
+}
+.t-axis {
+  display: flex; flex-direction: column; align-items: center;
+  position: relative;
+}
+.t-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  margin-top: 8px; flex-shrink: 0;
+  border: 1.5px solid var(--border-mid); background: var(--bg2);
+  position: relative; z-index: 1;
+}
+.t-dot-live {
+  background: var(--amber); border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(240,160,32,.22);
+  animation: pulse-ring 2.2s ease-in-out infinite;
+}
+.t-dot-next {
+  background: var(--bg2); border-color: var(--cyan);
+}
+.t-dot-done {
+  background: var(--bg3); border-color: var(--border-faint);
+  opacity: .5;
+}
+.t-line {
+  flex: 1; width: 1px; background: var(--border-faint);
+  min-height: 6px;
+}
+.t-block {
+  padding: 6px 8px 6px 10px; border-radius: var(--r-sm);
+  border-left: 2px solid transparent; margin: 4px 0 4px 8px;
+  cursor: pointer; transition: background .15s;
+}
+.t-block:hover { filter: brightness(1.1); }
+.tb-live {
+  background: var(--amber-dim); border-left-color: var(--amber);
+}
+.tb-next {
+  background: var(--cyan-dim); border-left-color: var(--cyan);
+}
+.tb-done {
+  background: transparent; border-left-color: var(--border-faint);
+  opacity: .55;
+}
+.tb-up {
+  background: var(--bg3); border-left-color: var(--border-subtle);
+}
+.tb-title { font-size: 12px; font-weight: 500; margin-bottom: 2px; }
+.tb-meta  { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+
+.now-marker {
+  display: grid; grid-template-columns: 38px 16px 1fr;
+  align-items: center; gap: 0; margin: 2px 0;
+}
+.now-tick {
+  grid-column: 2; height: 1px; background: var(--amber);
+  width: 100%; position: relative;
+}
+.now-tick::after {
+  content: '';
+  position: absolute; right: -2px; top: -3px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--amber);
+}
+.now-label {
+  grid-column: 3; padding-left: 12px;
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--amber); letter-spacing: .08em;
+  font-weight: 600;
+}
+
+/* ── PRESSURE REPORT ── */
+.p-tabs {
+  display: flex; gap: 0; margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-faint);
+}
+.p-tab {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-muted);
+  padding: 5px 12px 6px; cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  background: none; border-top: none; border-left: none; border-right: none;
+  transition: color .15s;
+}
+.p-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+.p-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 9px 0; border-bottom: 1px solid var(--border-faint);
+}
+.p-item:last-child { border-bottom: none; padding-bottom: 0; }
+.p-bar { width: 3px; align-self: stretch; border-radius: 2px; flex-shrink: 0; }
+.p-icon { font-size: 14px; flex-shrink: 0; margin-top: 0; width: 18px; text-align: center; }
+.p-body { flex: 1; }
+.p-title { font-size: 12px; color: var(--text-primary); margin-bottom: 2px; line-height: 1.4; }
+.p-sub {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
+  line-height: 1.4;
+}
+.p-cta {
+  display: inline-block; margin-top: 3px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: .06em; color: var(--cyan); text-transform: uppercase;
+  cursor: pointer; background: none; border: none; padding: 0;
+}
+
+/* ── FORECAST MINI ── */
+.forecast-mini {
+  display: flex; align-items: center; gap: 0;
+  background: var(--bg3); border-radius: var(--r-sm);
+  border: 1px solid var(--border-faint); margin-bottom: 12px; overflow: hidden;
+}
+.fc-block {
+  flex: 1; padding: 10px 12px; text-align: center;
+}
+.fc-block + .fc-block { border-left: 1px solid var(--border-faint); }
+.fc-val {
+  font-family: var(--font-mono); font-size: 15px; font-weight: 600;
+  color: var(--text-primary);
+}
+.fc-lbl {
+  font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .06em; margin-top: 2px;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.pf, .live-panel, .kpi {
+  animation: fade-up .3s ease forwards;
+}
+.kpi:nth-child(1) { animation-delay: .04s; }
+.kpi:nth-child(2) { animation-delay: .08s; }
+.kpi:nth-child(3) { animation-delay: .12s; }
+.kpi:nth-child(4) { animation-delay: .16s; }
+.kpi:nth-child(5) { animation-delay: .20s; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header class="hdr">
+  <span class="wordmark">ProjectHUD</span>
+  <div class="hdr-sep"></div>
+  <span class="page-title">COMPASS · MEETINGS</span>
+  <div class="hdr-right">
+    <span class="hdr-date">TUE MAY 19 2026</span>
+    <span class="hdr-clock" id="clock">9:47 AM</span>
+    <div class="avatar-hdr" title="Bram W.">BW</div>
+  </div>
+</header>
+
+<!-- ══ KPI STRIP ══ -->
+<div class="kpi-strip">
+  <div class="kpi">
+    <div class="kpi-bar" style="background:var(--cyan)"></div>
+    <div class="lbl">Meetings Today</div>
+    <div class="kpi-val" style="color:var(--text-primary)">5</div>
+    <div class="kpi-sub">3 remaining</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-bar" style="background:var(--amber)"></div>
+    <div class="lbl">Live Now</div>
+    <div class="kpi-val" style="color:var(--amber)">1</div>
+    <div class="kpi-sub" style="color:var(--amber)" id="kpi-rem">13m remaining</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-bar" style="background:var(--cyan)"></div>
+    <div class="lbl">Next Meeting</div>
+    <div class="kpi-val" style="color:var(--text-primary)">58<span style="font-size:14px;font-weight:500;color:var(--text-muted)">m</span></div>
+    <div class="kpi-sub">Brightwater Sync</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-bar" style="background:var(--rose)"></div>
+    <div class="lbl">Actions Due Today</div>
+    <div class="kpi-val" style="color:var(--rose)">7</div>
+    <div class="kpi-sub">3 on critical path</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-bar" style="background:var(--amber)"></div>
+    <div class="lbl">CP Health</div>
+    <div class="kpi-val" style="color:var(--amber)">87<span style="font-size:14px;font-weight:500;color:var(--text-muted)">%</span></div>
+    <div class="kpi-sub">↓3 pts since Mon</div>
+  </div>
+</div>
+
+<!-- ══ MAIN GRID ══ -->
+<main class="main">
+
+<!-- ── LEFT COL ── -->
+<div class="col-l">
+
+  <!-- ① JOIN NOW (live meeting) -->
+  <div class="live-panel">
+    <div class="live-glow"></div>
+    <div class="live-hdr">
+      <div class="pulse-dot"></div>
+      <span class="live-badge">Live Now</span>
+      <span class="live-workstream" style="margin-left:8px">Brightwater · Q2 workstream</span>
+      <div class="live-timer">
+        <span class="hi" id="rem-lbl">13m left</span>&nbsp;·&nbsp;started 9:30
+      </div>
+    </div>
+    <div class="live-body">
+      <div class="mtg-title-live">Q2 Product Strategy Review</div>
+      <div class="mtg-meta">DS-005 context · DC-02 decision queued · risk register refs AX-1, AX-2</div>
+
+      <div class="prog-row">
+        <div class="prog-track">
+          <div class="prog-fill" id="live-prog" style="width:57%"></div>
+        </div>
+        <span class="prog-lbl" id="prog-lbl">57% · 17m of 30m</span>
+      </div>
+
+      <div class="att-row">
+        <div class="av av-late"  title="Tom Holsten — late">TH</div>
+        <div class="av av-ok"   title="Amara Diallo — connected">AM</div>
+        <div class="av av-ok"   title="Priya Rao — connected">PR</div>
+        <div class="av av-ok"   title="Ren Nakamura — connected">RN</div>
+        <div class="av av-ok"   title="Saoirse Flynn — connected">SF</div>
+        <div class="av av-more">+2</div>
+        <span class="att-names">Tom (late) · Amara · Priya · Ren · Saoirse</span>
+        <div class="conn-state">
+          <div class="conn-dot" style="background:var(--amber)"></div>
+          <span>6/8 live</span>
+        </div>
+      </div>
+
+      <div class="flash">
+        <span class="flash-icon">⚡</span>
+        <span class="flash-text">Tom has an unresolved dissent on DS-005 — the decision this meeting derives from. Pattern: he surfaces it when in the room. 2 days to auto-escalation threshold.</span>
+        <button class="flash-cta" onclick="alert('Opening DS-005 dissent thread…')">PULL THREAD →</button>
+      </div>
+
+      <button class="join-btn" onclick="alert('Connecting to Q2 Product Strategy Review…')">JOIN NOW →</button>
+    </div>
+  </div>
+
+  <!-- ② DO NEXT (next meeting) -->
+  <div class="pf next-panel">
+    <div class="ph">
+      <span class="lbl">Next Up — Do Next</span>
+      <span class="mono" style="font-size:11px;color:var(--cyan)" id="next-countdown">in 58m · 11:00 AM</span>
+    </div>
+
+    <div class="mtg-title-next">Brightwater Client Sync</div>
+    <div class="mtg-meta" style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-bottom:10px">
+      60 min · External · Tom Holsten (client) · 5 attendees · Room: Conf B
+    </div>
+
+    <div class="flash flash-cyan">
+      <span class="flash-icon">⚡</span>
+      <span class="flash-text">DS-005 dissent (Tom) unqueried — he's the client on this call. Brief window before 11:00. This is the highest-leverage prep action.</span>
+      <button class="flash-cta" onclick="alert('Opening DS-005 for pre-read…')">PULL DS-005 →</button>
+    </div>
+
+    <div class="next-actions">
+      <button class="outline-btn" onclick="alert('Opening agenda…')">View Agenda →</button>
+      <button class="outline-btn outline-btn-muted" onclick="alert('Opening briefing pack…')">Briefing Pack</button>
+      <button class="outline-btn outline-btn-muted" onclick="alert('Attendee details…')">Attendees</button>
+    </div>
+  </div>
+
+  <!-- ③ WHAT'S LEFT (open items) -->
+  <div class="pf">
+    <div class="ph">
+      <span class="lbl">Open Items — What's Left Today</span>
+      <span class="ph-count">7</span>
+    </div>
+
+    <ul class="action-list">
+
+      <li class="ai-row">
+        <div class="ai-bar" style="background:var(--rose)"></div>
+        <span class="ai-id">AX-1</span>
+        <div class="ai-body">
+          <div class="ai-text">Publish dual-rail rate cards</div>
+          <div class="ai-tags">
+            <span class="tag tag-cp">Critical Path</span>
+            <span class="tag tag-due">Due EOD</span>
+            <span class="tag-owner">You</span>
+          </div>
+          <div class="ai-prov">Derives from DC-01 · ratified Apr 28, 8-yes/0-no/1-abstain · 3 tasks unblock on completion</div>
+        </div>
+        <div class="ai-right">
+          <div class="ai-due" style="color:var(--rose)">EOD</div>
+          <div class="ai-float">0d float</div>
+        </div>
+      </li>
+
+      <li class="ai-row">
+        <div class="ai-bar" style="background:var(--amber)"></div>
+        <span class="ai-id">AX-2</span>
+        <div class="ai-body">
+          <div class="ai-text">Brightwater P2 proposal draft</div>
+          <div class="ai-tags">
+            <span class="tag tag-cp">Critical Path</span>
+            <span class="tag tag-due">Due EOD</span>
+            <span class="tag-owner">You</span>
+          </div>
+          <div class="ai-prov">Derives from DC-01, DC-02 · Brightwater team 110% allocated against CP · 3h float</div>
+        </div>
+        <div class="ai-right">
+          <div class="ai-due" style="color:var(--amber)">EOD</div>
+          <div class="ai-float">3h float</div>
+        </div>
+      </li>
+
+      <li class="ai-row">
+        <div class="ai-bar" style="background:var(--cyan)"></div>
+        <span class="ai-id">DC-02</span>
+        <div class="ai-body">
+          <div class="ai-text">Risk tier approval — declare your belief</div>
+          <div class="ai-tags">
+            <span class="tag tag-dec">Decision</span>
+            <span class="tag-owner">Your input awaited 2d</span>
+          </div>
+          <div class="ai-prov">3 yes · 1 abstain · ratification paused pending your belief declaration</div>
+        </div>
+        <div class="ai-right">
+          <div class="ai-due" style="color:var(--cyan);cursor:pointer" onclick="alert('Opening DC-02 belief form…')">DECLARE →</div>
+        </div>
+      </li>
+
+      <li class="ai-row">
+        <div class="ai-bar" style="background:var(--rose)"></div>
+        <span class="ai-id">AX-6</span>
+        <div class="ai-body">
+          <div class="ai-text">Update integration manifest</div>
+          <div class="ai-tags">
+            <span class="tag tag-block">Blocked</span>
+            <span class="tag-owner">Onomura</span>
+          </div>
+          <div class="ai-prov">Onomura dissented on DC-02 · now blocked on work derived from that decision · revisit?</div>
+        </div>
+        <div class="ai-right">
+          <div class="ai-due" style="color:var(--rose)">BLOCKED</div>
+        </div>
+      </li>
+
+      <li class="ai-row">
+        <div class="ai-bar" style="background:var(--border-mid)"></div>
+        <span class="ai-id">AX-5</span>
+        <div class="ai-body">
+          <div class="ai-text">Finalize pricing model for Phase 2</div>
+          <div class="ai-tags">
+            <span class="tag tag-cp">Critical Path</span>
+            <span class="tag tag-float">2d float</span>
+            <span class="tag-owner">Aiyana</span>
+          </div>
+          <div class="ai-prov">Derives from DC-01 · limited slack · Aiyana at capacity with AX-2</div>
+        </div>
+        <div class="ai-right">
+          <div class="ai-due" style="color:var(--text-secondary)">Fri</div>
+          <div class="ai-float">2d float</div>
+        </div>
+      </li>
+
+    </ul>
+
+    <button class="more-link" onclick="alert('Showing all 7 items…')">+ 2 more items — show all 7 →</button>
+  </div>
+
+</div><!-- /col-l -->
+
+<!-- ── RIGHT COL ── -->
+<div class="col-r">
+
+  <!-- TODAY'S SCHEDULE -->
+  <div class="pf">
+    <div class="ph">
+      <span class="lbl">Today's Schedule</span>
+      <span class="mono" style="font-size:10px;color:var(--text-muted)">May 19</span>
+    </div>
+
+    <div class="timeline">
+
+      <!-- 9:00 — Standup DONE -->
+      <div class="t-row">
+        <div class="t-time" style="color:var(--text-faint)">9:00</div>
+        <div class="t-axis">
+          <div class="t-dot t-dot-done"></div>
+          <div class="t-line"></div>
+        </div>
+        <div class="t-block tb-done">
+          <div class="tb-title">Weekly Standup</div>
+          <div class="tb-meta">9:00–9:30 · 30m · done ✓</div>
+        </div>
+      </div>
+
+      <!-- 9:30 — Q2 Strategy LIVE -->
+      <div class="t-row">
+        <div class="t-time" style="color:var(--amber)">9:30</div>
+        <div class="t-axis">
+          <div class="t-dot t-dot-live"></div>
+          <div class="t-line" style="background:rgba(240,160,32,.2)"></div>
+        </div>
+        <div class="t-block tb-live">
+          <div class="tb-title" style="color:var(--amber)">Q2 Product Strategy Review</div>
+          <div class="tb-meta" style="color:rgba(240,160,32,.6)" id="tb-meta-live">9:30–10:00 · LIVE · 13m left</div>
+        </div>
+      </div>
+
+      <!-- NOW MARKER -->
+      <div class="now-marker">
+        <div></div>
+        <div class="now-tick"></div>
+        <div class="now-label" id="now-lbl">NOW · 9:47 AM</div>
+      </div>
+
+      <!-- 11:00 — Brightwater NEXT -->
+      <div class="t-row">
+        <div class="t-time" style="color:var(--cyan)">11:00</div>
+        <div class="t-axis">
+          <div class="t-dot t-dot-next"></div>
+          <div class="t-line"></div>
+        </div>
+        <div class="t-block tb-next">
+          <div class="tb-title" style="color:var(--cyan)">Brightwater Client Sync</div>
+          <div class="tb-meta">11:00–12:00 · 60m · External · DS-005</div>
+        </div>
+      </div>
+
+      <!-- 2:00 — Eng Review -->
+      <div class="t-row">
+        <div class="t-time">2:00</div>
+        <div class="t-axis">
+          <div class="t-dot"></div>
+          <div class="t-line"></div>
+        </div>
+        <div class="t-block tb-up">
+          <div class="tb-title">Engineering Review</div>
+          <div class="tb-meta">2:00–2:30 · 30m · Internal · 4 att</div>
+        </div>
+      </div>
+
+      <!-- 3:30 — Risk Review -->
+      <div class="t-row">
+        <div class="t-time">3:30</div>
+        <div class="t-axis">
+          <div class="t-dot"></div>
+          <div class="t-line" style="min-height:0"></div>
+        </div>
+        <div class="t-block tb-up">
+          <div class="tb-title">Risk Register Review</div>
+          <div class="tb-meta">3:30–4:30 · 60m · AX-6 · DS-005 context</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ④ PRESSURE REPORT (concerns) -->
+  <div class="pf">
+    <div class="ph">
+      <span class="lbl">Pressure Report</span>
+    </div>
+
+    <div class="p-tabs">
+      <button class="p-tab active" id="tab-w" onclick="presTab('w')">This Week</button>
+      <button class="p-tab" id="tab-m" onclick="presTab('m')">This Month</button>
+    </div>
+
+    <!-- WEEK PANE -->
+    <div id="pane-w">
+
+      <div class="p-item">
+        <div class="p-bar" style="background:var(--amber)"></div>
+        <span class="p-icon" style="color:var(--amber)">⚡</span>
+        <div class="p-body">
+          <div class="p-title">DS-005 dissent unresolved — 19 days</div>
+          <div class="p-sub">Tom joins Brightwater call at 11 AM. Pattern says he surfaces this in the room. Pull the thread before.</div>
+          <button class="p-cta" onclick="alert('Opening DS-005 thread…')">Pull DS-005 →</button>
+        </div>
+      </div>
+
+      <div class="p-item">
+        <div class="p-bar" style="background:var(--rose)"></div>
+        <span class="p-icon" style="color:var(--rose)">⛔</span>
+        <div class="p-body">
+          <div class="p-title">AX-6 blocked → downstream CP exposure</div>
+          <div class="p-sub">AX-1 depends on AX-6. Onomura dissented on DC-02 and is now blocked on its derived work.</div>
+          <button class="p-cta" onclick="alert('Opening DC-02…')">View DC-02 →</button>
+        </div>
+      </div>
+
+      <div class="p-item">
+        <div class="p-bar" style="background:var(--amber)"></div>
+        <span class="p-icon" style="color:var(--amber)">⚠</span>
+        <div class="p-body">
+          <div class="p-title">Brightwater P2: 0 drafts, deadline in 3 days</div>
+          <div class="p-sub">AX-2 is yours. 3h float. Brightwater team at 110% allocation on critical path work.</div>
+        </div>
+      </div>
+
+      <div class="p-item">
+        <div class="p-bar" style="background:var(--border-mid)"></div>
+        <span class="p-icon" style="color:var(--text-muted)">◈</span>
+        <div class="p-body">
+          <div class="p-title">Resource pressure: Brightwater team 110%</div>
+          <div class="p-sub">AX-2 (you) and AX-5 (Aiyana) both at risk. Two CP actions with limited slack under capacity strain.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- MONTH PANE -->
+    <div id="pane-m" style="display:none">
+
+      <div class="forecast-mini">
+        <div class="fc-block">
+          <div class="fc-val">Jun 14</div>
+          <div class="fc-lbl">P50 Complete</div>
+        </div>
+        <div class="fc-block">
+          <div class="fc-val" style="color:var(--amber)">Jun 28</div>
+          <div class="fc-lbl">P80 Complete</div>
+        </div>
+        <div class="fc-block">
+          <div class="fc-val">8d</div>
+          <div class="fc-lbl">Schedule Float</div>
+        </div>
+      </div>
+
+      <div class="p-item">
+        <div class="p-bar" style="background:var(--rose)"></div>
+        <span class="p-icon" style="color:var(--rose)">⏱</span>
+        <div class="p-body">
+          <div class="p-title">DS-005 dissent threshold: 19 of 21 days</div>
+          <div class="p-sub">Auto-escalation fires at 21d. Two days to resolve or formally acknowledge. Dissent log required.</div>
+          <button class="p-cta" onclick="alert('Opening dissent log…')">View Dissent Log →</button>
+        </div>
+      </div>
+
+      <div class="p-item">
+        <div class="p-bar" style="background:var(--amber)"></div>
+        <span class="p-icon" style="color:var(--amber)">⚡</span>
+        <div class="p-body">
+          <div class="p-title">3 decisions pending before Jul 1 budget gate</div>
+          <div class="p-sub">DC-02 (you), DC-03 (CFO), DC-04 (Aiyana). P80 completion assumes all ratified by Jun 20.</div>
+        </div>
+      </div>
+
+      <div class="p-item">
+        <div class="p-bar" style="background:var(--cyan)"></div>
+        <span class="p-icon" style="color:var(--cyan)">◎</span>
+        <div class="p-body">
+          <div class="p-title">Belief drift detected on DC-01</div>
+          <div class="p-sub">Holsten declared high confidence Apr 28. Current team aggregate: medium. No update in 21 days. Crystal Ball flagged.</div>
+          <button class="p-cta" onclick="alert('Opening Crystal Ball…')">Crystal Ball →</button>
+        </div>
+      </div>
+
+    </div><!-- /pane-m -->
+
+  </div><!-- /pressure report -->
+
+</div><!-- /col-r -->
+
+</main>
+
+<script>
+// ── CLOCK ──
+function fmtTime(d) {
+  var h = d.getHours(), m = d.getMinutes();
+  var ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return h + ':' + String(m).padStart(2,'0') + ' ' + ap;
+}
+function tick() {
+  var now = new Date();
+  var el = document.getElementById('clock');
+  if (el) el.textContent = fmtTime(now);
+  var nl = document.getElementById('now-lbl');
+  if (nl) nl.textContent = 'NOW · ' + fmtTime(now);
+}
+tick();
+setInterval(tick, 15000);
+
+// ── LIVE MEETING PROGRESS ──
+function updateLive() {
+  var now = new Date();
+  var start = new Date(now); start.setHours(9,30,0,0);
+  var end   = new Date(now); end.setHours(10,0,0,0);
+  var total = end - start;
+  var elapsed = now - start;
+  var remain  = end - now;
+  if (remain <= 0 || elapsed <= 0) return;
+  var pct = Math.min(100, Math.round((elapsed/total)*100));
+  var remMin = Math.floor(remain/60000);
+  var remSec = Math.floor((remain%60000)/1000);
+  var elMin  = Math.floor(elapsed/60000);
+  var remStr = remMin > 0 ? remMin+'m '+remSec+'s left' : remSec+'s left';
+  var kpiStr = remMin > 0 ? remMin+'m remaining' : 'ending…';
+  var tabStr = '9:30–10:00 · LIVE · '+(remMin > 0 ? remMin+'m left' : 'ending');
+
+  var lp = document.getElementById('live-prog');
+  var pl = document.getElementById('prog-lbl');
+  var rl = document.getElementById('rem-lbl');
+  var kr = document.getElementById('kpi-rem');
+  var tb = document.getElementById('tb-meta-live');
+  if (lp) lp.style.width = pct + '%';
+  if (pl) pl.textContent = pct+'% · '+elMin+'m of 30m';
+  if (rl) rl.textContent = remStr;
+  if (kr) kr.textContent = kpiStr;
+  if (tb) tb.textContent = tabStr;
+}
+updateLive();
+setInterval(updateLive, 1000);
+
+// ── NEXT MEETING COUNTDOWN ──
+function updateNext() {
+  var now = new Date();
+  var next = new Date(now); next.setHours(11,0,0,0);
+  var diff = next - now;
+  if (diff <= 0) return;
+  var h = Math.floor(diff/3600000);
+  var m = Math.floor((diff%3600000)/60000);
+  var str = h > 0 ? 'in '+h+'h '+m+'m · 11:00 AM' : 'in '+m+'m · 11:00 AM';
+  var el = document.getElementById('next-countdown');
+  if (el) el.textContent = str;
+}
+updateNext();
+setInterval(updateNext, 30000);
+
+// ── PRESSURE TABS ──
+function presTab(tab) {
+  ['w','m'].forEach(function(t) {
+    document.getElementById('tab-'+t).classList.toggle('active', t === tab);
+    document.getElementById('pane-'+t).style.display = t === tab ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>

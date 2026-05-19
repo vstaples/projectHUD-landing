@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accord — Meeting Desk</title>
+  <style>
+    :root{
+      --bg:#f5f1e9;
+      --paper:#fffaf1;
+      --paper2:#fbf2e4;
+      --ink:#202622;
+      --muted:#6e756f;
+      --faint:#9b9489;
+      --line:#ded4c6;
+      --line2:#ece2d5;
+      --green:#285f4d;
+      --green2:#dbe9e2;
+      --amber:#b66c1f;
+      --amber2:#f8e1c2;
+      --red:#963d32;
+      --red2:#f2d8d3;
+      --blue:#3f607b;
+      --blue2:#deebf3;
+      --shadow:0 24px 70px rgba(50,39,25,.14);
+      --shadow2:0 12px 32px rgba(50,39,25,.08);
+      --radius:28px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%,rgba(255,255,255,.9),transparent 30%),
+        radial-gradient(circle at 82% 5%,rgba(40,95,77,.15),transparent 28%),
+        linear-gradient(135deg,#f8f3eb 0%,#eee5d9 62%,#f7efe5 100%);
+      overflow:hidden;
+    }
+    .shell{height:100vh; padding:24px; display:grid; grid-template-rows:auto 1fr; gap:18px; max-width:1680px; margin:0 auto;}
+    .topbar{display:flex; align-items:center; justify-content:space-between; gap:18px;}
+    .brand{display:flex; align-items:center; gap:13px; min-width:270px;}
+    .mark{width:48px;height:48px;border-radius:17px;background:linear-gradient(135deg,#1f4f40,#73917d);color:#fff;display:grid;place-items:center;font-weight:950;font-size:23px;box-shadow:0 16px 34px rgba(40,95,77,.24)}
+    h1{margin:0;font-size:24px;letter-spacing:-.05em}.brand p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+    .command{height:48px; flex:1; max-width:720px; border:1px solid var(--line); background:rgba(255,250,241,.75); border-radius:999px; display:flex; align-items:center; padding:0 18px; color:var(--muted); font-size:14px; box-shadow:var(--shadow2)}
+    .top-actions{display:flex; gap:10px; align-items:center;}
+    button{border:0;border-radius:999px;padding:12px 17px;font-weight:850;background:var(--ink);color:#fff;cursor:pointer;box-shadow:var(--shadow2)}
+    .ghost{background:rgba(255,250,241,.76);color:var(--ink);border:1px solid var(--line);box-shadow:none}
+
+    .layout{min-height:0; display:grid; grid-template-columns:1.05fr .86fr .84fr; grid-template-rows:1fr; gap:18px;}
+    .col{min-height:0; display:grid; gap:18px;}
+    .left{grid-template-rows:1.08fr .92fr}.middle{grid-template-rows:1fr 1fr}.right{grid-template-rows:.98fr 1.02fr}
+    .card{background:rgba(255,250,241,.82);border:1px solid rgba(222,212,198,.92);border-radius:var(--radius);box-shadow:var(--shadow);backdrop-filter:blur(16px);overflow:hidden;min-height:0;}
+    .pad{padding:20px;}
+    .title{display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:14px;}
+    .title h2{margin:0;font-size:16px;letter-spacing:-.035em}.title p{margin:4px 0 0;color:var(--muted);font-size:12.5px;line-height:1.35}.pill{white-space:nowrap;font-size:11.5px;font-weight:900;padding:7px 10px;border-radius:999px;background:var(--line2);color:#565c56}.pill.green{background:var(--green2);color:var(--green)}.pill.amber{background:var(--amber2);color:#805016}.pill.red{background:var(--red2);color:var(--red)}.pill.blue{background:var(--blue2);color:var(--blue)}
+
+    .live{position:relative;background:linear-gradient(135deg,rgba(31,78,64,.98),rgba(82,111,95,.92));color:#fff;border-radius:30px;padding:24px;box-shadow:0 30px 80px rgba(31,78,64,.24);overflow:hidden;min-height:0;display:flex;flex-direction:column;justify-content:space-between;}
+    .live:after{content:"";position:absolute;right:-80px;bottom:-120px;width:310px;height:310px;border:42px solid rgba(255,255,255,.08);border-radius:50%}
+    .live-top{position:relative;z-index:1;display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.14em;opacity:.77;font-weight:950}.live h2{font-size:35px;letter-spacing:-.065em;line-height:1.03;margin:10px 0 10px;max-width:650px}.meta{display:flex;gap:10px;flex-wrap:wrap;font-size:13px;color:rgba(255,255,255,.84)}
+    .timer{min-width:146px;text-align:center;padding:14px;border-radius:24px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.2)}.timer strong{font-size:32px;display:block;letter-spacing:-.05em}.timer span{font-size:12px;font-weight:850;opacity:.77}
+    .live-actions{position:relative;z-index:1;display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.live-actions button{background:#fff;color:var(--green);box-shadow:none}.live-actions .trans{background:rgba(255,255,255,.13);color:#fff;border:1px solid rgba(255,255,255,.22)}
+    .needs{position:relative;z-index:1;margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.need{padding:12px 13px;border-radius:19px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14)}.need b{display:block;font-size:20px;margin-bottom:2px}.need span{display:block;font-size:12px;line-height:1.3;opacity:.84}
+
+    .lineup{display:flex;flex-direction:column;gap:9px}.meeting{display:grid;grid-template-columns:64px 1fr auto;gap:11px;align-items:center;padding:12px 13px;border-radius:19px;background:rgba(255,255,255,.58);border:1px solid rgba(222,212,198,.8)}.time{font-size:13px;font-weight:950;color:#4d534e}.meeting h3{font-size:14px;margin:0 0 3px;letter-spacing:-.025em}.meeting p{margin:0;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px}.flag{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(40,95,77,.12)}.flag.amber{background:var(--amber);box-shadow:0 0 0 5px rgba(182,108,31,.13)}.flag.red{background:var(--red);box-shadow:0 0 0 5px rgba(150,61,50,.12)}
+
+    .prep-list,.minutes-list,.brief-list{display:flex;flex-direction:column;gap:11px}.prep,.minute,.brief{padding:15px;border-radius:21px;background:rgba(255,255,255,.6);border:1px solid rgba(222,212,198,.84)}.row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.prep h3,.minute h3,.brief h3{margin:0;font-size:14.5px;letter-spacing:-.03em}.prep p,.minute p,.brief p{margin:5px 0 0;color:var(--muted);font-size:12.4px;line-height:1.35}.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.chip{font-size:11px;font-weight:850;padding:6px 8px;border-radius:999px;background:var(--line2);color:#545b55}.chip.red{background:var(--red2);color:var(--red)}.chip.amber{background:var(--amber2);color:#805016}.chip.green{background:var(--green2);color:var(--green)}
+    .meter{height:8px;background:#ece2d6;border-radius:99px;overflow:hidden;margin-top:12px}.bar{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--green),#93aa95);width:76%}.w44{width:44%;background:linear-gradient(90deg,var(--amber),#d9a66b)}.w20{width:20%;background:linear-gradient(90deg,var(--red),#cb786e)}
+    .minute{display:grid;grid-template-columns:1fr auto;gap:12px}.age{align-self:center;font-size:25px;font-weight:950;letter-spacing:-.06em;color:var(--red)}.age.ok{color:var(--green)}
+    .brief{background:linear-gradient(135deg,rgba(255,255,255,.74),rgba(245,236,223,.7))}.brief strong{color:var(--green)}
+    .deskbar{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}.desk{padding:12px;border-radius:18px;background:rgba(255,255,255,.58);border:1px solid rgba(222,212,198,.84)}.desk b{display:block;font-size:22px;letter-spacing:-.05em}.desk span{display:block;color:var(--muted);font-size:11.5px;line-height:1.25}
+
+    @media(max-width:1200px){body{overflow:auto}.shell{height:auto}.layout{grid-template-columns:1fr}.col{grid-template-rows:auto}.command{display:none}.meeting p{max-width:65vw}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><div class="mark">A</div><div><h1>Accord</h1><p>Meeting desk · Tuesday, May 19</p></div></div>
+      <div class="command">Search people, meetings, minutes, agenda items, decisions, actions, or attachments…</div>
+      <div class="top-actions"><button class="ghost">Draft Minutes</button><button>Start Meeting</button></div>
+    </header>
+
+    <section class="layout">
+      <div class="col left">
+        <section class="live">
+          <div>
+            <div class="live-top">
+              <div>
+                <div class="eyebrow">Live priority</div>
+                <h2>Capital Program Steering starts in 08 minutes</h2>
+                <div class="meta"><span>Boardroom B + Teams</span><span>·</span><span>14 attendees</span><span>·</span><span>minutes shell ready</span></div>
+              </div>
+              <div class="timer"><strong>08:12</strong><span>until start</span></div>
+            </div>
+            <div class="live-actions"><button>Join + Open Meeting Desk</button><button class="trans">Prep Brief</button><button class="trans">Prior Minutes</button></div>
+          </div>
+          <div class="needs">
+            <div class="need"><b>1</b><span>budget note still missing</span></div>
+            <div class="need"><b>3</b><span>open actions likely to be discussed</span></div>
+            <div class="need"><b>Ready</b><span>agenda, attendees, and template aligned</span></div>
+          </div>
+        </section>
+
+        <section class="card pad">
+          <div class="title"><div><h2>Today’s lineup</h2><p>One-line scan of the day, with attention drawn only where action is needed.</p></div><span class="pill green">6 total</span></div>
+          <div class="lineup">
+            <div class="meeting"><div class="time">9:00</div><div><h3>Vendor Readiness Review</h3><p>complete · minutes circulated · no follow-up needed</p></div><span class="pill green">done</span></div>
+            <div class="meeting"><div class="time">10:30</div><div><h3>Capital Program Steering</h3><p>starts soon · budget note missing · join link ready</p></div><span class="flag amber"></span></div>
+            <div class="meeting"><div class="time">12:00</div><div><h3>Circulation window</h3><p>best open slot to release 3 completed minute packets</p></div><span class="pill amber">suggested</span></div>
+            <div class="meeting"><div class="time">1:15</div><div><h3>Risk Register Working Session</h3><p>not ready · owner comments and heatmap missing</p></div><span class="flag red"></span></div>
+            <div class="meeting"><div class="time">3:00</div><div><h3>Executive Decision Review</h3><p>prep memo incomplete · two assumptions need backup</p></div><span class="flag amber"></span></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="col middle">
+        <section class="card pad">
+          <div class="title"><div><h2>Preparation queue</h2><p>The work that prevents meetings from becoming messy.</p></div><span class="pill red">2 urgent</span></div>
+          <div class="prep-list">
+            <div class="prep"><div class="row"><h3>Risk Register Working Session</h3><span class="pill red">not ready</span></div><p>Missing owner comments, stale mitigation dates, and no updated risk heatmap.</p><div class="chips"><span class="chip red">Ping 3 owners</span><span class="chip red">Attach heatmap</span><span class="chip amber">Resolve dates</span></div><div class="meter"><div class="bar w20"></div></div></div>
+            <div class="prep"><div class="row"><h3>Executive Decision Review</h3><span class="pill amber">needs polish</span></div><p>Memo exists, but the rationale is thin and two assumptions are unsupported.</p><div class="chips"><span class="chip amber">Add evidence</span><span class="chip amber">Clarify recommendation</span></div><div class="meter"><div class="bar w44"></div></div></div>
+            <div class="prep"><div class="row"><h3>Capital Program Steering</h3><span class="pill green">nearly ready</span></div><p>Agenda, prior minutes, and action register are ready. One budget note remains.</p><div class="chips"><span class="chip green">Agenda ready</span><span class="chip green">Template ready</span><span class="chip amber">Budget note</span></div><div class="meter"><div class="bar"></div></div></div>
+          </div>
+        </section>
+
+        <section class="card pad">
+          <div class="title"><div><h2>Briefing assistance</h2><p>Plain-language guidance before you walk into the room.</p></div><span class="pill blue">assistant</span></div>
+          <div class="brief-list">
+            <div class="brief"><h3>For your next meeting</h3><p><strong>Ask Finance</strong> for the latest capital variance, confirm whether Legal accepted the revised wording, and be ready to explain why Action A-332 remains blocked.</p></div>
+            <div class="brief"><h3>Suggested agenda adjustment</h3><p>Move “budget variance” ahead of “vendor acceleration.” The budget question is blocking the main decision.</p></div>
+            <div class="brief"><h3>Best use of your 12:00 opening</h3><p>Circulate the three completed minute packets before the afternoon meetings create another backlog.</p></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="col right">
+        <section class="card pad">
+          <div class="title"><div><h2>Minutes awaiting circulation</h2><p>The backlog that needs your review, cleanup, or release.</p></div><span class="pill red">7 pending</span></div>
+          <div class="minutes-list">
+            <div class="minute"><div><h3>Facilities Weekly Sync</h3><p>Decision wording needs cleanup before sending to attendees.</p></div><div class="age">2d</div></div>
+            <div class="minute"><div><h3>Procurement Review</h3><p>Legal comment unresolved; vendor action owner missing.</p></div><div class="age">1d</div></div>
+            <div class="minute"><div><h3>PMO Standup</h3><p>Ready to send. No unresolved comments detected.</p></div><div class="age ok">✓</div></div>
+            <div class="minute"><div><h3>Schedule Reset</h3><p>Needs final action-owner check before circulation.</p></div><div class="age">6h</div></div>
+          </div>
+        </section>
+
+        <section class="card pad">
+          <div class="title"><div><h2>At-a-glance workload</h2><p>A quiet summary of what deserves attention today.</p></div><span class="pill">desk view</span></div>
+          <div class="deskbar">
+            <div class="desk"><b>1</b><span>meeting starting soon</span></div>
+            <div class="desk"><b>3</b><span>prep tasks before 1:15</span></div>
+            <div class="desk"><b>7</b><span>minute packets pending</span></div>
+            <div class="desk"><b>2</b><span>items blocked by owners</span></div>
+          </div>
+          <div style="height:14px"></div>
+          <div class="brief"><h3>Accord recommendation</h3><p>Do not open the full archive now. Your highest-value move is to finish the Capital Program budget note, then use the noon window to circulate ready minutes.</p></div>
+          <div style="height:11px"></div>
+          <div class="brief"><h3>What can wait</h3><p>The archive cleanup and tomorrow’s recurring agenda maintenance are safe to defer until after today’s executive review.</p></div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

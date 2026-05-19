@@ -1,0 +1,326 @@
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f1219;font-family:'Outfit',system-ui,sans-serif;color:#dce6f5;font-size:15px;line-height:1.5}
+.shell{display:flex;flex-direction:column;min-height:700px;background:#0f1219}
+.topbar{display:flex;align-items:center;gap:16px;padding:0 24px;height:52px;background:#141824;border-bottom:1px solid #1e2438;flex-shrink:0}
+.brand{font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:#dce6f5;letter-spacing:-.02em;flex-shrink:0}
+.brand span{color:#00D2FF}
+.search{flex:1;max-width:480px;background:#1e2438;border:1px solid #252d44;border-radius:8px;padding:8px 16px;display:flex;align-items:center;gap:10px;color:#4a5670;font-size:14px;cursor:text}
+.search i{font-size:16px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.date{font-size:14px;color:#7a8a9a}
+.avatar{width:32px;height:32px;border-radius:50%;background:#152c54;color:#4a8cf5;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+
+.body{display:flex;flex-direction:column;gap:20px;padding:24px;flex:1}
+
+.hero{background:#141824;border:1px solid #1e2438;border-radius:12px;padding:28px 32px;display:flex;align-items:flex-start;gap:40px}
+.hero-left{flex:1;min-width:0}
+.hero-eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7a8a9a;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#48aa88;flex-shrink:0}
+.hero-title{font-size:26px;font-weight:600;color:#dce6f5;line-height:1.2;margin-bottom:8px}
+.hero-sub{font-size:15px;color:#8899b2;margin-bottom:20px}
+.hero-signals{display:flex;flex-direction:column;gap:8px;margin-bottom:24px}
+.signal{display:flex;align-items:center;gap:10px;font-size:14px;padding:10px 14px;border-radius:7px;background:#1e2438;border-left:3px solid transparent}
+.sig--warn{border-left-color:#e89430;color:#dce6f5}
+.sig--warn .sig-icon{color:#e89430}
+.sig--ok{border-left-color:#48aa88;color:#dce6f5}
+.sig--ok .sig-icon{color:#48aa88}
+.sig-icon{font-size:16px;flex-shrink:0}
+.sig-text{flex:1}
+.hero-actions{display:flex;gap:10px}
+.btn-primary{padding:11px 24px;border-radius:7px;background:rgba(0,210,255,.10);border:1px solid rgba(0,210,255,.3);color:#00D2FF;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:.01em}
+.btn-secondary{padding:11px 24px;border-radius:7px;background:transparent;border:1px solid #252d44;color:#8899b2;font-size:15px;font-weight:500;cursor:pointer;font-family:inherit}
+.hero-right{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;gap:4px}
+.countdown-lbl{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#7a8a9a;text-align:right}
+.countdown{font-size:52px;font-weight:700;color:#00D2FF;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.countdown-sub{font-size:13px;color:#7a8a9a;text-align:right}
+.live-badge{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 12px;border-radius:4px;background:rgba(72,170,136,.12);color:#48aa88;border:1px solid rgba(72,170,136,.25);margin-bottom:8px}
+
+.mid-row{display:flex;gap:16px}
+.card{background:#141824;border:1px solid #1e2438;border-radius:10px;padding:20px 22px;flex:1}
+.card-hdr{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.card-title{font-size:12px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:#7a8a9a;flex:1}
+.card-count{font-size:12px;font-weight:700;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.cnt-red{background:rgba(224,82,82,.15);color:#e05252}
+.cnt-amber{background:rgba(232,148,48,.15);color:#e89430}
+.cnt-cyan{background:rgba(0,210,255,.12);color:#00D2FF}
+.action-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.action-row:last-child{border-bottom:none;padding-bottom:0}
+.action-row:first-of-type{padding-top:0}
+.badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;border:1px solid;white-space:nowrap;flex-shrink:0;margin-top:3px;letter-spacing:.03em}
+.b-ax{color:#e89430;background:rgba(232,148,48,.08);border-color:rgba(232,148,48,.25)}
+.b-dc{color:#8b6ef5;background:rgba(139,110,245,.08);border-color:rgba(139,110,245,.25)}
+.b-rk{color:#e05252;background:rgba(224,82,82,.08);border-color:rgba(224,82,82,.22)}
+.b-nt{color:#48aa88;background:rgba(72,170,136,.08);border-color:rgba(72,170,136,.22)}
+.action-body{flex:1;min-width:0}
+.action-text{font-size:14px;color:#dce6f5;line-height:1.4;margin-bottom:3px}
+.action-meta{font-size:12px;color:#7a8a9a}
+.action-due-red{color:#e05252;font-weight:600}
+.action-due-amber{color:#e89430;font-weight:600}
+.action-owner{font-size:12px;color:#4a8cf5;flex-shrink:0;margin-top:3px}
+
+.rsvp-item{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.rsvp-item:last-of-type{border-bottom:none;padding-bottom:0}
+.rsvp-item:first-of-type{padding-top:0}
+.rsvp-title{font-size:15px;font-weight:600;color:#dce6f5;margin-bottom:3px}
+.rsvp-by{font-size:12px;color:#7a8a9a;margin-bottom:10px}
+.rsvp-urgent{font-size:12px;color:#e05252;font-weight:600;margin-bottom:10px}
+.rsvp-btns{display:flex;gap:8px}
+.btn-accept{flex:1;padding:8px;border-radius:6px;background:rgba(72,170,136,.08);border:1px solid rgba(72,170,136,.22);color:#48aa88;font-size:13px;font-weight:600;text-align:center;cursor:pointer;font-family:inherit}
+.btn-decline{flex:1;padding:8px;border-radius:6px;background:rgba(224,82,82,.08);border:1px solid rgba(224,82,82,.22);color:#e05252;font-size:13px;font-weight:600;text-align:center;cursor:pointer;font-family:inherit}
+
+.thread-item{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer}
+.thread-item:last-of-type{border-bottom:none;padding-bottom:0}
+.thread-item:first-of-type{padding-top:0}
+.thread-item:hover .thread-arrow{opacity:1}
+.thread-ws-lbl{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#7a8a9a;margin-bottom:3px}
+.thread-topic{font-size:14px;font-weight:600;color:#dce6f5;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.thread-arrow{color:#4a5670;font-size:14px;margin-left:auto;opacity:0;transition:opacity .13s}
+.thread-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;border:1px solid}
+.tp-blocked{color:#e05252;border-color:rgba(224,82,82,.3);background:rgba(224,82,82,.07)}
+.tp-open{color:#e89430;border-color:rgba(232,148,48,.3);background:rgba(232,148,48,.07)}
+.tp-good{color:#48aa88;border-color:rgba(72,170,136,.3);background:rgba(72,170,136,.07)}
+.thread-chain{display:flex;align-items:center;gap:6px;font-size:12px;color:#7a8a9a}
+.chain-dot{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0}
+.cd-dc{background:rgba(139,110,245,.15);color:#8b6ef5}
+.cd-ax{background:rgba(232,148,48,.12);color:#e89430}
+.cd-rk{background:rgba(224,82,82,.12);color:#e05252}
+.cd-live{background:rgba(0,210,255,.10);color:#00D2FF;border:1px solid rgba(0,210,255,.3)}
+.chain-line{flex:1;height:1px;background:#1e2438}
+
+.health-strip{display:flex;gap:12px}
+.ws-tile{flex:1;background:#141824;border:1px solid #1e2438;border-radius:8px;padding:14px 16px;cursor:pointer;transition:border-color .12s}
+.ws-tile:hover{border-color:#252d44}
+.ws-name{font-size:14px;font-weight:600;color:#dce6f5;margin-bottom:3px}
+.ws-meta{font-size:12px;color:#7a8a9a;margin-bottom:10px}
+.ws-bar-wrap{height:5px;background:#1e2438;border-radius:3px;margin-bottom:10px}
+.ws-bar{height:5px;border-radius:3px}
+.wb-green{background:#48aa88}
+.wb-amber{background:#e89430}
+.wb-red{background:#e05252}
+.ws-stats{display:flex;gap:0}
+.ws-stat{flex:1;text-align:center;padding:4px 0;border-right:1px solid #1e2438}
+.ws-stat:last-child{border-right:none}
+.ws-stat-val{font-size:16px;font-weight:700;line-height:1}
+.ws-stat-lbl{font-size:10px;color:#7a8a9a;text-transform:uppercase;letter-spacing:.06em}
+.wv-dc{color:#8b6ef5}
+.wv-ax{color:#e89430}
+.wv-rk{color:#e05252}
+
+.ai-bar{border-top:1px solid #1e2438;padding:12px 24px;background:#141824;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.ai-input{flex:1;background:#1e2438;border:1px solid #252d44;border-radius:8px;padding:10px 16px;font-size:14px;color:#dce6f5;font-family:inherit;outline:none}
+.ai-input::placeholder{color:#4a5670}
+.ai-btn{padding:10px 20px;background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.25);border-radius:7px;color:#00D2FF;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+.ai-icon{color:#00D2FF;font-size:18px;flex-shrink:0}
+</style>
+
+<div class="shell">
+<div class="topbar">
+  <div class="brand">Acc<span>.</span></div>
+  <div class="search"><i class="ti ti-search"></i>Search decisions, owners, commitments, minutes…</div>
+  <div class="topbar-right">
+    <div class="date">Tuesday · May 19</div>
+    <div class="avatar">VS</div>
+  </div>
+</div>
+
+<div class="body">
+
+  <div class="hero">
+    <div class="hero-left">
+      <div class="hero-eyebrow"><span class="live-dot"></span>Live session in progress</div>
+      <div class="hero-title">C-11 Percolate Smoke Test Meeting</div>
+      <div class="hero-sub">C-11 Test Workstream · Started at 10:22 AM</div>
+      <div class="hero-signals">
+        <div class="signal sig--ok">
+          <i class="ti ti-check sig-icon"></i>
+          <div class="sig-text">12 nodes captured · 2 decisions sealed this session</div>
+        </div>
+        <div class="signal sig--warn">
+          <i class="ti ti-alert-triangle sig-icon"></i>
+          <div class="sig-text">AX-007 (Angela Kim · 4 days overdue) is on today's agenda and still unresolved</div>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button class="btn-primary">Rejoin session →</button>
+        <button class="btn-secondary">View minutes draft</button>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="live-badge"><span class="live-dot"></span>LIVE</div>
+      <div class="countdown-lbl">Elapsed</div>
+      <div class="countdown">41:32</div>
+      <div class="countdown-sub">3 attendees · C-11 Workstream</div>
+    </div>
+  </div>
+
+  <div class="mid-row">
+
+    <div class="card" style="flex:1.1">
+      <div class="card-hdr">
+        <div class="card-title">Your open commitments</div>
+        <div class="card-count cnt-amber">4</div>
+      </div>
+      <div class="action-row">
+        <div class="badge b-ax">AX-021</div>
+        <div class="action-body">
+          <div class="action-text">Schedule vendor alignment call and circulate agenda</div>
+          <div class="action-meta">Control Adapter · <span class="action-due-amber">Due today</span></div>
+        </div>
+      </div>
+      <div class="action-row">
+        <div class="badge b-ax">AX-019</div>
+        <div class="action-body">
+          <div class="action-text">Review component spec draft from engineering</div>
+          <div class="action-meta">C-11 Test · Due May 22</div>
+        </div>
+      </div>
+      <div class="action-row">
+        <div class="badge b-ax">AX-029</div>
+        <div class="action-body">
+          <div class="action-text">Follow up with vendor on API documentation release date</div>
+          <div class="action-meta">C-11 Test · Due May 22</div>
+        </div>
+      </div>
+      <div class="action-row">
+        <div class="badge b-rk">RK-009</div>
+        <div class="action-body">
+          <div class="action-text">Assess schedule risk — fixture test completion blocked pending spec</div>
+          <div class="action-meta">Control Adapter · <span class="action-due-amber">No due date set</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div class="card-title">Needs your response</div>
+        <div class="card-count cnt-red">2</div>
+      </div>
+      <div class="rsvp-item">
+        <div class="rsvp-title">CCCC Test Meeting #3 · Milestone Review</div>
+        <div class="rsvp-by">Invited by Angela Kim · Mon May 18 · 9:00 AM</div>
+        <div class="rsvp-urgent">RSVP 2 days overdue — Angela is waiting</div>
+        <div class="rsvp-btns">
+          <button class="btn-accept">✓ Accept</button>
+          <button class="btn-decline">✗ Decline</button>
+        </div>
+      </div>
+      <div class="rsvp-item">
+        <div class="rsvp-title">Base · Quarterly Decision Review</div>
+        <div class="rsvp-by">Organizer: You · Wed May 20 · 1:00 PM</div>
+        <div class="action-meta" style="margin-bottom:10px;color:#e89430;font-weight:600;font-size:12px">4 decisions to ratify · prep packet not started</div>
+        <button class="btn-accept" style="width:100%">Start prep →</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div class="card-title">Unresolved threads</div>
+        <div class="card-count cnt-red">3</div>
+      </div>
+      <div class="thread-item">
+        <div class="thread-ws-lbl">C-11 Test · 4 meetings</div>
+        <div class="thread-topic">
+          Vendor NDA execution
+          <span class="thread-pill tp-blocked">Blocked</span>
+          <i class="ti ti-chevron-right thread-arrow"></i>
+        </div>
+        <div class="thread-chain">
+          <div class="chain-dot cd-dc">DC</div>
+          <div class="chain-line"></div>
+          <div class="chain-dot cd-ax">AX</div>
+          <div class="chain-line"></div>
+          <div class="chain-dot cd-rk">RK</div>
+          <div class="chain-line"></div>
+          <div class="chain-dot cd-ax">AX</div>
+          <div class="chain-line"></div>
+          <div class="chain-dot cd-live">●</div>
+        </div>
+      </div>
+      <div class="thread-item">
+        <div class="thread-ws-lbl">Control Adapter · 3 meetings</div>
+        <div class="thread-topic">
+          Fixture test timeline
+          <span class="thread-pill tp-open">3 open</span>
+          <i class="ti ti-chevron-right thread-arrow"></i>
+        </div>
+        <div class="thread-chain">
+          <div class="chain-dot cd-dc">NT</div>
+          <div class="chain-line"></div>
+          <div class="chain-dot cd-dc">DC</div>
+          <div class="chain-line"></div>
+          <div class="chain-dot cd-ax">AX</div>
+          <div class="chain-line"></div>
+          <div class="chain-dot cd-live">●</div>
+        </div>
+      </div>
+      <div class="thread-item">
+        <div class="thread-ws-lbl">C-11 Test · 2 meetings</div>
+        <div class="thread-topic">
+          Component spec review
+          <span class="thread-pill tp-good">On track</span>
+          <i class="ti ti-chevron-right thread-arrow"></i>
+        </div>
+        <div class="thread-chain">
+          <div class="chain-dot cd-dc">DC</div>
+          <div class="chain-line"></div>
+          <div class="chain-dot cd-ax">AX</div>
+          <div class="chain-line"></div>
+          <div class="chain-dot cd-live">●</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="health-strip">
+    <div class="ws-tile">
+      <div class="ws-name">C-11 Test Workstream</div>
+      <div class="ws-meta">12 meetings · 1 live now</div>
+      <div class="ws-bar-wrap"><div class="ws-bar wb-amber" style="width:52%"></div></div>
+      <div class="ws-stats">
+        <div class="ws-stat"><div class="ws-stat-val wv-dc">15</div><div class="ws-stat-lbl">Dec</div></div>
+        <div class="ws-stat"><div class="ws-stat-val wv-ax">28</div><div class="ws-stat-lbl">Act</div></div>
+        <div class="ws-stat"><div class="ws-stat-val wv-rk">8</div><div class="ws-stat-lbl">Risk</div></div>
+      </div>
+    </div>
+    <div class="ws-tile">
+      <div class="ws-name">Control Adapter</div>
+      <div class="ws-meta">22 meetings · high velocity</div>
+      <div class="ws-bar-wrap"><div class="ws-bar wb-green" style="width:81%"></div></div>
+      <div class="ws-stats">
+        <div class="ws-stat"><div class="ws-stat-val wv-dc">31</div><div class="ws-stat-lbl">Dec</div></div>
+        <div class="ws-stat"><div class="ws-stat-val wv-ax">12</div><div class="ws-stat-lbl">Act</div></div>
+        <div class="ws-stat"><div class="ws-stat-val wv-rk">2</div><div class="ws-stat-lbl">Risk</div></div>
+      </div>
+    </div>
+    <div class="ws-tile">
+      <div class="ws-name">CCCC Test</div>
+      <div class="ws-meta">2 meetings · new</div>
+      <div class="ws-bar-wrap"><div class="ws-bar wb-amber" style="width:35%"></div></div>
+      <div class="ws-stats">
+        <div class="ws-stat"><div class="ws-stat-val wv-dc">4</div><div class="ws-stat-lbl">Dec</div></div>
+        <div class="ws-stat"><div class="ws-stat-val wv-ax">6</div><div class="ws-stat-lbl">Act</div></div>
+        <div class="ws-stat"><div class="ws-stat-val wv-rk">1</div><div class="ws-stat-lbl">Risk</div></div>
+      </div>
+    </div>
+    <div class="ws-tile" style="opacity:.6">
+      <div class="ws-name">Base</div>
+      <div class="ws-meta">3 meetings · low cadence</div>
+      <div class="ws-bar-wrap"><div class="ws-bar wb-red" style="width:22%"></div></div>
+      <div class="ws-stats">
+        <div class="ws-stat"><div class="ws-stat-val wv-dc">8</div><div class="ws-stat-lbl">Dec</div></div>
+        <div class="ws-stat"><div class="ws-stat-val wv-ax">4</div><div class="ws-stat-lbl">Act</div></div>
+        <div class="ws-stat"><div class="ws-stat-val wv-rk">0</div><div class="ws-stat-lbl">Risk</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="ai-bar">
+  <i class="ti ti-sparkles ai-icon"></i>
+  <input class="ai-input" placeholder='Ask Accord anything — "What must I resolve before the 2:00 PM meeting?" · "Which decisions have not been followed through?"'>
+  <button class="ai-btn">Ask →</button>
+</div>
+</div>
