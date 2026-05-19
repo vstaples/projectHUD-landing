@@ -117,7 +117,9 @@ var AccordLiveCapture = (function () {
     '.ac-lc-progress-wrap{flex-shrink:0;display:flex;align-items:center;gap:8px}' +
     '.ac-lc-progress{display:flex;gap:2px;height:4px;border-radius:2px;overflow:hidden;width:80px}' +
     '.ac-lc-seg{height:4px;flex:1;border-radius:1px}.ac-lc-seg--done{background:var(--dec)}.ac-lc-seg--active{background:rgba(74,140,245,.5)}.ac-lc-seg--todo{background:rgba(255,255,255,.12)}' +
-    '.ac-lc-timer{font-size:12px;font-weight:500;font-family:"SF Mono","JetBrains Mono",monospace;color:var(--md);flex-shrink:0;min-width:44px;text-align:right}' +
+    '.ac-lc-timer-wrap{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0}' +
+    '.ac-lc-timer{font-size:22px;font-weight:600;color:var(--hi);letter-spacing:.04em;font-variant-numeric:tabular-nums;line-height:1}' +
+    '.ac-lc-timer-lbl{font-size:10px;color:var(--md);letter-spacing:.1em;text-transform:uppercase;margin-top:1px}' +
     '.ac-lc-end-btn{font-size:11px;font-weight:600;letter-spacing:.3px;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd);border-radius:6px;padding:4px 12px;cursor:pointer;flex-shrink:0;transition:opacity .1s}.ac-lc-end-btn:hover{opacity:.8}.ac-lc-end-btn:disabled{opacity:.45;cursor:not-allowed}' +
     '.ac-lc-body{display:flex;flex:1;min-height:0;overflow:hidden}' +
     '.ac-lc-sidebar{display:flex;flex-direction:column;flex-shrink:0;position:relative;background:var(--surface);border-right:1px solid rgba(255,255,255,.06);overflow:hidden;min-width:160px;max-width:320px}' +
@@ -284,7 +286,7 @@ var AccordLiveCapture = (function () {
       '<span class="ac-lc-title">' + _esc(meeting.title || 'Untitled') + '</span>' +
       '<div class="ac-lc-topbar-right" id="ac-lc-topbar-right">' +
         '<div class="ac-lc-progress-wrap"><div class="ac-lc-progress" id="ac-lc-progress-bar"></div></div>' +
-        '<span class="ac-lc-timer" id="ac-lc-timer">00:00</span>' +
+        '<div class="ac-lc-timer-wrap"><span class="ac-lc-timer" id="ac-lc-timer">00:00</span><span class="ac-lc-timer-lbl">elapsed</span></div>' +
         '<button type="button" class="ac-lc-end-btn" id="ac-lc-end-btn">END MEETING</button>' +
       '</div>' +
     '</div>' +

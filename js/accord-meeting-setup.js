@@ -1622,17 +1622,16 @@
     try {
       var lw = localStorage.getItem(LS_KEY_LEFT);
       var rw = localStorage.getItem(LS_KEY_RIGHT);
-      if (lw) {
-        var lwn = parseInt(lw, 10);
-        if (lwn >= COL_MIN_W && lwn <= COL_MAX_W) {
-          cols.style.setProperty('--col-left-w', lwn + 'px');
-        }
+      var lwn = lw ? parseInt(lw, 10) : 0;
+      var rwn = rw ? parseInt(rw, 10) : 0;
+      var vw = window.innerWidth || 1200;
+      // Guard: if saved widths leave < 200px for center column, reset both
+      if (lwn + rwn > vw - 200) { lwn = 0; rwn = 0; }
+      if (lwn >= COL_MIN_W && lwn <= COL_MAX_W) {
+        cols.style.setProperty('--col-left-w', lwn + 'px');
       }
-      if (rw) {
-        var rwn = parseInt(rw, 10);
-        if (rwn >= COL_MIN_W && rwn <= COL_MAX_W) {
-          cols.style.setProperty('--col-right-w', rwn + 'px');
-        }
+      if (rwn >= COL_MIN_W && rwn <= COL_MAX_W) {
+        cols.style.setProperty('--col-right-w', rwn + 'px');
       }
     } catch (e) {}
   }

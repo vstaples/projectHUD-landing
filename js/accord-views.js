@@ -123,6 +123,11 @@
           ${ws.description ? `<p class="ac-view-desc">${esc(ws.description)}</p>` : ''}
         </header>
 
+        <div class="ac-ws-tabs" id="ac-ws-tabs">
+          <div class="ac-ws-tab active" data-tab="meetings">Meetings</div>
+          <div class="ac-ws-tab" data-tab="kb">Knowledge Base</div>
+        </div>
+
         <div class="ac-view-body">`;
 
     // Sub-workstreams section (only at top-level)
@@ -274,6 +279,31 @@
     host.querySelector('[data-action="new-meeting"]')?.addEventListener('click', () => {
       _openNewMeetingForWorkstream(workstreamId);
     });
+
+    // CMD-ACCORD-KNOWLEDGE-BASE-1 Phase 2 — tab wiring
+    var _wsTabMeetings = host.querySelector('[data-tab="meetings"]');
+    var _wsTabKb       = host.querySelector('[data-tab="kb"]');
+    var _wsViewBody    = host.querySelector('.ac-view-body');
+    if (_wsTabMeetings && _wsTabKb && _wsViewBody) {
+      _wsTabMeetings.addEventListener('click', function () {
+        _wsTabMeetings.classList.add('active');
+        _wsTabKb.classList.remove('active');
+        _wsViewBody.style.display = '';
+        if (window.AccordKnowledgeBase) {
+          window.AccordKnowledgeBase.destroy();
+          window.AccordKnowledgeBase._activeTab = 'meetings';
+        }
+      });
+      _wsTabKb.addEventListener('click', function () {
+        _wsTabKb.classList.add('active');
+        _wsTabMeetings.classList.remove('active');
+        _wsViewBody.style.display = 'none';
+        if (window.AccordKnowledgeBase) {
+          window.AccordKnowledgeBase.render(workstreamId, host);
+          window.AccordKnowledgeBase._activeTab = 'kb';
+        }
+      });
+    }
   }
 
   // Phase 5 fix: open #newMeetingModal with a one-shot submit handler
@@ -449,9 +479,38 @@
       return;
     }
 
-    // CMD-ACCORD-MINUTES-1 v2: closed meetings are handled by AccordLiveCapture
-    // review mode (_enterReviewMode). When the operator navigates to a closed
-    // meeting fresh (not via END MEETING), fall through to the 5-tab shell below.
+    // CMD-ACCORD-KNOWLEDGE-BASE-1 Phase 2: closed and sealed meetings route to
+    // AccordLiveCapture review mode. Mirrors the running branch exactly.
+    if (meeting.state === 'closed' || meeting.state === 'sealed') {
+      _detachSurfaceHost();
+      // Clear prior view content (e.g. 5-tab shell) after detaching surface host
+      if (host) { Array.from(host.children).forEach(function(c){ if(c.id !== 'ac-meeting-surface-host') c.remove(); }); }
+      var _sfHostC = document.getElementById('ac-meeting-surface-host');
+      if (_sfHostC) {
+        _sfHostC.classList.remove('idle', 'running', 'closed', 'sealed');
+        _sfHostC.classList.add('closed');
+        if (_sfHostC.parentElement !== host) host.appendChild(_sfHostC);
+        _sfHostC.style.display = '';
+      }
+      var _sfCenterC = document.querySelector('.ac-center');
+      if (_sfCenterC) {
+        _sfCenterC.classList.remove('meeting-idle', 'meeting-running', 'meeting-closed');
+        _sfCenterC.classList.add('meeting-closed');
+      }
+      if (window.Accord && window.Accord.loadMeeting && meeting.meeting_id) {
+        try { await window.Accord.loadMeeting(meeting.meeting_id); }
+        catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure (closed)', e); }
+      }
+      if (window.AccordLiveCapture && window.AccordLiveCapture.render) {
+        window.AccordLiveCapture.render(meeting);
+        setTimeout(function() {
+          if (window.AccordLiveCapture && window.AccordLiveCapture._enterReviewMode) {
+            window.AccordLiveCapture._enterReviewMode();
+          }
+        }, 0);
+      }
+      return;
+    }
 
     await _loadIfNeeded();
     const owningWsId = workstreamId || meeting.workstream_id;
@@ -683,7 +742,18 @@
     if (!host || host.style.display === 'none') return;
 
     if (lvl === 'workstream' && ctx.workstreamId) {
-      renderWorkstreamView(host, ctx.workstreamId);
+      // CMD-ACCORD-KNOWLEDGE-BASE-1 Phase 2 — restore KB tab if active
+      renderWorkstreamView(host, ctx.workstreamId).then(function () {
+        if (window.AccordKnowledgeBase && window.AccordKnowledgeBase._activeTab === 'kb') {
+          var _kbTab  = host.querySelector('[data-tab="kb"]');
+          var _mtgTab = host.querySelector('[data-tab="meetings"]');
+          var _vb     = host.querySelector('.ac-view-body');
+          if (_kbTab)  _kbTab.classList.add('active');
+          if (_mtgTab) _mtgTab.classList.remove('active');
+          if (_vb)     _vb.style.display = 'none';
+          window.AccordKnowledgeBase.render(ctx.workstreamId, host);
+        }
+      });
     } else if (lvl === 'meeting' && ctx.meetingId) {
       renderMeetingView(host, ctx.meetingId, ctx.workstreamId);
     }
