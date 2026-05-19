@@ -281,8 +281,7 @@
   // ── Entry HTML ─────────────────────────────────────────────
   function _entryHtml(n, nameMap, mtgTitleMap) {
     var tc  = TAG_COLORS[n.tag] || TAG_COLORS.note;
-    var lbl = TAG_LABELS[n.tag] || (n.tag ? n.tag.toUpperCase().slice(0, 2) : 'NT');
-    if (n.seq_id) lbl = lbl + '-' + n.seq_id;
+    var lbl = n.seq_id || TAG_LABELS[n.tag] || (n.tag ? n.tag.toUpperCase().slice(0, 2) : 'NT');
     var badgeStyle = 'color:' + tc.color + ';background:' + tc.bg + ';border-color:' + tc.bd;
 
     var dateStr = _fmtShortDate(n.created_at);
