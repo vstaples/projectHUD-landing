@@ -146,9 +146,11 @@ var AccordMinutes = (function () {
   }
 
   function _seqLabel(tag, seqId) {
+    // seq_id from DB is already the full label string (e.g. "DC-018").
+    // Return it directly; only construct a fallback prefix when absent.
+    if (seqId) return String(seqId);
     var prefixes = { decision:'DC', action:'AX', risk:'RK', dissent:'DS', question:'PK' };
-    var prefix = prefixes[tag] || _tagLabel(tag);
-    return seqId ? prefix + '-' + _padSeq(seqId) : prefix;
+    return prefixes[tag] || _tagLabel(tag);
   }
 
   function _outcomeStatusHtml(status) {
