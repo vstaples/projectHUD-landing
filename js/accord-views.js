@@ -449,6 +449,34 @@
       return;
     }
 
+    // CMD-ACCORD-MINUTES-1 Phase 2: closed → Minutes surface.
+    // Same pattern as running branch above.
+    if (meeting.state === 'closed') {
+      _detachSurfaceHost();
+      if (window.Accord && window.Accord.loadMeeting && meeting.meeting_id) {
+        try { await window.Accord.loadMeeting(meeting.meeting_id); }
+        catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure (closed)', e); }
+      }
+      var _sfHostCl = document.getElementById('ac-meeting-surface-host');
+      if (_sfHostCl) {
+        _sfHostCl.classList.remove('idle', 'running', 'closed', 'sealed');
+        _sfHostCl.classList.add('closed');
+        host.innerHTML = '';
+        if (_sfHostCl.parentElement !== host) host.appendChild(_sfHostCl);
+        _sfHostCl.classList.add('active');
+        _sfHostCl.style.display = '';
+      }
+      var _sfCenterCl = document.querySelector('.ac-center');
+      if (_sfCenterCl) {
+        _sfCenterCl.classList.remove('meeting-idle', 'meeting-running', 'meeting-closed');
+        _sfCenterCl.classList.add('meeting-closed');
+      }
+      if (window.AccordMinutes && window.AccordMinutes.render) {
+        window.AccordMinutes.render(meeting);
+      }
+      return;
+    }
+
     await _loadIfNeeded();
     const owningWsId = workstreamId || meeting.workstream_id;
     const ws = owningWsId ? cache.workstreams.find(w => w.workstream_id === owningWsId) : null;
