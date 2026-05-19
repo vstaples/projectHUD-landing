@@ -1,15 +1,13 @@
 // ============================================================
 // accord-minutes.js
-// CMD-ACCORD-MINUTES-1 · Phase 2
+// CMD-ACCORD-MINUTES-1 · Phase 2 + Phase 3
 // 2026-05-19 · Operator: Vaughn Staples
 //
 // Minutes surface — review, edit, route + send.
 // Renders when accord_meetings.state = 'closed'.
-// Registered via AccordMinutes.render() called from
-// accord-views.js:renderMeetingView() closed-state branch.
 //
-// Phase 2: shell + topbar + sidebar (checklist, sections nav,
-//          recipients) + canvas section anchors/placeholders.
+// Phase 2: shell + topbar + sidebar + canvas chrome.
+// Phase 3: Meeting Header + Outcomes + Agenda sections wired.
 //
 // Iron Rules: 36, 40 §1, 47, 64, 71, 72, 73 in force.
 // var only — no let/const.
@@ -23,11 +21,18 @@ var AccordMinutes = (function () {
   // ── Module state ────────────────────────────────────────────
   var _meeting          = null;
   var _myResourceId     = null;
-  var _attendees        = [];   // [{ resource_id, name, checked }]
+  var _attendees        = [];   // [{ resource_id, name, checked, role, rsvp_status }]
   var _externalRecs     = [];   // [{ email, checked }]
-  var _checkedItems     = {};   // { 'header': true, … }
+  var _checkedItems     = {};
+  var _attendeeNameMap  = {};   // resource_id → name
+  var _userIdNameMap    = {};   // user_id → name
+  var _outcomes         = [];
+  var _agendaItems      = [];
+  var _agendaExpanded   = {};
+  var _agendaNodes      = {};
+  var _excludedNodeIds  = {};
 
-  // ── Checklist items ─────────────────────────────────────────
+  // ── Checklist ────────────────────────────────────────────────
   var _CHECKLIST = [
     { id: 'header',     label: 'Meeting header' },
     { id: 'attendance', label: 'Attendance confirmed' },
@@ -37,18 +42,18 @@ var AccordMinutes = (function () {
     { id: 'actions',    label: 'Actions confirmed' },
   ];
 
-  // ── Canvas sections ─────────────────────────────────────────
+  // ── Canvas sections ──────────────────────────────────────────
   var _SECTIONS = [
-    { id: 'sec-header',    title: 'Meeting Details',   bar: 'var(--md)',  add: false },
-    { id: 'sec-outcomes',  title: 'Intended Outcomes', bar: 'var(--dec)', add: true  },
-    { id: 'sec-agenda',    title: 'Agenda & Captures', bar: 'var(--nt)',  add: false },
-    { id: 'sec-decisions', title: 'Decisions',         bar: 'var(--dcn)', add: true  },
-    { id: 'sec-actions',   title: 'Action Items',      bar: 'var(--act)', add: true  },
-    { id: 'sec-risks',     title: 'Risks & Dissents',  bar: 'var(--rsk)', add: true  },
-    { id: 'sec-parking',   title: 'Parking Lot',       bar: '#9478e0',    add: true  },
+    { id: 'sec-header',    title: 'Meeting Details',   bar: 'var(--md)',  edit: true,      open: false },
+    { id: 'sec-outcomes',  title: 'Intended Outcomes', bar: 'var(--dec)', add: true,       open: true  },
+    { id: 'sec-agenda',    title: 'Agenda & Captures', bar: 'var(--nt)',  agendaAdd: true, open: true  },
+    { id: 'sec-decisions', title: 'Decisions',         bar: 'var(--dcn)', add: true,       open: false },
+    { id: 'sec-actions',   title: 'Action Items',      bar: 'var(--act)', add: true,       open: false },
+    { id: 'sec-risks',     title: 'Risks & Dissents',  bar: 'var(--rsk)', add: true,       open: false },
+    { id: 'sec-parking',   title: 'Parking Lot',       bar: '#9478e0',    add: true,       open: false },
   ];
 
-  // ── Sidebar nav items ───────────────────────────────────────
+  // ── Sidebar nav ──────────────────────────────────────────────
   var _NAV = [
     { secId: 'sec-header',    label: 'Meeting Header',    dot: 'var(--md)',  countKey: null        },
     { secId: 'sec-outcomes',  label: 'Intended Outcomes', dot: 'var(--dec)', countKey: 'outcomes'  },
@@ -72,6 +77,57 @@ var AccordMinutes = (function () {
                           : (p[0][0] + p[p.length-1][0]).toUpperCase();
   }
 
+  function _fmtFullDate(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso);
+      var DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      return DAYS[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+    } catch(e) { return ''; }
+  }
+
+  function _fmtTimePart(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso);
+      var h = d.getHours(); var m = d.getMinutes();
+      var ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+    } catch(e) { return ''; }
+  }
+
+  function _tagLabel(tag) {
+    var m = { note:'NT', decision:'DC', action:'AX', risk:'RK', dissent:'DS', question:'Q' };
+    return m[tag] || tag.toUpperCase().slice(0,2);
+  }
+
+  function _tagBadgeStyle(tag) {
+    var s = {
+      note:     'color:var(--nt);background:var(--nt-bg);border-color:var(--nt-bd)',
+      decision: 'color:var(--dcn);background:var(--dcn-bg);border-color:var(--dcn-bd)',
+      action:   'color:var(--act);background:var(--act-bg);border-color:var(--act-bd)',
+      risk:     'color:var(--rsk);background:var(--rsk-bg);border-color:var(--rsk-bd)',
+      dissent:  'color:var(--rsk);background:var(--rsk-bg);border-color:var(--rsk-bd)',
+      question: 'color:var(--dcn);background:var(--dcn-bg);border-color:var(--dcn-bd)',
+    };
+    return s[tag] || 'color:var(--md);background:transparent;border-color:var(--b2)';
+  }
+
+  function _outcomeStatusHtml(status) {
+    var MAP = {
+      achieved: { label:'\u2713 Met', style:'color:var(--nt);background:var(--nt-bg);border:1px solid var(--nt-bd)'    },
+      partial:  { label:'Partial',   style:'color:var(--act);background:var(--act-bg);border:1px solid var(--act-bd)' },
+      abandoned:{ label:'Unmet',     style:'color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd)' },
+      open:     { label:'Open',      style:'color:var(--md);background:var(--raised);border:1px solid var(--b1)'      },
+      carried:  { label:'Carried',   style:'color:var(--md);background:var(--raised);border:1px solid var(--b1)'      },
+    };
+    var s = MAP[status] || MAP['open'];
+    return '<span class="ac-min-outcome-status" style="'+s.style+'">'+_esc(s.label)+'</span>';
+  }
+
+  // ── Font ─────────────────────────────────────────────────────
   function _ensureOutfitFont() {
     if (document.querySelector('link[data-accord-outfit]')) return;
     var link = document.createElement('link');
@@ -87,7 +143,11 @@ var AccordMinutes = (function () {
     var s = document.createElement('style');
     s.id = 'ac-minutes-suppress';
     s.textContent = '#closedBanner{display:none!important}'
-                  + '.ac-meeting-tabs-shell{display:none!important}';
+                  + '.ac-meeting-tabs-shell{display:none!important}'
+                  + '.ac-live-filmstrip{display:none!important}'
+                  + '.ac-ws-timeline{display:none!important}'
+                  + '.ac-filmstrip{display:none!important}'
+                  + '.ac-status-bar{display:none!important}';
     document.head.appendChild(s);
   }
 
@@ -99,7 +159,6 @@ var AccordMinutes = (function () {
   // ── CSS ──────────────────────────────────────────────────────
   function _css() {
     return (
-      // Shell root
       '.ac-minutes-shell{' +
         '--void:#0b0d14;--surface:#10131e;--raised:#171c2e;--hover:#1d2338;' +
         '--b0:#1e2438;--b1:#252d44;--b2:#313d5e;' +
@@ -113,24 +172,21 @@ var AccordMinutes = (function () {
         'display:flex;flex-direction:column;height:100%;' +
         'background:var(--void);color:var(--hi);overflow:hidden' +
       '}' +
-
-      // Scrollbars
       '.ac-minutes-shell ::-webkit-scrollbar{width:4px;height:4px}' +
       '.ac-minutes-shell ::-webkit-scrollbar-track{background:transparent}' +
       '.ac-minutes-shell ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:2px}' +
       '.ac-minutes-shell ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.26)}' +
-
       // Topbar
       '.ac-min-topbar{display:flex;align-items:center;gap:12px;padding:0 16px;height:48px;flex-shrink:0;background:var(--surface);border-bottom:1px solid rgba(255,255,255,.06)}' +
       '.ac-min-logo{font-weight:600;font-size:15px;letter-spacing:-.3px;color:var(--hi);flex-shrink:0}' +
       '.ac-min-logo em{font-style:normal;color:var(--dec)}' +
-      '.ac-min-state-badge{font-size:11px;font-weight:600;border-radius:20px;padding:2px 10px;flex-shrink:0;white-space:nowrap;transition:background .2s,color .2s}' +
+      '.ac-min-state-badge{font-size:11px;font-weight:600;border-radius:20px;padding:2px 10px;flex-shrink:0;white-space:nowrap}' +
       '.ac-min-state-badge--review{color:var(--act);background:rgba(232,148,48,.10);border:1px solid rgba(232,148,48,.25)}' +
       '.ac-min-state-badge--ready{color:var(--nt);background:rgba(72,170,136,.10);border:1px solid rgba(72,170,136,.25)}' +
       '.ac-min-state-badge--sent{color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd)}' +
       '.ac-min-title{flex:1;min-width:0;font-size:14px;font-weight:500;color:var(--hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
       '.ac-min-preview-btn{font-size:11px;font-weight:500;color:var(--lo);background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:6px;padding:4px 12px;cursor:not-allowed;opacity:.35;flex-shrink:0;font-family:inherit}' +
-      '.ac-min-send-btn{font-size:11px;font-weight:600;border-radius:6px;padding:4px 14px;flex-shrink:0;cursor:pointer;transition:opacity .15s,background .15s;font-family:inherit}' +
+      '.ac-min-send-btn{font-size:11px;font-weight:600;border-radius:6px;padding:4px 14px;flex-shrink:0;cursor:pointer;transition:opacity .15s;font-family:inherit}' +
       '.ac-min-send-btn--disabled{color:var(--lo);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);cursor:not-allowed;opacity:.5}' +
       '.ac-min-send-btn--enabled{color:#fff;background:var(--nt);border:1px solid var(--nt-bd)}' +
       '.ac-min-send-btn--enabled:hover{opacity:.85}' +
@@ -138,24 +194,18 @@ var AccordMinutes = (function () {
       '.ac-min-user-chip{display:flex;align-items:center;gap:7px;flex-shrink:0;padding:3px 10px 3px 5px;border-radius:20px;background:var(--b0);border:1px solid rgba(255,255,255,.07)}' +
       '.ac-min-user-avatar{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--dec);background:var(--dec-bg);flex-shrink:0}' +
       '.ac-min-user-name{font-size:11px;font-weight:500;color:var(--md);white-space:nowrap}' +
-
-      // Body layout
+      // Body
       '.ac-min-body{display:flex;flex:1;min-height:0;overflow:hidden}' +
-
       // Sidebar
       '.ac-min-sidebar{width:240px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surface);border-right:1px solid rgba(255,255,255,.06);overflow-y:auto}' +
       '.ac-min-sb-section{padding:14px 14px 2px}' +
       '.ac-min-sb-label{display:block;font-size:11px;font-weight:700;color:var(--hi);letter-spacing:.10em;text-transform:uppercase;margin-bottom:6px}' +
-
-      // Checklist
       '.ac-min-checklist{padding:0 8px 10px}' +
       '.ac-min-check-row{display:flex;align-items:center;gap:10px;padding:5px 8px;border-radius:5px;cursor:pointer;transition:background .1s;user-select:none}' +
       '.ac-min-check-row:hover{background:var(--raised)}' +
       '.ac-min-circle{width:16px;height:16px;border-radius:50%;border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,border-color .15s;font-size:0}' +
       '.ac-min-circle.checked{background:var(--nt);border-color:var(--nt);font-size:9px;font-weight:700;color:#fff;line-height:1}' +
       '.ac-min-check-label{font-size:12px;color:var(--md)}' +
-
-      // Sections nav
       '.ac-min-nav{padding:0 8px 10px}' +
       '.ac-min-nav-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--md);text-decoration:none;transition:background .1s,color .1s}' +
       '.ac-min-nav-item:hover{background:var(--raised);color:var(--hi)}' +
@@ -163,44 +213,91 @@ var AccordMinutes = (function () {
       '.ac-min-nav-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}' +
       '.ac-min-nav-lbl{flex:1}' +
       '.ac-min-nav-count{font-size:10px;color:var(--lo);flex-shrink:0}' +
-
-      // Recipients
       '.ac-min-recipients{padding:0 8px 16px}' +
       '.ac-min-rec-row{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:5px;cursor:pointer;transition:background .1s;user-select:none}' +
       '.ac-min-rec-row:hover{background:var(--raised)}' +
       '.ac-min-rec-avatar{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--dec);background:var(--dec-bg);flex-shrink:0}' +
       '.ac-min-rec-name{flex:1;min-width:0;font-size:12px;color:var(--md);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-      '.ac-min-rec-check{width:14px;height:14px;border-radius:3px;border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;font-size:0}' +
+      '.ac-min-rec-check{width:14px;height:14px;border-radius:3px;border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0}' +
       '.ac-min-rec-check.checked{background:var(--nt);border-color:var(--nt);font-size:8px;font-weight:700;color:#fff;line-height:1}' +
       '.ac-min-add-ext-link{display:block;padding:5px 8px;font-size:11px;color:var(--dec);cursor:pointer;border-radius:5px;transition:background .1s;text-decoration:none}' +
       '.ac-min-add-ext-link:hover{background:var(--raised)}' +
       '.ac-min-ext-input-row{display:flex;gap:6px;padding:4px 8px;align-items:center}' +
-      '.ac-min-ext-input{flex:1;background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:5px 8px;font-size:11px;font-family:inherit;color:var(--hi);outline:none;transition:border-color .15s}' +
+      '.ac-min-ext-input{flex:1;background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:5px 8px;font-size:11px;font-family:inherit;color:var(--hi);outline:none}' +
       '.ac-min-ext-input:focus{border-color:rgba(74,140,245,.4)}' +
       '.ac-min-ext-add-btn{font-size:10px;font-weight:600;color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd);border-radius:4px;padding:4px 9px;cursor:pointer;font-family:inherit;flex-shrink:0}' +
-      '.ac-min-ext-add-btn:hover{opacity:.8}' +
-
       // Canvas
       '.ac-min-canvas{flex:1;min-width:0;overflow-y:auto;padding:0}' +
-
-      // Canvas meeting title
-      '.ac-min-mtg-title{font-size:26px;font-weight:600;color:var(--hi);padding:24px 28px 0;line-height:1.2}' +
-
+      '.ac-min-mtg-title{font-size:26px;font-weight:600;color:var(--hi);padding:24px 28px 4px;line-height:1.2}' +
+      '.ac-min-stakes{font-size:13px;font-style:italic;color:var(--md);border-left:3px solid var(--b2);padding:5px 12px;margin:8px 28px 16px}' +
       // Section chrome
       '.ac-min-sec{margin-bottom:0}' +
       '.ac-min-sec-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:10px 24px;background:var(--void);border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;user-select:none}' +
       '.ac-min-sec-bar{width:4px;height:16px;border-radius:2px;flex-shrink:0}' +
       '.ac-min-sec-title{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--md);flex:1}' +
-      '.ac-min-sec-add{font-size:11px;font-weight:600;color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd);border-radius:5px;padding:3px 10px;cursor:pointer;flex-shrink:0;transition:opacity .1s;font-family:inherit}' +
+      '.ac-min-sec-add{font-size:11px;font-weight:600;color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd);border-radius:5px;padding:3px 10px;cursor:pointer;flex-shrink:0;font-family:inherit;transition:opacity .1s}' +
       '.ac-min-sec-add:hover{opacity:.8}' +
-      '.ac-min-sec-chevron{font-size:20px;color:var(--md);transition:transform .15s;flex-shrink:0;line-height:1}' +
+      '.ac-min-sec-add--amber{font-size:11px;font-weight:600;color:var(--act);background:var(--act-bg);border:1px solid var(--act-bd);border-radius:5px;padding:3px 10px;cursor:not-allowed;flex-shrink:0;opacity:.4;font-family:inherit}' +
+      '.ac-min-sec-edit-btn{font-size:11px;font-weight:500;color:var(--lo);background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:3px 10px;cursor:not-allowed;opacity:.5;flex-shrink:0;font-family:inherit}' +
+      '.ac-min-sec-chevron{font-size:10px;color:var(--lo);transition:transform .15s;flex-shrink:0;line-height:1}' +
       '.ac-min-sec-chevron.open{transform:rotate(90deg)}' +
-      '.ac-min-sec-body{padding:16px 24px 20px}' +
-      '.ac-min-sec-placeholder{font-size:12px;color:var(--lo);font-style:italic}'
+      '.ac-min-sec-body{overflow:hidden}' +
+      '.ac-min-sec-body-inner{padding:16px 24px 20px}' +
+      '.ac-min-sec-placeholder{font-size:12px;color:var(--lo);font-style:italic}' +
+      '.ac-min-sec-empty{font-size:12px;color:var(--lo);font-style:italic;padding:2px 0 6px}' +
+      // Meeting details
+      '.ac-min-details-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin-bottom:16px}' +
+      '.ac-min-detail-lbl{font-size:12px;color:var(--lo);font-weight:600;white-space:nowrap;padding:1px 0}' +
+      '.ac-min-detail-val{font-size:13px;color:var(--hi);padding:1px 0}' +
+      '.ac-min-chip-section{margin-top:14px}' +
+      '.ac-min-chip-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--lo);display:block;margin-bottom:7px}' +
+      '.ac-min-chips{display:flex;flex-wrap:wrap;gap:6px}' +
+      '.ac-min-chip{display:flex;align-items:center;gap:7px;background:var(--raised);border:1px solid var(--b1);border-radius:20px;padding:4px 10px 4px 5px}' +
+      '.ac-min-chip-avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:var(--dec);background:var(--dec-bg);flex-shrink:0}' +
+      '.ac-min-chip-name{font-size:12px;color:var(--hi)}' +
+      '.ac-min-chip-role{font-size:11px;color:var(--lo)}' +
+      // Outcomes
+      '.ac-min-outcome-row{display:flex;align-items:flex-start;gap:10px;padding:7px 10px;margin-bottom:4px;border-radius:6px;background:var(--surface);position:relative}' +
+      '.ac-min-outcome-row:hover .ac-min-outcome-del{display:flex}' +
+      '.ac-min-outcome-row.deleted{opacity:.35}' +
+      '.ac-min-outcome-row.deleted .ac-min-outcome-desc{text-decoration:line-through}' +
+      '.ac-min-outcome-status{font-size:11px;font-weight:600;border-radius:10px;padding:2px 8px;flex-shrink:0;white-space:nowrap;margin-top:1px}' +
+      '.ac-min-outcome-desc{flex:1;font-size:13px;color:var(--hi);outline:none;word-break:break-word;min-width:0}' +
+      '.ac-min-outcome-desc:focus{outline:1px solid rgba(74,140,245,.3);border-radius:3px;padding:1px 3px}' +
+      '.ac-min-outcome-owner{font-size:11px;color:var(--lo);flex-shrink:0;white-space:nowrap;margin-top:2px}' +
+      '.ac-min-outcome-del{display:none;align-items:center;font-size:13px;font-weight:700;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd);border-radius:3px;padding:0 6px;cursor:pointer;line-height:18px;flex-shrink:0;font-family:inherit}' +
+      '.ac-min-outcome-add-row{display:flex;gap:6px;padding:10px 0 4px;align-items:center}' +
+      '.ac-min-outcome-input{flex:1;background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:6px;padding:7px 10px;font-size:12px;font-family:inherit;color:var(--hi);outline:none;transition:border-color .15s}' +
+      '.ac-min-outcome-input:focus{border-color:rgba(74,140,245,.4)}' +
+      '.ac-min-outcome-add-btn{font-size:11px;font-weight:600;color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd);border-radius:6px;padding:6px 12px;cursor:pointer;flex-shrink:0;font-family:inherit}' +
+      '.ac-min-outcome-add-btn:hover{opacity:.8}' +
+      // Agenda
+      '.ac-min-agenda-item{margin-bottom:6px;margin-left:8px;border-radius:6px;box-shadow:-2px 0 0 0 var(--nt)}' +
+      '.ac-min-agenda-item-header{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;background:#13172a;border-radius:6px;transition:background .1s}' +
+      '.ac-min-agenda-item-header:hover{background:var(--hover)}' +
+      '.ac-min-agenda-item.expanded .ac-min-agenda-item-header{border-radius:6px 6px 0 0}' +
+      '.ac-min-item-chevron{font-size:9px;color:var(--lo);transition:transform .15s;flex-shrink:0}' +
+      '.ac-min-item-chevron.open{transform:rotate(90deg)}' +
+      '.ac-min-item-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--hi);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);flex-shrink:0}' +
+      '.ac-min-item-title{flex:1;font-size:14px;font-weight:500;color:var(--hi)}' +
+      '.ac-min-item-add-btn{font-size:10px;font-weight:600;color:var(--act);background:var(--act-bg);border:1px solid var(--act-bd);border-radius:5px;padding:2px 8px;cursor:not-allowed;opacity:.4;font-family:inherit;flex-shrink:0}' +
+      '.ac-min-agenda-item-body{padding:6px 10px 10px;background:#13172a;border-top:1px solid rgba(255,255,255,.05);border-radius:0 0 6px 6px}' +
+      // Entry rows
+      '.ac-min-entry-list{display:flex;flex-direction:column;gap:4px}' +
+      '.ac-min-entry-row{display:flex;align-items:baseline;gap:8px;padding:5px 8px;border-radius:5px;background:rgba(255,255,255,.03);position:relative}' +
+      '.ac-min-entry-row:hover .ac-min-entry-exclude{display:block}' +
+      '.ac-min-entry-row.excluded{opacity:.35}' +
+      '.ac-min-tag-badge{font-size:10px;font-weight:700;padding:0 5px;border-radius:2px;border:1px solid;flex-shrink:0;line-height:1.5;white-space:nowrap}' +
+      '.ac-min-entry-summary{flex:1;font-size:13px;color:var(--hi)}' +
+      '.ac-min-entry-summary.struck{text-decoration:line-through}' +
+      '.ac-min-entry-author{font-size:11px;color:var(--lo);flex-shrink:0;white-space:nowrap}' +
+      '.ac-min-entry-time{font-size:11px;color:var(--lo);flex-shrink:0;white-space:nowrap}' +
+      '.ac-min-entry-exclude{display:none;font-size:10px;font-weight:600;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd);border-radius:3px;padding:1px 6px;cursor:pointer;flex-shrink:0;font-family:inherit}' +
+      '.ac-min-entry-empty{font-size:12px;color:var(--lo);font-style:italic;padding:6px 0}'
     );
   }
 
-  // ── HTML builders ────────────────────────────────────────────
+  // ── Shell HTML ───────────────────────────────────────────────
   function _userChipHtml() {
     var me = window.Accord && window.Accord.state && window.Accord.state.me;
     var name = (me && me.name) || '';
@@ -224,37 +321,48 @@ var AccordMinutes = (function () {
       return '<a class="ac-min-nav-item" data-nav-sec="'+n.secId+'" href="#'+n.secId+'">' +
         '<span class="ac-min-nav-dot" style="background:'+n.dot+'"></span>' +
         '<span class="ac-min-nav-lbl">'+_esc(n.label)+'</span>' +
-        (n.countKey
-          ? '<span class="ac-min-nav-count" id="ac-min-nc-'+n.countKey+'">\u2014</span>'
-          : '') +
+        (n.countKey ? '<span class="ac-min-nav-count" id="ac-min-nc-'+n.countKey+'">\u2014</span>' : '') +
       '</a>';
     }).join('');
   }
 
+  function _secHeaderBtnHtml(sec) {
+    if (sec.edit)      return '<button type="button" class="ac-min-sec-edit-btn" disabled>Edit</button>';
+    if (sec.agendaAdd) return '<button type="button" class="ac-min-sec-add--amber" disabled>+ Add item</button>';
+    if (sec.add)       return '<button type="button" class="ac-min-sec-add" data-sec-add="'+sec.id+'">+ Add</button>';
+    return '';
+  }
+
   function _canvasHtml(meeting) {
-    var titleHtml = '<div class="ac-min-mtg-title">'+_esc(meeting.title||'Untitled')+'</div>';
-    var sectionsHtml = _SECTIONS.map(function(sec) {
+    var title  = '<div class="ac-min-mtg-title">'+_esc(meeting.title||'Untitled')+'</div>';
+    var stakes = meeting.stakes
+      ? '<div class="ac-min-stakes">'+_esc(meeting.stakes)+'</div>' : '';
+
+    var secs = _SECTIONS.map(function(sec) {
+      var isOpen   = !!sec.open;
+      var isPhase4 = (sec.id==='sec-decisions'||sec.id==='sec-actions'||sec.id==='sec-risks'||sec.id==='sec-parking');
+      var placeholder = isPhase4
+        ? '<div class="ac-min-sec-placeholder">Content loads in Phase 4.</div>'
+        : '<div class="ac-min-sec-placeholder">Loading\u2026</div>';
       return '<div class="ac-min-sec" id="'+sec.id+'">' +
         '<div class="ac-min-sec-header" data-sec-toggle="'+sec.id+'">' +
           '<span class="ac-min-sec-bar" style="background:'+sec.bar+'"></span>' +
           '<span class="ac-min-sec-title">'+_esc(sec.title)+'</span>' +
-          (sec.add
-            ? '<button type="button" class="ac-min-sec-add" data-sec-add="'+sec.id+'">+ Add</button>'
-            : '') +
-          '<span class="ac-min-sec-chevron open">\u25b6</span>' +
+          _secHeaderBtnHtml(sec) +
+          '<span class="ac-min-sec-chevron'+(isOpen?' open':'')+'">\u25b6</span>' +
         '</div>' +
-        '<div class="ac-min-sec-body" id="ac-min-sb-'+sec.id+'">' +
-          '<div class="ac-min-sec-placeholder">Content loads in Phase 3 &amp; 4.</div>' +
+        '<div class="ac-min-sec-body" id="ac-min-sb-'+sec.id+'"'+(isOpen?'':' style="display:none"')+'>' +
+          '<div class="ac-min-sec-body-inner">'+placeholder+'</div>' +
         '</div>' +
       '</div>';
     }).join('');
-    return titleHtml + sectionsHtml;
+
+    return title + stakes + secs;
   }
 
   function _shellHtml(meeting) {
     return '<div class="ac-minutes-shell" id="ac-min-shell">' +
       '<style>'+_css()+'</style>' +
-      // Topbar
       '<div class="ac-min-topbar">' +
         '<span class="ac-min-logo">accord<em>.</em></span>' +
         '<span class="ac-min-state-badge ac-min-state-badge--review" id="ac-min-badge">Under Review</span>' +
@@ -263,9 +371,7 @@ var AccordMinutes = (function () {
         '<button type="button" class="ac-min-send-btn ac-min-send-btn--disabled" id="ac-min-send-btn" disabled>Route + Send \u2191</button>' +
         _userChipHtml() +
       '</div>' +
-      // Body
       '<div class="ac-min-body">' +
-        // Sidebar
         '<div class="ac-min-sidebar" id="ac-min-sidebar">' +
           '<div class="ac-min-sb-section"><span class="ac-min-sb-label">Review Checklist</span></div>' +
           '<div class="ac-min-checklist" id="ac-min-checklist">'+_checklistHtml()+'</div>' +
@@ -274,7 +380,6 @@ var AccordMinutes = (function () {
           '<div class="ac-min-sb-section"><span class="ac-min-sb-label">Recipients</span></div>' +
           '<div class="ac-min-recipients" id="ac-min-recipients"><div style="font-size:11px;color:var(--lo);padding:4px 8px">Loading\u2026</div></div>' +
         '</div>' +
-        // Canvas
         '<div class="ac-min-canvas" id="ac-min-canvas">'+_canvasHtml(meeting)+'</div>' +
       '</div>' +
     '</div>';
@@ -309,11 +414,12 @@ var AccordMinutes = (function () {
     }
   }
 
-  // ── Section collapse/expand ──────────────────────────────────
+  // ── Section toggles ──────────────────────────────────────────
   function _wireSectionToggles() {
     var canvas = document.getElementById('ac-min-canvas'); if (!canvas) return;
     canvas.addEventListener('click', function(ev) {
-      if (ev.target.closest('[data-sec-add]')) return;  // + Add handled by Phases 3/4
+      if (ev.target.closest('[data-sec-add]')) return;
+      if (ev.target.closest('.ac-min-agenda-item-header')) return;
       var hdr = ev.target.closest('[data-sec-toggle]'); if (!hdr) return;
       var secId = hdr.dataset.secToggle;
       var body  = document.getElementById('ac-min-sb-' + secId);
@@ -325,11 +431,10 @@ var AccordMinutes = (function () {
     });
   }
 
-  // ── Sections nav — scroll observer ──────────────────────────
+  // ── Nav ──────────────────────────────────────────────────────
   function _wireNavObserver() {
     var canvas = document.getElementById('ac-min-canvas'); if (!canvas) return;
     var secIds = _NAV.map(function(n) { return n.secId; });
-
     function _update() {
       var cr = canvas.getBoundingClientRect();
       var active = secIds[0];
@@ -344,18 +449,15 @@ var AccordMinutes = (function () {
         link.classList.toggle('active', link.dataset.navSec === active);
       });
     }
-
     canvas.addEventListener('scroll', _update, { passive: true });
     _update();
   }
 
-  // ── Sections nav — click ─────────────────────────────────────
   function _wireNavClicks() {
     document.querySelectorAll('.ac-min-nav-item').forEach(function(link) {
       link.addEventListener('click', function(ev) {
         ev.preventDefault();
         var secId = link.dataset.navSec;
-        // Expand section if collapsed
         var body = document.getElementById('ac-min-sb-' + secId);
         var hdr  = document.querySelector('[data-sec-toggle="'+secId+'"]');
         var chev = hdr ? hdr.querySelector('.ac-min-sec-chevron') : null;
@@ -369,19 +471,38 @@ var AccordMinutes = (function () {
     });
   }
 
+  function _wireSendBtn() {
+    var btn = document.getElementById('ac-min-send-btn'); if (!btn) return;
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      console.log('[AccordMinutes] Route + Send — Phase 5 scope');
+    });
+  }
+
   // ── Recipients ───────────────────────────────────────────────
   function _loadRecipients(meetingId) {
     if (!meetingId) return;
     API.get('accord_meeting_attendees?meeting_id=eq.'+meetingId+'&select=attendee_id,resource_id,role_in_meeting,rsvp_status')
       .then(function(rows) {
         rows = rows || [];
-        if (!rows.length) { _renderRecipients([]); return; }
+        if (!rows.length) { _renderRecipients(); return; }
         var rids = rows.map(function(r) { return r.resource_id; });
-        API.get('resources?id=in.('+rids.join(',')+')&select=id,name')
+        API.get('resources?id=in.('+rids.join(',')+')'+'&select=id,user_id,name')
           .then(function(res) {
-            var nm = {}; (res||[]).forEach(function(r) { nm[r.id] = r.name; });
+            var nm = {};
+            (res||[]).forEach(function(r) {
+              nm[r.id] = r.name;
+              _attendeeNameMap[r.id] = r.name;
+              if (r.user_id) _userIdNameMap[r.user_id] = r.name;
+            });
             _attendees = rows.map(function(a) {
-              return { resource_id: a.resource_id, name: nm[a.resource_id]||'Unknown', checked: true };
+              return {
+                resource_id: a.resource_id,
+                name:        nm[a.resource_id]||'Unknown',
+                checked:     true,
+                role:        a.role_in_meeting,
+                rsvp_status: a.rsvp_status,
+              };
             });
             _renderRecipients();
           }).catch(function() { _renderRecipients(); });
@@ -398,7 +519,6 @@ var AccordMinutes = (function () {
           '" id="ac-min-rck-'+_esc(a.resource_id)+'">'+(a.checked?'\u2713':'')+'</span>' +
       '</div>';
     }).join('');
-
     _externalRecs.forEach(function(ext) {
       html += '<div class="ac-min-rec-row" data-rec-ext="'+_esc(ext.email)+'">' +
         '<span class="ac-min-rec-avatar" style="font-size:8px;letter-spacing:0">EXT</span>' +
@@ -407,7 +527,6 @@ var AccordMinutes = (function () {
           (ext.checked?'\u2713':'')+'</span>' +
       '</div>';
     });
-
     html += '<a class="ac-min-add-ext-link" id="ac-min-add-ext">+ Add external recipient\u2026</a>' +
       '<div id="ac-min-ext-wrap" style="display:none">' +
         '<div class="ac-min-ext-input-row">' +
@@ -415,13 +534,11 @@ var AccordMinutes = (function () {
           '<button type="button" class="ac-min-ext-add-btn" id="ac-min-ext-add">Add</button>' +
         '</div>' +
       '</div>';
-
     container.innerHTML = html;
     _wireRecipientClicks(container);
   }
 
   function _wireRecipientClicks(container) {
-    // Toggle checkboxes
     container.addEventListener('click', function(ev) {
       var row = ev.target.closest('.ac-min-rec-row'); if (!row) return;
       var rid  = row.dataset.recId;
@@ -442,20 +559,16 @@ var AccordMinutes = (function () {
         }
       }
     });
-
-    // External recipient input
     var addLink = document.getElementById('ac-min-add-ext');
     var wrap    = document.getElementById('ac-min-ext-wrap');
     var input   = document.getElementById('ac-min-ext-input');
     var addBtn  = document.getElementById('ac-min-ext-add');
     if (!addLink || !wrap) return;
-
     addLink.addEventListener('click', function(ev) {
       ev.preventDefault();
       wrap.style.display = '';
       if (input) { input.value = ''; setTimeout(function() { input.focus(); }, 0); }
     });
-
     function _commitExt() {
       var email = input ? input.value.trim() : '';
       if (!email || email.indexOf('@') < 1) return;
@@ -463,56 +576,372 @@ var AccordMinutes = (function () {
       wrap.style.display = 'none';
       _renderRecipients();
     }
-
     if (addBtn) addBtn.addEventListener('click', _commitExt);
     if (input) input.addEventListener('keydown', function(ev) {
       if (ev.key === 'Enter') { ev.preventDefault(); _commitExt(); }
     });
   }
 
-  // ── Section counts (non-blocking) ────────────────────────────
+  // ── Nav counts ───────────────────────────────────────────────
   function _loadSectionCounts(meetingId) {
     if (!meetingId) return;
-
     API.get('accord_meeting_outcomes?meeting_id=eq.'+meetingId+'&select=outcome_id')
-      .then(function(rows) { _setCount('outcomes', (rows||[]).length); }).catch(function(){});
-
+      .then(function(r) { _setCount('outcomes', (r||[]).length); }).catch(function(){});
     API.get('accord_agenda_items?meeting_id=eq.'+meetingId+'&select=agenda_item_id')
-      .then(function(rows) { _setCount('agenda', (rows||[]).length); }).catch(function(){});
-
+      .then(function(r) { _setCount('agenda', (r||[]).length); }).catch(function(){});
     API.get('accord_nodes?meeting_id=eq.'+meetingId+'&tag=in.(decision,action,risk,dissent,question)&select=node_id,tag')
       .then(function(rows) {
         rows = rows || [];
-        var dc = 0; var ax = 0; var rk = 0; var pk = 0;
+        var dc=0; var ax=0; var rk=0; var pk=0;
         rows.forEach(function(n) {
-          if (n.tag==='decision') dc++;
-          else if (n.tag==='action') ax++;
+          if      (n.tag==='decision')             dc++;
+          else if (n.tag==='action')               ax++;
           else if (n.tag==='risk'||n.tag==='dissent') rk++;
-          else if (n.tag==='question') pk++;
+          else if (n.tag==='question')             pk++;
         });
-        _setCount('decisions', dc);
-        _setCount('actions',   ax);
-        _setCount('risks',     rk);
-        _setCount('parking',   pk);
+        _setCount('decisions',dc); _setCount('actions',ax);
+        _setCount('risks',rk);     _setCount('parking',pk);
       }).catch(function(){});
   }
 
   function _setCount(key, n) {
-    var el = document.getElementById('ac-min-nc-' + key);
+    var el = document.getElementById('ac-min-nc-'+key);
     if (el) el.textContent = n > 0 ? String(n) : '\u2014';
   }
 
-  // ── Route + Send placeholder (Phase 5) ──────────────────────
-  function _wireSendBtn() {
-    var btn = document.getElementById('ac-min-send-btn'); if (!btn) return;
-    btn.addEventListener('click', function() {
-      if (btn.disabled) return;
-      // Phase 5: open Route + Send modal
-      console.log('[AccordMinutes] Route + Send — Phase 5 scope');
+  // ── Meeting Details ──────────────────────────────────────────
+  function _loadMeetingDetails(meeting) {
+    var extrasP = API.get('accord_meetings?meeting_id=eq.'+meeting.meeting_id+'&select=started_at,ended_at')
+      .then(function(r) { return (r&&r[0])||{}; }).catch(function() { return {}; });
+    var orgP = meeting.organizer_id
+      ? API.get('resources?user_id=eq.'+meeting.organizer_id+'&select=id,name&limit=1')
+          .then(function(r) { return (r&&r[0])||null; }).catch(function() { return null; })
+      : Promise.resolve(null);
+    var wsP = meeting.workstream_id
+      ? API.get('workstreams?workstream_id=eq.'+meeting.workstream_id+'&select=workstream_id,name&limit=1')
+          .then(function(r) { return (r&&r[0])||null; }).catch(function() { return null; })
+      : Promise.resolve(null);
+    Promise.all([extrasP, orgP, wsP]).then(function(res) {
+      _renderMeetingDetails(meeting, res[0]||{}, res[1], res[2]?res[2].name:null);
+    }).catch(function() { _renderMeetingDetails(meeting, {}, null, null); });
+  }
+
+  function _renderMeetingDetails(meeting, extras, organizer, workstreamName) {
+    var body = document.getElementById('ac-min-sb-sec-header'); if (!body) return;
+    var dateStr  = _fmtFullDate(meeting.scheduled_for);
+    var durStr   = meeting.duration_minutes ? meeting.duration_minutes + ' minutes' : '\u2014';
+    var timeRange = '';
+    if (extras && extras.started_at) {
+      timeRange = _fmtTimePart(extras.started_at);
+      if (extras.ended_at) timeRange += ' \u2013 ' + _fmtTimePart(extras.ended_at);
+    }
+    var durFull = durStr + (timeRange ? ' \u00b7 ' + timeRange : '');
+    var orgName = organizer ? organizer.name : '\u2014';
+    var wsName  = workstreamName || '\u2014';
+
+    var metaHtml =
+      '<div class="ac-min-details-grid">' +
+        '<span class="ac-min-detail-lbl">Date</span><span class="ac-min-detail-val">'+_esc(dateStr||'\u2014')+'</span>' +
+        '<span class="ac-min-detail-lbl">Duration</span><span class="ac-min-detail-val">'+_esc(durFull)+'</span>' +
+        '<span class="ac-min-detail-lbl">Organizer</span><span class="ac-min-detail-val">'+_esc(orgName)+'</span>' +
+        '<span class="ac-min-detail-lbl">Workstream</span><span class="ac-min-detail-val">'+_esc(wsName)+'</span>' +
+      '</div>';
+
+    var attended = _attendees.filter(function(a) { return a.rsvp_status === 'accepted'; });
+    var absent   = _attendees.filter(function(a) { return a.rsvp_status !== 'accepted'; });
+
+    var attendedHtml = '';
+    if (attended.length) {
+      attendedHtml = '<div class="ac-min-chip-section">' +
+        '<span class="ac-min-chip-label">Attended</span><div class="ac-min-chips">' +
+        attended.map(function(a) {
+          return '<div class="ac-min-chip"><span class="ac-min-chip-avatar">'+_esc(_initials(a.name))+'</span>' +
+            '<span class="ac-min-chip-name">'+_esc(a.name)+
+              (a.role==='organizer'?' <span class="ac-min-chip-role">\u00b7 Organizer</span>':'')+'</span></div>';
+        }).join('') + '</div></div>';
+    }
+
+    var absentHtml = '';
+    if (absent.length) {
+      absentHtml = '<div class="ac-min-chip-section" style="opacity:.45">' +
+        '<span class="ac-min-chip-label">Invited \u00b7 Did Not Join</span><div class="ac-min-chips">' +
+        absent.map(function(a) {
+          return '<div class="ac-min-chip"><span class="ac-min-chip-avatar">'+_esc(_initials(a.name))+'</span>' +
+            '<span class="ac-min-chip-name">'+_esc(a.name)+'</span></div>';
+        }).join('') + '</div></div>';
+    }
+
+    body.innerHTML = '<div class="ac-min-sec-body-inner">'+metaHtml+attendedHtml+absentHtml+'</div>';
+  }
+
+  // ── Outcomes ─────────────────────────────────────────────────
+  function _loadOutcomes(meetingId) {
+    if (!meetingId) return;
+    API.get('accord_meeting_outcomes?meeting_id=eq.'+meetingId+'&select=outcome_id,verb,description,owner_resource_id,status,position&order=position.asc')
+      .then(function(rows) {
+        _outcomes = rows || [];
+        _renderOutcomes();
+        _setCount('outcomes', _outcomes.length);
+      }).catch(function() {
+        var body = document.getElementById('ac-min-sb-sec-outcomes');
+        if (body) body.innerHTML = '<div class="ac-min-sec-body-inner"><div class="ac-min-sec-empty">Could not load outcomes.</div></div>';
+      });
+  }
+
+  function _outcomeRowHtml(outcome) {
+    var ownerName = _attendeeNameMap[outcome.owner_resource_id] || '';
+    var isDeleted = outcome.status === 'abandoned';
+    return '<div class="ac-min-outcome-row'+(isDeleted?' deleted':'')+'" data-outcome-id="'+_esc(outcome.outcome_id)+'">' +
+      _outcomeStatusHtml(outcome.status) +
+      '<span class="ac-min-outcome-desc" contenteditable="true" data-orig="'+_esc(outcome.description||'')+'">'+
+        _esc(outcome.description||'')+'</span>' +
+      (ownerName ? '<span class="ac-min-outcome-owner">'+_esc(ownerName)+'</span>' : '') +
+      '<button type="button" class="ac-min-outcome-del" data-action="del-outcome" data-outcome-id="'+_esc(outcome.outcome_id)+'">\u00d7</button>' +
+    '</div>';
+  }
+
+  function _renderOutcomes() {
+    var body = document.getElementById('ac-min-sb-sec-outcomes'); if (!body) return;
+    var listHtml = _outcomes.length
+      ? '<div id="ac-min-outcomes-list">'+_outcomes.map(_outcomeRowHtml).join('')+'</div>'
+      : '<div id="ac-min-outcomes-list"><div class="ac-min-sec-empty">No outcomes recorded.</div></div>';
+    body.innerHTML = '<div class="ac-min-sec-body-inner">'+listHtml+_outcomeAddHtml()+'</div>';
+    _wireOutcomeSection(body);
+  }
+
+  function _outcomeAddHtml() {
+    return '<div class="ac-min-outcome-add-row">' +
+      '<input type="text" class="ac-min-outcome-input" id="ac-min-outcome-inp" placeholder="Describe an intended outcome\u2026" />' +
+      '<button type="button" class="ac-min-outcome-add-btn" id="ac-min-outcome-add">Add \u2192</button>' +
+    '</div>';
+  }
+
+  function _wireOutcomeSection(body) {
+    // Description edit — focusout bubbles unlike blur
+    body.addEventListener('focusout', function(ev) {
+      var desc = ev.target;
+      if (!desc.classList || !desc.classList.contains('ac-min-outcome-desc')) return;
+      var newText = desc.textContent.trim();
+      var orig    = desc.dataset.orig;
+      if (newText === orig) return;
+      var row = desc.closest('[data-outcome-id]'); if (!row) return;
+      var oid = row.dataset.outcomeId;
+      // IR71: update DOM only after PATCH confirms
+      // IR73: filter includes meeting_id
+      API.patch('accord_meeting_outcomes?outcome_id=eq.'+oid+'&meeting_id=eq.'+_meeting.meeting_id, { description: newText })
+        .then(function() {
+          desc.dataset.orig = newText;
+          var o = _outcomes.find(function(x) { return x.outcome_id === oid; });
+          if (o) o.description = newText;
+        }).catch(function(e) {
+          console.error('[AccordMinutes] outcome PATCH failed', e);
+          desc.textContent = orig;
+        });
+    });
+
+    // × soft delete
+    body.addEventListener('click', function(ev) {
+      var delBtn = ev.target.closest('[data-action="del-outcome"]'); if (!delBtn) return;
+      var oid = delBtn.dataset.outcomeId;
+      API.patch('accord_meeting_outcomes?outcome_id=eq.'+oid+'&meeting_id=eq.'+_meeting.meeting_id, { status: 'abandoned' })
+        .then(function() {
+          var o = _outcomes.find(function(x) { return x.outcome_id === oid; });
+          if (o) o.status = 'abandoned';
+          var row = body.querySelector('[data-outcome-id="'+oid+'"]');
+          if (row) row.classList.add('deleted');
+        }).catch(function(e) { console.error('[AccordMinutes] outcome delete failed', e); });
+    });
+
+    // + Add
+    var inp = document.getElementById('ac-min-outcome-inp');
+    var btn = document.getElementById('ac-min-outcome-add');
+    if (!inp || !btn) return;
+
+    function _commit() {
+      var text = inp.value.trim(); if (!text) return;
+      var me = window.Accord && window.Accord.state && window.Accord.state.me;
+      if (!me) return;
+      var row = {
+        firm_id:     me.firm_id,
+        meeting_id:  _meeting.meeting_id,
+        description: text,
+        verb:        'INFORM',
+        status:      'open',
+        position:    _outcomes.length + 1,
+      };
+      if (me.id) row.created_by = me.id; // IR47: nullable; include if available
+      btn.disabled = true;
+      API.post('accord_meeting_outcomes', row)
+        .then(function(created) {
+          var newOut = Array.isArray(created) ? created[0] : created;
+          inp.value = ''; btn.disabled = false;
+          if (!newOut) return;
+          _outcomes.push(newOut);
+          var list = document.getElementById('ac-min-outcomes-list');
+          if (list) {
+            var d = document.createElement('div');
+            d.innerHTML = _outcomeRowHtml(newOut);
+            list.appendChild(d.firstChild);
+          }
+          _setCount('outcomes', _outcomes.length);
+        }).catch(function(e) {
+          console.error('[AccordMinutes] outcome INSERT failed', e);
+          btn.disabled = false;
+        });
+    }
+
+    btn.addEventListener('click', _commit);
+    inp.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); _commit(); }
     });
   }
 
-  // ── Level-changed listener ───────────────────────────────────
+  // ── Agenda & Captures ────────────────────────────────────────
+  function _loadAgenda(meetingId) {
+    if (!meetingId) return;
+    API.get('accord_agenda_items?meeting_id=eq.'+meetingId+'&select=agenda_item_id,title,position,status&order=position.asc')
+      .then(function(rows) {
+        _agendaItems = rows || [];
+        _renderAgendaSection();
+        _setCount('agenda', _agendaItems.length);
+      }).catch(function() {
+        var body = document.getElementById('ac-min-sb-sec-agenda');
+        if (body) body.innerHTML = '<div class="ac-min-sec-body-inner"><div class="ac-min-sec-empty">Could not load agenda.</div></div>';
+      });
+  }
+
+  function _renderAgendaSection() {
+    var body = document.getElementById('ac-min-sb-sec-agenda'); if (!body) return;
+    if (!_agendaItems.length) {
+      body.innerHTML = '<div class="ac-min-sec-body-inner"><div class="ac-min-sec-empty">No agenda items.</div></div>';
+      return;
+    }
+    var html = '<div class="ac-min-sec-body-inner"><div id="ac-min-agenda-list">';
+    _agendaItems.forEach(function(item) {
+      html += _agendaItemHtml(item, !!_agendaExpanded[item.agenda_item_id]);
+    });
+    html += '</div></div>';
+    body.innerHTML = html;
+    _wireAgendaSection(body);
+  }
+
+  function _agendaItemHtml(item, expanded) {
+    var bodyHtml = expanded
+      ? '<div class="ac-min-agenda-item-body" id="ac-min-aib-'+_esc(item.agenda_item_id)+'">' +
+          '<div style="font-size:11px;color:var(--lo);padding:6px 0">Loading\u2026</div></div>'
+      : '';
+    return '<div class="ac-min-agenda-item'+(expanded?' expanded':'')+'" id="ac-min-ai-'+_esc(item.agenda_item_id)+'">' +
+      '<div class="ac-min-agenda-item-header" data-action="toggle-item" data-item-id="'+_esc(item.agenda_item_id)+'">' +
+        '<span class="ac-min-item-chevron'+(expanded?' open':'')+'">&#9654;</span>' +
+        '<span class="ac-min-item-num">'+_esc(item.position)+'</span>' +
+        '<span class="ac-min-item-title">'+_esc(item.title||'Untitled')+'</span>' +
+        '<button type="button" class="ac-min-item-add-btn" disabled>+ Add</button>' +
+      '</div>' +
+      bodyHtml +
+    '</div>';
+  }
+
+  function _wireAgendaSection(body) {
+    body.addEventListener('click', function(ev) {
+      var hdr = ev.target.closest('[data-action="toggle-item"]'); if (!hdr) return;
+      var itemId = hdr.dataset.itemId;
+      var item   = _agendaItems.find(function(a) { return a.agenda_item_id === itemId; });
+      if (!item) return;
+      _agendaExpanded[itemId] = !_agendaExpanded[itemId];
+      var itemEl = document.getElementById('ac-min-ai-'+itemId); if (!itemEl) return;
+      var chev   = hdr.querySelector('.ac-min-item-chevron');
+      if (_agendaExpanded[itemId]) {
+        itemEl.classList.add('expanded');
+        if (chev) chev.classList.add('open');
+        if (!document.getElementById('ac-min-aib-'+itemId)) {
+          var bd = document.createElement('div');
+          bd.className = 'ac-min-agenda-item-body';
+          bd.id = 'ac-min-aib-'+itemId;
+          bd.innerHTML = '<div style="font-size:11px;color:var(--lo);padding:6px 0">Loading\u2026</div>';
+          itemEl.appendChild(bd);
+        }
+        _loadAgendaItemNodes(item);
+      } else {
+        itemEl.classList.remove('expanded');
+        if (chev) chev.classList.remove('open');
+        var bdEl = document.getElementById('ac-min-aib-'+itemId);
+        if (bdEl && bdEl.parentElement) bdEl.parentElement.removeChild(bdEl);
+      }
+    });
+  }
+
+  function _loadAgendaItemNodes(item) {
+    if (!_meeting) return;
+    if (_agendaNodes[item.agenda_item_id]) {
+      _renderAgendaItemBody(item, _agendaNodes[item.agenda_item_id]);
+      return;
+    }
+    API.get('accord_nodes?meeting_id=eq.'+_meeting.meeting_id+'&agenda_item_id=eq.'+item.agenda_item_id+'&select=node_id,seq_id,tag,summary,created_by,created_at&order=created_at.asc')
+      .then(function(rows) {
+        _agendaNodes[item.agenda_item_id] = rows || [];
+        _renderAgendaItemBody(item, _agendaNodes[item.agenda_item_id]);
+      }).catch(function() {
+        var bd = document.getElementById('ac-min-aib-'+item.agenda_item_id);
+        if (bd) bd.innerHTML = '<div class="ac-min-entry-empty">Failed to load.</div>';
+      });
+  }
+
+  function _renderAgendaItemBody(item, nodes) {
+    var bd = document.getElementById('ac-min-aib-'+item.agenda_item_id); if (!bd) return;
+    if (!nodes || !nodes.length) {
+      bd.innerHTML = '<div class="ac-min-entry-empty">No captures for this item.</div>';
+      return;
+    }
+    // Resolve any unknown user_ids not already in _userIdNameMap
+    var unknown = [];
+    nodes.forEach(function(n) {
+      if (n.created_by && !_userIdNameMap[n.created_by]) unknown.push(n.created_by);
+    });
+    var resolveP = unknown.length
+      ? API.get('resources?user_id=in.('+unknown.join(',')+')'+'&select=user_id,name')
+          .then(function(res) {
+            (res||[]).forEach(function(r) { if (r.user_id) _userIdNameMap[r.user_id] = r.name; });
+          }).catch(function(){})
+      : Promise.resolve();
+
+    resolveP.then(function() {
+      var html = nodes.map(function(n) {
+        return _entryRowHtml(n, _userIdNameMap[n.created_by]||'');
+      }).join('');
+      bd.innerHTML = '<div class="ac-min-entry-list">'+html+'</div>';
+      _wireEntryExclude(bd);
+    });
+  }
+
+  function _entryRowHtml(node, authorName) {
+    var excluded = !!_excludedNodeIds[node.node_id];
+    return '<div class="ac-min-entry-row'+(excluded?' excluded':'')+'" data-node-id="'+_esc(node.node_id)+'">' +
+      '<span class="ac-min-tag-badge" style="'+_tagBadgeStyle(node.tag)+'">'+_esc(_tagLabel(node.tag))+'</span>' +
+      '<span class="ac-min-entry-summary'+(excluded?' struck':'')+'">'+_esc((node.summary||'').slice(0,140))+'</span>' +
+      (authorName ? '<span class="ac-min-entry-author">'+_esc(authorName)+'</span>' : '') +
+      '<span class="ac-min-entry-time">'+_esc(_fmtTimePart(node.created_at))+'</span>' +
+      '<button type="button" class="ac-min-entry-exclude" data-action="toggle-exclude" data-node-id="'+_esc(node.node_id)+'">'+
+        (excluded?'Include':'Exclude')+'</button>' +
+    '</div>';
+  }
+
+  function _wireEntryExclude(bodyEl) {
+    bodyEl.addEventListener('click', function(ev) {
+      var btn = ev.target.closest('[data-action="toggle-exclude"]'); if (!btn) return;
+      var nodeId = btn.dataset.nodeId;
+      if (_excludedNodeIds[nodeId]) { delete _excludedNodeIds[nodeId]; }
+      else { _excludedNodeIds[nodeId] = true; }
+      var row = bodyEl.querySelector('[data-node-id="'+nodeId+'"]');
+      if (row) {
+        row.classList.toggle('excluded', !!_excludedNodeIds[nodeId]);
+        var sum = row.querySelector('.ac-min-entry-summary');
+        if (sum) sum.classList.toggle('struck', !!_excludedNodeIds[nodeId]);
+        btn.textContent = _excludedNodeIds[nodeId] ? 'Include' : 'Exclude';
+      }
+    });
+  }
+
+  // ── Level-changed ────────────────────────────────────────────
   function _onLevelChanged() {
     window.removeEventListener('accord:level-changed', _onLevelChanged);
     destroy();
@@ -523,18 +952,24 @@ var AccordMinutes = (function () {
     _removeSuppressionStyles();
     var host = document.getElementById('ac-meeting-surface-host');
     if (host) host.innerHTML = '';
-    _meeting      = null;
-    _myResourceId = null;
-    _attendees    = [];
-    _externalRecs = [];
-    _checkedItems = {};
+    _meeting         = null;
+    _myResourceId    = null;
+    _attendees       = [];
+    _externalRecs    = [];
+    _checkedItems    = {};
+    _attendeeNameMap = {};
+    _userIdNameMap   = {};
+    _outcomes        = [];
+    _agendaItems     = [];
+    _agendaExpanded  = {};
+    _agendaNodes     = {};
+    _excludedNodeIds = {};
   }
 
   // ── Public API ───────────────────────────────────────────────
   function render(meeting) {
     _meeting      = meeting;
     _myResourceId = (window.Accord&&window.Accord.state&&window.Accord.state.me&&window.Accord.state.me.resource_id)||null;
-
     _ensureOutfitFont();
     _injectSuppressionStyles();
 
@@ -548,8 +983,15 @@ var AccordMinutes = (function () {
     _wireNavObserver();
     _wireNavClicks();
     _wireSendBtn();
+
+    // Recipients first — populates _attendeeNameMap and _userIdNameMap
     _loadRecipients(meeting.meeting_id);
     _loadSectionCounts(meeting.meeting_id);
+
+    // Meeting details deferred 200ms to allow attendee maps to populate
+    setTimeout(function() { _loadMeetingDetails(meeting); }, 200);
+    _loadOutcomes(meeting.meeting_id);
+    _loadAgenda(meeting.meeting_id);
 
     window.removeEventListener('accord:level-changed', _onLevelChanged);
     window.addEventListener('accord:level-changed',    _onLevelChanged);
