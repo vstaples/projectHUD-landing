@@ -485,21 +485,22 @@
       _detachSurfaceHost();
       // Clear prior view content (e.g. 5-tab shell) after detaching surface host
       if (host) { Array.from(host.children).forEach(function(c){ if(c.id !== 'ac-meeting-surface-host') c.remove(); }); }
+      if (window.Accord && window.Accord.loadMeeting && meeting.meeting_id) {
+        try { await window.Accord.loadMeeting(meeting.meeting_id); }
+        catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure (closed)', e); }
+      }
       var _sfHostC = document.getElementById('ac-meeting-surface-host');
       if (_sfHostC) {
         _sfHostC.classList.remove('idle', 'running', 'closed', 'sealed');
         _sfHostC.classList.add('closed');
         if (_sfHostC.parentElement !== host) host.appendChild(_sfHostC);
+        _sfHostC.classList.add('active');
         _sfHostC.style.display = '';
       }
       var _sfCenterC = document.querySelector('.ac-center');
       if (_sfCenterC) {
         _sfCenterC.classList.remove('meeting-idle', 'meeting-running', 'meeting-closed');
         _sfCenterC.classList.add('meeting-closed');
-      }
-      if (window.Accord && window.Accord.loadMeeting && meeting.meeting_id) {
-        try { await window.Accord.loadMeeting(meeting.meeting_id); }
-        catch (e) { console.warn('[Accord-views] loadMeeting best-effort failure (closed)', e); }
       }
       if (window.AccordLiveCapture && window.AccordLiveCapture.render) {
         window.AccordLiveCapture.render(meeting);
