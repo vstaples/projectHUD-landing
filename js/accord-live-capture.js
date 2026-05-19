@@ -243,12 +243,13 @@ var AccordLiveCapture = (function () {
     '.ac-lc-captured-row.excluded{opacity:.6}' +
     '.ac-lc-captured-row.excluded .ac-lc-note-exclude{display:block;color:var(--lo);border-color:rgba(255,255,255,.12);background:transparent}' +
     // Preview overlay — dark topbar, light document
-    '.ac-lc-preview-overlay{position:fixed;inset:0;z-index:200;background:#f4f5f7;display:none;flex-direction:column;overflow:hidden;font-family:"Outfit",system-ui,sans-serif}' +
+    '.ac-lc-preview-overlay{position:fixed;inset:0;z-index:200;background:#0b0d14;display:none;flex-direction:column;overflow:hidden;font-family:"Outfit",system-ui,sans-serif}' +
     '.ac-lc-preview-overlay.open{display:flex}' +
     '.ac-lc-preview-topbar{height:50px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 24px;background:#10131e;border-bottom:1px solid #1e2438}' +
     '.ac-lc-preview-close{font-size:18px;color:#8899b2;cursor:pointer;flex-shrink:0;transition:color .12s}.ac-lc-preview-close:hover{color:#dce6f5}' +
     '.ac-lc-preview-title{font-size:13px;font-weight:500;color:#dce6f5}' +
-    '.ac-lc-preview-doc{flex:1;overflow-y:auto;padding:48px 56px;max-width:800px;margin:0 auto;width:100%;box-sizing:border-box;background:#ffffff}' +
+    '.ac-lc-preview-doc-outer{flex:1;overflow-y:auto;background:#0b0d14;padding:32px 0}' +
+    '.ac-lc-preview-doc{max-width:760px;margin:0 auto;padding:48px 56px;background:#ffffff;box-sizing:border-box;border-radius:4px}' +
     // Preview document — light mode, print-ready
     '.ac-lc-preview-doc .pv-title{font-size:26px;font-weight:600;color:#1a1f2e;margin-bottom:8px;line-height:1.2}' +
     '.ac-lc-preview-doc .pv-stakes{font-size:13px;color:#555e70;font-style:italic;border-left:3px solid #d0d4df;padding-left:10px;margin-bottom:28px;line-height:1.6}' +
@@ -262,11 +263,12 @@ var AccordLiveCapture = (function () {
     '.ac-lc-preview-doc .pv-chip{font-size:12px;padding:3px 10px;border-radius:20px;background:#f0f2f7;border:1px solid #dde0ea;color:#3d4560}' +
     '.ac-lc-preview-doc .pv-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f0f2f7}' +
     '.ac-lc-preview-doc .pv-row:last-child{border-bottom:none}' +
-    '.ac-lc-preview-doc .pv-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;border:1px solid;white-space:nowrap;margin-top:3px;line-height:1.5;flex-shrink:0;letter-spacing:.03em}' +
+    '.ac-lc-preview-doc .pv-badge{font-size:10px;font-weight:700;padding:0 5px;border-radius:2px;border:1px solid;white-space:nowrap;margin-top:3px;line-height:1.4;flex-shrink:0;letter-spacing:.03em}' +
     '.ac-lc-preview-doc .pv-text{font-size:13px;color:#2d3348;flex:1;line-height:1.6}' +
     '.ac-lc-preview-doc .pv-meta-sm{font-size:11px;color:#9aa0b2;flex-shrink:0;padding-top:2px}' +
     '.ac-lc-preview-doc .pv-empty{font-size:13px;color:#9aa0b2;font-style:italic;padding:6px 0}' +
     '.ac-lc-preview-doc .pv-agenda-item{margin-bottom:18px}' +
+    '.ac-lc-preview-doc .pv-agenda-entries{padding-left:30px}' +
     '.ac-lc-preview-doc .pv-agenda-title{font-size:14px;font-weight:600;color:#1a1f2e;margin-bottom:8px;display:flex;align-items:center;gap:8px}' +
     '.ac-lc-preview-doc .pv-agenda-num{width:22px;height:22px;border-radius:50%;background:#e8eaf0;border:1px solid #d0d4df;font-size:11px;font-weight:700;color:#6b7590;display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
     '.ac-lc-preview-doc .pv-outcome-flag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:2px;letter-spacing:.03em}'
@@ -2302,7 +2304,7 @@ var AccordLiveCapture = (function () {
           '<span class="ac-lc-preview-close" onclick="AccordLiveCapture._closePreview()">\u2715</span>' +
           '<span class="ac-lc-preview-title">Preview \u2014 ' + _esc(_meeting ? _meeting.title : '') + '</span>' +
         '</div>' +
-        '<div class="ac-lc-preview-doc" id="ac-lc-preview-doc"></div>';
+        '<div class="ac-lc-preview-doc-outer"><div class="ac-lc-preview-doc" id="ac-lc-preview-doc"></div></div>';
       document.body.appendChild(overlay);
 
       document.addEventListener('keydown', function(e) {
@@ -2396,7 +2398,7 @@ var AccordLiveCapture = (function () {
     }
 
     // ── AGENDA & CAPTURES ────────────────────────────────────────
-    html += _pvSectionHeader('Agenda &amp; Captures', '#9aa0b2');
+    html += _pvSectionHeader('Agenda \u0026 Captures', '#9aa0b2');
     if (!_agendaItems.length) {
       html += '<div class="pv-empty">No agenda items.</div>';
     } else {
@@ -2410,6 +2412,7 @@ var AccordLiveCapture = (function () {
           _esc(item.title || 'Untitled') +
         '</div>';
         if (nodes.length) {
+          html += '<div class="pv-agenda-entries">';
           nodes.forEach(function(n) {
             var tagColor = { decision: '#6a5acd', note: '#2a9d6e', action: '#c97d1a', risk: '#c0392b', dissent: '#c0392b', question: '#6b7590' }[n.tag] || 'var(--md)';
             var tagBg    = { decision: '#ede9fb', note: '#e6f7f0', action: '#fdf3e3', risk: '#fdecea', dissent: '#fdecea', question: '#f0f2f7' }[n.tag] || 'rgba(255,255,255,.06)';
@@ -2421,6 +2424,7 @@ var AccordLiveCapture = (function () {
               '<span class="pv-meta-sm">' + (authorName ? _esc(authorName) + ' \u00b7 ' : '') + _esc(_fmtTime(n.created_at)) + '</span>' +
             '</div>';
           });
+          html += '</div>';
         }
         html += '</div>';
       });
