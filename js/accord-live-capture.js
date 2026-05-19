@@ -1200,6 +1200,15 @@ var AccordLiveCapture = (function () {
 
   // _endMeeting — IR71: local state only in .then(); IR73: AND state=eq.running guard
   function _endMeeting() {
+    // Recovery path: if PATCH already succeeded but _enterReviewMode failed on a prior
+    // attempt, the meeting is already closed in the DB. Skip the PATCH and recover directly.
+    if (_meeting && _meeting.state === 'closed') {
+      var recoverBtn = document.getElementById('ac-lc-end-btn');
+      if (recoverBtn) { recoverBtn.disabled = false; recoverBtn.style.opacity = ''; recoverBtn.style.pointerEvents = ''; }
+      _enterReviewMode();
+      return;
+    }
+
     var btn = document.getElementById('ac-lc-end-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Ending\u2026'; }
 
@@ -2023,6 +2032,7 @@ var AccordLiveCapture = (function () {
     // 4. Disable END MEETING
     var endBtn = document.getElementById('ac-lc-end-btn');
     if (endBtn) {
+      endBtn.textContent = 'END MEETING';
       endBtn.disabled = true;
       endBtn.style.opacity = '.35';
       endBtn.style.pointerEvents = 'none';
@@ -2265,5 +2275,5 @@ var AccordLiveCapture = (function () {
     window.removeEventListener('accord:remote-agenda', _onRemoteAgenda);
   }
 
-  return { render: render, destroy: destroy, _toggleChecklist: _toggleChecklist };
+  return { render: render, destroy: destroy, _toggleChecklist: _toggleChecklist, _enterReviewMode: _enterReviewMode };
 })();
