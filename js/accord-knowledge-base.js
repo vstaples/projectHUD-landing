@@ -35,6 +35,9 @@
       '.ac-ws-tab.active{color:var(--hi,#dce6f5);' +
         'border-bottom-color:var(--dec,#4a8cf5)}',
 
+      /* ── Workstream view layout — flex column so KB shell fills remaining height ── */
+      '.ac-view-workstream{display:flex;flex-direction:column;height:100%}',
+
       /* ── KB shell container ── */
       '.ac-kb-shell{' +
         '--void:#0b0d14;--surface:#10131e;--raised:#171c2e;--hover:#1d2338;' +
@@ -146,10 +149,13 @@
     var titleEl = host ? host.querySelector('.ac-view-title') : null;
     var wsName  = titleEl ? titleEl.textContent.trim() : 'Workstream';
 
+    // Append inside .ac-view-workstream so shell sits in the flex column
+    // after the tab bar — not as a sibling after the entire .ac-view wrapper.
+    var viewEl = host.querySelector('.ac-view-workstream') || host;
     var shell = document.createElement('div');
     shell.id = 'ac-kb-shell';
     shell.className = 'ac-kb-shell';
-    host.appendChild(shell);
+    viewEl.appendChild(shell);
     shell.innerHTML = '<div class="ac-kb-placeholder">Loading knowledge base\u2026</div>';
 
     // Load closed/sealed meetings for this workstream
