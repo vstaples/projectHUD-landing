@@ -2280,7 +2280,7 @@ var AccordLiveCapture = (function () {
 
     // Load workstream name
     if (_meeting.workstream_id) {
-      API.get('workstreams?id=eq.' + _meeting.workstream_id + '&select=id,name&limit=1')
+      API.get('workstreams?workstream_id=eq.' + _meeting.workstream_id + '&select=workstream_id,name&limit=1')
         .then(function(rows) { _workstreamName = (rows && rows[0] && rows[0].name) || ''; })
         .catch(function() { _workstreamName = ''; });
     }
