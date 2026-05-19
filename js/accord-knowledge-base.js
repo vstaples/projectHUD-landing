@@ -1,7 +1,7 @@
 // ============================================================
 // ProjectHUD — accord-knowledge-base.js
-// CMD-ACCORD-KNOWLEDGE-BASE-1 · Phase 3
-// Full discipline/topic hierarchy canvas with live data.
+// CMD-ACCORD-KNOWLEDGE-BASE-1 · Phase 4
+// Flat filter views: Decisions, Action Items, Risks, Notes.
 //
 // Public API:
 //   AccordKnowledgeBase.render(workstreamId, host)
@@ -117,7 +117,7 @@
         'color:var(--lo);text-transform:uppercase;flex-shrink:0}',
       '.ac-kb-pills{display:flex;gap:4px;flex:1;flex-wrap:wrap}',
       '.ac-kb-pill{font-size:12px;font-weight:600;padding:5px 13px;border-radius:20px;' +
-        'cursor:default;color:var(--md);border:1px solid transparent;' +
+        'cursor:pointer;color:var(--md);border:1px solid transparent;' +
         'transition:color .13s,border-color .13s;user-select:none}',
       '.ac-kb-pill.active[data-pill="all"]{color:var(--dec);border-color:var(--dec-bd)}',
       '.ac-kb-pill.active[data-pill="decisions"]{color:var(--dcn);border-color:var(--dcn-bd)}',
@@ -198,9 +198,37 @@
         'border:1px solid var(--b0);background:var(--raised);color:var(--md)}',
       '.ac-kb-chip--active{border-color:var(--dec-bd);color:var(--dec);' +
         'background:var(--dec-bg)}',
+
+      /* ── Flat filter views ── */
+      '.ac-kb-flat-sec{font-size:11px;font-weight:700;letter-spacing:.10em;' +
+        'text-transform:uppercase;color:var(--lo);' +
+        'padding:14px 0 6px;display:flex;align-items:center;gap:10px}',
+      '.ac-kb-flat-sec::after{content:"";flex:1;height:1px;background:var(--b0)}',
+      '.ac-kb-flat-list{display:flex;flex-direction:column;gap:6px;margin-bottom:4px}',
+      '.ac-kb-flat-entry{display:flex;align-items:flex-start;gap:12px;' +
+        'padding:10px 14px;background:var(--raised);border:1px solid var(--b0);' +
+        'border-left:3px solid var(--b2);border-radius:6px;transition:border-color .12s}',
+      '.ac-kb-flat-entry:hover{border-color:var(--b1)}',
+      '.ac-kb-flat-entry--dc{border-left-color:var(--dcn)}',
+      '.ac-kb-flat-entry--ax{border-left-color:var(--act)}',
+      '.ac-kb-flat-entry--rk{border-left-color:var(--rsk)}',
+      '.ac-kb-flat-body{flex:1;min-width:0}',
+      '.ac-kb-flat-text{font-size:13px;color:var(--hi);line-height:1.5}',
+      '.ac-kb-flat-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:5px}',
+      '.ac-kb-flat-author{font-size:11px;color:var(--lo)}',
+      '.ac-kb-flat-date{font-size:11px;color:var(--lo)}',
+      '.ac-kb-flat-mtg{font-size:11px;color:var(--lo);padding:1px 7px;border-radius:10px;' +
+        'background:rgba(255,255,255,.04);border:1px solid var(--b0)}',
+      '.ac-kb-flat-status{font-size:11px;font-weight:600}',
+      '.ac-kb-flat-status--open{color:var(--act)}',
+      '.ac-kb-flat-status--done{color:var(--nt)}',
+      '.ac-kb-flat-status--over{color:var(--rsk)}',
+      '.ac-kb-flat-severity{font-size:11px;font-weight:600;padding:1px 7px;border-radius:10px;border:1px solid}',
+      '.ac-kb-flat-severity--low,.ac-kb-flat-severity--medium{color:var(--act);border-color:var(--act-bd);background:var(--act-bg)}',
+      '.ac-kb-flat-severity--high{color:var(--rsk);border-color:var(--rsk-bd);background:var(--rsk-bg)}',
     ].join('');
     document.head.appendChild(s);
-    console.log('%c[accord-knowledge-base.js] v20260519-CMD-ACCORD-KNOWLEDGE-BASE-1-P3 styles injected',
+    console.log('%c[accord-knowledge-base.js] v20260519-CMD-ACCORD-KNOWLEDGE-BASE-1-P4 styles injected',
       'background:#e89430;color:#fff;padding:2px 6px;border-radius:3px;font-weight:600');
   })();
 
@@ -310,6 +338,190 @@
     h +=   '</div>';
     h += '</div>';
     return h;
+  }
+
+  // ── Filter state ────────────────────────────────────────────
+  var _activeFilter = 'all';
+
+  // ── Flat entry HTML ─────────────────────────────────────────
+  function _flatEntryHtml(n, typeClass, badgeStyle, badgeLbl, meta) {
+    var h = '';
+    h += '<div class="ac-kb-flat-entry ac-kb-flat-entry--' + typeClass + '">';
+    h +=   '<span class="ac-kb-entry-badge" style="' + badgeStyle + '">' + _esc(badgeLbl) + '</span>';
+    h +=   '<div class="ac-kb-flat-body">';
+    h +=     '<div class="ac-kb-flat-text">' + _esc(n.summary || '(no summary)') + '</div>';
+    h +=     '<div class="ac-kb-flat-meta">' + meta + '</div>';
+    h +=   '</div>';
+    h += '</div>';
+    return h;
+  }
+
+  function _mtgChipHtml(meetingId, mtgTitleMap) {
+    if (!meetingId || !mtgTitleMap[meetingId]) return '';
+    var t = mtgTitleMap[meetingId];
+    if (t.length > 28) t = t.slice(0, 25) + '\u2026';
+    return '<span class="ac-kb-flat-mtg">' + _esc(t) + '</span>';
+  }
+
+  function _authorHtml(n, nameMap) {
+    if (!n.created_by) return '';
+    var name = nameMap[n.created_by] || (String(n.created_by).slice(0, 8) + '\u2026');
+    return '<span class="ac-kb-flat-author">' + _esc(name) + '</span>';
+  }
+
+  function _flatSectionHtml(label, entries, rowFn) {
+    if (!entries.length) return '';
+    var h = '';
+    h += '<div class="ac-kb-flat-sec">' + _esc(label) + '</div>';
+    h += '<div class="ac-kb-flat-list">';
+    for (var i = 0; i < entries.length; i++) h += rowFn(entries[i]);
+    h += '</div>';
+    return h;
+  }
+
+  // ── Decisions flat view ─────────────────────────────────────
+  function _decisionsHtml(nodes, nameMap, mtgTitleMap) {
+    var decisions = [];
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].tag === 'decision') decisions.push(nodes[i]);
+    }
+    if (!decisions.length) {
+      return '<div class="ac-kb-placeholder">No decisions recorded yet.</div>';
+    }
+    var tc = TAG_COLORS.decision;
+    var bs = 'color:' + tc.color + ';background:' + tc.bg + ';border-color:' + tc.bd;
+    return _flatSectionHtml('Recorded', decisions, function (n) {
+      var meta = '';
+      meta += _authorHtml(n, nameMap);
+      meta += '<span class="ac-kb-flat-date">' + _esc(_fmtShortDate(n.created_at)) + '</span>';
+      meta += _mtgChipHtml(n.meeting_id, mtgTitleMap);
+      return _flatEntryHtml(n, 'dc', bs, n.seq_id || 'DC', meta);
+    });
+  }
+
+  // ── Action Items flat view ──────────────────────────────────
+  function _actionsHtml(nodes, nameMap, mtgTitleMap) {
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var overdue = [], open = [], closed = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.tag !== 'action') continue;
+      if (n.status === 'committed') {
+        closed.push(n);
+      } else if (n.due_date && new Date(n.due_date) < today) {
+        overdue.push(n);
+      } else {
+        open.push(n);
+      }
+    }
+    if (!overdue.length && !open.length && !closed.length) {
+      return '<div class="ac-kb-placeholder">No action items recorded yet.</div>';
+    }
+    var tc = TAG_COLORS.action;
+    var bs = 'color:' + tc.color + ';background:' + tc.bg + ';border-color:' + tc.bd;
+
+    function _axRow(n, statusLabel, statusCls, dueCls) {
+      var body = {};
+      try { body = JSON.parse(n.body || '{}'); } catch (e) {}
+      var assignee = body.assignee_name || '\u2014';
+      var dueStr = n.due_date ? _fmtShortDate(n.due_date) : '';
+      var meta = '';
+      meta += '<span class="ac-kb-flat-author">' + _esc(assignee) + '</span>';
+      if (dueStr) {
+        meta += '<span class="ac-kb-flat-date" style="color:' + dueCls + '">' + _esc(dueStr) + '</span>';
+      }
+      meta += _mtgChipHtml(n.meeting_id, mtgTitleMap);
+      meta += '<span class="ac-kb-flat-status ac-kb-flat-status--' + statusCls + '">' +
+              _esc(statusLabel) + '</span>';
+      return _flatEntryHtml(n, 'ax', bs, n.seq_id || 'AX', meta);
+    }
+
+    var html = '';
+    html += _flatSectionHtml('Overdue', overdue, function (n) {
+      return _axRow(n, 'Overdue', 'over', 'var(--rsk)');
+    });
+    html += _flatSectionHtml('Open', open, function (n) {
+      return _axRow(n, 'Open', 'open', n.due_date ? 'var(--act)' : 'var(--lo)');
+    });
+    html += _flatSectionHtml('Closed', closed, function (n) {
+      return _axRow(n, 'Done', 'done', 'var(--lo)');
+    });
+    return html;
+  }
+
+  // ── Risks flat view ─────────────────────────────────────────
+  function _risksHtml(nodes, nameMap, mtgTitleMap) {
+    var open = [], mitigated = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.tag !== 'risk' && n.tag !== 'dissent') continue;
+      if (n.status === 'committed') {
+        mitigated.push(n);
+      } else {
+        open.push(n);
+      }
+    }
+    if (!open.length && !mitigated.length) {
+      return '<div class="ac-kb-placeholder">No risks recorded yet.</div>';
+    }
+    var tc = TAG_COLORS.risk;
+    var bs = 'color:' + tc.color + ';background:' + tc.bg + ';border-color:' + tc.bd;
+
+    function _rkRow(n) {
+      var body = {};
+      try { body = JSON.parse(n.body || '{}'); } catch (e) {}
+      var severity = body.severity ? String(body.severity).toLowerCase() : null;
+      var lbl = n.seq_id || (n.tag === 'dissent' ? 'DS' : 'RK');
+      var meta = '';
+      if (severity) {
+        meta += '<span class="ac-kb-flat-severity ac-kb-flat-severity--' + _esc(severity) + '">' +
+                _esc(severity.charAt(0).toUpperCase() + severity.slice(1)) + '</span>';
+      }
+      meta += _authorHtml(n, nameMap);
+      meta += _mtgChipHtml(n.meeting_id, mtgTitleMap);
+      return _flatEntryHtml(n, 'rk', bs, lbl, meta);
+    }
+
+    var html = '';
+    html += _flatSectionHtml('Open',      open,      _rkRow);
+    html += _flatSectionHtml('Mitigated', mitigated, _rkRow);
+    return html;
+  }
+
+  // ── _setFilter ──────────────────────────────────────────────
+  function _setFilter(type) {
+    _activeFilter = type;
+
+    var pills = document.querySelectorAll('#ac-kb-shell .ac-kb-pill');
+    for (var pi = 0; pi < pills.length; pi++) {
+      pills[pi].classList.toggle('active', pills[pi].getAttribute('data-pill') === type);
+    }
+
+    var canvas = document.getElementById('ac-kb-canvas');
+    if (!canvas) return;
+
+    var mtgTitleMap = {};
+    for (var mi = 0; mi < _lastMeetings.length; mi++) {
+      mtgTitleMap[_lastMeetings[mi].meeting_id] = _lastMeetings[mi].title || '(untitled)';
+    }
+
+    if (type === 'all') {
+      canvas.innerHTML = _canvasHtml(_lastNodes, _lastMeetings, _lastNameMap);
+      _wireCanvas(canvas);
+    } else if (type === 'notes') {
+      var noteNodes = [];
+      for (var ni = 0; ni < _lastNodes.length; ni++) {
+        if (_lastNodes[ni].tag === 'note') noteNodes.push(_lastNodes[ni]);
+      }
+      canvas.innerHTML = _canvasHtml(noteNodes, _lastMeetings, _lastNameMap);
+      _wireCanvas(canvas);
+    } else if (type === 'decisions') {
+      canvas.innerHTML = _decisionsHtml(_lastNodes, _lastNameMap, mtgTitleMap);
+    } else if (type === 'actions') {
+      canvas.innerHTML = _actionsHtml(_lastNodes, _lastNameMap, mtgTitleMap);
+    } else if (type === 'risks') {
+      canvas.innerHTML = _risksHtml(_lastNodes, _lastNameMap, mtgTitleMap);
+    }
   }
 
   // ── Canvas HTML ────────────────────────────────────────────
@@ -600,8 +812,19 @@
 
     shell.innerHTML = html;
 
+    _activeFilter = 'all';
+
     var canvasEl = shell.querySelector('#ac-kb-canvas');
     if (canvasEl) _wireCanvas(canvasEl);
+
+    var pillsBar = shell.querySelector('.ac-kb-pills');
+    if (pillsBar) {
+      pillsBar.addEventListener('click', function (e) {
+        var pill = e.target.closest('.ac-kb-pill');
+        if (!pill) return;
+        _setFilter(pill.getAttribute('data-pill'));
+      });
+    }
   }
 
   // ── Destroy ────────────────────────────────────────────────
