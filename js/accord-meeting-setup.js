@@ -1282,7 +1282,7 @@
       if (!footerFix) {
         footerFix = document.createElement('style');
         footerFix.id = 'ac-setup-footer-fix';
-        footerFix.textContent = '.ac-setup-footer{position:sticky;bottom:0;z-index:50;flex-shrink:0}';
+        footerFix.textContent = '.ac-setup-footer{position:sticky;bottom:0;z-index:50;flex-shrink:0}.ac-footer-right{margin-left:auto;position:sticky;right:0}';
         document.head.appendChild(footerFix);
       }
 
