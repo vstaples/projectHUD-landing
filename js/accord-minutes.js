@@ -481,13 +481,13 @@ var AccordMinutes = (function () {
 
   // ── Recipients ───────────────────────────────────────────────
   function _loadRecipients(meetingId) {
-    if (!meetingId) return;
-    API.get('accord_meeting_attendees?meeting_id=eq.'+meetingId+'&select=attendee_id,resource_id,role_in_meeting,rsvp_status')
+    if (!meetingId) return Promise.resolve();
+    return API.get('accord_meeting_attendees?meeting_id=eq.'+meetingId+'&select=attendee_id,resource_id,role_in_meeting,rsvp_status')
       .then(function(rows) {
         rows = rows || [];
         if (!rows.length) { _renderRecipients(); return; }
         var rids = rows.map(function(r) { return r.resource_id; });
-        API.get('resources?id=in.('+rids.join(',')+')'+'&select=id,user_id,name')
+        return API.get('resources?id=in.('+rids.join(',')+')'+'&select=id,user_id,name')
           .then(function(res) {
             var nm = {};
             (res||[]).forEach(function(r) {
@@ -984,12 +984,13 @@ var AccordMinutes = (function () {
     _wireNavClicks();
     _wireSendBtn();
 
-    // Recipients first — populates _attendeeNameMap and _userIdNameMap
-    _loadRecipients(meeting.meeting_id);
-    _loadSectionCounts(meeting.meeting_id);
+    // Recipients first — _loadMeetingDetails chains off its promise so attendee
+    // maps are guaranteed populated before chips render (no setTimeout sequencing)
+    _loadRecipients(meeting.meeting_id)
+      .then(function() { _loadMeetingDetails(meeting); })
+      .catch(function() { _loadMeetingDetails(meeting); });
 
-    // Meeting details deferred 200ms to allow attendee maps to populate
-    setTimeout(function() { _loadMeetingDetails(meeting); }, 200);
+    _loadSectionCounts(meeting.meeting_id);
     _loadOutcomes(meeting.meeting_id);
     _loadAgenda(meeting.meeting_id);
 
