@@ -1,6 +1,6 @@
 // ============================================================
 // accord-minutes.js
-// CMD-ACCORD-MINUTES-1 · Phase 2 + Phase 3
+// CMD-ACCORD-MINUTES-1 · Phase 2 + Phase 3 + Phase 4
 // 2026-05-19 · Operator: Vaughn Staples
 //
 // Minutes surface — review, edit, route + send.
@@ -8,6 +8,7 @@
 //
 // Phase 2: shell + topbar + sidebar + canvas chrome.
 // Phase 3: Meeting Header + Outcomes + Agenda sections wired.
+// Phase 4: Decisions + Actions + Risks & Dissents + Parking Lot.
 //
 // Iron Rules: 36, 40 §1, 47, 64, 71, 72, 73 in force.
 // var only — no let/const.
@@ -30,7 +31,15 @@ var AccordMinutes = (function () {
   var _agendaItems      = [];
   var _agendaExpanded   = {};
   var _agendaNodes      = {};
-  var _excludedNodeIds  = {};
+  var _excludedNodeIds  = {};   // node_id → true (Phase 3+4 exclude from send)
+
+  // Phase 4 section state
+  var _decisions        = [];
+  var _actions          = [];
+  var _risks            = [];
+  var _parking          = [];
+  var _dtColsVerified   = false;  // IR47: discipline+topic verified on accord_nodes
+  var _actionPopupNodeId = null;  // node_id of currently-open action edit popup
 
   // ── Checklist ────────────────────────────────────────────────
   var _CHECKLIST = [
@@ -45,7 +54,7 @@ var AccordMinutes = (function () {
   // ── Canvas sections ──────────────────────────────────────────
   var _SECTIONS = [
     { id: 'sec-header',    title: 'Meeting Details',   bar: 'var(--md)',  edit: true,      open: false },
-    { id: 'sec-outcomes',  title: 'Intended Outcomes', bar: 'var(--dec)',                   open: true  },
+    { id: 'sec-outcomes',  title: 'Intended Outcomes', bar: 'var(--dec)',                  open: true  },
     { id: 'sec-agenda',    title: 'Agenda & Captures', bar: 'var(--nt)',  agendaAdd: true, open: true  },
     { id: 'sec-decisions', title: 'Decisions',         bar: 'var(--dcn)', add: true,       open: false },
     { id: 'sec-actions',   title: 'Action Items',      bar: 'var(--act)', add: true,       open: false },
@@ -98,6 +107,21 @@ var AccordMinutes = (function () {
     } catch(e) { return ''; }
   }
 
+  function _fmtShortDate(iso) {
+    if (!iso) return '';
+    try {
+      var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var d = new Date(iso + 'T00:00:00');
+      return MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+    } catch(e) { return iso; }
+  }
+
+  function _isOverdue(dueDateStr) {
+    if (!dueDateStr) return false;
+    var today = new Date(); today.setHours(0,0,0,0);
+    return new Date(dueDateStr + 'T00:00:00') < today;
+  }
+
   function _tagLabel(tag) {
     var m = { note:'NT', decision:'DC', action:'AX', risk:'RK', dissent:'DS', question:'Q' };
     return m[tag] || tag.toUpperCase().slice(0,2);
@@ -119,6 +143,12 @@ var AccordMinutes = (function () {
     var s = String(n || 0);
     while (s.length < 3) s = '0' + s;
     return s;
+  }
+
+  function _seqLabel(tag, seqId) {
+    var prefixes = { decision:'DC', action:'AX', risk:'RK', dissent:'DS', question:'PK' };
+    var prefix = prefixes[tag] || _tagLabel(tag);
+    return seqId ? prefix + '-' + _padSeq(seqId) : prefix;
   }
 
   function _outcomeStatusHtml(status) {
@@ -288,7 +318,7 @@ var AccordMinutes = (function () {
       '.ac-min-item-title{flex:1;font-size:14px;font-weight:500;color:var(--hi)}' +
       '.ac-min-item-add-btn{font-size:10px;font-weight:600;color:var(--act);background:var(--act-bg);border:1px solid var(--act-bd);border-radius:5px;padding:2px 8px;cursor:not-allowed;opacity:.4;font-family:inherit;flex-shrink:0}' +
       '.ac-min-agenda-item-body{padding:6px 10px 10px;background:#13172a;border-top:1px solid rgba(255,255,255,.05);border-radius:0 0 6px 6px}' +
-      // Entry rows
+      // Entry rows (agenda captures)
       '.ac-min-entry-list{display:flex;flex-direction:column;gap:4px}' +
       '.ac-min-entry-row{display:flex;align-items:baseline;gap:8px;padding:5px 8px;border-radius:5px;background:rgba(255,255,255,.03);position:relative}' +
       '.ac-min-entry-row:hover .ac-min-entry-exclude{display:block}' +
@@ -299,7 +329,54 @@ var AccordMinutes = (function () {
       '.ac-min-entry-author{font-size:11px;color:var(--lo);flex-shrink:0;white-space:nowrap}' +
       '.ac-min-entry-time{font-size:11px;color:var(--lo);flex-shrink:0;white-space:nowrap}' +
       '.ac-min-entry-exclude{display:none;font-size:10px;font-weight:600;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd);border-radius:3px;padding:1px 6px;cursor:pointer;flex-shrink:0;font-family:inherit}' +
-      '.ac-min-entry-empty{font-size:12px;color:var(--lo);font-style:italic;padding:6px 0}'
+      '.ac-min-entry-empty{font-size:12px;color:var(--lo);font-style:italic;padding:6px 0}' +
+      // ── Phase 4 node rows ────────────────────────────────────
+      '.ac-min-node-list{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}' +
+      '.ac-min-node-row{display:flex;align-items:flex-start;gap:8px;padding:7px 8px;border-radius:5px;background:rgba(255,255,255,.03);position:relative;transition:background .1s}' +
+      '.ac-min-node-row:hover{background:var(--raised)}' +
+      '.ac-min-node-row:hover .ac-min-node-del{opacity:1}' +
+      '.ac-min-node-row.deleted{opacity:.35}' +
+      '.ac-min-node-row.deleted .ac-min-node-summary{text-decoration:line-through}' +
+      '.ac-min-node-badge{font-size:10px;font-weight:700;padding:0 5px;border-radius:2px;border:1px solid;line-height:1.5;flex-shrink:0;margin-top:3px;white-space:nowrap}' +
+      '.ac-min-node-summary{flex:1;font-size:13px;color:var(--hi);outline:none;word-break:break-word;min-width:0;line-height:1.5}' +
+      '.ac-min-node-summary:focus{outline:1px solid rgba(74,140,245,.3);border-radius:3px;padding:1px 3px}' +
+      '.ac-min-node-meta{font-size:11px;color:var(--lo);flex-shrink:0;white-space:nowrap;margin-top:3px}' +
+      '.ac-min-node-del{font-size:11px;opacity:0;transition:opacity .12s;font-weight:700;color:var(--rsk);background:var(--rsk-bg);border:1px solid var(--rsk-bd);border-radius:3px;padding:0 5px;cursor:pointer;line-height:1.5;flex-shrink:0;margin-top:3px;font-family:inherit}' +
+      // Action-specific meta chips
+      '.ac-min-node-owner{font-size:11px;color:var(--lo);flex-shrink:0;white-space:nowrap;margin-top:3px}' +
+      '.ac-min-node-due{font-size:11px;flex-shrink:0;white-space:nowrap;margin-top:3px}' +
+      '.ac-min-node-due--future{color:var(--act)}' +
+      '.ac-min-node-due--overdue{color:var(--rsk);font-weight:600}' +
+      '.ac-min-node-status{font-size:10px;font-weight:600;border-radius:10px;padding:1px 7px;flex-shrink:0;white-space:nowrap;margin-top:4px;border:1px solid}' +
+      '.ac-min-node-status--open{color:var(--act);background:var(--act-bg);border-color:var(--act-bd)}' +
+      '.ac-min-node-status--overdue{color:var(--rsk);background:var(--rsk-bg);border-color:var(--rsk-bd)}' +
+      '.ac-min-node-status--done{color:var(--nt);background:var(--nt-bg);border-color:var(--nt-bd)}' +
+      // Severity chip
+      '.ac-min-node-sev{font-size:10px;font-weight:600;border-radius:10px;padding:1px 7px;flex-shrink:0;white-space:nowrap;margin-top:4px;border:1px solid}' +
+      '.ac-min-node-sev--low{color:var(--act);background:var(--act-bg);border-color:var(--act-bd)}' +
+      '.ac-min-node-sev--medium{color:var(--act);background:var(--act-bg);border-color:var(--act-bd)}' +
+      '.ac-min-node-sev--high{color:var(--rsk);background:var(--rsk-bg);border-color:var(--rsk-bd)}' +
+      // Parking lot dot
+      '.ac-min-node-dot{width:6px;height:6px;border-radius:50%;background:#9478e0;flex-shrink:0;margin-top:6px}' +
+      '.ac-min-node-source{font-size:11px;color:var(--lo);flex-shrink:0;white-space:nowrap;margin-top:3px}' +
+      // Add row (bottom of each section)
+      '.ac-min-node-add-row{display:flex;gap:6px;padding:6px 0 2px;align-items:center}' +
+      '.ac-min-node-input{flex:1;background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:6px;padding:7px 10px;font-size:12px;font-family:inherit;color:var(--hi);outline:none;transition:border-color .15s}' +
+      '.ac-min-node-input:focus{border-color:rgba(74,140,245,.4)}' +
+      '.ac-min-node-add-btn{font-size:11px;font-weight:600;color:var(--dec);background:var(--dec-bg);border:1px solid var(--dec-bd);border-radius:6px;padding:6px 12px;cursor:pointer;flex-shrink:0;font-family:inherit;transition:opacity .1s}' +
+      '.ac-min-node-add-btn:hover{opacity:.8}' +
+      '.ac-min-node-add-btn:disabled{opacity:.4;cursor:not-allowed}' +
+      // Action edit popup
+      '.ac-min-action-popup{position:relative;background:var(--surface);border:1px solid var(--b2);border-radius:8px;padding:12px 14px;margin:4px 0 8px;display:flex;flex-direction:column;gap:8px}' +
+      '.ac-min-action-popup-row{display:flex;align-items:center;gap:8px}' +
+      '.ac-min-action-popup-lbl{font-size:11px;font-weight:600;color:var(--lo);min-width:60px;flex-shrink:0}' +
+      '.ac-min-action-popup-input{flex:1;background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:5px 9px;font-size:12px;font-family:inherit;color:var(--hi);outline:none}' +
+      '.ac-min-action-popup-input:focus{border-color:rgba(74,140,245,.4)}' +
+      '.ac-min-action-popup-select{flex:1;background:var(--raised);border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:5px 9px;font-size:12px;font-family:inherit;color:var(--hi);outline:none}' +
+      '.ac-min-action-popup-btns{display:flex;gap:6px;justify-content:flex-end;padding-top:2px}' +
+      '.ac-min-action-popup-cancel{font-size:11px;color:var(--lo);background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:4px 12px;cursor:pointer;font-family:inherit}' +
+      '.ac-min-action-popup-confirm{font-size:11px;font-weight:600;color:#fff;background:var(--nt);border:1px solid var(--nt-bd);border-radius:5px;padding:4px 12px;cursor:pointer;font-family:inherit}' +
+      '.ac-min-action-popup-confirm:hover{opacity:.85}'
     );
   }
 
@@ -345,11 +422,7 @@ var AccordMinutes = (function () {
       ? '<div class="ac-min-stakes">'+_esc(meeting.stakes)+'</div>' : '';
 
     var secs = _SECTIONS.map(function(sec) {
-      var isOpen   = !!sec.open;
-      var isPhase4 = (sec.id==='sec-decisions'||sec.id==='sec-actions'||sec.id==='sec-risks'||sec.id==='sec-parking');
-      var placeholder = isPhase4
-        ? '<div class="ac-min-sec-placeholder">Content loads in Phase 4.</div>'
-        : '<div class="ac-min-sec-placeholder">Loading\u2026</div>';
+      var isOpen = !!sec.open;
       return '<div class="ac-min-sec" id="'+sec.id+'">' +
         '<div class="ac-min-sec-header" data-sec-toggle="'+sec.id+'">' +
           '<span class="ac-min-sec-bar" style="background:'+sec.bar+'"></span>' +
@@ -358,7 +431,7 @@ var AccordMinutes = (function () {
           '<span class="ac-min-sec-chevron'+(isOpen?' open':'')+'">\u25b6</span>' +
         '</div>' +
         '<div class="ac-min-sec-body" id="ac-min-sb-'+sec.id+'"'+(isOpen?'':' style="display:none"')+'>' +
-          '<div class="ac-min-sec-body-inner">'+placeholder+'</div>' +
+          '<div class="ac-min-sec-body-inner"><div class="ac-min-sec-placeholder">Loading\u2026</div></div>' +
         '</div>' +
       '</div>';
     }).join('');
@@ -434,6 +507,38 @@ var AccordMinutes = (function () {
       var open = body.style.display !== 'none';
       body.style.display = open ? 'none' : '';
       if (chev) chev.classList.toggle('open', !open);
+    });
+  }
+
+  // ── Canvas + Add button routing ──────────────────────────────
+  function _wireCanvasAddBtns() {
+    var canvas = document.getElementById('ac-min-canvas'); if (!canvas) return;
+    var inputMap = {
+      'sec-decisions': 'ac-min-dc-input',
+      'sec-actions':   'ac-min-ax-input',
+      'sec-risks':     'ac-min-rk-input',
+      'sec-parking':   'ac-min-pk-input',
+    };
+    canvas.addEventListener('click', function(ev) {
+      var btn = ev.target.closest('[data-sec-add]'); if (!btn) return;
+      var secId = btn.dataset.secAdd;
+      var body  = document.getElementById('ac-min-sb-' + secId);
+      var hdr   = document.querySelector('[data-sec-toggle="'+secId+'"]');
+      var chev  = hdr ? hdr.querySelector('.ac-min-sec-chevron') : null;
+      if (body && body.style.display === 'none') {
+        body.style.display = '';
+        if (chev) chev.classList.add('open');
+      }
+      var inputId = inputMap[secId];
+      if (inputId) {
+        var inp = document.getElementById(inputId);
+        if (inp) {
+          setTimeout(function() {
+            inp.focus();
+            inp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }, 60);
+        }
+      }
     });
   }
 
@@ -600,19 +705,22 @@ var AccordMinutes = (function () {
         rows = rows || [];
         var dc=0; var ax=0; var rk=0; var pk=0;
         rows.forEach(function(n) {
-          if      (n.tag==='decision')             dc++;
-          else if (n.tag==='action')               ax++;
+          if      (n.tag==='decision')                dc++;
+          else if (n.tag==='action')                  ax++;
           else if (n.tag==='risk'||n.tag==='dissent') rk++;
-          else if (n.tag==='question')             pk++;
+          else if (n.tag==='question')                pk++;
         });
-        _setCount('decisions',dc); _setCount('actions',ax);
-        _setCount('risks',rk);     _setCount('parking',pk);
+        _setCount('decisions',dc); _setCount('risks',rk); _setCount('parking',pk);
+        // Actions count updated by _loadActions with overdue info; set placeholder here
+        _setCount('actions', ax);
       }).catch(function(){});
   }
 
   function _setCount(key, n) {
     var el = document.getElementById('ac-min-nc-'+key);
-    if (el) el.textContent = n > 0 ? String(n) : '\u2014';
+    if (!el) return;
+    if (typeof n === 'string') { el.textContent = n || '\u2014'; return; }
+    el.textContent = n > 0 ? String(n) : '\u2014';
   }
 
   // ── Meeting Details ──────────────────────────────────────────
@@ -708,6 +816,8 @@ var AccordMinutes = (function () {
 
   function _renderOutcomes() {
     var body = document.getElementById('ac-min-sb-sec-outcomes'); if (!body) return;
+    // Phase 3 carry-forward: outcomes are read-only — DB trigger blocks INSERT on closed meetings.
+    // No + Add row rendered. Display only.
     var listHtml = _outcomes.length
       ? '<div id="ac-min-outcomes-list">'+_outcomes.map(_outcomeRowHtml).join('')+'</div>'
       : '<div id="ac-min-outcomes-list"><div class="ac-min-sec-empty">No outcomes recorded.</div></div>';
@@ -716,7 +826,7 @@ var AccordMinutes = (function () {
   }
 
   function _wireOutcomeSection(body) {
-    // Description edit — focusout bubbles unlike blur
+    // Description edit
     body.addEventListener('focusout', function(ev) {
       var desc = ev.target;
       if (!desc.classList || !desc.classList.contains('ac-min-outcome-desc')) return;
@@ -738,7 +848,7 @@ var AccordMinutes = (function () {
         });
     });
 
-    // × soft delete
+    // × soft delete (mark abandoned — status that renders as Unmet)
     body.addEventListener('click', function(ev) {
       var delBtn = ev.target.closest('[data-action="del-outcome"]'); if (!delBtn) return;
       var oid = delBtn.dataset.outcomeId;
@@ -749,49 +859,6 @@ var AccordMinutes = (function () {
           var row = body.querySelector('[data-outcome-id="'+oid+'"]');
           if (row) row.classList.add('deleted');
         }).catch(function(e) { console.error('[AccordMinutes] outcome delete failed', e); });
-    });
-
-    // + Add
-    var inp = document.getElementById('ac-min-outcome-inp');
-    var btn = document.getElementById('ac-min-outcome-add');
-    if (!inp || !btn) return;
-
-    function _commit() {
-      var text = inp.value.trim(); if (!text) return;
-      var me = window.Accord && window.Accord.state && window.Accord.state.me;
-      if (!me) return;
-      var row = {
-        firm_id:     me.firm_id,
-        meeting_id:  _meeting.meeting_id,
-        description: text,
-        verb:        'INFORM',
-        status:      'open',
-        position:    _outcomes.length + 1,
-      };
-      if (me.id) row.created_by = me.id; // IR47: nullable; include if available
-      btn.disabled = true;
-      API.post('accord_meeting_outcomes', row)
-        .then(function(created) {
-          var newOut = Array.isArray(created) ? created[0] : created;
-          inp.value = ''; btn.disabled = false;
-          if (!newOut) return;
-          _outcomes.push(newOut);
-          var list = document.getElementById('ac-min-outcomes-list');
-          if (list) {
-            var d = document.createElement('div');
-            d.innerHTML = _outcomeRowHtml(newOut);
-            list.appendChild(d.firstChild);
-          }
-          _setCount('outcomes', _outcomes.length);
-        }).catch(function(e) {
-          console.error('[AccordMinutes] outcome INSERT failed', e);
-          btn.disabled = false;
-        });
-    }
-
-    btn.addEventListener('click', _commit);
-    inp.addEventListener('keydown', function(ev) {
-      if (ev.key === 'Enter') { ev.preventDefault(); _commit(); }
     });
   }
 
@@ -891,7 +958,6 @@ var AccordMinutes = (function () {
       bd.innerHTML = '<div class="ac-min-entry-empty">No captures for this item.</div>';
       return;
     }
-    // Resolve any unknown user_ids not already in _userIdNameMap
     var unknown = [];
     nodes.forEach(function(n) {
       if (n.created_by && !_userIdNameMap[n.created_by]) unknown.push(n.created_by);
@@ -940,6 +1006,700 @@ var AccordMinutes = (function () {
     });
   }
 
+  // ── IR47 — Verify discipline + topic columns ──────────────────
+  // Run once at init. If columns absent, _dtColsVerified stays false
+  // and _buildNodePayload omits those fields from all INSERTs.
+  function _verifyDisciplineTopic() {
+    return API.get('information_schema/columns?table_name=eq.accord_nodes&column_name=in.(discipline,topic)&select=column_name')
+      .then(function(rows) {
+        _dtColsVerified = (rows && rows.length === 2);
+        if (!_dtColsVerified) {
+          console.warn('[AccordMinutes] IR47 finding: discipline/topic cols ' +
+            (rows ? rows.length : 0) + '/2 present on accord_nodes. Omitting from INSERTs.');
+        } else {
+          console.log('[AccordMinutes] IR47: discipline + topic confirmed on accord_nodes.');
+        }
+      }).catch(function(e) {
+        _dtColsVerified = false;
+        console.warn('[AccordMinutes] IR47: column check errored — omitting discipline/topic from INSERTs.', e);
+      });
+  }
+
+  // ── Node INSERT payload builder ───────────────────────────────
+  function _buildNodePayload(tag, summary) {
+    var me = window.Accord && window.Accord.state && window.Accord.state.me;
+    var payload = {
+      firm_id:        (me && me.firm_id)                          || null,
+      meeting_id:     _meeting.meeting_id,
+      agenda_item_id: null,
+      thread_id:      null,
+      tag:            tag,
+      summary:        summary,
+      body:           null,
+      created_by:     (me && (me.resource_id || me.id))           || null,
+    };
+    if (_dtColsVerified) {
+      payload.discipline = null;
+      payload.topic      = null;
+    }
+    return payload;
+  }
+
+  // ── Author resolution helper ─────────────────────────────────
+  function _resolveAuthors(nodes, cb) {
+    var unknown = [];
+    nodes.forEach(function(n) {
+      if (n.created_by && !_userIdNameMap[n.created_by]) unknown.push(n.created_by);
+    });
+    if (!unknown.length) { cb(); return; }
+    API.get('resources?user_id=in.('+unknown.join(',')+')'+'&select=user_id,name')
+      .then(function(res) {
+        (res||[]).forEach(function(r) { if (r.user_id) _userIdNameMap[r.user_id] = r.name; });
+        cb();
+      }).catch(function() { cb(); });
+  }
+
+  // ── Shared node row soft-delete handler ──────────────────────
+  // Used by Decisions, Risks, Parking Lot.
+  // IR71: DOM fade only after server PATCH confirms.
+  // IR73: meeting_id guard included in filter.
+  function _softDeleteNode(nodeId, listArray, listEl) {
+    API.patch(
+      'accord_nodes?node_id=eq.'+nodeId+'&meeting_id=eq.'+_meeting.meeting_id,
+      { status: 'deleted' }
+    ).then(function() {
+      var i = listArray.findIndex(function(n) { return n.node_id === nodeId; });
+      if (i > -1) listArray[i].status = 'deleted';
+      var row = listEl.querySelector('[data-node-id="'+nodeId+'"]');
+      if (row) { row.classList.add('deleted'); }
+    }).catch(function(e) {
+      console.error('[AccordMinutes] soft-delete failed for', nodeId, e);
+    });
+  }
+
+  // ── Summary PATCH helper ─────────────────────────────────────
+  // IR71: reverts on failure. IR73: meeting_id guard.
+  function _patchNodeSummary(nodeId, newText, origText, descEl, listArray) {
+    API.patch(
+      'accord_nodes?node_id=eq.'+nodeId+'&meeting_id=eq.'+_meeting.meeting_id,
+      { summary: newText }
+    ).then(function() {
+      if (descEl) descEl.dataset.orig = newText;
+      var n = listArray.find(function(x) { return x.node_id === nodeId; });
+      if (n) n.summary = newText;
+    }).catch(function(e) {
+      console.error('[AccordMinutes] summary PATCH failed', e);
+      if (descEl) descEl.textContent = origText;
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ── Phase 4 §4.1 — Decisions ─────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+
+  function _loadDecisions(meetingId) {
+    if (!meetingId) return;
+    API.get('accord_nodes?meeting_id=eq.'+meetingId+
+        '&tag=eq.decision&select=node_id,seq_id,tag,summary,created_by,created_at,status&order=created_at.asc')
+      .then(function(rows) {
+        _decisions = (rows||[]).filter(function(n) { return n.status !== 'deleted'; });
+        _renderDecisions();
+        _setCount('decisions', _decisions.length);
+      }).catch(function() {
+        var body = document.getElementById('ac-min-sb-sec-decisions');
+        if (body) body.innerHTML = '<div class="ac-min-sec-body-inner"><div class="ac-min-sec-empty">Could not load decisions.</div></div>';
+      });
+  }
+
+  function _dcRowHtml(node) {
+    var label = _seqLabel('decision', node.seq_id);
+    var author = _userIdNameMap[node.created_by] || '';
+    var meta = author
+      ? _esc(author) + (node.created_at ? ' \u00b7 '+_esc(_fmtTimePart(node.created_at)) : '')
+      : (node.created_at ? _esc(_fmtTimePart(node.created_at)) : '');
+    return '<div class="ac-min-node-row'+(node.status==='deleted'?' deleted':'')+'" data-node-id="'+_esc(node.node_id)+'">' +
+      '<span class="ac-min-node-badge" style="'+_tagBadgeStyle('decision')+'">'+_esc(label)+'</span>' +
+      '<span class="ac-min-node-summary" contenteditable="true" data-orig="'+_esc(node.summary||'')+'">'+_esc(node.summary||'')+'</span>' +
+      (meta ? '<span class="ac-min-node-meta">'+meta+'</span>' : '') +
+      '<button type="button" class="ac-min-node-del" data-action="del-dc" data-node-id="'+_esc(node.node_id)+'">\u00d7</button>' +
+    '</div>';
+  }
+
+  function _renderDecisions() {
+    var body = document.getElementById('ac-min-sb-sec-decisions'); if (!body) return;
+    _resolveAuthors(_decisions, function() {
+      var listHtml = _decisions.length
+        ? _decisions.map(_dcRowHtml).join('')
+        : '<div class="ac-min-sec-empty">No decisions recorded.</div>';
+      body.innerHTML =
+        '<div class="ac-min-sec-body-inner">' +
+          '<div class="ac-min-node-list" id="ac-min-dc-list">'+listHtml+'</div>' +
+          '<div class="ac-min-node-add-row">' +
+            '<input type="text" class="ac-min-node-input" id="ac-min-dc-input" placeholder="Add a decision\u2026" />' +
+            '<button type="button" class="ac-min-node-add-btn" id="ac-min-dc-add">+ Add</button>' +
+          '</div>' +
+        '</div>';
+      _wireDecisions(body);
+    });
+  }
+
+  function _wireDecisions(body) {
+    var list = document.getElementById('ac-min-dc-list');
+
+    // Summary contenteditable — blur → PATCH (IR71, IR73)
+    body.addEventListener('focusout', function(ev) {
+      var desc = ev.target;
+      if (!desc.classList.contains('ac-min-node-summary')) return;
+      var row = desc.closest('[data-node-id]'); if (!row) return;
+      var nodeId  = row.dataset.nodeId;
+      var newText = desc.textContent.trim();
+      var origText = desc.dataset.orig;
+      if (newText === origText) return;
+      _patchNodeSummary(nodeId, newText, origText, desc, _decisions);
+    });
+
+    // × soft delete
+    body.addEventListener('click', function(ev) {
+      var btn = ev.target.closest('[data-action="del-dc"]'); if (!btn) return;
+      var nodeId = btn.dataset.nodeId;
+      _softDeleteNode(nodeId, _decisions, list || body);
+    });
+
+    // + Add INSERT
+    var inp    = document.getElementById('ac-min-dc-input');
+    var addBtn = document.getElementById('ac-min-dc-add');
+    if (!inp || !addBtn) return;
+
+    function _commitDc() {
+      var text = inp.value.trim(); if (!text) return;
+      var payload = _buildNodePayload('decision', text);
+      addBtn.disabled = true;
+      API.post('accord_nodes', payload)
+        .then(function(created) {
+          var newNode = Array.isArray(created) ? created[0] : created;
+          inp.value = ''; addBtn.disabled = false;
+          if (!newNode) return;
+          newNode.status = newNode.status || null;
+          _decisions.push(newNode);
+          if (list) {
+            // Remove empty placeholder if present
+            var empty = list.querySelector('.ac-min-sec-empty');
+            if (empty) list.innerHTML = '';
+            // Resolve author then append
+            _resolveAuthors([newNode], function() {
+              var d = document.createElement('div');
+              d.innerHTML = _dcRowHtml(newNode);
+              list.appendChild(d.firstChild);
+            });
+          }
+          _setCount('decisions', _decisions.length);
+        }).catch(function(e) {
+          console.error('[AccordMinutes] decision INSERT failed', e);
+          addBtn.disabled = false;
+        });
+    }
+
+    addBtn.addEventListener('click', _commitDc);
+    inp.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); _commitDc(); }
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ── Phase 4 §4.2 — Action Items ──────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+
+  function _loadActions(meetingId) {
+    if (!meetingId) return;
+    API.get('accord_nodes?meeting_id=eq.'+meetingId+
+        '&tag=eq.action&select=node_id,seq_id,tag,summary,body,created_by,created_at,due_date,status&order=created_at.asc')
+      .then(function(rows) {
+        _actions = (rows||[]).filter(function(n) { return n.status !== 'deleted'; });
+        var overdue = _actions.filter(function(a) {
+          return _isOverdue(a.due_date) && a.status !== 'closed';
+        }).length;
+        var countStr = _actions.length + ' assigned' + (overdue > 0 ? ' \u00b7 ' + overdue + ' overdue' : '');
+        _renderActions();
+        _setCount('actions', countStr);
+      }).catch(function() {
+        var body = document.getElementById('ac-min-sb-sec-actions');
+        if (body) body.innerHTML = '<div class="ac-min-sec-body-inner"><div class="ac-min-sec-empty">Could not load action items.</div></div>';
+      });
+  }
+
+  function _parseActionBody(bodyStr) {
+    if (!bodyStr) return { assignee_name: null, assignee_resource_id: null };
+    try { return JSON.parse(bodyStr) || {}; } catch(e) { return {}; }
+  }
+
+  function _axRowHtml(node) {
+    var label    = _seqLabel('action', node.seq_id);
+    var bodyData = _parseActionBody(node.body);
+    var owner    = bodyData.assignee_name || 'Unassigned';
+    var overdue  = _isOverdue(node.due_date) && node.status !== 'closed';
+    var dueStr   = node.due_date ? _fmtShortDate(node.due_date) : '\u2014';
+    var dueCls   = node.due_date
+      ? (overdue ? 'ac-min-node-due--overdue' : 'ac-min-node-due--future')
+      : '';
+    var statusCls, statusLabel;
+    if (node.status === 'closed') {
+      statusCls = 'ac-min-node-status--done'; statusLabel = 'Done';
+    } else if (overdue) {
+      statusCls = 'ac-min-node-status--overdue'; statusLabel = 'Overdue';
+    } else {
+      statusCls = 'ac-min-node-status--open'; statusLabel = 'Open';
+    }
+    return '<div class="ac-min-node-row'+(node.status==='deleted'?' deleted':'')+'" data-node-id="'+_esc(node.node_id)+'" data-action-row="1">' +
+      '<span class="ac-min-node-badge" style="'+_tagBadgeStyle('action')+'">'+_esc(label)+'</span>' +
+      '<span class="ac-min-node-summary" contenteditable="true" data-orig="'+_esc(node.summary||'')+'">'+_esc(node.summary||'')+'</span>' +
+      '<span class="ac-min-node-owner">'+_esc(owner)+'</span>' +
+      (node.due_date ? '<span class="ac-min-node-due '+dueCls+'">'+_esc(dueStr)+'</span>' : '') +
+      '<span class="ac-min-node-status '+statusCls+'">'+statusLabel+'</span>' +
+      '<button type="button" class="ac-min-node-del" data-action="del-ax" data-node-id="'+_esc(node.node_id)+'">\u00d7</button>' +
+    '</div>';
+  }
+
+  function _renderActions() {
+    var body = document.getElementById('ac-min-sb-sec-actions'); if (!body) return;
+    _resolveAuthors(_actions, function() {
+      var listHtml = _actions.length
+        ? _actions.map(_axRowHtml).join('')
+        : '<div class="ac-min-sec-empty">No action items recorded.</div>';
+      body.innerHTML =
+        '<div class="ac-min-sec-body-inner">' +
+          '<div class="ac-min-node-list" id="ac-min-ax-list">'+listHtml+'</div>' +
+          '<div class="ac-min-node-add-row">' +
+            '<input type="text" class="ac-min-node-input" id="ac-min-ax-input" placeholder="Add an action item\u2026" />' +
+            '<button type="button" class="ac-min-node-add-btn" id="ac-min-ax-add">+ Add</button>' +
+          '</div>' +
+        '</div>';
+      _wireActions(body);
+    });
+  }
+
+  function _wireActions(body) {
+    var list = document.getElementById('ac-min-ax-list');
+
+    // Summary contenteditable — blur → PATCH (IR71, IR73)
+    body.addEventListener('focusout', function(ev) {
+      var desc = ev.target;
+      if (!desc.classList.contains('ac-min-node-summary')) return;
+      var row = desc.closest('[data-action-row]'); if (!row) return;
+      var nodeId   = row.dataset.nodeId;
+      var newText  = desc.textContent.trim();
+      var origText = desc.dataset.orig;
+      if (newText === origText) return;
+      _patchNodeSummary(nodeId, newText, origText, desc, _actions);
+    });
+
+    // × soft delete
+    body.addEventListener('click', function(ev) {
+      if (ev.target.closest('.ac-min-action-popup')) return; // don't intercept popup clicks
+      var delBtn = ev.target.closest('[data-action="del-ax"]'); if (!delBtn) return;
+      var nodeId = delBtn.dataset.nodeId;
+      _softDeleteNode(nodeId, _actions, list || body);
+    });
+
+    // Row click → edit popup (not on badge, not on del, not on summary focus)
+    body.addEventListener('click', function(ev) {
+      if (ev.target.closest('.ac-min-node-del'))    return;
+      if (ev.target.closest('.ac-min-action-popup')) return;
+      if (ev.target.closest('[data-action="del-ax"]')) return;
+      var row = ev.target.closest('[data-action-row]'); if (!row) return;
+      if (ev.target.classList.contains('ac-min-node-summary')) return; // let contenteditable handle
+      var nodeId = row.dataset.nodeId;
+      _openActionPopup(row, nodeId);
+    });
+
+    // + Add INSERT
+    var inp    = document.getElementById('ac-min-ax-input');
+    var addBtn = document.getElementById('ac-min-ax-add');
+    if (!inp || !addBtn) return;
+
+    function _commitAx() {
+      var text = inp.value.trim(); if (!text) return;
+      var payload = _buildNodePayload('action', text);
+      addBtn.disabled = true;
+      API.post('accord_nodes', payload)
+        .then(function(created) {
+          var newNode = Array.isArray(created) ? created[0] : created;
+          inp.value = ''; addBtn.disabled = false;
+          if (!newNode) return;
+          newNode.status = newNode.status || null;
+          _actions.push(newNode);
+          if (list) {
+            var empty = list.querySelector('.ac-min-sec-empty');
+            if (empty) list.innerHTML = '';
+            var d = document.createElement('div');
+            d.innerHTML = _axRowHtml(newNode);
+            list.appendChild(d.firstChild);
+          }
+          // Recount with overdue
+          var overdue = _actions.filter(function(a) {
+            return _isOverdue(a.due_date) && a.status !== 'closed';
+          }).length;
+          var countStr = _actions.length + ' assigned' + (overdue > 0 ? ' \u00b7 '+overdue+' overdue' : '');
+          _setCount('actions', countStr);
+        }).catch(function(e) {
+          console.error('[AccordMinutes] action INSERT failed', e);
+          addBtn.disabled = false;
+        });
+    }
+
+    addBtn.addEventListener('click', _commitAx);
+    inp.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); _commitAx(); }
+    });
+  }
+
+  function _openActionPopup(row, nodeId) {
+    // Close any existing popup first
+    _closeActionPopup();
+    _actionPopupNodeId = nodeId;
+
+    var node = _actions.find(function(n) { return n.node_id === nodeId; });
+    if (!node) return;
+    var bodyData = _parseActionBody(node.body);
+    var assigneeName = bodyData.assignee_name || '';
+    var assigneeId   = bodyData.assignee_resource_id || '';
+    var dueVal   = node.due_date || '';
+    var statusVal = (node.status === 'closed') ? 'closed' : 'open';
+
+    var popup = document.createElement('div');
+    popup.className = 'ac-min-action-popup';
+    popup.id = 'ac-min-ax-popup-'+nodeId;
+    popup.innerHTML =
+      '<div class="ac-min-action-popup-row">' +
+        '<span class="ac-min-action-popup-lbl">Task</span>' +
+        '<input type="text" class="ac-min-action-popup-input" id="ac-min-ax-p-sum" value="'+_esc(node.summary||'')+'" />' +
+      '</div>' +
+      '<div class="ac-min-action-popup-row">' +
+        '<span class="ac-min-action-popup-lbl">Assignee</span>' +
+        '<input type="text" class="ac-min-action-popup-input" id="ac-min-ax-p-assignee" ' +
+          'value="'+_esc(assigneeName)+'" placeholder="Name or leave blank" />' +
+      '</div>' +
+      '<div class="ac-min-action-popup-row">' +
+        '<span class="ac-min-action-popup-lbl">Due date</span>' +
+        '<input type="date" class="ac-min-action-popup-input" id="ac-min-ax-p-due" value="'+_esc(dueVal)+'" />' +
+      '</div>' +
+      '<div class="ac-min-action-popup-row">' +
+        '<span class="ac-min-action-popup-lbl">Status</span>' +
+        '<select class="ac-min-action-popup-select" id="ac-min-ax-p-status">' +
+          '<option value="open"'+(statusVal==='open'?' selected':'')+'>Open</option>' +
+          '<option value="closed"'+(statusVal==='closed'?' selected':'')+'>Done</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="ac-min-action-popup-btns">' +
+        '<button type="button" class="ac-min-action-popup-cancel" id="ac-min-ax-p-cancel">Cancel</button>' +
+        '<button type="button" class="ac-min-action-popup-confirm" id="ac-min-ax-p-confirm">Save</button>' +
+      '</div>';
+
+    // Insert popup directly after the row
+    row.parentNode.insertBefore(popup, row.nextSibling);
+
+    document.getElementById('ac-min-ax-p-cancel').addEventListener('click', function() {
+      _closeActionPopup();
+    });
+
+    document.getElementById('ac-min-ax-p-confirm').addEventListener('click', function() {
+      var sumEl      = document.getElementById('ac-min-ax-p-sum');
+      var assigneeEl = document.getElementById('ac-min-ax-p-assignee');
+      var dueEl      = document.getElementById('ac-min-ax-p-due');
+      var statusEl   = document.getElementById('ac-min-ax-p-status');
+
+      var newSummary  = sumEl      ? sumEl.value.trim()      : (node.summary || '');
+      var newAssignee = assigneeEl ? assigneeEl.value.trim() : assigneeName;
+      var newDue      = dueEl      ? dueEl.value             : dueVal;
+      var newStatus   = statusEl   ? statusEl.value          : statusVal;
+
+      var newBody = JSON.stringify({
+        assignee_name:        newAssignee || null,
+        assignee_resource_id: (newAssignee === assigneeName ? assigneeId : null) || null,
+      });
+
+      var patch = {
+        summary:  newSummary,
+        body:     newBody,
+        due_date: newDue || null,
+        status:   newStatus === 'closed' ? 'closed' : null,
+      };
+
+      // IR71: wait for confirm before DOM update
+      // IR73: meeting_id guard in filter
+      API.patch(
+        'accord_nodes?node_id=eq.'+nodeId+'&meeting_id=eq.'+_meeting.meeting_id,
+        patch
+      ).then(function() {
+        // Update in-memory record
+        var n = _actions.find(function(x) { return x.node_id === nodeId; });
+        if (n) {
+          n.summary  = newSummary;
+          n.body     = newBody;
+          n.due_date = newDue || null;
+          n.status   = newStatus === 'closed' ? 'closed' : null;
+        }
+        // Re-render the row
+        var list = document.getElementById('ac-min-ax-list');
+        var oldRow = list ? list.querySelector('[data-node-id="'+nodeId+'"]') : null;
+        if (oldRow && n) {
+          var tmp = document.createElement('div');
+          tmp.innerHTML = _axRowHtml(n);
+          oldRow.parentNode.replaceChild(tmp.firstChild, oldRow);
+        }
+        _closeActionPopup();
+        // Update overdue count
+        var overdue = _actions.filter(function(a) {
+          return _isOverdue(a.due_date) && a.status !== 'closed';
+        }).length;
+        var countStr = _actions.length + ' assigned' + (overdue > 0 ? ' \u00b7 '+overdue+' overdue' : '');
+        _setCount('actions', countStr);
+      }).catch(function(e) {
+        console.error('[AccordMinutes] action PATCH failed', e);
+        _closeActionPopup();
+      });
+    });
+  }
+
+  function _closeActionPopup() {
+    if (_actionPopupNodeId) {
+      var p = document.getElementById('ac-min-ax-popup-'+_actionPopupNodeId);
+      if (p && p.parentNode) p.parentNode.removeChild(p);
+      _actionPopupNodeId = null;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ── Phase 4 §4.3 — Risks & Dissents ──────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+
+  function _loadRisks(meetingId) {
+    if (!meetingId) return;
+    API.get('accord_nodes?meeting_id=eq.'+meetingId+
+        '&tag=in.(risk,dissent)&select=node_id,seq_id,tag,summary,body,created_by,created_at,status&order=created_at.asc')
+      .then(function(rows) {
+        _risks = (rows||[]).filter(function(n) { return n.status !== 'deleted'; });
+        _renderRisks();
+        _setCount('risks', _risks.length);
+      }).catch(function() {
+        var body = document.getElementById('ac-min-sb-sec-risks');
+        if (body) body.innerHTML = '<div class="ac-min-sec-body-inner"><div class="ac-min-sec-empty">Could not load risks.</div></div>';
+      });
+  }
+
+  function _parseRiskBody(bodyStr) {
+    if (!bodyStr) return {};
+    try { return JSON.parse(bodyStr) || {}; } catch(e) { return {}; }
+  }
+
+  function _sevChipHtml(severity) {
+    if (!severity) return '';
+    var cls = severity === 'high' ? 'ac-min-node-sev--high' : 'ac-min-node-sev--' + severity;
+    var label = severity.charAt(0).toUpperCase() + severity.slice(1);
+    return '<span class="ac-min-node-sev '+cls+'">'+_esc(label)+'</span>';
+  }
+
+  function _rkRowHtml(node) {
+    var label    = _seqLabel(node.tag, node.seq_id);
+    var bodyData = _parseRiskBody(node.body);
+    var author   = _userIdNameMap[node.created_by] || '';
+    var metaParts = [];
+    if (author) metaParts.push(author);
+    if (node.created_at) metaParts.push(_fmtTimePart(node.created_at));
+    var meta = metaParts.join(' \u00b7 ');
+    return '<div class="ac-min-node-row'+(node.status==='deleted'?' deleted':'')+'" data-node-id="'+_esc(node.node_id)+'">' +
+      '<span class="ac-min-node-badge" style="'+_tagBadgeStyle(node.tag)+'">'+_esc(label)+'</span>' +
+      '<span class="ac-min-node-summary" contenteditable="true" data-orig="'+_esc(node.summary||'')+'">'+_esc(node.summary||'')+'</span>' +
+      _sevChipHtml(bodyData.severity) +
+      (meta ? '<span class="ac-min-node-meta">'+_esc(meta)+'</span>' : '') +
+      '<button type="button" class="ac-min-node-del" data-action="del-rk" data-node-id="'+_esc(node.node_id)+'">\u00d7</button>' +
+    '</div>';
+  }
+
+  function _renderRisks() {
+    var body = document.getElementById('ac-min-sb-sec-risks'); if (!body) return;
+    _resolveAuthors(_risks, function() {
+      var listHtml = _risks.length
+        ? _risks.map(_rkRowHtml).join('')
+        : '<div class="ac-min-sec-empty">No risks or dissents recorded.</div>';
+      body.innerHTML =
+        '<div class="ac-min-sec-body-inner">' +
+          '<div class="ac-min-node-list" id="ac-min-rk-list">'+listHtml+'</div>' +
+          '<div class="ac-min-node-add-row">' +
+            '<input type="text" class="ac-min-node-input" id="ac-min-rk-input" placeholder="Add a risk\u2026" />' +
+            '<button type="button" class="ac-min-node-add-btn" id="ac-min-rk-add">+ Add</button>' +
+          '</div>' +
+        '</div>';
+      _wireRisks(body);
+    });
+  }
+
+  function _wireRisks(body) {
+    var list = document.getElementById('ac-min-rk-list');
+
+    // Summary contenteditable — blur → PATCH (IR71, IR73)
+    body.addEventListener('focusout', function(ev) {
+      var desc = ev.target;
+      if (!desc.classList.contains('ac-min-node-summary')) return;
+      var row = desc.closest('[data-node-id]'); if (!row) return;
+      var nodeId   = row.dataset.nodeId;
+      var newText  = desc.textContent.trim();
+      var origText = desc.dataset.orig;
+      if (newText === origText) return;
+      _patchNodeSummary(nodeId, newText, origText, desc, _risks);
+    });
+
+    // × soft delete
+    body.addEventListener('click', function(ev) {
+      var btn = ev.target.closest('[data-action="del-rk"]'); if (!btn) return;
+      var nodeId = btn.dataset.nodeId;
+      _softDeleteNode(nodeId, _risks, list || body);
+    });
+
+    // + Add INSERT (tag='risk')
+    var inp    = document.getElementById('ac-min-rk-input');
+    var addBtn = document.getElementById('ac-min-rk-add');
+    if (!inp || !addBtn) return;
+
+    function _commitRk() {
+      var text = inp.value.trim(); if (!text) return;
+      var payload = _buildNodePayload('risk', text);
+      addBtn.disabled = true;
+      API.post('accord_nodes', payload)
+        .then(function(created) {
+          var newNode = Array.isArray(created) ? created[0] : created;
+          inp.value = ''; addBtn.disabled = false;
+          if (!newNode) return;
+          newNode.status = newNode.status || null;
+          _risks.push(newNode);
+          if (list) {
+            var empty = list.querySelector('.ac-min-sec-empty');
+            if (empty) list.innerHTML = '';
+            _resolveAuthors([newNode], function() {
+              var d = document.createElement('div');
+              d.innerHTML = _rkRowHtml(newNode);
+              list.appendChild(d.firstChild);
+            });
+          }
+          _setCount('risks', _risks.length);
+        }).catch(function(e) {
+          console.error('[AccordMinutes] risk INSERT failed', e);
+          addBtn.disabled = false;
+        });
+    }
+
+    addBtn.addEventListener('click', _commitRk);
+    inp.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); _commitRk(); }
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ── Phase 4 §4.4 — Parking Lot ───────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+
+  function _loadParking(meetingId) {
+    if (!meetingId) return;
+    API.get('accord_nodes?meeting_id=eq.'+meetingId+
+        '&tag=eq.question&select=node_id,seq_id,tag,summary,created_by,created_at,agenda_item_id,status&order=created_at.asc')
+      .then(function(rows) {
+        _parking = (rows||[]).filter(function(n) { return n.status !== 'deleted'; });
+        _renderParking();
+        _setCount('parking', _parking.length);
+      }).catch(function() {
+        var body = document.getElementById('ac-min-sb-sec-parking');
+        if (body) body.innerHTML = '<div class="ac-min-sec-body-inner"><div class="ac-min-sec-empty">Could not load parking lot.</div></div>';
+      });
+  }
+
+  function _pkRowHtml(node) {
+    // Resolve source agenda item title from already-loaded _agendaItems
+    var sourceTitle = null;
+    if (node.agenda_item_id) {
+      var ai = _agendaItems.find(function(a) { return a.agenda_item_id === node.agenda_item_id; });
+      if (ai) sourceTitle = ai.title;
+    }
+    return '<div class="ac-min-node-row'+(node.status==='deleted'?' deleted':'')+'" data-node-id="'+_esc(node.node_id)+'">' +
+      '<span class="ac-min-node-dot"></span>' +
+      '<span class="ac-min-node-summary" contenteditable="true" data-orig="'+_esc(node.summary||'')+'">'+_esc(node.summary||'')+'</span>' +
+      (sourceTitle ? '<span class="ac-min-node-source">\u2192 '+_esc(sourceTitle)+'</span>' : '') +
+      '<button type="button" class="ac-min-node-del" data-action="del-pk" data-node-id="'+_esc(node.node_id)+'">\u00d7</button>' +
+    '</div>';
+  }
+
+  function _renderParking() {
+    var body = document.getElementById('ac-min-sb-sec-parking'); if (!body) return;
+    var listHtml = _parking.length
+      ? _parking.map(_pkRowHtml).join('')
+      : '<div class="ac-min-sec-empty">No parking lot items.</div>';
+    body.innerHTML =
+      '<div class="ac-min-sec-body-inner">' +
+        '<div class="ac-min-node-list" id="ac-min-pk-list">'+listHtml+'</div>' +
+        '<div class="ac-min-node-add-row">' +
+          '<input type="text" class="ac-min-node-input" id="ac-min-pk-input" placeholder="Add to parking lot\u2026" />' +
+          '<button type="button" class="ac-min-node-add-btn" id="ac-min-pk-add">+ Add</button>' +
+        '</div>' +
+      '</div>';
+    _wireParking(body);
+  }
+
+  function _wireParking(body) {
+    var list = document.getElementById('ac-min-pk-list');
+
+    // Summary contenteditable — blur → PATCH (IR71, IR73)
+    body.addEventListener('focusout', function(ev) {
+      var desc = ev.target;
+      if (!desc.classList.contains('ac-min-node-summary')) return;
+      var row = desc.closest('[data-node-id]'); if (!row) return;
+      var nodeId   = row.dataset.nodeId;
+      var newText  = desc.textContent.trim();
+      var origText = desc.dataset.orig;
+      if (newText === origText) return;
+      _patchNodeSummary(nodeId, newText, origText, desc, _parking);
+    });
+
+    // × soft delete
+    body.addEventListener('click', function(ev) {
+      var btn = ev.target.closest('[data-action="del-pk"]'); if (!btn) return;
+      var nodeId = btn.dataset.nodeId;
+      _softDeleteNode(nodeId, _parking, list || body);
+    });
+
+    // + Add INSERT (tag='question')
+    var inp    = document.getElementById('ac-min-pk-input');
+    var addBtn = document.getElementById('ac-min-pk-add');
+    if (!inp || !addBtn) return;
+
+    function _commitPk() {
+      var text = inp.value.trim(); if (!text) return;
+      var payload = _buildNodePayload('question', text);
+      addBtn.disabled = true;
+      API.post('accord_nodes', payload)
+        .then(function(created) {
+          var newNode = Array.isArray(created) ? created[0] : created;
+          inp.value = ''; addBtn.disabled = false;
+          if (!newNode) return;
+          newNode.status = newNode.status || null;
+          _parking.push(newNode);
+          if (list) {
+            var empty = list.querySelector('.ac-min-sec-empty');
+            if (empty) list.innerHTML = '';
+            var d = document.createElement('div');
+            d.innerHTML = _pkRowHtml(newNode);
+            list.appendChild(d.firstChild);
+          }
+          _setCount('parking', _parking.length);
+        }).catch(function(e) {
+          console.error('[AccordMinutes] parking INSERT failed', e);
+          addBtn.disabled = false;
+        });
+    }
+
+    addBtn.addEventListener('click', _commitPk);
+    inp.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); _commitPk(); }
+    });
+  }
+
   // ── Level-changed ────────────────────────────────────────────
   function _onLevelChanged() {
     window.removeEventListener('accord:level-changed', _onLevelChanged);
@@ -949,20 +1709,27 @@ var AccordMinutes = (function () {
   // ── Teardown ─────────────────────────────────────────────────
   function _teardown() {
     _removeSuppressionStyles();
+    _closeActionPopup();
     var host = document.getElementById('ac-meeting-surface-host');
     if (host) host.innerHTML = '';
-    _meeting         = null;
-    _myResourceId    = null;
-    _attendees       = [];
-    _externalRecs    = [];
-    _checkedItems    = {};
-    _attendeeNameMap = {};
-    _userIdNameMap   = {};
-    _outcomes        = [];
-    _agendaItems     = [];
-    _agendaExpanded  = {};
-    _agendaNodes     = {};
-    _excludedNodeIds = {};
+    _meeting            = null;
+    _myResourceId       = null;
+    _attendees          = [];
+    _externalRecs       = [];
+    _checkedItems       = {};
+    _attendeeNameMap    = {};
+    _userIdNameMap      = {};
+    _outcomes           = [];
+    _agendaItems        = [];
+    _agendaExpanded     = {};
+    _agendaNodes        = {};
+    _excludedNodeIds    = {};
+    _decisions          = [];
+    _actions            = [];
+    _risks              = [];
+    _parking            = [];
+    _dtColsVerified     = false;
+    _actionPopupNodeId  = null;
   }
 
   // ── Public API ───────────────────────────────────────────────
@@ -979,6 +1746,7 @@ var AccordMinutes = (function () {
 
     _wireChecklist();
     _wireSectionToggles();
+    _wireCanvasAddBtns();
     _wireNavObserver();
     _wireNavClicks();
     _wireSendBtn();
@@ -992,6 +1760,18 @@ var AccordMinutes = (function () {
     _loadSectionCounts(meeting.meeting_id);
     _loadOutcomes(meeting.meeting_id);
     _loadAgenda(meeting.meeting_id);
+
+    // IR47: verify discipline+topic columns, then load Phase 4 sections.
+    // _agendaItems may not be populated yet when Phase 4 sections load —
+    // that's acceptable; Parking Lot resolveTitle will find empty array
+    // and degrade gracefully (no source label shown). If agenda is needed
+    // before parking, chain off _loadAgenda's promise in Phase 5+.
+    _verifyDisciplineTopic().then(function() {
+      _loadDecisions(meeting.meeting_id);
+      _loadActions(meeting.meeting_id);
+      _loadRisks(meeting.meeting_id);
+      _loadParking(meeting.meeting_id);
+    });
 
     window.removeEventListener('accord:level-changed', _onLevelChanged);
     window.addEventListener('accord:level-changed',    _onLevelChanged);
