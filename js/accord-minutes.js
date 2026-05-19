@@ -915,7 +915,7 @@ var AccordMinutes = (function () {
   function _entryRowHtml(node, authorName) {
     var excluded = !!_excludedNodeIds[node.node_id];
     return '<div class="ac-min-entry-row'+(excluded?' excluded':'')+'" data-node-id="'+_esc(node.node_id)+'">' +
-      '<span class="ac-min-tag-badge" style="'+_tagBadgeStyle(node.tag)+'">'+_esc(_tagLabel(node.tag)+'-'+_padSeq(node.seq_id))+'</span>' +
+      '<span class="ac-min-tag-badge" style="'+_tagBadgeStyle(node.tag)+'">'+_esc(node.seq_id||_tagLabel(node.tag))+'</span>' +
       '<span class="ac-min-entry-summary'+(excluded?' struck':'')+'">'+_esc((node.summary||'').slice(0,140))+'</span>' +
       (authorName ? '<span class="ac-min-entry-author">'+_esc(authorName)+'</span>' : '') +
       '<span class="ac-min-entry-time">'+_esc(_fmtTimePart(node.created_at))+'</span>' +
