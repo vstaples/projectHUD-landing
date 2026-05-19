@@ -2512,7 +2512,7 @@ var AccordLiveCapture = (function () {
       return API.post('accord_minutes_renders', {
         firm_id:        _meeting.firm_id,
         meeting_id:     _meeting.meeting_id,
-        rendered_by:    _myResourceId,
+        rendered_by:    (window.Accord&&window.Accord.state&&window.Accord.state.me&&window.Accord.state.me.id)||_myResourceId,
         rendered_at:    new Date().toISOString(),
         render_version: 'v1',
         storage_path:   'pending',
