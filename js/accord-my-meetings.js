@@ -1,12 +1,13 @@
 // ============================================================
 // ProjectHUD — accord-my-meetings.js
-// Version: v20260513-CMD-ACCORD-MY-MEETINGS-2b
-// Modified: 2026-05-13
+// Version: v20260519-CMD-ACCORD-MY-MEETINGS-1-P2
+// Modified: 2026-05-19
 //
-// CMD-ACCORD-MY-MEETINGS-2b — enriched card content.
-//   - LIVE NOW: title + time running + workstream + JOIN
-//   - PENDING:  title + date/time/duration + "Invited by" + RSVP
-//   - UPCOMING: title + date/time + workstream + role
+// CMD-ACCORD-MY-MEETINGS-1 Phase 2 — closed meetings, stakes, state badges.
+//   - LIVE NOW:    state badge + stakes line
+//   - PENDING:     state badge + stakes line
+//   - UPCOMING:    state badge + stakes line
+//   - CLOSED (new): top 10 closed/sealed, clickable → review mode
 //
 // IR66 — data shape verified via console probes 2026-05-13.
 // IR67 — version + date stamped above.
@@ -20,6 +21,45 @@
   var _mmContainer  = null;
   var _mmTimer      = null;
   var _clickHandler = null;
+
+  // ── State badges ────────────────────────────────────────────
+  var STATE_BADGES = {
+    running: '<span class="ac-mm-state ac-mm-state--live">&#9679; LIVE</span>',
+    idle:    '<span class="ac-mm-state ac-mm-state--preparing">Preparing</span>',
+    closed:  '<span class="ac-mm-state ac-mm-state--closed">Closed</span>',
+    sealed:  '<span class="ac-mm-state ac-mm-state--closed">Sealed</span>'
+  };
+
+  // ── CSS injection (once per page load) ─────────────────────
+  (function _injectStyles() {
+    if (document.getElementById('ac-mm-p2-styles')) return;
+    var s = document.createElement('style');
+    s.id = 'ac-mm-p2-styles';
+    s.textContent =
+      '.ac-mm-state{display:inline-block;font-size:10px;font-weight:700;' +
+        'padding:1px 7px;border-radius:3px;margin-bottom:5px;letter-spacing:.06em}' +
+      '.ac-mm-state--live{background:rgba(72,170,136,.12);color:#48aa88;' +
+        'border:1px solid rgba(72,170,136,.25)}' +
+      '.ac-mm-state--preparing{background:rgba(232,148,48,.08);color:#e89430;' +
+        'border:1px solid rgba(232,148,48,.22)}' +
+      '.ac-mm-state--closed{background:rgba(255,255,255,.04);color:#7a8a9a;' +
+        'border:1px solid rgba(255,255,255,.08)}' +
+      '.ac-mm-stakes{font-size:12px;color:var(--lo,#7a8a9a);font-style:italic;' +
+        'border-left:2px solid rgba(255,255,255,.12);' +
+        'padding-left:7px;margin:4px 0 6px;line-height:1.5;' +
+        'display:-webkit-box;-webkit-line-clamp:2;' +
+        '-webkit-box-orient:vertical;overflow:hidden}' +
+      '.ac-mm-card--live     .ac-mm-stakes{border-left-color:rgba(72,170,136,.4)}' +
+      '.ac-mm-card--pending  .ac-mm-stakes{border-left-color:rgba(224,82,82,.4)}' +
+      '.ac-mm-card--upcoming .ac-mm-stakes{border-left-color:rgba(232,148,48,.4)}' +
+      '.ac-mm-card--closed   .ac-mm-stakes{border-left-color:rgba(255,255,255,.1)}' +
+      '.ac-mm-card--closed{border-left:3px solid rgba(255,255,255,.10);' +
+        'opacity:.75;cursor:pointer}' +
+      '.ac-mm-card--closed:hover{opacity:1}';
+    document.head.appendChild(s);
+    console.log('%c[accord-my-meetings.js] v20260519-CMD-ACCORD-MY-MEETINGS-1-P2 styles injected',
+      'background:#e89430;color:#fff;padding:2px 6px;border-radius:3px;font-weight:600');
+  })();
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -117,13 +157,13 @@
       return;
     }
 
-    // Q1 -- organized meetings (running or idle) with workstream name
+    // Q1 -- organized meetings (all states) with workstream name
     var qOrganized = API.get(
       'accord_meetings?organizer_id=eq.' + uid +
-      '&state=in.(running,idle)' +
+      '&state=in.(running,idle,closed,sealed)' +
       '&order=scheduled_for.asc.nullsfirst' +
       '&select=meeting_id,title,state,scheduled_for,duration_minutes,' +
-      'workstream_id,started_at,workstreams(name)' +
+      'workstream_id,started_at,stakes,workstreams(name)' +
       '&limit=50'
     ).catch(function () { return []; });
 
@@ -133,7 +173,7 @@
           'accord_meeting_attendees?resource_id=eq.' + rid +
           '&select=attendee_id,meeting_id,rsvp_status,' +
           'accord_meetings!inner(meeting_id,title,state,scheduled_for,' +
-          'duration_minutes,workstream_id,organizer_id,started_at,' +
+          'duration_minutes,workstream_id,organizer_id,started_at,stakes,' +
           'workstreams(name),users(name))'
         ).catch(function () { return []; })
       : Promise.resolve([]);
@@ -156,6 +196,7 @@
           workstream_id:    m.workstream_id,
           workstream_name:  m.workstreams ? m.workstreams.name : null,
           started_at:       m.started_at,
+          stakes:           m.stakes || null,
           organizer_name:   null,
           role:             'organizer',
           rsvp_status:      'accepted'
@@ -174,6 +215,7 @@
           workstream_id:    m.workstream_id,
           workstream_name:  m.workstreams ? m.workstreams.name : null,
           started_at:       m.started_at,
+          stakes:           m.stakes || null,
           organizer_name:   m.users ? m.users.name : null,
           role:             'attendee',
           rsvp_status:      inv.rsvp_status,
@@ -200,7 +242,13 @@
         return new Date(a.scheduled_for) - new Date(b.scheduled_for);
       });
 
-      container.innerHTML = _myMeetingsHtml(liveNow, pendingZ, upcoming);
+      var closed = meetings.filter(function (m) {
+        return m.state === 'closed' || m.state === 'sealed';
+      }).sort(function (a, b) {
+        return new Date(b.scheduled_for) - new Date(a.scheduled_for);
+      }).slice(0, 10);
+
+      container.innerHTML = _myMeetingsHtml(liveNow, pendingZ, upcoming, closed);
       _clickHandler = function (ev) { _onContainerClick(ev); };
       container.addEventListener('click', _clickHandler);
 
@@ -212,7 +260,7 @@
     });
   }
 
-  function _myMeetingsHtml(liveNow, pending, upcoming) {
+  function _myMeetingsHtml(liveNow, pending, upcoming, closed) {
     var html = '';
 
     // LIVE NOW
@@ -221,7 +269,11 @@
       html += '<div class="ac-mm-zone-label">&#9679; LIVE NOW</div>';
       liveNow.forEach(function (m) {
         html += '<div class="ac-mm-card ac-mm-card--live">';
+        html += (STATE_BADGES[m.state] || '');
         html += '<div class="ac-mm-card-title">' + esc(m.title || 'Untitled') + '</div>';
+        if (m.stakes) {
+          html += '<div class="ac-mm-stakes">' + esc(m.stakes) + '</div>';
+        }
         var meta = [];
         if (m.started_at) meta.push(_timeAgo(m.started_at));
         if (m.workstream_name) meta.push(esc(m.workstream_name));
@@ -251,7 +303,11 @@
               '<span class="ac-mm-badge">' + pending.length + '</span></div>';
       pending.forEach(function (m) {
         html += '<div class="ac-mm-card ac-mm-card--pending">';
+        html += (STATE_BADGES.idle || '');
         html += '<div class="ac-mm-card-title">' + esc(m.title || 'Untitled') + '</div>';
+        if (m.stakes) {
+          html += '<div class="ac-mm-stakes">' + esc(m.stakes) + '</div>';
+        }
         var meta = [];
         if (m.scheduled_for) meta.push(_fmtDateTime(m.scheduled_for));
         if (m.duration_minutes) meta.push(m.duration_minutes + ' min');
@@ -285,7 +341,11 @@
                 'data-action="mm-open-meeting" ' +
                 'data-meeting-id="' + esc(m.meeting_id) + '" ' +
                 'data-workstream-id="' + esc(m.workstream_id || '') + '">';
+        html += (STATE_BADGES.idle || '');
         html += '<div class="ac-mm-card-title">' + esc(m.title || 'Untitled') + '</div>';
+        if (m.stakes) {
+          html += '<div class="ac-mm-stakes">' + esc(m.stakes) + '</div>';
+        }
         var meta = [];
         if (m.scheduled_for) meta.push(_fmtDate(m.scheduled_for));
         if (m.workstream_name) meta.push(esc(m.workstream_name));
@@ -299,7 +359,34 @@
       html += '</div>';
     }
 
-    if (!liveNow.length && !pending.length && !upcoming.length) {
+    // CLOSED
+    if (closed && closed.length) {
+      html += '<div class="ac-mm-zone">';
+      html += '<div class="ac-mm-zone-label">CLOSED</div>';
+      closed.forEach(function (m) {
+        html += '<div class="ac-mm-card ac-mm-card--closed" ' +
+                'data-action="mm-open-meeting" ' +
+                'data-meeting-id="' + esc(m.meeting_id) + '" ' +
+                'data-workstream-id="' + esc(m.workstream_id || '') + '">';
+        html += (STATE_BADGES[m.state] || STATE_BADGES.closed);
+        html += '<div class="ac-mm-card-title">' + esc(m.title || 'Untitled') + '</div>';
+        if (m.stakes) {
+          html += '<div class="ac-mm-stakes">' + esc(m.stakes) + '</div>';
+        }
+        var meta = [];
+        if (m.scheduled_for) meta.push(_fmtDate(m.scheduled_for));
+        if (m.workstream_name) meta.push(esc(m.workstream_name));
+        if (meta.length) {
+          html += '<div class="ac-mm-card-meta">' + meta.join(' &middot; ') + '</div>';
+        }
+        html += '<div class="ac-mm-card-role">' +
+                (m.role === 'organizer' ? 'Organizer' : 'Attended') + '</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    if (!liveNow.length && !pending.length && !upcoming.length && (!closed || !closed.length)) {
       html += '<div class="ac-mm-empty">No upcoming meetings.</div>';
     }
 
