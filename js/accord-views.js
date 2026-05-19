@@ -420,6 +420,8 @@
     // only fires for closed/sealed meetings that still use the 5-tab shell.
     if (meeting.state === 'running') {
       _detachSurfaceHost();
+      // Clear prior view content (e.g. 5-tab shell) after detaching surface host
+      if (host) { Array.from(host.children).forEach(function(c){ if(c.id !== 'ac-meeting-surface-host') c.remove(); }); }
       // loadMeeting populates Accord.state.meeting, resolves thread,
       // subscribes the meeting Realtime channel, and starts the presence
       // heartbeat — all required by the Live Capture shell.
@@ -431,8 +433,6 @@
       if (_sfHostR) {
         _sfHostR.classList.remove('idle', 'running', 'closed', 'sealed');
         _sfHostR.classList.add('running');
-        // Clear any prior view content (e.g. workstream view) before mounting.
-        // host.innerHTML = '';
         // Append surface host into the view host so it participates in layout.
         if (_sfHostR.parentElement !== host) host.appendChild(_sfHostR);
         _sfHostR.classList.add('active');
