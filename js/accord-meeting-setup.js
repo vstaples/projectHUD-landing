@@ -7471,6 +7471,15 @@
 
     host.innerHTML = _buildHTML(meeting, workstreamId);
 
+    // Footer fix — keep BEGIN MEETING always visible at right edge
+    var _ff = document.getElementById('ac-setup-footer-fix');
+    if (!_ff) {
+      _ff = document.createElement('style');
+      _ff.id = 'ac-setup-footer-fix';
+      document.head.appendChild(_ff);
+    }
+    _ff.textContent = '.ac-setup-footer{position:sticky;bottom:0;z-index:50;flex-shrink:0}.ac-footer-right{margin-left:auto;position:sticky;right:0;background:inherit}';
+
     // ── CMD-ACCORD-SETUP-LAYOUT-1: layout init + listeners ────
     _initColWidths();
     _initFilmstripHeight();
