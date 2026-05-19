@@ -48,13 +48,6 @@ var AccordLiveCapture = (function () {
   var _sectionAttendees = [];   // meeting attendees for PersonPicker in Actions
   var _actionAssignee = null;   // pending assignee from PersonPicker in add row
 
-  // Preview / Review mode state
-  var _excludedNodeIds  = new Set();   // nodes struck from preview by Exclude button
-  var _agendaNodeCache  = {};          // agenda_item_id → captured node array
-  var _attendeesList    = [];          // full attendee list with rsvp_status for preview
-  var _outcomesCache    = [];          // accord_meeting_outcomes rows for preview
-  var _workstreamName   = '';          // workstream display name for preview
-
   // Sidebar resize
   var _sidebarDragging   = false;
   var _sidebarStartX     = 0;
@@ -234,41 +227,7 @@ var AccordLiveCapture = (function () {
     '.ac-lc-recip-row{display:flex;align-items:center;gap:7px;padding:4px 0}' +
     '.ac-lc-recip-av{width:22px;height:22px;border-radius:50%;background:#152c54;color:#4a8cf5;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;flex-shrink:0}' +
     '.ac-lc-recip-name{font-size:12px;color:var(--md);flex:1}' +
-    '.ac-lc-recip-role{font-size:11px;color:var(--lo);flex-shrink:0}' +
-    // Exclude button (review mode only — visible via ac-lc-shell--review)
-    '.ac-lc-note-exclude{display:none;position:absolute;right:30px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:600;color:var(--act);background:var(--act-bg);border:1px solid var(--act-bd);border-radius:3px;padding:0 6px;cursor:pointer;line-height:18px;z-index:10;white-space:nowrap}' +
-    '.ac-lc-shell--review .ac-lc-captured-row:hover .ac-lc-note-exclude{display:block}' +
-    '.ac-lc-shell--review .ac-lc-captured-row:hover .ac-lc-note-delete{display:none}' +
-    '.ac-lc-captured-row.excluded .ac-lc-captured-text{text-decoration:line-through;opacity:.4}' +
-    '.ac-lc-captured-row.excluded{opacity:.6}' +
-    '.ac-lc-captured-row.excluded .ac-lc-note-exclude{display:block;color:var(--lo);border-color:rgba(255,255,255,.12);background:transparent}' +
-    // Preview overlay
-    '.ac-lc-preview-overlay{position:fixed;inset:0;z-index:200;background:var(--void);display:none;flex-direction:column;overflow:hidden}' +
-    '.ac-lc-preview-overlay.open{display:flex}' +
-    '.ac-lc-preview-topbar{height:50px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--b0)}' +
-    '.ac-lc-preview-close{font-size:18px;color:var(--md);cursor:pointer;flex-shrink:0;transition:color .12s}.ac-lc-preview-close:hover{color:var(--hi)}' +
-    '.ac-lc-preview-title{font-size:13px;font-weight:500;color:var(--md)}' +
-    '.ac-lc-preview-doc{flex:1;overflow-y:auto;padding:40px;max-width:860px;margin:0 auto;width:100%;box-sizing:border-box}' +
-    // Preview document styles
-    '.ac-lc-preview-doc .pv-title{font-size:26px;font-weight:600;color:var(--hi);margin-bottom:8px}' +
-    '.ac-lc-preview-doc .pv-stakes{font-size:13px;color:var(--md);font-style:italic;border-left:3px solid var(--b2);padding-left:10px;margin-bottom:24px;line-height:1.5}' +
-    '.ac-lc-preview-doc .pv-sec-hdr{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--hi);border-bottom:1px solid var(--b1);padding-bottom:6px;margin:24px 0 12px;display:flex;align-items:center;gap:8px}' +
-    '.ac-lc-preview-doc .pv-sec-bar{width:4px;height:14px;border-radius:2px;flex-shrink:0}' +
-    '.ac-lc-preview-doc .pv-meta-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin-bottom:14px}' +
-    '.ac-lc-preview-doc .pv-meta-lbl{font-size:12px;color:var(--lo);font-weight:600}' +
-    '.ac-lc-preview-doc .pv-meta-val{font-size:13px;color:var(--hi)}' +
-    '.ac-lc-preview-doc .pv-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}' +
-    '.ac-lc-preview-doc .pv-chip{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--raised);border:1px solid var(--b1);color:var(--md)}' +
-    '.ac-lc-preview-doc .pv-row{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}' +
-    '.ac-lc-preview-doc .pv-row:last-child{border-bottom:none}' +
-    '.ac-lc-preview-doc .pv-badge{font-size:10px;font-weight:700;padding:0 5px;border-radius:2px;border:1px solid;white-space:nowrap;margin-top:2px;line-height:1.5;flex-shrink:0}' +
-    '.ac-lc-preview-doc .pv-text{font-size:13px;color:var(--hi);flex:1;line-height:1.5}' +
-    '.ac-lc-preview-doc .pv-meta-sm{font-size:11px;color:var(--lo);flex-shrink:0}' +
-    '.ac-lc-preview-doc .pv-empty{font-size:13px;color:var(--lo);font-style:italic;padding:6px 0}' +
-    '.ac-lc-preview-doc .pv-agenda-item{margin-bottom:16px}' +
-    '.ac-lc-preview-doc .pv-agenda-title{font-size:14px;font-weight:500;color:var(--hi);margin-bottom:6px;display:flex;align-items:center;gap:8px}' +
-    '.ac-lc-preview-doc .pv-agenda-num{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);font-size:11px;font-weight:600;color:var(--hi);display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
-    '.ac-lc-preview-doc .pv-outcome-flag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:2px}'
+    '.ac-lc-recip-role{font-size:11px;color:var(--lo);flex-shrink:0}'
   }
 
   // Shell HTML
@@ -388,8 +347,7 @@ var AccordLiveCapture = (function () {
         var rids = rows.map(function(r) { return r.resource_id; });
         API.get('resources?id=in.(' + rids.join(',') + ')&select=id,name').then(function(resources) {
           (resources || []).forEach(function(r) { _attendeeNameMap[r.id] = r.name; });
-          var att = rows.map(function(a) { return { resource_id: a.resource_id, name: _attendeeNameMap[a.resource_id] || 'Unknown', role: a.role_in_meeting, rsvp_status: a.rsvp_status }; });
-          _attendeesList = att;
+          var att = rows.map(function(a) { return { resource_id: a.resource_id, name: _attendeeNameMap[a.resource_id] || 'Unknown', role: a.role_in_meeting }; });
           _renderAttendees(att);
           _startPresencePoll(att);
         });
@@ -739,22 +697,6 @@ var AccordLiveCapture = (function () {
       var del = ev.target.closest('[data-action="delete-note"]');
       if (del) { ev.stopPropagation(); _deleteNote(del.dataset.nodeId); return; }
 
-      // Exclude note (review mode)
-      var exc = ev.target.closest('[data-action="exclude-note"]');
-      if (exc) {
-        ev.stopPropagation();
-        var excId = exc.dataset.nodeId;
-        var row = exc.closest('.ac-lc-captured-row');
-        if (_excludedNodeIds.has(excId)) {
-          _excludedNodeIds.delete(excId);
-          if (row) { row.classList.remove('excluded'); exc.textContent = 'Exclude'; }
-        } else {
-          _excludedNodeIds.add(excId);
-          if (row) { row.classList.add('excluded'); exc.textContent = 'Restore'; }
-        }
-        return;
-      }
-
       // Note row click → edit popup
       var nr = ev.target.closest('[data-action="note-row"]');
       if (nr && !ev.target.closest('[data-action="reclassify"]')) {
@@ -779,7 +721,6 @@ var AccordLiveCapture = (function () {
     var capP  = API.get('accord_nodes?meeting_id=eq.'+mid+'&agenda_item_id=eq.'+item.agenda_item_id+'&select=node_id,seq_id,tag,summary,created_at,created_by&order=created_at.asc').catch(function() { return []; });
     Promise.all([histP, capP]).then(function(results) {
       var body2 = document.getElementById('ac-lc-item-body-' + item.agenda_item_id); if (!body2) return;
-      _agendaNodeCache[item.agenda_item_id] = results[1] || [];
       body2.innerHTML = _itemBodyHtml(item, results[0]||[], results[1]||[]);
       _wireItemBodyEvents(body2, item);
     });
@@ -832,7 +773,6 @@ var AccordLiveCapture = (function () {
       '<span class="ac-lc-captured-badge" style="color:'+_tagColor(n.tag)+';background:'+_tagBg(n.tag)+';border:1px solid rgba(255,255,255,.18)" data-action="reclassify" data-node-id="'+_esc(n.node_id)+'" data-current-tag="'+_esc(n.tag)+'">'+_esc(n.seq_id||_tagLabel(n.tag))+'</span>' +
       '<span class="ac-lc-captured-text">'+_esc((n.summary||'').slice(0,100))+'</span>' +
       '<span class="ac-lc-captured-time">'+_esc(_fmtTime(n.created_at))+'</span>' +
-      '<span class="ac-lc-note-exclude" data-action="exclude-note" data-node-id="'+_esc(n.node_id)+'">Exclude</span>' +
       '<span class="ac-lc-note-delete" data-action="delete-note" data-node-id="'+_esc(n.node_id)+'">×</span>' +
     '</div>';
   }
@@ -2106,13 +2046,6 @@ var AccordLiveCapture = (function () {
 
     // 7. Load recipients (non-blocking)
     _loadRecipients();
-
-    // 8. Mark shell as review mode (enables Exclude buttons, hides delete)
-    var shell = document.getElementById('ac-lc-shell');
-    if (shell) shell.classList.add('ac-lc-shell--review');
-
-    // 9. Pre-fetch data needed for preview render (IR71: no queries during render)
-    _preloadPreviewData();
   }
 
   function _renderReviewTopbarActions() {
@@ -2257,240 +2190,9 @@ var AccordLiveCapture = (function () {
     });
   }
 
-  // ── Preview Modal (Phase 2) ────────────────────────────────────────────────
-
-  function _preloadPreviewData() {
-    if (!_meeting || !_meeting.meeting_id) return;
-    var mid = _meeting.meeting_id;
-
-    // Load outcomes
-    API.get('accord_meeting_outcomes?meeting_id=eq.' + mid + '&select=outcome_id,verb,description,owner_resource_id,status&order=created_at.asc')
-      .then(function(rows) { _outcomesCache = rows || []; })
-      .catch(function() { _outcomesCache = []; });
-
-    // Load workstream name
-    if (_meeting.workstream_id) {
-      API.get('workstreams?id=eq.' + _meeting.workstream_id + '&select=id,name&limit=1')
-        .then(function(rows) { _workstreamName = (rows && rows[0] && rows[0].name) || ''; })
-        .catch(function() { _workstreamName = ''; });
-    }
-
-    // Load nodes for agenda items not yet cached
-    _agendaItems.forEach(function(item) {
-      if (!_agendaNodeCache[item.agenda_item_id]) {
-        API.get('accord_nodes?meeting_id=eq.' + mid + '&agenda_item_id=eq.' + item.agenda_item_id + '&select=node_id,seq_id,tag,summary,created_at,created_by&order=created_at.asc')
-          .then(function(nodes) { _agendaNodeCache[item.agenda_item_id] = nodes || []; })
-          .catch(function() { _agendaNodeCache[item.agenda_item_id] = []; });
-      }
-    });
-  }
-
+  // Phase 2 stub — Preview modal
   function _openPreview() {
-    var overlay = document.getElementById('ac-lc-preview-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'ac-lc-preview-overlay';
-      overlay.className = 'ac-lc-preview-overlay';
-      overlay.innerHTML =
-        '<div class="ac-lc-preview-topbar">' +
-          '<span class="ac-lc-preview-close" onclick="AccordLiveCapture._closePreview()">\u2715</span>' +
-          '<span class="ac-lc-preview-title">Preview \u2014 ' + _esc(_meeting ? _meeting.title : '') + '</span>' +
-        '</div>' +
-        '<div class="ac-lc-preview-doc" id="ac-lc-preview-doc"></div>';
-      document.body.appendChild(overlay);
-
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') AccordLiveCapture._closePreview();
-      });
-    }
-
-    document.getElementById('ac-lc-preview-doc').innerHTML = _buildPreviewDocument();
-    overlay.classList.add('open');
-  }
-
-  AccordLiveCapture._closePreview = function() {
-    var overlay = document.getElementById('ac-lc-preview-overlay');
-    if (overlay) overlay.classList.remove('open');
-  };
-
-  function _pvSectionHeader(label, barColor) {
-    return '<div class="pv-sec-hdr">' +
-      '<div class="pv-sec-bar" style="background:' + barColor + '"></div>' +
-      _esc(label) +
-    '</div>';
-  }
-
-  function _pvOutcomeFlag(status) {
-    var m = {
-      achieved:  { text: '\u2713 Met',   color: 'var(--nt)',  bg: 'var(--nt-bg)',  bd: 'var(--nt-bd)'  },
-      partial:   { text: 'Partial',       color: 'var(--act)', bg: 'var(--act-bg)', bd: 'var(--act-bd)' },
-      abandoned: { text: 'Unmet',         color: 'var(--rsk)', bg: 'var(--rsk-bg)', bd: 'var(--rsk-bd)' },
-      open:      { text: 'Open',          color: 'var(--md)',  bg: 'rgba(255,255,255,.06)', bd: 'rgba(255,255,255,.12)' },
-      carried:   { text: 'Carried',       color: 'var(--lo)',  bg: 'rgba(255,255,255,.05)', bd: 'rgba(255,255,255,.10)' }
-    };
-    var s = m[status] || m.open;
-    return '<span class="pv-outcome-flag" style="color:' + s.color + ';background:' + s.bg + ';border:1px solid ' + s.bd + '">' + s.text + '</span>';
-  }
-
-  function _buildPreviewDocument() {
-    if (!_meeting) return '<div class="pv-empty">No meeting data.</div>';
-
-    var html = '';
-
-    // Title + stakes
-    html += '<div class="pv-title">' + _esc(_meeting.title || 'Untitled') + '</div>';
-    if (_meeting.stakes) {
-      html += '<div class="pv-stakes">' + _esc(_meeting.stakes) + '</div>';
-    }
-
-    // ── MEETING DETAILS ──────────────────────────────────────────
-    html += _pvSectionHeader('Meeting Details', 'var(--b2)');
-    html += '<div class="pv-meta-grid">';
-
-    var dateStr = _meeting.scheduled_for
-      ? new Date(_meeting.scheduled_for).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-      : '—';
-    html += '<span class="pv-meta-lbl">Date</span><span class="pv-meta-val">' + _esc(dateStr) + '</span>';
-
-    var durStr = _meeting.duration_minutes ? _meeting.duration_minutes + ' min' : '—';
-    html += '<span class="pv-meta-lbl">Duration</span><span class="pv-meta-val">' + _esc(durStr) + '</span>';
-
-    var orgName = (_meeting.organizer_id && _attendeeNameMap[_meeting.organizer_id]) || '—';
-    html += '<span class="pv-meta-lbl">Organizer</span><span class="pv-meta-val">' + _esc(orgName) + '</span>';
-
-    var wsDisplay = _workstreamName || (_meeting.workstream_id ? String(_meeting.workstream_id).slice(0, 8) : '—');
-    html += '<span class="pv-meta-lbl">Workstream</span><span class="pv-meta-val">' + _esc(wsDisplay) + '</span>';
-
-    html += '</div>';
-
-    // Attended / absent chips
-    var attended = _attendeesList.filter(function(a) { return a.rsvp_status === 'accepted' || a.role === 'organizer'; });
-    var absent   = _attendeesList.filter(function(a) { return a.rsvp_status !== 'accepted' && a.role !== 'organizer'; });
-
-    if (attended.length) {
-      html += '<div class="pv-meta-grid"><span class="pv-meta-lbl">Attended</span><div class="pv-chips">';
-      attended.forEach(function(a) { html += '<span class="pv-chip">' + _esc(a.name) + '</span>'; });
-      html += '</div></div>';
-    }
-    if (absent.length) {
-      html += '<div class="pv-meta-grid"><span class="pv-meta-lbl">Absent</span><div class="pv-chips">';
-      absent.forEach(function(a) { html += '<span class="pv-chip" style="opacity:.6">' + _esc(a.name) + '</span>'; });
-      html += '</div></div>';
-    }
-
-    // ── INTENDED OUTCOMES ────────────────────────────────────────
-    html += _pvSectionHeader('Intended Outcomes', 'var(--nt)');
-    if (!_outcomesCache.length) {
-      html += '<div class="pv-empty">No outcomes recorded.</div>';
-    } else {
-      _outcomesCache.forEach(function(o) {
-        var ownerName = (o.owner_resource_id && _attendeeNameMap[o.owner_resource_id]) || '';
-        html += '<div class="pv-row">' +
-          _pvOutcomeFlag(o.status || 'open') +
-          '<span class="pv-text">' + _esc((o.description || o.verb || '')) + '</span>' +
-          (ownerName ? '<span class="pv-meta-sm">' + _esc(ownerName) + '</span>' : '') +
-        '</div>';
-      });
-    }
-
-    // ── AGENDA & CAPTURES ────────────────────────────────────────
-    html += _pvSectionHeader('Agenda &amp; Captures', 'var(--nt)');
-    if (!_agendaItems.length) {
-      html += '<div class="pv-empty">No agenda items.</div>';
-    } else {
-      _agendaItems.forEach(function(item) {
-        var nodes = (_agendaNodeCache[item.agenda_item_id] || []).filter(function(n) {
-          return !_excludedNodeIds.has(n.node_id);
-        });
-        html += '<div class="pv-agenda-item">';
-        html += '<div class="pv-agenda-title">' +
-          '<div class="pv-agenda-num">' + _esc(item.position) + '</div>' +
-          _esc(item.title || 'Untitled') +
-        '</div>';
-        if (nodes.length) {
-          nodes.forEach(function(n) {
-            var tagColor = { decision: 'var(--dec)', note: 'var(--nt)', action: 'var(--act)', risk: 'var(--rsk)', dissent: 'var(--rsk)', question: 'var(--md)' }[n.tag] || 'var(--md)';
-            var tagBg    = { decision: 'var(--dec-bg)', note: 'var(--nt-bg)', action: 'var(--act-bg)', risk: 'var(--rsk-bg)', dissent: 'var(--rsk-bg)', question: 'rgba(255,255,255,.06)' }[n.tag] || 'rgba(255,255,255,.06)';
-            var label    = { decision: 'DC', note: 'NT', action: 'AX', risk: 'RK', dissent: 'DS', question: 'Q' }[n.tag] || (n.tag||'').toUpperCase().slice(0,2);
-            var authorName = (n.created_by && _attendeeNameMap[n.created_by]) || '';
-            html += '<div class="pv-row">' +
-              '<span class="pv-badge" style="color:' + tagColor + ';background:' + tagBg + ';border-color:' + tagColor + '">' + _esc(n.seq_id || label) + '</span>' +
-              '<span class="pv-text">' + _esc((n.summary || '').slice(0, 200)) + '</span>' +
-              '<span class="pv-meta-sm">' + (authorName ? _esc(authorName) + ' \u00b7 ' : '') + _esc(_fmtTime(n.created_at)) + '</span>' +
-            '</div>';
-          });
-        }
-        html += '</div>';
-      });
-    }
-
-    // ── DECISIONS ────────────────────────────────────────────────
-    html += _pvSectionHeader('Decisions', 'var(--dec)');
-    if (!_sectionNodes.decision.length) {
-      html += '<div class="pv-empty">No decisions recorded.</div>';
-    } else {
-      _sectionNodes.decision.forEach(function(n) {
-        var authorName = (n.created_by && _attendeeNameMap[n.created_by]) || '';
-        html += '<div class="pv-row">' +
-          '<span class="pv-badge" style="color:var(--dec);background:var(--dec-bg);border-color:var(--dec)">' + _esc(n.seq_id || 'DC') + '</span>' +
-          '<span class="pv-text">' + _esc((n.summary || '').slice(0, 200)) + '</span>' +
-          '<span class="pv-meta-sm">' + (authorName ? _esc(authorName) + ' \u00b7 ' : '') + _esc(_fmtTime(n.created_at)) + '</span>' +
-        '</div>';
-      });
-    }
-
-    // ── ACTION ITEMS ─────────────────────────────────────────────
-    html += _pvSectionHeader('Action Items', 'var(--act)');
-    if (!_sectionNodes.action.length) {
-      html += '<div class="pv-empty">No action items recorded.</div>';
-    } else {
-      _sectionNodes.action.forEach(function(n) {
-        var ownerName = (n.body && _attendeeNameMap[n.body]) || (n.created_by && _attendeeNameMap[n.created_by]) || '';
-        var dueStr = n.due_date ? _fmtDate(n.due_date) : '';
-        html += '<div class="pv-row">' +
-          '<span class="pv-badge" style="color:var(--act);background:var(--act-bg);border-color:var(--act)">' + _esc(n.seq_id || 'AX') + '</span>' +
-          '<span class="pv-text">' + _esc((n.summary || '').slice(0, 200)) + '</span>' +
-          (ownerName ? '<span class="pv-meta-sm">' + _esc(ownerName) + '</span>' : '') +
-          (dueStr ? '<span class="pv-meta-sm">' + _esc(dueStr) + '</span>' : '') +
-        '</div>';
-      });
-    }
-
-    // ── RISKS & DISSENTS ─────────────────────────────────────────
-    html += _pvSectionHeader('Risks &amp; Dissents', 'var(--rsk)');
-    if (!_sectionNodes.risk.length) {
-      html += '<div class="pv-empty">No risks recorded.</div>';
-    } else {
-      _sectionNodes.risk.forEach(function(n) {
-        var label = (n.tag === 'dissent') ? 'DS' : 'RK';
-        var authorName = (n.created_by && _attendeeNameMap[n.created_by]) || '';
-        html += '<div class="pv-row">' +
-          '<span class="pv-badge" style="color:var(--rsk);background:var(--rsk-bg);border-color:var(--rsk)">' + _esc(n.seq_id || label) + '</span>' +
-          '<span class="pv-text">' + _esc((n.summary || '').slice(0, 200)) + '</span>' +
-          (authorName ? '<span class="pv-meta-sm">' + _esc(authorName) + '</span>' : '') +
-        '</div>';
-      });
-    }
-
-    // ── PARKING LOT ──────────────────────────────────────────────
-    html += _pvSectionHeader('Parking Lot', '#9478e0');
-    if (!_sectionNodes.question.length) {
-      html += '<div class="pv-empty">No parking lot items.</div>';
-    } else {
-      _sectionNodes.question.forEach(function(n) {
-        var sourceItem = n.agenda_item_id
-          ? _agendaItems.find(function(a) { return a.agenda_item_id === n.agenda_item_id; })
-          : null;
-        var sourceLabel = sourceItem ? sourceItem.title : '';
-        html += '<div class="pv-row">' +
-          '<span style="color:#9478e0;font-size:11px;flex-shrink:0;margin-top:3px">\u25cf</span>' +
-          '<span class="pv-text">' + _esc((n.summary || '').slice(0, 200)) + '</span>' +
-          (sourceLabel ? '<span class="pv-meta-sm">' + _esc(sourceLabel) + '</span>' : '') +
-        '</div>';
-      });
-    }
-
-    return html;
+    // TODO: Phase 2
   }
 
   // Phase 3 stub — Route + Send modal
@@ -2504,7 +2206,6 @@ var AccordLiveCapture = (function () {
     if (_intersectionObs) { _intersectionObs.disconnect(); _intersectionObs=null; }
     _chatMessages=[]; _agendaItems=[]; _agendaExpanded={}; _agendaHistCollapsed={}; _agendaNewCounts={}; _agendaClickHandler=null;
     _sectionNodes={decision:[],action:[],risk:[],question:[]}; _sectionAttendees=[]; _actionAssignee=null;
-    _excludedNodeIds=new Set(); _agendaNodeCache={}; _attendeesList=[]; _outcomesCache=[]; _workstreamName='';
     _meeting=null; _myResourceId=null; _attendeeNameMap={};
     var host = document.getElementById('ac-meeting-surface-host'); if (host) host.innerHTML='';
   }
@@ -2574,5 +2275,5 @@ var AccordLiveCapture = (function () {
     window.removeEventListener('accord:remote-agenda', _onRemoteAgenda);
   }
 
-  return { render: render, destroy: destroy, _toggleChecklist: _toggleChecklist, _enterReviewMode: _enterReviewMode, _closePreview: function() { AccordLiveCapture._closePreview(); } };
+  return { render: render, destroy: destroy, _toggleChecklist: _toggleChecklist, _enterReviewMode: _enterReviewMode };
 })();
