@@ -246,10 +246,9 @@ var AccordLiveCapture = (function () {
     '.ac-lc-preview-overlay{position:fixed;inset:0;z-index:200;background:#0b0d14;display:none;flex-direction:column;overflow:hidden;font-family:"Outfit",system-ui,sans-serif}' +
     '.ac-lc-preview-overlay.open{display:flex}' +
     '.ac-lc-preview-topbar{height:50px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 24px;background:#10131e;border-bottom:1px solid #1e2438}' +
-    '.ac-lc-preview-close{font-size:18px;color:#8899b2;cursor:pointer;flex-shrink:0;transition:color .12s}.ac-lc-preview-close:hover{color:#dce6f5}' +
+    '.ac-lc-preview-close{font-size:13px;font-weight:600;color:#00c9c9;cursor:pointer;flex-shrink:0;transition:color .12s;padding:5px 10px;border-radius:4px;border:1px solid rgba(0,201,201,.3)}.ac-lc-preview-close:hover{color:#fff;border-color:rgba(0,201,201,.6)}' +
     '.ac-lc-preview-title{font-size:13px;font-weight:500;color:#dce6f5;flex:1}' +
-    '.ac-lc-preview-exit{font-size:12px;font-weight:600;padding:6px 14px;border-radius:5px;background:rgba(255,255,255,.08);color:#dce6f5;border:1px solid rgba(255,255,255,.15);cursor:pointer;flex-shrink:0;transition:all .13s;font-family:inherit}' +
-    '.ac-lc-preview-exit:hover{background:rgba(255,255,255,.14)}' +
+    '.ac-lc-preview-exit{display:none}' +
     '.ac-lc-preview-doc-outer{flex:1;overflow-y:auto;background:#0b0d14;padding:32px 0}' +
     '.ac-lc-preview-doc{max-width:760px;margin:0 auto;padding:48px 56px;background:#ffffff;box-sizing:border-box;border-radius:4px}' +
     // Preview document — light mode, print-ready
@@ -2072,6 +2071,10 @@ var AccordLiveCapture = (function () {
   // No other module depends on accord:level-changed for running→closed.
 
   function _enterReviewMode() {
+    // Hide accord. logo — state badge serves as identity in review mode
+    var logo = document.querySelector('.ac-lc-logo');
+    if (logo) logo.style.display = 'none';
+
     // 1. Stop timer and live data streams
     _stopTimer();
     _stopPresencePoll();
@@ -2303,9 +2306,8 @@ var AccordLiveCapture = (function () {
       overlay.className = 'ac-lc-preview-overlay';
       overlay.innerHTML =
         '<div class="ac-lc-preview-topbar">' +
-          '<span class="ac-lc-preview-close" onclick="AccordLiveCapture._closePreview()" title="Close preview">\u2715</span>' +
           '<span class="ac-lc-preview-title">Preview \u2014 ' + _esc(_meeting ? _meeting.title : '') + '</span>' +
-          '<button class="ac-lc-preview-exit" onclick="AccordLiveCapture._closePreview()">\u2190 Back to Review</button>' +
+          '<span class="ac-lc-preview-close" onclick="AccordLiveCapture._closePreview()" title="Close preview">\u2715 Close</span>' +
         '</div>' +
         '<div class="ac-lc-preview-doc-outer"><div class="ac-lc-preview-doc" id="ac-lc-preview-doc"></div></div>';
       document.body.appendChild(overlay);
@@ -2503,8 +2505,127 @@ var AccordLiveCapture = (function () {
   }
 
   // Phase 3 stub — Route + Send modal
+  function _getOrCreateRender() {
+    return API.get('accord_minutes_renders?meeting_id=eq.' + _meeting.meeting_id + '&order=rendered_at.desc&limit=1')
+    .then(function(rows) {
+      if (rows && rows.length > 0) return rows[0].render_id;
+      return API.post('accord_minutes_renders', {
+        firm_id:        _meeting.firm_id,
+        meeting_id:     _meeting.meeting_id,
+        rendered_by:    _myResourceId,
+        rendered_at:    new Date().toISOString(),
+        render_version: 'v1',
+        storage_path:   'pending',
+        status:         'pending',
+        template_id:    'default'
+      }, { prefer: 'return=representation' }).then(function(row) {
+        return Array.isArray(row) ? row[0].render_id : row.render_id;
+      });
+    });
+  }
+
   function _openSendModal() {
-    // TODO: Phase 3
+    var modal = document.getElementById('ac-lc-send-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'ac-lc-send-modal';
+      modal.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.7);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;font-family:Outfit,system-ui,sans-serif';
+      modal.innerHTML =
+        '<div style="background:#171c2e;border:1px solid #313d5e;border-radius:10px;padding:24px;width:460px;box-shadow:0 24px 60px rgba(0,0,0,.8)">' +
+          '<div style="font-size:16px;font-weight:600;color:#dce6f5;margin-bottom:4px">Route + Send Minutes</div>' +
+          '<div style="font-size:12px;color:#7a8a9a;margin-bottom:20px">' + (_meeting ? (_meeting.title || '') : '') + '</div>' +
+          '<div style="font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#8899b2;margin-bottom:8px">Sending to</div>' +
+          '<div id="ac-lc-modal-recipients" style="display:flex;flex-direction:column;gap:5px;margin-bottom:16px"></div>' +
+          '<div style="font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#8899b2;margin-bottom:6px">Add external recipients</div>' +
+          '<input id="ac-lc-modal-ext-email" placeholder="email@example.com — separate with commas" style="width:100%;background:#10131e;border:1px solid #252d44;border-radius:5px;padding:9px 12px;color:#dce6f5;outline:none;font-family:inherit;font-size:13px;box-sizing:border-box;margin-bottom:4px">' +
+          '<div id="ac-lc-modal-error" style="font-size:12px;color:#e05252;display:none;margin:6px 0"></div>' +
+          '<div style="font-size:12px;color:#7a8a9a;margin:12px 0 18px;font-style:italic;border-left:2px solid #313d5e;padding-left:8px;line-height:1.5">Recipients receive a clean formatted minutes document.' + (_excludedNodeIds.size > 0 ? ' · ' + _excludedNodeIds.size + ' entries excluded.' : '') + '</div>' +
+          '<div style="display:flex;gap:8px">' +
+            '<button onclick="document.getElementById('ac-lc-send-modal').remove()" style="flex:1;padding:10px;border-radius:5px;font-size:13px;background:#10131e;border:1px solid #252d44;color:#8899b2;cursor:pointer;font-family:inherit">Cancel</button>' +
+            '<button id="ac-lc-modal-send-btn" style="flex:2;padding:10px;border-radius:5px;font-size:13px;font-weight:600;background:rgba(72,170,136,.08);border:1px solid rgba(72,170,136,.22);color:#48aa88;cursor:pointer;font-family:inherit">Send Minutes ↑</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(modal);
+
+      // Populate recipients
+      var recipList = document.getElementById('ac-lc-modal-recipients');
+      _attendeesList.forEach(function(a) {
+        var initials = (a.name||'?').split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+        var role = (a.resource_id === (_meeting&&_meeting.organizer_id)) ? 'Organizer'
+          : (a.rsvp_status === 'accepted') ? 'Attended' : 'Invited · absent';
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:7px 10px;background:#10131e;border:1px solid #252d44;border-radius:5px';
+        row.innerHTML =
+          '<div style="width:24px;height:24px;border-radius:50%;background:#152c54;color:#4a8cf5;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0">' + initials + '</div>' +
+          '<span style="font-size:13px;color:#dce6f5;flex:1">' + _esc(a.name||'Unknown') + '</span>' +
+          '<span style="font-size:11px;color:#7a8a9a">' + role + '</span>' +
+          '<input type="checkbox" class="ac-lc-recip-check" data-resource-id="' + a.resource_id + '" checked style="width:16px;height:16px;cursor:pointer">';
+        recipList.appendChild(row);
+      });
+
+      // Send button
+      document.getElementById('ac-lc-modal-send-btn').onclick = function() {
+        var btn = document.getElementById('ac-lc-modal-send-btn');
+        btn.disabled = true; btn.textContent = 'Sending…';
+
+        var internalIds = [];
+        document.querySelectorAll('.ac-lc-recip-check:checked').forEach(function(cb) {
+          internalIds.push(cb.dataset.resourceId);
+        });
+
+        var externalEmails = [];
+        var extVal = (document.getElementById('ac-lc-modal-ext-email').value || '').trim();
+        if (extVal) {
+          var parts = extVal.split(',');
+          for (var i = 0; i < parts.length; i++) {
+            var addr = parts[i].trim();
+            if (addr && !/.+@.+\..+/.test(addr)) {
+              var errEl = document.getElementById('ac-lc-modal-error');
+              errEl.textContent = 'Invalid email: ' + addr;
+              errEl.style.display = 'block';
+              btn.disabled = false; btn.textContent = 'Send Minutes ↑';
+              return;
+            }
+            if (addr) externalEmails.push(addr);
+          }
+        }
+
+        if (!internalIds.length && !externalEmails.length) {
+          var errEl = document.getElementById('ac-lc-modal-error');
+          errEl.textContent = 'No recipients selected.';
+          errEl.style.display = 'block';
+          btn.disabled = false; btn.textContent = 'Send Minutes ↑';
+          return;
+        }
+
+        _getOrCreateRender().then(function(renderId) {
+          var rows = [];
+          internalIds.forEach(function(rid) {
+            rows.push({ firm_id: _meeting.firm_id, render_id: renderId, resource_id: rid, external_email: null });
+          });
+          externalEmails.forEach(function(email) {
+            rows.push({ firm_id: _meeting.firm_id, render_id: renderId, resource_id: null, external_email: email });
+          });
+          return API.post('accord_minutes_recipients', rows);
+        }).then(function() {
+          modal.remove();
+          var badge = document.getElementById('ac-lc-state-badge');
+          if (badge) { badge.className = 'ac-lc-review-badge ac-lc-review-badge--sent'; badge.textContent = 'Sent · ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+          var sendBtn = document.getElementById('ac-lc-send-btn');
+          if (sendBtn) { sendBtn.textContent = 'Sent ✓'; sendBtn.style.opacity = '.5'; sendBtn.style.pointerEvents = 'none'; }
+        }).catch(function(err) {
+          console.error('[AccordLiveCapture] send failed', err);
+          var errEl = document.getElementById('ac-lc-modal-error');
+          if (errEl) { errEl.textContent = 'Send failed. Please try again.'; errEl.style.display = 'block'; }
+          var b = document.getElementById('ac-lc-modal-send-btn');
+          if (b) { b.disabled = false; b.textContent = 'Send Minutes ↑'; }
+        });
+      };
+
+      // Backdrop click closes
+      modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+    }
+    modal.style.display = 'flex';
   }
 
   // Teardown
