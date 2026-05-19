@@ -205,19 +205,43 @@ var AccordLiveCapture = (function () {
     '.ac-lc-edit-field textarea:focus,.ac-lc-edit-field input:focus{border-color:rgba(74,140,245,.4)}' +
     '.ac-lc-edit-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:10px}' +
     '.ac-lc-edit-cancel{font-size:11px;color:var(--lo);background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:4px 10px;cursor:pointer}' +
-    '.ac-lc-edit-save{font-size:11px;font-weight:600;color:var(--hi);background:var(--dec);border:none;border-radius:5px;padding:4px 12px;cursor:pointer}'
+    '.ac-lc-edit-save{font-size:11px;font-weight:600;color:var(--hi);background:var(--dec);border:none;border-radius:5px;padding:4px 12px;cursor:pointer}' +
+    // Phase 7 (CMD-ACCORD-MINUTES-1 v2): Review mode
+    '.ac-lc-topbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0}' +
+    '.ac-lc-topbar-btn{font-size:11px;font-weight:600;color:var(--hi);background:var(--raised);border:1px solid var(--b2);border-radius:6px;padding:4px 12px;cursor:pointer;flex-shrink:0;transition:opacity .1s;font-family:inherit}.ac-lc-topbar-btn:hover{opacity:.8}' +
+    '.ac-lc-review-badge{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:3px;flex-shrink:0}' +
+    '.ac-lc-review-badge--review{background:rgba(232,148,48,.10);color:var(--act);border:1px solid rgba(232,148,48,.22)}' +
+    '.ac-lc-review-badge--ready{background:var(--nt-bg);color:var(--nt);border:1px solid var(--nt-bd)}' +
+    '.ac-lc-review-badge--sent{background:var(--dec-bg);color:var(--dec);border:1px solid var(--dec-bd)}' +
+    '.ac-lc-send-btn.disabled{opacity:.35;pointer-events:none}' +
+    '.ac-lc-review-sidebar{width:240px;flex-shrink:0;background:var(--surface);border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;overflow-y:auto}' +
+    '.ac-lc-rsb-section{padding:12px 16px 10px;border-bottom:1px solid rgba(255,255,255,.06)}' +
+    '.ac-lc-rsb-label{font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:var(--hi);margin-bottom:8px}' +
+    '.ac-lc-chk-row{display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer}' +
+    '.ac-lc-chk-toggle{width:16px;height:16px;border-radius:50%;border:1px solid var(--b2);flex-shrink:0;transition:all .13s;display:flex;align-items:center;justify-content:center}' +
+    '.ac-lc-chk-toggle.done{background:var(--nt);border-color:var(--nt)}' +
+    '.ac-lc-chk-toggle.done::after{content:"✓";font-size:9px;color:white;font-weight:700}' +
+    '.ac-lc-chk-lbl{font-size:12px;color:var(--md)}' +
+    '.ac-lc-chk-row.done .ac-lc-chk-lbl{color:var(--nt)}' +
+    '.ac-lc-rsb-add-recip{font-size:11px;color:var(--lo);cursor:pointer;padding:4px 0}.ac-lc-rsb-add-recip:hover{color:var(--md)}' +
+    '.ac-lc-recip-row{display:flex;align-items:center;gap:7px;padding:4px 0}' +
+    '.ac-lc-recip-av{width:22px;height:22px;border-radius:50%;background:#152c54;color:#4a8cf5;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;flex-shrink:0}' +
+    '.ac-lc-recip-name{font-size:12px;color:var(--md);flex:1}' +
+    '.ac-lc-recip-role{font-size:11px;color:var(--lo);flex-shrink:0}'
   }
 
   // Shell HTML
   function _shellHtml(meeting) {
     return '<div class="ac-live-capture-shell" id="ac-lc-shell"><style>' + _css() + '</style>' +
-    '<div class="ac-lc-topbar">' +
+    '<div class="ac-lc-topbar" id="ac-lc-topbar">' +
       '<span class="ac-lc-logo">accord<em>.</em></span>' +
-      '<div class="ac-lc-live-pill"><span class="ac-lc-live-dot"></span>LIVE</div>' +
+      '<div class="ac-lc-live-pill" id="ac-lc-live-pill"><span class="ac-lc-live-dot"></span>LIVE</div>' +
       '<span class="ac-lc-title">' + _esc(meeting.title || 'Untitled') + '</span>' +
-      '<div class="ac-lc-progress-wrap"><div class="ac-lc-progress" id="ac-lc-progress-bar"></div></div>' +
-      '<span class="ac-lc-timer" id="ac-lc-timer">00:00</span>' +
-      '<button type="button" class="ac-lc-end-btn" id="ac-lc-end-btn">END MEETING</button>' +
+      '<div class="ac-lc-topbar-right" id="ac-lc-topbar-right">' +
+        '<div class="ac-lc-progress-wrap"><div class="ac-lc-progress" id="ac-lc-progress-bar"></div></div>' +
+        '<span class="ac-lc-timer" id="ac-lc-timer">00:00</span>' +
+        '<button type="button" class="ac-lc-end-btn" id="ac-lc-end-btn">END MEETING</button>' +
+      '</div>' +
     '</div>' +
     '<div class="ac-lc-body">' +
       '<div class="ac-lc-sidebar" id="ac-lc-sidebar">' +
@@ -1190,17 +1214,9 @@ var AccordLiveCapture = (function () {
       if (window.Accord && window.Accord.state && window.Accord.state.meeting) {
         window.Accord.state.meeting.state = 'closed';
       }
-      // IR72: dispatch level-changed — accord-transitions.js routes to closed view
-      // Detail shape confirmed from accord-core.js:313 — { level, context }
-      window.dispatchEvent(new CustomEvent('accord:level-changed', {
-        detail: {
-          level:   'meeting',
-          context: {
-            meetingId:     _meeting.meeting_id,
-            workstreamId:  _meeting.workstream_id
-          }
-        }
-      }));
+      // CMD-ACCORD-MINUTES-1 v2: stay in shell, transition to review mode.
+      // IR72: accord:level-changed is NOT dispatched here. See finding below.
+      _enterReviewMode();
     }).catch(function(err) {
       console.error('[AccordLiveCapture] _endMeeting PATCH failed', err);
       if (btn) { btn.disabled = false; btn.textContent = 'END MEETING'; }
@@ -1968,6 +1984,212 @@ var AccordLiveCapture = (function () {
       .then(function(rows) { _agendaItems=rows||[]; _renderAgendaSection(); _renderProgressBar(_agendaItems); }).catch(function() {});
   }
 
+  // ── CMD-ACCORD-MINUTES-1 v2: Review Mode ────────────────────────────────
+
+  // IR72 FINDING: accord:level-changed is no longer dispatched from _endMeeting().
+  // Confirmed consumers of this event for the running→closed transition:
+  //   1. _onLevelChanged() in this module — teardown; NOT desirable here (shell stays mounted).
+  //   2. accord.html _applyTopnavContext() — updates topnav prefix/brand-meta label.
+  //      Without the dispatch, topnav will still show "In Session · Live Capture" until
+  //      the operator navigates away. Accepted cosmetic gap for Phase 1; the Live Capture
+  //      shell is full-panel so topnav chrome is not visible during review.
+  //   3. accord-transitions.js — drives renderMeetingView (routes to closed surface).
+  //      This is exactly what we're replacing with in-place review mode.
+  // No other module depends on accord:level-changed for running→closed.
+
+  function _enterReviewMode() {
+    // 1. Stop timer and live data streams
+    _stopTimer();
+    _stopPresencePoll();
+    _unsubscribeChatRealtime();
+    window.removeEventListener('accord:remote-node',   _onRemoteNode);
+    window.removeEventListener('accord:remote-agenda', _onRemoteAgenda);
+
+    // 2. Hide LIVE pill
+    var liveEl = document.getElementById('ac-lc-live-pill');
+    if (liveEl) liveEl.style.display = 'none';
+
+    // 3. Insert state badge after live pill position (before title = children[2])
+    var badge = document.getElementById('ac-lc-state-badge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.id = 'ac-lc-state-badge';
+      var topbar = document.getElementById('ac-lc-topbar');
+      if (topbar) topbar.insertBefore(badge, topbar.children[2]);
+    }
+    badge.className = 'ac-lc-review-badge ac-lc-review-badge--review';
+    badge.textContent = 'Under Review';
+
+    // 4. Disable END MEETING
+    var endBtn = document.getElementById('ac-lc-end-btn');
+    if (endBtn) {
+      endBtn.disabled = true;
+      endBtn.style.opacity = '.35';
+      endBtn.style.pointerEvents = 'none';
+    }
+
+    // 5. Add Preview + Route+Send to topbar
+    _renderReviewTopbarActions();
+
+    // 6. Swap sidebar
+    _renderReviewSidebar();
+
+    // 7. Load recipients (non-blocking)
+    _loadRecipients();
+  }
+
+  function _renderReviewTopbarActions() {
+    var topbarRight = document.getElementById('ac-lc-topbar-right');
+    if (!topbarRight) return;
+
+    var previewBtn = document.createElement('button');
+    previewBtn.id = 'ac-lc-preview-btn';
+    previewBtn.className = 'ac-lc-topbar-btn';
+    previewBtn.textContent = 'Preview \u2192';
+    previewBtn.onclick = function() { _openPreview(); };
+
+    var sendBtn = document.createElement('button');
+    sendBtn.id = 'ac-lc-send-btn';
+    sendBtn.className = 'ac-lc-topbar-btn ac-lc-send-btn disabled';
+    sendBtn.textContent = 'Route + Send \u2191';
+    sendBtn.disabled = true;
+    sendBtn.onclick = function() { _openSendModal(); };
+
+    topbarRight.insertBefore(sendBtn, topbarRight.firstChild);
+    topbarRight.insertBefore(previewBtn, sendBtn);
+  }
+
+  function _renderReviewSidebar() {
+    var liveSidebar = document.getElementById('ac-lc-sidebar');
+    if (liveSidebar) liveSidebar.style.display = 'none';
+
+    var reviewSidebar = document.createElement('div');
+    reviewSidebar.id = 'ac-lc-review-sidebar';
+    reviewSidebar.className = 'ac-lc-review-sidebar';
+    reviewSidebar.innerHTML = _buildReviewSidebarHTML();
+
+    if (liveSidebar && liveSidebar.parentNode) {
+      liveSidebar.parentNode.insertBefore(reviewSidebar, liveSidebar);
+    }
+
+    _wireChecklistToggles();
+
+    // Wire add-external link (Phase 3 stub)
+    var addLink = document.getElementById('ac-lc-add-recip-link');
+    if (addLink) addLink.addEventListener('click', function() { /* Phase 3 */ });
+
+    // Re-wire sections nav clicks to new nav items
+    _wireNavClicks();
+    if (_updateNavActive) _updateNavActive();
+  }
+
+  function _buildReviewSidebarHTML() {
+    return '<div class="ac-lc-rsb-section ac-lc-rsb-checklist">' +
+      '<div class="ac-lc-rsb-label">Review Checklist</div>' +
+      '<div class="ac-lc-rsb-items">' +
+        _checklistItem('Meeting header') +
+        _checklistItem('Attendance confirmed') +
+        _checklistItem('Outcomes reviewed') +
+        _checklistItem('Agenda entries checked') +
+        _checklistItem('Decisions verified') +
+        _checklistItem('Actions confirmed') +
+      '</div>' +
+    '</div>' +
+    '<div class="ac-lc-rsb-section ac-lc-rsb-nav">' +
+      '<div class="ac-lc-rsb-label">Sections</div>' +
+      _buildSectionsNav() +
+    '</div>' +
+    '<div class="ac-lc-rsb-section ac-lc-rsb-recipients">' +
+      '<div class="ac-lc-rsb-label">Recipients</div>' +
+      '<div id="ac-lc-recipients-list"></div>' +
+      '<div class="ac-lc-rsb-add-recip" id="ac-lc-add-recip-link">+ Add external recipient\u2026</div>' +
+    '</div>';
+  }
+
+  function _checklistItem(label) {
+    return '<div class="ac-lc-chk-row">' +
+      '<div class="ac-lc-chk-toggle"></div>' +
+      '<span class="ac-lc-chk-lbl">' + _esc(label) + '</span>' +
+    '</div>';
+  }
+
+  function _buildSectionsNav() {
+    return '<nav class="ac-lc-nav">' +
+      '<a class="ac-lc-nav-item" data-section="agenda"    href="#ac-lc-sec-agenda">Agenda</a>' +
+      '<a class="ac-lc-nav-item" data-section="decisions" href="#ac-lc-sec-decisions">Decisions</a>' +
+      '<a class="ac-lc-nav-item" data-section="actions"   href="#ac-lc-sec-actions">Action Items</a>' +
+      '<a class="ac-lc-nav-item" data-section="risks"     href="#ac-lc-sec-risks">Risks &amp; Issues</a>' +
+      '<a class="ac-lc-nav-item" data-section="parking"   href="#ac-lc-sec-parking">Parking Lot</a>' +
+    '</nav>';
+  }
+
+  function _wireChecklistToggles() {
+    document.querySelectorAll('.ac-lc-rsb-checklist .ac-lc-chk-row').forEach(function(row) {
+      row.addEventListener('click', function() { _toggleChecklist(row); });
+    });
+  }
+
+  function _toggleChecklist(row) {
+    var toggle = row.querySelector('.ac-lc-chk-toggle');
+    if (!toggle) return;
+    var done = toggle.classList.toggle('done');
+    row.classList.toggle('done', done);
+
+    var total   = document.querySelectorAll('.ac-lc-rsb-checklist .ac-lc-chk-toggle').length;
+    var checked = document.querySelectorAll('.ac-lc-rsb-checklist .ac-lc-chk-toggle.done').length;
+    var sendBtn = document.getElementById('ac-lc-send-btn');
+    var badge   = document.getElementById('ac-lc-state-badge');
+
+    if (checked === total) {
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.classList.remove('disabled'); }
+      if (badge)   { badge.className = 'ac-lc-review-badge ac-lc-review-badge--ready'; badge.textContent = 'Ready to Send'; }
+    } else {
+      if (sendBtn) { sendBtn.disabled = true; sendBtn.classList.add('disabled'); }
+      if (badge)   { badge.className = 'ac-lc-review-badge ac-lc-review-badge--review'; badge.textContent = 'Under Review'; }
+    }
+  }
+
+  // IR47: organizer_id is on accord_meetings (_meeting.organizer_id), NOT on accord_meeting_attendees.
+  function _loadRecipients() {
+    if (!_meeting || !_meeting.meeting_id) return;
+    return API.get('accord_meeting_attendees?meeting_id=eq.' + _meeting.meeting_id)
+    .then(function(attendees) {
+      if (!attendees || !attendees.length) return;
+      var ids = attendees.map(function(a) { return a.resource_id; }).join(',');
+      return API.get('resources?id=in.(' + ids + ')&select=id,name')
+      .then(function(resources) {
+        var nameMap = {};
+        (resources || []).forEach(function(r) { nameMap[r.id] = r.name; });
+        var list = document.getElementById('ac-lc-recipients-list');
+        if (!list) return;
+        list.innerHTML = attendees.map(function(a) {
+          var name     = nameMap[a.resource_id] || 'Unknown';
+          var initials = name.split(' ').map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+          var role     = a.resource_id === (_meeting.organizer_id || '') ? 'Organizer'
+                       : a.rsvp_status === 'accepted' ? 'Attended' : 'Invited · absent';
+          return '<div class="ac-lc-recip-row">' +
+            '<div class="ac-lc-recip-av">' + _esc(initials) + '</div>' +
+            '<span class="ac-lc-recip-name">' + _esc(name) + '</span>' +
+            '<span class="ac-lc-recip-role">' + _esc(role) + '</span>' +
+            '<input type="checkbox" class="ac-lc-recip-check" data-resource-id="' + _esc(a.resource_id) + '" checked>' +
+          '</div>';
+        }).join('');
+      });
+    }).catch(function(err) {
+      console.warn('[AccordLiveCapture] _loadRecipients failed', err);
+    });
+  }
+
+  // Phase 2 stub — Preview modal
+  function _openPreview() {
+    // TODO: Phase 2
+  }
+
+  // Phase 3 stub — Route + Send modal
+  function _openSendModal() {
+    // TODO: Phase 3
+  }
+
   // Teardown
   function _teardown() {
     _stopTimer(); _stopPresencePoll(); _unsubscribeChatRealtime();
@@ -2043,5 +2265,5 @@ var AccordLiveCapture = (function () {
     window.removeEventListener('accord:remote-agenda', _onRemoteAgenda);
   }
 
-  return { render: render, destroy: destroy };
+  return { render: render, destroy: destroy, _toggleChecklist: _toggleChecklist };
 })();
