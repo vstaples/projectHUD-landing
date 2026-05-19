@@ -36,7 +36,7 @@
         'border-bottom-color:var(--dec,#4a8cf5)}',
 
       /* ── Workstream view layout — flex column so KB shell fills remaining height ── */
-      '.ac-view-workstream{display:flex;flex-direction:column;height:100%}',
+      '.ac-view-workstream{display:flex;flex-direction:column;overflow:hidden}',
 
       /* ── KB shell container ── */
       '.ac-kb-shell{' +
