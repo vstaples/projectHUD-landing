@@ -2285,6 +2285,11 @@ var AccordLiveCapture = (function () {
     });
   }
 
+  function _closePreview() {
+    var overlay = document.getElementById('ac-lc-preview-overlay');
+    if (overlay) overlay.classList.remove('open');
+  }
+
   function _openPreview() {
     var overlay = document.getElementById('ac-lc-preview-overlay');
     if (!overlay) {
