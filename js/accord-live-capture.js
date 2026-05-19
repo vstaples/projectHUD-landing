@@ -247,7 +247,9 @@ var AccordLiveCapture = (function () {
     '.ac-lc-preview-overlay.open{display:flex}' +
     '.ac-lc-preview-topbar{height:50px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 24px;background:#10131e;border-bottom:1px solid #1e2438}' +
     '.ac-lc-preview-close{font-size:18px;color:#8899b2;cursor:pointer;flex-shrink:0;transition:color .12s}.ac-lc-preview-close:hover{color:#dce6f5}' +
-    '.ac-lc-preview-title{font-size:13px;font-weight:500;color:#dce6f5}' +
+    '.ac-lc-preview-title{font-size:13px;font-weight:500;color:#dce6f5;flex:1}' +
+    '.ac-lc-preview-exit{font-size:12px;font-weight:600;padding:6px 14px;border-radius:5px;background:rgba(255,255,255,.08);color:#dce6f5;border:1px solid rgba(255,255,255,.15);cursor:pointer;flex-shrink:0;transition:all .13s;font-family:inherit}' +
+    '.ac-lc-preview-exit:hover{background:rgba(255,255,255,.14)}' +
     '.ac-lc-preview-doc-outer{flex:1;overflow-y:auto;background:#0b0d14;padding:32px 0}' +
     '.ac-lc-preview-doc{max-width:760px;margin:0 auto;padding:48px 56px;background:#ffffff;box-sizing:border-box;border-radius:4px}' +
     // Preview document — light mode, print-ready
@@ -2301,8 +2303,9 @@ var AccordLiveCapture = (function () {
       overlay.className = 'ac-lc-preview-overlay';
       overlay.innerHTML =
         '<div class="ac-lc-preview-topbar">' +
-          '<span class="ac-lc-preview-close" onclick="AccordLiveCapture._closePreview()">\u2715</span>' +
+          '<span class="ac-lc-preview-close" onclick="AccordLiveCapture._closePreview()" title="Close preview">\u2715</span>' +
           '<span class="ac-lc-preview-title">Preview \u2014 ' + _esc(_meeting ? _meeting.title : '') + '</span>' +
+          '<button class="ac-lc-preview-exit" onclick="AccordLiveCapture._closePreview()">\u2190 Back to Review</button>' +
         '</div>' +
         '<div class="ac-lc-preview-doc-outer"><div class="ac-lc-preview-doc" id="ac-lc-preview-doc"></div></div>';
       document.body.appendChild(overlay);
