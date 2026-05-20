@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accord · Today</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+:root{
+  --bg0:#060a10;--bg1:#0a1119;--bg2:#0d1520;--bg3:#101a27;
+  --border:rgba(255,255,255,.08);--border-f:rgba(255,255,255,.04);--border-m:rgba(255,255,255,.12);
+  --cyan:#00d2ff;--amber:#f0a020;--green:#34c070;--red:#ff4d6d;--violet:#a855f7;
+  --tp:#e8f0f8;--ts:#c8d8e8;--tm:#4a6a88;--tf:#3a5a78;--tff:#2a4060;
+  --ui:'Syne',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+  --r:8px;--rlg:14px;
+  --r1w1:400px;--r1w2:300px;
+  --r2w1:400px;--r2w2:300px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp);font-size:13px;line-height:1.5;overflow:hidden}
+
+/* ── NAV ── */
+.topnav{display:flex;align-items:center;gap:0;padding:0 20px;height:68px;background:var(--bg1);border-bottom:1px solid var(--border);z-index:30;flex-shrink:0}
+.accord-mark{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.accord-mark svg{flex-shrink:0}
+.accord-name{font-family:var(--ui);font-size:22px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.nav-divider{width:4px;height:32px;background:var(--cyan);border-radius:2px;margin:0 20px;flex-shrink:0;opacity:.85}
+.meeting-center{font-family:var(--ui);font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-.02em;white-space:nowrap}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.nav-clock,.nav-date{font-family:var(--mono);font-size:11px}
+.nav-clock{color:var(--tm)}.nav-date{color:var(--tff)}
+.avatar{width:28px;height:28px;border-radius:50%;background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.25);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--cyan)}
+
+/* ── SITUATION STRIP ── */
+.strip{
+  display:flex;align-items:center;gap:0;
+  height:36px;flex-shrink:0;
+  background:var(--bg1);
+  border-bottom:1px solid var(--border);
+  padding:0 20px;
+  position:relative;
+  overflow:hidden;
+}
+.strip::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,rgba(240,160,32,.05) 0%,transparent 40%);
+  pointer-events:none;
+}
+.strip-live{display:flex;align-items:center;gap:7px;padding-right:20px;border-right:1px solid var(--border-m);margin-right:20px}
+.strip-pulse{width:7px;height:7px;border-radius:50%;background:var(--amber);flex-shrink:0;animation:pg 2s ease-in-out infinite}
+@keyframes pg{0%,100%{box-shadow:0 0 0 0 rgba(240,160,32,.6)}50%{box-shadow:0 0 0 5px rgba(240,160,32,0)}}
+.strip-live-text{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
+.strip-chips{display:flex;align-items:center;gap:16px}
+.strip-chip{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--tm)}
+.strip-chip-num{font-weight:600}
+.strip-chip-num.red{color:var(--red)}
+.strip-chip-num.amber{color:var(--amber)}
+.strip-chip-num.cyan{color:var(--cyan)}
+.strip-sep{width:1px;height:14px;background:var(--border)}
+.strip-right{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tff)}
+
+/* ── PAGE ── */
+.page{display:flex;flex-direction:column;height:calc(100vh - 104px);padding:12px 20px;gap:10px}
+.row{display:flex;flex:1;min-height:0;align-items:stretch}
+
+/* ── CELLS ── */
+.r1c1{width:var(--r1w1);flex:none;min-width:220px;display:flex;flex-direction:column;min-height:0}
+.r1c2{width:var(--r1w2);flex:none;min-width:220px;display:flex;flex-direction:column;min-height:0}
+.r1c3{flex:1;min-width:220px;display:flex;flex-direction:column;min-height:0}
+.r2c1{width:var(--r2w1);flex:none;min-width:220px;display:flex;flex-direction:column;min-height:0}
+.r2c2{width:var(--r2w2);flex:none;min-width:220px;display:flex;flex-direction:column;min-height:0}
+.r2c3{flex:1;min-width:220px;display:flex;flex-direction:column;min-height:0}
+
+/* ── HANDLE ── */
+.col-handle{width:14px;flex-shrink:0;cursor:col-resize;display:flex;align-items:stretch;justify-content:center;padding:0 5px;user-select:none}
+.col-handle-inner{width:2px;border-radius:1px;background:rgba(255,255,255,.05);transition:background .15s;flex:1}
+.col-handle:hover .col-handle-inner,.col-handle.dragging .col-handle-inner{background:rgba(0,210,255,.35)}
+
+/* ── PANEL ── */
+.panel{flex:1;display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rlg);overflow:hidden;min-height:0}
+.panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 15px 12px;background:var(--bg1);border-bottom:1px solid var(--border-f);flex-shrink:0}
+.panel-title{font-family:var(--ui);font-size:15px;font-weight:700;color:var(--tp);letter-spacing:-.01em}
+.panel-lbl{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--tm)}
+.panel-meta{font-family:var(--mono);font-size:11px;color:var(--tm)}
+.panel-body{flex:1;overflow-y:auto;min-height:0}
+.panel-body::-webkit-scrollbar{width:4px}.panel-body::-webkit-scrollbar-thumb{background:var(--border-m);border-radius:2px}
+.panel-foot{flex-shrink:0}
+.divider{height:1px;background:var(--border-f);margin:10px 0}
+.section-lbl{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--tff);margin-bottom:7px}
+
+/* ── LIVE CARD — ambient presence treatment ── */
+.live-panel{
+  flex:1;display:flex;flex-direction:column;
+  border-radius:var(--rlg);overflow:hidden;min-height:0;
+  background:var(--bg2);
+  border:1px solid rgba(240,160,32,.22);
+  box-shadow:0 0 0 1px rgba(240,160,32,.06),inset 0 0 40px rgba(240,160,32,.03);
+  position:relative;
+}
+.live-panel::before{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse at 20% 0%,rgba(240,160,32,.07) 0%,transparent 55%);
+}
+.live-topbar{display:flex;align-items:center;justify-content:space-between;padding:9px 16px 11px;background:rgba(240,160,32,.06);border-bottom:1px solid rgba(240,160,32,.14);flex-shrink:0;position:relative;z-index:1}
+.live-badge{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+.live-pulse{width:7px;height:7px;border-radius:50%;background:var(--amber);animation:pa 2s ease-in-out infinite}
+@keyframes pa{0%,100%{box-shadow:0 0 0 0 rgba(240,160,32,.6)}50%{box-shadow:0 0 0 5px rgba(240,160,32,0)}}
+.verdict-btn{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:4px;background:rgba(240,160,32,.12);color:var(--amber);border:1px solid rgba(240,160,32,.3);cursor:pointer;transition:background .15s;position:relative}
+.verdict-btn:hover{background:rgba(240,160,32,.22)}
+.verdict-dot{width:5px;height:5px;border-radius:50%;background:var(--amber)}
+.live-inner{padding:15px 16px 12px;position:relative;z-index:1}
+.meeting-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.meeting-info{flex:1;padding-right:14px}
+.meeting-title{font-size:20px;font-weight:700;color:var(--tp);margin-bottom:4px;letter-spacing:-.01em}
+.meeting-stakes{font-size:12px;color:rgba(240,160,32,.7);margin-bottom:8px}
+.meta-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tf);margin-bottom:3px}
+.meta-row i{font-size:12px}
+.timer-block{text-align:right;flex-shrink:0}
+.timer-lbl{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(240,160,32,.4);margin-bottom:2px}
+.timer-val{font-family:var(--mono);font-size:30px;font-weight:600;color:var(--cyan);line-height:1}
+.timer-sub{font-family:var(--mono);font-size:9px;color:var(--tff);margin-top:2px}
+.attendees{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+.att-pill{display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:4px;background:rgba(255,255,255,.03);border:1px solid var(--border);font-size:11px;font-weight:500}
+.att-pill.c{color:var(--ts);border-color:rgba(52,192,112,.2)}
+.att-pill.l{color:var(--amber);border-color:rgba(240,160,32,.25)}
+.att-pill.a{color:var(--tff)}
+.att-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dg{background:var(--green)}.da{background:var(--amber)}.dd{background:#2a4060}
+.chips{display:flex;gap:6px}
+.chip{flex:1;display:flex;flex-direction:column;align-items:center;padding:9px 5px;border-radius:6px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:background .15s}
+.chip:hover{background:rgba(255,255,255,.05)}
+.chip-num{font-family:var(--mono);font-size:18px;font-weight:600;line-height:1;margin-bottom:3px}
+.cn-r{color:var(--red)}.cn-a{color:var(--amber)}.cn-m{color:var(--tff)}
+.chip-lbl{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tff);text-align:center;line-height:1.3}
+.live-footer{display:flex;align-items:center;justify-content:space-between;padding:9px 16px 13px;position:relative;z-index:1;border-top:1px solid rgba(240,160,32,.1)}
+.footer-note{font-family:var(--mono);font-size:10px;color:var(--tff)}
+.rejoin-btn{padding:7px 18px;background:rgba(0,210,255,.08);color:var(--cyan);font-family:var(--ui);font-size:12px;font-weight:700;border:1px solid rgba(0,210,255,.35);border-radius:6px;cursor:pointer;transition:all .15s}
+.rejoin-btn:hover{background:rgba(0,210,255,.18)}
+
+/* ── POPUP ── */
+.popup{display:none;position:absolute;top:34px;right:0;width:260px;background:#111e30;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:13px;z-index:40}
+.popup.open{display:block}
+.popup-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.popup-ttl{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--tm)}
+.popup-x{background:none;border:none;color:var(--tf);font-size:15px;cursor:pointer}
+.v-pill{display:inline-flex;padding:4px 10px;border-radius:20px;margin-bottom:11px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:rgba(240,160,32,.12);color:var(--amber);border:1px solid rgba(240,160,32,.25)}
+.ck-list{list-style:none;display:flex;flex-direction:column;gap:6px}
+.ck-item{display:flex;align-items:flex-start;gap:6px;font-size:11px}
+.ci-p{color:var(--green);flex-shrink:0}.ci-f{color:var(--red);flex-shrink:0}.ci-w{color:var(--amber);flex-shrink:0}
+.ct-p{color:var(--tm)}.ct-f{color:var(--tp)}.ct-w{color:#c8a060}
+.gap-note{margin-top:9px;padding:6px 8px;background:rgba(255,255,255,.03);border-radius:4px;border-left:2px solid var(--tff);font-family:var(--mono);font-size:8px;color:var(--tff);line-height:1.5}
+
+/* ── SCHEDULE ── */
+.timeline{padding:10px 12px 14px}
+.t-row{display:grid;grid-template-columns:36px 13px 1fr;align-items:stretch}
+.t-time{font-family:var(--mono);font-size:10px;color:var(--tff);padding-top:8px;text-align:right;padding-right:7px;line-height:1}
+.t-time.ta{color:var(--amber)}.t-time.tn{color:var(--cyan)}
+.t-axis{display:flex;flex-direction:column;align-items:center}
+.t-dot{width:9px;height:9px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.td-dn{background:var(--bg2);border:1.5px solid #1e3048;opacity:.5}
+.td-lv{background:var(--amber);border:2px solid var(--amber);box-shadow:0 0 0 3px rgba(240,160,32,.2);animation:pa2 2s ease-in-out infinite}
+@keyframes pa2{0%,100%{box-shadow:0 0 0 0 rgba(240,160,32,.5)}50%{box-shadow:0 0 0 4px rgba(240,160,32,0)}}
+.td-nx{background:var(--bg2);border:2px solid var(--cyan)}
+.td-ft{background:var(--bg2);border:1.5px solid #2a4060}
+.t-line{flex:1;width:1.5px;background:var(--border-f);min-height:5px}
+.tl-lv{background:rgba(240,160,32,.18)}
+.t-block{margin:3px 0 3px 8px;padding:6px 8px;border-radius:5px;border-left:2px solid transparent;cursor:pointer;transition:background .15s}
+.tb-dn{opacity:.4;border-left-color:#1e3048}.tb-dn:hover{opacity:.6}
+.tb-lv{background:rgba(240,160,32,.07);border-left-color:var(--amber)}.tb-lv:hover{background:rgba(240,160,32,.12)}
+.tb-nx{background:rgba(0,210,255,.05);border-left-color:var(--cyan)}.tb-nx:hover{background:rgba(0,210,255,.1)}
+.tb-ext{border-left-color:var(--violet)}
+.tb-ft{background:rgba(255,255,255,.015);border-left-color:#1e3048}.tb-ft:hover{background:rgba(255,255,255,.03)}
+.tb-title{font-size:12px;font-weight:600;color:var(--tp);line-height:1.2;margin-bottom:2px}
+.tb-dn .tb-title{color:var(--tff);text-decoration:line-through;text-decoration-color:#2a4060}
+.tb-meta{font-family:var(--mono);font-size:9px;color:var(--tff);display:flex;align-items:center;gap:4px}
+.tb-lv .tb-meta{color:rgba(240,160,32,.6)}.tb-nx .tb-meta{color:rgba(0,210,255,.5)}
+.tp-pill{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 4px;border-radius:2px}
+.tp-ext{background:rgba(168,85,247,.12);color:var(--violet)}.tp-int{background:rgba(0,210,255,.08);color:#2a7a9a}.tp-lv{background:rgba(240,160,32,.12);color:var(--amber)}
+.now-row{display:grid;grid-template-columns:36px 13px 1fr;align-items:center;margin:1px 0}
+.now-time{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--amber);text-align:right;padding-right:7px}
+.now-line{height:1.5px;background:var(--amber);width:100%;position:relative}
+.now-line::before{content:'';position:absolute;left:-4px;top:-3px;width:7px;height:7px;border-radius:50%;background:var(--amber)}
+.now-lbl{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--amber);padding-left:9px}
+
+/* ── UPCOMING ── */
+.up-body{display:flex;flex-direction:column;height:100%;padding:10px 12px}
+.tab-bar{display:flex;border-bottom:1px solid var(--border-f);margin-bottom:10px;flex-shrink:0}
+.tab{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px 6px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;border-top:none;border-left:none;border-right:none;color:var(--tff);transition:color .15s}
+.tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}.tab:hover:not(.active){color:var(--tm)}
+.up-scroll{flex:1;overflow-y:auto;min-height:0}
+.up-scroll::-webkit-scrollbar{width:4px}.up-scroll::-webkit-scrollbar-thumb{background:var(--border-m);border-radius:2px}
+.up-card{background:rgba(255,255,255,.02);border:1px solid var(--border-f);border-radius:var(--r);padding:10px 11px;margin-bottom:8px;cursor:pointer;border-left:3px solid #1e3048;transition:background .15s}
+.up-card:last-child{margin-bottom:0}.up-card:hover{background:rgba(255,255,255,.04)}.up-card.ext{border-left-color:var(--violet)}
+.up-top{display:flex;align-items:flex-start;justify-content:space-between;gap:7px;margin-bottom:3px}
+.up-title{font-size:13px;font-weight:700;color:var(--tp);line-height:1.2;flex:1}
+.verd{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:3px;flex-shrink:0;margin-top:1px}
+.v-go{background:rgba(52,192,112,.1);color:var(--green);border:1px solid rgba(52,192,112,.2)}
+.v-cv{background:rgba(240,160,32,.1);color:var(--amber);border:1px solid rgba(240,160,32,.2)}
+.v-no{background:rgba(255,77,109,.1);color:var(--red);border:1px solid rgba(255,77,109,.2)}
+.up-row2{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.up-date{font-family:var(--mono);font-size:10px;color:var(--tf)}
+.up-dot{width:3px;height:3px;border-radius:50%;background:var(--tff)}
+.up-ws{font-family:var(--mono);font-size:10px;color:var(--tff)}
+.up-brief{font-size:11px;color:var(--tff);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px}
+
+/* ── MINUTES ── */
+.min-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border-f)}
+.min-row:last-child{border-bottom:none}.min-row:hover{background:rgba(255,255,255,.02)}
+.min-left{flex:1;min-width:0}
+.min-title{font-size:13px;font-weight:600;color:var(--tp);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.min-meta{display:flex;align-items:center;gap:4px}
+.min-date{font-family:var(--mono);font-size:10px;color:var(--tf)}
+.min-ws{font-family:var(--mono);font-size:10px;color:var(--tff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px}
+.min-age{font-family:var(--mono);font-size:10px;padding:1px 5px;border-radius:3px;flex-shrink:0}
+.ag{background:rgba(52,192,112,.08);color:#2a7a50}.aa{background:rgba(240,160,32,.1);color:#9a7030}.ar{background:rgba(255,77,109,.1);color:#9a3040}
+.badge{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border-radius:3px;flex-shrink:0;white-space:nowrap;display:inline-block}
+.b-c{background:rgba(0,210,255,.08);color:var(--cyan);border:1px solid rgba(0,210,255,.25);cursor:pointer}.b-c:hover{background:rgba(0,210,255,.18)}
+.b-n{background:rgba(255,77,109,.07);color:var(--red);border:1px solid rgba(255,77,109,.2)}
+
+/* ── NOTES ── */
+.note-row{display:grid;grid-template-columns:26px 1fr 100px 20px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border-f);position:relative}
+.note-row:last-child{border-bottom:none}.note-row:hover{background:rgba(255,255,255,.02)}
+.note-row:hover .note-acts{opacity:1}
+.note-row:hover .note-time,.note-row:hover .note-badge{opacity:0}
+.note-ck{width:13px;height:13px;border-radius:3px;border:1px solid var(--tff);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:8px;transition:all .15s}
+.note-ck:hover{border-color:var(--cyan)}.note-ck.ck{background:rgba(0,210,255,.15);border-color:var(--cyan);color:var(--cyan)}
+.note-body{font-size:12px;color:var(--ts);padding:0 7px;line-height:1.4}
+.note-body.ck{color:var(--tff);text-decoration:line-through;text-decoration-color:#2a4060}
+.note-time{font-family:var(--mono);font-size:10px;color:var(--tff);white-space:nowrap;text-align:right;transition:opacity .15s}
+.note-badge{width:18px;height:18px;border-radius:50%;background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:600;color:var(--violet);margin-left:2px;transition:opacity .15s}
+.no-badge{width:18px;margin-left:2px}
+.note-acts{display:flex;align-items:center;gap:4px;opacity:0;transition:opacity .15s;position:absolute;right:12px}
+.n-pro{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:3px;border:1px solid rgba(0,210,255,.25);background:rgba(0,210,255,.08);color:var(--cyan);cursor:pointer;white-space:nowrap}
+.n-del{width:16px;height:16px;border-radius:3px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.2);color:var(--red);font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.notes-input{border-top:1px solid var(--border-f);padding:7px 12px;display:grid;grid-template-columns:26px 1fr 100px 20px;align-items:center;background:var(--bg3);flex-shrink:0}
+.ni-ck{width:13px;height:13px;border-radius:3px;border:1px solid #1a2e44}
+.ni-f{font-size:12px;color:var(--tm);padding:0 7px;outline:none;caret-color:var(--cyan);min-height:18px}
+.ni-f:empty::before{content:'New item…';color:#1e3048;pointer-events:none}
+.promo-modal{display:none;position:absolute;right:12px;top:26px;width:175px;background:#111e30;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:9px;z-index:20}
+.promo-modal.open{display:block}
+.promo-lbl{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--tf);margin-bottom:6px}
+.promo-opt{padding:5px 6px;border-radius:4px;font-size:11px;color:var(--ts);cursor:pointer}.promo-opt:hover{background:rgba(0,210,255,.08);color:var(--cyan)}
+
+/* ── NEEDS RESPONSE ── */
+.nr-badge{width:20px;height:20px;border-radius:50%;background:rgba(255,77,109,.18);border:1px solid rgba(255,77,109,.3);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:600;color:var(--red)}
+.nr-item{padding:13px 16px 11px;border-bottom:1px solid var(--border-f)}
+.nr-item:last-child{border-bottom:none}
+.nr-title{font-size:14px;font-weight:700;color:var(--tp);margin-bottom:4px;letter-spacing:-.01em}
+.nr-meta{font-family:var(--mono);font-size:10px;color:var(--tf);margin-bottom:7px}
+.nr-sig{font-family:var(--mono);font-size:10px;font-weight:600;margin-bottom:9px}
+.ns-r{color:var(--red)}.ns-a{color:var(--amber)}
+.nr-btns{display:flex;gap:7px}
+.nr-btn{flex:1;padding:7px 0;border-radius:5px;font-size:12px;font-weight:700;text-align:center;cursor:pointer;transition:all .15s}
+.nb-ac{background:rgba(52,192,112,.1);border:1px solid rgba(52,192,112,.3);color:var(--green)}.nb-ac:hover{background:rgba(52,192,112,.2)}
+.nb-dc{background:rgba(255,77,109,.07);border:1px solid rgba(255,77,109,.25);color:var(--red)}.nb-dc:hover{background:rgba(255,77,109,.17)}
+.nb-pr{width:100%;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.25);color:var(--cyan)}.nb-pr:hover{background:rgba(0,210,255,.14)}
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav class="topnav">
+  <div class="accord-mark">
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 90 90" role="img">
+      <defs>
+        <radialGradient id="glow" cx="50%" cy="50%" r="55%">
+          <stop offset="0%" stop-color="#54F7FF" stop-opacity="0.55"/>
+          <stop offset="55%" stop-color="#0AAED1" stop-opacity="0.12"/>
+          <stop offset="100%" stop-color="#041022" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="cyanFill" x1="24" y1="18" x2="66" y2="72" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#7FFFFF"/>
+          <stop offset="45%" stop-color="#15DCEB"/>
+          <stop offset="100%" stop-color="#076D9F"/>
+        </linearGradient>
+        <linearGradient id="darkFill" x1="18" y1="30" x2="72" y2="76" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#0D355A"/>
+          <stop offset="100%" stop-color="#041022"/>
+        </linearGradient>
+        <filter id="softGlow" x="-35%" y="-35%" width="170%" height="170%">
+          <feGaussianBlur stdDeviation="1.4" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect width="90" height="90" fill="#020814"/>
+      <circle cx="45" cy="45" r="42" fill="url(#glow)"/>
+      <circle cx="42.5" cy="45.5" r="31.5" fill="none" stroke="#12345A" stroke-width="2"/>
+      <path d="M15.5 50.5A31.7 31.7 0 0 1 68 22.5" fill="none" stroke="#24DDF0" stroke-width="2.4" stroke-linecap="round" opacity="0.95"/>
+      <path d="M70.8 31.3A31.8 31.8 0 0 1 25.3 74.8" fill="none" stroke="#0C7DB2" stroke-width="2.1" stroke-linecap="round" opacity="0.8"/>
+      <path d="M19.5 29.7A33.8 33.8 0 0 1 63.2 17.4" fill="none" stroke="#0C7DB2" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+      <circle cx="43.5" cy="31.2" r="9.6" fill="url(#cyanFill)" stroke="#05182D" stroke-width="1.6"/>
+      <path d="M27.2 58.8c2.8-11.6 9-16.6 16.3-16.6 8.6 0 14.5 6.4 16.8 17.2-9.6 6.6-23.2 6.3-33.1-.6z" fill="url(#cyanFill)" stroke="#041022" stroke-width="1.6"/>
+      <circle cx="23.7" cy="39.2" r="7.5" fill="url(#darkFill)" stroke="#2BE7F4" stroke-width="1.2" opacity="0.92"/>
+      <path d="M12.8 61c2-10.6 6.6-15.7 13-15.7 4.7 0 8.7 2.7 11 7.7-5.3 6.5-13 9.1-24 8z" fill="url(#darkFill)" stroke="#05203A" stroke-width="1.4" opacity="0.92"/>
+      <circle cx="63.2" cy="39.2" r="7.5" fill="url(#cyanFill)" stroke="#041022" stroke-width="1.3" opacity="0.88"/>
+      <path d="M51.4 52.8c2.5-4.9 6.3-7.5 11-7.5 6.3 0 10.9 5.2 12.9 15.7-7.8 1.1-15.2-1.3-23.9-8.2z" fill="url(#cyanFill)" stroke="#041022" stroke-width="1.4" opacity="0.8"/>
+      <path d="M33 61.5 43.7 72 76.5 39.7" fill="none" stroke="#06152A" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.78"/>
+      <path d="M33 61.5 43.7 72 76.5 39.7" fill="none" stroke="#75FFFF" stroke-width="5.8" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)"/>
+      <path d="M33 61.5 43.7 72 76.5 39.7" fill="none" stroke="#0BBBD7" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+      <path d="M70.8 21.2 73.4 27.1 79.3 29.7 73.4 32.2 70.8 38.2 68.3 32.2 62.3 29.7 68.3 27.1z" fill="#E9FFFF" opacity="0.95" filter="url(#softGlow)"/>
+    </svg>
+    <span class="accord-name"><span style="color:#ffffff">ACC</span><span style="color:#00d2ff">ORD</span></span>
+  </div>
+  <div class="nav-divider"></div>
+  <div class="meeting-center">Meeting Center</div>
+  <div class="nav-right">
+    <span class="nav-date">Tue May 19, 2026</span>
+    <span class="nav-clock" id="nav-clock">–</span>
+    <div class="avatar">VS</div>
+  </div>
+</nav>
+
+<!-- ── SITUATION STRIP ── -->
+<div class="strip">
+  <div class="strip-live">
+    <div class="strip-pulse"></div>
+    <div class="strip-live-text">1 live now</div>
+  </div>
+  <div class="strip-chips">
+    <div class="strip-chip">
+      <span class="strip-chip-num cyan">5</span>
+      <span>meetings today</span>
+    </div>
+    <div class="strip-sep"></div>
+    <div class="strip-chip">
+      <span class="strip-chip-num red">4</span>
+      <span>actions due</span>
+    </div>
+    <div class="strip-sep"></div>
+    <div class="strip-chip">
+      <span class="strip-chip-num amber">2</span>
+      <span>need your response</span>
+    </div>
+    <div class="strip-sep"></div>
+    <div class="strip-chip">
+      <span class="strip-chip-num amber">2</span>
+      <span>minutes not ready</span>
+    </div>
+  </div>
+  <div class="strip-right" id="strip-time">–</div>
+</div>
+
+<!-- ── PAGE ── -->
+<main class="page">
+
+  <!-- ════ ROW 1 (58%) ════ -->
+  <div class="row row-1">
+
+    <!-- LIVE CARD -->
+    <div class="r1c1">
+      <div class="live-panel">
+        <div class="live-topbar">
+          <div class="live-badge"><div class="live-pulse"></div>Live session in progress</div>
+          <div class="verdict-btn" onclick="togglePopup()">
+            <div class="verdict-dot"></div>Go with caveats
+            <div class="popup" id="rdpop">
+              <div class="popup-hdr"><div class="popup-ttl">Readiness</div><button class="popup-x" onclick="event.stopPropagation();togglePopup()">×</button></div>
+              <div class="v-pill">Go with caveats</div>
+              <ul class="ck-list">
+                <li class="ck-item"><span class="ci-f">✗</span><span class="ct-f">Outcomes not defined</span></li>
+                <li class="ck-item"><span class="ci-p">✓</span><span class="ct-p">No declined attendees</span></li>
+                <li class="ck-item"><span class="ci-p">✓</span><span class="ct-p">Duration set</span></li>
+                <li class="ck-item"><span class="ci-p">✓</span><span class="ct-p">Agenda items present</span></li>
+                <li class="ck-item"><span class="ci-w">△</span><span class="ct-w">4 overdue actions in workstream</span></li>
+              </ul>
+              <div class="gap-note">⬡ Required vs. optional attendee designation not yet modeled.</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="live-inner">
+            <div class="meeting-row">
+              <div class="meeting-info">
+                <div class="meeting-title">Interview: Glen Campbell</div>
+                <div class="meeting-stakes">Electrical Engineer Candidate · C-11 Workstream</div>
+                <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label">Started –</span></div>
+                <div class="meta-row"><i class="ti ti-map-pin"></i>Conference Room B</div>
+              </div>
+              <div class="timer-block">
+                <div class="timer-lbl">Elapsed</div>
+                <div class="timer-val" id="elapsed">–</div>
+                <div class="timer-sub" id="timer-sub">–</div>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <div class="section-lbl">Attendees</div>
+            <div class="attendees">
+              <div class="att-pill c"><div class="att-dot dg"></div>Vaughn Staples</div>
+              <div class="att-pill c"><div class="att-dot dg"></div>Glen Campbell</div>
+              <div class="att-pill c"><div class="att-dot dg"></div>Ariel Fischer</div>
+              <div class="att-pill l"><div class="att-dot da"></div>Tim Roth</div>
+              <div class="att-pill a"><div class="att-dot dd"></div>Beth Cassidy</div>
+            </div>
+            <div class="divider"></div>
+            <div class="section-lbl">Open items</div>
+            <div class="chips">
+              <div class="chip"><div class="chip-num cn-r">4</div><div class="chip-lbl">Actions Due</div></div>
+              <div class="chip"><div class="chip-num cn-a">2</div><div class="chip-lbl">Decisions Needed</div></div>
+              <div class="chip"><div class="chip-num cn-a">3</div><div class="chip-lbl">Open Questions</div></div>
+              <div class="chip"><div class="chip-num cn-m">5</div><div class="chip-lbl">Agenda Items</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="live-footer panel-foot">
+          <div class="footer-note">C-11 Workstream · Decision pending</div>
+          <button class="rejoin-btn">Rejoin session →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-handle" id="r1ha"><div class="col-handle-inner"></div></div>
+
+    <!-- NOTES -->
+    <div class="r1c2">
+      <div class="panel">
+        <div class="panel-hdr"><div class="panel-title">Notes</div><div class="panel-meta" id="note-count">5 items</div></div>
+        <div class="panel-body">
+          <div id="notes-inner">
+            <div class="note-row" id="n-1"><div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">Chase Tim on AX-007 delivery confirmation</div><div class="note-time">May 19 · 9:14 AM</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro('p-1')">→ Action</div><div class="n-del" onclick="delNote('n-1')">×</div></div><div class="promo-modal" id="p-1"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote('n-1','p-1')">C-11 Workstream</div><div class="promo-opt" onclick="proNote('n-1','p-1')">Base Workstream</div><div class="promo-opt" onclick="proNote('n-1','p-1')">Control Adapter</div></div></div>
+            <div class="note-row" id="n-2"><div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">Call Bob before 3pm today</div><div class="note-time">May 19 · 9:31 AM</div><div class="note-badge" title="Beth Cassidy">BC</div><div class="note-acts"><div class="n-pro" onclick="tPro('p-2')">→ Action</div><div class="n-del" onclick="delNote('n-2')">×</div></div><div class="promo-modal" id="p-2"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote('n-2','p-2')">C-11 Workstream</div><div class="promo-opt" onclick="proNote('n-2','p-2')">Base Workstream</div><div class="promo-opt" onclick="proNote('n-2','p-2')">Control Adapter</div></div></div>
+            <div class="note-row" id="n-3"><div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">Review vendor shortlist before 11am call</div><div class="note-time">May 19 · 9:45 AM</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro('p-3')">→ Action</div><div class="n-del" onclick="delNote('n-3')">×</div></div><div class="promo-modal" id="p-3"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote('n-3','p-3')">C-11 Workstream</div><div class="promo-opt" onclick="proNote('n-3','p-3')">Base Workstream</div><div class="promo-opt" onclick="proNote('n-3','p-3')">Control Adapter</div></div></div>
+            <div class="note-row" id="n-4"><div class="note-ck ck" onclick="toggleNote(this)">✓</div><div class="note-body ck">Send Angela the updated prototype spec</div><div class="note-time">May 19 · 10:05 AM</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro('p-4')">→ Action</div><div class="n-del" onclick="delNote('n-4')">×</div></div><div class="promo-modal" id="p-4"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote('n-4','p-4')">C-11 Workstream</div><div class="promo-opt" onclick="proNote('n-4','p-4')">Base Workstream</div><div class="promo-opt" onclick="proNote('n-4','p-4')">Control Adapter</div></div></div>
+            <div class="note-row" id="n-5"><div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">Block time Friday for board prep</div><div class="note-time">May 19 · 10:31 AM</div><div class="note-badge" title="Beth Cassidy">BC</div><div class="note-acts"><div class="n-pro" onclick="tPro('p-5')">→ Action</div><div class="n-del" onclick="delNote('n-5')">×</div></div><div class="promo-modal" id="p-5"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote('n-5','p-5')">C-11 Workstream</div><div class="promo-opt" onclick="proNote('n-5','p-5')">Base Workstream</div><div class="promo-opt" onclick="proNote('n-5','p-5')">Control Adapter</div></div></div>
+          </div>
+        </div>
+        <div class="notes-input panel-foot">
+          <div class="ni-ck"></div>
+          <div class="ni-f" id="ni-f" contenteditable="true" onkeydown="noteKey(event)"></div>
+          <div></div><div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-handle" id="r1hb"><div class="col-handle-inner"></div></div>
+
+    <!-- NEEDS RESPONSE -->
+    <div class="r1c3">
+      <div class="panel">
+        <div class="panel-hdr"><div class="panel-title">Needs Your Response</div><div class="nr-badge" id="nr-ct">2</div></div>
+        <div class="panel-body">
+          <div class="nr-item" id="nr-1">
+            <div class="nr-title">CCCC Test Meeting #3 · Milestone Review</div>
+            <div class="nr-meta">Invited by Angela Kim · Mon May 18 · 9:00 AM</div>
+            <div class="nr-sig ns-r">RSVP 2 days overdue — Angela is waiting</div>
+            <div class="nr-btns"><div class="nr-btn nb-ac" onclick="dismissNr('nr-1')">✓ Accept</div><div class="nr-btn nb-dc" onclick="dismissNr('nr-1')">✗ Decline</div></div>
+          </div>
+          <div class="nr-item" id="nr-2">
+            <div class="nr-title">Base · Quarterly Decision Review</div>
+            <div class="nr-meta">Organizer: You · Wed May 20 · 1:00 PM</div>
+            <div class="nr-sig ns-a">4 decisions to ratify · prep packet not started</div>
+            <div class="nr-btns"><div class="nr-btn nb-pr">Start prep →</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /row 1 -->
+
+  <!-- ════ ROW 2 (42%) ════ -->
+  <div class="row row-2">
+
+    <!-- SCHEDULE -->
+    <div class="r2c1">
+      <div class="panel">
+        <div class="panel-hdr"><div class="panel-title">Today's Schedule</div><div class="panel-meta">May 19</div></div>
+        <div class="panel-body">
+          <div class="timeline">
+            <div class="t-row"><div class="t-time">9:00</div><div class="t-axis"><div class="t-dot td-dn"></div><div class="t-line"></div></div><div class="t-block tb-dn"><div class="tb-title">Weekly Standup</div><div class="tb-meta">9:00–9:30</div></div></div>
+            <div class="t-row"><div class="t-time ta" id="live-time-lbl">–</div><div class="t-axis"><div class="t-dot td-lv"></div><div class="t-line tl-lv"></div></div><div class="t-block tb-lv"><div class="tb-title">Interview: Glen Campbell</div><div class="tb-meta" id="live-range-lbl">– <span class="tp-pill tp-lv">Live</span></div></div></div>
+            <div class="now-row"><div class="now-time" id="now-t">–</div><div class="now-line"></div><div class="now-lbl">Now</div></div>
+            <div class="t-row"><div class="t-time tn">11:00</div><div class="t-axis"><div class="t-dot td-nx"></div><div class="t-line"></div></div><div class="t-block tb-nx tb-ext"><div class="tb-title">Brightwater Client Sync</div><div class="tb-meta">11:00–12:00 <span class="tp-pill tp-ext">Ext</span></div></div></div>
+            <div class="t-row"><div class="t-time">2:00</div><div class="t-axis"><div class="t-dot td-ft"></div><div class="t-line"></div></div><div class="t-block tb-ft"><div class="tb-title">Engineering Review</div><div class="tb-meta">2:00–2:30 <span class="tp-pill tp-int">Int</span></div></div></div>
+            <div class="t-row"><div class="t-time">3:30</div><div class="t-axis"><div class="t-dot td-ft"></div><div class="t-line" style="min-height:0"></div></div><div class="t-block tb-ft"><div class="tb-title">Risk Register Review</div><div class="tb-meta">3:30–4:30</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-handle" id="r2ha"><div class="col-handle-inner"></div></div>
+
+    <!-- UPCOMING -->
+    <div class="r2c2">
+      <div class="panel">
+        <div class="panel-hdr"><div class="panel-title">Upcoming Meetings</div></div>
+        <div class="up-body">
+          <div class="tab-bar">
+            <button class="tab active" id="tw" onclick="swTab('w')">This Week</button>
+            <button class="tab" id="tm_tab" onclick="swTab('m')">This Month</button>
+          </div>
+          <div class="up-scroll">
+            <div id="pw">
+              <div class="up-card"><div class="up-top"><div class="up-title">Brightwater Client Sync</div><div class="verd v-cv">Caveats</div></div><div class="up-row2"><span class="up-date">Wed May 20 · 11:00–12:00</span><div class="up-dot"></div><span class="tp-pill tp-ext">External</span></div><div class="up-ws">C-11 Workstream</div><div class="up-brief">Must complete endoscope prototype by 8/11; need to ratify materials vendor selection before this call.</div></div>
+              <div class="up-card"><div class="up-top"><div class="up-title">Engineering Review</div><div class="verd v-go">Go</div></div><div class="up-row2"><span class="up-date">Wed May 20 · 2:00–2:30</span><div class="up-dot"></div><span class="tp-pill tp-int">Internal</span></div><div class="up-ws">Base Workstream</div><div class="up-brief">Sprint 14 velocity review and blocker triage.</div></div>
+              <div class="up-card ext"><div class="up-top"><div class="up-title">Board Steering Update</div><div class="verd v-no">Not Ready</div></div><div class="up-row2"><span class="up-date">Fri May 22 · 9:00–10:00</span><div class="up-dot"></div><span class="tp-pill tp-ext">External</span></div><div class="up-ws">Control Adapter</div></div>
+            </div>
+            <div id="pm" style="display:none">
+              <div class="up-card"><div class="up-top"><div class="up-title">Q2 Design Review</div><div class="verd v-no">Not Ready</div></div><div class="up-row2"><span class="up-date">Mon Jun 1 · 10:00–11:30</span><div class="up-dot"></div><span class="tp-pill tp-int">Internal</span></div><div class="up-ws">Base Workstream</div><div class="up-brief">Full design review ahead of Q2 close.</div></div>
+              <div class="up-card ext"><div class="up-top"><div class="up-title">Regulatory Affairs Briefing</div><div class="verd v-no">Not Ready</div></div><div class="up-row2"><span class="up-date">Thu Jun 11 · 2:00–3:00</span><div class="up-dot"></div><span class="tp-pill tp-ext">External</span></div><div class="up-ws">Control Adapter</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-handle" id="r2hb"><div class="col-handle-inner"></div></div>
+
+    <!-- MINUTES -->
+    <div class="r2c3">
+      <div class="panel">
+        <div class="panel-hdr"><div class="panel-title">Minutes</div><div class="panel-meta">6 meetings · 2 not ready</div></div>
+        <div class="panel-body">
+          <div class="min-row"><div class="min-left"><div class="min-title">C-11 Percolate Smoke Test</div><div class="min-meta"><span class="min-date">May 19</span><div class="up-dot"></div><span class="min-ws">C-11 Workstream</span><span class="min-age ag">Today</span></div></div><div class="badge b-c">Complete →</div></div>
+          <div class="min-row"><div class="min-left"><div class="min-title">Q2 Product Strategy Review</div><div class="min-meta"><span class="min-date">May 18</span><div class="up-dot"></div><span class="min-ws">Base Workstream</span><span class="min-age ag">1 day ago</span></div></div><div class="badge b-n">Not Ready</div></div>
+          <div class="min-row"><div class="min-left"><div class="min-title">Brightwater Vendor Alignment</div><div class="min-meta"><span class="min-date">May 15</span><div class="up-dot"></div><span class="min-ws">C-11 Workstream</span><span class="min-age ag">4 days</span></div></div><div class="badge b-c">Complete →</div></div>
+          <div class="min-row"><div class="min-left"><div class="min-title">Engineering Sprint 13 Retro</div><div class="min-meta"><span class="min-date">May 12</span><div class="up-dot"></div><span class="min-ws">Base Workstream</span><span class="min-age aa">7 days</span></div></div><div class="badge b-c">Complete →</div></div>
+          <div class="min-row"><div class="min-left"><div class="min-title">Risk Register Review</div><div class="min-meta"><span class="min-date">May 8</span><div class="up-dot"></div><span class="min-ws">Control Adapter</span><span class="min-age aa">11 days</span></div></div><div class="badge b-n">Not Ready</div></div>
+          <div class="min-row"><div class="min-left"><div class="min-title">Board Steering Update</div><div class="min-meta"><span class="min-date">May 5</span><div class="up-dot"></div><span class="min-ws">Control Adapter</span><span class="min-age ar">14 days</span></div></div><div class="badge b-c">Complete →</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /row 2 -->
+
+</main>
+
+<script>
+/* ── TIME UTILS ── */
+function fmt(d){var h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+(m<10?'0':'')+m+' '+ap;}
+function fmtH(d){var h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+(m<10?'0':'')+m+' '+ap;}
+var mos=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtS(d){var mon=mos[d.getMonth()],day=d.getDate(),h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return mon+' '+day+' · '+h+':'+(m<10?'0':'')+m+' '+ap;}
+
+/* ── LIVE MEETING — relative to real current time ── */
+/* Meeting started 45 minutes ago from now, runs 60 min */
+var DURATION_MIN=60;
+function getMeetingStart(){
+  var now=new Date();
+  var s=new Date(now.getTime()-45*60*1000);
+  return s;
+}
+function getMeetingEnd(start){return new Date(start.getTime()+DURATION_MIN*60*1000);}
+
+function padZ(n){return n<10?'0'+n:String(n);}
+
+function tickAll(){
+  var now=new Date();
+  var t=fmt(now);
+  ['nav-clock','now-t','strip-time'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t;});
+
+  var start=getMeetingStart();
+  var end=getMeetingEnd(start);
+  var elapsedSec=Math.max(0,Math.floor((now-start)/1000));
+  var m=Math.floor(elapsedSec/60),s=elapsedSec%60;
+  var el=document.getElementById('elapsed');
+  if(el)el.textContent=m+':'+padZ(s);
+
+  var sl=document.getElementById('started-label');
+  if(sl)sl.textContent='Started: '+fmtH(start);
+
+  var sub=document.getElementById('timer-sub');
+  var remSec=Math.max(0,Math.floor((end-now)/1000));
+  var rm=Math.floor(remSec/60);
+  if(sub)sub.textContent=rm>0?(rm+'m remaining'):'ending soon';
+
+  /* schedule labels */
+  var stH=start.getHours(),stM=start.getMinutes();
+  var enH=end.getHours(),enM=end.getMinutes();
+  function hm(h,m){return h+':'+(m<10?'0':'')+m;}
+  var tl=document.getElementById('live-time-lbl');
+  if(tl)tl.textContent=hm(stH,stM);
+  var rl=document.getElementById('live-range-lbl');
+  if(rl)rl.innerHTML=hm(stH,stM)+'–'+hm(enH,enM)+' <span class="tp-pill tp-lv">Live</span>';
+}
+tickAll();
+setInterval(tickAll,1000);
+
+/* ── POPUP ── */
+function togglePopup(){document.getElementById('rdpop').classList.toggle('open');}
+document.addEventListener('click',function(e){if(!e.target.closest('.verdict-btn')){var p=document.getElementById('rdpop');if(p)p.classList.remove('open');}});
+
+/* ── TABS ── */
+function swTab(t){
+  document.getElementById('tw').className='tab'+(t==='w'?' active':'');
+  document.getElementById('tm_tab').className='tab'+(t==='m'?' active':'');
+  document.getElementById('pw').style.display=t==='w'?'':'none';
+  document.getElementById('pm').style.display=t==='m'?'':'none';
+}
+
+/* ── NEEDS RESPONSE ── */
+function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);}
+
+/* ── NOTES ── */
+var nc=6;
+function updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n+(n===1?' item':' items');}
+function toggleNote(el){var c=el.classList.toggle('ck');el.textContent=c?'✓':'';var b=el.nextElementSibling;if(b)b.classList.toggle('ck',c);}
+function delNote(id){var el=document.getElementById(id);if(el)el.remove();updNC();}
+function tPro(id){document.querySelectorAll('.promo-modal').forEach(function(m){if(m.id!==id)m.classList.remove('open');});var m=document.getElementById(id);if(m)m.classList.toggle('open');}
+function proNote(nid,pid){var m=document.getElementById(pid);if(m)m.classList.remove('open');var el=document.getElementById(nid);if(el){el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();updNC();},300);}}
+function noteKey(e){
+  if(e.key!=='Enter')return;e.preventDefault();
+  var f=document.getElementById('ni-f'),val=f.textContent.trim();if(!val)return;
+  var id='n-'+nc,pid='p-'+nc;nc++;
+  var t=fmtS(new Date());
+  var row=document.createElement('div');row.className='note-row';row.id=id;
+  row.innerHTML='<div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">'+val+'</div><div class="note-time">'+t+'</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro(\''+pid+'\')">→ Action</div><div class="n-del" onclick="delNote(\''+id+'\')">×</div></div><div class="promo-modal" id="'+pid+'"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">C-11 Workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">Base Workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">Control Adapter</div></div>';
+  document.getElementById('notes-inner').appendChild(row);f.textContent='';updNC();
+}
+document.addEventListener('click',function(e){if(!e.target.closest('.n-pro')&&!e.target.closest('.promo-modal'))document.querySelectorAll('.promo-modal').forEach(function(m){m.classList.remove('open');});});
+
+/* ── RESIZE — independent per row ── */
+var r1w=[0,0],r2w=[0,0];
+function applyR1(){var r=document.documentElement;r.style.setProperty('--r1w1',r1w[0]+'px');r.style.setProperty('--r1w2',r1w[1]+'px');}
+function applyR2(){var r=document.documentElement;r.style.setProperty('--r2w1',r2w[0]+'px');r.style.setProperty('--r2w2',r2w[1]+'px');}
+function getW(rowSel){var row=document.querySelector(rowSel);return row?row.getBoundingClientRect().width-28:800;}
+function initW(){
+  var a1=getW('.row-1');r1w[0]=a1*.40;r1w[1]=a1*.30;applyR1();
+  var a2=getW('.row-2');r2w[0]=a2*.40;r2w[1]=a2*.30;applyR2();
+}
+function mkHandle(id,widths,colIdx,applyFn){
+  var h=document.getElementById(id);if(!h)return;
+  h.addEventListener('mousedown',function(e){
+    var sx=e.clientX,sw0=widths[colIdx],sw1=widths[colIdx+1];
+    h.classList.add('dragging');document.body.style.cursor='col-resize';document.body.style.userSelect='none';
+    function mv(e){var dx=e.clientX-sx;widths[colIdx]=Math.max(200,sw0+dx);if(colIdx+1<widths.length)widths[colIdx+1]=Math.max(200,sw1-dx);applyFn();}
+    function up(){h.classList.remove('dragging');document.body.style.cursor='';document.body.style.userSelect='';document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);}
+    document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);e.preventDefault();
+  });
+}
+initW();
+mkHandle('r1ha',r1w,0,applyR1);mkHandle('r1hb',r1w,1,applyR1);
+mkHandle('r2ha',r2w,0,applyR2);mkHandle('r2hb',r2w,1,applyR2);
+window.addEventListener('resize',initW);
+</script>
+</body>
+</html>

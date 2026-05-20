@@ -9,7 +9,7 @@
 <!-- Editorial fonts (per Style Doctrine v1.7 §2 + prototype v3b-4) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&family=Syne:wght@500;600;700&display=swap" rel="stylesheet">
 
 <!-- CMD-ACCORD-CONSTELLATION-ENTRY-1 Phase 2 + Phase 3 + Phase 4a stylesheets -->
 <link rel="stylesheet" href="/css/accord-constellation.css">
@@ -2870,16 +2870,6 @@
   <nav class="topnav">
     <div class="brand">Accord<span class="brand-meta" id="brandMeta">— loading —</span></div>
 
-    <button class="live-connect" id="liveConnectBtn" title="Subscribe to the meeting channel">
-      <span class="lc-pulse"></span>
-      <span class="lc-label">LIVE CONNECT</span>
-    </button>
-
-    <!-- CMD-ACCORD-WORKSTREAMS-SUBSTRATE-1 Phase 4: small chrome link for
-         Manage Workstreams surface (Q-INV-2 Option B). -->
-    <a href="#" class="chrome-link" id="manageWorkstreamsLink"
-       title="Manage workstream organizing buckets">Manage workstreams</a>
-
     <!-- X-30/31/32: meeting-context label. Replaces LIVE CONNECT +
          Manage workstreams when inside a meeting. Hidden by default;
          accord-core.js shows/hides on accord:level-changed. -->
@@ -3524,12 +3514,9 @@
     }
 
     // X-30/31/32: show/hide topnav chrome based on meeting level.
-    // In meeting context: hide LIVE CONNECT + Manage workstreams,
-    // show context label (Preparing/In Session · title · workstream).
-    // On ascent: restore chrome, hide context label.
+    // CMD-ACCORD-MEETING-CENTER-1: liveConnectBtn and manageWorkstreamsLink
+    // removed from DOM — references dropped.
     function _applyTopnavContext(level) {
-      var liveBtn   = document.getElementById('liveConnectBtn');
-      var manageBtn = document.getElementById('manageWorkstreamsLink');
       var ctx       = document.getElementById('acTopnavContext');
       var prefix    = document.getElementById('acTopnavPrefix');
       var brandEl   = document.getElementById('brandMeta');
@@ -3556,7 +3543,6 @@
           var freshTitle = titleEl.cloneNode(false);
           freshTitle.textContent = meetingTitle;
           titleEl.parentNode.replaceChild(freshTitle, titleEl);
-          // Title click: no-op (already at meeting level)
           freshTitle.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' || e.key === ' ') e.preventDefault();
           });
@@ -3567,7 +3553,7 @@
         if (wsEl) {
           var freshWs = wsEl.cloneNode(false);
           freshWs.textContent = '← Back';
-          freshWs.title = wsName; // tooltip still shows workstream name
+          freshWs.title = wsName;
           wsEl.parentNode.replaceChild(freshWs, wsEl);
           freshWs.addEventListener('click', function() {
             if (wsId && window.Accord && typeof window.Accord.setLevel === 'function') {
@@ -3582,16 +3568,11 @@
           });
         }
 
-        // Show context label; hide constellation-level chrome
         ctx.style.display = 'flex';
-        if (liveBtn)   liveBtn.style.display  = 'none';
-        if (manageBtn) manageBtn.style.display = 'none';
 
       } else {
-        // Ascending out of meeting — restore chrome, hide context label
+        // Ascending out of meeting — hide context label
         ctx.style.display = 'none';
-        if (liveBtn)   liveBtn.style.display  = '';
-        if (manageBtn) manageBtn.style.display = '';
         _setBrandMeta('capture');
       }
     }
@@ -3662,6 +3643,46 @@
     load('/js/accord-dnd.js');
     // CMD-ACCORD-MEETING-SETUP-1 Phase 2
     load('/js/accord-meeting-setup.js');
+  })();
+</script>
+
+<!-- CMD-ACCORD-MEETING-CENTER-1: Accord Tier 1 tab registration.
+     Initialises HUDShell with the three Accord module tabs.
+     onTier1Select fires on every click; MEETING CENTER navigates
+     to accord-today.html. WORKSTREAMS and KNOWLEDGE BASE are
+     served by this page — no navigation required. -->
+<script>
+  (function() {
+    function _initAccordShell() {
+      if (!window.HUDShell) {
+        // HUDShell not yet loaded — retry once after short delay
+        setTimeout(_initAccordShell, 80);
+        return;
+      }
+      HUDShell.init({
+        page:        'accord',
+        moduleName:  'Accord',
+        tier1: [
+          { id: 'workstreams',    label: 'Workstreams'    },
+          { id: 'meeting-center', label: 'Meeting Center' },
+          { id: 'knowledge-base', label: 'Knowledge Base' }
+        ],
+        tier2: {},
+        initialTier1: 'workstreams',
+        onTier1Select: function(tabId) {
+          if (tabId === 'meeting-center') {
+            window.location.href = '/accord-today.html';
+          }
+          // WORKSTREAMS and KNOWLEDGE BASE: surface routing handled
+          // by existing accord-views.js / accord-knowledge-base.js
+        }
+      });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', _initAccordShell);
+    } else {
+      _initAccordShell();
+    }
   })();
 </script>
 

@@ -688,6 +688,9 @@
   }
 
   // CMD-ACCORD-MY-MEETINGS-2 -- tab bar injection
+  // CMD-ACCORD-MEETING-CENTER-1: MY MEETINGS tab removed. MY MEETINGS is now
+  // the MEETING CENTER surface (accord-today.html) reached via Tier 1 tab.
+  // WORKSTREAMS is a plain rail header, not a tab.
   function _ensureRailTabs() {
     if (document.querySelector('.ac-rail-tabs')) return;  // idempotent
     var railLeft = document.getElementById('ac-rail-left');
@@ -708,17 +711,14 @@
     var oldHeader   = railLeft.querySelector('.ac-rail-header');
     var collapseBtn = oldHeader ? oldHeader.querySelector('.ac-rail-collapse') : null;
 
-    // Build tab bar
-    var tabBar = document.createElement('div');
-    tabBar.className = 'ac-rail-tabs';
-    tabBar.innerHTML =
-      '<button class="ac-rail-tab ac-rail-tab--active" ' +
-      'data-tab="workstreams" data-action="rail-tab-switch">WORKSTREAMS</button>' +
-      '<button class="ac-rail-tab" ' +
-      'data-tab="my-meetings" data-action="rail-tab-switch">MY MEETINGS</button>' +
+    // Build plain header (no tab bar — WORKSTREAMS is the only rail panel)
+    var header = document.createElement('div');
+    header.className = 'ac-rail-header';
+    header.innerHTML =
+      '<div class="ac-rail-title">Workstreams</div>' +
       (collapseBtn ? collapseBtn.outerHTML : '');
 
-    // Workstream panel -- wrap existing content
+    // Workstream panel — wrap existing content
     var wsPanel = document.createElement('div');
     wsPanel.className = 'ac-rail-panel';
     wsPanel.setAttribute('data-panel', 'workstreams');
@@ -734,44 +734,15 @@
       if (scroll) wsPanel.appendChild(scroll);
     }
 
-    // My Meetings panel
-    var mmPanel = document.createElement('div');
-    mmPanel.className = 'ac-rail-panel';
-    mmPanel.setAttribute('data-panel', 'my-meetings');
-    mmPanel.style.display = 'none';
-    mmPanel.innerHTML = '<div id="ac-mm-rail-content"></div>';
-
     // Remove old header, insert new structure
     if (oldHeader) oldHeader.remove();
-    railLeft.insertBefore(tabBar, railLeft.firstChild);
+    railLeft.insertBefore(header, railLeft.firstChild);
     railLeft.appendChild(wsPanel);
-    railLeft.appendChild(mmPanel);
-
-    // Wire tab delegation
-    tabBar.addEventListener('click', function (ev) {
-      var target = ev.target;
-      if (!target.dataset || target.dataset.action !== 'rail-tab-switch') return;
-      _switchRailTab(target.dataset.tab);
-    });
-
   }
 
   function _switchRailTab(tab) {
-    document.querySelectorAll('.ac-rail-tab').forEach(function (t) {
-      t.classList.toggle('ac-rail-tab--active', t.dataset.tab === tab);
-    });
-    document.querySelectorAll('.ac-rail-panel').forEach(function (p) {
-      p.style.display = p.getAttribute('data-panel') === tab ? '' : 'none';
-    });
-    if (tab === 'my-meetings') {
-      if (window.AccordMyMeetings) {
-        window.AccordMyMeetings.renderInRail(
-          document.getElementById('ac-mm-rail-content')
-        );
-      }
-    } else {
-      if (window.AccordMyMeetings) window.AccordMyMeetings.pauseRefresh();
-    }
+    // No-op: tab switching retired with MY MEETINGS removal.
+    // Retained to avoid errors if any legacy caller invokes it.
   }
 
   // X-19 + X-19b -- drag-to-resize both rails

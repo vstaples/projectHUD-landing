@@ -407,6 +407,14 @@ const HUDShell = (() => {
       }
       .hud-tier1-tab:hover { color: #e8f4ff; background: rgba(255,255,255,0.03); }
       .hud-tier1-tab.active { color: #00d2ff; border-bottom-color: #00d2ff; }
+      /* CMD-ACCORD-MEETING-CENTER-1: Accord module — amber active tab + Syne wordmark */
+      body.accord-module #hud-tier1 .hud-tier1-tab.active {
+        color: #ffaa00;
+        border-bottom-color: #ffaa00;
+      }
+      body.accord-module .hud-module-name {
+        font-family: 'Syne', system-ui, sans-serif;
+      }
       .hud-tier1-tab .tab-dot {
         width: 6px; height: 6px; border-radius: 50%;
         background: currentColor; opacity: 0.5;
@@ -940,6 +948,8 @@ const HUDShell = (() => {
     document.body.insertBefore(header, document.body.firstChild);
     document.body.classList.add('hud-header-rendered');
     document.body.classList.add('hud-shell-body');
+    // CMD-ACCORD-MEETING-CENTER-1: module-specific body class for CSS scoping
+    if (modKey === 'Accord') document.body.classList.add('accord-module');
 
     _startDatetimeTicker();
     _bindNotifBtn();
