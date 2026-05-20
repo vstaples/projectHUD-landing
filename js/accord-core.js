@@ -903,12 +903,16 @@ const Accord = (() => {
   }
 
   function _wireLiveConnect() {
-    $('liveConnectBtn').addEventListener('click', async () => {
+    // CMD-ACCORD-MEETING-CENTER-1: liveConnectBtn removed from accord.html.
+    // Guard prevents TypeError on surfaces where the element is absent.
+    const lcBtn = $('liveConnectBtn');
+    if (!lcBtn) return;
+    lcBtn.addEventListener('click', async () => {
       if (!state.meeting) return;
       if (state.channel) {
         try { await state.channel.unsubscribe(); } catch (e) {}
         state.channel = null;
-        $('liveConnectBtn').classList.remove('connected');
+        lcBtn.classList.remove('connected');
       } else {
         await _subscribeMeetingChannel(state.meeting.meeting_id);
       }
