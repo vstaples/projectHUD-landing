@@ -3657,21 +3657,28 @@
 </script>
 
 <!-- CMD-ACCORD-MEETING-CENTER-1: Accord Tier 1 tab registration.
-     Initialises HUDShell with the three Accord module tabs.
-     onTier1Select fires on every click; MEETING CENTER navigates
-     to accord-today.html. WORKSTREAMS and KNOWLEDGE BASE are
-     served by this page — no navigation required. -->
+     Defensive pattern: _buildHeader guard prevents re-init if sidebar.js
+     already built the header (e.g. from a prior cached deploy). We bypass
+     by calling _buildTier1 via HUDShell.init — which only skips tier1 if
+     the strip is already in DOM — and add accord-module body class manually
+     so CSS overrides apply regardless of init order. -->
 <script>
   (function() {
     function _initAccordShell() {
-      if (!window.HUDShell) {
-        // HUDShell not yet loaded — retry once after short delay
-        setTimeout(_initAccordShell, 80);
-        return;
-      }
+      if (!window.HUDShell) { setTimeout(_initAccordShell, 80); return; }
+
+      // Always stamp body class — safe to re-add
+      document.body.classList.add('accord-module');
+
+      // If tier1 already built, nothing more to do
+      if (document.getElementById('hud-tier1')) return;
+
+      // Call init — header guard will no-op if already built,
+      // but tier1 block will still run and build the strip
       HUDShell.init({
         page:        'accord',
         moduleName:  'Accord',
+        header:      false,          // suppress header rebuild — already exists
         tier1: [
           { id: 'workstreams',    label: 'Workstreams'    },
           { id: 'meeting-center', label: 'Meeting Center' },
@@ -3683,11 +3690,13 @@
           if (tabId === 'meeting-center') {
             window.location.href = '/accord-today.html';
           }
-          // WORKSTREAMS and KNOWLEDGE BASE: surface routing handled
-          // by existing accord-views.js / accord-knowledge-base.js
         }
       });
+
+      // Confirm
+      console.log('[accord] tier1 built:', !!document.getElementById('hud-tier1'));
     }
+
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', _initAccordShell);
     } else {
