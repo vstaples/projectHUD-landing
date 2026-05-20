@@ -900,7 +900,15 @@ const HUDShell = (() => {
 
 
   function _buildHeader(moduleName) {
-    if (document.getElementById('hud-header')) return; // idempotent
+    const existingHeader = document.getElementById('hud-header');
+    if (existingHeader) {
+      // Guard fired — header already exists from cached sidebar.js build.
+      // Retroactively stamp the module body class so Tier 1 renders correctly.
+      if (moduleName === 'Accord' && !document.body.classList.contains('accord-module')) {
+        document.body.classList.add('accord-module');
+      }
+      return; // existing guard return preserved
+    }
     const initials = _userInitialsFallback();
 
     // Resolve module-specific icon and wordmark split.
