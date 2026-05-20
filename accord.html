@@ -21,6 +21,10 @@
   #hud-header-left .hud-module-name {
     font-family: 'Syne', system-ui, sans-serif !important;
   }
+  /* Hide legacy accord topnav once hud-shell header takes over */
+  body.hud-header-rendered #accord-app .topnav {
+    display: none !important;
+  }
 </style>
 <link rel="stylesheet" href="/css/accord-constellation.css">
 <link rel="stylesheet" href="/css/accord-rails.css">
@@ -3678,7 +3682,6 @@
       HUDShell.init({
         page:        'accord',
         moduleName:  'Accord',
-        header:      false,          // suppress header rebuild — already exists
         tier1: [
           { id: 'workstreams',    label: 'Workstreams'    },
           { id: 'meeting-center', label: 'Meeting Center' },
