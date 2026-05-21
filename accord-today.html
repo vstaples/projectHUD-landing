@@ -627,7 +627,6 @@ window.addEventListener('resize',initW);
 <script>
 (function(){
   function build(){
-    if(!window.HUDShell){setTimeout(build,80);return;}
     if(document.getElementById('hud-tier1'))return;
     document.body.classList.add('accord-module');
     var strip=document.createElement('div');strip.id='hud-tier1';
