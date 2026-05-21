@@ -27,7 +27,7 @@
   --mc-hero-bg:#0d1520;--mc-hero-border-opacity:0.22;
   --mc-panel-bg:#0d1520;--mc-strip-bg:#0a1119;
   --mc-amber:#f0a020;--mc-cyan:#00d2ff;--mc-red:#ff4d6d;--mc-violet:#a855f7;
-  --mc-row1-flex:1;--mc-row2-flex:1;
+  --mc-border-width:1px;--mc-panel-opacity:1;
   --mc-brightness:1;--mc-contrast:1;--mc-saturate:1;
   --mc-col-gap:6px;--mc-zone-gap:6px;--mc-radius:8px;
   --mc-text-primary:#e8f0f8;--mc-text-muted:#7a9abf;--mc-text-meta:#5a7a9a;
@@ -51,7 +51,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .strip{
   display:flex;align-items:center;gap:0;
   height:36px;flex-shrink:0;
-  background:var(--bg1);
+  background:var(--mc-strip-bg,var(--bg1));
   border-bottom:1px solid var(--border);
   padding:0 20px;
   position:relative;
@@ -95,7 +95,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .col-handle:hover .col-handle-inner,.col-handle.dragging .col-handle-inner{background:rgba(0,210,255,.35)}
 
 /* ── PANEL ── */
-.panel{flex:1;display:flex;flex-direction:column;background:var(--mc-panel-bg,var(--bg2));border:1px solid var(--border);border-radius:var(--mc-radius,var(--rlg));overflow:hidden;min-height:0}
+.panel{flex:1;display:flex;flex-direction:column;background:var(--mc-panel-bg,var(--bg2));border:var(--mc-border-width,1px) solid var(--border);border-radius:var(--mc-radius,var(--rlg));overflow:hidden;min-height:0;opacity:var(--mc-panel-opacity,1)}
 .panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 15px 12px;background:var(--bg1);border-bottom:1px solid var(--border-f);flex-shrink:0}
 .panel-title{font-family:var(--ui);font-size:15px;font-weight:700;color:var(--tp);letter-spacing:-.01em}
 .panel-lbl{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--tm)}
@@ -112,7 +112,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
   flex:1;display:flex;flex-direction:column;
   border-radius:var(--mc-radius,var(--rlg));overflow:hidden;min-height:0;
   background:var(--mc-hero-bg,var(--bg2));
-  border:1px solid rgba(240,160,32,var(--mc-hero-border-opacity,0.22));
+  border:var(--mc-border-width,1px) solid rgba(240,160,32,var(--mc-hero-border-opacity,0.22));
   box-shadow:0 0 0 1px rgba(240,160,32,.06),inset 0 0 40px rgba(240,160,32,.03);
   position:relative;
 }
@@ -1011,7 +1011,7 @@ function _initRealtime(){
 
 // ── C-08 DISPLAY TUNING ──
 var _MC_TUNE_KEY='accord-mc-display-tuning';
-var _MC_DEFAULTS={brightness:1,contrast:1,saturate:1,colGap:6,zoneGap:10,radius:8,heroBg:'#0d1520',heroBorderOpacity:.22,panelBg:'#0d1520',stripBg:'#0a1119',amber:'#f0a020',cyan:'#00d2ff',red:'#ff4d6d',violet:'#a855f7',row1Flex:1,row2Flex:1,textPrimary:'#e8f0f8',textMuted:'#7a9abf',textMeta:'#5a7a9a'};
+var _MC_DEFAULTS={brightness:1,contrast:1,saturate:1,colGap:6,zoneGap:10,radius:8,borderWidth:1,panelOpacity:1,heroBg:'#0d1520',heroBorderOpacity:.22,panelBg:'#0d1520',stripBg:'#0a1119',amber:'#f0a020',cyan:'#00d2ff',red:'#ff4d6d',violet:'#a855f7',row1Flex:1,row2Flex:1,textPrimary:'#e8f0f8',textMuted:'#7a9abf',textMeta:'#5a7a9a'};
 var _MC_PRESETS={dark:{brightness:1,contrast:1,saturate:1,heroBg:'#0d1520'},medium:{brightness:1.1,contrast:.95,saturate:1.1,heroBg:'#111c2a'},bright:{brightness:1.25,contrast:.9,saturate:1.2,heroBg:'#162030'}};
 var _mcTuneWin=null;
 
@@ -1023,6 +1023,7 @@ function _mcApplyTune(t){
   var r=document.documentElement.style;
   r.setProperty('--mc-brightness',t.brightness);r.setProperty('--mc-contrast',t.contrast);r.setProperty('--mc-saturate',t.saturate);
   r.setProperty('--mc-col-gap',t.colGap+'px');r.setProperty('--mc-zone-gap',t.zoneGap+'px');r.setProperty('--mc-radius',t.radius+'px');
+  r.setProperty('--mc-border-width',(t.borderWidth||1)+'px');r.setProperty('--mc-panel-opacity',t.panelOpacity||1);
   r.setProperty('--mc-hero-bg',t.heroBg);r.setProperty('--mc-hero-border-opacity',t.heroBorderOpacity);
   r.setProperty('--mc-panel-bg',t.panelBg);r.setProperty('--mc-strip-bg',t.stripBg);
   r.setProperty('--mc-amber',t.amber);r.setProperty('--mc-cyan',t.cyan);r.setProperty('--mc-red',t.red);r.setProperty('--mc-violet',t.violet);
@@ -1080,6 +1081,8 @@ function _mcTuneHTML(t){
   +'<div class="row"><span class="lbl">Column gap</span><input type="range" id="colGap" min="0" max="20" step="1" value="'+t.colGap+'" oninput="sync()"><span class="val" id="v-colGap">'+t.colGap+'px</span></div>'
   +'<div class="row"><span class="lbl">Zone gap</span><input type="range" id="zoneGap" min="0" max="20" step="1" value="'+t.zoneGap+'" oninput="sync()"><span class="val" id="v-zoneGap">'+t.zoneGap+'px</span></div>'
   +'<div class="row"><span class="lbl">Corner radius</span><input type="range" id="radius" min="0" max="24" step="1" value="'+t.radius+'" oninput="sync()"><span class="val" id="v-radius">'+t.radius+'px</span></div>'
+  +'<div class="row"><span class="lbl">Border thickness</span><input type="range" id="borderWidth" min="0" max="4" step=".5" value="'+(t.borderWidth||1)+'" oninput="sync()"><span class="val" id="v-borderWidth">'+(t.borderWidth||1)+'px</span></div>'
+  +'<div class="row"><span class="lbl">Panel opacity</span><input type="range" id="panelOpacity" min=".2" max="1" step=".01" value="'+(t.panelOpacity||1)+'" oninput="sync()"><span class="val" id="v-panelOpacity">'+(t.panelOpacity||1)+'</span></div>'
   +'<div class="sec">Row Height Ratio</div>'
   +'<div id="ratio-lbl">Row 1: 50% · Row 2: 50%</div>'
   +'<input type="range" id="rowRatio" min="35" max="65" step="1" value="50" style="width:100%;margin-bottom:4px;accent-color:#f0a020" oninput="syncRatio()">'
@@ -1108,7 +1111,7 @@ function _mcTuneHTML(t){
   +'  var r1=parseFloat((ratio/50).toFixed(3)),r2=parseFloat(((100-ratio)/50).toFixed(3));'
   +'  return{brightness:parseFloat(g("brightness").value),contrast:parseFloat(g("contrast").value),'
   +'    saturate:parseFloat(g("saturate").value),colGap:parseInt(g("colGap").value),zoneGap:parseInt(g("zoneGap").value),'
-  +'    radius:parseInt(g("radius").value),heroBg:g("heroBg").value,heroBorderOpacity:parseFloat(g("heroBorderOpacity").value),'
+  +'    radius:parseInt(g("radius").value),borderWidth:parseFloat(g("borderWidth").value),panelOpacity:parseFloat(g("panelOpacity").value),heroBg:g("heroBg").value,heroBorderOpacity:parseFloat(g("heroBorderOpacity").value),'
   +'    panelBg:g("panelBg").value,stripBg:g("stripBg").value,amber:g("amber").value,cyan:g("cyan").value,'
   +'    red:g("red").value,violet:g("violet").value,row1Flex:r1,row2Flex:r2,'
   +'    textPrimary:g("textPrimary").value,textMuted:g("textMuted").value,textMeta:g("textMeta").value};}'
@@ -1119,7 +1122,7 @@ function _mcTuneHTML(t){
   +'  sync();}'
   +'function sync(){'
   +'  updVal("brightness");updVal("contrast");updVal("saturate");'
-  +'  updVal("colGap","px");updVal("zoneGap","px");updVal("radius","px");updVal("heroBorderOpacity");'
+  +'  updVal("colGap","px");updVal("zoneGap","px");updVal("radius","px");updVal("heroBorderOpacity");updVal("borderWidth","px");updVal("panelOpacity");'
   +'  var t=getTune();window.opener&&window.opener.postMessage({type:"mc-tune-apply",tune:t},"*");}'
   +'function save(){var t=getTune();localStorage.setItem(KEY,JSON.stringify(t));window.opener&&window.opener.postMessage({type:"mc-tune-apply",tune:t},"*");}'
   +'function exportTune(){window.opener&&window.opener.console.log("[MC] display-tuning export:",JSON.stringify(getTune(),null,2));}'
@@ -1127,7 +1130,7 @@ function _mcTuneHTML(t){
   +'  localStorage.removeItem(KEY);'
   +'  var d=DEFAULTS;'
   +'  g("brightness").value=d.brightness;g("contrast").value=d.contrast;g("saturate").value=d.saturate;'
-  +'  g("colGap").value=d.colGap;g("zoneGap").value=d.zoneGap;g("radius").value=d.radius;'
+  +'  g("colGap").value=d.colGap;g("zoneGap").value=d.zoneGap;g("radius").value=d.radius;g("borderWidth").value=d.borderWidth;g("panelOpacity").value=d.panelOpacity;'
   +'  g("heroBg").value=d.heroBg;g("heroBorderOpacity").value=d.heroBorderOpacity;'
   +'  g("panelBg").value=d.panelBg;g("stripBg").value=d.stripBg;'
   +'  g("amber").value=d.amber;g("cyan").value=d.cyan;g("red").value=d.red;g("violet").value=d.violet;'
