@@ -36,7 +36,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .meeting-center{font-family:var(--ui);font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-.02em;white-space:nowrap}
 .nav-right{margin-left:auto;display:flex;align-items:center;gap:12px}
 .nav-clock,.nav-date{font-family:var(--mono);font-size:11px}
-.nav-clock{color:var(--tm)}.nav-date{color:var(--tff)}
+.nav-clock{color:var(--tm)}.nav-date{color:var(--tm)}
 .avatar{width:28px;height:28px;border-radius:50%;background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.25);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--cyan)}
 
 /* ── SITUATION STRIP ── */
@@ -65,7 +65,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .strip-chip-num.amber{color:var(--amber)}
 .strip-chip-num.cyan{color:var(--cyan)}
 .strip-sep{width:1px;height:14px;background:var(--border)}
-.strip-right{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tff)}
+.strip-right{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tm)}
 
 /* ── PAGE ── */
 .page{display:flex;flex-direction:column;height:calc(100vh - 110px);padding:12px 20px;gap:10px}
@@ -95,7 +95,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .panel-foot{flex-shrink:0}
 .panel-empty{padding:20px 16px;font-family:var(--mono);font-size:13px;color:var(--tm)}
 .divider{height:1px;background:var(--border-f);margin:10px 0}
-.section-lbl{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--tff);margin-bottom:7px}
+.section-lbl{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--tm);margin-bottom:7px}
 
 /* ── LIVE CARD — ambient presence treatment ── */
 .live-panel{
@@ -127,7 +127,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .timer-block{text-align:right;flex-shrink:0}
 .timer-lbl{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(240,160,32,.4);margin-bottom:2px}
 .timer-val{font-family:var(--mono);font-size:30px;font-weight:600;color:var(--cyan);line-height:1}
-.timer-sub{font-family:var(--mono);font-size:9px;color:var(--tff);margin-top:2px}
+.timer-sub{font-family:var(--mono);font-size:11px;color:var(--tm);margin-top:2px}
 .attendees{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
 .att-pill{display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:4px;background:rgba(255,255,255,.03);border:1px solid var(--border);font-size:11px;font-weight:500}
 .att-pill.c{color:var(--ts);border-color:rgba(52,192,112,.2)}
@@ -139,10 +139,10 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .chip{flex:1;display:flex;flex-direction:column;align-items:center;padding:9px 5px;border-radius:6px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:background .15s}
 .chip:hover{background:rgba(255,255,255,.05)}
 .chip-num{font-family:var(--mono);font-size:18px;font-weight:600;line-height:1;margin-bottom:3px}
-.cn-r{color:var(--red)}.cn-a{color:var(--amber)}.cn-m{color:var(--tff)}
-.chip-lbl{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tff);text-align:center;line-height:1.3}
+.cn-r{color:var(--red)}.cn-a{color:var(--amber)}.cn-m{color:var(--tm)}
+.chip-lbl{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tm);text-align:center;line-height:1.3}
 .live-footer{display:flex;align-items:center;justify-content:space-between;padding:9px 16px 13px;position:relative;z-index:1;border-top:1px solid rgba(240,160,32,.1)}
-.footer-note{font-family:var(--mono);font-size:10px;color:var(--tff)}
+.footer-note{font-family:var(--mono);font-size:11px;color:var(--tm)}
 .rejoin-btn{padding:7px 18px;background:rgba(0,210,255,.08);color:var(--cyan);font-family:var(--ui);font-size:12px;font-weight:700;border:1px solid rgba(0,210,255,.35);border-radius:6px;cursor:pointer;transition:all .15s}
 .rejoin-btn:hover{background:rgba(0,210,255,.18)}
 
@@ -157,12 +157,12 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .ck-item{display:flex;align-items:flex-start;gap:6px;font-size:11px}
 .ci-p{color:var(--green);flex-shrink:0}.ci-f{color:var(--red);flex-shrink:0}.ci-w{color:var(--amber);flex-shrink:0}
 .ct-p{color:var(--tm)}.ct-f{color:var(--tp)}.ct-w{color:#c8a060}
-.gap-note{margin-top:9px;padding:6px 8px;background:rgba(255,255,255,.03);border-radius:4px;border-left:2px solid var(--tff);font-family:var(--mono);font-size:8px;color:var(--tff);line-height:1.5}
+.gap-note{margin-top:9px;padding:6px 8px;background:rgba(255,255,255,.03);border-radius:4px;border-left:2px solid var(--tm);font-family:var(--mono);font-size:11px;color:var(--tm);line-height:1.5}
 
 /* ── SCHEDULE ── */
 .timeline{padding:10px 12px 14px}
 .t-row{display:grid;grid-template-columns:36px 13px 1fr;align-items:stretch}
-.t-time{font-family:var(--mono);font-size:10px;color:var(--tff);padding-top:8px;text-align:right;padding-right:7px;line-height:1}
+.t-time{font-family:var(--mono);font-size:11px;color:var(--tm);padding-top:8px;text-align:right;padding-right:7px;line-height:1}
 .t-time.ta{color:var(--amber)}.t-time.tn{color:var(--cyan)}
 .t-axis{display:flex;flex-direction:column;align-items:center}
 .t-dot{width:9px;height:9px;border-radius:50%;margin-top:6px;flex-shrink:0}
@@ -181,7 +181,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .tb-ft{background:rgba(255,255,255,.015);border-left-color:#1e3048}.tb-ft:hover{background:rgba(255,255,255,.03)}
 .tb-title{font-size:12px;font-weight:600;color:var(--tp);line-height:1.2;margin-bottom:2px}
 .tb-dn .tb-title{color:var(--tff);text-decoration:line-through;text-decoration-color:#2a4060}
-.tb-meta{font-family:var(--mono);font-size:9px;color:var(--tff);display:flex;align-items:center;gap:4px}
+.tb-meta{font-family:var(--mono);font-size:11px;color:var(--tm);display:flex;align-items:center;gap:4px}
 .tb-lv .tb-meta{color:rgba(240,160,32,.6)}.tb-nx .tb-meta{color:rgba(0,210,255,.5)}
 .tp-pill{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 4px;border-radius:2px}
 .tp-ext{background:rgba(168,85,247,.12);color:var(--violet)}.tp-int{background:rgba(0,210,255,.08);color:#2a7a9a}.tp-lv{background:rgba(240,160,32,.12);color:var(--amber)}
@@ -194,7 +194,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 /* ── UPCOMING ── */
 .up-body{display:flex;flex-direction:column;height:100%;padding:10px 12px}
 .tab-bar{display:flex;border-bottom:1px solid var(--border-f);margin-bottom:10px;flex-shrink:0}
-.tab{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px 6px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;border-top:none;border-left:none;border-right:none;color:var(--tff);transition:color .15s}
+.tab{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px 6px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;border-top:none;border-left:none;border-right:none;color:var(--tm);transition:color .15s}
 .tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}.tab:hover:not(.active){color:var(--tm)}
 .up-scroll{flex:1;overflow-y:auto;min-height:0}
 .up-scroll::-webkit-scrollbar{width:4px}.up-scroll::-webkit-scrollbar-thumb{background:var(--border-m);border-radius:2px}
@@ -209,8 +209,8 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .up-row2{display:flex;align-items:center;gap:5px;margin-bottom:3px}
 .up-date{font-family:var(--mono);font-size:10px;color:var(--tf)}
 .up-dot{width:3px;height:3px;border-radius:50%;background:var(--tff)}
-.up-ws{font-family:var(--mono);font-size:10px;color:var(--tff)}
-.up-brief{font-size:11px;color:var(--tff);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px}
+.up-ws{font-family:var(--mono);font-size:11px;color:var(--tm)}
+.up-brief{font-size:12px;color:var(--tm);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px}
 
 /* ── MINUTES ── */
 .min-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border-f)}
@@ -219,7 +219,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .min-title{font-size:13px;font-weight:600;color:var(--tp);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .min-meta{display:flex;align-items:center;gap:4px}
 .min-date{font-family:var(--mono);font-size:10px;color:var(--tf)}
-.min-ws{font-family:var(--mono);font-size:10px;color:var(--tff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px}
+.min-ws{font-family:var(--mono);font-size:11px;color:var(--tm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px}
 .min-age{font-family:var(--mono);font-size:10px;padding:1px 5px;border-radius:3px;flex-shrink:0}
 .ag{background:rgba(52,192,112,.08);color:#2a7a50}.aa{background:rgba(240,160,32,.1);color:#9a7030}.ar{background:rgba(255,77,109,.1);color:#9a3040}
 .badge{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border-radius:3px;flex-shrink:0;white-space:nowrap;display:inline-block}
@@ -235,7 +235,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .note-ck:hover{border-color:var(--cyan)}.note-ck.ck{background:rgba(0,210,255,.15);border-color:var(--cyan);color:var(--cyan)}
 .note-body{font-size:13px;color:var(--ts);padding:0 7px;line-height:1.4}
 .note-body.ck{color:var(--tff);text-decoration:line-through;text-decoration-color:#2a4060}
-.note-time{font-family:var(--mono);font-size:11px;color:var(--tff);white-space:nowrap;text-align:right;transition:opacity .15s}
+.note-time{font-family:var(--mono);font-size:11px;color:var(--tm);white-space:nowrap;text-align:right;transition:opacity .15s}
 .note-badge{width:18px;height:18px;border-radius:50%;background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:600;color:var(--violet);margin-left:2px;transition:opacity .15s}
 .no-badge{width:18px;margin-left:2px}
 .note-acts{display:flex;align-items:center;gap:4px;opacity:0;transition:opacity .15s;position:absolute;right:12px}
@@ -346,7 +346,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><span style="font-size:9px;opacity:.35;margin-right:10px;letter-spacing:.04em">build 2026-05-21.C07</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.C07</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -380,10 +380,10 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
           <div class="live-inner">
             <div class="meeting-row">
               <div class="meeting-info">
-                <div class="meeting-title" id="mc-meeting-title" style="color:var(--tff)">Loading...</div>
+                <div class="meeting-title" id="mc-meeting-title" style="color:var(--tm)">Loading...</div>
                 <div class="meeting-stakes" id="mc-meeting-stakes">-</div>
-                <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label" style="color:var(--tff)">-</span></div>
-                <div class="meta-row"><i class="ti ti-map-pin"></i><span id="mc-location" style="color:var(--tff)">-</span></div>
+                <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label" style="color:var(--tm)">-</span></div>
+                <div class="meta-row"><i class="ti ti-map-pin"></i><span id="mc-location" style="color:var(--tm)">-</span></div>
               </div>
               <div class="timer-block">
                 <div class="timer-lbl">Elapsed</div>
@@ -394,7 +394,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
             <div class="divider"></div>
             <div class="section-lbl">Attendees</div>
             <div class="attendees">
-              <span style="font-family:var(--mono);font-size:10px;color:var(--tff)">Loading...</span>
+              <span style="font-family:var(--mono);font-size:11px;color:var(--tm)">Loading...</span>
             </div>
             <div class="divider"></div>
             <div class="section-lbl">Open items</div>
@@ -802,7 +802,7 @@ function _renderLiveCard(m){
 }
 
 function _renderNoMeeting(){
-  var badge=document.querySelector('.live-badge');if(badge)badge.innerHTML='<span style="color:var(--tff)">No meetings today</span>';
+  var badge=document.querySelector('.live-badge');if(badge)badge.innerHTML='<span style="color:var(--tm)">No meetings today</span>';
   var t=document.getElementById('mc-meeting-title');if(t){t.textContent='No meetings today';t.style.color='var(--tff)';}
   var el=document.getElementById('elapsed');if(el)el.textContent='-';
   var at=document.querySelector('.attendees');if(at)at.innerHTML='';
