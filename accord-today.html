@@ -188,16 +188,16 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .tl-lv{background:rgba(240,160,32,.18)}
 .t-block{margin:3px 0 3px 8px;padding:6px 8px;border-radius:5px;border-left:2px solid transparent;cursor:pointer;transition:background .15s}
 .tb-dn{opacity:.4;border-left-color:#1e3048}.tb-dn:hover{opacity:.6}
-.tb-lv{background:rgba(240,160,32,.07);border-left-color:var(--amber)}.tb-lv:hover{background:rgba(240,160,32,.12)}
+.tb-lv{background:rgba(52,192,112,.07);border-left-color:var(--green)}.tb-lv:hover{background:rgba(52,192,112,.12)}
 .tb-nx{background:rgba(0,210,255,.05);border-left-color:var(--cyan)}.tb-nx:hover{background:rgba(0,210,255,.1)}
 .tb-ext{border-left-color:var(--violet)}
 .tb-ft{background:rgba(255,255,255,.015);border-left-color:#1e3048}.tb-ft:hover{background:rgba(255,255,255,.03)}
 .tb-title{font-size:12px;font-weight:600;color:var(--tp);line-height:1.2;margin-bottom:2px}
 .tb-dn .tb-title{color:var(--tff);text-decoration:line-through;text-decoration-color:#2a4060}
 .tb-meta{font-family:var(--mono);font-size:11px;color:var(--tm);display:flex;align-items:center;gap:4px}
-.tb-lv .tb-meta{color:rgba(240,160,32,.6)}.tb-nx .tb-meta{color:rgba(0,210,255,.5)}
+.tb-lv .tb-meta{color:rgba(52,192,112,.7)}.tb-nx .tb-meta{color:rgba(0,210,255,.5)}
 .tp-pill{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 4px;border-radius:2px}
-.tp-ext{background:rgba(168,85,247,.12);color:var(--violet)}.tp-int{background:rgba(0,210,255,.08);color:#2a7a9a}.tp-lv{background:rgba(240,160,32,.12);color:var(--amber)}
+.tp-ext{background:rgba(168,85,247,.12);color:var(--violet)}.tp-int{background:rgba(0,210,255,.08);color:#2a7a9a}.tp-lv{background:rgba(52,192,112,.12);color:var(--green)}
 .now-row{display:grid;grid-template-columns:36px 13px 1fr;align-items:center;margin:1px 0}
 .now-time{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--amber);text-align:right;padding-right:7px}
 .now-line{height:1.5px;background:var(--amber);width:100%;position:relative}
@@ -359,7 +359,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1427</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1436</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -407,8 +407,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
           </div>
         </div>
         <div class="live-footer panel-foot">
-          <div class="footer-note" id="mc-footer-note">-</div>
-          <button class="rejoin-btn">Rejoin session →</button>
+          <button class="rejoin-btn">Join session →</button>
         </div>
       </div>
     </div>
@@ -749,7 +748,16 @@ function _renderLiveCard(m){
   s('mc-meeting-stakes',(m.stakes||m.briefing_text||'')+(m.workstreams?' · '+m.workstreams.name:''));
   s('started-label','Started: '+fmt(new Date(m.started_at)),'');
   s('mc-location',m.location||'No location set','');
-  s('mc-footer-note',(m.workstreams?m.workstreams.name+' · ':'')+'Live');
+  // Hide GO WITH CAVEATS — meeting is starting
+  var vb=document.querySelector('.verdict-btn');if(vb)vb.style.display='none';
+  // Organizer name — fetch from users table
+  if(m.organizer_id){
+    API.get('users?id=eq.'+m.organizer_id+'&select=name').then(function(r){
+      var name=r&&r[0]?r[0].name:'–';
+      var sl=document.getElementById('started-label');
+      if(sl)sl.innerHTML='Organizer: <span style="color:var(--cyan)">'+_esc(name)+'</span>';
+    }).catch(function(){});
+  }
   var el=document.getElementById('elapsed');if(el)el.style.color='';
   var btn=document.querySelector('.rejoin-btn');
   if(btn){
@@ -782,9 +790,18 @@ function _renderCountdown(m){
   if(badge)badge.innerHTML='<span style="color:var(--cyan);letter-spacing:.06em;font-size:10px;font-weight:600;text-transform:uppercase">↗ Next Meeting</span>';
   var t=document.getElementById('mc-meeting-title');if(t){t.textContent=m.title;t.style.color='';}
   var st=document.getElementById('mc-meeting-stakes');if(st)st.textContent=(m.stakes||m.briefing_text||'')+(m.workstreams?' · '+m.workstreams.name:'');
+  var vb=document.querySelector('.verdict-btn');if(vb)vb.style.display='';
   var sl=document.getElementById('started-label');
   var sf=new Date(m.scheduled_for);
   if(sl)sl.textContent='Starts: '+fmt(sf);
+  // Show organizer name
+  if(m.organizer_id){
+    API.get('users?id=eq.'+m.organizer_id+'&select=name').then(function(r){
+      var name=r&&r[0]?r[0].name:'–';
+      var el=document.getElementById('started-label');
+      if(el)el.innerHTML='Organizer: <span style="color:var(--cyan)">'+_esc(name)+'</span>';
+    }).catch(function(){});
+  }
   var loc=document.getElementById('mc-location');if(loc)loc.textContent=m.location||'No location set';
   var btn=document.querySelector('.rejoin-btn');
   if(btn){
@@ -821,6 +838,8 @@ function _renderCountdown(m){
     if(el)el.textContent=mm+':'+padZ(ss);
     var sub=document.getElementById('timer-sub');
     if(sub)sub.textContent=diff>0?'until start':'starting now';
+    var vb=document.querySelector('.verdict-btn');
+    if(diff===0&&vb)vb.style.display='none';
     // Activate button within 60s
     var btn=document.querySelector('.rejoin-btn');
     if(btn&&diff<=60&&diff>0){
