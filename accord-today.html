@@ -882,7 +882,7 @@ function _loadUpcoming(){
   var pw=document.getElementById('pw'),pm=document.getElementById('pm'),pp=document.getElementById('pp');
   Promise.all([
     API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+now.toISOString()+'&scheduled_for=lt.'+nextMonth.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,scheduled_for,stakes,workstreams(name)'),
-    API.get('accord_meetings?state=eq.idle&(scheduled_for=is.null,scheduled_for=lt.'+now.toISOString()+')&firm_id=eq.'+MC.firmId+'&order=created_at.desc&limit=20&select=meeting_id,title,scheduled_for,stakes,workstreams(name)')
+    API.get('accord_meetings?state=eq.idle&or=(scheduled_for.is.null,scheduled_for.lt.'+now.toISOString()+')&firm_id=eq.'+MC.firmId+'&order=created_at.desc&limit=20&select=meeting_id,title,scheduled_for,stakes,workstreams(name)')
   ]).then(function(r){
     var rows=r[0]||[],drafts=r[1]||[];
     function cards(list){
