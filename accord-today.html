@@ -1022,11 +1022,14 @@ setInterval(function(){
 
 </script>
 
-<!-- CMD-ACCORD-MEETING-CENTER-1 C-03: Supabase client + shell loader -->
-<script src="/js/supabase.js"></script>
-<script src="/js/sidebar.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
-<script src="/js/coc.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
+<!-- CMD-ACCORD-MEETING-CENTER-1 C-03: Script load order matches accord.html exactly -->
+<script src="/js/config.js"></script>
+<script src="/js/auth.js"></script>
 <script src="/js/api.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
+<script src="/js/coc.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/version.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
+<script src="/js/sidebar.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
 
 <!-- CMD-ACCORD-MEETING-CENTER-1 C-03: Accord Tier 1 tab strip.
      Identical pattern to accord.html _buildAccordTier1.
@@ -1085,6 +1088,13 @@ setInterval(function(){
     document.body.classList.add('accord-tier1-ready');
     _setActive('meeting-center'); // This page = Meeting Center tab active
     console.log('[accord-today] tier1 built — meeting-center active');
+
+    // Initialize HUDShell so CURRENT_USER gets resolved (matches accord.html pattern)
+    if(window.HUDShell && typeof HUDShell.init === 'function'){
+      HUDShell.init({page:'accord-today'}).catch(function(e){
+        console.warn('[accord-today] HUDShell.init error:', e);
+      });
+    }
   }
 
   if (document.readyState === 'loading') {
