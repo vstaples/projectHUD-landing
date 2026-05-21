@@ -232,9 +232,9 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .note-row:hover .note-time,.note-row:hover .note-badge{opacity:0}
 .note-ck{width:13px;height:13px;border-radius:3px;border:1px solid var(--tff);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:8px;transition:all .15s}
 .note-ck:hover{border-color:var(--cyan)}.note-ck.ck{background:rgba(0,210,255,.15);border-color:var(--cyan);color:var(--cyan)}
-.note-body{font-size:12px;color:var(--ts);padding:0 7px;line-height:1.4}
+.note-body{font-size:13px;color:var(--ts);padding:0 7px;line-height:1.4}
 .note-body.ck{color:var(--tff);text-decoration:line-through;text-decoration-color:#2a4060}
-.note-time{font-family:var(--mono);font-size:10px;color:var(--tff);white-space:nowrap;text-align:right;transition:opacity .15s}
+.note-time{font-family:var(--mono);font-size:11px;color:var(--tff);white-space:nowrap;text-align:right;transition:opacity .15s}
 .note-badge{width:18px;height:18px;border-radius:50%;background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:600;color:var(--violet);margin-left:2px;transition:opacity .15s}
 .no-badge{width:18px;margin-left:2px}
 .note-acts{display:flex;align-items:center;gap:4px;opacity:0;transition:opacity .15s;position:absolute;right:12px}
@@ -604,14 +604,14 @@ function tPro(pid){
   if(!m.classList.contains('open'))return;
   var optsEl=document.getElementById(pid+'-opts');if(!optsEl)return;
   if(_wsCache){_renderWsOpts(optsEl,pid);return;}
-  API.get('workstreams?select=id,name&order=name.asc').then(function(r){
+  API.get('workstreams?select=workstream_id,name&order=name.asc').then(function(r){
     _wsCache=r||[];_renderWsOpts(optsEl,pid);
   }).catch(function(){optsEl.innerHTML='<div class="promo-opt" style="color:var(--tff)">Error loading</div>';});
 }
 function _renderWsOpts(optsEl,pid){
   var row=optsEl.closest('.note-row');var iid=row?row.dataset.itemId:'';
   optsEl.innerHTML=_wsCache.map(function(ws){
-    return '<div class="promo-opt" onclick="proNoteDB(\''+iid+'\',\''+ws.id+'\',\''+pid+'\')">'+_esc(ws.name)+'</div>';
+    return '<div class="promo-opt" onclick="proNoteDB(\''+iid+'\',\''+ws.workstream_id+'\',\''+pid+'\')">'+_esc(ws.name)+'</div>';
   }).join('')||'<div class="promo-opt" style="color:var(--tff)">No workstreams</div>';
 }
 function proNoteDB(iid,wsId,pid){
