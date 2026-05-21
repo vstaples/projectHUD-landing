@@ -1168,12 +1168,12 @@ function _loadNeedsResponse(){
         var sf=m.scheduled_for?new Date(m.scheduled_for):null;
         var dateStr=sf?(_mos[sf.getMonth()]+' '+sf.getDate()+' · '+_hm(sf.getHours(),sf.getMinutes())):'–';
         var hoursAgo=(new Date()-new Date(a.invited_at))/3600000,isOverdue=hoursAgo>48;
+        var d=Math.floor(hoursAgo/24);
         var el=document.createElement('div');el.className='nr-item';el.dataset.attendeeId=a.attendee_id;
         el.style.setProperty('border-left','3px solid '+_nrColors[_nrIdx++%_nrColors.length],'important');
-        var h='<div class="nr-title">'+_esc(m.title||'Untitled')+'</div>';
         var overdueHtml=isOverdue?'<span style="font-size:12px"><span style="color:var(--tm)">RSVP </span><span style="color:#ff4d6d">'+d+' day'+(d===1?'':'s')+'</span><span style="color:var(--tm)"> overdue</span></span>':'';
+        var h='<div class="nr-title">'+_esc(m.title||'Untitled')+'</div>';
         h+='<div class="nr-meta"><span><span style="color:var(--tm)">Invited by </span><span style="color:var(--cyan)">'+_esc(orgName)+'</span><span style="color:var(--green)"> · '+dateStr+'</span></span>'+overdueHtml+'</div>';
-        h+=overdueHtml;
         h+='<div class="nr-btns"><div class="nr-btn nb-ac" onclick="rsvpRespond(\''+a.attendee_id+'\',\'accepted\')">✓ Accept</div><div class="nr-btn nb-dc" onclick="rsvpRespond(\''+a.attendee_id+'\',\'declined\')">✗ Decline</div></div>';
         el.innerHTML=h;body.appendChild(el);
       });
@@ -1454,7 +1454,7 @@ document.addEventListener('DOMContentLoaded',function(){
     var bs=document.createElement('span');
     bs.id='nav-build-stamp';
     bs.style.cssText='font-family:Arial,sans-serif;font-size:13px;color:var(--tm);white-space:nowrap;letter-spacing:.03em;';
-    bs.innerHTML='<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-21.2036</span>';
+    bs.innerHTML='<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-21.2040</span>';
     var nt=document.createElement('span');
     nt.id='nav-time';
     nt.style.cssText='font-family:Arial,sans-serif;font-size:13px;color:var(--tm);white-space:nowrap;';
