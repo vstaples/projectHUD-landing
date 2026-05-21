@@ -3660,50 +3660,68 @@
   })();
 </script>
 
-<!-- CMD-ACCORD-MEETING-CENTER-1: Accord Tier 1 tab registration.
-     Defensive pattern: _buildHeader guard prevents re-init if sidebar.js
-     already built the header (e.g. from a prior cached deploy). We bypass
-     by calling _buildTier1 via HUDShell.init — which only skips tier1 if
-     the strip is already in DOM — and add accord-module body class manually
-     so CSS overrides apply regardless of init order. -->
+<!-- CMD-ACCORD-MEETING-CENTER-1: Accord Tier 1 tab strip.
+     Built directly — bypasses HUDShell.init() tier1 path which is blocked
+     by the accord-setup-fullpage layout context on this surface. -->
 <script>
   (function() {
-    function _initAccordShell() {
-      if (!window.HUDShell) { setTimeout(_initAccordShell, 80); return; }
-
-      // Always stamp body class — safe to re-add
-      document.body.classList.add('accord-module');
-
-      // If tier1 already built, nothing more to do
+    function _buildAccordTier1() {
+      if (!window.HUDShell) { setTimeout(_buildAccordTier1, 80); return; }
       if (document.getElementById('hud-tier1')) return;
 
-      // Call init — header guard will no-op if already built,
-      // but tier1 block will still run and build the strip
-      HUDShell.init({
-        page:        'accord',
-        moduleName:  'Accord',
-        tier1: [
-          { id: 'workstreams',    label: 'Workstreams'    },
-          { id: 'meeting-center', label: 'Meeting Center' },
-          { id: 'knowledge-base', label: 'Knowledge Base' }
-        ],
-        tier2: {},
-        initialTier1: 'workstreams',
-        onTier1Select: function(tabId) {
-          if (tabId === 'meeting-center') {
+      // Stamp module body class for CSS overrides (amber tab, Syne font)
+      document.body.classList.add('accord-module');
+
+      // Build strip
+      var strip = document.createElement('div');
+      strip.id = 'hud-tier1';
+
+      var tabs = [
+        { id: 'workstreams',    label: 'Workstreams'    },
+        { id: 'meeting-center', label: 'Meeting Center' },
+        { id: 'knowledge-base', label: 'Knowledge Base' }
+      ];
+
+      function _setActive(id) {
+        document.querySelectorAll('#hud-tier1 .hud-tier1-tab').forEach(function(b) {
+          b.classList.toggle('active', b.dataset.tier1Id === id);
+        });
+      }
+
+      tabs.forEach(function(t) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'hud-tier1-tab';
+        btn.dataset.tier1Id = t.id;
+        btn.innerHTML = '<span class="tab-dot"></span><span>' + t.label + '</span>';
+        btn.addEventListener('click', function() {
+          if (t.id === 'meeting-center') {
             window.location.href = '/accord-today.html';
+            return;
           }
-        }
+          _setActive(t.id);
+        });
+        strip.appendChild(btn);
       });
 
-      // Confirm
+      // Insert immediately after #hud-header
+      var header = document.getElementById('hud-header');
+      if (header) {
+        header.insertAdjacentElement('afterend', strip);
+      } else {
+        document.body.insertBefore(strip, document.body.firstChild.nextSibling);
+      }
+
+      document.body.classList.add('hud-tier1-rendered');
+      _setActive('workstreams');
+
       console.log('[accord] tier1 built:', !!document.getElementById('hud-tier1'));
     }
 
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', _initAccordShell);
+      document.addEventListener('DOMContentLoaded', _buildAccordTier1);
     } else {
-      _initAccordShell();
+      _buildAccordTier1();
     }
   })();
 </script>
