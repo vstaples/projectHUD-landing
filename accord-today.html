@@ -434,21 +434,8 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
     <!-- NEEDS RESPONSE -->
     <div class="r1c3">
       <div class="panel">
-        <div class="panel-hdr"><div class="panel-title">Needs Your Response</div><div class="nr-badge" id="nr-ct">2</div></div>
-        <div class="panel-body">
-          <div class="nr-item" id="nr-1">
-            <div class="nr-title">CCCC Test Meeting #3 · Milestone Review</div>
-            <div class="nr-meta">Invited by Angela Kim · Mon May 18 · 9:00 AM</div>
-            <div class="nr-sig ns-r">RSVP 2 days overdue — Angela is waiting</div>
-            <div class="nr-btns"><div class="nr-btn nb-ac" onclick="dismissNr('nr-1')">✓ Accept</div><div class="nr-btn nb-dc" onclick="dismissNr('nr-1')">✗ Decline</div></div>
-          </div>
-          <div class="nr-item" id="nr-2">
-            <div class="nr-title">Base · Quarterly Decision Review</div>
-            <div class="nr-meta">Organizer: You · Wed May 20 · 1:00 PM</div>
-            <div class="nr-sig ns-a">4 decisions to ratify · prep packet not started</div>
-            <div class="nr-btns"><div class="nr-btn nb-pr">Start prep →</div></div>
-          </div>
-        </div>
+        <div class="panel-hdr"><div class="panel-title">Needs Your Response</div><div class="nr-badge" id="nr-ct">–</div></div>
+        <div class="panel-body" id="nr-body"></div>
       </div>
     </div>
 
@@ -915,6 +902,63 @@ function _loadMinutes(){
     }).catch(function(e){console.warn('[MC] minutes error:',e);});
 }
 
+// Needs Your Response
+function _loadNeedsResponse(){
+  var body=document.getElementById('nr-body');if(!body||!MC.resourceId)return;
+  var now=new Date().toISOString();
+  Promise.all([
+    API.get('accord_meeting_attendees?rsvp_status=eq.pending&resource_id=eq.'+MC.resourceId+'&select=attendee_id,invited_at,meeting_id(meeting_id,title,scheduled_for,organizer_id)'),
+    API.get('accord_meetings?organizer_id=eq.'+MC.userId+'&state=eq.idle&scheduled_for=gte.'+now+'&order=scheduled_for.asc&select=meeting_id,title,scheduled_for,workstream_id(name)')
+  ]).then(function(r){
+    var rsvps=r[0]||[],upcoming=r[1]||[];
+    var orgIds=[...new Set(rsvps.map(function(a){return a.meeting_id&&a.meeting_id.organizer_id;}).filter(Boolean))];
+    var nameP=orgIds.length?API.get('users?id=in.('+orgIds.join(',')+')'+'&select=id,name'):Promise.resolve([]);
+    nameP.then(function(nameRows){
+      var nameMap={};(nameRows||[]).forEach(function(u){nameMap[u.id]=u.name;});
+      var total=rsvps.length+upcoming.length;
+      var badge=document.getElementById('nr-ct');if(badge)badge.textContent=total||'0';
+      if(!total){body.innerHTML='<div style="padding:20px 16px;font-family:var(--mono);font-size:11px;color:var(--tff)">You\'re all clear.</div>';return;}
+      body.innerHTML='';
+      rsvps.forEach(function(a){
+        var m=a.meeting_id||{},orgName=nameMap[m.organizer_id]||'Organizer';
+        var sf=m.scheduled_for?new Date(m.scheduled_for):null;
+        var dateStr=sf?(_mos[sf.getMonth()]+' '+sf.getDate()+' · '+_hm(sf.getHours(),sf.getMinutes())):'–';
+        var hoursAgo=(new Date()-new Date(a.invited_at))/3600000,isOverdue=hoursAgo>48;
+        var el=document.createElement('div');el.className='nr-item';el.dataset.attendeeId=a.attendee_id;
+        var h='<div class="nr-title">'+_esc(m.title||'Untitled')+'</div>';
+        h+='<div class="nr-meta">Invited by '+_esc(orgName)+' · '+dateStr+'</div>';
+        if(isOverdue){var d=Math.floor(hoursAgo/24);h+='<div class="nr-sig ns-r">RSVP '+d+' day'+(d===1?'':'s')+' overdue — '+_esc(orgName)+' is waiting</div>';}
+        h+='<div class="nr-btns"><div class="nr-btn nb-ac" onclick="rsvpRespond(\''+a.attendee_id+'\',\'accepted\')">✓ Accept</div><div class="nr-btn nb-dc" onclick="rsvpRespond(\''+a.attendee_id+'\',\'declined\')">✗ Decline</div></div>';
+        el.innerHTML=h;body.appendChild(el);
+      });
+      upcoming.forEach(function(m){
+        var sf=m.scheduled_for?new Date(m.scheduled_for):null;
+        var dateStr=sf?(_mos[sf.getMonth()]+' '+sf.getDate()+' · '+_hm(sf.getHours(),sf.getMinutes())):'–';
+        var ws=m.workstream_id?m.workstream_id.name:'';
+        var el=document.createElement('div');el.className='nr-item';el.dataset.meetingId=m.meeting_id;
+        var h='<div class="nr-title">'+_esc(m.title)+'</div>';
+        h+='<div class="nr-meta">'+(ws?_esc(ws)+' · ':'')+dateStr+'</div>';
+        h+='<div class="nr-sig ns-a">Prep not started</div>';
+        h+='<div class="nr-btns"><div class="nr-btn nb-pr" onclick="window.location.href=\'/accord.html?meeting='+m.meeting_id+'\'">Start prep →</div></div>';
+        el.innerHTML=h;body.appendChild(el);
+      });
+      console.log('[MC] needs response loaded: rsvps='+rsvps.length+' prep='+upcoming.length);
+    });
+  }).catch(function(e){console.warn('[MC] needs response error:',e);});
+}
+function rsvpRespond(attendeeId,status){
+  var item=document.querySelector('.nr-item[data-attendee-id="'+attendeeId+'"]');if(!item)return;
+  item.style.opacity='.3';item.style.transition='opacity .3s';
+  API.patch('accord_meeting_attendees?attendee_id=eq.'+attendeeId,{rsvp_status:status}).catch(function(e){console.warn('[MC] rsvp error:',e);});
+  setTimeout(function(){
+    item.remove();
+    var rem=document.querySelectorAll('.nr-item').length;
+    var badge=document.getElementById('nr-ct');if(badge)badge.textContent=rem;
+    var body=document.getElementById('nr-body');
+    if(body&&!rem)body.innerHTML='<div style="padding:20px 16px;font-family:var(--mono);font-size:11px;color:var(--tff)">You\'re all clear.</div>';
+  },300);
+}
+
 // Boot
 document.addEventListener('DOMContentLoaded',function(){
   _initW();
@@ -922,7 +966,7 @@ document.addEventListener('DOMContentLoaded',function(){
   _mkHandle('r2ha',_r2w,0,_applyR2);_mkHandle('r2hb',_r2w,1,_applyR2);
   window.addEventListener('resize',_initW);
   _resolveIdentity(function(){
-    _loadStrip();_loadLiveCard();_loadSchedule();_loadUpcoming();_loadMinutes();_loadNotes();
+    _loadStrip();_loadLiveCard();_loadSchedule();_loadUpcoming();_loadMinutes();_loadNotes();_loadNeedsResponse();
   });
   setInterval(function(){if(MC.resourceId)_loadStrip();},60000);
 });
