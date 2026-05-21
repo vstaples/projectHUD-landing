@@ -104,13 +104,13 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 15px 12px;background:var(--bg1);border-bottom:1px solid var(--border-f);flex-shrink:0}
 .panel-title{font-family:var(--ui);font-size:15px;font-weight:700;color:var(--tp);letter-spacing:-.01em}
 .panel-lbl{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--tm)}
-.panel-meta{font-family:var(--ui);font-size:15px;font-weight:700;color:var(--cyan);letter-spacing:-.01em}
+.panel-meta{font-family:Arial,sans-serif;font-size:15px;font-weight:700;color:var(--tm);letter-spacing:0}#mc-schedule-date{font-family:var(--ui);color:var(--cyan);letter-spacing:-.01em}
 .panel-body{flex:1;overflow-y:auto;min-height:0}
 .panel-body::-webkit-scrollbar{width:5px}.panel-body::-webkit-scrollbar-track{background:rgba(255,255,255,.04)}.panel-body::-webkit-scrollbar-thumb{background:rgba(120,160,200,.35);border-radius:3px}.panel-body::-webkit-scrollbar-thumb:hover{background:rgba(120,160,200,.6)}
 .panel-foot{flex-shrink:0}
 .panel-empty{padding:20px 16px;font-family:var(--mono);font-size:13px;color:var(--tm)}
 .divider{height:1px;background:var(--border-f);margin:10px 0}
-.section-lbl{font-family:Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c8d8e8;margin-bottom:clamp(2px,var(--live-pad,7px),7px)}.live-inner .section-lbl{color:#f0a020;margin-top:4px;margin-bottom:3px}
+.section-lbl{font-family:Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c8d8e8;margin-bottom:clamp(2px,var(--live-pad,7px),7px)}.live-inner .section-lbl{color:#f0a020;margin-top:10px;margin-bottom:4px}
 
 /* ── LIVE CARD — ambient presence treatment ── */
 .live-panel{
@@ -136,8 +136,8 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .meeting-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
 .meeting-info{flex:1;padding-right:14px}
 .meeting-title{font-size:22px;font-weight:700;color:var(--tp);margin-bottom:4px;letter-spacing:-.01em;line-height:1.3}
-.meeting-stakes{font-size:12px;color:var(--mc-green,#34c070);opacity:.85;margin-bottom:clamp(2px,var(--live-pad,8px),8px)}
-.meta-row{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--tf);margin-bottom:3px;line-height:1.6}
+.meeting-stakes{font-size:14px;color:var(--mc-green,#34c070);opacity:.85;margin-bottom:clamp(2px,var(--live-pad,8px),8px)}
+.meta-row{display:flex;align-items:center;gap:6px;font-size:13px;color:#ffffff;margin-bottom:0;line-height:1.6;white-space:nowrap;overflow:hidden}
 .meta-row i{font-size:12px}
 .timer-block{text-align:right;flex-shrink:0}
 .timer-lbl{font-family:Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c8d8e8;margin-bottom:2px}
@@ -245,24 +245,24 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .b-n{background:rgba(255,77,109,.07);color:var(--red);border:1px solid rgba(255,77,109,.2)}
 
 /* ── NOTES ── */
-.note-row{display:grid;grid-template-columns:26px 1fr 100px 20px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border-f);position:relative}
+.note-row{display:grid;grid-template-columns:26px 1fr 100px 20px;align-items:center;padding:1px 0 1px 12px;border-bottom:1px solid var(--border-f);position:relative}
 .note-row:last-child{border-bottom:none}.note-row:hover{background:rgba(255,255,255,.02)}
 .note-row:hover .note-acts{opacity:1}
 .note-row:hover .note-time,.note-row:hover .note-badge{opacity:0}
 .note-ck{width:13px;height:13px;border-radius:3px;border:1px solid var(--tff);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:8px;transition:all .15s}
 .note-ck:hover{border-color:var(--cyan)}.note-ck.ck{background:rgba(0,210,255,.15);border-color:var(--cyan);color:var(--cyan)}
-.note-body{font-size:13px;color:var(--ts);padding:0 7px;line-height:1.4}
-.note-body.ck{color:var(--tff);text-decoration:line-through;text-decoration-color:#2a4060}
-.note-time{font-family:var(--mono);font-size:11px;color:var(--tm);white-space:nowrap;text-align:right;transition:opacity .15s}
+.note-body{font-family:Arial,sans-serif;font-size:13px;color:var(--ts);padding:0 7px;line-height:1.4}
+.note-body.ck{color:#7a9abf;text-decoration:line-through;text-decoration-color:#4a6a8a}
+.note-time{font-family:Arial,sans-serif;font-size:11px;color:var(--tm);white-space:nowrap;text-align:right;transition:opacity .15s;padding-right:0;margin-right:-5px}
 .note-badge{width:18px;height:18px;border-radius:50%;background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:600;color:var(--violet);margin-left:2px;transition:opacity .15s}
 .no-badge{width:18px;margin-left:2px}
 .note-acts{display:flex;align-items:center;gap:4px;opacity:0;transition:opacity .15s;position:absolute;right:12px}
 .n-pro{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:3px;border:1px solid rgba(0,210,255,.25);background:rgba(0,210,255,.08);color:var(--cyan);cursor:pointer;white-space:nowrap}
 .n-del{width:16px;height:16px;border-radius:3px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.2);color:var(--red);font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .notes-input{border-top:1px solid var(--border-f);padding:7px 12px;display:grid;grid-template-columns:26px 1fr 100px 20px;align-items:center;background:var(--bg3);flex-shrink:0}
-.ni-ck{width:13px;height:13px;border-radius:3px;border:1px solid #1a2e44}
-.ni-f{font-size:12px;color:var(--tm);padding:0 7px;outline:none;caret-color:var(--cyan);min-height:18px}
-.ni-f:empty::before{content:'New item…';color:#1e3048;pointer-events:none}
+.ni-ck{width:13px;height:13px;border-radius:3px;border:1px solid #1a2e44;visibility:hidden}
+.ni-f{font-family:Arial,sans-serif;font-size:12px;color:#c8d8e8;padding:2px 7px;outline:none;caret-color:var(--cyan);min-height:18px;background:rgba(255,255,255,.06);border-top:1px solid rgba(255,255,255,.1)}
+.ni-f:empty::before{content:'New item…';color:#7a9abf;pointer-events:none}
 .promo-modal{display:none;position:absolute;right:12px;top:26px;width:175px;background:#111e30;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:9px;z-index:20}
 .promo-modal.open{display:block}
 .promo-lbl{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--tf);margin-bottom:6px}
@@ -364,7 +364,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1549</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1645</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -541,7 +541,7 @@ document.addEventListener('click',function(e){if(!e.target.closest('.verdict-btn
 function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);}
 
 /* ── NOTES (DB-backed) ── */
-function _updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n?n+(n===1?' item':' items'):'';}
+function _updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n?n+(n===1?' Item':' Items'):'';}
 function _buildNoteRow(item){
   var iid=item.item_id;
   var isCk=!!item.completed_at,isOther=item.author_resource_id&&item.author_resource_id!==MC.resourceId;
@@ -920,26 +920,32 @@ function _loadSchedule(){
   var tl=document.getElementById('mc-schedule-timeline');if(!tl)return;
   var dateEl=document.getElementById('mc-schedule-date');
   if(dateEl){var n=new Date();dateEl.textContent=_mos[n.getMonth()]+' '+n.getDate();}
-  API.get('accord_meetings?state=in.(idle,running)&scheduled_for=gte.'+todayUTC.toISOString()+'&scheduled_for=lt.'+tomorrowUTC.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,state,scheduled_for,duration_minutes,workstreams(name)')
+  API.get('accord_meetings?state=in.(idle,running)&scheduled_for=gte.'+todayUTC.toISOString()+'&scheduled_for=lt.'+tomorrowUTC.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,state,scheduled_for,duration_minutes,organizer_id,workstreams(name)')
     .then(function(rows){
       if(!rows||!rows.length){tl.innerHTML='<div class="panel-empty">No meetings scheduled today.</div>';return;}
-      tl.innerHTML='';var now=new Date(),nowR=false;
-      rows.forEach(function(m,i){
-        var sf=new Date(m.scheduled_for),ef=m.duration_minutes?new Date(sf.getTime()+m.duration_minutes*60000):null;
-        var isDone=m.state==='running'?false:(m.state==='closed'||m.state==='sealed'||(ef&&ef<now));
-        var isLive=m.state==='running',isNext=!isLive&&!isDone&&!nowR;
-        if(isNext){nowR=true;var nr=document.createElement('div');nr.className='now-row';nr.innerHTML='<div class="now-time" id="now-t">'+fmt(now)+'</div><div class="now-line"></div><div class="now-lbl">Now</div>';tl.appendChild(nr);}
-        var ts=_hm(sf.getHours(),sf.getMinutes());
-        var rs=ts+(ef?'-'+_hm(ef.getHours(),ef.getMinutes()):'');
-        var dc=isDone?'td-dn':isLive?'td-lv':isNext?'td-nx':'td-ft';
-        var bc='t-block '+(isDone?'tb-dn':isLive?'tb-lv':isNext?'tb-nx':'tb-ft');
-        var tc=isLive?'ta':isNext?'tn':'';
-        var row=document.createElement('div');row.className='t-row';
-        row.innerHTML='<div class="t-time '+tc+'">'+ts+'</div><div class="t-axis"><div class="t-dot '+dc+'"></div>'+(i<rows.length-1?'<div class="t-line'+(isLive?' tl-lv':'')+'"></div>':'')+'</div><div class="'+bc+'" data-mid="'+m.meeting_id+'"><div class="tb-title">'+_esc(m.title)+'</div><div class="tb-meta">'+rs+(isLive?' <span class="tp-pill tp-lv">Live</span>':'')+'</div></div>';
-        tl.appendChild(row);
+      var orgIds=[...new Set(rows.map(function(m){return m.organizer_id;}).filter(Boolean))];
+      return API.get('users?id=in.('+orgIds.join(',')+')'+'&select=id,name').then(function(users){
+        var nameMap={};(users||[]).forEach(function(u){nameMap[u.id]=u.name;});
+        tl.innerHTML='';var now=new Date(),nowR=false;
+        rows.forEach(function(m,i){
+          var sf=new Date(m.scheduled_for),ef=m.duration_minutes?new Date(sf.getTime()+m.duration_minutes*60000):null;
+          var isDone=m.state==='running'?false:(m.state==='closed'||m.state==='sealed'||(ef&&ef<now));
+          var isLive=m.state==='running',isNext=!isLive&&!isDone&&!nowR;
+          if(isNext){nowR=true;var nr=document.createElement('div');nr.className='now-row';nr.innerHTML='<div class="now-time" id="now-t">'+fmt(now)+'</div><div class="now-line"></div><div class="now-lbl">Now</div>';tl.appendChild(nr);}
+          var ts=_hm(sf.getHours(),sf.getMinutes());
+          var rs=ts+(ef?'–'+_hm(ef.getHours(),ef.getMinutes()):'');
+          var dc=isDone?'td-dn':isLive?'td-lv':isNext?'td-nx':'td-ft';
+          var bc='t-block '+(isDone?'tb-dn':isLive?'tb-lv':isNext?'tb-nx':'tb-ft');
+          var tc=isLive?'ta':isNext?'tn':'';
+          var orgName=nameMap[m.organizer_id]||'';
+          var meta=rs+(orgName?' <span style="color:var(--tm)">· '+orgName+'</span>':'')+(isLive?' <span class="tp-pill tp-lv">Live</span>':'');
+          var row=document.createElement('div');row.className='t-row';
+          row.innerHTML='<div class="t-time '+tc+'">'+ts+'</div><div class="t-axis"><div class="t-dot '+dc+'"></div>'+(i<rows.length-1?'<div class="t-line'+(isLive?' tl-lv':'')+'"></div>':'')+'</div><div class="'+bc+'" data-mid="'+m.meeting_id+'"><div class="tb-title">'+_esc(m.title)+'</div><div class="tb-meta">'+meta+'</div></div>';
+          tl.appendChild(row);
+        });
+        tl.addEventListener('click',function(e){var b=e.target.closest('[data-mid]');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});
+        console.log('[MC] schedule rendered:',rows.length);
       });
-      tl.addEventListener('click',function(e){var b=e.target.closest('[data-mid]');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});
-      console.log('[MC] schedule rendered:',rows.length);
     }).catch(function(e){console.warn('[MC] schedule error:',e);});
 }
 
