@@ -637,7 +637,16 @@ function noteKey(e){
   var id='n-'+nc,pid='p-'+nc;nc++;
   var t=fmtS(new Date());
   var row=document.createElement('div');row.className='note-row';row.id=id;
-  row.innerHTML='<div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">'+val+'</div><div class="note-time">'+t+'</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro(''+pid+'')">→ Action</div><div class="n-del" onclick="delNote(''+id+'')">×</div></div><div class="promo-modal" id="'+pid+'"><div class="promo-lbl">Promote to workstream</div></div>';
+  var html='<div class="note-ck" onclick="toggleNote(this)"></div>';
+  html+='<div class="note-body">'+val+'</div>';
+  html+='<div class="note-time">'+t+'</div>';
+  html+='<div class="no-badge"></div>';
+  html+='<div class="note-acts">';
+  html+='<div class="n-pro" onclick="tPro('+JSON.stringify(pid)+')">→ Action</div>';
+  html+='<div class="n-del" onclick="delNote('+JSON.stringify(id)+')">×</div>';
+  html+='</div>';
+  html+='<div class="promo-modal" id="'+pid+'"><div class="promo-lbl">Promote to workstream</div></div>';
+  row.innerHTML=html;
   document.getElementById('notes-inner').appendChild(row);f.textContent='';updNC();
 }
 document.addEventListener('click',function(e){if(!e.target.closest('.n-pro')&&!e.target.closest('.promo-modal'))document.querySelectorAll('.promo-modal').forEach(function(m){m.classList.remove('open');});});
@@ -981,13 +990,18 @@ function _loadSchedule(){
             '<div class="t-dot '+dotCls+'"></div>'+
             (i<meetings.length-1?'<div class="t-line'+(isLive?' tl-lv':'')+'"></div>':'')+
           '</div>'+
-          '<div class="t-block '+blockCls+'" onclick="window.location.href='/accord.html?meeting='+m.meeting_id+''">'+
+          '<div class="t-block '+blockCls+'" data-mid="'+m.meeting_id+'">'+
             '<div class="tb-title">'+_esc(m.title)+'</div>'+
             '<div class="tb-meta">'+rangeStr+(isLive?' <span class="tp-pill tp-lv">Live</span>':'')+'</div>'+
           '</div>';
         container.appendChild(row);
       });
       console.log('[MC] schedule rendered — '+meetings.length+' meetings');
+      // Delegated click — navigate to meeting from data-mid attribute
+      container.addEventListener('click',function(e){
+        var block=e.target.closest('[data-mid]');
+        if(block)window.location.href='/accord.html?meeting='+block.dataset.mid;
+      });
     })
     .catch(function(e){console.warn('[MC] schedule error:',e);});
 }
