@@ -21,16 +21,19 @@
   #hud-header-left .hud-module-name {
     font-family: 'Syne', system-ui, sans-serif !important;
   }
-  /* Hide legacy accord topnav once hud-shell header takes over */
-  body.hud-header-rendered #accord-app .topnav {
-    display: none !important;
+  /* CMD-ACCORD-MEETING-CENTER-1: Tier 1 strip positioning.
+     The native topnav stays in flow — NOT hidden.
+     hud.css positions #hud-tier1 at top:48px (assumes hud-shell header).
+     The native Accord topnav is ~63px tall, so we override top to 0
+     and use relative positioning inside #accord-app instead of fixed. */
+  #hud-tier1 {
+    position: relative !important;
+    top: auto !important;
+    width: 100%;
+    z-index: 10;
   }
-  /* Push three-pane content below the fixed tier1 strip (42px).
-     Topnav stays at the top of #accord-app. Strip is fixed at top:48px
-     (native topnav height). Three-pane sits below topnav and needs 42px
-     padding to clear the strip. */
-  body.hud-tier1-rendered #accord-app .ac-three-pane {
-    padding-top: 42px !important;
+  body.accord-tier1-ready #accord-app .ac-three-pane {
+    padding-top: 0;
   }
 </style>
 <link rel="stylesheet" href="/css/accord-constellation.css">
@@ -3678,7 +3681,6 @@
 
       // Stamp module body class for CSS overrides (amber tab, Syne font)
       document.body.classList.add('accord-module');
-      document.body.classList.add('hud-header-rendered');
 
       // Build strip
       var strip = document.createElement('div');
@@ -3712,16 +3714,16 @@
         strip.appendChild(btn);
       });
 
-      // Insert immediately after #hud-header
-      var header = document.getElementById('hud-header');
-      if (header) {
-        header.insertAdjacentElement('afterend', strip);
+      // Insert after the native topnav inside #accord-app
+      var topnav = document.querySelector('#accord-app .topnav');
+      if (topnav) {
+        topnav.insertAdjacentElement('afterend', strip);
       } else {
-        document.body.insertBefore(strip, document.body.firstChild.nextSibling);
+        var app = document.getElementById('accord-app');
+        if (app) app.prepend(strip);
       }
 
-      document.body.classList.add('hud-tier1-rendered');
-      document.body.classList.add('hud-header-rendered'); // required for CSS push selector
+      document.body.classList.add('accord-tier1-ready');
       _setActive('workstreams');
 
       console.log('[accord] tier1 built:', !!document.getElementById('hud-tier1'));
