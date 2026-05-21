@@ -76,8 +76,8 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .strip-right{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tm)}
 
 /* ── PAGE ── */
-.page{display:flex;flex-direction:column;height:calc(100vh - 110px);padding:12px 20px;gap:var(--mc-zone-gap,10px);filter:brightness(var(--mc-brightness,1)) contrast(var(--mc-contrast,1)) saturate(var(--mc-saturate,1))}
-.row{display:flex;flex:1;min-height:0;align-items:stretch;gap:var(--mc-col-gap,6px)}
+.page{display:flex;flex-direction:column;height:calc(100vh - 110px);padding:12px 20px;gap:var(--mc-zone-gap,10px)}
+.row{display:flex;flex:1;min-height:0;align-items:stretch;gap:var(--mc-col-gap,6px);filter:brightness(var(--mc-brightness,1)) contrast(var(--mc-contrast,1)) saturate(var(--mc-saturate,1))}
 .row-1{flex:var(--mc-row1-flex)}
 .row-2{flex:var(--mc-row2-flex)}
 
@@ -93,6 +93,9 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .col-handle{width:14px;flex-shrink:0;cursor:col-resize;display:flex;align-items:stretch;justify-content:center;padding:0 5px;user-select:none}
 .col-handle-inner{width:2px;border-radius:1px;background:rgba(255,255,255,.05);transition:background .15s;flex:1}
 .col-handle:hover .col-handle-inner,.col-handle.dragging .col-handle-inner{background:rgba(0,210,255,.35)}
+.row-handle{height:10px;flex-shrink:0;cursor:row-resize;display:flex;align-items:center;justify-content:stretch;padding:4px 0;user-select:none}
+.row-handle-inner{height:2px;width:100%;border-radius:1px;background:rgba(255,255,255,.05);transition:background .15s}
+.row-handle:hover .row-handle-inner,.row-handle.dragging .row-handle-inner{background:rgba(240,160,32,.45)}
 
 /* ── PANEL ── */
 .panel{flex:1;display:flex;flex-direction:column;background:var(--mc-panel-bg,var(--bg2));border:var(--mc-border-width,1px) solid var(--border);border-radius:var(--mc-radius,var(--rlg));overflow:hidden;min-height:0;opacity:var(--mc-panel-opacity,1)}
@@ -131,7 +134,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .meeting-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
 .meeting-info{flex:1;padding-right:14px}
 .meeting-title{font-size:20px;font-weight:700;color:var(--tp);margin-bottom:4px;letter-spacing:-.01em}
-.meeting-stakes{font-size:12px;color:rgba(240,160,32,.7);margin-bottom:8px}
+.meeting-stakes{font-size:12px;color:rgba(0,210,255,.75);margin-bottom:8px}
 .meta-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tf);margin-bottom:3px}
 .meta-row i{font-size:12px}
 .timer-block{text-align:right;flex-shrink:0}
@@ -372,18 +375,6 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
           <div class="live-badge"><div class="live-pulse"></div>Live session in progress</div>
           <div class="verdict-btn" onclick="togglePopup()">
             <div class="verdict-dot"></div>Go with caveats
-            <div class="popup" id="rdpop">
-              <div class="popup-hdr"><div class="popup-ttl">Readiness</div><button class="popup-x" onclick="event.stopPropagation();togglePopup()">×</button></div>
-              <div class="v-pill">Go with caveats</div>
-              <ul class="ck-list">
-                <li class="ck-item"><span class="ci-f">✗</span><span class="ct-f">Outcomes not defined</span></li>
-                <li class="ck-item"><span class="ci-p">✓</span><span class="ct-p">No declined attendees</span></li>
-                <li class="ck-item"><span class="ci-p">✓</span><span class="ct-p">Duration set</span></li>
-                <li class="ck-item"><span class="ci-p">✓</span><span class="ct-p">Agenda items present</span></li>
-                <li class="ck-item"><span class="ci-w">△</span><span class="ct-w">4 overdue actions in workstream</span></li>
-              </ul>
-              <div class="gap-note">⬡ Required vs. optional attendee designation not yet modeled.</div>
-            </div>
           </div>
         </div>
         <div class="panel-body">
@@ -392,8 +383,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
               <div class="meeting-info">
                 <div class="meeting-title" id="mc-meeting-title" style="color:var(--tm)">Loading...</div>
                 <div class="meeting-stakes" id="mc-meeting-stakes">-</div>
-                <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label" style="color:var(--tm)">-</span></div>
-                <div class="meta-row"><i class="ti ti-map-pin"></i><span id="mc-location" style="color:var(--tm)">-</span></div>
+                <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label" style="color:var(--tm)">-</span><span style="color:var(--tff);margin:0 6px">·</span><i class="ti ti-map-pin"></i><span id="mc-location" style="color:var(--tm)">-</span></div>
               </div>
               <div class="timer-block">
                 <div class="timer-lbl">Elapsed</div>
@@ -451,6 +441,9 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
     </div>
 
   </div><!-- /row 1 -->
+
+  <!-- horizontal resize handle -->
+  <div class="row-handle" id="rh"><div class="row-handle-inner"></div></div>
 
   <!-- ════ ROW 2 (42%) ════ -->
   <div class="row row-2">
@@ -552,7 +545,21 @@ tickAll();
 setInterval(tickAll,1000);
 
 /* ── POPUP ── */
-function togglePopup(){var p=document.getElementById('rdpop');var btn=document.querySelector('.verdict-btn');if(!p)return;var isOpen=p.classList.toggle('open');if(isOpen&&btn){var r=btn.getBoundingClientRect();p.style.top=(r.bottom+6)+'px';p.style.right=(window.innerWidth-r.right)+'px';}}
+function togglePopup(){
+  var p=document.getElementById('rdpop');var btn=document.querySelector('.verdict-btn');if(!p)return;
+  var isOpen=p.classList.toggle('open');
+  if(isOpen&&btn){
+    var r=btn.getBoundingClientRect();
+    p.style.top=(r.bottom+6)+'px';
+    // Align right edge of popup to right edge of button; clamp to viewport
+    var left=r.right-260;
+    if(left<8)left=8;
+    p.style.left=left+'px';
+    p.style.right='auto';
+    p.style.maxHeight=(window.innerHeight-r.bottom-20)+'px';
+    p.style.overflowY='auto';
+  }
+}
 document.addEventListener('click',function(e){if(!e.target.closest('.verdict-btn')){var p=document.getElementById('rdpop');if(p)p.classList.remove('open');}});
 
 /* ── TABS ── */
@@ -1185,6 +1192,42 @@ document.addEventListener('DOMContentLoaded',function(){
   _initW();
   _mkHandle('r1ha',_r1w,0,_applyR1);_mkHandle('r1hb',_r1w,1,_applyR1);
   _mkHandle('r2ha',_r2w,0,_applyR2);_mkHandle('r2hb',_r2w,1,_applyR2);
+  // Row height resize handle
+  (function(){
+    var h=document.getElementById('rh');if(!h)return;
+    h.addEventListener('mousedown',function(e){
+      var page=document.querySelector('.page');
+      var r1=document.querySelector('.row-1');
+      var r2=document.querySelector('.row-2');
+      if(!r1||!r2||!page)return;
+      var sy=e.clientY;
+      var ph=page.getBoundingClientRect().height;
+      var r1h0=r1.getBoundingClientRect().height;
+      var r2h0=r2.getBoundingClientRect().height;
+      h.classList.add('dragging');
+      document.body.style.cursor='row-resize';
+      document.body.style.userSelect='none';
+      function mv(e){
+        var dy=e.clientY-sy;
+        var nr1=Math.max(80,r1h0+dy);
+        var nr2=Math.max(80,r2h0-dy);
+        var total=nr1+nr2;
+        var f1=nr1/total,f2=nr2/total;
+        document.documentElement.style.setProperty('--mc-row1-flex',f1.toFixed(4));
+        document.documentElement.style.setProperty('--mc-row2-flex',f2.toFixed(4));
+      }
+      function up(){
+        h.classList.remove('dragging');
+        document.body.style.cursor='';
+        document.body.style.userSelect='';
+        document.removeEventListener('mousemove',mv);
+        document.removeEventListener('mouseup',up);
+      }
+      document.addEventListener('mousemove',mv);
+      document.addEventListener('mouseup',up);
+      e.preventDefault();
+    });
+  })();
   window.addEventListener('resize',_initW);
   _resolveIdentity(function(){
     _loadStrip();_loadLiveCard();_loadSchedule();_loadUpcoming();_loadMinutes();_loadNotes();_loadNeedsResponse();_initRealtime();
@@ -1192,5 +1235,18 @@ document.addEventListener('DOMContentLoaded',function(){
   setInterval(function(){if(MC.resourceId)_loadStrip();},60000);
 });
 </script>
+<!-- Readiness popup — direct body child to escape all filter/stacking contexts -->
+<div class="popup" id="rdpop">
+  <div class="popup-hdr"><div class="popup-ttl">Readiness</div><button class="popup-x" onclick="togglePopup()">×</button></div>
+  <div class="v-pill">Go with caveats</div>
+  <ul class="ck-list">
+    <li class="ck-item"><span class="ci-f">✗</span><span class="ct-f">Outcomes not defined</span></li>
+    <li class="ck-item"><span class="ci-p">✓</span><span class="ct-p">No declined attendees</span></li>
+    <li class="ck-item"><span class="ci-p">✓</span><span class="ct-p">Duration set</span></li>
+    <li class="ck-item"><span class="ci-p">✓</span><span class="ct-p">Agenda items present</span></li>
+    <li class="ck-item"><span class="ci-w">△</span><span class="ct-w">4 overdue actions in workstream</span></li>
+  </ul>
+  <div class="gap-note">⬡ Required vs. optional attendee designation not yet modeled.</div>
+</div>
 </body>
 </html>
