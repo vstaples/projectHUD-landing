@@ -579,8 +579,8 @@ function _buildNoteRow(item){
   h+='<div class="note-time">'+t+'</div>';
   if(isOther&&item._authorName){var ini=item._authorName.trim().split(/\s+/).map(function(w){return w[0];}).join('').toUpperCase().substring(0,2);h+='<div class="note-badge" title="'+_esc(item._authorName)+'">'+ini+'</div>';}
   else{h+='<div class="no-badge"></div>';}
-  h+='<div class="note-acts"><div class="n-pro" onclick="tPro('+JSON.stringify(pid)+')">&#8594; Action</div>';
-  h+='<div class="n-del" onclick="delNoteDB('+JSON.stringify(iid)+')">&#215;</div></div>';
+  h+='<div class="note-acts"><div class="n-pro" onclick="tPro(\''+pid+'\')">&#8594; Action</div>';
+  h+='<div class="n-del" onclick="delNoteDB(\''+iid+'\')">&#215;</div></div>';
   h+='<div class="promo-modal" id="'+pid+'"><div class="promo-lbl">Promote to workstream</div><div id="'+pid+'-opts" class="promo-opts-inner">Loading…</div></div>';
   row.innerHTML=h;return row;
 }
@@ -611,7 +611,7 @@ function tPro(pid){
 function _renderWsOpts(optsEl,pid){
   var row=optsEl.closest('.note-row');var iid=row?row.dataset.itemId:'';
   optsEl.innerHTML=_wsCache.map(function(ws){
-    return '<div class="promo-opt" onclick="proNoteDB('+JSON.stringify(iid)+','+JSON.stringify(ws.id)+','+JSON.stringify(pid)+')">'+_esc(ws.name)+'</div>';
+    return '<div class="promo-opt" onclick="proNoteDB(\''+iid+'\',\''+ws.id+'\',\''+pid+'\')">'+_esc(ws.name)+'</div>';
   }).join('')||'<div class="promo-opt" style="color:var(--tff)">No workstreams</div>';
 }
 function proNoteDB(iid,wsId,pid){
