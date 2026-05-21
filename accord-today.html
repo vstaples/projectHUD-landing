@@ -104,13 +104,13 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 15px 12px;background:var(--bg1);border-bottom:1px solid var(--border-f);flex-shrink:0}
 .panel-title{font-family:var(--ui);font-size:15px;font-weight:700;color:var(--tp);letter-spacing:-.01em}
 .panel-lbl{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--tm)}
-.panel-meta{font-family:var(--mono);font-size:11px;color:var(--tm)}
+.panel-meta{font-family:var(--ui);font-size:15px;font-weight:700;color:var(--cyan);letter-spacing:-.01em}
 .panel-body{flex:1;overflow-y:auto;min-height:0}
 .panel-body::-webkit-scrollbar{width:5px}.panel-body::-webkit-scrollbar-track{background:rgba(255,255,255,.04)}.panel-body::-webkit-scrollbar-thumb{background:rgba(120,160,200,.35);border-radius:3px}.panel-body::-webkit-scrollbar-thumb:hover{background:rgba(120,160,200,.6)}
 .panel-foot{flex-shrink:0}
 .panel-empty{padding:20px 16px;font-family:var(--mono);font-size:13px;color:var(--tm)}
 .divider{height:1px;background:var(--border-f);margin:10px 0}
-.section-lbl{font-family:Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c8d8e8;margin-bottom:clamp(2px,var(--live-pad,7px),7px)}.live-inner .section-lbl{color:#f0a020}
+.section-lbl{font-family:Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c8d8e8;margin-bottom:clamp(2px,var(--live-pad,7px),7px)}.live-inner .section-lbl{color:#f0a020;margin-top:4px;margin-bottom:3px}
 
 /* ── LIVE CARD — ambient presence treatment ── */
 .live-panel{
@@ -135,7 +135,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .live-inner{padding:clamp(6px,var(--live-pad,15px),15px) 16px clamp(4px,calc(var(--live-pad,12px) - 2px),12px);position:relative;z-index:1;transform:translateZ(0)}
 .meeting-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
 .meeting-info{flex:1;padding-right:14px}
-.meeting-title{font-size:24px;font-weight:700;color:var(--tp);margin-bottom:4px;letter-spacing:-.01em;line-height:1.3}
+.meeting-title{font-size:22px;font-weight:700;color:var(--tp);margin-bottom:4px;letter-spacing:-.01em;line-height:1.3}
 .meeting-stakes{font-size:12px;color:var(--mc-green,#34c070);opacity:.85;margin-bottom:clamp(2px,var(--live-pad,8px),8px)}
 .meta-row{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--tf);margin-bottom:3px;line-height:1.6}
 .meta-row i{font-size:12px}
@@ -180,7 +180,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 /* ── SCHEDULE ── */
 .timeline{padding:10px 12px 14px}
 .t-row{display:grid;grid-template-columns:36px 13px 1fr;align-items:stretch}
-.t-time{font-family:var(--mono);font-size:11px;color:var(--tm);padding-top:8px;text-align:right;padding-right:7px;line-height:1}
+.t-time{font-family:var(--mono);font-size:11px;color:#ffffff;padding-top:8px;text-align:right;padding-right:7px;line-height:1}
 .t-time.ta{color:var(--amber)}.t-time.tn{color:var(--cyan)}
 .t-axis{display:flex;flex-direction:column;align-items:center}
 .t-dot{width:9px;height:9px;border-radius:50%;margin-top:6px;flex-shrink:0}
@@ -191,16 +191,16 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .td-ft{background:var(--bg2);border:1.5px solid #2a4060}
 .t-line{flex:1;width:1.5px;background:var(--border-f);min-height:5px}
 .tl-lv{background:rgba(240,160,32,.18)}
-.t-block{margin:3px 0 3px 8px;padding:6px 8px;border-radius:5px;border-left:2px solid transparent;cursor:pointer;transition:background .15s}
-.tb-dn{opacity:.4;border-left-color:#1e3048}.tb-dn:hover{opacity:.6}
-.tb-lv{background:rgba(52,192,112,.07);border-left-color:var(--green)}.tb-lv:hover{background:rgba(52,192,112,.12)}
+.t-block{margin:3px 0 3px 8px;padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.15);border-left:3px solid transparent;cursor:pointer;transition:background .15s}
+.tb-dn{opacity:1;background:rgba(255,255,255,.04);border-left-color:#4a6a8a}.tb-dn:hover{background:rgba(255,255,255,.06)}
+.tb-lv{background:rgba(52,192,112,.12);border-left-color:#34c070}.tb-lv:hover{background:rgba(52,192,112,.18)}
 .tb-nx{background:rgba(0,210,255,.05);border-left-color:var(--cyan)}.tb-nx:hover{background:rgba(0,210,255,.1)}
 .tb-ext{border-left-color:var(--violet)}
-.tb-ft{background:rgba(255,255,255,.015);border-left-color:#1e3048}.tb-ft:hover{background:rgba(255,255,255,.03)}
+.tb-ft{background:rgba(255,255,255,.04);border-left-color:#4a6a8a}.tb-ft:hover{background:rgba(255,255,255,.06)}
 .tb-title{font-size:12px;font-weight:600;color:var(--tp);line-height:1.2;margin-bottom:2px}
-.tb-dn .tb-title{color:var(--tff);text-decoration:line-through;text-decoration-color:#2a4060}
+.tb-dn .tb-title{color:var(--tm);text-decoration:line-through;text-decoration-color:#4a6a8a}
 .tb-meta{font-family:var(--mono);font-size:11px;color:var(--tm);display:flex;align-items:center;gap:4px}
-.tb-lv .tb-meta{color:rgba(52,192,112,.7)}.tb-nx .tb-meta{color:rgba(0,210,255,.5)}
+.tb-lv .tb-title{color:#ffffff;font-weight:700}.tb-lv .tb-meta{color:rgba(52,192,112,.9)}.tb-nx .tb-meta{color:rgba(0,210,255,.5)}
 .tp-pill{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 4px;border-radius:2px}
 .tp-ext{background:rgba(168,85,247,.12);color:var(--violet)}.tp-int{background:rgba(0,210,255,.08);color:#2a7a9a}.tp-lv{background:rgba(52,192,112,.12);color:var(--green)}
 .now-row{display:grid;grid-template-columns:36px 13px 1fr;align-items:center;margin:1px 0}
@@ -364,7 +364,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1521</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1542</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -389,11 +389,11 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
                 <div class="meeting-title" id="mc-meeting-title" style="color:var(--tm)">Loading...</div>
                 <div class="meeting-stakes" id="mc-meeting-stakes">-</div>
                 <div class="meta-row" style="gap:12px">
-                  <i class="ti ti-user"></i><span id="organizer-label" style="color:var(--tm)">-</span>
-                  <span style="color:var(--tff)">·</span>
-                  <i class="ti ti-clock"></i><span id="started-label" style="color:var(--tm)">-</span>
-                  <span style="color:var(--tff)">·</span>
-                  <i class="ti ti-map-pin"></i><span id="mc-location" style="color:var(--tm)">-</span>
+                  <i class="ti ti-user"></i><span style="color:var(--tf)">Organizer: </span><span id="organizer-label" style="color:var(--cyan)">-</span>
+                  <span style="color:var(--tff);margin:0 4px">·</span>
+                  <i class="ti ti-clock"></i><span style="color:var(--tf)" id="time-lbl">Started: </span><span id="started-label" style="color:var(--cyan)">-</span>
+                  <span style="color:var(--tff);margin:0 4px">·</span>
+                  <i class="ti ti-map-pin"></i><span style="color:var(--tf)">Location: </span><span id="mc-location" style="color:var(--cyan)">-</span>
                 </div>
               </div>
               <div class="timer-block">
@@ -757,8 +757,9 @@ function _renderLiveCard(m){
   var s=function(id,v,clr){var el=document.getElementById(id);if(el){el.textContent=v;if(clr!==undefined)el.style.color=clr;}};
   s('mc-meeting-title',m.title||'Untitled','');
   s('mc-meeting-stakes',(m.stakes||m.briefing_text||'')+(m.workstreams?' · '+m.workstreams.name:''));
-  s('started-label','Started: '+fmt(new Date(m.started_at)),'');
-  s('mc-location',m.location||'No location set','');
+  s('started-label',fmt(new Date(m.started_at)),'');
+  s('mc-location',m.location||'Not set','');
+  var tlbl=document.getElementById('time-lbl');if(tlbl)tlbl.textContent='Started: ';
   // Hide GO WITH CAVEATS — meeting is starting
   var vb=document.querySelector('.verdict-btn');if(vb)vb.style.display='none';
   // Organizer name
@@ -804,7 +805,8 @@ function _renderCountdown(m){
   var vb=document.querySelector('.verdict-btn');if(vb)vb.style.display='';
   var sl=document.getElementById('started-label');
   var sf=new Date(m.scheduled_for);
-  if(sl)sl.textContent='Starts: '+fmt(sf);
+  if(sl)sl.textContent=fmt(sf);
+  var tlbl=document.getElementById('time-lbl');if(tlbl)tlbl.textContent='Starts: ';
   // Show organizer name
   if(m.organizer_id){
     API.get('users?id=eq.'+m.organizer_id+'&select=name').then(function(r){
@@ -813,7 +815,7 @@ function _renderCountdown(m){
       if(ol)ol.innerHTML='Organizer: <span style="color:var(--cyan)">'+_esc(name)+'</span>';
     }).catch(function(){});
   }
-  var loc=document.getElementById('mc-location');if(loc)loc.textContent=m.location||'No location set';
+  var loc=document.getElementById('mc-location');if(loc)loc.textContent=m.location||'Not set';
   var btn=document.querySelector('.rejoin-btn');
   if(btn){
     if(isOrganizer){
@@ -924,7 +926,7 @@ function _loadSchedule(){
       tl.innerHTML='';var now=new Date(),nowR=false;
       rows.forEach(function(m,i){
         var sf=new Date(m.scheduled_for),ef=m.duration_minutes?new Date(sf.getTime()+m.duration_minutes*60000):null;
-        var isDone=m.state==='closed'||m.state==='sealed'||(ef&&ef<now);
+        var isDone=(m.state==='closed'||m.state==='sealed')&&m.state!=='running';
         var isLive=m.state==='running',isNext=!isLive&&!isDone&&!nowR;
         if(isNext){nowR=true;var nr=document.createElement('div');nr.className='now-row';nr.innerHTML='<div class="now-time" id="now-t">'+fmt(now)+'</div><div class="now-line"></div><div class="now-lbl">Now</div>';tl.appendChild(nr);}
         var ts=_hm(sf.getHours(),sf.getMinutes());
