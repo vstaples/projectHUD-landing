@@ -500,49 +500,14 @@ function fmtH(d){var h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||
 var mos=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function fmtS(d){var mon=mos[d.getMonth()],day=d.getDate(),h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return mon+' '+day+' · '+h+':'+(m<10?'0':'')+m+' '+ap;}
 
-/* ── LIVE MEETING — relative to real current time ── */
-/* Meeting started 45 minutes ago from now, runs 60 min */
-var DURATION_MIN=60;
-function getMeetingStart(){
-  var now=new Date();
-  var s=new Date(now.getTime()-45*60*1000);
-  return s;
-}
-function getMeetingEnd(start){return new Date(start.getTime()+DURATION_MIN*60*1000);}
-
 function padZ(n){return n<10?'0'+n:String(n);}
 
-function tickAll(){
-  var now=new Date();
-  var t=fmt(now);
-  ['nav-clock','now-t','strip-time'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t;});
-
-  var start=getMeetingStart();
-  var end=getMeetingEnd(start);
-  var elapsedSec=Math.max(0,Math.floor((now-start)/1000));
-  var m=Math.floor(elapsedSec/60),s=elapsedSec%60;
-  var el=document.getElementById('elapsed');
-  if(el)el.textContent=m+':'+padZ(s);
-
-  var sl=document.getElementById('started-label');
-  if(sl)sl.textContent='Started: '+fmtH(start);
-
-  var sub=document.getElementById('timer-sub');
-  var remSec=Math.max(0,Math.floor((end-now)/1000));
-  var rm=Math.floor(remSec/60);
-  if(sub)sub.textContent=rm>0?(rm+'m remaining'):'ending soon';
-
-  /* schedule labels */
-  var stH=start.getHours(),stM=start.getMinutes();
-  var enH=end.getHours(),enM=end.getMinutes();
-  function hm(h,m){return h+':'+(m<10?'0':'')+m;}
-  var tl=document.getElementById('live-time-lbl');
-  if(tl)tl.textContent=hm(stH,stM);
-  var rl=document.getElementById('live-range-lbl');
-  if(rl)rl.innerHTML=hm(stH,stM)+'–'+hm(enH,enM)+' <span class="tp-pill tp-lv">Live</span>';
+function _tickClock(){
+  var t=fmt(new Date());
+  ['nav-clock','strip-time'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t;});
 }
-tickAll();
-setInterval(tickAll,1000);
+_tickClock();
+setInterval(_tickClock,1000);
 
 /* ── POPUP ── */
 function togglePopup(){
@@ -795,10 +760,15 @@ function _renderLiveCard(m){
   s('mc-footer-note',(m.workstreams?m.workstreams.name+' · ':'')+'Live');
   var el=document.getElementById('elapsed');if(el)el.style.color='';
   var btn=document.querySelector('.rejoin-btn');
-  if(btn){btn.textContent='Join session →';btn.onclick=function(){
-    if(window.CoC&&MC.liveMeeting)CoC.write('accord.meeting.joined_from_center','meeting',MC.liveMeeting.meeting_id).catch(function(){});
-    window.location.href='/accord.html?meeting='+m.meeting_id;
-  };}
+  if(btn){
+    var mid=m.meeting_id;
+    var label=m.organizer_id===MC.userId?'Join session →':'Join session →';
+    btn.textContent=label;btn.style.opacity='1';btn.style.cursor='pointer';
+    btn.onclick=function(){
+      if(window.CoC)CoC.write('accord.meeting.joined_from_center','meeting',mid).catch(function(){});
+      window.location.href='/accord.html?meeting='+mid;
+    };
+  }
   API.get('accord_meeting_attendees?meeting_id=eq.'+m.meeting_id+'&select=attendee_id,resource_id,rsvp_status,resources(name)').then(function(rows){
     var c=document.querySelector('.attendees');if(!c)return;c.innerHTML='';
     (rows||[]).forEach(function(a){
@@ -825,26 +795,87 @@ function _renderLiveCard(m){
   console.log('[MC] live card rendered:',m.title);
 }
 
+function _renderCountdown(m){
+  MC.nextMeeting=m;
+  var isOrganizer=m.organizer_id===MC.userId;
+  var badge=document.querySelector('.live-badge');
+  if(badge)badge.innerHTML='<span style="color:var(--cyan);letter-spacing:.06em;font-size:10px;font-weight:600;text-transform:uppercase">↗ Next Meeting</span>';
+  var t=document.getElementById('mc-meeting-title');if(t){t.textContent=m.title;t.style.color='';}
+  var st=document.getElementById('mc-meeting-stakes');if(st)st.textContent=(m.stakes||m.briefing_text||'')+(m.workstreams?' · '+m.workstreams.name:'');
+  var sl=document.getElementById('started-label');
+  var sf=new Date(m.scheduled_for);
+  if(sl)sl.textContent='Starts: '+fmt(sf);
+  var loc=document.getElementById('mc-location');if(loc)loc.textContent=m.location||'No location set';
+  var btn=document.querySelector('.rejoin-btn');
+  if(btn){
+    if(isOrganizer){
+      btn.textContent='Start Meeting';
+      btn.style.opacity='.4';
+      btn.style.cursor='not-allowed';
+      btn.onclick=null;
+    } else {
+      btn.textContent='Join session →';
+      btn.style.opacity='.4';
+      btn.style.cursor='not-allowed';
+      btn.onclick=null;
+    }
+  }
+  // Fetch attendees
+  API.get('accord_meeting_attendees?meeting_id=eq.'+m.meeting_id+'&select=attendee_id,resource_id,rsvp_status,resources(name)').then(function(rows){
+    var c=document.querySelector('.attendees');if(!c)return;c.innerHTML='';
+    (rows||[]).forEach(function(a){
+      var name=a.resources?a.resources.name:'Unknown';
+      var cls=a.rsvp_status==='accepted'?'c':a.rsvp_status==='declined'?'a':'l';
+      var dot=a.rsvp_status==='accepted'?'dg':a.rsvp_status==='declined'?'dd':'da';
+      c.innerHTML+='<div class="att-pill '+cls+'"><div class="att-dot '+dot+'"></div>'+_esc(name)+'</div>';
+    });
+  });
+  // Countdown ticker
+  if(_liveInterval)clearInterval(_liveInterval);
+  _liveInterval=setInterval(function(){
+    var now=new Date(),sf=new Date(MC.nextMeeting.scheduled_for);
+    var diff=Math.max(0,Math.floor((sf-now)/1000));
+    var mm=Math.floor(diff/60),ss=diff%60;
+    var el=document.getElementById('elapsed');
+    if(el)el.textContent=mm+':'+padZ(ss);
+    var sub=document.getElementById('timer-sub');
+    if(sub)sub.textContent=diff>0?'until start':'starting now';
+    // Activate button within 60s
+    var btn=document.querySelector('.rejoin-btn');
+    if(btn&&diff<=60&&diff>0){
+      btn.style.opacity='1';btn.style.cursor='pointer';
+      var mid=MC.nextMeeting.meeting_id;
+      btn.onclick=function(){
+        if(window.CoC)CoC.write('accord.meeting.joined_from_center','meeting',mid).catch(function(){});
+        window.location.href='/accord.html?meeting='+mid;
+      };
+    }
+    // Auto-transition to live when diff hits 0 via realtime; force-check every 30s
+  },1000);
+  // Initial timer value
+  var now=new Date(),diff=Math.max(0,Math.floor((sf-now)/1000));
+  var el=document.getElementById('elapsed');if(el)el.textContent=Math.floor(diff/60)+':'+padZ(diff%60);
+  var sub=document.getElementById('timer-sub');if(sub)sub.textContent=diff>0?'until start':'starting now';
+  console.log('[MC] countdown rendered:',m.title,'in',Math.floor(diff/60)+'m'+diff%60+'s');
+}
+
 function _renderNoMeeting(){
   var badge=document.querySelector('.live-badge');if(badge)badge.innerHTML='<span style="color:var(--tm)">No meetings today</span>';
   var t=document.getElementById('mc-meeting-title');if(t){t.textContent='No meetings today';t.style.color='var(--tff)';}
   var el=document.getElementById('elapsed');if(el)el.textContent='-';
+  var sub=document.getElementById('timer-sub');if(sub)sub.textContent='';
   var at=document.querySelector('.attendees');if(at)at.innerHTML='';
 }
 
 function _loadLiveCard(){
   var todayUTC=new Date();todayUTC.setUTCHours(0,0,0,0);
-  API.get('accord_meetings?state=eq.running&started_at=gte.'+todayUTC.toISOString()+'&order=started_at.desc&limit=1&select=meeting_id,title,stakes,briefing_text,started_at,duration_minutes,location,workstream_id,workstreams(name)')
+  API.get('accord_meetings?state=eq.running&started_at=gte.'+todayUTC.toISOString()+'&order=started_at.desc&limit=1&select=meeting_id,title,stakes,briefing_text,started_at,duration_minutes,location,organizer_id,workstream_id,workstreams(name)')
     .then(function(rows){
       if(rows&&rows[0]){_renderLiveCard(rows[0]);return;}
-      API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+new Date().toISOString()+'&order=scheduled_for.asc&limit=1&select=meeting_id,title,stakes,scheduled_for,workstreams(name)')
+      API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+new Date().toISOString()+'&order=scheduled_for.asc&limit=1&select=meeting_id,title,stakes,briefing_text,scheduled_for,duration_minutes,location,organizer_id,workstream_id,workstreams(name)')
         .then(function(r2){
-          if(r2&&r2[0]){
-            var m=r2[0];
-            var t=document.getElementById('mc-meeting-title');if(t){t.textContent=m.title;t.style.color='';}
-            var badge=document.querySelector('.live-badge');if(badge)badge.innerHTML='<span style="color:var(--cyan)">↗ Next Meeting</span>';
-            var btn=document.querySelector('.rejoin-btn');if(btn){btn.textContent='Prepare →';btn.onclick=function(){window.location.href='/accord.html?meeting='+m.meeting_id;};}
-          } else {_renderNoMeeting();}
+          if(r2&&r2[0]){_renderCountdown(r2[0]);}
+          else{_renderNoMeeting();}
         });
     }).catch(function(e){console.warn('[MC] live card error:',e);_renderNoMeeting();});
 }
