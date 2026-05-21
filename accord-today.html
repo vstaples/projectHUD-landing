@@ -359,7 +359,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1416</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1427</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -526,14 +526,6 @@ function togglePopup(){
   }
 }
 document.addEventListener('click',function(e){if(!e.target.closest('.verdict-btn')){var p=document.getElementById('rdpop');if(p)p.classList.remove('open');}});
-
-/* ── TABS ── */
-function swTab(t){
-  document.getElementById('tw').className='tab'+(t==='w'?' active':'');
-  document.getElementById('tm_tab').className='tab'+(t==='m'?' active':'');
-  document.getElementById('pw').style.display=t==='w'?'':'none';
-  document.getElementById('pm').style.display=t==='m'?'':'none';
-}
 
 /* ── NEEDS RESPONSE ── */
 function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);}
@@ -778,19 +770,7 @@ function _renderLiveCard(m){
       c.innerHTML+='<div class="att-pill '+cls+'"><div class="att-dot '+dot+'"></div>'+_esc(name)+'</div>';
     });
   });
-  Promise.all([
-    API.get('accord_nodes?tag=eq.action&meeting_id=eq.'+m.meeting_id+'&select=node_id,due_date'),
-    API.get('accord_agenda_items?meeting_id=eq.'+m.meeting_id+'&item_type=eq.DECIDE&select=agenda_item_id'),
-    API.get('accord_agenda_items?meeting_id=eq.'+m.meeting_id+'&item_type=eq.QUESTION&select=agenda_item_id'),
-    API.get('accord_agenda_items?meeting_id=eq.'+m.meeting_id+'&select=agenda_item_id')
-  ]).then(function(r){
-    var now=new Date(),od=(r[0]||[]).filter(function(n){return n.due_date&&new Date(n.due_date)<now;});
-    function sc(id,v,cls){var el=document.getElementById(id);if(el){el.textContent=v;el.className='chip-num cn-'+cls;}}
-    sc('chip-actions-due',od.length,od.length>0?'r':'m');
-    sc('chip-decisions',(r[1]||[]).length,(r[1]||[]).length>0?'a':'m');
-    sc('chip-questions',(r[2]||[]).length,(r[2]||[]).length>0?'a':'m');
-    sc('chip-agenda',(r[3]||[]).length,'m');
-  });
+  _loadOpenItems(m.meeting_id);
   _startLiveTicker();
   console.log('[MC] live card rendered:',m.title);
 }
@@ -820,6 +800,7 @@ function _renderCountdown(m){
       btn.onclick=null;
     }
   }
+  _loadOpenItems(m.meeting_id);
   // Fetch attendees
   API.get('accord_meeting_attendees?meeting_id=eq.'+m.meeting_id+'&select=attendee_id,resource_id,rsvp_status,resources(name)').then(function(rows){
     var c=document.querySelector('.attendees');if(!c)return;c.innerHTML='';
@@ -857,6 +838,26 @@ function _renderCountdown(m){
   var el=document.getElementById('elapsed');if(el)el.textContent=Math.floor(diff/60)+':'+padZ(diff%60);
   var sub=document.getElementById('timer-sub');if(sub)sub.textContent=diff>0?'until start':'starting now';
   console.log('[MC] countdown rendered:',m.title,'in',Math.floor(diff/60)+'m'+diff%60+'s');
+}
+
+function _loadOpenItems(meetingId){
+  ['chip-actions-due','chip-decisions','chip-questions','chip-agenda'].forEach(function(id){
+    var el=document.getElementById(id);if(el){el.textContent='0';el.className='chip-num cn-m';}
+  });
+  if(!meetingId)return;
+  Promise.all([
+    API.get('accord_nodes?tag=eq.action&meeting_id=eq.'+meetingId+'&select=node_id,due_date'),
+    API.get('accord_agenda_items?meeting_id=eq.'+meetingId+'&item_type=eq.DECIDE&select=agenda_item_id'),
+    API.get('accord_agenda_items?meeting_id=eq.'+meetingId+'&item_type=eq.QUESTION&select=agenda_item_id'),
+    API.get('accord_agenda_items?meeting_id=eq.'+meetingId+'&select=agenda_item_id')
+  ]).then(function(r){
+    var now=new Date(),od=(r[0]||[]).filter(function(n){return n.due_date&&new Date(n.due_date)<now;});
+    function sc(id,v,cls){var el=document.getElementById(id);if(el){el.textContent=v;el.className='chip-num cn-'+cls;}}
+    sc('chip-actions-due',od.length,od.length>0?'r':'m');
+    sc('chip-decisions',(r[1]||[]).length,(r[1]||[]).length>0?'a':'m');
+    sc('chip-questions',(r[2]||[]).length,(r[2]||[]).length>0?'a':'m');
+    sc('chip-agenda',(r[3]||[]).length,'m');
+  }).catch(function(e){console.warn('[MC] open items error:',e);});
 }
 
 function _renderNoMeeting(){
@@ -1067,7 +1068,12 @@ function _initRealtime(){
       .on('postgres_changes',{event:'UPDATE',schema:'public',table:'accord_meetings'},function(payload){
         var n=payload.new||{};
         console.log('[MC] realtime: meeting',n.meeting_id,'→',n.state);
-        if(n.state==='running'||n.state==='idle')_loadLiveCard();
+        if(n.state==='running'){
+          // Short delay to let DB replica settle, then fetch full row
+          setTimeout(function(){_loadLiveCard();_loadStrip();},400);
+        } else if(n.state==='idle'||n.state==='closed'){
+          setTimeout(function(){_loadLiveCard();_loadStrip();},400);
+        }
       })
       .subscribe(function(status){console.log('[MC] realtime status:',status);});
   }).catch(function(e){console.warn('[MC] realtime auth error:',e);});
