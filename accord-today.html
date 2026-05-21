@@ -518,26 +518,27 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
     <div class="r2c3">
       <div class="panel">
         <div class="panel-hdr"><div class="panel-title">Minutes</div><div class="panel-meta">6 meetings · 2 not ready</div></div>
-        <div class="panel-body">
-          <div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading…</div>';
-        container.appendChild(row);
-      });
-      console.log('[MC] schedule rendered — '+meetings.length+' meetings');
-      // Delegated click — navigate to meeting from data-mid attribute
-      container.addEventListener('click',function(e){
-        var block=e.target.closest('[data-mid]');
-        if(block)window.location.href='/accord.html?meeting='+block.dataset.mid;
-      });
-    })
-    .catch(function(e){console.warn('[MC] schedule error:',e);});
-}
+        <div class="panel-body" id="mc-minutes-body">
+          <div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading…</div>
+        </div>
+      </div>
+    </div>
 
+  </div><!-- /row 2 -->
+
+</main>
+
+<script>
 /* ── BOOT ── */
-_waitForAPI(function(){
-  _resolveIdentity(function(){
-    _loadStrip();
-    _loadLiveCard();
-    _loadSchedule();
+// Scripts load dynamically via sidebar.js loader — wait for window.load
+// before starting the API poll, same pattern as accord-core.js _init().
+window.addEventListener('load', function() {
+  _waitForAPI(function(){
+    _resolveIdentity(function(){
+      _loadStrip();
+      _loadLiveCard();
+      _loadSchedule();
+    });
   });
 });
 
