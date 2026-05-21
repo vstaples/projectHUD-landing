@@ -101,7 +101,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .panel-lbl{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--tm)}
 .panel-meta{font-family:var(--mono);font-size:11px;color:var(--tm)}
 .panel-body{flex:1;overflow-y:auto;min-height:0}
-.panel-body::-webkit-scrollbar{width:4px}.panel-body::-webkit-scrollbar-thumb{background:var(--border-m);border-radius:2px}
+.panel-body::-webkit-scrollbar{width:5px}.panel-body::-webkit-scrollbar-track{background:rgba(255,255,255,.04)}.panel-body::-webkit-scrollbar-thumb{background:rgba(120,160,200,.35);border-radius:3px}.panel-body::-webkit-scrollbar-thumb:hover{background:rgba(120,160,200,.6)}
 .panel-foot{flex-shrink:0}
 .panel-empty{padding:20px 16px;font-family:var(--mono);font-size:13px;color:var(--tm)}
 .divider{height:1px;background:var(--border-f);margin:10px 0}
@@ -207,7 +207,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .tab{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px 6px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;border-top:none;border-left:none;border-right:none;color:var(--tm);transition:color .15s}
 .tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}.tab:hover:not(.active){color:var(--tm)}
 .up-scroll{flex:1;overflow-y:auto;min-height:0}
-.up-scroll::-webkit-scrollbar{width:4px}.up-scroll::-webkit-scrollbar-thumb{background:var(--border-m);border-radius:2px}
+.up-scroll::-webkit-scrollbar{width:5px}.up-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,.04)}.up-scroll::-webkit-scrollbar-thumb{background:rgba(120,160,200,.35);border-radius:3px}.up-scroll::-webkit-scrollbar-thumb:hover{background:rgba(120,160,200,.6)}
 .up-card{background:rgba(255,255,255,.02);border:1px solid var(--border-f);border-radius:var(--r);padding:10px 11px;margin-bottom:8px;cursor:pointer;border-left:3px solid #1e3048;transition:background .15s}
 .up-card:last-child{margin-bottom:0}.up-card:hover{background:rgba(255,255,255,.04)}.up-card.ext{border-left-color:var(--violet)}
 .up-top{display:flex;align-items:flex-start;justify-content:space-between;gap:7px;margin-bottom:3px}
@@ -356,7 +356,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.C08</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.C09</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -458,7 +458,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
     <!-- SCHEDULE -->
     <div class="r2c1">
       <div class="panel">
-        <div class="panel-hdr"><div class="panel-title">Today's Schedule</div><div class="panel-meta">May 19</div></div>
+        <div class="panel-hdr"><div class="panel-title">Today's Schedule</div><div class="panel-meta" id="mc-schedule-date">–</div></div>
         <div class="panel-body">
           <div class="timeline" id="mc-schedule-timeline"><div class="panel-empty">Loading schedule...</div></div>
         </div>
@@ -475,10 +475,12 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
           <div class="tab-bar">
             <button class="tab active" id="tw" onclick="swTab('w')">This Week</button>
             <button class="tab" id="tm_tab" onclick="swTab('m')">This Month</button>
+            <button class="tab" id="tp_tab" onclick="swTab('p')">Pending</button>
           </div>
           <div class="up-scroll">
             <div id="pw"><div class="panel-empty">Loading...</div></div>
             <div id="pm" style="display:none"><div class="panel-empty">Loading...</div></div>
+            <div id="pp" style="display:none"><div class="panel-empty">Loading...</div></div>
           </div>
         </div>
       </div>
@@ -687,7 +689,14 @@ _tickClock();setInterval(_tickClock,15000);
 // UI
 function togglePopup(){document.getElementById('rdpop').classList.toggle('open');}
 document.addEventListener('click',function(e){if(!e.target.closest('.verdict-btn')){var p=document.getElementById('rdpop');if(p)p.classList.remove('open');}});
-function swTab(t){document.getElementById('tw').className='tab'+(t==='w'?' active':'');document.getElementById('tm_tab').className='tab'+(t==='m'?' active':'');document.getElementById('pw').style.display=t==='w'?'':'none';document.getElementById('pm').style.display=t==='m'?'':'none';}
+function swTab(t){
+  document.getElementById('tw').className='tab'+(t==='w'?' active':'');
+  document.getElementById('tm_tab').className='tab'+(t==='m'?' active':'');
+  document.getElementById('tp_tab').className='tab'+(t==='p'?' active':'');
+  document.getElementById('pw').style.display=t==='w'?'':'none';
+  document.getElementById('pm').style.display=t==='m'?'':'none';
+  document.getElementById('pp').style.display=t==='p'?'':'none';
+}
 function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);}
 
 // Notes — load from scratch_items
@@ -840,7 +849,9 @@ function _loadSchedule(){
   var todayUTC=new Date();todayUTC.setUTCHours(0,0,0,0);
   var tomorrowUTC=new Date(todayUTC.getTime()+86400000);
   var tl=document.getElementById('mc-schedule-timeline');if(!tl)return;
-  API.get('accord_meetings?scheduled_for=gte.'+todayUTC.toISOString()+'&scheduled_for=lt.'+tomorrowUTC.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,state,scheduled_for,duration_minutes,workstreams(name)')
+  var dateEl=document.getElementById('mc-schedule-date');
+  if(dateEl){var n=new Date();dateEl.textContent=_mos[n.getMonth()]+' '+n.getDate();}
+  API.get('accord_meetings?state=in.(idle,running)&scheduled_for=gte.'+todayUTC.toISOString()+'&scheduled_for=lt.'+tomorrowUTC.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,state,scheduled_for,duration_minutes,workstreams(name)')
     .then(function(rows){
       if(!rows||!rows.length){tl.innerHTML='<div class="panel-empty">No meetings scheduled today.</div>';return;}
       tl.innerHTML='';var now=new Date(),nowR=false;
@@ -867,31 +878,48 @@ function _loadSchedule(){
 function _loadUpcoming(){
   var now=new Date(),nextMonth=new Date(now.getTime()+30*24*60*60*1000);
   var EMPTY='<div class="panel-empty">No upcoming meetings scheduled.</div>';
-  API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+now.toISOString()+'&scheduled_for=lt.'+nextMonth.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,scheduled_for,stakes,workstreams(name)')
-    .then(function(rows){
-      var pw=document.getElementById('pw'),pm=document.getElementById('pm');
-      if(!rows||!rows.length){if(pw)pw.innerHTML=EMPTY;if(pm)pm.innerHTML=EMPTY;return;}
-      var wkEnd=new Date(now);wkEnd.setDate(wkEnd.getDate()+(6-wkEnd.getDay()));wkEnd.setHours(23,59,59,999);
-      function cards(list){
-        if(!list.length)return EMPTY;
-        return list.map(function(m){
-          var sf=new Date(m.scheduled_for);
-          var ds=_mos[sf.getMonth()]+' '+sf.getDate()+' · '+_hm(sf.getHours(),sf.getMinutes());
-          var ws=m.workstreams?m.workstreams.name:'';
-          return '<div class="up-card mc-up-link" data-mid="'+m.meeting_id+'">'
-            +'<div class="up-top"><div class="up-title">'+_esc(m.title)+'</div><div class="verd v-no">Not Ready</div></div>'
-            +'<div class="up-row2"><span class="up-date">'+ds+'</span></div>'
-            +(ws?'<div class="up-ws">'+_esc(ws)+'</div>':'')
-            +(m.stakes?'<div class="up-brief">'+_esc(m.stakes)+'</div>':'')
-            +'</div>';
-        }).join('');
-      }
-      var wk=rows.filter(function(m){return new Date(m.scheduled_for)<=wkEnd;});
-      var mo=rows.filter(function(m){return new Date(m.scheduled_for)>wkEnd;});
-      if(pw){pw.innerHTML=cards(wk)||EMPTY;pw.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});}
-      if(pm){pm.innerHTML=cards(mo)||EMPTY;pm.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});}
-      console.log('[MC] upcoming rendered:',rows.length);
-    }).catch(function(e){console.warn('[MC] upcoming error:',e);});
+  var EMPTY_P='<div class="panel-empty">No draft meetings.</div>';
+  var pw=document.getElementById('pw'),pm=document.getElementById('pm'),pp=document.getElementById('pp');
+  Promise.all([
+    API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+now.toISOString()+'&scheduled_for=lt.'+nextMonth.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,scheduled_for,stakes,workstreams(name)'),
+    API.get('accord_meetings?state=eq.idle&(scheduled_for=is.null,scheduled_for=lt.'+now.toISOString()+')&firm_id=eq.'+MC.firmId+'&order=created_at.desc&limit=20&select=meeting_id,title,scheduled_for,stakes,workstreams(name)')
+  ]).then(function(r){
+    var rows=r[0]||[],drafts=r[1]||[];
+    function cards(list){
+      if(!list.length)return EMPTY;
+      return list.map(function(m){
+        var sf=m.scheduled_for?new Date(m.scheduled_for):null;
+        var ds=sf?_mos[sf.getMonth()]+' '+sf.getDate()+' · '+_hm(sf.getHours(),sf.getMinutes()):'–';
+        var ws=m.workstreams?m.workstreams.name:'';
+        return '<div class="up-card mc-up-link" data-mid="'+m.meeting_id+'">'
+          +'<div class="up-top"><div class="up-title">'+_esc(m.title)+'</div><div class="verd v-no">Not Ready</div></div>'
+          +'<div class="up-row2"><span class="up-date">'+ds+'</span>'+(ws?'<span class="up-ws" style="margin-left:8px">'+_esc(ws)+'</span>':'')+'</div>'
+          +(m.stakes?'<div class="up-brief">'+_esc(m.stakes)+'</div>':'')
+          +'</div>';
+      }).join('');
+    }
+    function draftCards(list){
+      if(!list.length)return EMPTY_P;
+      return list.map(function(m){
+        var ws=m.workstreams?m.workstreams.name:'';
+        return '<div class="up-card mc-up-link" data-mid="'+m.meeting_id+'" style="border-left-color:var(--tm)">'
+          +'<div class="up-top"><div class="up-title">'+_esc(m.title)+'</div><div class="verd" style="background:rgba(90,122,154,.15);color:var(--tm);border-color:var(--tm)">Draft</div></div>'
+          +(ws?'<div class="up-row2"><span class="up-ws">'+_esc(ws)+'</span></div>':'')
+          +(m.stakes?'<div class="up-brief">'+_esc(m.stakes)+'</div>':'')
+          +'</div>';
+      }).join('');
+    }
+    var wkEnd=new Date(now);wkEnd.setDate(wkEnd.getDate()+(6-wkEnd.getDay()));wkEnd.setHours(23,59,59,999);
+    var wk=rows.filter(function(m){return new Date(m.scheduled_for)<=wkEnd;});
+    var mo=rows.filter(function(m){return new Date(m.scheduled_for)>wkEnd;});
+    if(pw){pw.innerHTML=cards(wk)||EMPTY;pw.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});}
+    if(pm){pm.innerHTML=cards(mo)||EMPTY;pm.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});}
+    if(pp){pp.innerHTML=draftCards(drafts);pp.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});}
+    // Badge pending count on tab
+    var ptab=document.getElementById('tp_tab');
+    if(ptab&&drafts.length)ptab.textContent='Pending ('+drafts.length+')';
+    console.log('[MC] upcoming rendered: scheduled='+rows.length+' drafts='+drafts.length);
+  }).catch(function(e){console.warn('[MC] upcoming error:',e);});
 }
 
 // Minutes
