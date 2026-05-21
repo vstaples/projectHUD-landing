@@ -364,7 +364,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1542</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1549</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -757,8 +757,8 @@ function _renderLiveCard(m){
   var s=function(id,v,clr){var el=document.getElementById(id);if(el){el.textContent=v;if(clr!==undefined)el.style.color=clr;}};
   s('mc-meeting-title',m.title||'Untitled','');
   s('mc-meeting-stakes',(m.stakes||m.briefing_text||'')+(m.workstreams?' · '+m.workstreams.name:''));
-  s('started-label',fmt(new Date(m.started_at)),'');
-  s('mc-location',m.location||'Not set','');
+  s('started-label',fmt(new Date(m.started_at)),'var(--cyan)');
+  s('mc-location',m.location||'Not set','var(--cyan)');
   var tlbl=document.getElementById('time-lbl');if(tlbl)tlbl.textContent='Started: ';
   // Hide GO WITH CAVEATS — meeting is starting
   var vb=document.querySelector('.verdict-btn');if(vb)vb.style.display='none';
@@ -767,7 +767,7 @@ function _renderLiveCard(m){
     API.get('users?id=eq.'+m.organizer_id+'&select=name').then(function(r){
       var name=r&&r[0]?r[0].name:'–';
       var ol=document.getElementById('organizer-label');
-      if(ol)ol.innerHTML='Organizer: <span style="color:var(--cyan)">'+_esc(name)+'</span>';
+      if(ol){ol.textContent=name;ol.style.color="var(--cyan)";}
     }).catch(function(){});
   }
   var el=document.getElementById('elapsed');if(el)el.style.color='';
@@ -805,17 +805,17 @@ function _renderCountdown(m){
   var vb=document.querySelector('.verdict-btn');if(vb)vb.style.display='';
   var sl=document.getElementById('started-label');
   var sf=new Date(m.scheduled_for);
-  if(sl)sl.textContent=fmt(sf);
+  if(sl){sl.textContent=fmt(sf);sl.style.color='var(--cyan)';}
   var tlbl=document.getElementById('time-lbl');if(tlbl)tlbl.textContent='Starts: ';
   // Show organizer name
   if(m.organizer_id){
     API.get('users?id=eq.'+m.organizer_id+'&select=name').then(function(r){
       var name=r&&r[0]?r[0].name:'–';
       var ol=document.getElementById('organizer-label');
-      if(ol)ol.innerHTML='Organizer: <span style="color:var(--cyan)">'+_esc(name)+'</span>';
+      if(ol){ol.textContent=name;ol.style.color="var(--cyan)";}
     }).catch(function(){});
   }
-  var loc=document.getElementById('mc-location');if(loc)loc.textContent=m.location||'Not set';
+  var loc=document.getElementById('mc-location');if(loc){loc.textContent=m.location||'Not set';loc.style.color='var(--cyan)';}
   var btn=document.querySelector('.rejoin-btn');
   if(btn){
     if(isOrganizer){
@@ -926,7 +926,7 @@ function _loadSchedule(){
       tl.innerHTML='';var now=new Date(),nowR=false;
       rows.forEach(function(m,i){
         var sf=new Date(m.scheduled_for),ef=m.duration_minutes?new Date(sf.getTime()+m.duration_minutes*60000):null;
-        var isDone=(m.state==='closed'||m.state==='sealed')&&m.state!=='running';
+        var isDone=m.state==='running'?false:(m.state==='closed'||m.state==='sealed'||(ef&&ef<now));
         var isLive=m.state==='running',isNext=!isLive&&!isDone&&!nowR;
         if(isNext){nowR=true;var nr=document.createElement('div');nr.className='now-row';nr.innerHTML='<div class="now-time" id="now-t">'+fmt(now)+'</div><div class="now-line"></div><div class="now-lbl">Now</div>';tl.appendChild(nr);}
         var ts=_hm(sf.getHours(),sf.getMinutes());
