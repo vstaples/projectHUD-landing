@@ -364,7 +364,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1839</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1849</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -652,6 +652,10 @@ function fmtS(d){return _mos[d.getMonth()]+' '+d.getDate()+' · '+fmt(d);}
 function padZ(n){return n<10?'0'+n:String(n);}
 function _hm(h,m){return h+':'+(m<10?'0':'')+m;}
 function _esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function _goMeeting(mid){
+  history.replaceState({page:'meeting-center'},'Meeting Center','/accord-today.html');
+  window.location.href='/accord.html?meeting='+mid;
+}
 
 // Clock
 function _tickClock(){
@@ -822,7 +826,7 @@ function _renderLiveCard(m){
     btn.style.borderColor='rgba(52,192,112,.35)';
     btn.onclick=function(){
       if(window.CoC)CoC.write('accord.meeting.joined_from_center','meeting',mid).catch(function(){});
-      window.location.href='/accord.html?meeting='+mid;
+      _goMeeting(mid);
     };
   }
   API.get('accord_meeting_attendees?meeting_id=eq.'+m.meeting_id+'&select=attendee_id,resource_id,rsvp_status,resources(name)').then(function(rows){
@@ -911,14 +915,14 @@ function _renderCountdown(m){
         btn.onclick=function(){
           btn.disabled=true;btn.textContent='Starting…';
           API.patch('accord_meetings?meeting_id=eq.'+mid,{state:'running',started_at:new Date().toISOString()})
-            .then(function(){window.location.href='/accord.html?meeting='+mid;})
+            .then(function(){_goMeeting(mid);})
             .catch(function(){btn.disabled=false;btn.textContent='Start Meeting';});
         };
       }
     } else if(!isOrg&&diff===0){
       btn.style.opacity='1';btn.style.cursor='pointer';
       btn.textContent='Join Session →';
-      btn.onclick=function(){window.location.href='/accord.html?meeting='+mid;};
+      btn.onclick=function(){_goMeeting(mid);};
     }
   },1000);
 
@@ -1000,7 +1004,7 @@ function _loadSchedule(){
           row.innerHTML='<div class="t-time '+tc+'">'+ts+'</div><div class="t-axis"><div class="t-dot '+dc+'"></div>'+(i<rows.length-1?'<div class="t-line'+(isLive?' tl-lv':'')+'"></div>':'')+'</div><div class="'+bc+'" data-mid="'+m.meeting_id+'"><div class="tb-title">'+_esc(m.title)+'</div><div class="tb-meta">'+meta+'</div></div>';
           tl.appendChild(row);
         });
-        tl.addEventListener('click',function(e){var b=e.target.closest('[data-mid]');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});
+        tl.addEventListener('click',function(e){var b=e.target.closest('[data-mid]');if(b)_goMeeting(b.dataset.mid);});
         console.log('[MC] schedule rendered:',rows.length);
       });
     }).catch(function(e){console.warn('[MC] schedule error:',e);});
@@ -1044,9 +1048,9 @@ function _loadUpcoming(){
     var wkEnd=new Date(now);wkEnd.setDate(wkEnd.getDate()+(6-wkEnd.getDay()));wkEnd.setHours(23,59,59,999);
     var wk=rows.filter(function(m){return new Date(m.scheduled_for)<=wkEnd;});
     var mo=rows.filter(function(m){return new Date(m.scheduled_for)>wkEnd;});
-    if(pw){pw.innerHTML=cards(wk)||EMPTY;pw.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});}
-    if(pm){pm.innerHTML=cards(mo)||EMPTY;pm.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});}
-    if(pp){pp.innerHTML=draftCards(drafts);pp.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});}
+    if(pw){pw.innerHTML=cards(wk)||EMPTY;pw.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)_goMeeting(b.dataset.mid);});}
+    if(pm){pm.innerHTML=cards(mo)||EMPTY;pm.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)_goMeeting(b.dataset.mid);});}
+    if(pp){pp.innerHTML=draftCards(drafts);pp.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)_goMeeting(b.dataset.mid);});}
     // Badge pending count on tab
     var ptab=document.getElementById('tp_tab');
     if(ptab&&drafts.length)ptab.textContent='Pending ('+drafts.length+')';
@@ -1076,7 +1080,7 @@ function _loadMinutes(){
         var b=e.target.closest('.mc-min-link');
         if(b){
           if(window.CoC)CoC.write('accord.minutes.opened_from_center','meeting',b.dataset.mid).catch(function(){});
-          window.location.href='/accord.html?meeting='+b.dataset.mid;
+          _goMeeting(b.dataset.mid);
         }
       });
       console.log('[MC] minutes rendered:',meetings.length);
