@@ -216,7 +216,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}.tab:hover:not(.active){color:var(--tm)}
 .up-scroll{flex:1;overflow-y:auto;min-height:0}
 .up-scroll::-webkit-scrollbar{width:5px}.up-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,.04)}.up-scroll::-webkit-scrollbar-thumb{background:rgba(120,160,200,.35);border-radius:3px}.up-scroll::-webkit-scrollbar-thumb:hover{background:rgba(120,160,200,.6)}
-.up-card{background:rgba(255,255,255,.02);border:1px solid var(--border-f);border-radius:var(--r);padding:10px 11px;margin-bottom:8px;cursor:pointer;border-left:3px solid #1e3048;transition:background .15s}
+.up-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 11px;margin-bottom:8px;cursor:pointer;border-left:3px solid var(--cyan);transition:background .15s}
 .up-card:last-child{margin-bottom:0}.up-card:hover{background:rgba(255,255,255,.04)}.up-card.ext{border-left-color:var(--violet)}
 .up-top{display:flex;align-items:flex-start;justify-content:space-between;gap:7px;margin-bottom:3px}
 .up-title{font-size:13px;font-weight:700;color:var(--tp);line-height:1.2;flex:1}
@@ -224,11 +224,11 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .v-go{background:rgba(52,192,112,.1);color:var(--green);border:1px solid rgba(52,192,112,.2)}
 .v-cv{background:rgba(240,160,32,.1);color:var(--amber);border:1px solid rgba(240,160,32,.2)}
 .v-no{background:rgba(255,77,109,.1);color:var(--red);border:1px solid rgba(255,77,109,.2)}
-.up-row2{display:flex;align-items:center;gap:5px;margin-bottom:3px}
-.up-date{font-family:var(--mono);font-size:10px;color:var(--tf)}
+.up-row2{display:flex;align-items:center;gap:5px;margin-bottom:3px;justify-content:space-between}
+.up-date{font-family:Arial,sans-serif;font-size:13px;font-weight:600;color:var(--green)}
 .up-dot{width:3px;height:3px;border-radius:50%;background:var(--tff)}
 .up-ws{font-family:var(--mono);font-size:11px;color:var(--tm)}
-.up-brief{font-size:12px;color:var(--tm);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px}
+.up-org{font-family:Arial,sans-serif;font-size:11px;color:var(--cyan);margin-left:auto;white-space:nowrap}.up-brief{font-size:12px;color:var(--tm);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px}
 
 /* ── MINUTES ── */
 .min-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border-f)}
@@ -364,7 +364,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1849</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1853</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -1017,44 +1017,76 @@ function _loadUpcoming(){
   var EMPTY_P='<div class="panel-empty">No draft meetings.</div>';
   var pw=document.getElementById('pw'),pm=document.getElementById('pm'),pp=document.getElementById('pp');
   Promise.all([
-    API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+now.toISOString()+'&scheduled_for=lt.'+nextMonth.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,scheduled_for,stakes,workstreams(name)'),
-    API.get('accord_meetings?state=eq.idle&or=(scheduled_for.is.null,scheduled_for.lt.'+now.toISOString()+')&firm_id=eq.'+MC.firmId+'&order=created_at.desc&limit=20&select=meeting_id,title,scheduled_for,stakes,workstreams(name)')
+    API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+now.toISOString()+'&scheduled_for=lt.'+nextMonth.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,scheduled_for,stakes,organizer_id,workstreams(name)'),
+    API.get('accord_meetings?state=eq.idle&or=(scheduled_for.is.null,scheduled_for.lt.'+now.toISOString()+')&firm_id=eq.'+MC.firmId+'&order=created_at.desc&limit=20&select=meeting_id,title,scheduled_for,stakes,organizer_id,workstreams(name)')
   ]).then(function(r){
     var rows=r[0]||[],drafts=r[1]||[];
-    function cards(list){
-      if(!list.length)return EMPTY;
-      return list.map(function(m){
-        var sf=m.scheduled_for?new Date(m.scheduled_for):null;
-        var ds=sf?_mos[sf.getMonth()]+' '+sf.getDate()+' · '+_hm(sf.getHours(),sf.getMinutes()):'–';
-        var ws=m.workstreams?m.workstreams.name:'';
-        return '<div class="up-card mc-up-link" data-mid="'+m.meeting_id+'">'
-          +'<div class="up-top"><div class="up-title">'+_esc(m.title)+'</div><div class="verd v-no">Not Ready</div></div>'
-          +'<div class="up-row2"><span class="up-date">'+ds+'</span>'+(ws?'<span class="up-ws" style="margin-left:8px">'+_esc(ws)+'</span>':'')+'</div>'
-          +(m.stakes?'<div class="up-brief">'+_esc(m.stakes)+'</div>':'')
-          +'</div>';
-      }).join('');
-    }
-    function draftCards(list){
-      if(!list.length)return EMPTY_P;
-      return list.map(function(m){
-        var ws=m.workstreams?m.workstreams.name:'';
-        return '<div class="up-card mc-up-link" data-mid="'+m.meeting_id+'" style="border-left-color:var(--tm)">'
-          +'<div class="up-top"><div class="up-title">'+_esc(m.title)+'</div><div class="verd" style="background:rgba(90,122,154,.15);color:var(--tm);border-color:var(--tm)">Draft</div></div>'
-          +(ws?'<div class="up-row2"><span class="up-ws">'+_esc(ws)+'</span></div>':'')
-          +(m.stakes?'<div class="up-brief">'+_esc(m.stakes)+'</div>':'')
-          +'</div>';
-      }).join('');
-    }
-    var wkEnd=new Date(now);wkEnd.setDate(wkEnd.getDate()+(6-wkEnd.getDay()));wkEnd.setHours(23,59,59,999);
-    var wk=rows.filter(function(m){return new Date(m.scheduled_for)<=wkEnd;});
-    var mo=rows.filter(function(m){return new Date(m.scheduled_for)>wkEnd;});
-    if(pw){pw.innerHTML=cards(wk)||EMPTY;pw.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)_goMeeting(b.dataset.mid);});}
-    if(pm){pm.innerHTML=cards(mo)||EMPTY;pm.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)_goMeeting(b.dataset.mid);});}
-    if(pp){pp.innerHTML=draftCards(drafts);pp.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)_goMeeting(b.dataset.mid);});}
-    // Badge pending count on tab
-    var ptab=document.getElementById('tp_tab');
-    if(ptab&&drafts.length)ptab.textContent='Pending ('+drafts.length+')';
-    console.log('[MC] upcoming rendered: scheduled='+rows.length+' drafts='+drafts.length);
+    // Fetch organizer names for all meetings
+    var allMeetings=rows.concat(drafts);
+    var orgIds=[...new Set(allMeetings.map(function(m){return m.organizer_id;}).filter(Boolean))];
+    var namePromise=orgIds.length?API.get('users?id=in.('+orgIds.join(',')+')'+'&select=id,name'):Promise.resolve([]);
+    return namePromise.then(function(users){
+      var nameMap={};(users||[]).forEach(function(u){nameMap[u.id]=u.name;});
+      function cards(list){
+        if(!list.length)return EMPTY;
+        return list.map(function(m){
+          var sf=m.scheduled_for?new Date(m.scheduled_for):null;
+          var ds=sf?_mos[sf.getMonth()]+' '+sf.getDate()+' · '+_hm(sf.getHours(),sf.getMinutes()):'–';
+          var ws=m.workstreams?m.workstreams.name:'';
+          var orgName=nameMap[m.organizer_id]||'';
+          var row2Left='<span class="up-date">'+ds+'</span>'+(ws?'<span class="up-ws" style="margin-left:8px">'+_esc(ws)+'</span>':'');
+          var row2Right=orgName?'<span class="up-org">'+_esc(orgName)+'</span>':'';
+          return '<div class="up-card mc-up-link" data-mid="'+m.meeting_id+'">'
+            +'<div class="up-top"><div class="up-title">'+_esc(m.title)+'</div>'
+            +'<div class="verd v-no" data-mid="'+m.meeting_id+'" style="cursor:help" title="Hover for readiness details">Not Ready</div></div>'
+            +'<div class="up-row2">'+row2Left+row2Right+'</div>'
+            +(m.stakes?'<div class="up-brief">'+_esc(m.stakes)+'</div>':'')
+            +'</div>';
+        }).join('');
+      }
+      function draftCards(list){
+        if(!list.length)return EMPTY_P;
+        return list.map(function(m){
+          var ws=m.workstreams?m.workstreams.name:'';
+          var orgName=nameMap[m.organizer_id]||'';
+          return '<div class="up-card mc-up-link" data-mid="'+m.meeting_id+'" style="border-left-color:var(--tm)">'
+            +'<div class="up-top"><div class="up-title">'+_esc(m.title)+'</div><div class="verd" style="background:rgba(90,122,154,.15);color:var(--tm);border-color:var(--tm)">Draft</div></div>'
+            +(ws||orgName?'<div class="up-row2">'+(ws?'<span class="up-ws">'+_esc(ws)+'</span>':'')+(orgName?'<span class="up-org">'+_esc(orgName)+'</span>':'')+'</div>':'')
+            +(m.stakes?'<div class="up-brief">'+_esc(m.stakes)+'</div>':'')
+            +'</div>';
+        }).join('');
+      }
+      var wkEnd=new Date(now);wkEnd.setDate(wkEnd.getDate()+(6-wkEnd.getDay()));wkEnd.setHours(23,59,59,999);
+      var wk=rows.filter(function(m){return new Date(m.scheduled_for)<=wkEnd;});
+      var mo=rows.filter(function(m){return new Date(m.scheduled_for)>wkEnd;});
+      function wirePanel(el,html){
+        if(!el)return;
+        el.innerHTML=html;
+        el.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)_goMeeting(b.dataset.mid);});
+        // Wire NOT READY hover tooltips
+        el.querySelectorAll('.verd.v-no').forEach(function(badge){
+          badge.addEventListener('mouseenter',function(e){
+            var tip=document.getElementById('up-tip');
+            if(!tip){tip=document.createElement('div');tip.id='up-tip';
+              tip.style.cssText='position:fixed;background:#0a1525;border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:10px 13px;font-family:Arial,sans-serif;font-size:11px;color:#c8d8e8;z-index:2000;box-shadow:0 8px 24px rgba(0,0,0,.7);line-height:1.8;min-width:200px;pointer-events:none;';
+              document.body.appendChild(tip);}
+            tip.innerHTML='<div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--amber);margin-bottom:6px;text-transform:uppercase">Why Not Ready</div>'
+              +'<div>✗ Outcomes not defined</div><div>✗ No agenda items</div><div>△ No pre-reads uploaded</div>';
+            var r=badge.getBoundingClientRect();
+            tip.style.top=(r.bottom+6)+'px';
+            tip.style.left=Math.max(8,r.right-200)+'px';
+            tip.style.display='block';
+          });
+          badge.addEventListener('mouseleave',function(){var t=document.getElementById('up-tip');if(t)t.style.display='none';});
+        });
+      }
+      wirePanel(pw,cards(wk)||EMPTY);
+      wirePanel(pm,cards(mo)||EMPTY);
+      if(pp){pp.innerHTML=draftCards(drafts);pp.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)_goMeeting(b.dataset.mid);});}
+      var ptab=document.getElementById('tp_tab');
+      if(ptab&&drafts.length)ptab.textContent='Pending ('+drafts.length+')';
+      console.log('[MC] upcoming rendered: scheduled='+rows.length+' drafts='+drafts.length);
+    });
   }).catch(function(e){console.warn('[MC] upcoming error:',e);});
 }
 
