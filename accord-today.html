@@ -417,15 +417,9 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
     <!-- NOTES -->
     <div class="r1c2">
       <div class="panel">
-        <div class="panel-hdr"><div class="panel-title">Notes</div><div class="panel-meta" id="note-count">5 items</div></div>
+        <div class="panel-hdr"><div class="panel-title">Notes</div><div class="panel-meta" id="note-count">–</div></div>
         <div class="panel-body">
-          <div id="notes-inner">
-            <div class="note-row" id="n-1"><div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">Chase Tim on AX-007 delivery confirmation</div><div class="note-time">May 19 · 9:14 AM</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro('p-1')">→ Action</div><div class="n-del" onclick="delNote('n-1')">×</div></div><div class="promo-modal" id="p-1"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote('n-1','p-1')">C-11 Workstream</div><div class="promo-opt" onclick="proNote('n-1','p-1')">Base Workstream</div><div class="promo-opt" onclick="proNote('n-1','p-1')">Control Adapter</div></div></div>
-            <div class="note-row" id="n-2"><div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">Call Bob before 3pm today</div><div class="note-time">May 19 · 9:31 AM</div><div class="note-badge" title="Beth Cassidy">BC</div><div class="note-acts"><div class="n-pro" onclick="tPro('p-2')">→ Action</div><div class="n-del" onclick="delNote('n-2')">×</div></div><div class="promo-modal" id="p-2"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote('n-2','p-2')">C-11 Workstream</div><div class="promo-opt" onclick="proNote('n-2','p-2')">Base Workstream</div><div class="promo-opt" onclick="proNote('n-2','p-2')">Control Adapter</div></div></div>
-            <div class="note-row" id="n-3"><div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">Review vendor shortlist before 11am call</div><div class="note-time">May 19 · 9:45 AM</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro('p-3')">→ Action</div><div class="n-del" onclick="delNote('n-3')">×</div></div><div class="promo-modal" id="p-3"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote('n-3','p-3')">C-11 Workstream</div><div class="promo-opt" onclick="proNote('n-3','p-3')">Base Workstream</div><div class="promo-opt" onclick="proNote('n-3','p-3')">Control Adapter</div></div></div>
-            <div class="note-row" id="n-4"><div class="note-ck ck" onclick="toggleNote(this)">✓</div><div class="note-body ck">Send Angela the updated prototype spec</div><div class="note-time">May 19 · 10:05 AM</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro('p-4')">→ Action</div><div class="n-del" onclick="delNote('n-4')">×</div></div><div class="promo-modal" id="p-4"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote('n-4','p-4')">C-11 Workstream</div><div class="promo-opt" onclick="proNote('n-4','p-4')">Base Workstream</div><div class="promo-opt" onclick="proNote('n-4','p-4')">Control Adapter</div></div></div>
-            <div class="note-row" id="n-5"><div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">Block time Friday for board prep</div><div class="note-time">May 19 · 10:31 AM</div><div class="note-badge" title="Beth Cassidy">BC</div><div class="note-acts"><div class="n-pro" onclick="tPro('p-5')">→ Action</div><div class="n-del" onclick="delNote('n-5')">×</div></div><div class="promo-modal" id="p-5"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote('n-5','p-5')">C-11 Workstream</div><div class="promo-opt" onclick="proNote('n-5','p-5')">Base Workstream</div><div class="promo-opt" onclick="proNote('n-5','p-5')">Control Adapter</div></div></div>
-          </div>
+          <div id="notes-inner"></div>
         </div>
         <div class="notes-input panel-foot">
           <div class="ni-ck"></div>
@@ -572,21 +566,76 @@ function swTab(t){
 /* ── NEEDS RESPONSE ── */
 function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);}
 
-/* ── NOTES ── */
-var nc=6;
-function updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n+(n===1?' item':' items');}
-function toggleNote(el){var c=el.classList.toggle('ck');el.textContent=c?'✓':'';var b=el.nextElementSibling;if(b)b.classList.toggle('ck',c);}
-function delNote(id){var el=document.getElementById(id);if(el)el.remove();updNC();}
-function tPro(id){document.querySelectorAll('.promo-modal').forEach(function(m){if(m.id!==id)m.classList.remove('open');});var m=document.getElementById(id);if(m)m.classList.toggle('open');}
-function proNote(nid,pid){var m=document.getElementById(pid);if(m)m.classList.remove('open');var el=document.getElementById(nid);if(el){el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();updNC();},300);}}
+/* ── NOTES (DB-backed) ── */
+var _wsCache=null;
+function _updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n+(n===1?' item':' items');}
+function _buildNoteRow(item){
+  var iid=item.item_id,pid='p-'+iid;
+  var isCk=!!item.completed_at,isOther=item.author_resource_id&&item.author_resource_id!==MC.resourceId;
+  var t=fmtS(new Date(item.created_at));
+  var row=document.createElement('div');row.className='note-row';row.dataset.itemId=iid;
+  var h='<div class="note-ck'+(isCk?' ck':'')+'" onclick="toggleNote(this)">'+(isCk?'✓':'')+'</div>';
+  h+='<div class="note-body'+(isCk?' ck':'')+'">'+_esc(item.body)+'</div>';
+  h+='<div class="note-time">'+t+'</div>';
+  if(isOther&&item._authorName){var ini=item._authorName.trim().split(/\s+/).map(function(w){return w[0];}).join('').toUpperCase().substring(0,2);h+='<div class="note-badge" title="'+_esc(item._authorName)+'">'+ini+'</div>';}
+  else{h+='<div class="no-badge"></div>';}
+  h+='<div class="note-acts"><div class="n-pro" onclick="tPro('+JSON.stringify(pid)+')">&#8594; Action</div>';
+  h+='<div class="n-del" onclick="delNoteDB('+JSON.stringify(iid)+')">&#215;</div></div>';
+  h+='<div class="promo-modal" id="'+pid+'"><div class="promo-lbl">Promote to workstream</div><div id="'+pid+'-opts" class="promo-opts-inner">Loading…</div></div>';
+  row.innerHTML=h;return row;
+}
+function toggleNote(el){
+  var row=el.closest('.note-row');if(!row)return;
+  var iid=row.dataset.itemId,c=el.classList.toggle('ck');
+  el.textContent=c?'✓':'';var b=el.nextElementSibling;if(b)b.classList.toggle('ck',c);
+  if(iid)API.patch('scratch_items?item_id=eq.'+iid,{completed_at:c?new Date().toISOString():null}).catch(function(e){console.warn('[MC] toggle note error:',e);});
+}
+function delNoteDB(iid){
+  var row=document.querySelector('.note-row[data-item-id="'+iid+'"]');
+  if(!row)return;
+  row.style.opacity='.3';row.style.transition='opacity .3s';
+  API.del('scratch_items?item_id=eq.'+iid).catch(function(e){console.warn('[MC] del note error:',e);});
+  setTimeout(function(){row.remove();_updNC();},300);
+}
+function tPro(pid){
+  document.querySelectorAll('.promo-modal').forEach(function(m){if(m.id!==pid)m.classList.remove('open');});
+  var m=document.getElementById(pid);if(!m)return;
+  m.classList.toggle('open');
+  if(!m.classList.contains('open'))return;
+  var optsEl=document.getElementById(pid+'-opts');if(!optsEl)return;
+  if(_wsCache){_renderWsOpts(optsEl,pid);return;}
+  API.get('workstreams?select=id,name&order=name.asc').then(function(r){
+    _wsCache=r||[];_renderWsOpts(optsEl,pid);
+  }).catch(function(){optsEl.innerHTML='<div class="promo-opt" style="color:var(--tff)">Error loading</div>';});
+}
+function _renderWsOpts(optsEl,pid){
+  var row=optsEl.closest('.note-row');var iid=row?row.dataset.itemId:'';
+  optsEl.innerHTML=_wsCache.map(function(ws){
+    return '<div class="promo-opt" onclick="proNoteDB('+JSON.stringify(iid)+','+JSON.stringify(ws.id)+','+JSON.stringify(pid)+')">'+_esc(ws.name)+'</div>';
+  }).join('')||'<div class="promo-opt" style="color:var(--tff)">No workstreams</div>';
+}
+function proNoteDB(iid,wsId,pid){
+  var row=document.querySelector('.note-row[data-item-id="'+iid+'"]');if(!row)return;
+  var body=row.querySelector('.note-body');var txt=body?body.textContent:'';
+  var m=document.getElementById(pid);if(m)m.classList.remove('open');
+  API.post('accord_nodes',{firm_id:MC.firmId,workstream_id:wsId,tag:'action',summary:txt,meeting_id:null,created_by:MC.userId}).then(function(r){
+    var nid=r&&r[0]?r[0].node_id:null;
+    if(nid)API.patch('scratch_items?item_id=eq.'+iid,{promoted_node_id:nid}).catch(function(){});
+    row.style.opacity='.3';row.style.transition='opacity .3s';
+    setTimeout(function(){row.remove();_updNC();},300);
+    console.log('[MC] note promoted to action:',nid);
+  }).catch(function(e){console.warn('[MC] promote error:',e);});
+}
 function noteKey(e){
   if(e.key!=='Enter')return;e.preventDefault();
-  var f=document.getElementById('ni-f'),val=f.textContent.trim();if(!val)return;
-  var id='n-'+nc,pid='p-'+nc;nc++;
-  var t=fmtS(new Date());
-  var row=document.createElement('div');row.className='note-row';row.id=id;
-  row.innerHTML='<div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">'+val+'</div><div class="note-time">'+t+'</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro(\''+pid+'\')">→ Action</div><div class="n-del" onclick="delNote(\''+id+'\')">×</div></div><div class="promo-modal" id="'+pid+'"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">C-11 Workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">Base Workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">Control Adapter</div></div>';
-  document.getElementById('notes-inner').appendChild(row);f.textContent='';updNC();
+  var f=document.getElementById('ni-f'),val=f.textContent.trim();if(!val||!MC.resourceId)return;
+  f.textContent='';
+  API.post('scratch_items',{firm_id:MC.firmId,owner_resource_id:MC.resourceId,author_resource_id:MC.resourceId,body:val}).then(function(r){
+    var item=r&&r[0]?r[0]:null;if(!item)return;
+    var row=_buildNoteRow(item);
+    document.getElementById('notes-inner').appendChild(row);_updNC();
+    console.log('[MC] note added:',item.item_id);
+  }).catch(function(e){console.warn('[MC] add note error:',e);});
 }
 document.addEventListener('click',function(e){if(!e.target.closest('.n-pro')&&!e.target.closest('.promo-modal'))document.querySelectorAll('.promo-modal').forEach(function(m){m.classList.remove('open');});});
 
@@ -676,29 +725,27 @@ document.addEventListener('click',function(e){if(!e.target.closest('.verdict-btn
 function swTab(t){document.getElementById('tw').className='tab'+(t==='w'?' active':'');document.getElementById('tm_tab').className='tab'+(t==='m'?' active':'');document.getElementById('pw').style.display=t==='w'?'':'none';document.getElementById('pm').style.display=t==='m'?'':'none';}
 function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);}
 
-// Notes
-var _nc=6;
-function updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n+(n===1?' item':' items');}
-function toggleNote(el){var c=el.classList.toggle('ck');el.textContent=c?'✓':'';var b=el.nextElementSibling;if(b)b.classList.toggle('ck',c);}
-function delNote(id){var el=document.getElementById(id);if(el)el.remove();updNC();}
-function tPro(id){document.querySelectorAll('.promo-modal').forEach(function(m){if(m.id!==id)m.classList.remove('open');});var m=document.getElementById(id);if(m)m.classList.toggle('open');}
-function proNote(nid,pid){var m=document.getElementById(pid);if(m)m.classList.remove('open');var el=document.getElementById(nid);if(el){el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();updNC();},300);}}
-function noteKey(e){
-  if(e.key!=='Enter')return;e.preventDefault();
-  var f=document.getElementById('ni-f'),val=f.textContent.trim();if(!val)return;
-  var id='n-'+_nc,pid='p-'+_nc;_nc++;
-  var t=fmtS(new Date());
-  var row=document.createElement('div');row.className='note-row';row.id=id;
-  var h='<div class="note-ck" onclick="toggleNote(this)"></div>';
-  h+='<div class="note-body">'+_esc(val)+'</div>';
-  h+='<div class="note-time">'+t+'</div>';
-  h+='<div class="no-badge"></div>';
-  h+='<div class="note-acts"><div class="n-pro" onclick="tPro('+JSON.stringify(pid)+')">&#8594; Action</div>';
-  h+='<div class="n-del" onclick="delNote('+JSON.stringify(id)+')">&#215;</div></div>';
-  row.innerHTML=h;
-  document.getElementById('notes-inner').appendChild(row);f.textContent='';updNC();
+// Notes — load from scratch_items
+function _loadNotes(){
+  var inner=document.getElementById('notes-inner');if(!inner||!MC.resourceId)return;
+  API.get('scratch_items?owner_resource_id=eq.'+MC.resourceId+'&order=created_at.asc&select=item_id,body,created_at,completed_at,promoted_node_id,author_resource_id')
+    .then(function(rows){
+      if(!rows||!rows.length){inner.innerHTML='';_updNC();console.log('[MC] notes loaded: 0');return;}
+      var others=rows.filter(function(r){return r.author_resource_id&&r.author_resource_id!==MC.resourceId;});
+      var otherIds=[...new Set(others.map(function(r){return r.author_resource_id;}))];
+      var nameP=otherIds.length?API.get('resources?id=in.('+otherIds.join(',')+')'+'&select=id,name'):Promise.resolve([]);
+      nameP.then(function(rNames){
+        var nameMap={};(rNames||[]).forEach(function(r){nameMap[r.id]=r.name;});
+        inner.innerHTML='';
+        rows.forEach(function(item){
+          item._authorName=nameMap[item.author_resource_id]||null;
+          inner.appendChild(_buildNoteRow(item));
+        });
+        _updNC();
+        console.log('[MC] notes loaded:',rows.length);
+      });
+    }).catch(function(e){console.warn('[MC] notes error:',e);});
 }
-document.addEventListener('click',function(e){if(!e.target.closest('.n-pro')&&!e.target.closest('.promo-modal'))document.querySelectorAll('.promo-modal').forEach(function(m){m.classList.remove('open');});});
 
 // Resize
 var _r1w=[0,0],_r2w=[0,0];
@@ -908,7 +955,7 @@ document.addEventListener('DOMContentLoaded',function(){
   _mkHandle('r2ha',_r2w,0,_applyR2);_mkHandle('r2hb',_r2w,1,_applyR2);
   window.addEventListener('resize',_initW);
   _resolveIdentity(function(){
-    _loadStrip();_loadLiveCard();_loadSchedule();_loadUpcoming();_loadMinutes();
+    _loadStrip();_loadLiveCard();_loadSchedule();_loadUpcoming();_loadMinutes();_loadNotes();
   });
   setInterval(function(){if(MC.resourceId)_loadStrip();},60000);
 });
