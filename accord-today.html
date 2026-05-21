@@ -9,23 +9,10 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <link rel="stylesheet" href="/css/hud.css">
-
-<!-- CMD-ACCORD-MEETING-CENTER-1 C-03: Meeting Center surface styles -->
-<!-- Tier 1 tab amber override — same pattern as accord.html -->
 <style>
-  #hud-tier1 .hud-tier1-tab.active {
-    color: #ffaa00 !important;
-    border-bottom-color: #ffaa00 !important;
-  }
-  #hud-tier1 {
-    position: relative !important;
-    top: auto !important;
-    width: 100%;
-    z-index: 10;
-  }
-  body.accord-tier1-ready .mc-page {
-    /* strip already in flow — no padding adjustment needed */
-  }
+  /* Tier 1 amber override */
+  #hud-tier1 .hud-tier1-tab.active { color:#ffaa00!important; border-bottom-color:#ffaa00!important; }
+  #hud-tier1 { position:relative!important; top:auto!important; width:100%; z-index:10; }
 </style>
 <style>
 :root{
@@ -82,7 +69,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .strip-right{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tff)}
 
 /* ── PAGE ── */
-.page{display:flex;flex-direction:column;height:calc(100vh - 110px)  /* 68px nav + 42px tier1 strip */;padding:12px 20px;gap:10px}
+.page{display:flex;flex-direction:column;height:calc(100vh - 110px) /* 68px nav + 42px tier1 */;padding:12px 20px;gap:10px}
 .row{display:flex;flex:1;min-height:0;align-items:stretch}
 
 /* ── CELLS ── */
@@ -281,49 +268,45 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 <body>
 
 <!-- ── NAV ── -->
-<!-- CMD-ACCORD-MEETING-CENTER-1 C-03: Shell-compatible header.
-     sidebar.js (= hud-shell.js) builds #hud-header when HUDShell.init() is called.
-     Meeting Center calls HUDShell.init({page:accord-today}) via early boot script.
-     The Tier 1 strip is built by _buildAccordTier1() below, same as accord.html. -->
 <nav class="topnav" id="mc-topnav">
   <div class="accord-mark">
     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 90 90" role="img">
       <defs>
-        <radialGradient id="glow2" cx="50%" cy="50%" r="55%">
+        <radialGradient id="glow" cx="50%" cy="50%" r="55%">
           <stop offset="0%" stop-color="#54F7FF" stop-opacity="0.55"/>
           <stop offset="55%" stop-color="#0AAED1" stop-opacity="0.12"/>
           <stop offset="100%" stop-color="#041022" stop-opacity="0"/>
         </radialGradient>
-        <linearGradient id="cyanFill2" x1="24" y1="18" x2="66" y2="72" gradientUnits="userSpaceOnUse">
+        <linearGradient id="cyanFill" x1="24" y1="18" x2="66" y2="72" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stop-color="#7FFFFF"/>
           <stop offset="45%" stop-color="#15DCEB"/>
           <stop offset="100%" stop-color="#076D9F"/>
         </linearGradient>
-        <linearGradient id="darkFill2" x1="18" y1="30" x2="72" y2="76" gradientUnits="userSpaceOnUse">
+        <linearGradient id="darkFill" x1="18" y1="30" x2="72" y2="76" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stop-color="#0D355A"/>
           <stop offset="100%" stop-color="#041022"/>
         </linearGradient>
-        <filter id="softGlow2" x="-35%" y="-35%" width="170%" height="170%">
+        <filter id="softGlow" x="-35%" y="-35%" width="170%" height="170%">
           <feGaussianBlur stdDeviation="1.4" result="blur"/>
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
       </defs>
       <rect width="90" height="90" fill="#020814"/>
-      <circle cx="45" cy="45" r="42" fill="url(#glow2)"/>
+      <circle cx="45" cy="45" r="42" fill="url(#glow)"/>
       <circle cx="42.5" cy="45.5" r="31.5" fill="none" stroke="#12345A" stroke-width="2"/>
       <path d="M15.5 50.5A31.7 31.7 0 0 1 68 22.5" fill="none" stroke="#24DDF0" stroke-width="2.4" stroke-linecap="round" opacity="0.95"/>
       <path d="M70.8 31.3A31.8 31.8 0 0 1 25.3 74.8" fill="none" stroke="#0C7DB2" stroke-width="2.1" stroke-linecap="round" opacity="0.8"/>
       <path d="M19.5 29.7A33.8 33.8 0 0 1 63.2 17.4" fill="none" stroke="#0C7DB2" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
-      <circle cx="43.5" cy="31.2" r="9.6" fill="url(#cyanFill2)" stroke="#05182D" stroke-width="1.6"/>
-      <path d="M27.2 58.8c2.8-11.6 9-16.6 16.3-16.6 8.6 0 14.5 6.4 16.8 17.2-9.6 6.6-23.2 6.3-33.1-.6z" fill="url(#cyanFill2)" stroke="#041022" stroke-width="1.6"/>
-      <circle cx="23.7" cy="39.2" r="7.5" fill="url(#darkFill2)" stroke="#2BE7F4" stroke-width="1.2" opacity="0.92"/>
-      <path d="M12.8 61c2-10.6 6.6-15.7 13-15.7 4.7 0 8.7 2.7 11 7.7-5.3 6.5-13 9.1-24 8z" fill="url(#darkFill2)" stroke="#05203A" stroke-width="1.4" opacity="0.92"/>
-      <circle cx="63.2" cy="39.2" r="7.5" fill="url(#cyanFill2)" stroke="#041022" stroke-width="1.3" opacity="0.88"/>
-      <path d="M51.4 52.8c2.5-4.9 6.3-7.5 11-7.5 6.3 0 10.9 5.2 12.9 15.7-7.8 1.1-15.2-1.3-23.9-8.2z" fill="url(#cyanFill2)" stroke="#041022" stroke-width="1.4" opacity="0.8"/>
+      <circle cx="43.5" cy="31.2" r="9.6" fill="url(#cyanFill)" stroke="#05182D" stroke-width="1.6"/>
+      <path d="M27.2 58.8c2.8-11.6 9-16.6 16.3-16.6 8.6 0 14.5 6.4 16.8 17.2-9.6 6.6-23.2 6.3-33.1-.6z" fill="url(#cyanFill)" stroke="#041022" stroke-width="1.6"/>
+      <circle cx="23.7" cy="39.2" r="7.5" fill="url(#darkFill)" stroke="#2BE7F4" stroke-width="1.2" opacity="0.92"/>
+      <path d="M12.8 61c2-10.6 6.6-15.7 13-15.7 4.7 0 8.7 2.7 11 7.7-5.3 6.5-13 9.1-24 8z" fill="url(#darkFill)" stroke="#05203A" stroke-width="1.4" opacity="0.92"/>
+      <circle cx="63.2" cy="39.2" r="7.5" fill="url(#cyanFill)" stroke="#041022" stroke-width="1.3" opacity="0.88"/>
+      <path d="M51.4 52.8c2.5-4.9 6.3-7.5 11-7.5 6.3 0 10.9 5.2 12.9 15.7-7.8 1.1-15.2-1.3-23.9-8.2z" fill="url(#cyanFill)" stroke="#041022" stroke-width="1.4" opacity="0.8"/>
       <path d="M33 61.5 43.7 72 76.5 39.7" fill="none" stroke="#06152A" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.78"/>
-      <path d="M33 61.5 43.7 72 76.5 39.7" fill="none" stroke="#75FFFF" stroke-width="5.8" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow2)"/>
+      <path d="M33 61.5 43.7 72 76.5 39.7" fill="none" stroke="#75FFFF" stroke-width="5.8" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)"/>
       <path d="M33 61.5 43.7 72 76.5 39.7" fill="none" stroke="#0BBBD7" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-      <path d="M70.8 21.2 73.4 27.1 79.3 29.7 73.4 32.2 70.8 38.2 68.3 32.2 62.3 29.7 68.3 27.1z" fill="#E9FFFF" opacity="0.95" filter="url(#softGlow2)"/>
+      <path d="M70.8 21.2 73.4 27.1 79.3 29.7 73.4 32.2 70.8 38.2 68.3 32.2 62.3 29.7 68.3 27.1z" fill="#E9FFFF" opacity="0.95" filter="url(#softGlow)"/>
     </svg>
     <span class="accord-name"><span style="color:#ffffff">ACC</span><span style="color:#00d2ff">ORD</span></span>
   </div>
@@ -332,7 +315,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
   <div class="nav-right">
     <span class="nav-date" id="mc-nav-date">–</span>
     <span class="nav-clock" id="nav-clock">–</span>
-    <div class="avatar" id="mc-avatar">VS</div>
+    <div class="avatar">VS</div>
   </div>
 </nav>
 
@@ -411,7 +394,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
             <div class="divider"></div>
             <div class="section-lbl">Attendees</div>
             <div class="attendees">
-              <span style="font-family:var(--mono);font-size:10px;color:var(--tff)">Loading attendees…</span>
+              <span id="mc-attendees-loading" style="font-family:var(--mono);font-size:10px;color:var(--tff)">Loading…</span>
             </div>
             <div class="divider"></div>
             <div class="section-lbl">Open items</div>
@@ -486,9 +469,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <div class="panel">
         <div class="panel-hdr"><div class="panel-title">Today's Schedule</div><div class="panel-meta">May 19</div></div>
         <div class="panel-body">
-          <div class="timeline" id="mc-schedule-timeline">
-            <div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading schedule…</div>
-          </div>
+          <div class="timeline" id="mc-schedule-timeline"><div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading schedule…</div></div>
         </div>
       </div>
     </div>
@@ -505,8 +486,8 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
             <button class="tab" id="tm_tab" onclick="swTab('m')">This Month</button>
           </div>
           <div class="up-scroll">
-            <div id="pw"><div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading…</div></div>
-            <div id="pm" style="display:none"><div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading…</div></div>
+            <div id="pw"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading…</div></div>
+            <div id="pm" style="display:none"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading…</div></div>
           </div>
         </div>
       </div>
@@ -518,9 +499,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
     <div class="r2c3">
       <div class="panel">
         <div class="panel-hdr"><div class="panel-title">Minutes</div><div class="panel-meta">6 meetings · 2 not ready</div></div>
-        <div class="panel-body" id="mc-minutes-body">
-          <div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading…</div>
-        </div>
+        <div class="panel-body" id="mc-minutes-body"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading…</div></div>
       </div>
     </div>
 
@@ -529,62 +508,141 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 </main>
 
 <script>
-/* ── BOOT ── */
-// Scripts load dynamically via sidebar.js loader — wait for window.load
-// before starting the API poll, same pattern as accord-core.js _init().
-window.addEventListener('load', function() {
-  _waitForAPI(function(){
-    _resolveIdentity(function(){
-      _loadStrip();
-      _loadLiveCard();
-      _loadSchedule();
-    });
+/* ── TIME UTILS ── */
+function fmt(d){var h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+(m<10?'0':'')+m+' '+ap;}
+function fmtH(d){var h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+(m<10?'0':'')+m+' '+ap;}
+var mos=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtS(d){var mon=mos[d.getMonth()],day=d.getDate(),h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return mon+' '+day+' · '+h+':'+(m<10?'0':'')+m+' '+ap;}
+
+/* ── LIVE MEETING — relative to real current time ── */
+/* Meeting started 45 minutes ago from now, runs 60 min */
+var DURATION_MIN=60;
+function getMeetingStart(){
+  var now=new Date();
+  var s=new Date(now.getTime()-45*60*1000);
+  return s;
+}
+function getMeetingEnd(start){return new Date(start.getTime()+DURATION_MIN*60*1000);}
+
+function padZ(n){return n<10?'0'+n:String(n);}
+
+function tickAll(){
+  var now=new Date();
+  var t=fmt(now);
+  ['nav-clock','now-t','strip-time'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t;});
+
+  var start=getMeetingStart();
+  var end=getMeetingEnd(start);
+  var elapsedSec=Math.max(0,Math.floor((now-start)/1000));
+  var m=Math.floor(elapsedSec/60),s=elapsedSec%60;
+  var el=document.getElementById('elapsed');
+  if(el)el.textContent=m+':'+padZ(s);
+
+  var sl=document.getElementById('started-label');
+  if(sl)sl.textContent='Started: '+fmtH(start);
+
+  var sub=document.getElementById('timer-sub');
+  var remSec=Math.max(0,Math.floor((end-now)/1000));
+  var rm=Math.floor(remSec/60);
+  if(sub)sub.textContent=rm>0?(rm+'m remaining'):'ending soon';
+
+  /* schedule labels */
+  var stH=start.getHours(),stM=start.getMinutes();
+  var enH=end.getHours(),enM=end.getMinutes();
+  function hm(h,m){return h+':'+(m<10?'0':'')+m;}
+  var tl=document.getElementById('live-time-lbl');
+  if(tl)tl.textContent=hm(stH,stM);
+  var rl=document.getElementById('live-range-lbl');
+  if(rl)rl.innerHTML=hm(stH,stM)+'–'+hm(enH,enM)+' <span class="tp-pill tp-lv">Live</span>';
+}
+tickAll();
+setInterval(tickAll,1000);
+
+/* ── POPUP ── */
+function togglePopup(){document.getElementById('rdpop').classList.toggle('open');}
+document.addEventListener('click',function(e){if(!e.target.closest('.verdict-btn')){var p=document.getElementById('rdpop');if(p)p.classList.remove('open');}});
+
+/* ── TABS ── */
+function swTab(t){
+  document.getElementById('tw').className='tab'+(t==='w'?' active':'');
+  document.getElementById('tm_tab').className='tab'+(t==='m'?' active':'');
+  document.getElementById('pw').style.display=t==='w'?'':'none';
+  document.getElementById('pm').style.display=t==='m'?'':'none';
+}
+
+/* ── NEEDS RESPONSE ── */
+function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);}
+
+/* ── NOTES ── */
+var nc=6;
+function updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n+(n===1?' item':' items');}
+function toggleNote(el){var c=el.classList.toggle('ck');el.textContent=c?'✓':'';var b=el.nextElementSibling;if(b)b.classList.toggle('ck',c);}
+function delNote(id){var el=document.getElementById(id);if(el)el.remove();updNC();}
+function tPro(id){document.querySelectorAll('.promo-modal').forEach(function(m){if(m.id!==id)m.classList.remove('open');});var m=document.getElementById(id);if(m)m.classList.toggle('open');}
+function proNote(nid,pid){var m=document.getElementById(pid);if(m)m.classList.remove('open');var el=document.getElementById(nid);if(el){el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();updNC();},300);}}
+function noteKey(e){
+  if(e.key!=='Enter')return;e.preventDefault();
+  var f=document.getElementById('ni-f'),val=f.textContent.trim();if(!val)return;
+  var id='n-'+nc,pid='p-'+nc;nc++;
+  var t=fmtS(new Date());
+  var row=document.createElement('div');row.className='note-row';row.id=id;
+  row.innerHTML='<div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">'+val+'</div><div class="note-time">'+t+'</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro(\''+pid+'\')">→ Action</div><div class="n-del" onclick="delNote(\''+id+'\')">×</div></div><div class="promo-modal" id="'+pid+'"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">C-11 Workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">Base Workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">Control Adapter</div></div>';
+  document.getElementById('notes-inner').appendChild(row);f.textContent='';updNC();
+}
+document.addEventListener('click',function(e){if(!e.target.closest('.n-pro')&&!e.target.closest('.promo-modal'))document.querySelectorAll('.promo-modal').forEach(function(m){m.classList.remove('open');});});
+
+/* ── RESIZE — independent per row ── */
+var r1w=[0,0],r2w=[0,0];
+function applyR1(){var r=document.documentElement;r.style.setProperty('--r1w1',r1w[0]+'px');r.style.setProperty('--r1w2',r1w[1]+'px');}
+function applyR2(){var r=document.documentElement;r.style.setProperty('--r2w1',r2w[0]+'px');r.style.setProperty('--r2w2',r2w[1]+'px');}
+function getW(rowSel){var row=document.querySelector(rowSel);return row?row.getBoundingClientRect().width-28:800;}
+function initW(){
+  var a1=getW('.row-1');r1w[0]=a1*.40;r1w[1]=a1*.30;applyR1();
+  var a2=getW('.row-2');r2w[0]=a2*.40;r2w[1]=a2*.30;applyR2();
+}
+function mkHandle(id,widths,colIdx,applyFn){
+  var h=document.getElementById(id);if(!h)return;
+  h.addEventListener('mousedown',function(e){
+    var sx=e.clientX,sw0=widths[colIdx],sw1=widths[colIdx+1];
+    h.classList.add('dragging');document.body.style.cursor='col-resize';document.body.style.userSelect='none';
+    function mv(e){var dx=e.clientX-sx;widths[colIdx]=Math.max(200,sw0+dx);if(colIdx+1<widths.length)widths[colIdx+1]=Math.max(200,sw1-dx);applyFn();}
+    function up(){h.classList.remove('dragging');document.body.style.cursor='';document.body.style.userSelect='';document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);}
+    document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);e.preventDefault();
   });
-});
-
-// Refresh strip every 60 seconds
-setInterval(function(){
-  if(MC.resourceId)_loadStrip();
-},60000);
-
+}
+initW();
+mkHandle('r1ha',r1w,0,applyR1);mkHandle('r1hb',r1w,1,applyR1);
+mkHandle('r2ha',r2w,0,applyR2);mkHandle('r2hb',r2w,1,applyR2);
+window.addEventListener('resize',initW);
 </script>
-
-<!-- CMD-ACCORD-MEETING-CENTER-1 C-03: Script load order matches accord.html exactly -->
+<!-- CMD-ACCORD-MEETING-CENTER-1: Production script load order (matches accord.html) -->
 <script src="/js/config.js"></script>
 <script src="/js/auth.js"></script>
-<script src="/js/api.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
-<script src="/js/coc.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
+<script src="/js/api.js"></script>
+<script src="/js/coc.js"></script>
 <script src="/js/ui.js"></script>
-<script src="/js/version.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
-<script src="/js/sidebar.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
-<!-- HUDShell.init not needed — identity resolved via Auth token directly -->
+<script src="/js/version.js?v=seed"></script>
+<script src="/js/sidebar.js"></script>
 
-<!-- CMD-ACCORD-MEETING-CENTER-1 C-03: Accord Tier 1 tab strip.
-     Identical pattern to accord.html _buildAccordTier1.
-     MEETING CENTER tab is active on this page. -->
+<!-- CMD-ACCORD-MEETING-CENTER-1: Accord Tier 1 tab strip -->
 <script>
 (function() {
   function _buildAccordTier1() {
     if (!window.HUDShell) { setTimeout(_buildAccordTier1, 80); return; }
     if (document.getElementById('hud-tier1')) return;
-
     document.body.classList.add('accord-module');
-
     var strip = document.createElement('div');
     strip.id = 'hud-tier1';
-
     var tabs = [
       { id: 'workstreams',    label: 'Workstreams'    },
       { id: 'meeting-center', label: 'Meeting Center' },
       { id: 'knowledge-base', label: 'Knowledge Base' }
     ];
-
     function _setActive(id) {
       document.querySelectorAll('#hud-tier1 .hud-tier1-tab').forEach(function(b) {
         b.classList.toggle('active', b.dataset.tier1Id === id);
       });
     }
-
     tabs.forEach(function(t) {
       var btn = document.createElement('button');
       btn.type = 'button';
@@ -592,40 +650,334 @@ setInterval(function(){
       btn.dataset.tier1Id = t.id;
       btn.innerHTML = '<span class="tab-dot"></span><span>' + t.label + '</span>';
       btn.addEventListener('click', function() {
-        if (t.id === 'workstreams') {
-          window.location.href = '/accord.html';
-          return;
-        }
-        if (t.id === 'knowledge-base') {
-          window.location.href = '/accord.html?view=knowledge-base';
-          return;
-        }
+        if (t.id === 'workstreams')    { window.location.href = '/accord.html'; return; }
+        if (t.id === 'knowledge-base') { window.location.href = '/accord.html?view=knowledge-base'; return; }
         _setActive(t.id);
       });
       strip.appendChild(btn);
     });
-
-    // Insert after the Meeting Center topnav
     var topnav = document.getElementById('mc-topnav');
-    if (topnav) {
-      topnav.insertAdjacentElement('afterend', strip);
-    } else {
-      document.body.insertBefore(strip, document.body.firstChild.nextSibling);
-    }
-
+    if (topnav) topnav.insertAdjacentElement('afterend', strip);
+    else document.body.insertBefore(strip, document.body.firstChild.nextSibling);
     document.body.classList.add('accord-tier1-ready');
-    _setActive('meeting-center'); // This page = Meeting Center tab active
+    _setActive('meeting-center');
     console.log('[accord-today] tier1 built — meeting-center active');
-
-    // HUDShell.init handled in early boot script above
   }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', _buildAccordTier1);
-  } else {
-    _buildAccordTier1();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _buildAccordTier1);
+  else _buildAccordTier1();
 })();
+</script>
+
+<!-- CMD-ACCORD-MEETING-CENTER-1 C-04: Meeting Center data layer -->
+<script>
+/* ── NAMESPACE ── */
+var MC = {};
+var _mos = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var _days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+/* ── TIME UTILS ── */
+function fmt(d){var h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+(m<10?'0':'')+m+' '+ap;}
+function fmtS(d){return _mos[d.getMonth()]+' '+d.getDate()+' · '+fmt(d);}
+function padZ(n){return n<10?'0'+n:String(n);}
+function _hm(h,m){return h+':'+(m<10?'0':'')+m;}
+function _esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+/* ── CLOCK ── */
+function _tickClock(){
+  var t=fmt(new Date());
+  ['nav-clock','strip-time'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t;});
+}
+_tickClock(); setInterval(_tickClock,15000);
+
+/* ── NAV DATE ── */
+(function(){
+  var d=new Date();
+  var el=document.getElementById('mc-nav-date');
+  if(el) el.textContent=_days[d.getDay()]+' '+_mos[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();
+})();
+
+/* ── UI INTERACTIONS ── */
+function togglePopup(){document.getElementById('rdpop').classList.toggle('open');}
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.verdict-btn')){var p=document.getElementById('rdpop');if(p)p.classList.remove('open');}
+});
+function swTab(t){
+  document.getElementById('tw').className='tab'+(t==='w'?' active':'');
+  document.getElementById('tm_tab').className='tab'+(t==='m'?' active':'');
+  document.getElementById('pw').style.display=t==='w'?'':'none';
+  document.getElementById('pm').style.display=t==='m'?'':'none';
+}
+function dismissNr(id){
+  var el=document.getElementById(id);if(!el)return;
+  el.style.opacity='.3';el.style.transition='opacity .3s';
+  setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);
+}
+
+/* ── NOTES ── */
+var _nc=6;
+function updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n+(n===1?' item':' items');}
+function toggleNote(el){var c=el.classList.toggle('ck');el.textContent=c?'✓':'';var b=el.nextElementSibling;if(b)b.classList.toggle('ck',c);}
+function delNote(id){var el=document.getElementById(id);if(el)el.remove();updNC();}
+function tPro(id){document.querySelectorAll('.promo-modal').forEach(function(m){if(m.id!==id)m.classList.remove('open');});var m=document.getElementById(id);if(m)m.classList.toggle('open');}
+function proNote(nid,pid){var m=document.getElementById(pid);if(m)m.classList.remove('open');var el=document.getElementById(nid);if(el){el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();updNC();},300);}}
+function noteKey(e){
+  if(e.key!=='Enter')return;e.preventDefault();
+  var f=document.getElementById('ni-f'),val=f.textContent.trim();if(!val)return;
+  var id='n-'+_nc,pid='p-'+_nc;_nc++;
+  var t=fmtS(new Date());
+  var row=document.createElement('div');row.className='note-row';row.id=id;
+  var h='<div class="note-ck" onclick="toggleNote(this)"></div>';
+  h+='<div class="note-body">'+_esc(val)+'</div>';
+  h+='<div class="note-time">'+t+'</div>';
+  h+='<div class="no-badge"></div>';
+  h+='<div class="note-acts">';
+  h+='<div class="n-pro" onclick="tPro('+JSON.stringify(pid)+')">→ Action</div>';
+  h+='<div class="n-del" onclick="delNote('+JSON.stringify(id)+')">×</div>';
+  h+='</div>';
+  row.innerHTML=h;
+  document.getElementById('notes-inner').appendChild(row);f.textContent='';updNC();
+}
+document.addEventListener('click',function(e){if(!e.target.closest('.n-pro')&&!e.target.closest('.promo-modal'))document.querySelectorAll('.promo-modal').forEach(function(m){m.classList.remove('open');});});
+
+/* ── RESIZE ── */
+var _r1w=[0,0],_r2w=[0,0];
+function _applyR1(){var r=document.documentElement;r.style.setProperty('--r1w1',_r1w[0]+'px');r.style.setProperty('--r1w2',_r1w[1]+'px');}
+function _applyR2(){var r=document.documentElement;r.style.setProperty('--r2w1',_r2w[0]+'px');r.style.setProperty('--r2w2',_r2w[1]+'px');}
+function _getW(sel){var row=document.querySelector(sel);return row?row.getBoundingClientRect().width-28:800;}
+function _initW(){
+  var a1=_getW('.row-1');_r1w[0]=a1*.40;_r1w[1]=a1*.30;_applyR1();
+  var a2=_getW('.row-2');_r2w[0]=a2*.40;_r2w[1]=a2*.30;_applyR2();
+}
+function _mkHandle(id,widths,col,applyFn){
+  var h=document.getElementById(id);if(!h)return;
+  h.addEventListener('mousedown',function(e){
+    var sx=e.clientX,sw0=widths[col],sw1=widths[col+1];
+    h.classList.add('dragging');document.body.style.cursor='col-resize';document.body.style.userSelect='none';
+    function mv(e){var dx=e.clientX-sx;widths[col]=Math.max(200,sw0+dx);if(col+1<widths.length)widths[col+1]=Math.max(200,sw1-dx);applyFn();}
+    function up(){h.classList.remove('dragging');document.body.style.cursor='';document.body.style.userSelect='';document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);}
+    document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);e.preventDefault();
+  });
+}
+
+/* ── IDENTITY (canonical accord-core.js pattern) ── */
+async function _resolveIdentity(cb){
+  try {
+    var token = await Auth.getFreshToken().catch(function(){ return Auth.getToken(); });
+    var claims = JSON.parse(atob(token.split('.')[1]));
+    var sub = claims.sub;
+    var uRows = await API.get('users?id=eq.'+sub+'&select=id,name,firm_id').catch(function(){return [];});
+    var rRows = await API.get('resources?user_id=eq.'+sub+'&select=id&limit=1').catch(function(){return [];});
+    MC.userId     = sub;
+    MC.resourceId = (rRows&&rRows[0]) ? rRows[0].id : null;
+    MC.userName   = (uRows&&uRows[0]) ? uRows[0].name : 'You';
+    MC.firmId     = (uRows&&uRows[0]) ? uRows[0].firm_id : null;
+    window.CURRENT_USER = { id:sub, name:MC.userName, firm_id:MC.firmId, resource_id:MC.resourceId };
+    var av=document.getElementById('mc-avatar');
+    if(av&&MC.userName) av.textContent=MC.userName.trim().split(/\s+/).map(function(w){return w[0];}).join('').toUpperCase().substring(0,2);
+    console.log('[MC] identity resolved — user:',MC.userName,'resource:',MC.resourceId);
+    cb();
+  } catch(e) {
+    console.warn('[MC] identity failed:',e);
+    MC.userId=null;MC.resourceId=null;MC.userName='Unknown';
+    cb();
+  }
+}
+
+/* ── STRIP ── */
+function _loadStrip(){
+  if(!MC.resourceId) return;
+  var now=new Date();
+  var todayUTC=new Date();todayUTC.setUTCHours(0,0,0,0);
+  var tomorrowUTC=new Date(todayUTC.getTime()+86400000);
+  Promise.all([
+    API.get('accord_meetings?state=eq.running&started_at=gte.'+todayUTC.toISOString()+'&select=meeting_id'),
+    API.get('accord_meetings?scheduled_for=gte.'+todayUTC.toISOString()+'&scheduled_for=lt.'+tomorrowUTC.toISOString()+'&select=meeting_id'),
+    API.get('accord_nodes?tag=eq.action&due_date=lt.'+now.toISOString()+'&select=node_id&limit=50'),
+    API.get('accord_meeting_attendees?rsvp_status=eq.pending&resource_id=eq.'+MC.resourceId+'&select=attendee_id')
+  ]).then(function(r){
+    var live=r[0]||[],today=r[1]||[],overdue=r[2]||[],rsvps=r[3]||[];
+    var liveEl=document.querySelector('.strip-live');
+    if(liveEl) liveEl.style.display=live.length?'':'none';
+    var lct=document.getElementById('strip-live-count');
+    if(lct) lct.textContent=live.length+' live now';
+    var mtg=document.getElementById('strip-mtg-count');if(mtg)mtg.textContent=today.length;
+    var act=document.getElementById('strip-action-count');if(act)act.textContent=overdue.length;
+    var rsv=document.getElementById('strip-rsvp-count');if(rsv)rsv.textContent=rsvps.length;
+    var min=document.getElementById('strip-min-count');if(min)min.textContent='0';
+    console.log('[MC] strip loaded');
+  }).catch(function(e){console.warn('[MC] strip error:',e);});
+}
+
+/* ── LIVE CARD ── */
+var _liveInterval=null;
+function _startLiveTicker(){
+  if(_liveInterval)return;
+  _liveInterval=setInterval(function(){
+    if(!MC.liveMeeting)return;
+    var diff=Math.max(0,Math.floor((new Date()-new Date(MC.liveMeeting.started_at))/1000));
+    var el=document.getElementById('elapsed');
+    if(el)el.textContent=Math.floor(diff/60)+':'+padZ(diff%60);
+  },1000);
+}
+
+function _renderLiveCard(m){
+  MC.liveMeeting=m;
+  var title=document.getElementById('mc-meeting-title');
+  if(title){title.textContent=m.title||'Untitled';title.style.color='';}
+  var stakes=document.getElementById('mc-meeting-stakes');
+  if(stakes) stakes.textContent=(m.stakes||m.briefing_text||'')+(m.workstreams?' · '+m.workstreams.name:'');
+  var sl=document.getElementById('started-label');
+  if(sl){sl.textContent='Started: '+fmt(new Date(m.started_at));sl.style.color='';}
+  var loc=document.getElementById('mc-location');
+  if(loc){loc.textContent=m.location||'No location set';loc.style.color='';}
+  var el=document.getElementById('elapsed');
+  if(el) el.style.color='';
+  var fn=document.getElementById('mc-footer-note');
+  if(fn) fn.textContent=(m.workstreams?m.workstreams.name+' · ':'')+'Live';
+  var btn=document.querySelector('.rejoin-btn');
+  if(btn){btn.textContent='Join session →';btn.onclick=function(){window.location.href='/accord.html?meeting='+m.meeting_id;};}
+
+  // Attendees
+  API.get('accord_meeting_attendees?meeting_id=eq.'+m.meeting_id+'&select=attendee_id,resource_id,rsvp_status,resources(name)')
+    .then(function(rows){
+      var c=document.querySelector('.attendees');if(!c)return;
+      c.innerHTML='';
+      (rows||[]).forEach(function(a){
+        var name=a.resources?a.resources.name:'Unknown';
+        var cls=a.rsvp_status==='accepted'?'c':a.rsvp_status==='declined'?'a':'l';
+        var dot=a.rsvp_status==='accepted'?'dg':a.rsvp_status==='declined'?'dd':'da';
+        c.innerHTML+='<div class="att-pill '+cls+'"><div class="att-dot '+dot+'"></div>'+_esc(name)+'</div>';
+      });
+    });
+
+  // Chips
+  Promise.all([
+    API.get('accord_nodes?tag=eq.action&meeting_id=eq.'+m.meeting_id+'&select=node_id,due_date'),
+    API.get('accord_agenda_items?meeting_id=eq.'+m.meeting_id+'&item_type=eq.DECIDE&select=agenda_item_id'),
+    API.get('accord_agenda_items?meeting_id=eq.'+m.meeting_id+'&item_type=eq.QUESTION&select=agenda_item_id'),
+    API.get('accord_agenda_items?meeting_id=eq.'+m.meeting_id+'&select=agenda_item_id')
+  ]).then(function(r){
+    var now=new Date();
+    var od=(r[0]||[]).filter(function(n){return n.due_date&&new Date(n.due_date)<now;});
+    function setChip(id,val,cls){var el=document.getElementById(id);if(el){el.textContent=val;el.className='chip-num cn-'+cls;}}
+    setChip('chip-actions-due',od.length,od.length>0?'r':'m');
+    setChip('chip-decisions',(r[1]||[]).length,(r[1]||[]).length>0?'a':'m');
+    setChip('chip-questions',(r[2]||[]).length,(r[2]||[]).length>0?'a':'m');
+    setChip('chip-agenda',(r[3]||[]).length,'m');
+  });
+
+  _startLiveTicker();
+  console.log('[MC] live card rendered:',m.title);
+}
+
+function _renderNoMeeting(){
+  var badge=document.querySelector('.live-badge');
+  if(badge) badge.innerHTML='<span style="color:var(--tff)">No meetings today</span>';
+  var title=document.getElementById('mc-meeting-title');
+  if(title){title.textContent='No meetings today';title.style.color='var(--tff)';}
+  var el=document.getElementById('elapsed');if(el)el.textContent='–';
+  document.querySelector('.attendees').innerHTML='';
+  console.log('[MC] no meeting today');
+}
+
+function _loadLiveCard(){
+  var todayUTC=new Date();todayUTC.setUTCHours(0,0,0,0);
+  API.get('accord_meetings?state=eq.running&started_at=gte.'+todayUTC.toISOString()+'&order=started_at.desc&limit=1&select=meeting_id,title,stakes,briefing_text,started_at,duration_minutes,location,workstream_id,workstreams(name)')
+    .then(function(rows){
+      if(rows&&rows[0]) _renderLiveCard(rows[0]);
+      else {
+        // Try next upcoming
+        API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+new Date().toISOString()+'&order=scheduled_for.asc&limit=1&select=meeting_id,title,stakes,scheduled_for,workstreams(name)')
+          .then(function(r2){
+            if(r2&&r2[0]){
+              var m=r2[0];
+              var title=document.getElementById('mc-meeting-title');
+              if(title){title.textContent=m.title;title.style.color='';}
+              var badge=document.querySelector('.live-badge');
+              if(badge) badge.innerHTML='<span style="color:var(--cyan)">↗ Next Meeting</span>';
+              var btn=document.querySelector('.rejoin-btn');
+              if(btn){btn.textContent='Prepare →';btn.onclick=function(){window.location.href='/accord.html?meeting='+m.meeting_id;};}
+            } else {
+              _renderNoMeeting();
+            }
+          });
+      }
+    }).catch(function(e){console.warn('[MC] live card error:',e);_renderNoMeeting();});
+}
+
+/* ── SCHEDULE ── */
+function _loadSchedule(){
+  var todayUTC=new Date();todayUTC.setUTCHours(0,0,0,0);
+  var tomorrowUTC=new Date(todayUTC.getTime()+86400000);
+  var tl=document.getElementById('mc-schedule-timeline');if(!tl)return;
+  API.get('accord_meetings?scheduled_for=gte.'+todayUTC.toISOString()+'&scheduled_for=lt.'+tomorrowUTC.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,state,scheduled_for,duration_minutes,workstreams(name)')
+    .then(function(rows){
+      if(!rows||!rows.length){
+        tl.innerHTML='<div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">No meetings scheduled today.</div>';
+        return;
+      }
+      tl.innerHTML='';
+      var now=new Date();var nowRendered=false;
+      rows.forEach(function(m,i){
+        var sf=new Date(m.scheduled_for);
+        var ef=m.duration_minutes?new Date(sf.getTime()+m.duration_minutes*60000):null;
+        var isDone=m.state==='closed'||m.state==='sealed'||(ef&&ef<now);
+        var isLive=m.state==='running';
+        var isNext=!isLive&&!isDone&&!nowRendered;
+        if(isNext){
+          nowRendered=true;
+          var nr=document.createElement('div');nr.className='now-row';
+          nr.innerHTML='<div class="now-time" id="now-t">'+fmt(now)+'</div><div class="now-line"></div><div class="now-lbl">Now</div>';
+          tl.appendChild(nr);
+        }
+        var timeStr=_hm(sf.getHours(),sf.getMinutes());
+        var rangeStr=timeStr+(ef?'–'+_hm(ef.getHours(),ef.getMinutes()):'');
+        var dotCls=isDone?'td-dn':isLive?'td-lv':isNext?'td-nx':'td-ft';
+        var blockCls='t-block '+(isDone?'tb-dn':isLive?'tb-lv':isNext?'tb-nx':'tb-ft');
+        var timeCls=isLive?'ta':isNext?'tn':'';
+        var row=document.createElement('div');row.className='t-row';
+        row.innerHTML=
+          '<div class="t-time '+timeCls+'">'+timeStr+'</div>'+
+          '<div class="t-axis"><div class="t-dot '+dotCls+'"></div>'+(i<rows.length-1?'<div class="t-line'+(isLive?' tl-lv':'')+'"></div>':'')+'</div>'+
+          '<div class="'+blockCls+'" data-mid="'+m.meeting_id+'">'+
+            '<div class="tb-title">'+_esc(m.title)+'</div>'+
+            '<div class="tb-meta">'+rangeStr+(isLive?' <span class="tp-pill tp-lv">Live</span>':'')+'</div>'+
+          '</div>';
+        tl.appendChild(row);
+      });
+      tl.addEventListener('click',function(e){
+        var b=e.target.closest('[data-mid]');
+        if(b) window.location.href='/accord.html?meeting='+b.dataset.mid;
+      });
+      console.log('[MC] schedule rendered:',rows.length,'meetings');
+    }).catch(function(e){console.warn('[MC] schedule error:',e);});
+}
+
+/* ── BOOT ── */
+window.addEventListener('load', function() {
+  _initW();
+  _mkHandle('r1ha',_r1w,0,_applyR1);_mkHandle('r1hb',_r1w,1,_applyR1);
+  _mkHandle('r2ha',_r2w,0,_applyR2);_mkHandle('r2hb',_r2w,1,_applyR2);
+  window.addEventListener('resize',_initW);
+
+  // Wait for API then resolve identity and load all panels
+  var _attempts=0;
+  function _waitForAPI(){
+    if(window.API&&window.API.get&&window.Auth&&window.Auth.getFreshToken){
+      _resolveIdentity(function(){
+        _loadStrip();
+        _loadLiveCard();
+        _loadSchedule();
+      });
+    } else {
+      _attempts++;
+      if(_attempts>80){console.warn('[MC] API/Auth not ready after 8s');return;}
+      setTimeout(_waitForAPI,100);
+    }
+  }
+  _waitForAPI();
+  setInterval(function(){if(MC.resourceId)_loadStrip();},60000);
+});
 </script>
 </body>
 </html>
