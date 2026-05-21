@@ -10,9 +10,8 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <link rel="stylesheet" href="/css/hud.css">
 <style>
-  /* Tier 1 amber override */
-  #hud-tier1 .hud-tier1-tab.active { color:#ffaa00!important; border-bottom-color:#ffaa00!important; }
-  #hud-tier1 { position:relative!important; top:auto!important; width:100%; z-index:10; }
+  #hud-tier1 .hud-tier1-tab.active{color:#ffaa00!important;border-bottom-color:#ffaa00!important;}
+  #hud-tier1{position:relative!important;top:auto!important;width:100%;z-index:10;}
 </style>
 <style>
 :root{
@@ -69,7 +68,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .strip-right{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tff)}
 
 /* ── PAGE ── */
-.page{display:flex;flex-direction:column;height:calc(100vh - 110px) /* 68px nav + 42px tier1 */;padding:12px 20px;gap:10px}
+.page{display:flex;flex-direction:column;height:calc(100vh - 110px);padding:12px 20px;gap:10px}
 .row{display:flex;flex:1;min-height:0;align-items:stretch}
 
 /* ── CELLS ── */
@@ -313,7 +312,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
   <div class="nav-divider"></div>
   <div class="meeting-center">Meeting Center</div>
   <div class="nav-right">
-    <span class="nav-date" id="mc-nav-date">–</span>
+    <span class="nav-date" id="mc-nav-date">-</span>
     <span class="nav-clock" id="nav-clock">–</span>
     <div class="avatar">VS</div>
   </div>
@@ -323,26 +322,26 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 <div class="strip">
   <div class="strip-live">
     <div class="strip-pulse"></div>
-    <div class="strip-live-text" id="strip-live-count">– live</div>
+    <div class="strip-live-text" id="strip-live-count">- live</div>
   </div>
   <div class="strip-chips">
     <div class="strip-chip">
-      <span class="strip-chip-num cyan" id="strip-mtg-count">–</span>
+      <span class="strip-chip-num cyan" id="strip-mtg-count">-</span>
       <span>meetings today</span>
     </div>
     <div class="strip-sep"></div>
     <div class="strip-chip">
-      <span class="strip-chip-num red" id="strip-action-count">–</span>
+      <span class="strip-chip-num red" id="strip-action-count">-</span>
       <span>actions due</span>
     </div>
     <div class="strip-sep"></div>
     <div class="strip-chip">
-      <span class="strip-chip-num amber" id="strip-rsvp-count">–</span>
+      <span class="strip-chip-num amber" id="strip-rsvp-count">-</span>
       <span>need your response</span>
     </div>
     <div class="strip-sep"></div>
     <div class="strip-chip">
-      <span class="strip-chip-num amber" id="strip-min-count">–</span>
+      <span class="strip-chip-num amber" id="strip-min-count">-</span>
       <span>minutes not ready</span>
     </div>
   </div>
@@ -380,34 +379,34 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
           <div class="live-inner">
             <div class="meeting-row">
               <div class="meeting-info">
-                <div class="meeting-title" id="mc-meeting-title" style="color:var(--tff)">Loading…</div>
-                <div class="meeting-stakes" id="mc-meeting-stakes">–</div>
-                <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label" style="color:var(--tff)">–</span></div>
-                <div class="meta-row"><i class="ti ti-map-pin"></i><span id="mc-location" style="color:var(--tff)">–</span></div>
+                <div class="meeting-title" id="mc-meeting-title" style="color:var(--tff)">Loading...</div>
+                <div class="meeting-stakes" id="mc-meeting-stakes">-</div>
+                <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label" style="color:var(--tff)">-</span></div>
+                <div class="meta-row"><i class="ti ti-map-pin"></i><span id="mc-location" style="color:var(--tff)">-</span></div>
               </div>
               <div class="timer-block">
                 <div class="timer-lbl">Elapsed</div>
-                <div class="timer-val" id="elapsed" style="color:var(--tff)">–:––</div>
+                <div class="timer-val" id="elapsed">–</div>
                 <div class="timer-sub" id="timer-sub">–</div>
               </div>
             </div>
             <div class="divider"></div>
             <div class="section-lbl">Attendees</div>
             <div class="attendees">
-              <span id="mc-attendees-loading" style="font-family:var(--mono);font-size:10px;color:var(--tff)">Loading…</span>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--tff)">Loading...</span>
             </div>
             <div class="divider"></div>
             <div class="section-lbl">Open items</div>
             <div class="chips">
-              <div class="chip"><div class="chip-num cn-r" id="chip-actions-due">–</div><div class="chip-lbl">Actions Due</div></div>
-              <div class="chip"><div class="chip-num cn-a" id="chip-decisions">–</div><div class="chip-lbl">Decisions Needed</div></div>
-              <div class="chip"><div class="chip-num cn-a" id="chip-questions">–</div><div class="chip-lbl">Open Questions</div></div>
-              <div class="chip"><div class="chip-num cn-m" id="chip-agenda">–</div><div class="chip-lbl">Agenda Items</div></div>
+              <div class="chip"><div class="chip-num cn-r" id="chip-actions-due">-</div><div class="chip-lbl">Actions Due</div></div>
+              <div class="chip"><div class="chip-num cn-a" id="chip-decisions">-</div><div class="chip-lbl">Decisions Needed</div></div>
+              <div class="chip"><div class="chip-num cn-a" id="chip-questions">-</div><div class="chip-lbl">Open Questions</div></div>
+              <div class="chip"><div class="chip-num cn-m" id="chip-agenda">-</div><div class="chip-lbl">Agenda Items</div></div>
             </div>
           </div>
         </div>
         <div class="live-footer panel-foot">
-          <div class="footer-note" id="mc-footer-note">–</div>
+          <div class="footer-note" id="mc-footer-note">-</div>
           <button class="rejoin-btn">Rejoin session →</button>
         </div>
       </div>
@@ -469,7 +468,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <div class="panel">
         <div class="panel-hdr"><div class="panel-title">Today's Schedule</div><div class="panel-meta">May 19</div></div>
         <div class="panel-body">
-          <div class="timeline" id="mc-schedule-timeline"><div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading schedule…</div></div>
+          <div class="timeline" id="mc-schedule-timeline"><div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading schedule...</div></div>
         </div>
       </div>
     </div>
@@ -486,8 +485,8 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
             <button class="tab" id="tm_tab" onclick="swTab('m')">This Month</button>
           </div>
           <div class="up-scroll">
-            <div id="pw"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading…</div></div>
-            <div id="pm" style="display:none"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading…</div></div>
+            <div id="pw"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading...</div></div>
+            <div id="pm" style="display:none"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading...</div></div>
           </div>
         </div>
       </div>
@@ -499,7 +498,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
     <div class="r2c3">
       <div class="panel">
         <div class="panel-hdr"><div class="panel-title">Minutes</div><div class="panel-meta">6 meetings · 2 not ready</div></div>
-        <div class="panel-body" id="mc-minutes-body"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading…</div></div>
+        <div class="panel-body" id="mc-minutes-body"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading...</div></div>
       </div>
     </div>
 
@@ -615,7 +614,8 @@ mkHandle('r1ha',r1w,0,applyR1);mkHandle('r1hb',r1w,1,applyR1);
 mkHandle('r2ha',r2w,0,applyR2);mkHandle('r2hb',r2w,1,applyR2);
 window.addEventListener('resize',initW);
 </script>
-<!-- CMD-ACCORD-MEETING-CENTER-1: Production script load order (matches accord.html) -->
+
+<!-- Production scripts -->
 <script src="/js/config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
@@ -623,96 +623,61 @@ window.addEventListener('resize',initW);
 <script src="/js/ui.js"></script>
 <script src="/js/version.js?v=seed"></script>
 
-<!-- CMD-ACCORD-MEETING-CENTER-1: Accord Tier 1 tab strip -->
+<!-- Tier 1 strip -->
 <script>
-(function() {
-  function _buildAccordTier1() {
-    if (!window.HUDShell) { setTimeout(_buildAccordTier1, 80); return; }
-    if (document.getElementById('hud-tier1')) return;
+(function(){
+  function build(){
+    if(!window.HUDShell){setTimeout(build,80);return;}
+    if(document.getElementById('hud-tier1'))return;
     document.body.classList.add('accord-module');
-    var strip = document.createElement('div');
-    strip.id = 'hud-tier1';
-    var tabs = [
-      { id: 'workstreams',    label: 'Workstreams'    },
-      { id: 'meeting-center', label: 'Meeting Center' },
-      { id: 'knowledge-base', label: 'Knowledge Base' }
-    ];
-    function _setActive(id) {
-      document.querySelectorAll('#hud-tier1 .hud-tier1-tab').forEach(function(b) {
-        b.classList.toggle('active', b.dataset.tier1Id === id);
-      });
-    }
-    tabs.forEach(function(t) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'hud-tier1-tab';
-      btn.dataset.tier1Id = t.id;
-      btn.innerHTML = '<span class="tab-dot"></span><span>' + t.label + '</span>';
-      btn.addEventListener('click', function() {
-        if (t.id === 'workstreams')    { window.location.href = '/accord.html'; return; }
-        if (t.id === 'knowledge-base') { window.location.href = '/accord.html?view=knowledge-base'; return; }
-        _setActive(t.id);
+    var strip=document.createElement('div');strip.id='hud-tier1';
+    [['workstreams','Workstreams'],['meeting-center','Meeting Center'],['knowledge-base','Knowledge Base']].forEach(function(t){
+      var btn=document.createElement('button');btn.type='button';btn.className='hud-tier1-tab';btn.dataset.tier1Id=t[0];
+      btn.innerHTML='<span class="tab-dot"></span><span>'+t[1]+'</span>';
+      btn.addEventListener('click',function(){
+        if(t[0]==='workstreams'){window.location.href='/accord.html';return;}
+        if(t[0]==='knowledge-base'){window.location.href='/accord.html?view=knowledge-base';return;}
+        document.querySelectorAll('.hud-tier1-tab').forEach(function(b){b.classList.toggle('active',b.dataset.tier1Id===t[0]);});
       });
       strip.appendChild(btn);
     });
-    var topnav = document.getElementById('mc-topnav');
-    if (topnav) topnav.insertAdjacentElement('afterend', strip);
-    else document.body.insertBefore(strip, document.body.firstChild.nextSibling);
+    var nav=document.getElementById('mc-topnav');
+    if(nav)nav.insertAdjacentElement('afterend',strip);
+    else document.body.insertBefore(strip,document.body.firstChild.nextSibling);
     document.body.classList.add('accord-tier1-ready');
-    _setActive('meeting-center');
-    console.log('[accord-today] tier1 built — meeting-center active');
+    document.querySelectorAll('.hud-tier1-tab').forEach(function(b){b.classList.toggle('active',b.dataset.tier1Id==='meeting-center');});
+    console.log('[accord-today] tier1 built - meeting-center active');
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _buildAccordTier1);
-  else _buildAccordTier1();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',build);
+  else build();
 })();
 </script>
 
-<!-- CMD-ACCORD-MEETING-CENTER-1 C-04: Meeting Center data layer -->
+<!-- MC data layer -->
 <script>
-/* ── NAMESPACE ── */
-var MC = {};
-var _mos = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-var _days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-
-/* ── TIME UTILS ── */
+var MC={};
+var _mos=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var _days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function fmt(d){var h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+(m<10?'0':'')+m+' '+ap;}
 function fmtS(d){return _mos[d.getMonth()]+' '+d.getDate()+' · '+fmt(d);}
 function padZ(n){return n<10?'0'+n:String(n);}
 function _hm(h,m){return h+':'+(m<10?'0':'')+m;}
 function _esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-/* ── CLOCK ── */
-function _tickClock(){
-  var t=fmt(new Date());
-  ['nav-clock','strip-time'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t;});
-}
-_tickClock(); setInterval(_tickClock,15000);
+// Clock
+function _tickClock(){var t=fmt(new Date());['nav-clock','strip-time'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t;});}
+_tickClock();setInterval(_tickClock,15000);
 
-/* ── NAV DATE ── */
-(function(){
-  var d=new Date();
-  var el=document.getElementById('mc-nav-date');
-  if(el) el.textContent=_days[d.getDay()]+' '+_mos[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();
-})();
+// Nav date
+(function(){var d=new Date(),el=document.getElementById('mc-nav-date');if(el)el.textContent=_days[d.getDay()]+' '+_mos[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();})();
 
-/* ── UI INTERACTIONS ── */
+// UI
 function togglePopup(){document.getElementById('rdpop').classList.toggle('open');}
-document.addEventListener('click',function(e){
-  if(!e.target.closest('.verdict-btn')){var p=document.getElementById('rdpop');if(p)p.classList.remove('open');}
-});
-function swTab(t){
-  document.getElementById('tw').className='tab'+(t==='w'?' active':'');
-  document.getElementById('tm_tab').className='tab'+(t==='m'?' active':'');
-  document.getElementById('pw').style.display=t==='w'?'':'none';
-  document.getElementById('pm').style.display=t==='m'?'':'none';
-}
-function dismissNr(id){
-  var el=document.getElementById(id);if(!el)return;
-  el.style.opacity='.3';el.style.transition='opacity .3s';
-  setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);
-}
+document.addEventListener('click',function(e){if(!e.target.closest('.verdict-btn')){var p=document.getElementById('rdpop');if(p)p.classList.remove('open');}});
+function swTab(t){document.getElementById('tw').className='tab'+(t==='w'?' active':'');document.getElementById('tm_tab').className='tab'+(t==='m'?' active':'');document.getElementById('pw').style.display=t==='w'?'':'none';document.getElementById('pm').style.display=t==='m'?'':'none';}
+function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);}
 
-/* ── NOTES ── */
+// Notes
 var _nc=6;
 function updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n+(n===1?' item':' items');}
 function toggleNote(el){var c=el.classList.toggle('ck');el.textContent=c?'✓':'';var b=el.nextElementSibling;if(b)b.classList.toggle('ck',c);}
@@ -729,64 +694,44 @@ function noteKey(e){
   h+='<div class="note-body">'+_esc(val)+'</div>';
   h+='<div class="note-time">'+t+'</div>';
   h+='<div class="no-badge"></div>';
-  h+='<div class="note-acts">';
-  h+='<div class="n-pro" onclick="tPro('+JSON.stringify(pid)+')">→ Action</div>';
-  h+='<div class="n-del" onclick="delNote('+JSON.stringify(id)+')">×</div>';
-  h+='</div>';
+  h+='<div class="note-acts"><div class="n-pro" onclick="tPro('+JSON.stringify(pid)+')">&#8594; Action</div>';
+  h+='<div class="n-del" onclick="delNote('+JSON.stringify(id)+')">&#215;</div></div>';
   row.innerHTML=h;
   document.getElementById('notes-inner').appendChild(row);f.textContent='';updNC();
 }
 document.addEventListener('click',function(e){if(!e.target.closest('.n-pro')&&!e.target.closest('.promo-modal'))document.querySelectorAll('.promo-modal').forEach(function(m){m.classList.remove('open');});});
 
-/* ── RESIZE ── */
+// Resize
 var _r1w=[0,0],_r2w=[0,0];
 function _applyR1(){var r=document.documentElement;r.style.setProperty('--r1w1',_r1w[0]+'px');r.style.setProperty('--r1w2',_r1w[1]+'px');}
 function _applyR2(){var r=document.documentElement;r.style.setProperty('--r2w1',_r2w[0]+'px');r.style.setProperty('--r2w2',_r2w[1]+'px');}
-function _getW(sel){var row=document.querySelector(sel);return row?row.getBoundingClientRect().width-28:800;}
-function _initW(){
-  var a1=_getW('.row-1');_r1w[0]=a1*.40;_r1w[1]=a1*.30;_applyR1();
-  var a2=_getW('.row-2');_r2w[0]=a2*.40;_r2w[1]=a2*.30;_applyR2();
-}
-function _mkHandle(id,widths,col,applyFn){
-  var h=document.getElementById(id);if(!h)return;
-  h.addEventListener('mousedown',function(e){
-    var sx=e.clientX,sw0=widths[col],sw1=widths[col+1];
-    h.classList.add('dragging');document.body.style.cursor='col-resize';document.body.style.userSelect='none';
-    function mv(e){var dx=e.clientX-sx;widths[col]=Math.max(200,sw0+dx);if(col+1<widths.length)widths[col+1]=Math.max(200,sw1-dx);applyFn();}
-    function up(){h.classList.remove('dragging');document.body.style.cursor='';document.body.style.userSelect='';document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);}
-    document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);e.preventDefault();
-  });
-}
+function _initW(){var a1,a2,r1=document.querySelector('.row-1'),r2=document.querySelector('.row-2');a1=r1?r1.getBoundingClientRect().width-28:800;a2=r2?r2.getBoundingClientRect().width-28:800;_r1w[0]=a1*.40;_r1w[1]=a1*.30;_applyR1();_r2w[0]=a2*.40;_r2w[1]=a2*.30;_applyR2();}
+function _mkHandle(id,w,c,fn){var h=document.getElementById(id);if(!h)return;h.addEventListener('mousedown',function(e){var sx=e.clientX,sw0=w[c],sw1=w[c+1];h.classList.add('dragging');document.body.style.cursor='col-resize';document.body.style.userSelect='none';function mv(e){var dx=e.clientX-sx;w[c]=Math.max(200,sw0+dx);if(c+1<w.length)w[c+1]=Math.max(200,sw1-dx);fn();}function up(){h.classList.remove('dragging');document.body.style.cursor='';document.body.style.userSelect='';document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);}document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);e.preventDefault();});}
 
-/* ── IDENTITY (canonical accord-core.js pattern) ── */
+// Identity (accord-core.js pattern)
 async function _resolveIdentity(cb){
-  try {
-    var token = await Auth.getFreshToken().catch(function(){ return Auth.getToken(); });
-    var claims = JSON.parse(atob(token.split('.')[1]));
-    var sub = claims.sub;
-    var uRows = await API.get('users?id=eq.'+sub+'&select=id,name,firm_id').catch(function(){return [];});
-    var rRows = await API.get('resources?user_id=eq.'+sub+'&select=id&limit=1').catch(function(){return [];});
-    MC.userId     = sub;
-    MC.resourceId = (rRows&&rRows[0]) ? rRows[0].id : null;
-    MC.userName   = (uRows&&uRows[0]) ? uRows[0].name : 'You';
-    MC.firmId     = (uRows&&uRows[0]) ? uRows[0].firm_id : null;
-    window.CURRENT_USER = { id:sub, name:MC.userName, firm_id:MC.firmId, resource_id:MC.resourceId };
+  try{
+    var token=await Auth.getFreshToken().catch(function(){return Auth.getToken();});
+    var claims=JSON.parse(atob(token.split('.')[1]));
+    var sub=claims.sub;
+    var uRows=await API.get('users?id=eq.'+sub+'&select=id,name,firm_id').catch(function(){return[];});
+    var rRows=await API.get('resources?user_id=eq.'+sub+'&select=id&limit=1').catch(function(){return[];});
+    MC.userId=sub;
+    MC.resourceId=(rRows&&rRows[0])?rRows[0].id:null;
+    MC.userName=(uRows&&uRows[0])?uRows[0].name:'You';
+    MC.firmId=(uRows&&uRows[0])?uRows[0].firm_id:null;
+    window.CURRENT_USER={id:sub,name:MC.userName,firm_id:MC.firmId,resource_id:MC.resourceId};
     var av=document.getElementById('mc-avatar');
-    if(av&&MC.userName) av.textContent=MC.userName.trim().split(/\s+/).map(function(w){return w[0];}).join('').toUpperCase().substring(0,2);
-    console.log('[MC] identity resolved — user:',MC.userName,'resource:',MC.resourceId);
+    if(av&&MC.userName)av.textContent=MC.userName.trim().split(/\s+/).map(function(w){return w[0];}).join('').toUpperCase().substring(0,2);
+    console.log('[MC] identity resolved - user:',MC.userName,'resource:',MC.resourceId);
     cb();
-  } catch(e) {
-    console.warn('[MC] identity failed:',e);
-    MC.userId=null;MC.resourceId=null;MC.userName='Unknown';
-    cb();
-  }
+  }catch(e){console.warn('[MC] identity failed:',e);MC.userId=null;MC.resourceId=null;MC.userName='Unknown';cb();}
 }
 
-/* ── STRIP ── */
+// Strip
 function _loadStrip(){
-  if(!MC.resourceId) return;
-  var now=new Date();
-  var todayUTC=new Date();todayUTC.setUTCHours(0,0,0,0);
+  if(!MC.resourceId)return;
+  var now=new Date(),todayUTC=new Date();todayUTC.setUTCHours(0,0,0,0);
   var tomorrowUTC=new Date(todayUTC.getTime()+86400000);
   Promise.all([
     API.get('accord_meetings?state=eq.running&started_at=gte.'+todayUTC.toISOString()+'&select=meeting_id'),
@@ -795,175 +740,176 @@ function _loadStrip(){
     API.get('accord_meeting_attendees?rsvp_status=eq.pending&resource_id=eq.'+MC.resourceId+'&select=attendee_id')
   ]).then(function(r){
     var live=r[0]||[],today=r[1]||[],overdue=r[2]||[],rsvps=r[3]||[];
-    var liveEl=document.querySelector('.strip-live');
-    if(liveEl) liveEl.style.display=live.length?'':'none';
-    var lct=document.getElementById('strip-live-count');
-    if(lct) lct.textContent=live.length+' live now';
-    var mtg=document.getElementById('strip-mtg-count');if(mtg)mtg.textContent=today.length;
-    var act=document.getElementById('strip-action-count');if(act)act.textContent=overdue.length;
-    var rsv=document.getElementById('strip-rsvp-count');if(rsv)rsv.textContent=rsvps.length;
-    var min=document.getElementById('strip-min-count');if(min)min.textContent='0';
+    var liveEl=document.querySelector('.strip-live');if(liveEl)liveEl.style.display=live.length?'':'none';
+    var lct=document.getElementById('strip-live-count');if(lct)lct.textContent=live.length+' live now';
+    var s=function(id,v){var el=document.getElementById(id);if(el)el.textContent=v;};
+    s('strip-mtg-count',today.length);s('strip-action-count',overdue.length);s('strip-rsvp-count',rsvps.length);s('strip-min-count','0');
     console.log('[MC] strip loaded');
   }).catch(function(e){console.warn('[MC] strip error:',e);});
 }
 
-/* ── LIVE CARD ── */
+// Live card ticker
 var _liveInterval=null;
 function _startLiveTicker(){
   if(_liveInterval)return;
   _liveInterval=setInterval(function(){
     if(!MC.liveMeeting)return;
     var diff=Math.max(0,Math.floor((new Date()-new Date(MC.liveMeeting.started_at))/1000));
-    var el=document.getElementById('elapsed');
-    if(el)el.textContent=Math.floor(diff/60)+':'+padZ(diff%60);
+    var el=document.getElementById('elapsed');if(el)el.textContent=Math.floor(diff/60)+':'+padZ(diff%60);
   },1000);
 }
 
 function _renderLiveCard(m){
   MC.liveMeeting=m;
-  var title=document.getElementById('mc-meeting-title');
-  if(title){title.textContent=m.title||'Untitled';title.style.color='';}
-  var stakes=document.getElementById('mc-meeting-stakes');
-  if(stakes) stakes.textContent=(m.stakes||m.briefing_text||'')+(m.workstreams?' · '+m.workstreams.name:'');
-  var sl=document.getElementById('started-label');
-  if(sl){sl.textContent='Started: '+fmt(new Date(m.started_at));sl.style.color='';}
-  var loc=document.getElementById('mc-location');
-  if(loc){loc.textContent=m.location||'No location set';loc.style.color='';}
-  var el=document.getElementById('elapsed');
-  if(el) el.style.color='';
-  var fn=document.getElementById('mc-footer-note');
-  if(fn) fn.textContent=(m.workstreams?m.workstreams.name+' · ':'')+'Live';
+  var s=function(id,v,clr){var el=document.getElementById(id);if(el){el.textContent=v;if(clr!==undefined)el.style.color=clr;}};
+  s('mc-meeting-title',m.title||'Untitled','');
+  s('mc-meeting-stakes',(m.stakes||m.briefing_text||'')+(m.workstreams?' · '+m.workstreams.name:''));
+  s('started-label','Started: '+fmt(new Date(m.started_at)),'');
+  s('mc-location',m.location||'No location set','');
+  s('mc-footer-note',(m.workstreams?m.workstreams.name+' · ':'')+'Live');
+  var el=document.getElementById('elapsed');if(el)el.style.color='';
   var btn=document.querySelector('.rejoin-btn');
   if(btn){btn.textContent='Join session →';btn.onclick=function(){window.location.href='/accord.html?meeting='+m.meeting_id;};}
-
-  // Attendees
-  API.get('accord_meeting_attendees?meeting_id=eq.'+m.meeting_id+'&select=attendee_id,resource_id,rsvp_status,resources(name)')
-    .then(function(rows){
-      var c=document.querySelector('.attendees');if(!c)return;
-      c.innerHTML='';
-      (rows||[]).forEach(function(a){
-        var name=a.resources?a.resources.name:'Unknown';
-        var cls=a.rsvp_status==='accepted'?'c':a.rsvp_status==='declined'?'a':'l';
-        var dot=a.rsvp_status==='accepted'?'dg':a.rsvp_status==='declined'?'dd':'da';
-        c.innerHTML+='<div class="att-pill '+cls+'"><div class="att-dot '+dot+'"></div>'+_esc(name)+'</div>';
-      });
+  API.get('accord_meeting_attendees?meeting_id=eq.'+m.meeting_id+'&select=attendee_id,resource_id,rsvp_status,resources(name)').then(function(rows){
+    var c=document.querySelector('.attendees');if(!c)return;c.innerHTML='';
+    (rows||[]).forEach(function(a){
+      var name=a.resources?a.resources.name:'Unknown';
+      var cls=a.rsvp_status==='accepted'?'c':a.rsvp_status==='declined'?'a':'l';
+      var dot=a.rsvp_status==='accepted'?'dg':a.rsvp_status==='declined'?'dd':'da';
+      c.innerHTML+='<div class="att-pill '+cls+'"><div class="att-dot '+dot+'"></div>'+_esc(name)+'</div>';
     });
-
-  // Chips
+  });
   Promise.all([
     API.get('accord_nodes?tag=eq.action&meeting_id=eq.'+m.meeting_id+'&select=node_id,due_date'),
     API.get('accord_agenda_items?meeting_id=eq.'+m.meeting_id+'&item_type=eq.DECIDE&select=agenda_item_id'),
     API.get('accord_agenda_items?meeting_id=eq.'+m.meeting_id+'&item_type=eq.QUESTION&select=agenda_item_id'),
     API.get('accord_agenda_items?meeting_id=eq.'+m.meeting_id+'&select=agenda_item_id')
   ]).then(function(r){
-    var now=new Date();
-    var od=(r[0]||[]).filter(function(n){return n.due_date&&new Date(n.due_date)<now;});
-    function setChip(id,val,cls){var el=document.getElementById(id);if(el){el.textContent=val;el.className='chip-num cn-'+cls;}}
-    setChip('chip-actions-due',od.length,od.length>0?'r':'m');
-    setChip('chip-decisions',(r[1]||[]).length,(r[1]||[]).length>0?'a':'m');
-    setChip('chip-questions',(r[2]||[]).length,(r[2]||[]).length>0?'a':'m');
-    setChip('chip-agenda',(r[3]||[]).length,'m');
+    var now=new Date(),od=(r[0]||[]).filter(function(n){return n.due_date&&new Date(n.due_date)<now;});
+    function sc(id,v,cls){var el=document.getElementById(id);if(el){el.textContent=v;el.className='chip-num cn-'+cls;}}
+    sc('chip-actions-due',od.length,od.length>0?'r':'m');
+    sc('chip-decisions',(r[1]||[]).length,(r[1]||[]).length>0?'a':'m');
+    sc('chip-questions',(r[2]||[]).length,(r[2]||[]).length>0?'a':'m');
+    sc('chip-agenda',(r[3]||[]).length,'m');
   });
-
   _startLiveTicker();
   console.log('[MC] live card rendered:',m.title);
 }
 
 function _renderNoMeeting(){
-  var badge=document.querySelector('.live-badge');
-  if(badge) badge.innerHTML='<span style="color:var(--tff)">No meetings today</span>';
-  var title=document.getElementById('mc-meeting-title');
-  if(title){title.textContent='No meetings today';title.style.color='var(--tff)';}
-  var el=document.getElementById('elapsed');if(el)el.textContent='–';
-  document.querySelector('.attendees').innerHTML='';
-  console.log('[MC] no meeting today');
+  var badge=document.querySelector('.live-badge');if(badge)badge.innerHTML='<span style="color:var(--tff)">No meetings today</span>';
+  var t=document.getElementById('mc-meeting-title');if(t){t.textContent='No meetings today';t.style.color='var(--tff)';}
+  var el=document.getElementById('elapsed');if(el)el.textContent='-';
+  var at=document.querySelector('.attendees');if(at)at.innerHTML='';
 }
 
 function _loadLiveCard(){
   var todayUTC=new Date();todayUTC.setUTCHours(0,0,0,0);
   API.get('accord_meetings?state=eq.running&started_at=gte.'+todayUTC.toISOString()+'&order=started_at.desc&limit=1&select=meeting_id,title,stakes,briefing_text,started_at,duration_minutes,location,workstream_id,workstreams(name)')
     .then(function(rows){
-      if(rows&&rows[0]) _renderLiveCard(rows[0]);
-      else {
-        // Try next upcoming
-        API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+new Date().toISOString()+'&order=scheduled_for.asc&limit=1&select=meeting_id,title,stakes,scheduled_for,workstreams(name)')
-          .then(function(r2){
-            if(r2&&r2[0]){
-              var m=r2[0];
-              var title=document.getElementById('mc-meeting-title');
-              if(title){title.textContent=m.title;title.style.color='';}
-              var badge=document.querySelector('.live-badge');
-              if(badge) badge.innerHTML='<span style="color:var(--cyan)">↗ Next Meeting</span>';
-              var btn=document.querySelector('.rejoin-btn');
-              if(btn){btn.textContent='Prepare →';btn.onclick=function(){window.location.href='/accord.html?meeting='+m.meeting_id;};}
-            } else {
-              _renderNoMeeting();
-            }
-          });
-      }
+      if(rows&&rows[0]){_renderLiveCard(rows[0]);return;}
+      API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+new Date().toISOString()+'&order=scheduled_for.asc&limit=1&select=meeting_id,title,stakes,scheduled_for,workstreams(name)')
+        .then(function(r2){
+          if(r2&&r2[0]){
+            var m=r2[0];
+            var t=document.getElementById('mc-meeting-title');if(t){t.textContent=m.title;t.style.color='';}
+            var badge=document.querySelector('.live-badge');if(badge)badge.innerHTML='<span style="color:var(--cyan)">↗ Next Meeting</span>';
+            var btn=document.querySelector('.rejoin-btn');if(btn){btn.textContent='Prepare →';btn.onclick=function(){window.location.href='/accord.html?meeting='+m.meeting_id;};}
+          } else {_renderNoMeeting();}
+        });
     }).catch(function(e){console.warn('[MC] live card error:',e);_renderNoMeeting();});
 }
 
-/* ── SCHEDULE ── */
+// Schedule
 function _loadSchedule(){
   var todayUTC=new Date();todayUTC.setUTCHours(0,0,0,0);
   var tomorrowUTC=new Date(todayUTC.getTime()+86400000);
   var tl=document.getElementById('mc-schedule-timeline');if(!tl)return;
   API.get('accord_meetings?scheduled_for=gte.'+todayUTC.toISOString()+'&scheduled_for=lt.'+tomorrowUTC.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,state,scheduled_for,duration_minutes,workstreams(name)')
     .then(function(rows){
-      if(!rows||!rows.length){
-        tl.innerHTML='<div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">No meetings scheduled today.</div>';
-        return;
-      }
-      tl.innerHTML='';
-      var now=new Date();var nowRendered=false;
+      if(!rows||!rows.length){tl.innerHTML='<div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">No meetings scheduled today.</div>';return;}
+      tl.innerHTML='';var now=new Date(),nowR=false;
       rows.forEach(function(m,i){
-        var sf=new Date(m.scheduled_for);
-        var ef=m.duration_minutes?new Date(sf.getTime()+m.duration_minutes*60000):null;
+        var sf=new Date(m.scheduled_for),ef=m.duration_minutes?new Date(sf.getTime()+m.duration_minutes*60000):null;
         var isDone=m.state==='closed'||m.state==='sealed'||(ef&&ef<now);
-        var isLive=m.state==='running';
-        var isNext=!isLive&&!isDone&&!nowRendered;
-        if(isNext){
-          nowRendered=true;
-          var nr=document.createElement('div');nr.className='now-row';
-          nr.innerHTML='<div class="now-time" id="now-t">'+fmt(now)+'</div><div class="now-line"></div><div class="now-lbl">Now</div>';
-          tl.appendChild(nr);
-        }
-        var timeStr=_hm(sf.getHours(),sf.getMinutes());
-        var rangeStr=timeStr+(ef?'–'+_hm(ef.getHours(),ef.getMinutes()):'');
-        var dotCls=isDone?'td-dn':isLive?'td-lv':isNext?'td-nx':'td-ft';
-        var blockCls='t-block '+(isDone?'tb-dn':isLive?'tb-lv':isNext?'tb-nx':'tb-ft');
-        var timeCls=isLive?'ta':isNext?'tn':'';
+        var isLive=m.state==='running',isNext=!isLive&&!isDone&&!nowR;
+        if(isNext){nowR=true;var nr=document.createElement('div');nr.className='now-row';nr.innerHTML='<div class="now-time" id="now-t">'+fmt(now)+'</div><div class="now-line"></div><div class="now-lbl">Now</div>';tl.appendChild(nr);}
+        var ts=_hm(sf.getHours(),sf.getMinutes());
+        var rs=ts+(ef?'-'+_hm(ef.getHours(),ef.getMinutes()):'');
+        var dc=isDone?'td-dn':isLive?'td-lv':isNext?'td-nx':'td-ft';
+        var bc='t-block '+(isDone?'tb-dn':isLive?'tb-lv':isNext?'tb-nx':'tb-ft');
+        var tc=isLive?'ta':isNext?'tn':'';
         var row=document.createElement('div');row.className='t-row';
-        row.innerHTML=
-          '<div class="t-time '+timeCls+'">'+timeStr+'</div>'+
-          '<div class="t-axis"><div class="t-dot '+dotCls+'"></div>'+(i<rows.length-1?'<div class="t-line'+(isLive?' tl-lv':'')+'"></div>':'')+'</div>'+
-          '<div class="'+blockCls+'" data-mid="'+m.meeting_id+'">'+
-            '<div class="tb-title">'+_esc(m.title)+'</div>'+
-            '<div class="tb-meta">'+rangeStr+(isLive?' <span class="tp-pill tp-lv">Live</span>':'')+'</div>'+
-          '</div>';
+        row.innerHTML='<div class="t-time '+tc+'">'+ts+'</div><div class="t-axis"><div class="t-dot '+dc+'"></div>'+(i<rows.length-1?'<div class="t-line'+(isLive?' tl-lv':'')+'"></div>':'')+'</div><div class="'+bc+'" data-mid="'+m.meeting_id+'"><div class="tb-title">'+_esc(m.title)+'</div><div class="tb-meta">'+rs+(isLive?' <span class="tp-pill tp-lv">Live</span>':'')+'</div></div>';
         tl.appendChild(row);
       });
-      tl.addEventListener('click',function(e){
-        var b=e.target.closest('[data-mid]');
-        if(b) window.location.href='/accord.html?meeting='+b.dataset.mid;
-      });
-      console.log('[MC] schedule rendered:',rows.length,'meetings');
+      tl.addEventListener('click',function(e){var b=e.target.closest('[data-mid]');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});
+      console.log('[MC] schedule rendered:',rows.length);
     }).catch(function(e){console.warn('[MC] schedule error:',e);});
 }
 
-/* ── BOOT ── */
-// auth.js and api.js are static script tags — available immediately at parse time.
-// No waiting needed. Boot runs at DOMContentLoaded.
-document.addEventListener('DOMContentLoaded', function() {
+// Upcoming
+function _loadUpcoming(){
+  var now=new Date(),nextMonth=new Date(now.getTime()+30*24*60*60*1000);
+  var EMPTY='<div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">No upcoming meetings scheduled.</div>';
+  API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+now.toISOString()+'&scheduled_for=lt.'+nextMonth.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,scheduled_for,stakes,workstreams(name)')
+    .then(function(rows){
+      var pw=document.getElementById('pw'),pm=document.getElementById('pm');
+      if(!rows||!rows.length){if(pw)pw.innerHTML=EMPTY;if(pm)pm.innerHTML=EMPTY;return;}
+      var wkEnd=new Date(now);wkEnd.setDate(wkEnd.getDate()+(6-wkEnd.getDay()));wkEnd.setHours(23,59,59,999);
+      function cards(list){
+        if(!list.length)return EMPTY;
+        return list.map(function(m){
+          var sf=new Date(m.scheduled_for);
+          var ds=_mos[sf.getMonth()]+' '+sf.getDate()+' · '+_hm(sf.getHours(),sf.getMinutes());
+          var ws=m.workstreams?m.workstreams.name:'';
+          return '<div class="up-card mc-up-link" data-mid="'+m.meeting_id+'">'
+            +'<div class="up-top"><div class="up-title">'+_esc(m.title)+'</div><div class="verd v-no">Not Ready</div></div>'
+            +'<div class="up-row2"><span class="up-date">'+ds+'</span></div>'
+            +(ws?'<div class="up-ws">'+_esc(ws)+'</div>':'')
+            +(m.stakes?'<div class="up-brief">'+_esc(m.stakes)+'</div>':'')
+            +'</div>';
+        }).join('');
+      }
+      var wk=rows.filter(function(m){return new Date(m.scheduled_for)<=wkEnd;});
+      var mo=rows.filter(function(m){return new Date(m.scheduled_for)>wkEnd;});
+      if(pw){pw.innerHTML=cards(wk)||EMPTY;pw.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});}
+      if(pm){pm.innerHTML=cards(mo)||EMPTY;pm.addEventListener('click',function(e){var b=e.target.closest('.mc-up-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});}
+      console.log('[MC] upcoming rendered:',rows.length);
+    }).catch(function(e){console.warn('[MC] upcoming error:',e);});
+}
+
+// Minutes
+function _loadMinutes(){
+  var body=document.getElementById('mc-minutes-body');if(!body)return;
+  API.get('accord_meetings?state=in.(closed,sealed)&order=sealed_at.desc&limit=15&select=meeting_id,title,sealed_at,workstream_id,workstreams(name)')
+    .then(function(meetings){
+      if(!meetings||!meetings.length){body.innerHTML='<div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">No sealed meetings yet.</div>';return;}
+      var now=new Date();
+      body.innerHTML=meetings.map(function(m){
+        var sealed=new Date(m.sealed_at),diff=Math.floor((now-sealed)/86400000);
+        var age=diff===0?'Today':diff===1?'1 day ago':diff+' days';
+        var ac=diff<=3?'ag':diff<=9?'aa':'ar';
+        var ws=m.workstreams?m.workstreams.name:'-';
+        var ds=_mos[sealed.getMonth()]+' '+sealed.getDate();
+        return '<div class="min-row"><div class="min-left"><div class="min-title">'+_esc(m.title)+'</div>'
+          +'<div class="min-meta"><span class="min-date">'+ds+'</span><div class="up-dot"></div>'
+          +'<span class="min-ws">'+_esc(ws)+'</span><span class="min-age '+ac+'">'+age+'</span></div></div>'
+          +'<div class="badge b-c mc-min-link" data-mid="'+m.meeting_id+'">Complete &#8594;</div></div>';
+      }).join('');
+      body.addEventListener('click',function(e){var b=e.target.closest('.mc-min-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});
+      console.log('[MC] minutes rendered:',meetings.length);
+    }).catch(function(e){console.warn('[MC] minutes error:',e);});
+}
+
+// Boot
+document.addEventListener('DOMContentLoaded',function(){
   _initW();
   _mkHandle('r1ha',_r1w,0,_applyR1);_mkHandle('r1hb',_r1w,1,_applyR1);
   _mkHandle('r2ha',_r2w,0,_applyR2);_mkHandle('r2hb',_r2w,1,_applyR2);
   window.addEventListener('resize',_initW);
   _resolveIdentity(function(){
-    _loadStrip();
-    _loadLiveCard();
-    _loadSchedule();
+    _loadStrip();_loadLiveCard();_loadSchedule();_loadUpcoming();_loadMinutes();
   });
   setInterval(function(){if(MC.resourceId)_loadStrip();},60000);
 });
