@@ -907,6 +907,8 @@ const HUDShell = (() => {
       if (moduleName === 'Accord' && !document.body.classList.contains('accord-module')) {
         document.body.classList.add('accord-module');
       }
+      // Ensure hud-header-rendered is present even when guard fires
+      document.body.classList.add('hud-header-rendered');
       return; // existing guard return preserved
     }
     const initials = _userInitialsFallback();
