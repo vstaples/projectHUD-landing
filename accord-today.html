@@ -283,7 +283,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 <!-- ── NAV ── -->
 <!-- CMD-ACCORD-MEETING-CENTER-1 C-03: Shell-compatible header.
      sidebar.js (= hud-shell.js) builds #hud-header when HUDShell.init() is called.
-     Meeting Center does not call HUDShell.init() — same pattern as accord.html.
+     Meeting Center calls HUDShell.init({page:accord-today}) via early boot script.
      The Tier 1 strip is built by _buildAccordTier1() below, same as accord.html. -->
 <nav class="topnav" id="mc-topnav">
   <div class="accord-mark">
@@ -340,26 +340,26 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 <div class="strip">
   <div class="strip-live">
     <div class="strip-pulse"></div>
-    <div class="strip-live-text" id="strip-live-count">1 live now</div>
+    <div class="strip-live-text" id="strip-live-count">– live</div>
   </div>
   <div class="strip-chips">
     <div class="strip-chip">
-      <span class="strip-chip-num cyan" id="strip-mtg-count">5</span>
+      <span class="strip-chip-num cyan" id="strip-mtg-count">–</span>
       <span>meetings today</span>
     </div>
     <div class="strip-sep"></div>
     <div class="strip-chip">
-      <span class="strip-chip-num red" id="strip-action-count">4</span>
+      <span class="strip-chip-num red" id="strip-action-count">–</span>
       <span>actions due</span>
     </div>
     <div class="strip-sep"></div>
     <div class="strip-chip">
-      <span class="strip-chip-num amber" id="strip-rsvp-count">2</span>
+      <span class="strip-chip-num amber" id="strip-rsvp-count">–</span>
       <span>need your response</span>
     </div>
     <div class="strip-sep"></div>
     <div class="strip-chip">
-      <span class="strip-chip-num amber" id="strip-min-count">2</span>
+      <span class="strip-chip-num amber" id="strip-min-count">–</span>
       <span>minutes not ready</span>
     </div>
   </div>
@@ -397,38 +397,34 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
           <div class="live-inner">
             <div class="meeting-row">
               <div class="meeting-info">
-                <div class="meeting-title">Interview: Glen Campbell</div>
-                <div class="meeting-stakes">Electrical Engineer Candidate · C-11 Workstream</div>
-                <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label">Started –</span></div>
-                <div class="meta-row"><i class="ti ti-map-pin"></i><span id="mc-location">Conference Room B</span></div>
+                <div class="meeting-title" id="mc-meeting-title" style="color:var(--tff)">Loading…</div>
+                <div class="meeting-stakes" id="mc-meeting-stakes">–</div>
+                <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label" style="color:var(--tff)">–</span></div>
+                <div class="meta-row"><i class="ti ti-map-pin"></i><span id="mc-location" style="color:var(--tff)">–</span></div>
               </div>
               <div class="timer-block">
                 <div class="timer-lbl">Elapsed</div>
-                <div class="timer-val" id="elapsed">–</div>
+                <div class="timer-val" id="elapsed" style="color:var(--tff)">–:––</div>
                 <div class="timer-sub" id="timer-sub">–</div>
               </div>
             </div>
             <div class="divider"></div>
             <div class="section-lbl">Attendees</div>
             <div class="attendees">
-              <div class="att-pill c"><div class="att-dot dg"></div>Vaughn Staples</div>
-              <div class="att-pill c"><div class="att-dot dg"></div>Glen Campbell</div>
-              <div class="att-pill c"><div class="att-dot dg"></div>Ariel Fischer</div>
-              <div class="att-pill l"><div class="att-dot da"></div>Tim Roth</div>
-              <div class="att-pill a"><div class="att-dot dd"></div>Beth Cassidy</div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--tff)">Loading attendees…</span>
             </div>
             <div class="divider"></div>
             <div class="section-lbl">Open items</div>
             <div class="chips">
-              <div class="chip"><div class="chip-num cn-r" id="chip-actions-due">4</div><div class="chip-lbl">Actions Due</div></div>
-              <div class="chip"><div class="chip-num cn-a" id="chip-decisions">2</div><div class="chip-lbl">Decisions Needed</div></div>
-              <div class="chip"><div class="chip-num cn-a" id="chip-questions">3</div><div class="chip-lbl">Open Questions</div></div>
-              <div class="chip"><div class="chip-num cn-m" id="chip-agenda">5</div><div class="chip-lbl">Agenda Items</div></div>
+              <div class="chip"><div class="chip-num cn-r" id="chip-actions-due">–</div><div class="chip-lbl">Actions Due</div></div>
+              <div class="chip"><div class="chip-num cn-a" id="chip-decisions">–</div><div class="chip-lbl">Decisions Needed</div></div>
+              <div class="chip"><div class="chip-num cn-a" id="chip-questions">–</div><div class="chip-lbl">Open Questions</div></div>
+              <div class="chip"><div class="chip-num cn-m" id="chip-agenda">–</div><div class="chip-lbl">Agenda Items</div></div>
             </div>
           </div>
         </div>
         <div class="live-footer panel-foot">
-          <div class="footer-note">C-11 Workstream · Decision pending</div>
+          <div class="footer-note" id="mc-footer-note">–</div>
           <button class="rejoin-btn">Rejoin session →</button>
         </div>
       </div>
@@ -490,13 +486,8 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <div class="panel">
         <div class="panel-hdr"><div class="panel-title">Today's Schedule</div><div class="panel-meta">May 19</div></div>
         <div class="panel-body">
-          <div class="timeline">
-            <div class="t-row"><div class="t-time">9:00</div><div class="t-axis"><div class="t-dot td-dn"></div><div class="t-line"></div></div><div class="t-block tb-dn"><div class="tb-title">Weekly Standup</div><div class="tb-meta">9:00–9:30</div></div></div>
-            <div class="t-row"><div class="t-time ta" id="live-time-lbl">–</div><div class="t-axis"><div class="t-dot td-lv"></div><div class="t-line tl-lv"></div></div><div class="t-block tb-lv"><div class="tb-title">Interview: Glen Campbell</div><div class="tb-meta" id="live-range-lbl">– <span class="tp-pill tp-lv">Live</span></div></div></div>
-            <div class="now-row"><div class="now-time" id="now-t">–</div><div class="now-line"></div><div class="now-lbl">Now</div></div>
-            <div class="t-row"><div class="t-time tn">11:00</div><div class="t-axis"><div class="t-dot td-nx"></div><div class="t-line"></div></div><div class="t-block tb-nx tb-ext"><div class="tb-title">Brightwater Client Sync</div><div class="tb-meta">11:00–12:00 <span class="tp-pill tp-ext">Ext</span></div></div></div>
-            <div class="t-row"><div class="t-time">2:00</div><div class="t-axis"><div class="t-dot td-ft"></div><div class="t-line"></div></div><div class="t-block tb-ft"><div class="tb-title">Engineering Review</div><div class="tb-meta">2:00–2:30 <span class="tp-pill tp-int">Int</span></div></div></div>
-            <div class="t-row"><div class="t-time">3:30</div><div class="t-axis"><div class="t-dot td-ft"></div><div class="t-line" style="min-height:0"></div></div><div class="t-block tb-ft"><div class="tb-title">Risk Register Review</div><div class="tb-meta">3:30–4:30</div></div></div>
+          <div class="timeline" id="mc-schedule-timeline">
+            <div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading schedule…</div>
           </div>
         </div>
       </div>
@@ -682,44 +673,43 @@ window.addEventListener('resize',initW);
    ============================================================ */
 function _waitForAPI(cb,attempts){
   attempts=attempts||0;
-  if(window.API&&window.API.get){cb();return;}
-  if(attempts>40){console.warn('[MC] API not available after 4s');return;}
+  if(window.API&&window.API.get&&window.Auth&&window.Auth.getFreshToken){cb();return;}
+  if(attempts>40){console.warn('[MC] API/Auth not available after 4s');return;}
   setTimeout(function(){_waitForAPI(cb,attempts+1);},100);
 }
 
-function _resolveIdentity(cb){
-  // CURRENT_USER is set by hud-shell.js after init — wait for it
-  var attempts=0;
-  function check(){
-    if(window.CURRENT_USER&&CURRENT_USER.user_id){
-      // Resolve resource_id from resources table (IR47: verify column name)
-      API.get('resources?user_id=eq.'+CURRENT_USER.user_id+'&select=id,name&limit=1')
-        .then(function(rows){
-          var row=(rows&&rows[0])||null;
-          MC.userId=CURRENT_USER.user_id;
-          MC.resourceId=row?row.id:null;
-          MC.userName=row?row.name:(CURRENT_USER.name||'');
-          // Populate avatar initials
-          var av=document.getElementById('mc-avatar');
-          if(av&&MC.userName){
-            av.textContent=MC.userName.split(' ').map(function(w){return w[0];}).join('').toUpperCase().substring(0,2);
-          }
-          console.log('[MC] identity resolved — resource:',MC.resourceId);
-          cb();
-        })
-        .catch(function(e){
-          console.warn('[MC] resource lookup failed:',e);
-          MC.userId=CURRENT_USER.user_id;
-          MC.resourceId=null;
-          cb();
-        });
-    } else {
-      attempts++;
-      if(attempts>50){console.warn('[MC] CURRENT_USER not set after 5s');cb();return;}
-      setTimeout(check,100);
+async function _resolveIdentity(cb){
+  // Canonical pattern from accord-core.js _resolveMe()
+  try {
+    var token = await Auth.getFreshToken().catch(function(){ return Auth.getToken(); });
+    var claims = JSON.parse(atob(token.split('.')[1]));
+    var sub = claims.sub;
+
+    var uRows = await API.get('users?id=eq.'+sub+'&select=id,name,email,firm_id').catch(function(){return [];});
+    var u = (uRows && uRows[0]) || null;
+
+    var rRows = await API.get('resources?user_id=eq.'+sub+'&select=id&limit=1').catch(function(){return [];});
+
+    MC.userId     = sub;
+    MC.resourceId = (rRows && rRows[0]) ? rRows[0].id : null;
+    MC.userName   = u ? u.name : 'You';
+    MC.firmId     = u ? u.firm_id : null;
+
+    window.CURRENT_USER = { id: sub, name: MC.userName, firm_id: MC.firmId, resource_id: MC.resourceId };
+
+    // Update avatar
+    var av = document.getElementById('mc-avatar');
+    if(av && MC.userName){
+      av.textContent = MC.userName.trim().split(/\s+/).map(function(w){return w[0];}).join('').toUpperCase().substring(0,2);
     }
+
+    console.log('[MC] identity resolved — user:', MC.userName, 'resource:', MC.resourceId);
+    cb();
+  } catch(e) {
+    console.warn('[MC] identity resolution failed:', e);
+    MC.userId = null; MC.resourceId = null; MC.userName = 'Unknown';
+    cb();
   }
-  check();
 }
 
 /* ── SITUATION STRIP ── */
@@ -1030,6 +1020,7 @@ setInterval(function(){
 <script src="/js/ui.js"></script>
 <script src="/js/version.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
 <script src="/js/sidebar.js?v=v20260509-CMD-ACCORD-MEETING-SETUP-140k"></script>
+<!-- HUDShell.init not needed — identity resolved via Auth token directly -->
 
 <!-- CMD-ACCORD-MEETING-CENTER-1 C-03: Accord Tier 1 tab strip.
      Identical pattern to accord.html _buildAccordTier1.
@@ -1089,12 +1080,7 @@ setInterval(function(){
     _setActive('meeting-center'); // This page = Meeting Center tab active
     console.log('[accord-today] tier1 built — meeting-center active');
 
-    // Initialize HUDShell so CURRENT_USER gets resolved (matches accord.html pattern)
-    if(window.HUDShell && typeof HUDShell.init === 'function'){
-      HUDShell.init({page:'accord-today'}).catch(function(e){
-        console.warn('[accord-today] HUDShell.init error:', e);
-      });
-    }
+    // HUDShell.init handled in early boot script above
   }
 
   if (document.readyState === 'loading') {
