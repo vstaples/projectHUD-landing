@@ -567,10 +567,9 @@ function swTab(t){
 function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);}
 
 /* ── NOTES (DB-backed) ── */
-var _wsCache=null;
 function _updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n+(n===1?' item':' items');}
 function _buildNoteRow(item){
-  var iid=item.item_id,pid='p-'+iid;
+  var iid=item.item_id;
   var isCk=!!item.completed_at,isOther=item.author_resource_id&&item.author_resource_id!==MC.resourceId;
   var t=fmtS(new Date(item.created_at));
   var row=document.createElement('div');row.className='note-row';row.dataset.itemId=iid;
@@ -579,9 +578,7 @@ function _buildNoteRow(item){
   h+='<div class="note-time">'+t+'</div>';
   if(isOther&&item._authorName){var ini=item._authorName.trim().split(/\s+/).map(function(w){return w[0];}).join('').toUpperCase().substring(0,2);h+='<div class="note-badge" title="'+_esc(item._authorName)+'">'+ini+'</div>';}
   else{h+='<div class="no-badge"></div>';}
-  h+='<div class="note-acts"><div class="n-pro" onclick="tPro(\''+pid+'\')">&#8594; Action</div>';
-  h+='<div class="n-del" onclick="delNoteDB(\''+iid+'\')">&#215;</div></div>';
-  h+='<div class="promo-modal" id="'+pid+'"><div class="promo-lbl">Promote to workstream</div><div id="'+pid+'-opts" class="promo-opts-inner">Loading…</div></div>';
+  h+='<div class="note-acts"><div class="n-del" onclick="delNoteDB(\''+iid+'\')">&#215;</div></div>';
   row.innerHTML=h;return row;
 }
 function toggleNote(el){
@@ -597,35 +594,6 @@ function delNoteDB(iid){
   API.del('scratch_items?item_id=eq.'+iid).catch(function(e){console.warn('[MC] del note error:',e);});
   setTimeout(function(){row.remove();_updNC();},300);
 }
-function tPro(pid){
-  document.querySelectorAll('.promo-modal').forEach(function(m){if(m.id!==pid)m.classList.remove('open');});
-  var m=document.getElementById(pid);if(!m)return;
-  m.classList.toggle('open');
-  if(!m.classList.contains('open'))return;
-  var optsEl=document.getElementById(pid+'-opts');if(!optsEl)return;
-  if(_wsCache){_renderWsOpts(optsEl,pid);return;}
-  API.get('workstreams?select=workstream_id,name&order=name.asc').then(function(r){
-    _wsCache=r||[];_renderWsOpts(optsEl,pid);
-  }).catch(function(){optsEl.innerHTML='<div class="promo-opt" style="color:var(--tff)">Error loading</div>';});
-}
-function _renderWsOpts(optsEl,pid){
-  var row=optsEl.closest('.note-row');var iid=row?row.dataset.itemId:'';
-  optsEl.innerHTML=_wsCache.map(function(ws){
-    return '<div class="promo-opt" onclick="proNoteDB(\''+iid+'\',\''+ws.workstream_id+'\',\''+pid+'\')">'+_esc(ws.name)+'</div>';
-  }).join('')||'<div class="promo-opt" style="color:var(--tff)">No workstreams</div>';
-}
-function proNoteDB(iid,wsId,pid){
-  var row=document.querySelector('.note-row[data-item-id="'+iid+'"]');if(!row)return;
-  var body=row.querySelector('.note-body');var txt=body?body.textContent:'';
-  var m=document.getElementById(pid);if(m)m.classList.remove('open');
-  API.post('accord_nodes',{firm_id:MC.firmId,workstream_id:wsId,tag:'action',summary:txt,meeting_id:null,created_by:MC.userId}).then(function(r){
-    var nid=r&&r[0]?r[0].node_id:null;
-    if(nid)API.patch('scratch_items?item_id=eq.'+iid,{promoted_node_id:nid}).catch(function(){});
-    row.style.opacity='.3';row.style.transition='opacity .3s';
-    setTimeout(function(){row.remove();_updNC();},300);
-    console.log('[MC] note promoted to action:',nid);
-  }).catch(function(e){console.warn('[MC] promote error:',e);});
-}
 function noteKey(e){
   if(e.key!=='Enter')return;e.preventDefault();
   var f=document.getElementById('ni-f'),val=f.textContent.trim();if(!val||!MC.resourceId)return;
@@ -637,7 +605,6 @@ function noteKey(e){
     console.log('[MC] note added:',item.item_id);
   }).catch(function(e){console.warn('[MC] add note error:',e);});
 }
-document.addEventListener('click',function(e){if(!e.target.closest('.n-pro')&&!e.target.closest('.promo-modal'))document.querySelectorAll('.promo-modal').forEach(function(m){m.classList.remove('open');});});
 
 /* ── RESIZE — independent per row ── */
 var r1w=[0,0],r2w=[0,0];
@@ -728,7 +695,7 @@ function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style
 // Notes — load from scratch_items
 function _loadNotes(){
   var inner=document.getElementById('notes-inner');if(!inner||!MC.resourceId)return;
-  API.get('scratch_items?owner_resource_id=eq.'+MC.resourceId+'&order=created_at.asc&select=item_id,body,created_at,completed_at,promoted_node_id,author_resource_id')
+  API.get('scratch_items?owner_resource_id=eq.'+MC.resourceId+'&order=created_at.asc&select=item_id,body,created_at,completed_at,author_resource_id')
     .then(function(rows){
       if(!rows||!rows.length){inner.innerHTML='';_updNC();console.log('[MC] notes loaded: 0');return;}
       var others=rows.filter(function(r){return r.author_resource_id&&r.author_resource_id!==MC.resourceId;});
