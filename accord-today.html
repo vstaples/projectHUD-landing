@@ -101,10 +101,10 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 
 /* ── PANEL ── */
 .panel{flex:1;display:flex;flex-direction:column;background:var(--mc-panel-bg,var(--bg2));border:var(--mc-border-width,1px) solid var(--border);border-radius:var(--mc-radius,var(--rlg));overflow:hidden;min-height:0;opacity:var(--mc-panel-opacity,1)}
-.panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 15px 12px;background:var(--bg1);border-bottom:1px solid var(--border-f);flex-shrink:0}
-.panel-title{font-family:var(--ui);font-size:15px;font-weight:700;color:var(--tp);letter-spacing:-.01em}
+.panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 15px 12px;background:var(--bg1);border-bottom:none;flex-shrink:0;position:relative}.panel-hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(to right,var(--cyan),transparent)}
+.panel-title{font-family:Arial,sans-serif;font-size:18px;font-weight:700;color:var(--tp);letter-spacing:-.01em}
 .panel-lbl{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--tm)}
-.panel-meta{font-family:Arial,sans-serif;font-size:15px;font-weight:700;color:var(--tm);letter-spacing:0}#mc-schedule-date{font-family:var(--ui);color:var(--cyan);letter-spacing:-.01em}
+.panel-meta{font-family:Arial,sans-serif;font-size:15px;font-weight:700;color:var(--tm);letter-spacing:0}#mc-schedule-date{font-family:var(--ui);color:var(--cyan);letter-spacing:-.01em;font-size:15px;font-weight:700}
 .panel-body{flex:1;overflow-y:auto;min-height:0}
 .panel-body::-webkit-scrollbar{width:5px}.panel-body::-webkit-scrollbar-track{background:rgba(255,255,255,.04)}.panel-body::-webkit-scrollbar-thumb{background:rgba(120,160,200,.35);border-radius:3px}.panel-body::-webkit-scrollbar-thumb:hover{background:rgba(120,160,200,.6)}
 .panel-foot{flex-shrink:0}
@@ -117,7 +117,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
   flex:1;display:flex;flex-direction:column;
   border-radius:var(--mc-radius,var(--rlg));overflow:visible;min-height:0;
   background:var(--mc-hero-bg,var(--bg2));
-  border:var(--mc-border-width,1px) solid rgba(240,160,32,var(--mc-hero-border-opacity,0.22));
+  border:1px solid rgba(240,160,32,.4);box-shadow:0 0 20px rgba(240,160,32,.08),inset 0 0 60px rgba(240,160,32,.03);
   box-shadow:0 0 0 1px rgba(240,160,32,.06),inset 0 0 40px rgba(240,160,32,.03);
   position:relative;
 }
@@ -125,8 +125,8 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
   content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(ellipse at 20% 0%,rgba(240,160,32,.07) 0%,transparent 55%);
 }
-.live-topbar{display:flex;align-items:center;justify-content:space-between;padding:clamp(4px,var(--live-pad,9px),11px) 16px;background:rgba(240,160,32,.06);border-bottom:1px solid rgba(240,160,32,.14);flex-shrink:0;position:relative;z-index:1}
-.live-badge{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+.live-topbar{display:flex;align-items:center;justify-content:space-between;padding:clamp(4px,var(--live-pad,9px),11px) 16px;background:rgba(240,160,32,.12);border-bottom:none;flex-shrink:0;position:relative;z-index:1}.live-topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(to right,rgba(240,160,32,.9),transparent);z-index:2}
+.live-badge{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#f0a020}
 .live-pulse{width:7px;height:7px;border-radius:50%;background:var(--amber);animation:pa 2s ease-in-out infinite}
 @keyframes pa{0%,100%{box-shadow:0 0 0 0 rgba(240,160,32,.6)}50%{box-shadow:0 0 0 5px rgba(240,160,32,0)}}
 .verdict-btn{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:4px;background:rgba(240,160,32,.12);color:var(--amber);border:1px solid rgba(240,160,32,.3);cursor:pointer;transition:background .15s;position:relative}
@@ -364,7 +364,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1753</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1839</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -751,11 +751,43 @@ function _loadStrip(){
 // Live card ticker
 var _liveInterval=null;
 function _startLiveTicker(){
-  if(_liveInterval)return;
+  if(_liveInterval)clearInterval(_liveInterval);
   _liveInterval=setInterval(function(){
     if(!MC.liveMeeting)return;
-    var diff=Math.max(0,Math.floor((new Date()-new Date(MC.liveMeeting.started_at))/1000));
-    var el=document.getElementById('elapsed');if(el)el.textContent=Math.floor(diff/60)+':'+padZ(diff%60);
+    var now=new Date();
+    var elapsed=Math.max(0,Math.floor((now-new Date(MC.liveMeeting.started_at))/1000));
+    var el=document.getElementById('elapsed');
+    if(el)el.textContent=Math.floor(elapsed/60)+':'+padZ(elapsed%60);
+    var sub=document.getElementById('timer-sub');
+    var durSec=(MC.liveMeeting.duration_minutes||60)*60;
+    var rem=Math.max(0,durSec-elapsed);
+    var rm=Math.floor(rem/60);
+    if(sub)sub.textContent=rem>0?(rm+'m remaining'):'ending soon';
+    // Button state: End Meeting when elapsed >= duration
+    var btn=document.querySelector('.rejoin-btn');
+    if(btn&&MC.liveMeeting.organizer_id===MC.userId&&elapsed>=durSec&&btn.dataset.state!=='ended'){
+      btn.dataset.state='end';
+      btn.textContent='End Meeting';
+      btn.style.background='rgba(255,77,109,.12)';
+      btn.style.color='#ff4d6d';
+      btn.style.borderColor='rgba(255,77,109,.4)';
+      btn.onclick=function(){
+        btn.disabled=true;btn.textContent='Ending…';
+        API.patch('accord_meetings?meeting_id=eq.'+MC.liveMeeting.meeting_id,{state:'closed'})
+          .then(function(){
+            btn.dataset.state='ended';
+            btn.textContent='Meeting Ended';
+            btn.style.background='rgba(255,255,255,.04)';
+            btn.style.color='var(--tm)';
+            btn.style.borderColor='rgba(255,255,255,.1)';
+            btn.style.cursor='default';
+            btn.onclick=null;
+            if(_liveInterval)clearInterval(_liveInterval);
+            var badge=document.querySelector('.live-badge');
+            if(badge)badge.innerHTML='<span style="color:var(--tm)">Meeting ended</span>';
+          }).catch(function(){btn.disabled=false;btn.textContent='End Meeting';});
+      };
+    }
   },1000);
 }
 
@@ -781,8 +813,13 @@ function _renderLiveCard(m){
   var btn=document.querySelector('.rejoin-btn');
   if(btn){
     var mid=m.meeting_id;
-    var label=m.organizer_id===MC.userId?'Join session →':'Join session →';
-    btn.textContent=label;btn.style.opacity='1';btn.style.cursor='pointer';
+    var isOrg=m.organizer_id===MC.userId;
+    btn.dataset.state='live';
+    btn.textContent=isOrg?'Rejoin Session →':'Join Session →';
+    btn.style.opacity='1';btn.style.cursor='pointer';
+    btn.style.background='rgba(52,192,112,.08)';
+    btn.style.color='var(--mc-green,#34c070)';
+    btn.style.borderColor='rgba(52,192,112,.35)';
     btn.onclick=function(){
       if(window.CoC)CoC.write('accord.meeting.joined_from_center','meeting',mid).catch(function(){});
       window.location.href='/accord.html?meeting='+mid;
@@ -860,18 +897,31 @@ function _renderCountdown(m){
     if(sub)sub.textContent=diff>0?'until start':'starting now';
     var vb=document.querySelector('.verdict-btn');
     if(diff===0&&vb)vb.style.display='none';
-    // Activate button within 60s
     var btn=document.querySelector('.rejoin-btn');
-    if(btn&&diff<=60&&diff>0){
+    if(!btn)return;
+    var mid=MC.nextMeeting.meeting_id;
+    var isOrg=MC.nextMeeting.organizer_id===MC.userId;
+    if(isOrg&&diff<=60){
+      btn.textContent='Start Meeting';
       btn.style.opacity='1';btn.style.cursor='pointer';
-      var mid=MC.nextMeeting.meeting_id;
-      btn.onclick=function(){
-        if(window.CoC)CoC.write('accord.meeting.joined_from_center','meeting',mid).catch(function(){});
-        window.location.href='/accord.html?meeting='+mid;
-      };
+      btn.style.background='rgba(52,192,112,.08)';
+      btn.style.color='var(--mc-green,#34c070)';
+      btn.style.borderColor='rgba(52,192,112,.35)';
+      if(!btn._startWired){btn._startWired=true;
+        btn.onclick=function(){
+          btn.disabled=true;btn.textContent='Starting…';
+          API.patch('accord_meetings?meeting_id=eq.'+mid,{state:'running',started_at:new Date().toISOString()})
+            .then(function(){window.location.href='/accord.html?meeting='+mid;})
+            .catch(function(){btn.disabled=false;btn.textContent='Start Meeting';});
+        };
+      }
+    } else if(!isOrg&&diff===0){
+      btn.style.opacity='1';btn.style.cursor='pointer';
+      btn.textContent='Join Session →';
+      btn.onclick=function(){window.location.href='/accord.html?meeting='+mid;};
     }
-    // Auto-transition to live when diff hits 0 via realtime; force-check every 30s
   },1000);
+
   // Initial timer value
   var now=new Date(),diff=Math.max(0,Math.floor((sf-now)/1000));
   var el=document.getElementById('elapsed');if(el)el.textContent=Math.floor(diff/60)+':'+padZ(diff%60);
