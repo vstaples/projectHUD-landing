@@ -555,7 +555,7 @@ function swTab(t){
 function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);}
 
 /* ── NOTES (DB-backed) ── */
-function _updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n+(n===1?' item':' items');}
+function _updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n?n+(n===1?' item':' items'):'';}
 function _buildNoteRow(item){
   var iid=item.item_id;
   var isCk=!!item.completed_at,isOther=item.author_resource_id&&item.author_resource_id!==MC.resourceId;
@@ -738,13 +738,14 @@ function _loadStrip(){
     API.get('accord_meetings?state=eq.running&started_at=gte.'+todayUTC.toISOString()+'&select=meeting_id'),
     API.get('accord_meetings?scheduled_for=gte.'+todayUTC.toISOString()+'&scheduled_for=lt.'+tomorrowUTC.toISOString()+'&select=meeting_id'),
     API.get('accord_nodes?tag=eq.action&due_date=lt.'+now.toISOString()+'&select=node_id&limit=50'),
-    API.get('accord_meeting_attendees?rsvp_status=eq.pending&resource_id=eq.'+MC.resourceId+'&select=attendee_id')
+    API.get('accord_meeting_attendees?rsvp_status=eq.pending&resource_id=eq.'+MC.resourceId+'&select=attendee_id'),
+    API.get('accord_minutes_renders?is_ready=eq.false&firm_id=eq.'+MC.firmId+'&select=render_id').catch(function(){return[];})
   ]).then(function(r){
-    var live=r[0]||[],today=r[1]||[],overdue=r[2]||[],rsvps=r[3]||[];
+    var live=r[0]||[],today=r[1]||[],overdue=r[2]||[],rsvps=r[3]||[],notReady=r[4]||[];
     var liveEl=document.querySelector('.strip-live');if(liveEl)liveEl.style.display=live.length?'':'none';
     var lct=document.getElementById('strip-live-count');if(lct)lct.textContent=live.length+' live now';
     var s=function(id,v){var el=document.getElementById(id);if(el)el.textContent=v;};
-    s('strip-mtg-count',today.length);s('strip-action-count',overdue.length);s('strip-rsvp-count',rsvps.length);s('strip-min-count','0');
+    s('strip-mtg-count',today.length);s('strip-action-count',overdue.length);s('strip-rsvp-count',rsvps.length);s('strip-min-count',notReady.length);
     console.log('[MC] strip loaded');
   }).catch(function(e){console.warn('[MC] strip error:',e);});
 }
@@ -770,7 +771,10 @@ function _renderLiveCard(m){
   s('mc-footer-note',(m.workstreams?m.workstreams.name+' · ':'')+'Live');
   var el=document.getElementById('elapsed');if(el)el.style.color='';
   var btn=document.querySelector('.rejoin-btn');
-  if(btn){btn.textContent='Join session →';btn.onclick=function(){window.location.href='/accord.html?meeting='+m.meeting_id;};}
+  if(btn){btn.textContent='Join session →';btn.onclick=function(){
+    if(window.CoC&&MC.liveMeeting)CoC.write('accord.meeting.joined_from_center','meeting',MC.liveMeeting.meeting_id).catch(function(){});
+    window.location.href='/accord.html?meeting='+m.meeting_id;
+  };}
   API.get('accord_meeting_attendees?meeting_id=eq.'+m.meeting_id+'&select=attendee_id,resource_id,rsvp_status,resources(name)').then(function(rows){
     var c=document.querySelector('.attendees');if(!c)return;c.innerHTML='';
     (rows||[]).forEach(function(a){
@@ -898,7 +902,13 @@ function _loadMinutes(){
           +'<span class="min-ws">'+_esc(ws)+'</span><span class="min-age '+ac+'">'+age+'</span></div></div>'
           +'<div class="badge b-c mc-min-link" data-mid="'+m.meeting_id+'">Complete &#8594;</div></div>';
       }).join('');
-      body.addEventListener('click',function(e){var b=e.target.closest('.mc-min-link');if(b)window.location.href='/accord.html?meeting='+b.dataset.mid;});
+      body.addEventListener('click',function(e){
+        var b=e.target.closest('.mc-min-link');
+        if(b){
+          if(window.CoC)CoC.write('accord.minutes.opened_from_center','meeting',b.dataset.mid).catch(function(){});
+          window.location.href='/accord.html?meeting='+b.dataset.mid;
+        }
+      });
       console.log('[MC] minutes rendered:',meetings.length);
     }).catch(function(e){console.warn('[MC] minutes error:',e);});
 }
@@ -950,6 +960,8 @@ function _loadNeedsResponse(){
 function rsvpRespond(attendeeId,status){
   var item=document.querySelector('.nr-item[data-attendee-id="'+attendeeId+'"]');if(!item)return;
   item.style.opacity='.3';item.style.transition='opacity .3s';
+  var mid=item.dataset.meetingId;
+  if(window.CoC&&mid)CoC.write('accord.rsvp.responded_from_center','meeting',mid,{status:status}).catch(function(){});
   API.patch('accord_meeting_attendees?attendee_id=eq.'+attendeeId,{rsvp_status:status}).catch(function(e){console.warn('[MC] rsvp error:',e);});
   setTimeout(function(){
     item.remove();
@@ -960,6 +972,33 @@ function rsvpRespond(attendeeId,status){
   },300);
 }
 
+// Realtime — accord_meetings state changes
+var _rtChannel=null;
+function _initRealtime(){
+  if(_rtChannel)return;
+  var SUPA_URL=(window.PHUD&&window.PHUD.SUPABASE_URL)||window.SUPABASE_URL;
+  var SUPA_KEY=(window.PHUD&&window.PHUD.SUPABASE_KEY)||window.SUPABASE_KEY;
+  if(!SUPA_URL||!SUPA_KEY){console.warn('[MC] realtime: no supabase credentials');return;}
+  if(!window.supabase){
+    // Load supabase JS lib dynamically
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    s.onload=function(){_initRealtime();};
+    document.head.appendChild(s);return;
+  }
+  var rt=window.supabase.createClient(SUPA_URL,SUPA_KEY,{realtime:{params:{eventsPerSecond:5}}});
+  Auth.getFreshToken().then(function(tok){
+    if(rt.realtime&&rt.realtime.setAuth)rt.realtime.setAuth(tok);
+    _rtChannel=rt.channel('mc-meetings-state')
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'accord_meetings'},function(payload){
+        var n=payload.new||{};
+        console.log('[MC] realtime: meeting',n.meeting_id,'→',n.state);
+        if(n.state==='running'||n.state==='idle')_loadLiveCard();
+      })
+      .subscribe(function(status){console.log('[MC] realtime status:',status);});
+  }).catch(function(e){console.warn('[MC] realtime auth error:',e);});
+}
+
 // Boot
 document.addEventListener('DOMContentLoaded',function(){
   _initW();
@@ -967,7 +1006,7 @@ document.addEventListener('DOMContentLoaded',function(){
   _mkHandle('r2ha',_r2w,0,_applyR2);_mkHandle('r2hb',_r2w,1,_applyR2);
   window.addEventListener('resize',_initW);
   _resolveIdentity(function(){
-    _loadStrip();_loadLiveCard();_loadSchedule();_loadUpcoming();_loadMinutes();_loadNotes();_loadNeedsResponse();
+    _loadStrip();_loadLiveCard();_loadSchedule();_loadUpcoming();_loadMinutes();_loadNotes();_loadNeedsResponse();_initRealtime();
   });
   setInterval(function(){if(MC.resourceId)_loadStrip();},60000);
 });
