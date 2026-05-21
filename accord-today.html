@@ -359,7 +359,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1436</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1438</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -383,7 +383,9 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
               <div class="meeting-info">
                 <div class="meeting-title" id="mc-meeting-title" style="color:var(--tm)">Loading...</div>
                 <div class="meeting-stakes" id="mc-meeting-stakes">-</div>
-                <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label" style="color:var(--tm)">-</span><span style="color:var(--tff);margin:0 6px">·</span><i class="ti ti-map-pin"></i><span id="mc-location" style="color:var(--tm)">-</span></div>
+                <div class="meta-row"><i class="ti ti-user"></i><span id="organizer-label" style="color:var(--tm)">-</span></div>
+                <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label" style="color:var(--tm)">-</span></div>
+                <div class="meta-row"><i class="ti ti-map-pin"></i><span id="mc-location" style="color:var(--tm)">-</span></div>
               </div>
               <div class="timer-block">
                 <div class="timer-lbl">Elapsed</div>
@@ -750,12 +752,12 @@ function _renderLiveCard(m){
   s('mc-location',m.location||'No location set','');
   // Hide GO WITH CAVEATS — meeting is starting
   var vb=document.querySelector('.verdict-btn');if(vb)vb.style.display='none';
-  // Organizer name — fetch from users table
+  // Organizer name
   if(m.organizer_id){
     API.get('users?id=eq.'+m.organizer_id+'&select=name').then(function(r){
       var name=r&&r[0]?r[0].name:'–';
-      var sl=document.getElementById('started-label');
-      if(sl)sl.innerHTML='Organizer: <span style="color:var(--cyan)">'+_esc(name)+'</span>';
+      var ol=document.getElementById('organizer-label');
+      if(ol)ol.innerHTML='Organizer: <span style="color:var(--cyan)">'+_esc(name)+'</span>';
     }).catch(function(){});
   }
   var el=document.getElementById('elapsed');if(el)el.style.color='';
@@ -798,8 +800,8 @@ function _renderCountdown(m){
   if(m.organizer_id){
     API.get('users?id=eq.'+m.organizer_id+'&select=name').then(function(r){
       var name=r&&r[0]?r[0].name:'–';
-      var el=document.getElementById('started-label');
-      if(el)el.innerHTML='Organizer: <span style="color:var(--cyan)">'+_esc(name)+'</span>';
+      var ol=document.getElementById('organizer-label');
+      if(ol)ol.innerHTML='Organizer: <span style="color:var(--cyan)">'+_esc(name)+'</span>';
     }).catch(function(){});
   }
   var loc=document.getElementById('mc-location');if(loc)loc.textContent=m.location||'No location set';
