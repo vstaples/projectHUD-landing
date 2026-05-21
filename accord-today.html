@@ -259,9 +259,9 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .note-acts{display:flex;align-items:center;gap:4px;opacity:0;transition:opacity .15s;position:absolute;right:12px}
 .n-pro{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:3px;border:1px solid rgba(0,210,255,.25);background:rgba(0,210,255,.08);color:var(--cyan);cursor:pointer;white-space:nowrap}
 .n-del{width:16px;height:16px;border-radius:3px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.2);color:var(--red);font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer}
-.notes-input{border-top:1px solid var(--border-f);padding:7px 12px;display:grid;grid-template-columns:26px 1fr 100px 20px;align-items:center;background:var(--bg3);flex-shrink:0}
-.ni-ck{width:13px;height:13px;border-radius:3px;border:1px solid #1a2e44;visibility:hidden}
-.ni-f{font-family:Arial,sans-serif;font-size:12px;color:#c8d8e8;padding:2px 7px;outline:none;caret-color:var(--cyan);min-height:18px;background:rgba(255,255,255,.06);border-top:1px solid rgba(255,255,255,.1)}
+.notes-input{border-top:1px solid rgba(255,255,255,.1);padding:8px 12px;display:block;background:var(--bg3);flex-shrink:0}
+.ni-ck{display:none}
+.ni-f{font-family:Arial,sans-serif;font-size:12px;color:#c8d8e8;padding:6px 10px;outline:none;caret-color:var(--cyan);min-height:27px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:8px;display:block;width:100%;box-sizing:border-box}
 .ni-f:empty::before{content:'New item…';color:#7a9abf;pointer-events:none}
 .promo-modal{display:none;position:absolute;right:12px;top:26px;width:175px;background:#111e30;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:9px;z-index:20}
 .promo-modal.open{display:block}
@@ -274,10 +274,10 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 
 .nr-title{font-size:14px;font-weight:700;color:var(--tp);margin-bottom:4px;letter-spacing:-.01em}
 .nr-meta{font-family:var(--mono);font-size:10px;color:var(--tf);margin-bottom:7px}
-.nr-sig{display:none}
+.nr-sig{font-family:Arial,sans-serif;font-size:12px;margin-bottom:6px;display:block}
 .ns-r{color:var(--red)}.ns-a{color:var(--amber)}
-.nr-btns{display:flex;gap:6px;margin-top:4px}
-.nr-btn{padding:3px 14px;border-radius:4px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;transition:all .15s;flex:0 0 auto}
+.nr-btns{display:flex;gap:6px;margin-top:5px;justify-content:flex-start}
+.nr-btn{padding:4px 16px;border-radius:4px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;transition:all .15s}
 .nb-ac{background:rgba(52,192,112,.1);border:1px solid rgba(52,192,112,.3);color:var(--green)}.nb-ac:hover{background:rgba(52,192,112,.2)}
 .nb-dc{background:rgba(255,77,109,.07);border:1px solid rgba(255,77,109,.25);color:var(--red)}.nb-dc:hover{background:rgba(255,77,109,.17)}
 .nb-pr{width:100%;background:rgba(0,210,255,.06);border:1px solid rgba(0,210,255,.25);color:var(--cyan)}.nb-pr:hover{background:rgba(0,210,255,.14)}
@@ -364,7 +364,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1927</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1935</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -1171,9 +1171,10 @@ function _loadNeedsResponse(){
         var el=document.createElement('div');el.className='nr-item';el.dataset.attendeeId=a.attendee_id;
         el.style.setProperty('border-left','3px solid '+_nrColors[_nrIdx++%_nrColors.length],'important');
         var overdueHtml='';
-        if(isOverdue){var d=Math.floor(hoursAgo/24);overdueHtml='<span style="margin-left:auto;font-size:12px"><span style="color:var(--tm)">RSVP </span><span style="color:#ff4d6d">'+d+' day'+(d===1?'':'s')+'</span><span style="color:var(--tm)"> overdue</span></span>';}
+        if(isOverdue){var d=Math.floor(hoursAgo/24);overdueHtml='<div class="nr-sig ns-r"><span style="color:var(--tm)">RSVP </span><span style="color:#ff4d6d">'+d+' day'+(d===1?'':'s')+' </span><span style="color:var(--tm)">overdue</span></div>';}
         var h='<div class="nr-title">'+_esc(m.title||'Untitled')+'</div>';
-        h+='<div class="nr-meta"><span><span style="color:var(--tm)">Invited by </span><span style="color:var(--cyan)">'+_esc(orgName)+'</span><span style="color:var(--green)"> · '+dateStr+'</span></span>'+overdueHtml+'</div>';
+        h+='<div class="nr-meta"><span style="color:var(--tm)">Invited by </span><span style="color:var(--cyan)">'+_esc(orgName)+'</span><span style="color:var(--green)"> · '+dateStr+'</span></div>';
+        h+=overdueHtml;
         h+='<div class="nr-btns"><div class="nr-btn nb-ac" onclick="rsvpRespond(\''+a.attendee_id+'\',\'accepted\')">✓ Accept</div><div class="nr-btn nb-dc" onclick="rsvpRespond(\''+a.attendee_id+'\',\'declined\')">✗ Decline</div></div>';
         el.innerHTML=h;body.appendChild(el);
       });
