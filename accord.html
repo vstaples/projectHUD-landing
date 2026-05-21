@@ -25,6 +25,13 @@
   body.hud-header-rendered #accord-app .topnav {
     display: none !important;
   }
+  /* Push three-pane content below the fixed tier1 strip (42px).
+     Topnav stays at the top of #accord-app. Strip is fixed at top:48px
+     (native topnav height). Three-pane sits below topnav and needs 42px
+     padding to clear the strip. */
+  body.hud-tier1-rendered #accord-app .ac-three-pane {
+    padding-top: 42px !important;
+  }
 </style>
 <link rel="stylesheet" href="/css/accord-constellation.css">
 <link rel="stylesheet" href="/css/accord-rails.css">
@@ -3671,6 +3678,7 @@
 
       // Stamp module body class for CSS overrides (amber tab, Syne font)
       document.body.classList.add('accord-module');
+      document.body.classList.add('hud-header-rendered');
 
       // Build strip
       var strip = document.createElement('div');
@@ -3713,6 +3721,7 @@
       }
 
       document.body.classList.add('hud-tier1-rendered');
+      document.body.classList.add('hud-header-rendered'); // required for CSS push selector
       _setActive('workstreams');
 
       console.log('[accord] tier1 built:', !!document.getElementById('hud-tier1'));
