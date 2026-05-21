@@ -93,6 +93,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 .panel-body{flex:1;overflow-y:auto;min-height:0}
 .panel-body::-webkit-scrollbar{width:4px}.panel-body::-webkit-scrollbar-thumb{background:var(--border-m);border-radius:2px}
 .panel-foot{flex-shrink:0}
+.panel-empty{padding:20px 16px;font-family:var(--mono);font-size:13px;color:var(--tm)}
 .divider{height:1px;background:var(--border-f);margin:10px 0}
 .section-lbl{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--tff);margin-bottom:7px}
 
@@ -449,7 +450,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <div class="panel">
         <div class="panel-hdr"><div class="panel-title">Today's Schedule</div><div class="panel-meta">May 19</div></div>
         <div class="panel-body">
-          <div class="timeline" id="mc-schedule-timeline"><div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading schedule...</div></div>
+          <div class="timeline" id="mc-schedule-timeline"><div class="panel-empty">Loading schedule...</div></div>
         </div>
       </div>
     </div>
@@ -466,8 +467,8 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
             <button class="tab" id="tm_tab" onclick="swTab('m')">This Month</button>
           </div>
           <div class="up-scroll">
-            <div id="pw"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading...</div></div>
-            <div id="pm" style="display:none"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading...</div></div>
+            <div id="pw"><div class="panel-empty">Loading...</div></div>
+            <div id="pm" style="display:none"><div class="panel-empty">Loading...</div></div>
           </div>
         </div>
       </div>
@@ -479,7 +480,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
     <div class="r2c3">
       <div class="panel">
         <div class="panel-hdr"><div class="panel-title">Minutes</div><div class="panel-meta">6 meetings · 2 not ready</div></div>
-        <div class="panel-body" id="mc-minutes-body"><div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">Loading...</div></div>
+        <div class="panel-body" id="mc-minutes-body"><div class="panel-empty">Loading...</div></div>
       </div>
     </div>
 
@@ -827,7 +828,7 @@ function _loadSchedule(){
   var tl=document.getElementById('mc-schedule-timeline');if(!tl)return;
   API.get('accord_meetings?scheduled_for=gte.'+todayUTC.toISOString()+'&scheduled_for=lt.'+tomorrowUTC.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,state,scheduled_for,duration_minutes,workstreams(name)')
     .then(function(rows){
-      if(!rows||!rows.length){tl.innerHTML='<div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">No meetings scheduled today.</div>';return;}
+      if(!rows||!rows.length){tl.innerHTML='<div class="panel-empty">No meetings scheduled today.</div>';return;}
       tl.innerHTML='';var now=new Date(),nowR=false;
       rows.forEach(function(m,i){
         var sf=new Date(m.scheduled_for),ef=m.duration_minutes?new Date(sf.getTime()+m.duration_minutes*60000):null;
@@ -851,7 +852,7 @@ function _loadSchedule(){
 // Upcoming
 function _loadUpcoming(){
   var now=new Date(),nextMonth=new Date(now.getTime()+30*24*60*60*1000);
-  var EMPTY='<div style="padding:20px;font-family:var(--mono);font-size:11px;color:var(--tff)">No upcoming meetings scheduled.</div>';
+  var EMPTY='<div class="panel-empty">No upcoming meetings scheduled.</div>';
   API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+now.toISOString()+'&scheduled_for=lt.'+nextMonth.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,scheduled_for,stakes,workstreams(name)')
     .then(function(rows){
       var pw=document.getElementById('pw'),pm=document.getElementById('pm');
@@ -884,7 +885,7 @@ function _loadMinutes(){
   var body=document.getElementById('mc-minutes-body');if(!body)return;
   API.get('accord_meetings?state=in.(closed,sealed)&order=sealed_at.desc&limit=15&select=meeting_id,title,sealed_at,workstream_id,workstreams(name)')
     .then(function(meetings){
-      if(!meetings||!meetings.length){body.innerHTML='<div style="padding:16px;font-family:var(--mono);font-size:11px;color:var(--tff)">No sealed meetings yet.</div>';return;}
+      if(!meetings||!meetings.length){body.innerHTML='<div class="panel-empty">No sealed meetings yet.</div>';return;}
       var now=new Date();
       body.innerHTML=meetings.map(function(m){
         var sealed=new Date(m.sealed_at),diff=Math.floor((now-sealed)/86400000);
@@ -917,7 +918,7 @@ function _loadNeedsResponse(){
       var nameMap={};(nameRows||[]).forEach(function(u){nameMap[u.id]=u.name;});
       var total=rsvps.length+upcoming.length;
       var badge=document.getElementById('nr-ct');if(badge)badge.textContent=total||'0';
-      if(!total){body.innerHTML='<div style="padding:20px 16px;font-family:var(--mono);font-size:11px;color:var(--tff)">You\'re all clear.</div>';return;}
+      if(!total){body.innerHTML='<div class="panel-empty">You\'re all clear.</div>';return;}
       body.innerHTML='';
       rsvps.forEach(function(a){
         var m=a.meeting_id||{},orgName=nameMap[m.organizer_id]||'Organizer';
@@ -955,7 +956,7 @@ function rsvpRespond(attendeeId,status){
     var rem=document.querySelectorAll('.nr-item').length;
     var badge=document.getElementById('nr-ct');if(badge)badge.textContent=rem;
     var body=document.getElementById('nr-body');
-    if(body&&!rem)body.innerHTML='<div style="padding:20px 16px;font-family:var(--mono);font-size:11px;color:var(--tff)">You\'re all clear.</div>';
+    if(body&&!rem)body.innerHTML='<div class="panel-empty">You\'re all clear.</div>';
   },300);
 }
 
