@@ -364,7 +364,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
       <span>minutes not ready</span>
     </div>
   </div>
-  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1645</span><span id="strip-time">–</span></div>
+  <div class="strip-right"><button id="mc-tune-btn" onclick="mcOpenTuning()" title="Display tuning" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--tm);padding:0 8px 0 0;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--amber)'" onmouseout="this.style.color='var(--tm)'">&#9728;</button><span style="font-size:10px;margin-right:12px;letter-spacing:.04em;color:var(--tm)">build 2026-05-21.1753</span><span id="strip-time">–</span></div>
 </div>
 
 <!-- ── PAGE ── -->
@@ -654,8 +654,15 @@ function _hm(h,m){return h+':'+(m<10?'0':'')+m;}
 function _esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 // Clock
-function _tickClock(){var t=fmt(new Date());['nav-clock','strip-time'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t;});}
+function _tickClock(){
+  var t=fmt(new Date());
+  ['nav-clock','strip-time'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t;});
+  // Update NOW arrow time live
+  var nowT=document.getElementById('now-t');if(nowT)nowT.textContent=t;
+}
 _tickClock();setInterval(_tickClock,15000);
+// Re-render schedule every 5 min so NOW arrow repositions as meetings pass
+setInterval(function(){if(MC.resourceId)_loadSchedule();},5*60*1000);
 
 // Nav date
 (function(){var d=new Date(),el=document.getElementById('mc-nav-date');if(el)el.textContent=_days[d.getDay()]+' '+_mos[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();})();
