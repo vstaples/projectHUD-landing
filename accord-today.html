@@ -622,7 +622,6 @@ window.addEventListener('resize',initW);
 <script src="/js/coc.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/version.js?v=seed"></script>
-<script src="/js/sidebar.js"></script>
 
 <!-- CMD-ACCORD-MEETING-CENTER-1: Accord Tier 1 tab strip -->
 <script>
@@ -954,28 +953,18 @@ function _loadSchedule(){
 }
 
 /* ── BOOT ── */
-window.addEventListener('load', function() {
+// auth.js and api.js are static script tags — available immediately at parse time.
+// No waiting needed. Boot runs at DOMContentLoaded.
+document.addEventListener('DOMContentLoaded', function() {
   _initW();
   _mkHandle('r1ha',_r1w,0,_applyR1);_mkHandle('r1hb',_r1w,1,_applyR1);
   _mkHandle('r2ha',_r2w,0,_applyR2);_mkHandle('r2hb',_r2w,1,_applyR2);
   window.addEventListener('resize',_initW);
-
-  // Wait for API then resolve identity and load all panels
-  var _attempts=0;
-  function _waitForAPI(){
-    if(window.API&&window.API.get&&window.Auth&&window.Auth.getFreshToken){
-      _resolveIdentity(function(){
-        _loadStrip();
-        _loadLiveCard();
-        _loadSchedule();
-      });
-    } else {
-      _attempts++;
-      if(_attempts>80){console.warn('[MC] API/Auth not ready after 8s');return;}
-      setTimeout(_waitForAPI,100);
-    }
-  }
-  _waitForAPI();
+  _resolveIdentity(function(){
+    _loadStrip();
+    _loadLiveCard();
+    _loadSchedule();
+  });
   setInterval(function(){if(MC.resourceId)_loadStrip();},60000);
 });
 </script>
