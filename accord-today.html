@@ -18,7 +18,7 @@
   --bg0:#060a10;--bg1:#0a1119;--bg2:#0d1520;--bg3:#101a27;
   --border:rgba(255,255,255,.08);--border-f:rgba(255,255,255,.04);--border-m:rgba(255,255,255,.12);
   --cyan:#00d2ff;--amber:#f0a020;--green:#34c070;--red:#ff4d6d;--violet:#a855f7;
-  --tp:#e8f0f8;--ts:#c8d8e8;--tm:#4a6a88;--tf:#3a5a78;--tff:#2a4060;
+  --tp:#e8f0f8;--ts:#c8d8e8;--tm:#7a9abf;--tf:#5a7a9a;--tff:#4a6a88;
   --ui:'Syne',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
   --r:8px;--rlg:14px;
   --r1w1:400px;--r1w2:300px;
@@ -30,7 +30,7 @@
   --mc-row1-flex:1;--mc-row2-flex:1;
   --mc-brightness:1;--mc-contrast:1;--mc-saturate:1;
   --mc-col-gap:6px;--mc-zone-gap:6px;--mc-radius:8px;
-  --mc-text-primary:#e8f0f8;--mc-text-muted:#4a6a88;--mc-text-meta:#3a5a78;
+  --mc-text-primary:#e8f0f8;--mc-text-muted:#7a9abf;--mc-text-meta:#5a7a9a;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp);font-size:13px;line-height:1.5;overflow:hidden}
@@ -1011,7 +1011,7 @@ function _initRealtime(){
 
 // ── C-08 DISPLAY TUNING ──
 var _MC_TUNE_KEY='accord-mc-display-tuning';
-var _MC_DEFAULTS={brightness:1,contrast:1,saturate:1,colGap:6,zoneGap:10,radius:8,heroBg:'#0d1520',heroBorderOpacity:.22,panelBg:'#0d1520',stripBg:'#0a1119',amber:'#f0a020',cyan:'#00d2ff',red:'#ff4d6d',violet:'#a855f7',row1Flex:1,row2Flex:1,textPrimary:'#e8f0f8',textMuted:'#4a6a88',textMeta:'#3a5a78'};
+var _MC_DEFAULTS={brightness:1,contrast:1,saturate:1,colGap:6,zoneGap:10,radius:8,heroBg:'#0d1520',heroBorderOpacity:.22,panelBg:'#0d1520',stripBg:'#0a1119',amber:'#f0a020',cyan:'#00d2ff',red:'#ff4d6d',violet:'#a855f7',row1Flex:1,row2Flex:1,textPrimary:'#e8f0f8',textMuted:'#7a9abf',textMeta:'#5a7a9a'};
 var _MC_PRESETS={dark:{brightness:1,contrast:1,saturate:1,heroBg:'#0d1520'},medium:{brightness:1.1,contrast:.95,saturate:1.1,heroBg:'#111c2a'},bright:{brightness:1.25,contrast:.9,saturate:1.2,heroBg:'#162030'}};
 var _mcTuneWin=null;
 
@@ -1026,8 +1026,10 @@ function _mcApplyTune(t){
   r.setProperty('--mc-hero-bg',t.heroBg);r.setProperty('--mc-hero-border-opacity',t.heroBorderOpacity);
   r.setProperty('--mc-panel-bg',t.panelBg);r.setProperty('--mc-strip-bg',t.stripBg);
   r.setProperty('--mc-amber',t.amber);r.setProperty('--mc-cyan',t.cyan);r.setProperty('--mc-red',t.red);r.setProperty('--mc-violet',t.violet);
+  r.setProperty('--amber',t.amber);r.setProperty('--cyan',t.cyan);r.setProperty('--red',t.red);r.setProperty('--violet',t.violet);
   r.setProperty('--mc-row1-flex',t.row1Flex);r.setProperty('--mc-row2-flex',t.row2Flex);
   r.setProperty('--mc-text-primary',t.textPrimary);r.setProperty('--mc-text-muted',t.textMuted);r.setProperty('--mc-text-meta',t.textMeta);
+  r.setProperty('--tp',t.textPrimary);r.setProperty('--ts',t.textPrimary);r.setProperty('--tm',t.textMuted);r.setProperty('--tf',t.textMeta);r.setProperty('--tff',t.textMeta);
 }
 function mcOpenTuning(){
   if(_mcTuneWin&&!_mcTuneWin.closed){_mcTuneWin.focus();return;}
