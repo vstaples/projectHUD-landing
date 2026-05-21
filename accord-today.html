@@ -340,26 +340,26 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 <div class="strip">
   <div class="strip-live">
     <div class="strip-pulse"></div>
-    <div class="strip-live-text">1 live now</div>
+    <div class="strip-live-text" id="strip-live-count">1 live now</div>
   </div>
   <div class="strip-chips">
     <div class="strip-chip">
-      <span class="strip-chip-num cyan">5</span>
+      <span class="strip-chip-num cyan" id="strip-mtg-count">5</span>
       <span>meetings today</span>
     </div>
     <div class="strip-sep"></div>
     <div class="strip-chip">
-      <span class="strip-chip-num red">4</span>
+      <span class="strip-chip-num red" id="strip-action-count">4</span>
       <span>actions due</span>
     </div>
     <div class="strip-sep"></div>
     <div class="strip-chip">
-      <span class="strip-chip-num amber">2</span>
+      <span class="strip-chip-num amber" id="strip-rsvp-count">2</span>
       <span>need your response</span>
     </div>
     <div class="strip-sep"></div>
     <div class="strip-chip">
-      <span class="strip-chip-num amber">2</span>
+      <span class="strip-chip-num amber" id="strip-min-count">2</span>
       <span>minutes not ready</span>
     </div>
   </div>
@@ -400,7 +400,7 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
                 <div class="meeting-title">Interview: Glen Campbell</div>
                 <div class="meeting-stakes">Electrical Engineer Candidate · C-11 Workstream</div>
                 <div class="meta-row"><i class="ti ti-clock"></i><span id="started-label">Started –</span></div>
-                <div class="meta-row"><i class="ti ti-map-pin"></i>Conference Room B</div>
+                <div class="meta-row"><i class="ti ti-map-pin"></i><span id="mc-location">Conference Room B</span></div>
               </div>
               <div class="timer-block">
                 <div class="timer-lbl">Elapsed</div>
@@ -420,10 +420,10 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
             <div class="divider"></div>
             <div class="section-lbl">Open items</div>
             <div class="chips">
-              <div class="chip"><div class="chip-num cn-r">4</div><div class="chip-lbl">Actions Due</div></div>
-              <div class="chip"><div class="chip-num cn-a">2</div><div class="chip-lbl">Decisions Needed</div></div>
-              <div class="chip"><div class="chip-num cn-a">3</div><div class="chip-lbl">Open Questions</div></div>
-              <div class="chip"><div class="chip-num cn-m">5</div><div class="chip-lbl">Agenda Items</div></div>
+              <div class="chip"><div class="chip-num cn-r" id="chip-actions-due">4</div><div class="chip-lbl">Actions Due</div></div>
+              <div class="chip"><div class="chip-num cn-a" id="chip-decisions">2</div><div class="chip-lbl">Decisions Needed</div></div>
+              <div class="chip"><div class="chip-num cn-a" id="chip-questions">3</div><div class="chip-lbl">Open Questions</div></div>
+              <div class="chip"><div class="chip-num cn-m" id="chip-agenda">5</div><div class="chip-lbl">Agenda Items</div></div>
             </div>
           </div>
         </div>
@@ -550,68 +550,60 @@ html,body{height:100%;font-family:var(--ui);background:var(--bg0);color:var(--tp
 </main>
 
 <script>
+/* ============================================================
+   CMD-ACCORD-MEETING-CENTER-1 C-04
+   Meeting Center — production data layer
+   ============================================================ */
+
 /* ── TIME UTILS ── */
-function fmt(d){var h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+(m<10?'0':'')+m+' '+ap;}
-function fmtH(d){var h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+(m<10?'0':'')+m+' '+ap;}
+var MC = {};  // namespace for all Meeting Center state
 var mos=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function fmtS(d){var mon=mos[d.getMonth()],day=d.getDate(),h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return mon+' '+day+' · '+h+':'+(m<10?'0':'')+m+' '+ap;}
-
-/* ── LIVE MEETING — relative to real current time ── */
-/* Meeting started 45 minutes ago from now, runs 60 min */
-var DURATION_MIN=60;
-function getMeetingStart(){
-  var now=new Date();
-  var s=new Date(now.getTime()-45*60*1000);
-  return s;
-}
-function getMeetingEnd(start){return new Date(start.getTime()+DURATION_MIN*60*1000);}
-
+var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function fmt(d){var h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+(m<10?'0':'')+m+' '+ap;}
+function fmtH(d){return fmt(d);}
+function fmtDate(d){return days[d.getDay()]+' '+mos[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();}
+function fmtS(d){return mos[d.getMonth()]+' '+d.getDate()+' · '+fmt(d);}
 function padZ(n){return n<10?'0'+n:String(n);}
+function hm(h,mi){return h+':'+(mi<10?'0':'')+mi;}
 
-function tickAll(){
+/* ── CLOCK (always running) ── */
+function tickClock(){
+  var t=fmt(new Date());
+  ['nav-clock','now-t','strip-time'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.textContent=t;
+  });
+}
+tickClock();
+setInterval(tickClock,15000);
+
+/* ── LIVE MEETING TICKER (runs when MC.liveMeeting is set) ── */
+var _liveInterval=null;
+function _startLiveTicker(){
+  if(_liveInterval)return;
+  _liveInterval=setInterval(_tickLive,1000);
+}
+function _tickLive(){
+  if(!MC.liveMeeting)return;
   var now=new Date();
-  var t=fmt(now);
-  ['nav-clock','now-t','strip-time'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t;});
-
-  var start=getMeetingStart();
-  var end=getMeetingEnd(start);
+  var start=new Date(MC.liveMeeting.started_at);
   var elapsedSec=Math.max(0,Math.floor((now-start)/1000));
   var m=Math.floor(elapsedSec/60),s=elapsedSec%60;
   var el=document.getElementById('elapsed');
   if(el)el.textContent=m+':'+padZ(s);
-
-  var sl=document.getElementById('started-label');
-  if(sl)sl.textContent='Started: '+fmtH(start);
-
   var sub=document.getElementById('timer-sub');
-  var remSec=Math.max(0,Math.floor((end-now)/1000));
-  var rm=Math.floor(remSec/60);
-  if(sub)sub.textContent=rm>0?(rm+'m remaining'):'ending soon';
-
-  /* schedule labels */
-  var stH=start.getHours(),stM=start.getMinutes();
-  var enH=end.getHours(),enM=end.getMinutes();
-  function hm(h,m){return h+':'+(m<10?'0':'')+m;}
-  var tl=document.getElementById('live-time-lbl');
-  if(tl)tl.textContent=hm(stH,stM);
-  var rl=document.getElementById('live-range-lbl');
-  if(rl)rl.innerHTML=hm(stH,stM)+'–'+hm(enH,enM)+' <span class="tp-pill tp-lv">Live</span>';
+  if(sub&&MC.liveMeeting.duration_minutes){
+    var endMs=start.getTime()+MC.liveMeeting.duration_minutes*60*1000;
+    var remSec=Math.max(0,Math.floor((endMs-now)/1000));
+    var rm=Math.floor(remSec/60);
+    sub.textContent=rm>0?(rm+'m remaining'):'ending soon';
+  }
 }
-tickAll();
-setInterval(tickAll,1000);
-
-/* ── NAV DATE (production) ── */
-(function() {
-  var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  var mos  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var now  = new Date();
-  var el   = document.getElementById('mc-nav-date');
-  if (el) el.textContent = days[now.getDay()] + ' ' + mos[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear();
-})();
 
 /* ── POPUP ── */
 function togglePopup(){document.getElementById('rdpop').classList.toggle('open');}
-document.addEventListener('click',function(e){if(!e.target.closest('.verdict-btn')){var p=document.getElementById('rdpop');if(p)p.classList.remove('open');}});
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.verdict-btn')){var p=document.getElementById('rdpop');if(p)p.classList.remove('open');}
+});
 
 /* ── TABS ── */
 function swTab(t){
@@ -621,10 +613,18 @@ function swTab(t){
   document.getElementById('pm').style.display=t==='m'?'':'none';
 }
 
-/* ── NEEDS RESPONSE ── */
-function dismissNr(id){var el=document.getElementById(id);if(!el)return;el.style.opacity='.3';el.style.transition='opacity .3s';setTimeout(function(){el.remove();var n=document.querySelectorAll('.nr-item').length;var b=document.getElementById('nr-ct');if(b)b.textContent=n;},300);}
+/* ── NEEDS RESPONSE (UI only — substrate wired in C-06) ── */
+function dismissNr(id){
+  var el=document.getElementById(id);if(!el)return;
+  el.style.opacity='.3';el.style.transition='opacity .3s';
+  setTimeout(function(){
+    el.remove();
+    var n=document.querySelectorAll('.nr-item').length;
+    var b=document.getElementById('nr-ct');if(b)b.textContent=n;
+  },300);
+}
 
-/* ── NOTES ── */
+/* ── NOTES (UI only — substrate wired in C-05) ── */
 var nc=6;
 function updNC(){var n=document.querySelectorAll('.note-row').length,el=document.getElementById('note-count');if(el)el.textContent=n+(n===1?' item':' items');}
 function toggleNote(el){var c=el.classList.toggle('ck');el.textContent=c?'✓':'';var b=el.nextElementSibling;if(b)b.classList.toggle('ck',c);}
@@ -637,7 +637,7 @@ function noteKey(e){
   var id='n-'+nc,pid='p-'+nc;nc++;
   var t=fmtS(new Date());
   var row=document.createElement('div');row.className='note-row';row.id=id;
-  row.innerHTML='<div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">'+val+'</div><div class="note-time">'+t+'</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro(\''+pid+'\')">→ Action</div><div class="n-del" onclick="delNote(\''+id+'\')">×</div></div><div class="promo-modal" id="'+pid+'"><div class="promo-lbl">Promote to workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">C-11 Workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">Base Workstream</div><div class="promo-opt" onclick="proNote(\''+id+'\',\''+pid+'\')">Control Adapter</div></div>';
+  row.innerHTML='<div class="note-ck" onclick="toggleNote(this)"></div><div class="note-body">'+val+'</div><div class="note-time">'+t+'</div><div class="no-badge"></div><div class="note-acts"><div class="n-pro" onclick="tPro(''+pid+'')">→ Action</div><div class="n-del" onclick="delNote(''+id+'')">×</div></div><div class="promo-modal" id="'+pid+'"><div class="promo-lbl">Promote to workstream</div></div>';
   document.getElementById('notes-inner').appendChild(row);f.textContent='';updNC();
 }
 document.addEventListener('click',function(e){if(!e.target.closest('.n-pro')&&!e.target.closest('.promo-modal'))document.querySelectorAll('.promo-modal').forEach(function(m){m.classList.remove('open');});});
@@ -665,6 +665,347 @@ initW();
 mkHandle('r1ha',r1w,0,applyR1);mkHandle('r1hb',r1w,1,applyR1);
 mkHandle('r2ha',r2w,0,applyR2);mkHandle('r2hb',r2w,1,applyR2);
 window.addEventListener('resize',initW);
+
+/* ============================================================
+   C-04: IDENTITY RESOLUTION + LIVE CARD + TODAY'S SCHEDULE
+   Waits for API to be ready, then resolves identity, then
+   runs all substrate queries in parallel.
+   ============================================================ */
+function _waitForAPI(cb,attempts){
+  attempts=attempts||0;
+  if(window.API&&window.API.get){cb();return;}
+  if(attempts>40){console.warn('[MC] API not available after 4s');return;}
+  setTimeout(function(){_waitForAPI(cb,attempts+1);},100);
+}
+
+function _resolveIdentity(cb){
+  // CURRENT_USER is set by hud-shell.js after init — wait for it
+  var attempts=0;
+  function check(){
+    if(window.CURRENT_USER&&CURRENT_USER.user_id){
+      // Resolve resource_id from resources table (IR47: verify column name)
+      API.get('resources?user_id=eq.'+CURRENT_USER.user_id+'&select=id,name&limit=1')
+        .then(function(rows){
+          var row=(rows&&rows[0])||null;
+          MC.userId=CURRENT_USER.user_id;
+          MC.resourceId=row?row.id:null;
+          MC.userName=row?row.name:(CURRENT_USER.name||'');
+          // Populate avatar initials
+          var av=document.getElementById('mc-avatar');
+          if(av&&MC.userName){
+            av.textContent=MC.userName.split(' ').map(function(w){return w[0];}).join('').toUpperCase().substring(0,2);
+          }
+          console.log('[MC] identity resolved — resource:',MC.resourceId);
+          cb();
+        })
+        .catch(function(e){
+          console.warn('[MC] resource lookup failed:',e);
+          MC.userId=CURRENT_USER.user_id;
+          MC.resourceId=null;
+          cb();
+        });
+    } else {
+      attempts++;
+      if(attempts>50){console.warn('[MC] CURRENT_USER not set after 5s');cb();return;}
+      setTimeout(check,100);
+    }
+  }
+  check();
+}
+
+/* ── SITUATION STRIP ── */
+function _loadStrip(){
+  if(!MC.resourceId)return;
+  var today=new Date();today.setHours(0,0,0,0);
+  var tomorrow=new Date(today.getTime()+86400000);
+  var todayISO=today.toISOString();
+  var tomorrowISO=tomorrow.toISOString();
+  var nowISO=new Date().toISOString();
+
+  Promise.all([
+    // Live meetings I'm in
+    API.get('accord_meetings?state=eq.running&select=meeting_id'),
+    // Today's meetings (organizer or attendee)
+    API.get('accord_meetings?scheduled_for=gte.'+todayISO+'&scheduled_for=lt.'+tomorrowISO+'&select=meeting_id'),
+    // My overdue actions
+    API.get('accord_nodes?tag=eq.action&due_date=lt.'+nowISO+'&select=node_id'),
+    // My pending RSVPs
+    API.get('accord_meeting_attendees?rsvp_status=eq.pending&resource_id=eq.'+MC.resourceId+'&select=attendee_id'),
+    // Not-ready minutes (closed meetings with no complete render)
+    API.get('accord_minutes_renders?status=neq.complete&select=render_id')
+  ]).then(function(results){
+    var live=results[0]||[], today=results[1]||[], actions=results[2]||[];
+    var rsvps=results[3]||[], minutes=results[4]||[];
+
+    // Update strip chips
+    _setChip('strip-live-count', live.length, live.length>0);
+    _setChip('strip-mtg-count', today.length, false);
+    _setChip('strip-action-count', actions.length, actions.length>0);
+    _setChip('strip-rsvp-count', rsvps.length, rsvps.length>0);
+    _setChip('strip-min-count', minutes.length, minutes.length>0);
+
+    // Show/hide live pulse
+    var pulse=document.querySelector('.strip-pulse');
+    var liveText=document.querySelector('.strip-live-text');
+    var liveSep=document.querySelector('.strip-live');
+    if(live.length===0&&liveSep){liveSep.style.display='none';}
+    else if(liveSep){
+      liveSep.style.display='';
+      if(liveText)liveText.textContent=live.length+' live now';
+    }
+    console.log('[MC] strip loaded — live:'+live.length+' mtg:'+today.length);
+  }).catch(function(e){console.warn('[MC] strip load error:',e);});
+}
+
+function _setChip(id,val,urgent){
+  var el=document.getElementById(id);
+  if(el){el.textContent=val;el.className='strip-chip-num'+(urgent?' red':'');}
+}
+
+/* ── LIVE CARD ── */
+function _loadLiveCard(){
+  if(!MC.resourceId)return;
+
+  // Find running meetings where I'm organizer or attendee
+  Promise.all([
+    API.get('accord_meetings?state=eq.running&select=meeting_id,title,stakes,briefing_text,started_at,duration_minutes,location,workstream_id,organizer_id,workstreams(name)'),
+    API.get('accord_meeting_attendees?resource_id=eq.'+MC.resourceId+'&select=meeting_id,rsvp_status&accord_meetings!inner(state=eq.running)')
+  ]).then(function(results){
+    var organized=results[0]||[];
+    var attending=results[1]||[];
+
+    // Merge — find first running meeting I'm part of
+    var allIds=organized.map(function(m){return m.meeting_id;});
+    attending.forEach(function(a){if(allIds.indexOf(a.meeting_id)===-1)allIds.push(a.meeting_id);});
+
+    if(allIds.length===0){
+      _renderNoLiveMeeting();
+      return;
+    }
+
+    // Load first running meeting full detail
+    var mid=allIds[0];
+    var meeting=organized.find(function(m){return m.meeting_id===mid;})||organized[0];
+    if(!meeting){
+      // I'm an attendee but not organizer — fetch meeting detail
+      API.get('accord_meetings?meeting_id=eq.'+mid+'&select=meeting_id,title,stakes,briefing_text,started_at,duration_minutes,location,workstream_id,workstreams(name)&limit=1')
+        .then(function(rows){if(rows&&rows[0])_renderLiveCard(rows[0],mid);});
+      return;
+    }
+    _renderLiveCard(meeting,mid);
+  }).catch(function(e){console.warn('[MC] live card error:',e);});
+}
+
+function _renderLiveCard(meeting,mid){
+  MC.liveMeeting=meeting;
+  MC.liveMeeting.meeting_id=mid;
+
+  // Update title and meta
+  var title=document.querySelector('.meeting-title');
+  if(title)title.textContent=meeting.title||'Untitled Meeting';
+
+  var stakes=document.querySelector('.meeting-stakes');
+  if(stakes){
+    var wsName=meeting.workstreams?meeting.workstreams.name:'';
+    stakes.textContent=(meeting.stakes||meeting.briefing_text||'')+(wsName?' · '+wsName:'');
+  }
+
+  var loc=document.getElementById('mc-location');
+  if(loc)loc.textContent=meeting.location||'No location set';
+
+  var sl=document.getElementById('started-label');
+  if(sl&&meeting.started_at)sl.textContent='Started: '+fmtH(new Date(meeting.started_at));
+
+  // Sub count
+  var sub=document.getElementById('timer-sub');
+  if(sub)sub.textContent='';
+
+  // Load attendees
+  API.get('accord_meeting_attendees?meeting_id=eq.'+mid+'&select=attendee_id,resource_id,rsvp_status,role_in_meeting,resources(name)')
+    .then(function(attendees){_renderAttendees(attendees||[]);});
+
+  // Load chips
+  Promise.all([
+    API.get('accord_nodes?tag=eq.action&meeting_id=eq.'+mid+'&select=node_id,due_date'),
+    API.get('accord_agenda_items?meeting_id=eq.'+mid+'&item_type=eq.DECIDE&select=agenda_item_id'),
+    API.get('accord_agenda_items?meeting_id=eq.'+mid+'&item_type=eq.QUESTION&select=agenda_item_id'),
+    API.get('accord_agenda_items?meeting_id=eq.'+mid+'&select=agenda_item_id')
+  ]).then(function(r){
+    var now=new Date();
+    var overdue=(r[0]||[]).filter(function(n){return n.due_date&&new Date(n.due_date)<now;});
+    _setChipVal('chip-actions-due',   overdue.length,    overdue.length>0,   'red');
+    _setChipVal('chip-decisions',     (r[1]||[]).length, (r[1]||[]).length>0,'amber');
+    _setChipVal('chip-questions',     (r[2]||[]).length, (r[2]||[]).length>0,'amber');
+    _setChipVal('chip-agenda',        (r[3]||[]).length, false,              'muted');
+  });
+
+  // Wire JOIN button
+  var btn=document.querySelector('.rejoin-btn');
+  if(btn){
+    btn.textContent='Join session →';
+    btn.onclick=function(){
+      window.location.href='/accord.html?meeting='+mid;
+    };
+  }
+
+  // Start live ticker
+  _startLiveTicker();
+  console.log('[MC] live card rendered for meeting:',mid);
+}
+
+function _renderNoLiveMeeting(){
+  // No live meeting — show next upcoming meeting instead
+  var now=new Date();
+  API.get('accord_meetings?state=eq.idle&scheduled_for=gte.'+now.toISOString()+'&order=scheduled_for.asc&limit=1&select=meeting_id,title,stakes,scheduled_for,duration_minutes,location,workstream_id,workstreams(name)')
+    .then(function(rows){
+      if(!rows||!rows[0]){
+        _renderEmptyLiveCard();
+        return;
+      }
+      var m=rows[0];
+      var badge=document.querySelector('.live-badge');
+      if(badge)badge.innerHTML='<span style="color:var(--cyan)">↗ Next Meeting</span>';
+      var pulse=document.querySelector('.live-pulse');
+      if(pulse){pulse.style.background='var(--cyan)';pulse.style.animationName='none';}
+
+      var title=document.querySelector('.meeting-title');
+      if(title)title.textContent=m.title||'Untitled Meeting';
+
+      var stakes=document.querySelector('.meeting-stakes');
+      if(stakes){var ws=m.workstreams?m.workstreams.name:'';stakes.textContent=(m.stakes||'')+(ws?' · '+ws:'');}
+
+      // Countdown
+      var sf=new Date(m.scheduled_for);
+      var el=document.getElementById('elapsed');
+      var lbl=document.querySelector('.timer-lbl');
+      if(lbl)lbl.textContent='Starts in';
+      var _cd=setInterval(function(){
+        var diff=Math.max(0,Math.floor((sf-new Date())/1000));
+        var hh=Math.floor(diff/3600),mm=Math.floor((diff%3600)/60),ss=diff%60;
+        if(el)el.textContent=(hh>0?hh+'h ':'')+mm+'m '+padZ(ss)+'s';
+        if(diff===0)clearInterval(_cd);
+      },1000);
+
+      var sl=document.getElementById('started-label');
+      if(sl)sl.textContent='Scheduled: '+fmtH(sf)+' · '+mos[sf.getMonth()]+' '+sf.getDate();
+
+      var btn=document.querySelector('.rejoin-btn');
+      if(btn){
+        btn.textContent='Prepare →';
+        btn.onclick=function(){window.location.href='/accord.html?meeting='+m.meeting_id;};
+      }
+      console.log('[MC] next meeting card rendered');
+    });
+}
+
+function _renderEmptyLiveCard(){
+  var badge=document.querySelector('.live-badge');
+  if(badge)badge.innerHTML='<span style="color:var(--tff)">No meetings today</span>';
+  var pulse=document.querySelector('.live-pulse');
+  if(pulse)pulse.style.display='none';
+  var el=document.getElementById('elapsed');
+  if(el)el.textContent='–';
+}
+
+function _renderAttendees(attendees){
+  var container=document.querySelector('.attendees');
+  if(!container)return;
+  container.innerHTML='';
+  attendees.forEach(function(a){
+    var name=a.resources?a.resources.name:'Unknown';
+    var status=a.rsvp_status;
+    var cls=status==='accepted'?'c':status==='declined'?'a':'l';
+    var dotCls=status==='accepted'?'dg':status==='declined'?'dd':'da';
+    var pill=document.createElement('div');
+    pill.className='att-pill '+cls;
+    pill.innerHTML='<div class="att-dot '+dotCls+'"></div>'+_esc(name);
+    container.appendChild(pill);
+  });
+}
+
+function _setChipVal(id,val,urgent,colorClass){
+  var el=document.getElementById(id);
+  if(el){
+    el.textContent=val;
+    el.className='chip-num cn-'+(urgent?colorClass:'m');
+  }
+}
+
+function _esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── TODAY'S SCHEDULE ── */
+function _loadSchedule(){
+  var today=new Date();today.setHours(0,0,0,0);
+  var tomorrow=new Date(today.getTime()+86400000);
+
+  API.get('accord_meetings?scheduled_for=gte.'+today.toISOString()+'&scheduled_for=lt.'+tomorrow.toISOString()+'&order=scheduled_for.asc&select=meeting_id,title,state,scheduled_for,duration_minutes,workstream_id,workstreams(name)')
+    .then(function(meetings){
+      if(!meetings||!meetings.length)return;
+      var container=document.querySelector('.timeline');
+      if(!container)return;
+      container.innerHTML='';
+
+      var now=new Date();
+      var nowRendered=false;
+
+      meetings.forEach(function(m,i){
+        var sf=new Date(m.scheduled_for);
+        var ef=m.duration_minutes?new Date(sf.getTime()+m.duration_minutes*60000):null;
+        var isDone=m.state==='closed'||m.state==='sealed'||(ef&&ef<now);
+        var isLive=m.state==='running';
+        var isNext=!isLive&&!isDone&&!nowRendered;
+
+        // Insert NOW marker before the first future meeting
+        if(!nowRendered&&!isDone&&!isLive){
+          nowRendered=true;
+          var nr=document.createElement('div');
+          nr.className='now-row';
+          nr.innerHTML='<div class="now-time" id="now-t">'+fmt(now)+'</div><div class="now-line"></div><div class="now-lbl">Now</div>';
+          container.appendChild(nr);
+        }
+
+        var timeStr=hm(sf.getHours(),sf.getMinutes());
+        var rangeStr=timeStr+(ef?'–'+hm(ef.getHours(),ef.getMinutes()):'');
+
+        var dotCls=isDone?'td-dn':isLive?'td-lv':isNext?'td-nx':'td-ft';
+        var blockCls=isDone?'tb-dn':isLive?'tb-lv':isNext?'tb-nx tb-ext':'tb-ft';
+        var timeCls=isLive?'ta':isNext?'tn':'';
+
+        var row=document.createElement('div');
+        row.className='t-row';
+        row.innerHTML=
+          '<div class="t-time '+timeCls+'">'+timeStr+'</div>'+
+          '<div class="t-axis">'+
+            '<div class="t-dot '+dotCls+'"></div>'+
+            (i<meetings.length-1?'<div class="t-line'+(isLive?' tl-lv':'')+'"></div>':'')+
+          '</div>'+
+          '<div class="t-block '+blockCls+'" onclick="window.location.href='/accord.html?meeting='+m.meeting_id+''">'+
+            '<div class="tb-title">'+_esc(m.title)+'</div>'+
+            '<div class="tb-meta">'+rangeStr+(isLive?' <span class="tp-pill tp-lv">Live</span>':'')+'</div>'+
+          '</div>';
+        container.appendChild(row);
+      });
+      console.log('[MC] schedule rendered — '+meetings.length+' meetings');
+    })
+    .catch(function(e){console.warn('[MC] schedule error:',e);});
+}
+
+/* ── BOOT ── */
+_waitForAPI(function(){
+  _resolveIdentity(function(){
+    _loadStrip();
+    _loadLiveCard();
+    _loadSchedule();
+  });
+});
+
+// Refresh strip every 60 seconds
+setInterval(function(){
+  if(MC.resourceId)_loadStrip();
+},60000);
+
 </script>
 
 <!-- CMD-ACCORD-MEETING-CENTER-1 C-03: Supabase client + shell loader -->
