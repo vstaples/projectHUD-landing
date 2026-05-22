@@ -400,7 +400,7 @@ const HUDShell = (() => {
         background: none; border: none;
         border-bottom: 2px solid transparent;
         color: #7a9bbf;
-        font-family: 'Barlow Condensed','Rajdhani',sans-serif;
+        font-family: Arial, sans-serif;
         font-size: 13px; font-weight: 600;
         letter-spacing: 0.10em; text-transform: uppercase;
         cursor: pointer; white-space: nowrap;
@@ -408,11 +408,7 @@ const HUDShell = (() => {
       }
       .hud-tier1-tab:hover { color: #e8f4ff; background: rgba(255,255,255,0.03); }
       .hud-tier1-tab.active { color: #00d2ff; border-bottom-color: #00d2ff; }
-      /* CMD-ACCORD-MEETING-CENTER-1: Accord module — amber active tab + Syne wordmark */
-      body.accord-module #hud-tier1 .hud-tier1-tab.active {
-        color: #ffaa00;
-        border-bottom-color: #ffaa00;
-      }
+      /* Accord module — cyan active tab (uniform across all Accord pages) + Syne wordmark */
       body.accord-module .hud-module-name {
         font-family: 'Syne', system-ui, sans-serif;
       }

@@ -3679,7 +3679,7 @@
       if (!window.HUDShell) { setTimeout(_buildAccordTier1, 80); return; }
       if (document.getElementById('hud-tier1')) return;
 
-      // Stamp module body class for CSS overrides (amber tab, Syne font)
+      // Stamp module body class for CSS overrides (cyan active tab, Syne font)
       document.body.classList.add('accord-module');
 
       // Build strip
@@ -3725,6 +3725,31 @@
 
       document.body.classList.add('accord-tier1-ready');
       _setActive('workstreams');
+
+      // Inject tune button + build stamp + clock (mirrors accord-today.html)
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'margin-left:auto;display:flex;align-items:center;gap:8px;padding-right:16px;';
+      var btn = document.createElement('button');
+      btn.id = 'mc-tune-btn'; btn.title = 'Display tuning'; btn.innerHTML = '&#9728;';
+      btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;color:var(--tm);padding:0;line-height:1;transition:color .15s;';
+      btn.onmouseover = function(){ this.style.color = 'var(--amber)'; };
+      btn.onmouseout  = function(){ this.style.color = 'var(--tm)'; };
+      btn.onclick     = function(){ if (typeof mcOpenTuning === 'function') mcOpenTuning(); };
+      var bs = document.createElement('span');
+      bs.id = 'nav-build-stamp';
+      bs.style.cssText = 'font-family:Arial,sans-serif;font-size:13px;color:var(--tm);white-space:nowrap;letter-spacing:.03em;';
+      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.0000</span>';
+      var nt = document.createElement('span');
+      nt.id = 'nav-time';
+      nt.style.cssText = 'font-family:Arial,sans-serif;font-size:13px;color:var(--tm);white-space:nowrap;';
+      wrap.appendChild(btn); wrap.appendChild(bs); wrap.appendChild(nt);
+      strip.appendChild(wrap);
+      // Sync clock
+      setInterval(function(){
+        var el = document.getElementById('nav-time');
+        if (el) el.textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+      }, 1000);
+      document.getElementById('nav-time').textContent = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
 
       console.log('[accord] tier1 built:', !!document.getElementById('hud-tier1'));
     }
