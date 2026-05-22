@@ -332,30 +332,34 @@
     const empty = document.createElement('div');
     empty.className = 'ac-empty';
     empty.innerHTML = `
-      <div class="ac-empty-inner">
-        <svg width="100%" viewBox="0 0 680 420" role="img" xmlns="http://www.w3.org/2000/svg" style="max-width:520px;display:block;margin:0 auto 8px;">
+      <div class="ac-empty-inner" style="width:50%;max-width:50%;">
+        <svg width="100%" viewBox="0 0 680 420" role="img" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 8px;">
           <title>No workstreams yet</title>
           <desc>Animated constellation placeholder — create your first workstream to begin</desc>
           <defs>
             <style>
               .ace-orb{fill:none;stroke:rgba(0,210,255,0.12);stroke-width:0.5}
-              .ace-ring{fill:none;stroke:#00d2ff;stroke-width:1;opacity:0.6}
-              .ace-core{fill:#00d2ff;opacity:0.25}
-              .ace-bright{fill:#00d2ff;opacity:0.7}
+              .ace-ring{fill:none;stroke:#00d2ff;stroke-width:1}
+              .ace-core{fill:#00d2ff}
               .ace-spoke{stroke:rgba(0,210,255,0.18);stroke-width:0.5;fill:none}
-              .ace-lbl{font-family:'JetBrains Mono',monospace;font-size:11px;fill:rgba(0,210,255,0.45);letter-spacing:0.12em}
+              .ace-lbl{font-family:'JetBrains Mono',monospace;font-size:11px;fill:rgba(0,210,255,0.7);letter-spacing:0.1em}
               .ace-h{font-family:'Syne',system-ui,sans-serif;font-size:22px;font-weight:700;fill:#e8f0f8}
-              .ace-sub{font-family:'JetBrains Mono',monospace;font-size:12px;fill:#7a9abf;letter-spacing:0.04em}
+              .ace-sub{font-family:'JetBrains Mono',monospace;font-size:12px;fill:#f0a020;letter-spacing:0.04em}
               .ace-cta-bg{fill:rgba(0,210,255,0.08);stroke:rgba(0,210,255,0.35);stroke-width:1}
-              .ace-cta-t{font-family:'JetBrains Mono',monospace;font-size:11px;fill:#e8f0f8;letter-spacing:0.1em}
-              .ace-p1{animation:ace-pulse 3s ease-in-out infinite;transform-origin:340px 185px}
-              .ace-p2{animation:ace-pulse 3s ease-in-out 1s infinite;transform-origin:340px 185px}
-              .ace-p3{animation:ace-pulse 3s ease-in-out 2s infinite;transform-origin:340px 185px}
+              .ace-cta-t{font-family:Arial,sans-serif;font-size:11px;fill:#e8f0f8;letter-spacing:0.05em}
+              .ace-halo{fill:rgba(0,210,255,0.08);stroke:none}
+              .ace-p1{animation:ace-orbit 3s ease-in-out infinite}
+              .ace-p2{animation:ace-orbit 3s ease-in-out 1s infinite}
+              .ace-p3{animation:ace-orbit 3s ease-in-out 2s infinite}
               .ace-f1{animation:ace-float 6s ease-in-out infinite}
               .ace-f2{animation:ace-float 6s ease-in-out 2s infinite}
               .ace-f3{animation:ace-float 6s ease-in-out 4s infinite}
-              @keyframes ace-pulse{0%,100%{opacity:0.12}50%{opacity:0.28}}
+              .ace-g1{animation:ace-glow 2.5s ease-in-out infinite}
+              .ace-g2{animation:ace-glow 2.5s ease-in-out 0.8s infinite}
+              .ace-g3{animation:ace-glow 2.5s ease-in-out 1.6s infinite}
+              @keyframes ace-orbit{0%,100%{opacity:0.12}50%{opacity:0.3}}
               @keyframes ace-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+              @keyframes ace-glow{0%,100%{opacity:0.15}50%{opacity:0.55}}
             </style>
           </defs>
           <circle class="ace-orb ace-p1" cx="340" cy="185" r="60"/>
@@ -367,30 +371,47 @@
           <line class="ace-spoke" x1="340" y1="185" x2="390" y2="290"/>
           <line class="ace-spoke" x1="340" y1="185" x2="232" y2="262"/>
           <line class="ace-spoke" x1="340" y1="185" x2="220" y2="185"/>
-          <g class="ace-f1"><circle class="ace-core" cx="340" cy="185" r="22"/><circle class="ace-ring" cx="340" cy="185" r="22"/><circle class="ace-bright" cx="340" cy="185" r="8"/></g>
-          <g class="ace-f2"><circle class="ace-core" cx="245" cy="110" r="12"/><circle class="ace-ring" cx="245" cy="110" r="12"/><circle class="ace-bright" cx="245" cy="110" r="4"/></g>
-          <text class="ace-lbl" x="183" y="105" text-anchor="middle">workstream</text>
-          <g class="ace-f3"><circle class="ace-core" cx="440" cy="108" r="14"/><circle class="ace-ring" cx="440" cy="108" r="14"/><circle class="ace-bright" cx="440" cy="108" r="5"/></g>
-          <text class="ace-lbl" x="490" y="103" text-anchor="middle">workstream</text>
-          <g class="ace-f1"><circle class="ace-core" cx="460" cy="218" r="10"/><circle class="ace-ring" cx="460" cy="218" r="10"/><circle class="ace-bright" cx="460" cy="218" r="3.5"/></g>
-          <g class="ace-f2"><circle class="ace-core" cx="390" cy="290" r="11"/><circle class="ace-ring" cx="390" cy="290" r="11"/><circle class="ace-bright" cx="390" cy="290" r="4"/></g>
-          <g class="ace-f3"><circle class="ace-core" cx="232" cy="262" r="13"/><circle class="ace-ring" cx="232" cy="262" r="13"/><circle class="ace-bright" cx="232" cy="262" r="4.5"/></g>
-          <text class="ace-lbl" x="175" y="277" text-anchor="middle">workstream</text>
-          <g class="ace-f1"><circle class="ace-core" cx="220" cy="185" r="9"/><circle class="ace-ring" cx="220" cy="185" r="9"/><circle class="ace-bright" cx="220" cy="185" r="3"/></g>
+          <g class="ace-f1"><circle class="ace-halo ace-g1" cx="340" cy="185" r="32"/><circle class="ace-core" cx="340" cy="185" r="22" opacity="0.15"/><circle class="ace-ring" cx="340" cy="185" r="22" opacity="0.6"/><circle class="ace-core" cx="340" cy="185" r="8" opacity="0.8"/></g>
+          <g class="ace-f2"><circle class="ace-halo ace-g2" cx="245" cy="110" r="20"/><circle class="ace-core" cx="245" cy="110" r="12" opacity="0.15"/><circle class="ace-ring" cx="245" cy="110" r="12" opacity="0.6"/><circle class="ace-core" cx="245" cy="110" r="4" opacity="0.8"/></g>
+          <text id="ace-lbl-a" class="ace-lbl" x="245" y="86" text-anchor="middle"></text>
+          <g class="ace-f3"><circle class="ace-halo ace-g3" cx="440" cy="108" r="22"/><circle class="ace-core" cx="440" cy="108" r="14" opacity="0.15"/><circle class="ace-ring" cx="440" cy="108" r="14" opacity="0.6"/><circle class="ace-core" cx="440" cy="108" r="5" opacity="0.8"/></g>
+          <text id="ace-lbl-b" class="ace-lbl" x="440" y="80" text-anchor="middle"></text>
+          <g class="ace-f1"><circle class="ace-halo ace-g1" cx="460" cy="218" r="18"/><circle class="ace-core" cx="460" cy="218" r="10" opacity="0.15"/><circle class="ace-ring" cx="460" cy="218" r="10" opacity="0.6"/><circle class="ace-core" cx="460" cy="218" r="3.5" opacity="0.8"/></g>
+          <g class="ace-f2"><circle class="ace-halo ace-g2" cx="390" cy="290" r="19"/><circle class="ace-core" cx="390" cy="290" r="11" opacity="0.15"/><circle class="ace-ring" cx="390" cy="290" r="11" opacity="0.6"/><circle class="ace-core" cx="390" cy="290" r="4" opacity="0.8"/></g>
+          <g class="ace-f3"><circle class="ace-halo ace-g3" cx="232" cy="262" r="21"/><circle class="ace-core" cx="232" cy="262" r="13" opacity="0.15"/><circle class="ace-ring" cx="232" cy="262" r="13" opacity="0.6"/><circle class="ace-core" cx="232" cy="262" r="4.5" opacity="0.8"/></g>
+          <text id="ace-lbl-c" class="ace-lbl" x="232" y="238" text-anchor="middle"></text>
+          <g class="ace-f1"><circle class="ace-halo ace-g1" cx="220" cy="185" r="17"/><circle class="ace-core" cx="220" cy="185" r="9" opacity="0.15"/><circle class="ace-ring" cx="220" cy="185" r="9" opacity="0.6"/><circle class="ace-core" cx="220" cy="185" r="3" opacity="0.8"/></g>
           <text class="ace-h" x="340" y="350" text-anchor="middle">No workstreams yet</text>
           <text class="ace-sub" x="340" y="374" text-anchor="middle">Workstreams group your meetings into themes you can navigate</text>
           <rect x="260" y="390" width="160" height="28" rx="3" class="ace-cta-bg"/>
-          <text class="ace-cta-t" x="340" y="409" text-anchor="middle">+ create workstream</text>
+          <text class="ace-cta-t" x="340" y="409" text-anchor="middle">Create Workstream</text>
         </svg>
       </div>`;
     state.container.appendChild(empty);
 
-    // SVG CTA button wires to the same event as before
-    empty.querySelector('rect.ace-cta-bg')?.addEventListener('click', () => {
-      _emit('accord:constellation-create-workstream', { source: 'empty-state' });
-    });
-    empty.querySelector('text.ace-cta-t')?.addEventListener('click', () => {
-      _emit('accord:constellation-create-workstream', { source: 'empty-state' });
+    // Cycle placeholder names through the 3 labelled nodes
+    const sets = [
+      ['Product Launch', 'Q3 Planning',  'Risk Review'],
+      ['Client Reviews', 'Onboarding',   'Vendor Ops'],
+      ['Brand Refresh',  'Hiring',        'Finance'],
+    ];
+    let idx = 0;
+    function _cycleNames() {
+      const s = sets[idx % sets.length];
+      ['ace-lbl-a','ace-lbl-b','ace-lbl-c'].forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = s[i];
+      });
+      idx++;
+    }
+    _cycleNames();
+    setInterval(_cycleNames, 3000);
+
+    // CTA wires to create-workstream event (both rect + text clickable)
+    ['rect.ace-cta-bg','text.ace-cta-t'].forEach(sel => {
+      empty.querySelector(sel)?.addEventListener('click', () => {
+        _emit('accord:constellation-create-workstream', { source: 'empty-state' });
+      });
     });
   }
 
