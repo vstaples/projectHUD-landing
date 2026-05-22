@@ -22,6 +22,8 @@ function _mcLoadTune(){
 function _mcApplyTune(t){
   var r=document.documentElement.style;
   r.setProperty('--mc-brightness',t.brightness);r.setProperty('--mc-contrast',t.contrast);r.setProperty('--mc-saturate',t.saturate);
+  // Apply filter directly to html so it affects all pages regardless of CSS structure
+  r.filter = 'brightness('+t.brightness+') contrast('+t.contrast+') saturate('+t.saturate+')';
   r.setProperty('--mc-col-gap',t.colGap+'px');r.setProperty('--mc-zone-gap',t.zoneGap+'px');r.setProperty('--mc-radius',t.radius+'px');
   r.setProperty('--mc-border-width',(t.borderWidth||1)+'px');r.setProperty('--mc-panel-opacity',t.panelOpacity||1);
   r.setProperty('--mc-hero-bg',t.heroBg);r.setProperty('--mc-hero-border-opacity',t.heroBorderOpacity);
