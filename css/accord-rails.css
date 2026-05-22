@@ -459,7 +459,41 @@
   }
 }
 
-/* ── Workstreams flash highlight (used by viewSubs scroll-into-view) ── */
+/* ── Inbox (virtual pinned category) ───────────────────────── */
+#accord-app .ac-inbox-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: rgba(0,210,255,0.12);
+  color: #00d2ff;
+  border: 1px solid rgba(0,210,255,0.3);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+#accord-app .ac-inbox-header {
+  cursor: pointer;
+}
+#accord-app .ac-inbox-header:hover {
+  background: rgba(0,210,255,0.05);
+}
+#accord-app .ac-inbox-item:hover {
+  background: rgba(0,210,255,0.05);
+  cursor: pointer;
+}
+#accord-app .ac-inbox-item {
+  padding: 5px 14px 5px 28px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #c8d8e8;
+  border-left: 2px solid transparent;
+  transition: background 100ms, border-color 100ms;
+}
+#accord-app .ac-inbox-item:hover {
+  border-left-color: rgba(0,210,255,0.4);
+}
+
+/* ── Workstreams flash highlight ───────────────────────────── */
 #accord-app .ws-row-flash {
   animation: ac-row-flash 1.4s ease-out;
 }

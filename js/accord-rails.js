@@ -59,6 +59,8 @@
     workstreams:    [],   // active top + sub for tree (state=active)
     meetings:       [],   // filed meetings only (workstream_id NOT NULL)
     parkingLot:     [],   // unfiled meetings (workstream_id IS NULL)
+    inbox:          [],   // pending RSVP invitations (virtual, client-side only)
+    inboxExpanded:  true, // default open
     treeExpanded:   {},   // { workstreamId: true } — persisted
     parkingSort:    'date',
     initialized:    false,
@@ -171,7 +173,7 @@
 
   // ── Data load ───────────────────────────────────────────────
   async function refresh() {
-    await Promise.all([_loadWorkstreams(), _loadMeetings()]);
+    await Promise.all([_loadWorkstreams(), _loadMeetings(), _loadInbox()]);
     _renderTree();
     _renderParkingLot();
   }
@@ -185,6 +187,53 @@
     } catch (e) {
       console.error('[Accord-rails] workstream load failed', e);
       local.workstreams = [];
+    }
+  }
+
+  async function _loadInbox() {
+    // Fetch pending RSVP attendee rows for current user's resource
+    try {
+      const resourceId = (window.MC && window.MC.resourceId) ||
+                         (window.Accord && window.Accord.state && window.Accord.state.resourceId);
+      if (!resourceId) { local.inbox = []; return; }
+
+      const attendees = await API.get(
+        'accord_meeting_attendees?resource_id=eq.' + resourceId +
+        '&rsvp_status=eq.pending&select=attendee_id,meeting_id,invited_at'
+      );
+      if (!Array.isArray(attendees) || !attendees.length) { local.inbox = []; return; }
+
+      // Fetch meeting titles for the pending invites
+      const ids = attendees.map(a => a.meeting_id).join(',');
+      const meetings = await API.get(
+        'accord_meetings?meeting_id=in.(' + ids + ')' +
+        '&select=meeting_id,title,scheduled_for,organizer_id'
+      );
+      const meetingMap = {};
+      (meetings || []).forEach(m => { meetingMap[m.meeting_id] = m; });
+
+      // Fetch organizer names
+      const orgIds = [...new Set((meetings || []).map(m => m.organizer_id).filter(Boolean))];
+      const orgMap = {};
+      if (orgIds.length) {
+        const resources = await API.get(
+          'resources?resource_id=in.(' + orgIds.join(',') + ')&select=resource_id,name'
+        );
+        (resources || []).forEach(r => { orgMap[r.resource_id] = r.name; });
+      }
+
+      local.inbox = attendees.map(a => ({
+        attendeeId:  a.attendee_id,
+        meetingId:   a.meeting_id,
+        invitedAt:   a.invited_at,
+        title:       (meetingMap[a.meeting_id] || {}).title || 'Untitled',
+        scheduledFor:(meetingMap[a.meeting_id] || {}).scheduled_for,
+        organizerId: (meetingMap[a.meeting_id] || {}).organizer_id,
+        organizer:   orgMap[(meetingMap[a.meeting_id] || {}).organizer_id] || 'Unknown',
+      }));
+    } catch (e) {
+      console.warn('[Accord-rails] inbox load failed', e);
+      local.inbox = [];
     }
   }
 
@@ -218,8 +267,12 @@
     const body = $('ac-tree-body');
     if (!body) return;
 
+    // Always prepend Inbox (virtual pinned category)
+    var inboxHtml = _renderInbox();
+
     if (!local.workstreams.length) {
-      body.innerHTML = '<div class="ac-tree-empty">No workstreams yet.<br>Use + NEW WORKSTREAM to begin.</div>';
+      body.innerHTML = inboxHtml + '<div class="ac-tree-empty">No workstreams yet.<br>Use + NEW WORKSTREAM to begin.</div>';
+      _wireInboxHandlers();
       // CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 S5.1 -- mount slideshow if not dismissed
       // X-29: guard typeof shouldShow — AccordSlideshow may exist as a partial
       // object if accord-slideshow.js loses the async load race on first render.
@@ -274,8 +327,129 @@
       html += _renderTopWs(top, subsByParent[top.workstream_id] || [], meetingsByWs, lvl, ctx);
     });
 
-    body.innerHTML = html;
+    body.innerHTML = inboxHtml + html;
     _wireTreeHandlers();
+    _wireInboxHandlers();
+  }
+
+  function _renderInbox() {
+    var count = local.inbox.length;
+    if (!count) return '';  // No pending invites — hide entirely
+
+    var expanded = local.inboxExpanded;
+    var badge = '<span class="ac-inbox-badge">' + count + '</span>';
+    var chevron = '<span class="ac-tree-chevron' + (expanded ? ' open' : '') + '">&#9656;</span>';
+
+    var rows = '';
+    if (expanded) {
+      local.inbox.forEach(function(item) {
+        var date = item.scheduledFor
+          ? new Date(item.scheduledFor).toLocaleDateString('en-US', {month:'short', day:'numeric'})
+          : (item.invitedAt ? new Date(item.invitedAt).toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '');
+        rows +=
+          '<div class="ac-tree-row ac-inbox-item" data-attendee-id="' + esc(item.attendeeId) + '" data-meeting-id="' + esc(item.meetingId) + '">' +
+            '<span style="width:10px;flex-shrink:0;"></span>' +
+            '<span class="ac-tree-label">' + esc(item.title) + '</span>' +
+            '<span class="ac-tree-meta">' + esc(date) + '</span>' +
+          '</div>';
+      });
+    }
+
+    return (
+      '<div class="ac-inbox-block">' +
+        '<div class="ac-tree-row ac-tree-ws ac-inbox-header" id="ac-inbox-header">' +
+          chevron +
+          '<span class="ac-tree-label" style="color:#00d2ff;font-weight:700;letter-spacing:0.08em;">INBOX</span>' +
+          badge +
+        '</div>' +
+        '<div class="ac-inbox-children" id="ac-inbox-children"' + (expanded ? '' : ' style="display:none"') + '>' +
+          rows +
+        '</div>' +
+      '</div>' +
+      '<div style="height:1px;background:rgba(0,210,255,0.1);margin:4px 0;"></div>'
+    );
+  }
+
+  function _wireInboxHandlers() {
+    // Toggle expand/collapse
+    var header = document.getElementById('ac-inbox-header');
+    if (header) {
+      header.addEventListener('click', function() {
+        local.inboxExpanded = !local.inboxExpanded;
+        _renderTree();
+      });
+    }
+
+    // Item click → show RSVP popup
+    document.querySelectorAll('.ac-inbox-item').forEach(function(row) {
+      row.addEventListener('click', function(e) {
+        e.stopPropagation();
+        _showRsvpPopup(row.dataset.attendeeId, row.dataset.meetingId, row);
+      });
+    });
+  }
+
+  function _showRsvpPopup(attendeeId, meetingId, anchorEl) {
+    // Remove any existing popup
+    var existing = document.getElementById('ac-inbox-rsvp-popup');
+    if (existing) { existing.remove(); if (existing.dataset.attendeeId === attendeeId) return; }
+
+    var item = local.inbox.find(function(i) { return i.attendeeId === attendeeId; });
+    if (!item) return;
+
+    var rect = anchorEl.getBoundingClientRect();
+    var popup = document.createElement('div');
+    popup.id = 'ac-inbox-rsvp-popup';
+    popup.dataset.attendeeId = attendeeId;
+    popup.style.cssText =
+      'position:fixed;z-index:1000;' +
+      'left:' + (rect.right + 8) + 'px;' +
+      'top:' + rect.top + 'px;' +
+      'background:#0d1a24;border:1px solid rgba(0,210,255,0.3);border-radius:6px;' +
+      'padding:14px 16px;min-width:240px;box-shadow:0 8px 32px rgba(0,0,0,0.5);';
+
+    var date = item.scheduledFor
+      ? new Date(item.scheduledFor).toLocaleDateString('en-US', {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
+      : '';
+
+    popup.innerHTML =
+      '<div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:#e8f0f8;margin-bottom:4px;">' + esc(item.title) + '</div>' +
+      '<div style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;margin-bottom:2px;">Invited by <span style="color:#00d2ff">' + esc(item.organizer) + '</span></div>' +
+      (date ? '<div style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;margin-bottom:12px;">' + esc(date) + '</div>' : '<div style="margin-bottom:12px;"></div>') +
+      '<div style="display:flex;gap:8px;">' +
+        '<button id="ac-rsvp-accept" style="flex:1;padding:7px;background:rgba(52,192,112,0.1);border:1px solid rgba(52,192,112,0.4);color:#34c070;font-family:Arial,sans-serif;font-size:12px;border-radius:4px;cursor:pointer;">✓ Accept</button>' +
+        '<button id="ac-rsvp-decline" style="flex:1;padding:7px;background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.4);color:#ff4d6d;font-family:Arial,sans-serif;font-size:12px;border-radius:4px;cursor:pointer;">✕ Decline</button>' +
+      '</div>';
+
+    document.body.appendChild(popup);
+
+    // Close on outside click
+    setTimeout(function() {
+      document.addEventListener('click', function _closePopup(e) {
+        if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', _closePopup); }
+      });
+    }, 50);
+
+    // Accept
+    document.getElementById('ac-rsvp-accept').addEventListener('click', function() {
+      _rsvpRespond(attendeeId, meetingId, 'accepted', popup);
+    });
+    // Decline
+    document.getElementById('ac-rsvp-decline').addEventListener('click', function() {
+      _rsvpRespond(attendeeId, meetingId, 'declined', popup);
+    });
+  }
+
+  async function _rsvpRespond(attendeeId, meetingId, status, popup) {
+    try {
+      await API.patch('accord_meeting_attendees?attendee_id=eq.' + attendeeId, { rsvp_status: status });
+      popup.remove();
+      // Remove from local inbox and re-render
+      local.inbox = local.inbox.filter(function(i) { return i.attendeeId !== attendeeId; });
+      _renderTree();
+    } catch(e) {
+      console.error('[Accord-rails] RSVP respond failed', e);
+    }
   }
 
   function _renderTopWs(ws, subs, meetingsByWs, lvl, ctx) {
