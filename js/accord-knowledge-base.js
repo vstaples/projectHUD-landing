@@ -948,11 +948,12 @@
   // ── Splash SVG ─────────────────────────────────────────────
   function _splashHtml() {
     return '<div id="ac-fw-kb-splash">' +
-      '<svg width="100%" viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg" style="max-width:480px;display:block;margin:0 auto 24px;">' +
+      '<svg width="100%" viewBox="0 0 680 420" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 24px;">' +
         '<defs><style>' +
-          '.kbs-orb{fill:none;stroke:rgba(0,210,255,0.25);stroke-width:0.8}' +
-          '.kbs-line{stroke:rgba(0,210,255,0.35);stroke-width:0.6;fill:none}' +
-          '.kbs-node{fill:rgba(0,210,255,0.15);stroke:#00d2ff;stroke-width:1;}' +
+          '.kbs-orb{fill:none;stroke:rgba(0,210,255,0.3);stroke-width:0.8}' +
+          '.kbs-line{stroke:rgba(0,210,255,0.5);stroke-width:0.6;fill:none}' +
+          '.kbs-node{fill:rgba(0,210,255,0.3);stroke:#00d2ff;stroke-width:1;}' +
+          '.kbs-halo{fill:rgba(0,210,255,0.35);stroke:none;}' +
           '.kbs-dot{fill:#00d2ff;opacity:0.8;}' +
           '.kbs-label{font-family:"JetBrains Mono",monospace;font-size:11px;fill:#00d2ff;letter-spacing:0.08em;}' +
           '.kbs-p1{animation:kbs-pulse 3s ease-in-out infinite}' +
@@ -961,35 +962,39 @@
           '.kbs-f1{animation:kbs-float 5s ease-in-out infinite}' +
           '.kbs-f2{animation:kbs-float 5s ease-in-out 1.5s infinite}' +
           '.kbs-f3{animation:kbs-float 5s ease-in-out 3s infinite}' +
-          '@keyframes kbs-pulse{0%,100%{opacity:0.25}50%{opacity:0.6}}' +
+          '.kbs-g1{animation:kbs-glow 2.5s ease-in-out infinite}' +
+          '.kbs-g2{animation:kbs-glow 2.5s ease-in-out 0.8s infinite}' +
+          '.kbs-g3{animation:kbs-glow 2.5s ease-in-out 1.6s infinite}' +
+          '@keyframes kbs-pulse{0%,100%{opacity:0.3}50%{opacity:0.6}}' +
           '@keyframes kbs-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}' +
+          '@keyframes kbs-glow{0%,100%{opacity:0.4}50%{opacity:0.9}}' +
         '</style></defs>' +
         // Central hub
-        '<g class="kbs-f1"><circle class="kbs-orb kbs-p1" cx="340" cy="150" r="55"/><circle class="kbs-node" cx="340" cy="150" r="18"/><circle class="kbs-dot" cx="340" cy="150" r="7"/></g>' +
+        '<g class="kbs-f1"><circle class="kbs-halo kbs-g1" cx="340" cy="185" r="36"/><circle class="kbs-node" cx="340" cy="185" r="22"/><circle class="kbs-dot" cx="340" cy="185" r="8"/></g>' +
         // Spokes
-        '<line class="kbs-line" x1="340" y1="150" x2="200" y2="80"/>' +
-        '<line class="kbs-line" x1="340" y1="150" x2="480" y2="80"/>' +
-        '<line class="kbs-line" x1="340" y1="150" x2="180" y2="180"/>' +
-        '<line class="kbs-line" x1="340" y1="150" x2="500" y2="190"/>' +
-        '<line class="kbs-line" x1="340" y1="150" x2="290" y2="240"/>' +
-        '<line class="kbs-line" x1="340" y1="150" x2="420" y2="235"/>' +
-        // Decision node
-        '<g class="kbs-f2"><circle class="kbs-node" cx="200" cy="80" r="12" style="stroke:rgba(0,210,255,0.8)"/><circle class="kbs-dot" cx="200" cy="80" r="4"/></g>' +
-        '<text class="kbs-label" x="200" y="60" text-anchor="middle">DECISIONS</text>' +
-        // Action node
-        '<g class="kbs-f3"><circle class="kbs-node" cx="480" cy="80" r="14" style="stroke:rgba(240,160,32,0.8)"/><circle class="kbs-dot" cx="480" cy="80" r="5" style="fill:#f0a020"/></g>' +
-        '<text class="kbs-label" x="480" y="60" text-anchor="middle" style="fill:#f0a020">ACTIONS</text>' +
-        // Risk node
-        '<g class="kbs-f1"><circle class="kbs-node" cx="180" cy="180" r="11" style="stroke:rgba(255,77,109,0.8)"/><circle class="kbs-dot" cx="180" cy="180" r="4" style="fill:#ff4d6d"/></g>' +
-        '<text class="kbs-label" x="138" y="205" text-anchor="middle" style="fill:#ff4d6d">RISKS</text>' +
-        // Note node
-        '<g class="kbs-f2"><circle class="kbs-node" cx="500" cy="190" r="10" style="stroke:rgba(168,85,247,0.8)"/><circle class="kbs-dot" cx="500" cy="190" r="3.5" style="fill:#a855f7"/></g>' +
-        '<text class="kbs-label" x="540" y="206" text-anchor="middle" style="fill:#a855f7">NOTES</text>' +
-        // Question node
-        '<g class="kbs-f3"><circle class="kbs-node" cx="290" cy="240" r="10" style="stroke:rgba(52,192,112,0.8)"/><circle class="kbs-dot" cx="290" cy="240" r="3.5" style="fill:#34c070"/></g>' +
-        '<text class="kbs-label" x="290" y="265" text-anchor="middle" style="fill:#34c070">QUESTIONS</text>' +
-        // Actions 2
-        '<g class="kbs-f1"><circle class="kbs-node" cx="420" cy="235" r="9" style="stroke:rgba(0,210,255,0.4)"/><circle class="kbs-dot" cx="420" cy="235" r="3"/></g>' +
+        '<line class="kbs-line" x1="340" y1="185" x2="200" y2="90"/>' +
+        '<line class="kbs-line" x1="340" y1="185" x2="480" y2="90"/>' +
+        '<line class="kbs-line" x1="340" y1="185" x2="170" y2="210"/>' +
+        '<line class="kbs-line" x1="340" y1="185" x2="510" y2="220"/>' +
+        '<line class="kbs-line" x1="340" y1="185" x2="270" y2="300"/>' +
+        '<line class="kbs-line" x1="340" y1="185" x2="430" y2="295"/>' +
+        // Decision node — top left
+        '<g class="kbs-f2"><circle class="kbs-halo kbs-g2" cx="200" cy="90" r="22"/><circle class="kbs-node" cx="200" cy="90" r="14" style="stroke:rgba(0,210,255,0.9)"/><circle class="kbs-dot" cx="200" cy="90" r="5"/></g>' +
+        '<text class="kbs-label" x="200" y="66" text-anchor="middle">DECISIONS</text>' +
+        // Action node — top right
+        '<g class="kbs-f3"><circle class="kbs-halo kbs-g3" cx="480" cy="90" r="24"/><circle class="kbs-node" cx="480" cy="90" r="16" style="stroke:rgba(240,160,32,0.9)"/><circle class="kbs-dot" cx="480" cy="90" r="6" style="fill:#f0a020"/></g>' +
+        '<text class="kbs-label" x="480" y="66" text-anchor="middle" style="fill:#f0a020">ACTIONS</text>' +
+        // Risk node — left
+        '<g class="kbs-f1"><circle class="kbs-halo kbs-g1" cx="170" cy="210" r="20"/><circle class="kbs-node" cx="170" cy="210" r="13" style="stroke:rgba(255,77,109,0.9)"/><circle class="kbs-dot" cx="170" cy="210" r="4.5" style="fill:#ff4d6d"/></g>' +
+        '<text class="kbs-label" x="118" y="232" text-anchor="middle" style="fill:#ff4d6d">RISKS</text>' +
+        // Note node — right
+        '<g class="kbs-f2"><circle class="kbs-halo kbs-g2" cx="510" cy="220" r="19"/><circle class="kbs-node" cx="510" cy="220" r="12" style="stroke:rgba(168,85,247,0.9)"/><circle class="kbs-dot" cx="510" cy="220" r="4" style="fill:#a855f7"/></g>' +
+        '<text class="kbs-label" x="556" y="236" text-anchor="middle" style="fill:#a855f7">NOTES</text>' +
+        // Question node — bottom left
+        '<g class="kbs-f3"><circle class="kbs-halo kbs-g3" cx="270" cy="300" r="18"/><circle class="kbs-node" cx="270" cy="300" r="12" style="stroke:rgba(52,192,112,0.9)"/><circle class="kbs-dot" cx="270" cy="300" r="4" style="fill:#34c070"/></g>' +
+        '<text class="kbs-label" x="270" y="328" text-anchor="middle" style="fill:#34c070">QUESTIONS</text>' +
+        // Extra node — bottom right
+        '<g class="kbs-f1"><circle class="kbs-halo kbs-g1" cx="430" cy="295" r="16"/><circle class="kbs-node" cx="430" cy="295" r="11" style="stroke:rgba(0,210,255,0.5)"/><circle class="kbs-dot" cx="430" cy="295" r="3.5"/></g>' +
       '</svg>' +
       '<div style="font-family:\'Syne\',system-ui,sans-serif;font-size:22px;font-weight:700;color:#ffffff;margin-bottom:8px;text-align:center;">Knowledge Base</div>' +
       '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:#f0a020;margin-bottom:16px;text-align:center;">Firm-wide decisions, actions, risks, notes &amp; questions</div>' +
