@@ -194,7 +194,8 @@
     // Fetch pending RSVP attendee rows for current user's resource
     try {
       const resourceId = (window.MC && window.MC.resourceId) ||
-                         (window.Accord && window.Accord.state && window.Accord.state.resourceId);
+                         (window.Accord && window.Accord.state && window.Accord.state.resourceId) ||
+                         (window.Accord && window.Accord.state && window.Accord.state.me && window.Accord.state.me.resource_id);
       if (!resourceId) { local.inbox = []; return; }
 
       const attendees = await API.get(
