@@ -141,9 +141,9 @@
 /* ── Left rail: tree ────────────────────────────────────────── */
 #accord-app .ac-tree-search {
   width: 100%;
-  background: var(--canvas-elev);
-  border: 1px solid var(--rule-strong);
-  color: var(--ink-body);
+  background: #1e2d45;
+  border: 1px solid rgba(0,210,255,0.3);
+  color: #e8f0f8;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;
   padding: 6px 9px;
@@ -160,22 +160,21 @@
 #accord-app .ac-tree-new-btn {
   margin-top: 7px;
   width: 100%;
-  background: none;
-  border: 1px dashed var(--rule-strong);
-  color: var(--ink-faint);
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  background: rgba(0,210,255,0.08);
+  border: 1px solid rgba(0,210,255,0.35);
+  color: #e8f0f8;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.05em;
   padding: 6px 8px;
   border-radius: 3px;
   cursor: pointer;
   transition: all 120ms;
 }
 #accord-app .ac-tree-new-btn:hover {
-  border-color: var(--signal-dim);
-  color: var(--signal);
-  background: var(--signal-soft);
+  background: rgba(0,210,255,0.15);
+  border-color: rgba(0,210,255,0.6);
+  color: #ffffff;
 }
 
 #accord-app .ac-tree-scroll {
@@ -295,8 +294,8 @@
 #accord-app .ac-tree-empty {
   padding: 24px 18px;
   text-align: center;
-  color: var(--ink-faint);
-  font-size: 12px;
+  color: #a0b8d0;
+  font-size: 13px;
   line-height: 1.6;
 }
 

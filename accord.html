@@ -2946,7 +2946,7 @@
     <div class="nav-right">
       <span class="nav-date" id="ac-nav-date"></span>
       <span class="nav-clock" id="ac-nav-clock"></span>
-      <div class="nav-avatar" id="ac-nav-avatar">VS</div>
+      <div class="nav-avatar" id="ac-nav-avatar">?</div>
     </div>
   </nav>
 
@@ -2962,7 +2962,7 @@
       <input id="ac-tree-search" class="ac-tree-search" type="text"
              placeholder="Search workstreams, meetings…" style="margin:0 14px 0;width:calc(100% - 28px)">
       <button id="ac-tree-new-btn" class="ac-tree-new-btn"
-              style="margin:7px 14px 0;width:calc(100% - 28px)">+ New workstream</button>
+              style="margin:7px 14px 0;width:calc(100% - 28px)">+ New Workstream</button>
       <div id="ac-tree-scroll" class="ac-tree-scroll">
         <div id="ac-tree-body"></div>
       </div>
@@ -3311,7 +3311,7 @@
         <label class="ws-archived-toggle">
           <input type="checkbox" id="ws-show-archived"> Show archived
         </label>
-        <button class="btn btn-prominent" id="ws-new-btn">+ New workstream</button>
+        <button class="btn btn-prominent" id="ws-new-btn">+ New Workstream</button>
       </div>
     </header>
 
@@ -3739,7 +3739,31 @@
             window.location.href = '/accord-today.html';
             return;
           }
+          if (t.id === 'knowledge-base') {
+            _setActive(t.id);
+            var title = document.getElementById('ac-nav-title');
+            if (title) title.textContent = 'Knowledge Base';
+            // Switch to workstreams surface and activate KB tab if a workstream is active
+            if (window.Accord && typeof window.Accord.switchSurface === 'function') {
+              var level = window.Accord.state && window.Accord.state.level;
+              if (level && level !== 'constellation') {
+                // Inside a workstream — switch to KB tab
+                window.Accord.switchSurface('workstreams');
+                setTimeout(function() {
+                  var kbTab = document.querySelector('[data-tab="kb"]');
+                  if (kbTab) kbTab.click();
+                }, 50);
+              } else {
+                // At constellation level — prompt user to select a workstream
+                window.Accord.switchSurface('workstreams');
+              }
+            }
+            return;
+          }
           _setActive(t.id);
+          if (window.Accord && typeof window.Accord.switchSurface === 'function') {
+            window.Accord.switchSurface('workstreams');
+          }
         });
         strip.appendChild(btn);
       });
@@ -3778,7 +3802,7 @@
       var bs = document.createElement('span');
       bs.id = 'nav-build-stamp';
       bs.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;letter-spacing:.03em;';
-      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.1218</span>';
+      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.1413</span>';
       var nt = document.createElement('span');
       nt.id = 'nav-time';
       nt.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;';
@@ -3817,14 +3841,16 @@
         setInterval(tickClock, 1000);
       })();
 
-      // Populate avatar initials from identity if available
-      (function() {
+      // Populate avatar initials — retry until Accord identity resolves
+      (function _setAvatar() {
         var av = document.getElementById('ac-nav-avatar');
         if (!av) return;
-        var name = document.getElementById('acIdentityName');
-        if (name && name.textContent.trim()) {
-          var parts = name.textContent.trim().split(' ');
-          av.textContent = (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+        var me = window.Accord && window.Accord.state && window.Accord.state.me;
+        if (me && me.name) {
+          var parts = me.name.trim().split(' ');
+          av.textContent = ((parts[0]||'')[0]||'').toUpperCase() + ((parts[1]||'')[0]||'').toUpperCase();
+        } else {
+          setTimeout(_setAvatar, 300);
         }
       })();
 

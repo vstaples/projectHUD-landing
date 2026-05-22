@@ -279,9 +279,15 @@
     const scroll = $('ac-tree-scroll');
     if (!scroll) return;
 
-    // Hide original rail header (collapse button row)
+    // Remove original rail header (collapse button row) — rebuilt in scroll
     var railHeader = document.querySelector('#ac-rail-left .ac-rail-header');
-    if (railHeader) railHeader.style.display = 'none';
+    if (railHeader) railHeader.remove();
+
+    // Remove original static search + new-btn (rebuilt inside scroll by _renderTree)
+    var staticSearch = document.querySelector('.ac-rail-panel > #ac-tree-search');
+    var staticNewBtn = document.querySelector('.ac-rail-panel > #ac-tree-new-btn');
+    if (staticSearch) staticSearch.remove();
+    if (staticNewBtn) staticNewBtn.remove();
 
     var inboxHtml   = _renderInbox();
     var headerStyle = 'cursor:pointer;display:flex;align-items:center;gap:7px;padding:6px 14px;';
@@ -337,7 +343,7 @@
       '</div>' +
       '<div id="ac-ws-children"' + (wsExpanded ? '' : ' style="display:none"') + '>' +
         '<input id="ac-tree-search" class="ac-tree-search" type="text" placeholder="Search workstreams, meetings…" style="margin:4px 14px 0;width:calc(100% - 28px);">' +
-        '<button id="ac-tree-new-btn" class="ac-tree-new-btn" style="margin:7px 14px 0;width:calc(100% - 28px);">+ New workstream</button>' +
+        '<button id="ac-tree-new-btn" class="ac-tree-new-btn" style="margin:7px 14px 0;width:calc(100% - 28px);">+ New Workstream</button>' +
         '<div id="ac-tree-body">' + treeHtml + '</div>' +
       '</div>';
 

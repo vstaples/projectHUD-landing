@@ -338,16 +338,16 @@
           <desc>Animated constellation placeholder — create your first workstream to begin</desc>
           <defs>
             <style>
-              .ace-orb{fill:none;stroke:rgba(0,210,255,0.12);stroke-width:0.5}
+              .ace-orb{fill:none;stroke:rgba(0,210,255,0.3);stroke-width:0.8}
               .ace-ring{fill:none;stroke:#00d2ff;stroke-width:1}
               .ace-core{fill:#00d2ff}
-              .ace-spoke{stroke:rgba(0,210,255,0.18);stroke-width:0.5;fill:none}
-              .ace-lbl{font-family:'JetBrains Mono',monospace;font-size:11px;fill:rgba(0,210,255,0.7);letter-spacing:0.1em}
-              .ace-h{font-family:'Syne',system-ui,sans-serif;font-size:22px;font-weight:700;fill:#e8f0f8}
+              .ace-spoke{stroke:rgba(0,210,255,0.5);stroke-width:0.5;fill:none}
+              .ace-lbl{font-family:'JetBrains Mono',monospace;font-size:11px;fill:#00d2ff;letter-spacing:0.1em}
+              .ace-h{font-family:'Syne',system-ui,sans-serif;font-size:22px;font-weight:700;fill:#ffffff}
               .ace-sub{font-family:'JetBrains Mono',monospace;font-size:12px;fill:#f0a020;letter-spacing:0.04em}
               .ace-cta-bg{fill:rgba(0,210,255,0.08);stroke:rgba(0,210,255,0.35);stroke-width:1}
               .ace-cta-t{font-family:Arial,sans-serif;font-size:11px;fill:#e8f0f8;letter-spacing:0.05em}
-              .ace-halo{fill:rgba(0,210,255,0.08);stroke:none}
+              .ace-halo{fill:rgba(0,210,255,0.35);stroke:none}
               .ace-p1{animation:ace-orbit 3s ease-in-out infinite}
               .ace-p2{animation:ace-orbit 3s ease-in-out 1s infinite}
               .ace-p3{animation:ace-orbit 3s ease-in-out 2s infinite}
@@ -357,9 +357,9 @@
               .ace-g1{animation:ace-glow 2.5s ease-in-out infinite}
               .ace-g2{animation:ace-glow 2.5s ease-in-out 0.8s infinite}
               .ace-g3{animation:ace-glow 2.5s ease-in-out 1.6s infinite}
-              @keyframes ace-orbit{0%,100%{opacity:0.12}50%{opacity:0.3}}
+              @keyframes ace-orbit{0%,100%{opacity:0.3}50%{opacity:0.6}}
               @keyframes ace-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
-              @keyframes ace-glow{0%,100%{opacity:0.15}50%{opacity:0.55}}
+              @keyframes ace-glow{0%,100%{opacity:0.4}50%{opacity:0.9}}
             </style>
           </defs>
           <circle class="ace-orb ace-p1" cx="340" cy="185" r="60"/>
@@ -371,16 +371,16 @@
           <line class="ace-spoke" x1="340" y1="185" x2="390" y2="290"/>
           <line class="ace-spoke" x1="340" y1="185" x2="232" y2="262"/>
           <line class="ace-spoke" x1="340" y1="185" x2="220" y2="185"/>
-          <g class="ace-f1"><circle class="ace-halo ace-g1" cx="340" cy="185" r="32"/><circle class="ace-core" cx="340" cy="185" r="22" opacity="0.15"/><circle class="ace-ring" cx="340" cy="185" r="22" opacity="0.6"/><circle class="ace-core" cx="340" cy="185" r="8" opacity="0.8"/></g>
-          <g class="ace-f2"><circle class="ace-halo ace-g2" cx="245" cy="110" r="20"/><circle class="ace-core" cx="245" cy="110" r="12" opacity="0.15"/><circle class="ace-ring" cx="245" cy="110" r="12" opacity="0.6"/><circle class="ace-core" cx="245" cy="110" r="4" opacity="0.8"/></g>
+          <g class="ace-f1"><circle class="ace-halo ace-g1" cx="340" cy="185" r="32"/><circle class="ace-core" cx="340" cy="185" r="22" opacity="0.3"/><circle class="ace-ring" cx="340" cy="185" r="22" opacity="0.6"/><circle class="ace-core" cx="340" cy="185" r="8" opacity="0.8"/></g>
+          <g class="ace-f2"><circle class="ace-halo ace-g2" cx="245" cy="110" r="20"/><circle class="ace-core" cx="245" cy="110" r="12" opacity="0.3"/><circle class="ace-ring" cx="245" cy="110" r="12" opacity="0.6"/><circle class="ace-core" cx="245" cy="110" r="4" opacity="0.8"/></g>
           <text id="ace-lbl-a" class="ace-lbl" x="245" y="86" text-anchor="middle"></text>
-          <g class="ace-f3"><circle class="ace-halo ace-g3" cx="440" cy="108" r="22"/><circle class="ace-core" cx="440" cy="108" r="14" opacity="0.15"/><circle class="ace-ring" cx="440" cy="108" r="14" opacity="0.6"/><circle class="ace-core" cx="440" cy="108" r="5" opacity="0.8"/></g>
+          <g class="ace-f3"><circle class="ace-halo ace-g3" cx="440" cy="108" r="22"/><circle class="ace-core" cx="440" cy="108" r="14" opacity="0.3"/><circle class="ace-ring" cx="440" cy="108" r="14" opacity="0.6"/><circle class="ace-core" cx="440" cy="108" r="5" opacity="0.8"/></g>
           <text id="ace-lbl-b" class="ace-lbl" x="440" y="80" text-anchor="middle"></text>
-          <g class="ace-f1"><circle class="ace-halo ace-g1" cx="460" cy="218" r="18"/><circle class="ace-core" cx="460" cy="218" r="10" opacity="0.15"/><circle class="ace-ring" cx="460" cy="218" r="10" opacity="0.6"/><circle class="ace-core" cx="460" cy="218" r="3.5" opacity="0.8"/></g>
-          <g class="ace-f2"><circle class="ace-halo ace-g2" cx="390" cy="290" r="19"/><circle class="ace-core" cx="390" cy="290" r="11" opacity="0.15"/><circle class="ace-ring" cx="390" cy="290" r="11" opacity="0.6"/><circle class="ace-core" cx="390" cy="290" r="4" opacity="0.8"/></g>
-          <g class="ace-f3"><circle class="ace-halo ace-g3" cx="232" cy="262" r="21"/><circle class="ace-core" cx="232" cy="262" r="13" opacity="0.15"/><circle class="ace-ring" cx="232" cy="262" r="13" opacity="0.6"/><circle class="ace-core" cx="232" cy="262" r="4.5" opacity="0.8"/></g>
+          <g class="ace-f1"><circle class="ace-halo ace-g1" cx="460" cy="218" r="18"/><circle class="ace-core" cx="460" cy="218" r="10" opacity="0.3"/><circle class="ace-ring" cx="460" cy="218" r="10" opacity="0.6"/><circle class="ace-core" cx="460" cy="218" r="3.5" opacity="0.8"/></g>
+          <g class="ace-f2"><circle class="ace-halo ace-g2" cx="390" cy="290" r="19"/><circle class="ace-core" cx="390" cy="290" r="11" opacity="0.3"/><circle class="ace-ring" cx="390" cy="290" r="11" opacity="0.6"/><circle class="ace-core" cx="390" cy="290" r="4" opacity="0.8"/></g>
+          <g class="ace-f3"><circle class="ace-halo ace-g3" cx="232" cy="262" r="21"/><circle class="ace-core" cx="232" cy="262" r="13" opacity="0.3"/><circle class="ace-ring" cx="232" cy="262" r="13" opacity="0.6"/><circle class="ace-core" cx="232" cy="262" r="4.5" opacity="0.8"/></g>
           <text id="ace-lbl-c" class="ace-lbl" x="232" y="238" text-anchor="middle"></text>
-          <g class="ace-f1"><circle class="ace-halo ace-g1" cx="220" cy="185" r="17"/><circle class="ace-core" cx="220" cy="185" r="9" opacity="0.15"/><circle class="ace-ring" cx="220" cy="185" r="9" opacity="0.6"/><circle class="ace-core" cx="220" cy="185" r="3" opacity="0.8"/></g>
+          <g class="ace-f1"><circle class="ace-halo ace-g1" cx="220" cy="185" r="17"/><circle class="ace-core" cx="220" cy="185" r="9" opacity="0.3"/><circle class="ace-ring" cx="220" cy="185" r="9" opacity="0.6"/><circle class="ace-core" cx="220" cy="185" r="3" opacity="0.8"/></g>
           <text class="ace-h" x="340" y="350" text-anchor="middle">No workstreams yet</text>
           <text class="ace-sub" x="340" y="374" text-anchor="middle">Workstreams group your meetings into themes you can navigate</text>
           <rect x="260" y="390" width="160" height="28" rx="3" class="ace-cta-bg"/>
