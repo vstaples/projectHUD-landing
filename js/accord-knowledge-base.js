@@ -1189,6 +1189,21 @@
     if (list) list.querySelectorAll('.ac-fw-row').forEach(function(r){ r.classList.remove('ac-fw-selected'); });
   }
 
+  var _fwLoaded = false;
+
+  async function _fwEnsureLoaded() {
+    if (_fwLoaded) return;
+    _fwLoaded = true;
+    var list = document.getElementById('ac-fw-kb-list');
+    if (list) list.innerHTML = '<div class="ac-fw-loading">Loading\u2026</div>';
+    var splash = document.getElementById('ac-fw-kb-splash');
+    var bar    = document.getElementById('ac-fw-kb-bar');
+    if (splash) splash.style.display = 'none';
+    if (bar)    bar.style.display    = '';
+    if (list)   list.style.display   = '';
+    await _fwLoad();
+  }
+
   // ── Main render ─────────────────────────────────────────────
   async function renderFirmWide(container) {
     destroyFirmWide();
@@ -1226,37 +1241,26 @@
         '<div id="ac-fw-panel-body"></div>' +
       '</div>';
 
-    // Load data
-    await _fwLoad();
+    // Show splash immediately — do NOT load data yet
+    // Data loads on first search or filter pill click
 
-    // Reveal list, hide splash
-    var splash = document.getElementById('ac-fw-kb-splash');
-    var bar    = document.getElementById('ac-fw-kb-bar');
-    var list   = document.getElementById('ac-fw-kb-list');
-
-    if (_fwData.length) {
-      if (splash) splash.style.display = 'none';
-      if (bar)    bar.style.display    = '';
-      if (list)   list.style.display   = '';
-      _fwRenderList();
-    }
-    // If no data, splash stays visible
-
-    // Wire filter pills
+    // Wire filter pills — load on first use
     _fwHost.querySelectorAll('.ac-fw-pill').forEach(function(btn) {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', async function() {
         _fwHost.querySelectorAll('.ac-fw-pill').forEach(function(b){ b.classList.remove('active'); });
         btn.classList.add('active');
         _fwActiveTag = btn.dataset.tag;
+        await _fwEnsureLoaded();
         _fwRenderList();
       });
     });
 
-    // Wire search
+    // Wire search — load on first keystroke
     var searchEl = document.getElementById('ac-fw-search');
     if (searchEl) {
-      searchEl.addEventListener('input', function() {
+      searchEl.addEventListener('input', async function() {
         _fwSearchQ = searchEl.value.trim();
+        await _fwEnsureLoaded();
         _fwRenderList();
       });
     }
@@ -1267,6 +1271,7 @@
   }
 
   function destroyFirmWide() {
+    _fwLoaded    = false;
     _fwClosePanel();
     if (_fwHost && _fwHost.parentElement) _fwHost.parentElement.removeChild(_fwHost);
     _fwHost     = null;
