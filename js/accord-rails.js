@@ -61,6 +61,7 @@
     parkingLot:     [],   // unfiled meetings (workstream_id IS NULL)
     inbox:          [],   // pending RSVP invitations (virtual, client-side only)
     inboxExpanded:  true, // default open
+    wsExpanded:     true, // WORKSTREAMS section default open
     treeExpanded:   {},   // { workstreamId: true } — persisted
     parkingSort:    'date',
     initialized:    false,
@@ -127,7 +128,7 @@
       if (collapsed) return 36;
       if (typeof override === 'number') return override;
       const saved = parseInt(localStorage.getItem(savedKey), 10);
-      return (Number.isFinite(saved) && saved >= 200 && saved <= 380) ? saved : defaultW;
+      return (Number.isFinite(saved) && saved >= 200) ? saved : defaultW;
     }
 
     const leftW  = _resolveW(leftCollapsed,  overrides.left,  'accord-rail-width',      250);
@@ -196,41 +197,51 @@
       const resourceId = (window.MC && window.MC.resourceId) ||
                          (window.Accord && window.Accord.state && window.Accord.state.resourceId) ||
                          (window.Accord && window.Accord.state && window.Accord.state.me && window.Accord.state.me.resource_id);
-      if (!resourceId) { local.inbox = []; return; }
+      if (!resourceId) {
+        // Identity not yet resolved — retry after accord-core populates state.me
+        setTimeout(async function() {
+          await _loadInbox();
+          _renderTree();
+        }, 800);
+        local.inbox = [];
+        return;
+      }
 
       const attendees = await API.get(
         'accord_meeting_attendees?resource_id=eq.' + resourceId +
-        '&rsvp_status=eq.pending&select=attendee_id,meeting_id,invited_at'
+        '&rsvp_status=in.(pending,accepted,declined)&select=attendee_id,meeting_id,rsvp_status,invited_at'
       );
       if (!Array.isArray(attendees) || !attendees.length) { local.inbox = []; return; }
 
-      // Fetch meeting titles for the pending invites
+      // Fetch meeting titles for the invites
       const ids = attendees.map(a => a.meeting_id).join(',');
       const meetings = await API.get(
         'accord_meetings?meeting_id=in.(' + ids + ')' +
-        '&select=meeting_id,title,scheduled_for,organizer_id'
+        '&select=meeting_id,title,scheduled_for,duration_minutes,organizer_id'
       );
       const meetingMap = {};
       (meetings || []).forEach(m => { meetingMap[m.meeting_id] = m; });
 
-      // Fetch organizer names
-      const orgIds = [...new Set((meetings || []).map(m => m.organizer_id).filter(Boolean))];
+      // Fetch organizer names via user_id
+      const orgUserIds = [...new Set((meetings || []).map(m => m.organizer_id).filter(Boolean))];
       const orgMap = {};
-      if (orgIds.length) {
+      if (orgUserIds.length) {
         const resources = await API.get(
-          'resources?resource_id=in.(' + orgIds.join(',') + ')&select=resource_id,name'
+          'resources?user_id=in.(' + orgUserIds.join(',') + ')&select=user_id,name'
         );
-        (resources || []).forEach(r => { orgMap[r.resource_id] = r.name; });
+        (resources || []).forEach(r => { orgMap[r.user_id] = r.name; });
       }
 
       local.inbox = attendees.map(a => ({
-        attendeeId:  a.attendee_id,
-        meetingId:   a.meeting_id,
-        invitedAt:   a.invited_at,
-        title:       (meetingMap[a.meeting_id] || {}).title || 'Untitled',
-        scheduledFor:(meetingMap[a.meeting_id] || {}).scheduled_for,
-        organizerId: (meetingMap[a.meeting_id] || {}).organizer_id,
-        organizer:   orgMap[(meetingMap[a.meeting_id] || {}).organizer_id] || 'Unknown',
+        attendeeId:      a.attendee_id,
+        meetingId:       a.meeting_id,
+        rsvpStatus:      a.rsvp_status,
+        invitedAt:       a.invited_at,
+        title:           (meetingMap[a.meeting_id] || {}).title || 'Untitled',
+        scheduledFor:    (meetingMap[a.meeting_id] || {}).scheduled_for,
+        durationMinutes: (meetingMap[a.meeting_id] || {}).duration_minutes,
+        organizerId:     (meetingMap[a.meeting_id] || {}).organizer_id,
+        organizer:       orgMap[(meetingMap[a.meeting_id] || {}).organizer_id] || 'Unknown',
       }));
     } catch (e) {
       console.warn('[Accord-rails] inbox load failed', e);
@@ -265,20 +276,23 @@
 
   // ── Tree render (3-level: ws → sub → meeting) ───────────────
   function _renderTree() {
-    const body = $('ac-tree-body');
-    if (!body) return;
+    const scroll = $('ac-tree-scroll');
+    if (!scroll) return;
 
-    // Always prepend Inbox (virtual pinned category)
-    var inboxHtml = _renderInbox();
+    // Hide original rail header (collapse button row)
+    var railHeader = document.querySelector('#ac-rail-left .ac-rail-header');
+    if (railHeader) railHeader.style.display = 'none';
 
+    var inboxHtml   = _renderInbox();
+    var headerStyle = 'cursor:pointer;display:flex;align-items:center;gap:7px;padding:6px 14px;';
+    var labelStyle  = 'color:#ffffff;font-weight:700;letter-spacing:0.08em;font-family:JetBrains Mono,monospace;font-size:11px;text-transform:uppercase;flex:1;';
+    var wsExpanded  = local.wsExpanded !== false;
+    var wsChevron   = '<span class="ac-tree-chevron' + (wsExpanded ? ' open' : '') + '" id="ac-ws-chevron">&#9656;</span>';
+
+    // Build workstream tree html
+    var treeHtml = '';
     if (!local.workstreams.length) {
-      body.innerHTML = inboxHtml + '<div class="ac-tree-empty">No workstreams yet.<br>Use + NEW WORKSTREAM to begin.</div>';
-      _wireInboxHandlers();
-      // CMD-ACCORD-CONSTELLATION-SLIDESHOW-1 S5.1 -- mount slideshow if not dismissed
-      // X-29: guard typeof shouldShow — AccordSlideshow may exist as a partial
-      // object if accord-slideshow.js loses the async load race on first render.
-      // If the object exists but shouldShow isn't ready yet, retry once after
-      // 500ms to catch the common case where the script loads just after boot.
+      treeHtml = '<div class="ac-tree-empty">No workstreams yet.<br>Use + NEW WORKSTREAM to begin.</div>';
       (function _trySlideshowMount() {
         if (window.AccordSlideshow && typeof window.AccordSlideshow.shouldShow === 'function') {
           if (window.AccordSlideshow.shouldShow()) {
@@ -286,93 +300,105 @@
             if (ssHost) window.AccordSlideshow.mount(ssHost);
           }
         } else if (window.AccordSlideshow) {
-          // Object exists but not yet fully initialized — retry once
           setTimeout(_trySlideshowMount, 500);
         }
-        // If AccordSlideshow doesn't exist at all, silently skip (no slideshow module)
       }());
-      return;
-    }
-    // If workstreams exist -- dismiss slideshow if somehow still showing
-    if (window.AccordSlideshow) {
-      if (typeof window.AccordSlideshow.dismiss === 'function') {
-        window.AccordSlideshow.dismiss();
-      } else if (typeof window.AccordSlideshow.dismount === 'function') {
-        window.AccordSlideshow.dismount();
+    } else {
+      if (window.AccordSlideshow) {
+        if (typeof window.AccordSlideshow.dismiss === 'function') window.AccordSlideshow.dismiss();
+        else if (typeof window.AccordSlideshow.dismount === 'function') window.AccordSlideshow.dismount();
       }
-    }
-
-    // Build hierarchy
-    // X-17: promote workstreams whose parent is invisible (RLS-filtered) to root
-    // rather than dropping them.
-    var visibleIds = new Set(local.workstreams.map(function(w) { return w.workstream_id; }));
-    var tops = local.workstreams.filter(function(w) {
-      return !w.parent_workstream_id || !visibleIds.has(w.parent_workstream_id);
-    });
-    var subsByParent = {};
-    local.workstreams.filter(function(w) { return w.parent_workstream_id; }).forEach(function(w) {
-      if (!subsByParent[w.parent_workstream_id]) subsByParent[w.parent_workstream_id] = [];
-      subsByParent[w.parent_workstream_id].push(w);
-    });
-    var meetingsByWs = {};
-    local.meetings.forEach(function(m) {
-      if (!meetingsByWs[m.workstream_id]) meetingsByWs[m.workstream_id] = [];
-      meetingsByWs[m.workstream_id].push(m);
-    });
-
-    var lvl = (window.Accord && window.Accord.state && window.Accord.state.level) || 'constellation';
-    var ctx = (window.Accord && window.Accord.state && window.Accord.state.levelContext) || {};
-
-    var html = '';
-    tops.forEach(function(top) {
-      html += _renderTopWs(top, subsByParent[top.workstream_id] || [], meetingsByWs, lvl, ctx);
-    });
-
-    body.innerHTML = inboxHtml + html;
-    _wireTreeHandlers();
-    _wireInboxHandlers();
-  }
-
-  function _renderInbox() {
-    var count = local.inbox.length;
-    if (!count) return '';  // No pending invites — hide entirely
-
-    var expanded = local.inboxExpanded;
-    var badge = '<span class="ac-inbox-badge">' + count + '</span>';
-    var chevron = '<span class="ac-tree-chevron' + (expanded ? ' open' : '') + '">&#9656;</span>';
-
-    var rows = '';
-    if (expanded) {
-      local.inbox.forEach(function(item) {
-        var date = item.scheduledFor
-          ? new Date(item.scheduledFor).toLocaleDateString('en-US', {month:'short', day:'numeric'})
-          : (item.invitedAt ? new Date(item.invitedAt).toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '');
-        rows +=
-          '<div class="ac-tree-row ac-inbox-item" data-attendee-id="' + esc(item.attendeeId) + '" data-meeting-id="' + esc(item.meetingId) + '">' +
-            '<span style="width:10px;flex-shrink:0;"></span>' +
-            '<span class="ac-tree-label">' + esc(item.title) + '</span>' +
-            '<span class="ac-tree-meta">' + esc(date) + '</span>' +
-          '</div>';
+      var visibleIds = new Set(local.workstreams.map(function(w) { return w.workstream_id; }));
+      var tops = local.workstreams.filter(function(w) {
+        return !w.parent_workstream_id || !visibleIds.has(w.parent_workstream_id);
+      });
+      var subsByParent = {};
+      local.workstreams.filter(function(w) { return w.parent_workstream_id; }).forEach(function(w) {
+        if (!subsByParent[w.parent_workstream_id]) subsByParent[w.parent_workstream_id] = [];
+        subsByParent[w.parent_workstream_id].push(w);
+      });
+      var meetingsByWs = {};
+      local.meetings.forEach(function(m) {
+        if (!meetingsByWs[m.workstream_id]) meetingsByWs[m.workstream_id] = [];
+        meetingsByWs[m.workstream_id].push(m);
+      });
+      var lvl = (window.Accord && window.Accord.state && window.Accord.state.level) || 'constellation';
+      var ctx = (window.Accord && window.Accord.state && window.Accord.state.levelContext) || {};
+      tops.forEach(function(top) {
+        treeHtml += _renderTopWs(top, subsByParent[top.workstream_id] || [], meetingsByWs, lvl, ctx);
       });
     }
 
+    scroll.innerHTML =
+      inboxHtml +
+      '<div id="ac-ws-header" style="' + headerStyle + '">' +
+        wsChevron +
+        '<span style="' + labelStyle + '">WORKSTREAMS</span>' +
+      '</div>' +
+      '<div id="ac-ws-children"' + (wsExpanded ? '' : ' style="display:none"') + '>' +
+        '<input id="ac-tree-search" class="ac-tree-search" type="text" placeholder="Search workstreams, meetings…" style="margin:4px 14px 0;width:calc(100% - 28px);">' +
+        '<button id="ac-tree-new-btn" class="ac-tree-new-btn" style="margin:7px 14px 0;width:calc(100% - 28px);">+ New workstream</button>' +
+        '<div id="ac-tree-body">' + treeHtml + '</div>' +
+      '</div>';
+
+    _wireTreeHandlers();
+    _wireInboxHandlers();
+
+    // Wire WORKSTREAMS toggle
+    var wsHeader = document.getElementById('ac-ws-header');
+    if (wsHeader) {
+      wsHeader.addEventListener('click', function() {
+        local.wsExpanded = local.wsExpanded === false ? true : false;
+        _renderTree();
+      });
+    }
+  }
+
+  function _pillHtml(status) {
+    if (status === 'accepted') return '<span class="ac-rsvp-pill" style="font-family:Arial,sans-serif;font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(52,192,112,0.12);color:#34c070;border:1px solid rgba(52,192,112,0.35);text-align:left;">ACCEPTED</span>';
+    if (status === 'declined') return '<span class="ac-rsvp-pill" style="font-family:Arial,sans-serif;font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(255,77,109,0.12);color:#ff4d6d;border:1px solid rgba(255,77,109,0.35);text-align:left;">DECLINED</span>';
+    return '<span class="ac-rsvp-pill" style="font-family:Arial,sans-serif;font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(240,160,32,0.12);color:#f0a020;border:1px solid rgba(240,160,32,0.35);text-align:left;">RSVP</span>';
+  }
+
+  function _renderInbox() {
+    var allItems = local.inbox;
+    if (!allItems.length) return '';
+    var pendingCount = allItems.filter(function(i) { return i.rsvpStatus === 'pending'; }).length;
+    var expanded = local.inboxExpanded;
+    var badgeStyle = 'font-family:JetBrains Mono,monospace;font-size:11px;padding:1px 7px;border-radius:10px;background:rgba(0,210,255,0.12);color:#00d2ff;border:1px solid rgba(0,210,255,0.3);';
+    var chevron = '<span class="ac-tree-chevron' + (expanded ? ' open' : '') + '">&#9656;</span>';
+    var headerStyle = 'cursor:pointer;display:flex;align-items:center;gap:7px;padding:6px 14px;';
+    var labelStyle = 'color:#ffffff;font-weight:700;letter-spacing:0.08em;font-family:JetBrains Mono,monospace;font-size:11px;text-transform:uppercase;flex:1;';
+    var rows = '';
+    if (expanded) {
+      allItems.forEach(function(item) {
+        var start = item.scheduledFor ? new Date(item.scheduledFor) : null;
+        var dateStr = start ? start.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ' · ' +
+          start.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}) +
+          (item.durationMinutes ? '\u2013' + new Date(start.getTime() + item.durationMinutes*60000).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}) : '') : '';
+        rows +=
+          '<div class="ac-inbox-item" data-attendee-id="' + esc(item.attendeeId) + '" data-meeting-id="' + esc(item.meetingId) + '" data-status="' + esc(item.rsvpStatus) + '" ' +
+          'style="display:grid;grid-template-columns:1fr auto 70px;align-items:center;gap:6px;padding:2px 14px 2px 28px;cursor:pointer;font-family:Arial,sans-serif;font-size:12px;">' +
+            '<span class="ac-tree-label">' + esc(item.title) + '</span>' +
+            '<span class="ac-tree-meta" style="color:#00d2ff;font-size:11px;text-align:right;">' + esc(dateStr) + '</span>' +
+            _pillHtml(item.rsvpStatus) +
+          '</div>';
+      });
+    }
     return (
       '<div class="ac-inbox-block">' +
-        '<div class="ac-tree-row ac-tree-ws ac-inbox-header" id="ac-inbox-header">' +
+        '<div id="ac-inbox-header" style="' + headerStyle + '">' +
           chevron +
-          '<span class="ac-tree-label" style="color:#00d2ff;font-weight:700;letter-spacing:0.08em;">INBOX</span>' +
-          badge +
+          '<span style="' + labelStyle + '">INBOX</span>' +
+          '<span style="' + badgeStyle + '">' + pendingCount + '</span>' +
         '</div>' +
-        '<div class="ac-inbox-children" id="ac-inbox-children"' + (expanded ? '' : ' style="display:none"') + '>' +
-          rows +
-        '</div>' +
+        '<div id="ac-inbox-children"' + (expanded ? '' : ' style="display:none"') + '>' + rows + '</div>' +
       '</div>' +
       '<div style="height:1px;background:rgba(0,210,255,0.1);margin:4px 0;"></div>'
     );
   }
 
   function _wireInboxHandlers() {
-    // Toggle expand/collapse
     var header = document.getElementById('ac-inbox-header');
     if (header) {
       header.addEventListener('click', function() {
@@ -380,8 +406,6 @@
         _renderTree();
       });
     }
-
-    // Item click → show RSVP popup
     document.querySelectorAll('.ac-inbox-item').forEach(function(row) {
       row.addEventListener('click', function(e) {
         e.stopPropagation();
@@ -390,69 +414,82 @@
     });
   }
 
-  function _showRsvpPopup(attendeeId, meetingId, anchorEl) {
-    // Remove any existing popup
+  function _popupField(label, value) {
+    if (!value) return '';
+    return '<div style="margin-bottom:8px;">' +
+      '<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#5a7a9f;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:2px;">' + label + '</div>' +
+      '<div style="font-family:Arial,sans-serif;font-size:12px;color:#c8d8e8;">' + value + '</div>' +
+    '</div>';
+  }
+
+  function _updateInboxPill(row, status) {
+    var pill = row.querySelector('.ac-rsvp-pill');
+    if (!pill) return;
+    if (status === 'accepted') { pill.textContent='ACCEPTED'; pill.style.background='rgba(52,192,112,0.12)'; pill.style.color='#34c070'; pill.style.borderColor='rgba(52,192,112,0.35)'; }
+    else { pill.textContent='DECLINED'; pill.style.background='rgba(255,77,109,0.12)'; pill.style.color='#ff4d6d'; pill.style.borderColor='rgba(255,77,109,0.35)'; }
+    row.dataset.status = status;
+    var pending = [...document.querySelectorAll('.ac-inbox-item')].filter(function(r) { return r.dataset.status === 'pending'; }).length;
+    var badge = document.querySelector('#ac-inbox-header span[style*="border-radius:10px"]');
+    if (badge) badge.textContent = pending;
+    var localItem = local.inbox.find(function(i) { return i.attendeeId === row.dataset.attendeeId; });
+    if (localItem) localItem.rsvpStatus = status;
+  }
+
+  async function _showRsvpPopup(attendeeId, meetingId, anchorEl) {
     var existing = document.getElementById('ac-inbox-rsvp-popup');
     if (existing) { existing.remove(); if (existing.dataset.attendeeId === attendeeId) return; }
-
-    var item = local.inbox.find(function(i) { return i.attendeeId === attendeeId; });
-    if (!item) return;
-
+    var meetings = await API.get('accord_meetings?meeting_id=eq.' + meetingId + '&select=title,stakes,location,scheduled_for,duration_minutes,organizer_id');
+    var m = (meetings && meetings[0]) || {};
+    var organizer = 'Unknown';
+    if (m.organizer_id) {
+      var res = await API.get('resources?user_id=eq.' + m.organizer_id + '&select=name');
+      organizer = (res && res[0] && res[0].name) || 'Unknown';
+    }
+    var title  = m.title || 'Meeting';
+    var meta   = anchorEl.querySelector('.ac-tree-meta') ? anchorEl.querySelector('.ac-tree-meta').textContent : '';
+    var status = anchorEl.dataset.status;
     var rect = anchorEl.getBoundingClientRect();
     var popup = document.createElement('div');
     popup.id = 'ac-inbox-rsvp-popup';
     popup.dataset.attendeeId = attendeeId;
-    popup.style.cssText =
-      'position:fixed;z-index:1000;' +
-      'left:' + (rect.right + 8) + 'px;' +
-      'top:' + rect.top + 'px;' +
+    popup.style.cssText = 'position:fixed;z-index:1000;left:' + (rect.right+8) + 'px;top:' + rect.top + 'px;' +
       'background:#0d1a24;border:1px solid rgba(0,210,255,0.3);border-radius:6px;' +
-      'padding:14px 16px;min-width:240px;box-shadow:0 8px 32px rgba(0,0,0,0.5);';
-
-    var date = item.scheduledFor
-      ? new Date(item.scheduledFor).toLocaleDateString('en-US', {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
-      : '';
-
+      'padding:14px 16px;min-width:280px;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.5);';
     popup.innerHTML =
-      '<div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:#e8f0f8;margin-bottom:4px;">' + esc(item.title) + '</div>' +
-      '<div style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;margin-bottom:2px;">Invited by <span style="color:#00d2ff">' + esc(item.organizer) + '</span></div>' +
-      (date ? '<div style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;margin-bottom:12px;">' + esc(date) + '</div>' : '<div style="margin-bottom:12px;"></div>') +
-      '<div style="display:flex;gap:8px;">' +
-        '<button id="ac-rsvp-accept" style="flex:1;padding:7px;background:rgba(52,192,112,0.1);border:1px solid rgba(52,192,112,0.4);color:#34c070;font-family:Arial,sans-serif;font-size:12px;border-radius:4px;cursor:pointer;">✓ Accept</button>' +
-        '<button id="ac-rsvp-decline" style="flex:1;padding:7px;background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.4);color:#ff4d6d;font-family:Arial,sans-serif;font-size:12px;border-radius:4px;cursor:pointer;">✕ Decline</button>' +
-      '</div>';
-
+      '<div style="font-family:Syne,sans-serif;font-size:15px;font-weight:700;color:#e8f0f8;margin-bottom:8px;">' + esc(title) + '</div>' +
+      _popupField('When', meta) +
+      _popupField('Organizer', organizer) +
+      _popupField('Stakes', m.stakes) +
+      _popupField('Location', m.location) +
+      (!m.stakes && !m.location ? '<div style="font-family:Arial,sans-serif;font-size:11px;color:#5a7a9f;margin-bottom:8px;font-style:italic;">No stakes or location set</div>' : '') +
+      (status === 'pending'
+        ? '<div style="display:flex;gap:8px;margin-top:12px;">' +
+            '<button id="ac-rsvp-accept" style="flex:1;padding:7px;background:rgba(52,192,112,0.1);border:1px solid rgba(52,192,112,0.4);color:#34c070;font-family:Arial,sans-serif;font-size:12px;border-radius:4px;cursor:pointer;">\u2713 Accept</button>' +
+            '<button id="ac-rsvp-decline" style="flex:1;padding:7px;background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.4);color:#ff4d6d;font-family:Arial,sans-serif;font-size:12px;border-radius:4px;cursor:pointer;">\u2715 Decline</button>' +
+          '</div>'
+        : '<div style="margin-top:12px;font-family:Arial,sans-serif;font-size:11px;color:' + (status==='accepted'?'#34c070':'#ff4d6d') + ';text-align:center;">' +
+            (status==='accepted' ? '\u2713 You accepted this meeting' : '\u2715 You declined this meeting') +
+          '</div>'
+      );
     document.body.appendChild(popup);
-
-    // Close on outside click
     setTimeout(function() {
       document.addEventListener('click', function _closePopup(e) {
         if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', _closePopup); }
       });
     }, 50);
-
-    // Accept
-    document.getElementById('ac-rsvp-accept').addEventListener('click', function() {
-      _rsvpRespond(attendeeId, meetingId, 'accepted', popup);
-    });
-    // Decline
-    document.getElementById('ac-rsvp-decline').addEventListener('click', function() {
-      _rsvpRespond(attendeeId, meetingId, 'declined', popup);
-    });
-  }
-
-  async function _rsvpRespond(attendeeId, meetingId, status, popup) {
-    try {
-      await API.patch('accord_meeting_attendees?attendee_id=eq.' + attendeeId, { rsvp_status: status });
-      popup.remove();
-      // Remove from local inbox and re-render
-      local.inbox = local.inbox.filter(function(i) { return i.attendeeId !== attendeeId; });
-      _renderTree();
-    } catch(e) {
-      console.error('[Accord-rails] RSVP respond failed', e);
+    if (status === 'pending') {
+      document.getElementById('ac-rsvp-accept').addEventListener('click', async function() {
+        await API.patch('accord_meeting_attendees?attendee_id=eq.' + attendeeId, { rsvp_status: 'accepted' });
+        popup.remove();
+        _updateInboxPill(anchorEl, 'accepted');
+      });
+      document.getElementById('ac-rsvp-decline').addEventListener('click', async function() {
+        await API.patch('accord_meeting_attendees?attendee_id=eq.' + attendeeId, { rsvp_status: 'declined' });
+        popup.remove();
+        _updateInboxPill(anchorEl, 'declined');
+      });
     }
   }
-
   function _renderTopWs(ws, subs, meetingsByWs, lvl, ctx) {
     const expanded = local.treeExpanded[ws.workstream_id] !== false;  // default open
     const ownMeetings = meetingsByWs[ws.workstream_id] || [];
@@ -974,8 +1011,8 @@
       // narrows it (handle is on the rail's LEFT edge).
       const delta = ev.clientX - startX;
       const newW  = side === 'left'
-        ? Math.min(380, Math.max(200, startW + delta))
-        : Math.min(380, Math.max(200, startW - delta));
+        ? Math.max(200, startW + delta)
+        : Math.max(200, startW - delta);
       // X-23e: route through helper so the opposite rail's collapse
       // state is respected during this drag.
       _applyGridCols(side === 'left' ? { left: newW } : { right: newW });
