@@ -47,6 +47,7 @@
   }
   #accord-app { background: #060a10 !important; }
   #accord-app #ac-topnav { background: #0a1119 !important; }
+  html { background: #060a10; }
   #hud-tier1 { background: rgba(10,16,28,0.95) !important; }
   #hud-header-left .hud-module-name {
     font-family: 'Syne', system-ui, sans-serif !important;
@@ -3769,7 +3770,7 @@
       var wrap = document.createElement('div');
       wrap.style.cssText = 'margin-left:auto;display:flex;align-items:center;gap:8px;padding-right:16px;';
       var btn = document.createElement('button');
-      btn.id = 'mc-tune-btn'; btn.title = 'Display tuning'; btn.innerHTML = '&#9728;';
+      btn.id = 'hud-display-btn'; btn.title = 'Display tuning'; btn.innerHTML = '&#9728;';
       btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;color:var(--tm);padding:0;line-height:1;transition:color .15s;';
       btn.onmouseover = function(){ this.style.color = 'var(--amber)'; };
       btn.onmouseout  = function(){ this.style.color = 'var(--tm)'; };
@@ -3777,12 +3778,16 @@
       var bs = document.createElement('span');
       bs.id = 'nav-build-stamp';
       bs.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;letter-spacing:.03em;';
-      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.0847</span>';
+      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.0908</span>';
       var nt = document.createElement('span');
       nt.id = 'nav-time';
       nt.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;';
       wrap.appendChild(btn); wrap.appendChild(bs); wrap.appendChild(nt);
       strip.appendChild(wrap);
+      // Wire display tuning button via HUDShell
+      if (window.HUDShell && typeof window.HUDShell.bindDisplayTuning === 'function') {
+        window.HUDShell.bindDisplayTuning();
+      }
       // Sync clock
       setInterval(function(){
         var el = document.getElementById('nav-time');

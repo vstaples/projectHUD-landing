@@ -1852,6 +1852,7 @@ const HUDShell = (() => {
     selectTier2: _selectTier2,
     getActiveTier1: () => _tier1Active,
     getActiveTier2: () => (_tier1Active ? _tier2Memory[_tier1Active] : null),
+    bindDisplayTuning: _bindDisplayTuningBtn,
   };
   window.HUDShell = api;
 
