@@ -3673,6 +3673,7 @@
       s.src = src + '?v=' + v;
       document.head.appendChild(s);
     }
+    load('/js/accord-display-tuning.js');
     load('/js/hud-shell.js');
     load('/js/cmd-center.js');
     load('/js/accord-core.js');
@@ -3799,19 +3800,14 @@
       btn.onmouseover = function(){ this.style.color = 'var(--amber)'; };
       btn.onmouseout  = function(){ this.style.color = 'var(--tm)'; };
       btn.onclick     = function(){ if (typeof mcOpenTuning === 'function') mcOpenTuning(); };
-      var bs = document.createElement('span');
       bs.id = 'nav-build-stamp';
       bs.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;letter-spacing:.03em;';
-      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.1413</span>';
+      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.1424</span>';
       var nt = document.createElement('span');
       nt.id = 'nav-time';
       nt.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;';
       wrap.appendChild(btn); wrap.appendChild(bs); wrap.appendChild(nt);
       strip.appendChild(wrap);
-      // Wire display tuning button via HUDShell
-      if (window.HUDShell && typeof window.HUDShell.bindDisplayTuning === 'function') {
-        window.HUDShell.bindDisplayTuning();
-      }
       // Sync clock
       setInterval(function(){
         var el = document.getElementById('nav-time');
