@@ -3800,9 +3800,10 @@
       btn.onmouseover = function(){ this.style.color = 'var(--amber)'; };
       btn.onmouseout  = function(){ this.style.color = 'var(--tm)'; };
       btn.onclick     = function(){ if (typeof mcOpenTuning === 'function') mcOpenTuning(); };
+      var bs = document.createElement('span');
       bs.id = 'nav-build-stamp';
       bs.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;letter-spacing:.03em;';
-      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.1424</span>';
+      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.1428</span>';
       var nt = document.createElement('span');
       nt.id = 'nav-time';
       nt.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;';
