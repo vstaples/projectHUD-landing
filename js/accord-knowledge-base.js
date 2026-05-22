@@ -835,10 +835,8 @@
 
   // ── Expose ─────────────────────────────────────────────────
   window.AccordKnowledgeBase = {
-    render:          render,
-    destroy:         destroy,
-    renderFirmWide:  renderFirmWide,
-    destroyFirmWide: destroyFirmWide,
+    render:     render,
+    destroy:    destroy,
     _activeTab: 'meetings',
   };
 
@@ -1276,6 +1274,12 @@
     _fwMtgMap   = {};
     _fwActiveTag = 'all';
     _fwSearchQ   = '';
+  }
+
+  // Extend the public API set up by the first IIFE
+  if (window.AccordKnowledgeBase) {
+    window.AccordKnowledgeBase.renderFirmWide  = renderFirmWide;
+    window.AccordKnowledgeBase.destroyFirmWide = destroyFirmWide;
   }
 
 })();
