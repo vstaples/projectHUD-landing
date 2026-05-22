@@ -117,24 +117,8 @@
    ============================================================ */
 
 #accord-app {
-  /* Canvas — warm slate palette from prototype v3b-4 */
-  --canvas-deep:   #1a1814;
-  --canvas:        #211e19;
-  --canvas-raised: #2a2620;
-  --canvas-elev:   #332e26;
-  --canvas-hover:  #3d372d;
-
-  /* Text — warm parchment hierarchy */
-  --ink-primary:   #f4ede0;
-  --ink-body:      #d6cdb8;
-  --ink-muted:     #b3a78f;
-  --ink-faint:     #908572;
-  --ink-ghost:     #5a5347;
-
-  /* Signal — muted amber, used sparingly */
-  --signal:        #d4a04a;
-  --signal-soft:   rgba(212, 160, 74, 0.15);
-  --signal-dim:    rgba(212, 160, 74, 0.4);
+  /* Palette tokens now defined in the HUDShell override block above.
+     Amber tokens removed — cyan palette applied uniformly. */
 
   /* Tag colors — desaturated per IR45 (declared not measured) */
   --tag-note:      #8ba89a;
@@ -142,10 +126,6 @@
   --tag-action:    #b07c8a;
   --tag-risk:      #a86f5e;
   --tag-question:  #7b8fa8;
-
-  /* Borders */
-  --rule:          rgba(244, 237, 224, 0.06);
-  --rule-strong:   rgba(244, 237, 224, 0.12);
 
   --rail-w: 320px;
   --meta-w: 320px;
@@ -3790,7 +3770,7 @@
       var bs = document.createElement('span');
       bs.id = 'nav-build-stamp';
       bs.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;letter-spacing:.03em;';
-      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.0749</span>';
+      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.0753</span>';
       var nt = document.createElement('span');
       nt.id = 'nav-time';
       nt.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;';
