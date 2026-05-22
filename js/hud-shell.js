@@ -515,7 +515,7 @@ const HUDShell = (() => {
     const currentPath = window.location.pathname;
     const NAV_ITEMS = [
       { href: '/dashboard.html',           icon: '◈', label: 'Dashboard',  section: 'top'   },
-      { href: '/accord.html',              icon: '◇', label: 'Accord',     section: 'main'  },
+      { href: '/accord-today.html',        icon: '◇', label: 'Accord',     section: 'main'  },
       { href: '/cadence.html',             icon: '⬡', label: 'Cadence',    section: 'main'  },
       { href: '/compass.html',             icon: '◈', label: 'Compass',    section: 'main'  },
       { href: '/pipeline.html',            icon: '▥', label: 'Pipeline',   section: 'main'  },
@@ -526,7 +526,7 @@ const HUDShell = (() => {
       { href: '/users.html',               icon: '◑', label: 'User Mgmt',  section: 'admin' },
     ];
     const navItem = item => {
-      const isActive = currentPath === item.href || (activePage && activePage === item.href.replace('/',''));
+      const isActive = currentPath === item.href || (activePage && activePage === item.href.replace('/','')) || (item.label === 'Accord' && currentPath.startsWith('/accord'));
       return `<a href="${item.href}" class="nav-item${isActive?' active':''}">
         <span class="nav-icon">${item.icon}</span>${item.label}
       </a>`;
