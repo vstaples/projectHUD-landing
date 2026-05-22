@@ -870,12 +870,12 @@
       '#ac-fw-kb-splash{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:40px;}',
       // Filter bar
       '#ac-fw-kb-bar{display:flex;align-items:center;gap:8px;padding:12px 20px;border-bottom:1px solid rgba(0,210,255,0.1);flex-shrink:0;flex-wrap:wrap;}',
-      '.ac-fw-pill{font-family:Arial,sans-serif;font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid rgba(0,210,255,0.2);color:#7a9abf;background:none;cursor:pointer;transition:all 120ms;white-space:nowrap;}',
-      '.ac-fw-pill.active{background:rgba(0,210,255,0.12);border-color:rgba(0,210,255,0.5);color:#00d2ff;}',
-      '.ac-fw-pill:hover:not(.active){border-color:rgba(0,210,255,0.35);color:#c8d8e8;}',
-      '#ac-fw-search{flex:1;min-width:180px;max-width:340px;background:#0d1a2a;border:1px solid rgba(0,210,255,0.2);color:#e8f0f8;font-family:"JetBrains Mono",monospace;font-size:12px;padding:5px 10px;border-radius:4px;outline:none;}',
+      '.ac-fw-pill{font-family:Arial,sans-serif;font-size:12px;padding:5px 12px;border-radius:3px;border:1px solid rgba(0,210,255,0.35);color:#e8f0f8;background:rgba(0,210,255,0.08);cursor:pointer;transition:all 120ms;white-space:nowrap;letter-spacing:0.05em;}',
+      '.ac-fw-pill.active{background:rgba(0,210,255,0.15);border-color:rgba(0,210,255,0.6);color:#ffffff;}',
+      '.ac-fw-pill:hover:not(.active){background:rgba(0,210,255,0.12);border-color:rgba(0,210,255,0.5);color:#ffffff;}',
+      '#ac-fw-search{flex:1;min-width:180px;max-width:340px;background:#243550;border:1px solid rgba(0,210,255,0.3);color:#a0b8cc;font-family:"JetBrains Mono",monospace;font-size:12px;padding:5px 10px;border-radius:4px;outline:none;}',
       '#ac-fw-search:focus{border-color:rgba(0,210,255,0.5);}',
-      '#ac-fw-search::placeholder{color:#3a5a7f;}',
+      '#ac-fw-search::placeholder{color:#6a8aaa;opacity:1;}',
       '#ac-fw-count{font-family:"JetBrains Mono",monospace;font-size:11px;color:#5a7a9f;margin-left:auto;white-space:nowrap;}',
       // List
       '#ac-fw-kb-list{flex:1;overflow-y:auto;padding:8px 0;}',
@@ -947,15 +947,15 @@
 
   // ── Splash SVG ─────────────────────────────────────────────
   function _splashHtml() {
-    return '<div id="ac-fw-kb-splash">' +
-      '<svg width="100%" viewBox="0 0 680 420" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 24px;">' +
+    return '<div id="ac-fw-kb-splash" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;flex:1;padding:20px 40px 40px;">' +
+      '<svg width="100%" viewBox="0 0 680 420" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto -30px;max-width:65%;">' +
         '<defs><style>' +
           '.kbs-orb{fill:none;stroke:rgba(0,210,255,0.3);stroke-width:0.8}' +
           '.kbs-line{stroke:rgba(0,210,255,0.5);stroke-width:0.6;fill:none}' +
           '.kbs-node{fill:rgba(0,210,255,0.3);stroke:#00d2ff;stroke-width:1;}' +
           '.kbs-halo{fill:rgba(0,210,255,0.35);stroke:none;}' +
           '.kbs-dot{fill:#00d2ff;opacity:0.8;}' +
-          '.kbs-label{font-family:"JetBrains Mono",monospace;font-size:11px;fill:#00d2ff;letter-spacing:0.08em;}' +
+          '.kbs-label{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:0.1em;}' +
           '.kbs-p1{animation:kbs-pulse 3s ease-in-out infinite}' +
           '.kbs-p2{animation:kbs-pulse 3s ease-in-out 1s infinite}' +
           '.kbs-p3{animation:kbs-pulse 3s ease-in-out 2s infinite}' +
@@ -967,7 +967,7 @@
           '.kbs-g3{animation:kbs-glow 2.5s ease-in-out 1.6s infinite}' +
           '@keyframes kbs-pulse{0%,100%{opacity:0.3}50%{opacity:0.6}}' +
           '@keyframes kbs-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}' +
-          '@keyframes kbs-glow{0%,100%{opacity:0.4}50%{opacity:0.9}}' +
+          '@keyframes kbs-glow{0%,100%{opacity:0.1}50%{opacity:0.35}}' +
         '</style></defs>' +
         // Central hub
         '<g class="kbs-f1"><circle class="kbs-halo kbs-g1" cx="340" cy="185" r="36"/><circle class="kbs-node" cx="340" cy="185" r="22"/><circle class="kbs-dot" cx="340" cy="185" r="8"/></g>' +
@@ -980,7 +980,7 @@
         '<line class="kbs-line" x1="340" y1="185" x2="430" y2="295"/>' +
         // Decision node — top left
         '<g class="kbs-f2"><circle class="kbs-halo kbs-g2" cx="200" cy="90" r="22"/><circle class="kbs-node" cx="200" cy="90" r="14" style="stroke:rgba(0,210,255,0.9)"/><circle class="kbs-dot" cx="200" cy="90" r="5"/></g>' +
-        '<text class="kbs-label" x="200" y="66" text-anchor="middle">DECISIONS</text>' +
+        '<text class="kbs-label" x="200" y="66" text-anchor="middle" fill="rgba(0,210,255,0.7)">DECISIONS</text>' +
         // Action node — top right
         '<g class="kbs-f3"><circle class="kbs-halo kbs-g3" cx="480" cy="90" r="24"/><circle class="kbs-node" cx="480" cy="90" r="16" style="stroke:rgba(240,160,32,0.9)"/><circle class="kbs-dot" cx="480" cy="90" r="6" style="fill:#f0a020"/></g>' +
         '<text class="kbs-label" x="480" y="66" text-anchor="middle" style="fill:#f0a020">ACTIONS</text>' +

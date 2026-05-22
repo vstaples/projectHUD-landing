@@ -141,10 +141,10 @@
 /* ── Left rail: tree ────────────────────────────────────────── */
 #accord-app .ac-tree-search {
   width: 100%;
-  background: #1e2d45;
+  background: #243550;
   border: 1px solid rgba(0,210,255,0.3);
-  color: #e8f0f8;
-  font-family: 'IBM Plex Mono', monospace;
+  color: #a0b8cc;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   padding: 6px 9px;
   outline: none;
@@ -152,6 +152,8 @@
   margin-top: 8px;
   transition: border-color 120ms;
 }
+#accord-app .ac-tree-search::placeholder { color: #6a8aaa; opacity: 1; }
+#accord-app .ac-tree-search:focus { border-color: rgba(0,210,255,0.5); }
 #accord-app .ac-tree-search:focus {
   border-color: var(--signal-dim);
 }
