@@ -835,9 +835,447 @@
 
   // ── Expose ─────────────────────────────────────────────────
   window.AccordKnowledgeBase = {
-    render:     render,
-    destroy:    destroy,
+    render:          render,
+    destroy:         destroy,
+    renderFirmWide:  renderFirmWide,
+    destroyFirmWide: destroyFirmWide,
     _activeTab: 'meetings',
   };
+
+})();
+// ============================================================
+// Firm-Wide Knowledge Base
+// Renders into #ac-fw-kb-host — a full-width surface injected
+// into the center pane of accord.html when the KB tier-1 tab
+// is clicked at constellation level.
+// ============================================================
+
+(function () {
+
+  var _fwHost     = null;   // #ac-fw-kb-host element
+  var _fwPanel    = null;   // slide-in detail panel
+  var _fwData     = [];     // all nodes fetched
+  var _fwMtgMap   = {};     // meeting_id → { title, workstreamName, state, workstreamId }
+  var _fwActiveTag = 'all'; // current filter tab
+  var _fwSearchQ   = '';    // current search string
+  var _fwSlideOpen = false;
+
+  // ── CSS injection ──────────────────────────────────────────
+  (function _injectFwStyles() {
+    if (document.getElementById('ac-fw-kb-styles')) return;
+    var s = document.createElement('style');
+    s.id = 'ac-fw-kb-styles';
+    s.textContent = [
+      // Host
+      '#ac-fw-kb-host{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:#060a10;position:relative;}',
+      // Splash
+      '#ac-fw-kb-splash{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:40px;}',
+      // Filter bar
+      '#ac-fw-kb-bar{display:flex;align-items:center;gap:8px;padding:12px 20px;border-bottom:1px solid rgba(0,210,255,0.1);flex-shrink:0;flex-wrap:wrap;}',
+      '.ac-fw-pill{font-family:Arial,sans-serif;font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid rgba(0,210,255,0.2);color:#7a9abf;background:none;cursor:pointer;transition:all 120ms;white-space:nowrap;}',
+      '.ac-fw-pill.active{background:rgba(0,210,255,0.12);border-color:rgba(0,210,255,0.5);color:#00d2ff;}',
+      '.ac-fw-pill:hover:not(.active){border-color:rgba(0,210,255,0.35);color:#c8d8e8;}',
+      '#ac-fw-search{flex:1;min-width:180px;max-width:340px;background:#0d1a2a;border:1px solid rgba(0,210,255,0.2);color:#e8f0f8;font-family:"JetBrains Mono",monospace;font-size:12px;padding:5px 10px;border-radius:4px;outline:none;}',
+      '#ac-fw-search:focus{border-color:rgba(0,210,255,0.5);}',
+      '#ac-fw-search::placeholder{color:#3a5a7f;}',
+      '#ac-fw-count{font-family:"JetBrains Mono",monospace;font-size:11px;color:#5a7a9f;margin-left:auto;white-space:nowrap;}',
+      // List
+      '#ac-fw-kb-list{flex:1;overflow-y:auto;padding:8px 0;}',
+      '.ac-fw-row{display:grid;grid-template-columns:64px 1fr auto auto auto;align-items:center;gap:10px;padding:7px 20px;cursor:pointer;border-left:3px solid transparent;transition:background 80ms,border-color 80ms;}',
+      '.ac-fw-row:hover{background:rgba(0,210,255,0.04);border-left-color:rgba(0,210,255,0.3);}',
+      '.ac-fw-row.ac-fw-selected{background:rgba(0,210,255,0.08);border-left-color:#00d2ff;}',
+      '.ac-fw-seq{font-family:"JetBrains Mono",monospace;font-size:10px;padding:2px 6px;border-radius:3px;text-align:center;white-space:nowrap;}',
+      '.ac-fw-summary{font-family:Arial,sans-serif;font-size:13px;color:#e8f0f8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.ac-fw-ws{font-family:"JetBrains Mono",monospace;font-size:10px;color:#00d2ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;}',
+      '.ac-fw-mtg{font-family:"JetBrains Mono",monospace;font-size:10px;color:#5a7a9f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;}',
+      '.ac-fw-date{font-family:"JetBrains Mono",monospace;font-size:10px;color:#5a7a9f;white-space:nowrap;}',
+      '.ac-fw-badge{font-family:Arial,sans-serif;font-size:10px;padding:2px 6px;border-radius:3px;white-space:nowrap;}',
+      '.ac-fw-badge-overdue{background:rgba(255,77,109,0.12);color:#ff4d6d;border:1px solid rgba(255,77,109,0.3);}',
+      '.ac-fw-badge-open{background:rgba(0,210,255,0.08);color:#7a9abf;border:1px solid rgba(0,210,255,0.15);}',
+      '.ac-fw-badge-done{background:rgba(52,192,112,0.08);color:#34c070;border:1px solid rgba(52,192,112,0.2);}',
+      // Seq badge colors by tag
+      '.ac-fw-seq-decision{background:rgba(0,210,255,0.12);color:#00d2ff;border:1px solid rgba(0,210,255,0.25);}',
+      '.ac-fw-seq-action{background:rgba(240,160,32,0.12);color:#f0a020;border:1px solid rgba(240,160,32,0.25);}',
+      '.ac-fw-seq-risk{background:rgba(255,77,109,0.12);color:#ff4d6d;border:1px solid rgba(255,77,109,0.25);}',
+      '.ac-fw-seq-note{background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.25);}',
+      '.ac-fw-seq-question{background:rgba(52,192,112,0.12);color:#34c070;border:1px solid rgba(52,192,112,0.25);}',
+      // Slide-in panel
+      '#ac-fw-panel{position:absolute;top:0;right:0;width:50%;height:100%;background:#0a1119;border-left:1px solid rgba(0,210,255,0.15);display:flex;flex-direction:column;transform:translateX(100%);transition:transform 260ms cubic-bezier(.25,.46,.45,.94);z-index:50;overflow:hidden;}',
+      '#ac-fw-panel.open{transform:translateX(0);}',
+      '#ac-fw-panel-header{padding:14px 18px 12px;border-bottom:1px solid rgba(0,210,255,0.1);flex-shrink:0;display:flex;align-items:flex-start;gap:10px;}',
+      '#ac-fw-panel-close{background:none;border:none;color:#5a7a9f;font-size:18px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;margin-top:2px;}',
+      '#ac-fw-panel-close:hover{color:#00d2ff;}',
+      '#ac-fw-panel-title{font-family:"Syne",system-ui,sans-serif;font-size:16px;font-weight:700;color:#e8f0f8;line-height:1.3;}',
+      '#ac-fw-panel-breadcrumb{font-family:"JetBrains Mono",monospace;font-size:10px;color:#5a7a9f;margin-top:3px;}',
+      '#ac-fw-panel-breadcrumb span{color:#00d2ff;}',
+      '#ac-fw-panel-body{flex:1;overflow-y:auto;padding:16px 18px;}',
+      '#ac-fw-panel-body .ac-fw-notice-field{margin-bottom:12px;}',
+      '#ac-fw-panel-body .ac-fw-notice-label{font-family:"JetBrains Mono",monospace;font-size:10px;color:#5a7a9f;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px;}',
+      '#ac-fw-panel-body .ac-fw-notice-value{font-family:Arial,sans-serif;font-size:13px;color:#c8d8e8;}',
+      '#ac-fw-panel-body .ac-fw-minutes-node{padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);}',
+      '#ac-fw-panel-body .ac-fw-minutes-seq{font-family:"JetBrains Mono",monospace;font-size:10px;color:#5a7a9f;margin-bottom:3px;}',
+      '#ac-fw-panel-body .ac-fw-minutes-summary{font-family:Arial,sans-serif;font-size:13px;color:#e8f0f8;}',
+      // Empty state
+      '.ac-fw-empty{padding:40px;text-align:center;color:#5a7a9f;font-family:"JetBrains Mono",monospace;font-size:12px;}',
+      // Loading
+      '.ac-fw-loading{padding:40px;text-align:center;color:#5a7a9f;font-family:"JetBrains Mono",monospace;font-size:12px;}',
+    ].join('');
+    document.head.appendChild(s);
+  })();
+
+  // ── Helpers ────────────────────────────────────────────────
+  function _esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function _fmt(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  }
+  function _isOverdue(node) {
+    if (node.tag !== 'action') return false;
+    if (node.status === 'committed' || node.status === 'closed') return false;
+    if (!node.due_date) return false;
+    return new Date(node.due_date) < new Date();
+  }
+  function _seqClass(tag) {
+    var map = { decision:'decision', action:'action', risk:'risk', note:'note', question:'question' };
+    return 'ac-fw-seq-' + (map[tag] || 'note');
+  }
+  function _tagLabel(tag) {
+    var map = { decision:'DECISION', action:'ACTION', risk:'RISK', note:'NOTE', question:'QUESTION' };
+    return map[tag] || tag.toUpperCase();
+  }
+
+  // ── Splash SVG ─────────────────────────────────────────────
+  function _splashHtml() {
+    return '<div id="ac-fw-kb-splash">' +
+      '<svg width="100%" viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg" style="max-width:480px;display:block;margin:0 auto 24px;">' +
+        '<defs><style>' +
+          '.kbs-orb{fill:none;stroke:rgba(0,210,255,0.25);stroke-width:0.8}' +
+          '.kbs-line{stroke:rgba(0,210,255,0.35);stroke-width:0.6;fill:none}' +
+          '.kbs-node{fill:rgba(0,210,255,0.15);stroke:#00d2ff;stroke-width:1;}' +
+          '.kbs-dot{fill:#00d2ff;opacity:0.8;}' +
+          '.kbs-label{font-family:"JetBrains Mono",monospace;font-size:11px;fill:#00d2ff;letter-spacing:0.08em;}' +
+          '.kbs-p1{animation:kbs-pulse 3s ease-in-out infinite}' +
+          '.kbs-p2{animation:kbs-pulse 3s ease-in-out 1s infinite}' +
+          '.kbs-p3{animation:kbs-pulse 3s ease-in-out 2s infinite}' +
+          '.kbs-f1{animation:kbs-float 5s ease-in-out infinite}' +
+          '.kbs-f2{animation:kbs-float 5s ease-in-out 1.5s infinite}' +
+          '.kbs-f3{animation:kbs-float 5s ease-in-out 3s infinite}' +
+          '@keyframes kbs-pulse{0%,100%{opacity:0.25}50%{opacity:0.6}}' +
+          '@keyframes kbs-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}' +
+        '</style></defs>' +
+        // Central hub
+        '<g class="kbs-f1"><circle class="kbs-orb kbs-p1" cx="340" cy="150" r="55"/><circle class="kbs-node" cx="340" cy="150" r="18"/><circle class="kbs-dot" cx="340" cy="150" r="7"/></g>' +
+        // Spokes
+        '<line class="kbs-line" x1="340" y1="150" x2="200" y2="80"/>' +
+        '<line class="kbs-line" x1="340" y1="150" x2="480" y2="80"/>' +
+        '<line class="kbs-line" x1="340" y1="150" x2="180" y2="180"/>' +
+        '<line class="kbs-line" x1="340" y1="150" x2="500" y2="190"/>' +
+        '<line class="kbs-line" x1="340" y1="150" x2="290" y2="240"/>' +
+        '<line class="kbs-line" x1="340" y1="150" x2="420" y2="235"/>' +
+        // Decision node
+        '<g class="kbs-f2"><circle class="kbs-node" cx="200" cy="80" r="12" style="stroke:rgba(0,210,255,0.8)"/><circle class="kbs-dot" cx="200" cy="80" r="4"/></g>' +
+        '<text class="kbs-label" x="200" y="60" text-anchor="middle">DECISIONS</text>' +
+        // Action node
+        '<g class="kbs-f3"><circle class="kbs-node" cx="480" cy="80" r="14" style="stroke:rgba(240,160,32,0.8)"/><circle class="kbs-dot" cx="480" cy="80" r="5" style="fill:#f0a020"/></g>' +
+        '<text class="kbs-label" x="480" y="60" text-anchor="middle" style="fill:#f0a020">ACTIONS</text>' +
+        // Risk node
+        '<g class="kbs-f1"><circle class="kbs-node" cx="180" cy="180" r="11" style="stroke:rgba(255,77,109,0.8)"/><circle class="kbs-dot" cx="180" cy="180" r="4" style="fill:#ff4d6d"/></g>' +
+        '<text class="kbs-label" x="138" y="205" text-anchor="middle" style="fill:#ff4d6d">RISKS</text>' +
+        // Note node
+        '<g class="kbs-f2"><circle class="kbs-node" cx="500" cy="190" r="10" style="stroke:rgba(168,85,247,0.8)"/><circle class="kbs-dot" cx="500" cy="190" r="3.5" style="fill:#a855f7"/></g>' +
+        '<text class="kbs-label" x="540" y="206" text-anchor="middle" style="fill:#a855f7">NOTES</text>' +
+        // Question node
+        '<g class="kbs-f3"><circle class="kbs-node" cx="290" cy="240" r="10" style="stroke:rgba(52,192,112,0.8)"/><circle class="kbs-dot" cx="290" cy="240" r="3.5" style="fill:#34c070"/></g>' +
+        '<text class="kbs-label" x="290" y="265" text-anchor="middle" style="fill:#34c070">QUESTIONS</text>' +
+        // Actions 2
+        '<g class="kbs-f1"><circle class="kbs-node" cx="420" cy="235" r="9" style="stroke:rgba(0,210,255,0.4)"/><circle class="kbs-dot" cx="420" cy="235" r="3"/></g>' +
+      '</svg>' +
+      '<div style="font-family:\'Syne\',system-ui,sans-serif;font-size:22px;font-weight:700;color:#ffffff;margin-bottom:8px;text-align:center;">Knowledge Base</div>' +
+      '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:#f0a020;margin-bottom:16px;text-align:center;">Firm-wide decisions, actions, risks, notes &amp; questions</div>' +
+      '<div style="font-family:Arial,sans-serif;font-size:13px;color:#7a9abf;text-align:center;line-height:1.7;max-width:420px;">' +
+        'Use the filter pills to browse by type, or search by keyword.<br>' +
+        'Click any entry to view its meeting context in the slide-in panel.' +
+      '</div>' +
+    '</div>';
+  }
+
+  // ── Load firm-wide data ─────────────────────────────────────
+  async function _fwLoad() {
+    var nodes = await API.get(
+      'accord_nodes?select=node_id,tag,summary,body,seq_id,seq_class,seq_number,status,' +
+      'due_date,created_at,sealed_at,meeting_id,discipline,topic,created_by' +
+      '&order=created_at.desc&limit=500'
+    );
+    nodes = Array.isArray(nodes) ? nodes : [];
+
+    // Fetch all meetings referenced
+    var mtgIds = [...new Set(nodes.map(function(n){ return n.meeting_id; }).filter(Boolean))];
+    var mtgs = [];
+    if (mtgIds.length) {
+      mtgs = await API.get(
+        'accord_meetings?meeting_id=in.(' + mtgIds.join(',') + ')' +
+        '&select=meeting_id,title,state,stakes,location,scheduled_for,workstream_id,organizer_id'
+      ) || [];
+    }
+
+    // Fetch workstream names
+    var wsIds = [...new Set(mtgs.map(function(m){ return m.workstream_id; }).filter(Boolean))];
+    var wss = [];
+    if (wsIds.length) {
+      wss = await API.get(
+        'workstreams?workstream_id=in.(' + wsIds.join(',') + ')&select=workstream_id,name'
+      ) || [];
+    }
+    var wsMap = {};
+    wss.forEach(function(w){ wsMap[w.workstream_id] = w.name; });
+
+    _fwMtgMap = {};
+    mtgs.forEach(function(m){
+      _fwMtgMap[m.meeting_id] = {
+        title:         m.title || 'Untitled',
+        state:         m.state,
+        stakes:        m.stakes,
+        location:      m.location,
+        scheduledFor:  m.scheduled_for,
+        workstreamId:  m.workstream_id,
+        workstreamName:wsMap[m.workstream_id] || '',
+        organizerId:   m.organizer_id,
+      };
+    });
+
+    _fwData = nodes;
+    return nodes;
+  }
+
+  // ── Render a single row ─────────────────────────────────────
+  function _fwRowHtml(n) {
+    var mtg   = _fwMtgMap[n.meeting_id] || {};
+    var date  = _fmt(n.sealed_at || n.created_at);
+    var badge = '';
+    if (n.tag === 'action') {
+      if (_isOverdue(n)) {
+        badge = '<span class="ac-fw-badge ac-fw-badge-overdue">OVERDUE</span>';
+      } else if (n.status === 'committed' || n.status === 'closed') {
+        badge = '<span class="ac-fw-badge ac-fw-badge-done">DONE</span>';
+      } else {
+        badge = '<span class="ac-fw-badge ac-fw-badge-open">OPEN</span>';
+      }
+    }
+    return '<div class="ac-fw-row" data-node-id="' + _esc(n.node_id) + '" data-meeting-id="' + _esc(n.meeting_id) + '">' +
+      '<span class="ac-fw-seq ' + _seqClass(n.tag) + '">' + _esc(n.seq_id || _tagLabel(n.tag)) + '</span>' +
+      '<span class="ac-fw-summary">' + _esc(n.summary || '—') + '</span>' +
+      '<span class="ac-fw-ws">' + _esc(mtg.workstreamName || '') + '</span>' +
+      '<span class="ac-fw-mtg">' + _esc(mtg.title || '') + '</span>' +
+      '<span class="ac-fw-date">' + _esc(date) + '</span>' +
+      (badge ? badge : '<span></span>') +
+    '</div>';
+  }
+
+  // ── Filter + render list ────────────────────────────────────
+  function _fwRenderList() {
+    var list = document.getElementById('ac-fw-kb-list');
+    var count = document.getElementById('ac-fw-count');
+    if (!list) return;
+
+    var filtered = _fwData.filter(function(n) {
+      if (_fwActiveTag !== 'all' && n.tag !== _fwActiveTag) return false;
+      if (_fwSearchQ) {
+        var q = _fwSearchQ.toLowerCase();
+        var hay = ((n.summary || '') + ' ' + (n.body || '')).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+
+    if (count) count.textContent = filtered.length + ' item' + (filtered.length !== 1 ? 's' : '');
+
+    if (!filtered.length) {
+      list.innerHTML = '<div class="ac-fw-empty">No results' + (_fwSearchQ ? ' for "' + _esc(_fwSearchQ) + '"' : '') + '</div>';
+      return;
+    }
+    list.innerHTML = filtered.map(_fwRowHtml).join('');
+
+    // Wire row clicks
+    list.querySelectorAll('.ac-fw-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        list.querySelectorAll('.ac-fw-row').forEach(function(r){ r.classList.remove('ac-fw-selected'); });
+        row.classList.add('ac-fw-selected');
+        _fwOpenPanel(row.dataset.meetingId);
+      });
+    });
+  }
+
+  // ── Slide-in panel ─────────────────────────────────────────
+  async function _fwOpenPanel(meetingId) {
+    var panel = document.getElementById('ac-fw-panel');
+    if (!panel) return;
+
+    var mtg = _fwMtgMap[meetingId] || {};
+    var titleEl = document.getElementById('ac-fw-panel-title');
+    var breadEl = document.getElementById('ac-fw-panel-breadcrumb');
+    var bodyEl  = document.getElementById('ac-fw-panel-body');
+
+    if (titleEl) titleEl.textContent = mtg.title || 'Meeting';
+    if (breadEl) breadEl.innerHTML = (mtg.workstreamName
+      ? '<span>' + _esc(mtg.workstreamName) + '</span> › '
+      : '') + _esc(mtg.title || '');
+
+    if (bodyEl) bodyEl.innerHTML = '<div class="ac-fw-loading">Loading\u2026</div>';
+
+    panel.classList.add('open');
+    _fwSlideOpen = true;
+
+    // Fetch meeting nodes for panel
+    var nodes = await API.get(
+      'accord_nodes?meeting_id=eq.' + meetingId +
+      '&select=node_id,tag,seq_id,summary,body,status,due_date,sealed_at,created_at' +
+      '&order=created_at.asc'
+    );
+    nodes = Array.isArray(nodes) ? nodes : [];
+
+    if (!bodyEl) return;
+
+    var isSealed = mtg.state === 'sealed';
+    var html = '';
+
+    // Header fields (always shown)
+    if (mtg.stakes) {
+      html += '<div class="ac-fw-notice-field"><div class="ac-fw-notice-label">Stakes</div>' +
+              '<div class="ac-fw-notice-value">' + _esc(mtg.stakes) + '</div></div>';
+    }
+    if (mtg.location) {
+      html += '<div class="ac-fw-notice-field"><div class="ac-fw-notice-label">Location</div>' +
+              '<div class="ac-fw-notice-value">' + _esc(mtg.location) + '</div></div>';
+    }
+    if (mtg.scheduledFor) {
+      html += '<div class="ac-fw-notice-field"><div class="ac-fw-notice-label">Scheduled</div>' +
+              '<div class="ac-fw-notice-value">' + _esc(_fmt(mtg.scheduledFor)) + '</div></div>';
+    }
+
+    // Divider
+    if (nodes.length) {
+      html += '<div style="height:1px;background:rgba(0,210,255,0.1);margin:12px 0;"></div>';
+      html += '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:#5a7a9f;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">' +
+        (isSealed ? 'Meeting Minutes' : 'Captured Items') + '</div>';
+
+      if (!nodes.length) {
+        html += '<div style="color:#5a7a9f;font-size:12px;font-family:Arial,sans-serif;">No items captured.</div>';
+      } else {
+        nodes.forEach(function(n) {
+          var overdue = _isOverdue(n);
+          html += '<div class="ac-fw-minutes-node">' +
+            '<div class="ac-fw-minutes-seq">' +
+              '<span class="ac-fw-seq ' + _seqClass(n.tag) + '" style="display:inline-block;margin-right:6px;">' + _esc(n.seq_id || _tagLabel(n.tag)) + '</span>' +
+              (overdue ? '<span class="ac-fw-badge ac-fw-badge-overdue" style="display:inline-block;">OVERDUE</span>' : '') +
+            '</div>' +
+            '<div class="ac-fw-minutes-summary">' + _esc(n.summary || '—') + '</div>' +
+            (n.body ? '<div style="font-family:Arial,sans-serif;font-size:12px;color:#7a9abf;margin-top:3px;">' + _esc(n.body) + '</div>' : '') +
+          '</div>';
+        });
+      }
+    } else {
+      html += '<div style="color:#5a7a9f;font-size:12px;font-family:Arial,sans-serif;margin-top:12px;">No items captured for this meeting.</div>';
+    }
+
+    bodyEl.innerHTML = html;
+  }
+
+  function _fwClosePanel() {
+    var panel = document.getElementById('ac-fw-panel');
+    if (panel) panel.classList.remove('open');
+    _fwSlideOpen = false;
+    var list = document.getElementById('ac-fw-kb-list');
+    if (list) list.querySelectorAll('.ac-fw-row').forEach(function(r){ r.classList.remove('ac-fw-selected'); });
+  }
+
+  // ── Main render ─────────────────────────────────────────────
+  async function renderFirmWide(container) {
+    destroyFirmWide();
+
+    container = container || document.querySelector('.ac-center, .ac-stage, #ac-constellation-host');
+    if (!container) return;
+
+    // Build host
+    _fwHost = document.createElement('div');
+    _fwHost.id = 'ac-fw-kb-host';
+    container.appendChild(_fwHost);
+
+    // Show splash immediately
+    _fwHost.innerHTML = _splashHtml() +
+      // Filter bar (hidden until data loads)
+      '<div id="ac-fw-kb-bar" style="display:none;">' +
+        ['all','decision','action','risk','note','question'].map(function(tag) {
+          return '<button class="ac-fw-pill' + (tag === 'all' ? ' active' : '') + '" data-tag="' + tag + '">' +
+            (tag === 'all' ? 'All' : tag.charAt(0).toUpperCase() + tag.slice(1) + 's') +
+          '</button>';
+        }).join('') +
+        '<input id="ac-fw-search" type="text" placeholder="Search keywords\u2026" autocomplete="off">' +
+        '<span id="ac-fw-count"></span>' +
+      '</div>' +
+      '<div id="ac-fw-kb-list" style="display:none;"></div>' +
+      // Slide-in panel
+      '<div id="ac-fw-panel">' +
+        '<div id="ac-fw-panel-header">' +
+          '<button id="ac-fw-panel-close">&#x2715;</button>' +
+          '<div>' +
+            '<div id="ac-fw-panel-title"></div>' +
+            '<div id="ac-fw-panel-breadcrumb"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div id="ac-fw-panel-body"></div>' +
+      '</div>';
+
+    // Load data
+    await _fwLoad();
+
+    // Reveal list, hide splash
+    var splash = document.getElementById('ac-fw-kb-splash');
+    var bar    = document.getElementById('ac-fw-kb-bar');
+    var list   = document.getElementById('ac-fw-kb-list');
+
+    if (_fwData.length) {
+      if (splash) splash.style.display = 'none';
+      if (bar)    bar.style.display    = '';
+      if (list)   list.style.display   = '';
+      _fwRenderList();
+    }
+    // If no data, splash stays visible
+
+    // Wire filter pills
+    _fwHost.querySelectorAll('.ac-fw-pill').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        _fwHost.querySelectorAll('.ac-fw-pill').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        _fwActiveTag = btn.dataset.tag;
+        _fwRenderList();
+      });
+    });
+
+    // Wire search
+    var searchEl = document.getElementById('ac-fw-search');
+    if (searchEl) {
+      searchEl.addEventListener('input', function() {
+        _fwSearchQ = searchEl.value.trim();
+        _fwRenderList();
+      });
+    }
+
+    // Wire panel close
+    var closeBtn = document.getElementById('ac-fw-panel-close');
+    if (closeBtn) closeBtn.addEventListener('click', _fwClosePanel);
+  }
+
+  function destroyFirmWide() {
+    _fwClosePanel();
+    if (_fwHost && _fwHost.parentElement) _fwHost.parentElement.removeChild(_fwHost);
+    _fwHost     = null;
+    _fwData     = [];
+    _fwMtgMap   = {};
+    _fwActiveTag = 'all';
+    _fwSearchQ   = '';
+  }
 
 })();

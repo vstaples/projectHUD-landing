@@ -3744,24 +3744,25 @@
             _setActive(t.id);
             var title = document.getElementById('ac-nav-title');
             if (title) title.textContent = 'Knowledge Base';
-            // Switch to workstreams surface and activate KB tab if a workstream is active
-            if (window.Accord && typeof window.Accord.switchSurface === 'function') {
-              var level = window.Accord.state && window.Accord.state.level;
-              if (level && level !== 'constellation') {
-                // Inside a workstream — switch to KB tab
-                window.Accord.switchSurface('workstreams');
-                setTimeout(function() {
-                  var kbTab = document.querySelector('[data-tab="kb"]');
-                  if (kbTab) kbTab.click();
-                }, 50);
-              } else {
-                // At constellation level — prompt user to select a workstream
-                window.Accord.switchSurface('workstreams');
+            // Render firm-wide KB into center stage
+            if (window.AccordKnowledgeBase && typeof window.AccordKnowledgeBase.renderFirmWide === 'function') {
+              // Ascend to constellation first if inside a meeting/workstream
+              if (window.Accord && window.Accord.state.level !== 'constellation') {
+                while (window.Accord.state.level !== 'constellation') {
+                  window.Accord.ascendLevel();
+                }
               }
+              setTimeout(function() {
+                var container = document.querySelector('.ac-stage, #ac-constellation-host, .ac-center');
+                window.AccordKnowledgeBase.renderFirmWide(container);
+              }, 100);
             }
             return;
           }
           _setActive(t.id);
+          if (window.AccordKnowledgeBase && typeof window.AccordKnowledgeBase.destroyFirmWide === 'function') {
+            window.AccordKnowledgeBase.destroyFirmWide();
+          }
           if (window.Accord && typeof window.Accord.switchSurface === 'function') {
             window.Accord.switchSurface('workstreams');
           }
@@ -3803,7 +3804,7 @@
       var bs = document.createElement('span');
       bs.id = 'nav-build-stamp';
       bs.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;letter-spacing:.03em;';
-      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.1432</span>';
+      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-22.1508</span>';
       var nt = document.createElement('span');
       nt.id = 'nav-time';
       nt.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;';
