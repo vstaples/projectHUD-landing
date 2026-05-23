@@ -287,12 +287,6 @@
     state.container.innerHTML = '';
     state.container.style.position = state.container.style.position || 'relative';
 
-    // Tooltip
-    state.tooltip = document.createElement('div');
-    state.tooltip.className = 'ac-tooltip';
-    state.tooltip.style.display = 'none';
-    state.container.appendChild(state.tooltip);
-
     // Context menu
     state.menu = document.createElement('div');
     state.menu.className = 'ac-context-menu';
@@ -585,9 +579,6 @@
     }
 
     // Interactions
-    g.addEventListener('mouseenter', (ev) => _showTooltip(w, ev));
-    g.addEventListener('mousemove',  (ev) => _moveTooltip(ev));
-    g.addEventListener('mouseleave', _hideTooltip);
 
     g.addEventListener('click', (ev) => {
       ev.stopPropagation();
