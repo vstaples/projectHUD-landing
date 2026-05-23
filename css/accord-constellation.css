@@ -48,13 +48,13 @@
 #accord-app .ac-node {
   cursor: pointer;
   outline: none;
-  transition: transform 180ms ease-out;
+  transition: none;
   transform-box: fill-box;
   transform-origin: center;
 }
 #accord-app .ac-node:hover,
 #accord-app .ac-node:focus-visible {
-  transform: scale(1.06);
+  transform: none;
 }
 #accord-app .ac-node:focus-visible .ac-node-rim {
   stroke: var(--ink-primary);
@@ -66,10 +66,10 @@
   fill: var(--signal);
   filter: blur(14px);
   pointer-events: none;
-  transition: opacity 180ms ease-out;
+  transition: none;
 }
 #accord-app .ac-node:hover .ac-node-glow {
-  opacity: 0.85 !important;
+  opacity: inherit;
 }
 
 /* Node body — saturated amber on canvas-elev base */
@@ -77,10 +77,10 @@
   fill: var(--canvas-elev);
   stroke: var(--signal);
   stroke-width: 1.25;
-  transition: fill 180ms ease-out;
+  transition: none;
 }
 #accord-app .ac-node:hover .ac-node-body {
-  fill: var(--canvas-hover);
+  fill: inherit;
 }
 
 /* Inner rim — thin amber ring for definition */
