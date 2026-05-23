@@ -540,6 +540,7 @@
         if (!item) return;
         _dnd.mid=item.dataset.meetingId; _dnd.down=true; _dnd.active=false;
         _dnd.pos={x:e.clientX, y:e.clientY};
+        console.log('[D&D] mousedown', _dnd.mid);
       });
 
       document.addEventListener('mousemove', function(e) {
@@ -547,7 +548,7 @@
         if (!_dnd.active) {
           if (Math.abs(e.clientX-_dnd.pos.x)<5 && Math.abs(e.clientY-_dnd.pos.y)<5) return;
           _dnd.active=true;
-          var rail=document.getElementById('ac-rail-left');
+          console.log('[D&D] drag started', _dnd.mid);
           if (rail) rail.style.userSelect='none';
           var src=document.querySelector('#ac-inbox-children .ac-inbox-item[data-meeting-id="'+_dnd.mid+'"]');
           if (src) src.style.opacity='0.4';
@@ -569,6 +570,7 @@
       document.addEventListener('mouseup', async function(e) {
         if (!_dnd.mid) return;
         var mid=_dnd.mid, wasActive=_dnd.active;
+        console.log('[D&D] mouseup', mid, 'active:', wasActive, 'x:', e.clientX, 'y:', e.clientY);
         _dnd.mid=null; _dnd.down=false; _dnd.active=false;
         if (_dnd.ghost){_dnd.ghost.remove();_dnd.ghost=null;}
         var t=wasActive?_dndTarget(e.clientX,e.clientY):null;
