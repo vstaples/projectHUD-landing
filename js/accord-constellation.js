@@ -312,7 +312,7 @@
   function _render() {
     // Remove previous SVG / empty-state (preserve tooltip + menu)
     Array.from(state.container.children).forEach(c => {
-      if (c !== state.tooltip && c !== state.menu) c.remove();
+      if (c !== state.menu) c.remove();
     });
 
     if (!state.workstreams.length) {
@@ -607,7 +607,7 @@
   }
 
   // ── Tooltip ─────────────────────────────────────────────────
-  function _showTooltip(w, ev) {
+  function _showTooltip(w, ev) { return; // disabled
     const tt = state.tooltip;
     if (!tt) return;
     const lastTouch = w._lastMs ? _humanDate(w._lastMs) : '—';
@@ -627,7 +627,7 @@
     _moveTooltip(ev);
   }
 
-  function _moveTooltip(ev) {
+  function _moveTooltip(ev) { return; // disabled
     const tt = state.tooltip;
     if (!tt || tt.style.display === 'none') return;
     const rect = state.container.getBoundingClientRect();
@@ -640,7 +640,7 @@
     tt.style.top  = Math.max(8, Math.min(py, maxY)) + 'px';
   }
 
-  function _hideTooltip() {
+  function _hideTooltip() { return; // disabled
     if (state.tooltip) state.tooltip.style.display = 'none';
   }
 
