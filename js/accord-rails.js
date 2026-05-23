@@ -521,6 +521,81 @@
         row.dataset.status = 'past';
       }
     });
+
+    // ── Drag-and-drop: inbox → workstream (Compass mouse-tracking pattern) ──
+    // HTML5 drag events don't fire inside overflow:auto scroll containers.
+    if (!document._acDndWired) {
+      document._acDndWired = true;
+      var _dnd = { mid:null, down:false, active:false, ghost:null, lastTarget:null, pos:{x:0,y:0} };
+
+      function _dndTarget(x, y) {
+        var els = document.elementsFromPoint(x, y);
+        for (var i=0; i<els.length; i++) {
+          var ws = els[i].closest && (els[i].closest('.ac-tree-ws[data-ws-id]') || els[i].closest('.ac-tree-sub[data-ws-id]'));
+          if (ws) return { wsId: ws.dataset.wsId, el: ws };
+        }
+        return null;
+      }
+
+      function _dndCleanup() {
+        if (_dnd.ghost) { _dnd.ghost.remove(); _dnd.ghost=null; }
+        if (_dnd.lastTarget) { _dnd.lastTarget.style.background=''; _dnd.lastTarget.style.borderLeftColor=''; _dnd.lastTarget=null; }
+        var src = _dnd.mid ? document.querySelector('.ac-inbox-item[data-meeting-id="'+_dnd.mid+'"]') : null;
+        if (src) src.style.opacity='';
+        var rail = document.getElementById('ac-rail-left');
+        if (rail) rail.style.userSelect='';
+      }
+
+      document.addEventListener('mousedown', function(e) {
+        var item = e.target && e.target.closest && e.target.closest('#ac-inbox-children .ac-inbox-item[data-meeting-id]');
+        if (!item) return;
+        _dnd.mid=item.dataset.meetingId; _dnd.down=true; _dnd.active=false;
+        _dnd.pos={x:e.clientX, y:e.clientY};
+      });
+
+      document.addEventListener('mousemove', function(e) {
+        if (!_dnd.mid || !_dnd.down) return;
+        if (!_dnd.active) {
+          if (Math.abs(e.clientX-_dnd.pos.x)<5 && Math.abs(e.clientY-_dnd.pos.y)<5) return;
+          _dnd.active=true;
+          var rail=document.getElementById('ac-rail-left');
+          if (rail) rail.style.userSelect='none';
+          var src=document.querySelector('#ac-inbox-children .ac-inbox-item[data-meeting-id="'+_dnd.mid+'"]');
+          if (src) src.style.opacity='0.4';
+          _dnd.ghost=document.createElement('div');
+          _dnd.ghost.style.cssText='position:fixed;pointer-events:none;z-index:9999;background:rgba(6,10,16,.95);border:1px solid rgba(0,210,255,.5);padding:3px 12px;font-family:"JetBrains Mono",monospace;font-size:12px;color:#00d2ff;border-radius:3px;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.7);';
+          var lbl=src&&src.querySelector('.ac-tree-label');
+          _dnd.ghost.textContent=(lbl&&lbl.textContent)||'Meeting';
+          document.body.appendChild(_dnd.ghost);
+        }
+        _dnd.ghost.style.left=(e.clientX+14)+'px'; _dnd.ghost.style.top=(e.clientY-8)+'px';
+        _dnd.ghost.style.display='none';
+        var t=_dndTarget(e.clientX,e.clientY);
+        _dnd.ghost.style.display='';
+        if (_dnd.lastTarget&&_dnd.lastTarget!==(t&&t.el)){_dnd.lastTarget.style.background='';_dnd.lastTarget.style.borderLeftColor='';}
+        if (t){t.el.style.background='rgba(240,160,32,0.15)';t.el.style.borderLeftColor='#f0a020';_dnd.lastTarget=t.el;}
+        else _dnd.lastTarget=null;
+      });
+
+      document.addEventListener('mouseup', async function(e) {
+        if (!_dnd.mid) return;
+        var mid=_dnd.mid, wasActive=_dnd.active;
+        _dnd.mid=null; _dnd.down=false; _dnd.active=false;
+        if (_dnd.ghost){_dnd.ghost.remove();_dnd.ghost=null;}
+        var t=wasActive?_dndTarget(e.clientX,e.clientY):null;
+        _dndCleanup();
+        if (!wasActive||!t) return;
+        try {
+          await _fileMeetingView(mid, t.wsId);
+          local.inbox=local.inbox.filter(function(i){return i.meetingId!==mid;});
+          var row=document.querySelector('.ac-inbox-item[data-meeting-id="'+mid+'"]');
+          if (row) row.remove();
+          t.el.style.background='rgba(52,192,112,0.12)';t.el.style.borderLeftColor='#34c070';
+          setTimeout(function(){t.el.style.background='';t.el.style.borderLeftColor='';},1200);
+          setTimeout(function(){refresh();},400);
+        } catch(err){console.error('[D&D]',err);}
+      });
+    }
   }
 
   function _popupField(label, value) {
