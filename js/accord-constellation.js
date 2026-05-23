@@ -489,11 +489,12 @@
       if (label) label.setAttribute('y', parseFloat(label.getAttribute('y') || 0) + 220);
     }
 
-    // Guide text + wrapper (only for ≤3 workstreams)
-    if (state.workstreams.length <= 3) {
-      const existing = document.getElementById('ac-constellation-guide');
-      if (existing) existing.remove();
+    // Remove any stale guide text
+    const existing = document.getElementById('ac-constellation-guide');
+    if (existing) existing.remove();
 
+    // Guide text + wrapper only for single workstream
+    if (state.workstreams.length === 1) {
       const guide = document.createElement('div');
       guide.id = 'ac-constellation-guide';
       guide.style.cssText = 'text-align:center;padding:0 40px 24px;max-width:520px;flex-shrink:0;';
