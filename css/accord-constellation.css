@@ -46,7 +46,7 @@
 
 /* ── Node group ────────────────────────────────────────────── */
 #accord-app .ac-node {
-  cursor: pointer;
+  cursor: default;
   outline: none;
   transition: none;
   transform-box: fill-box;
@@ -62,22 +62,13 @@
 }
 
 /* Glow halo behind node — amber, opacity is set inline per-weight */
-#accord-app .ac-node-glow {
-  fill: var(--signal);
-  filter: blur(14px);
-  pointer-events: none;
-  transition: none;
-}
-#accord-app .ac-node:hover .ac-node-glow {
-  opacity: inherit;
-}
-
 /* Node body — saturated amber on canvas-elev base */
 #accord-app .ac-node-body {
   fill: var(--canvas-elev);
   stroke: var(--signal);
   stroke-width: 1.25;
   transition: none;
+  pointer-events: none;
 }
 #accord-app .ac-node:hover .ac-node-body {
   fill: inherit;
@@ -263,7 +254,6 @@
 /* ── Reduced motion ───────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   #accord-app .ac-node,
-  #accord-app .ac-node-glow,
   #accord-app .ac-node-body,
   #accord-app .ac-empty-cta,
   #accord-app .ac-menu-item {

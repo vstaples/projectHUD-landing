@@ -465,7 +465,6 @@
       style.id = 'ac-constellation-anim';
       style.textContent = [
         '#accord-app .ac-ring-guide { display: none !important; }',
-        '#accord-app .ac-node-glow { animation: ac-halo-pulse 7s ease-in-out infinite; }',
         '@keyframes ac-halo-pulse { 0%,100%{ opacity:0.1; } 50%{ opacity:0.25; } }',
         '.ac-ripple { fill:none; stroke:#00d2ff; transform-origin:400px 400px; animation: ac-ripple-out 8s ease-out infinite; }',
         '.ac-ripple:nth-child(2) { animation-delay: 2.6s; }',
@@ -536,13 +535,6 @@
       role: 'button',
       'aria-label': `${w.name} — ${w._nTotal} meeting${w._nTotal === 1 ? '' : 's'}`,
     });
-
-    // Glow halo
-    g.appendChild(_svg('circle', {
-      class: 'ac-node-glow',
-      cx: x, cy: y, r: glowR,
-      style: `opacity:${(0.20 + 0.55 * wn).toFixed(3)}`,
-    }));
 
     // Node body
     g.appendChild(_svg('circle', {
