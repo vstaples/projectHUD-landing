@@ -449,7 +449,7 @@
       const R = ringR[ringName];
       list.forEach((w, i) => {
         // Evenly distribute; start at top (-π/2). For N=1, place at top.
-        const angle = -Math.PI / 2 + (2 * Math.PI * i) / N;
+        const angle = (N === 2 ? 0 : -Math.PI / 2) + (2 * Math.PI * i) / N;
         const x = cx + R * Math.cos(angle);
         const y = cy + R * Math.sin(angle);
         svg.appendChild(_renderNode(w, x, y));
@@ -459,70 +459,87 @@
     state.container.appendChild(svg);
     state.svg = svg;
 
-    // ── Single-workstream centering + ripple + guide ──────────
+    // ── Style injection ────────────────────────────────────────
     if (!document.getElementById('ac-constellation-anim')) {
       const style = document.createElement('style');
       style.id = 'ac-constellation-anim';
       style.textContent = [
         '#accord-app .ac-ring-guide { display: none !important; }',
-        '@keyframes ac-halo-pulse { 0%,100%{ opacity:0.1; } 50%{ opacity:0.25; } }',
-        '.ac-ripple { fill:none; stroke:#00d2ff; transform-origin:400px 400px; animation: ac-ripple-out 8s ease-out infinite; }',
-        '.ac-ripple:nth-child(2) { animation-delay: 2.6s; }',
-        '.ac-ripple:nth-child(3) { animation-delay: 5.2s; }',
-        '@keyframes ac-ripple-out { 0%{ r:30px; stroke-opacity:0.7; stroke-width:1.5; } 100%{ r:280px; stroke-opacity:0; stroke-width:0.5; } }',
+        '#accord-app .ac-node-glow { display: none !important; }',
         '#accord-app .ac-node-label { font-size:32px !important; font-family:"Syne",system-ui,sans-serif !important; fill:#e8f0f8 !important; }',
       ].join('');
       document.head.appendChild(style);
     }
 
-    // Add ripple circles behind nodes
-    for (let i = 0; i < 3; i++) {
-      const ripple = _svg('circle', { class: 'ac-ripple', cx, cy, r: 30 });
-      svg.insertBefore(ripple, svg.firstChild);
+    const isSingle = state.workstreams.length === 1;
+
+    // ── Ripple circles (single-node only) ─────────────────────
+    if (isSingle) {
+      if (!document.getElementById('ac-constellation-anim-ripple')) {
+        const rs = document.createElement('style');
+        rs.id = 'ac-constellation-anim-ripple';
+        rs.textContent = [
+          '.ac-ripple { fill:none; stroke:#00d2ff; pointer-events:none; animation: ac-ripple-out 8s ease-out infinite; }',
+          '.ac-ripple:nth-child(2) { animation-delay: 2.6s; }',
+          '.ac-ripple:nth-child(3) { animation-delay: 5.2s; }',
+          '@keyframes ac-ripple-out { 0%{ r:30px; stroke-opacity:0.7; stroke-width:1.5; } 100%{ r:280px; stroke-opacity:0; stroke-width:0.5; } }',
+        ].join('');
+        document.head.appendChild(rs);
+      }
+      for (let i = 0; i < 3; i++) {
+        const ripple = _svg('circle', { class: 'ac-ripple', cx, cy, r: 30 });
+        svg.insertBefore(ripple, svg.firstChild);
+      }
     }
 
-    // Center single-node constellation vertically
-    if (state.workstreams.length === 1) {
+    // ── Hub + spokes (multi-node) ─────────────────────────────
+    if (!isSingle) {
+      svg.querySelectorAll('.ac-node').forEach(node => {
+        const nodeCx = parseFloat(node.querySelector('circle')?.getAttribute('cx') || cx);
+        const nodeCy = parseFloat(node.querySelector('circle')?.getAttribute('cy') || cy);
+        const line = _svg('line', { x1: cx, y1: cy, x2: nodeCx, y2: nodeCy, stroke: 'rgba(0,210,255,0.3)', 'stroke-width': '0.8' });
+        line.style.pointerEvents = 'none';
+        svg.insertBefore(line, svg.firstChild);
+      });
+      const hub = _svg('circle', { cx, cy, r: 8, fill: '#00d2ff', opacity: '0.6' });
+      hub.style.pointerEvents = 'none';
+      svg.insertBefore(hub, svg.firstChild);
+    }
+
+    // ── Node label offset ─────────────────────────────────────
+    svg.querySelectorAll('.ac-node-label').forEach(label => {
+      const y = parseFloat(label.getAttribute('y') || 0);
+      label.setAttribute('y', y + 30);
+    });
+
+    // ── Single-node centering ─────────────────────────────────
+    if (isSingle) {
       const node = svg.querySelector('.ac-node');
       if (node) node.setAttribute('transform', 'translate(0, 220)');
       const label = svg.querySelector('.ac-node-label');
       if (label) label.setAttribute('y', parseFloat(label.getAttribute('y') || 0) + 220);
     }
 
-    // Remove any stale guide text
-    const existing = document.getElementById('ac-constellation-guide');
-    if (existing) existing.remove();
+    // ── SVG positioning ───────────────────────────────────────
+    state.container.style.position = 'relative';
+    svg.style.cssText = 'position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);width:500px;height:500px;';
 
-    // Guide text + wrapper only for single workstream
-    if (state.workstreams.length === 1) {
-      const guide = document.createElement('div');
-      guide.id = 'ac-constellation-guide';
-      guide.style.cssText = 'text-align:center;padding:0 40px 24px;max-width:520px;flex-shrink:0;';
-      guide.innerHTML =
-        '<div style="font-family:\'Syne\',system-ui,sans-serif;font-size:22px;font-weight:700;color:#ffffff;margin-bottom:6px;">Your Workstream Constellation</div>' +
-        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:14px;color:#f0a020;margin-bottom:10px;">Each node represents a workstream \u2014 a theme that groups your meetings</div>' +
-        '<div style="font-family:Arial,sans-serif;font-size:15px;color:#7a9abf;line-height:1.7;">' +
-          'File meetings into workstreams to build your constellation.<br>' +
-          'Click any node to explore its meetings, decisions, and actions.<br>' +
-          'Use <span style="color:#00d2ff">+ New Workstream</span> in the left panel to add more.' +
-        '</div>';
-
-      // Wrap SVG + guide tightly
-      const wrapper = document.createElement('div');
-      wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;';
-      svg.style.maxHeight = '55vh';
-      svg.style.width = 'auto';
-      state.container.insertBefore(wrapper, svg);
-      wrapper.appendChild(svg);
-      wrapper.appendChild(guide);
-
-      state.container.style.display = 'flex';
-      state.container.style.flexDirection = 'column';
-      state.container.style.alignItems = 'center';
-      state.container.style.justifyContent = 'center';
-    }
+    // ── Guide text overlay ────────────────────────────────────
+    const existingGuide = document.getElementById('ac-constellation-guide');
+    if (existingGuide) existingGuide.remove();
+    const guide = document.createElement('div');
+    guide.id = 'ac-constellation-guide';
+    guide.style.cssText = 'position:absolute;bottom:240px;left:0;right:0;text-align:center;padding:0 40px;pointer-events:none;';
+    guide.innerHTML =
+      '<div style="font-family:Syne,system-ui,sans-serif;font-size:22px;font-weight:700;color:#ffffff;margin-bottom:6px;">Your Workstream Constellation</div>' +
+      '<div style="font-family:JetBrains Mono,monospace;font-size:14px;color:#f0a020;margin-bottom:10px;">Each node represents a workstream — a theme that groups your meetings</div>' +
+      '<div style="font-family:Arial,sans-serif;font-size:15px;color:#7a9abf;line-height:1.7;">' +
+        'File meetings into workstreams to build your constellation.<br>' +
+        'Click any node to explore its meetings, decisions, and actions.<br>' +
+        'Use <span style="color:#00d2ff">+ New Workstream</span> in the left panel to add more.' +
+      '</div>';
+    state.container.appendChild(guide);
   }
-
   function _renderNode(w, x, y) {
     const wn = w._weight / state.weightMax;        // 0..1 weight-norm
     const r  = TUNE.NODE_RADIUS_MIN +
