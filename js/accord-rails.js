@@ -350,6 +350,12 @@
     _wireTreeHandlers();
     _wireInboxHandlers();
 
+    // Explicitly wire New Workstream button (may have been recreated)
+    var newBtn = document.getElementById('ac-tree-new-btn');
+    if (newBtn) {
+      newBtn.onclick = function() { window.AccordWorkstreams?.openCreate?.(); };
+    }
+
     // Wire WORKSTREAMS toggle
     var wsHeader = document.getElementById('ac-ws-header');
     if (wsHeader) {
@@ -417,6 +423,22 @@
         e.stopPropagation();
         _showRsvpPopup(row.dataset.attendeeId, row.dataset.meetingId, row);
       });
+    });
+
+    // Mark past pending meetings with strikethrough RSVP pill
+    var now = new Date();
+    document.querySelectorAll('.ac-inbox-item').forEach(function(row) {
+      if (row.dataset.status !== 'pending') return;
+      var meta = row.querySelector('.ac-tree-meta');
+      if (!meta) return;
+      var dateMatch = meta.textContent.match(/([A-Z][a-z]+ \d+)/);
+      if (!dateMatch) return;
+      var meetingDate = new Date(dateMatch[1] + ', ' + new Date().getFullYear());
+      if (meetingDate < now) {
+        var pill = row.querySelector('.ac-rsvp-pill');
+        if (pill) pill.style.textDecoration = 'line-through';
+        row.dataset.status = 'past';
+      }
     });
   }
 

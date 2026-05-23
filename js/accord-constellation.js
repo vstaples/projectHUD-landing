@@ -466,7 +466,6 @@
     state.svg = svg;
 
     // ── Single-workstream centering + ripple + guide ──────────
-    // Inject animation styles once
     if (!document.getElementById('ac-constellation-anim')) {
       const style = document.createElement('style');
       style.id = 'ac-constellation-anim';
@@ -478,7 +477,7 @@
         '.ac-ripple:nth-child(2) { animation-delay: 2.6s; }',
         '.ac-ripple:nth-child(3) { animation-delay: 5.2s; }',
         '@keyframes ac-ripple-out { 0%{ r:30px; stroke-opacity:0.7; stroke-width:1.5; } 100%{ r:280px; stroke-opacity:0; stroke-width:0.5; } }',
-        '#accord-app .ac-node-label { font-size:30px !important; font-family:"Syne",system-ui,sans-serif !important; fill:#e8f0f8 !important; }',
+        '#accord-app .ac-node-label { font-size:32px !important; font-family:"Syne",system-ui,sans-serif !important; fill:#e8f0f8 !important; }',
       ].join('');
       document.head.appendChild(style);
     }
@@ -495,28 +494,34 @@
       if (node) node.setAttribute('transform', 'translate(0, 220)');
       const label = svg.querySelector('.ac-node-label');
       if (label) label.setAttribute('y', parseFloat(label.getAttribute('y') || 0) + 220);
-      const glow = svg.querySelector('.ac-node-glow');
-      if (glow) glow.setAttribute('cy', parseFloat(glow.getAttribute('cy') || cy) + 220);
     }
 
-    // Guide text overlay (only when 3 or fewer workstreams)
+    // Guide text + wrapper (only for ≤3 workstreams)
     if (state.workstreams.length <= 3) {
       const existing = document.getElementById('ac-constellation-guide');
       if (existing) existing.remove();
+
       const guide = document.createElement('div');
       guide.id = 'ac-constellation-guide';
       guide.style.cssText = 'text-align:center;padding:0 40px 24px;max-width:520px;flex-shrink:0;';
       guide.innerHTML =
-        '<div style="font-family:\'Syne\',system-ui,sans-serif;font-size:20px;font-weight:700;color:#ffffff;margin-bottom:6px;">Your Workstream Constellation</div>' +
-        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:#f0a020;margin-bottom:10px;">Each node represents a workstream \u2014 a theme that groups your meetings</div>' +
-        '<div style="font-family:Arial,sans-serif;font-size:13px;color:#7a9abf;line-height:1.7;">' +
+        '<div style="font-family:\'Syne\',system-ui,sans-serif;font-size:22px;font-weight:700;color:#ffffff;margin-bottom:6px;">Your Workstream Constellation</div>' +
+        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:14px;color:#f0a020;margin-bottom:10px;">Each node represents a workstream \u2014 a theme that groups your meetings</div>' +
+        '<div style="font-family:Arial,sans-serif;font-size:15px;color:#7a9abf;line-height:1.7;">' +
           'File meetings into workstreams to build your constellation.<br>' +
           'Click any node to explore its meetings, decisions, and actions.<br>' +
           'Use <span style="color:#00d2ff">+ New Workstream</span> in the left panel to add more.' +
         '</div>';
-      state.container.appendChild(guide);
 
-      // Ensure stage is flex-column centered
+      // Wrap SVG + guide tightly
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;';
+      svg.style.maxHeight = '55vh';
+      svg.style.width = 'auto';
+      state.container.insertBefore(wrapper, svg);
+      wrapper.appendChild(svg);
+      wrapper.appendChild(guide);
+
       state.container.style.display = 'flex';
       state.container.style.flexDirection = 'column';
       state.container.style.alignItems = 'center';
