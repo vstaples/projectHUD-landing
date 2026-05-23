@@ -405,9 +405,6 @@
     document.querySelectorAll('.ac-tree-ws, .ac-tree-sub').forEach(function(row) {
       var wsId = row.dataset.wsId;
       if (!wsId) return;
-      row.addEventListener('dragenter', function(e) { e.preventDefault(); row.style.background='rgba(240,160,32,0.12)'; row.style.borderLeftColor='#f0a020'; });
-      row.addEventListener('dragover',  function(e) { e.preventDefault(); e.dataTransfer.dropEffect='move'; });
-      row.addEventListener('dragleave', function(e) { if (!row.contains(e.relatedTarget)) { row.style.background=''; row.style.borderLeftColor=''; } });
       row.addEventListener('drop', async function(e) {
         e.preventDefault(); e.stopPropagation();
         row.style.background=''; row.style.borderLeftColor='';
@@ -488,17 +485,9 @@
       });
     }
     document.querySelectorAll('.ac-inbox-item').forEach(function(row) {
-      // Make draggable
-      row.setAttribute('draggable', 'true');
+      // Remove draggable — mouse tracking handles D&D instead
+      row.removeAttribute('draggable');
       row.style.cursor = 'grab';
-      row.addEventListener('dragstart', function(e) {
-        var payload = JSON.stringify({ meetingId: row.dataset.meetingId, source: 'inbox' });
-        e.dataTransfer.setData('application/json', payload);
-        e.dataTransfer.setData('text/plain', payload);
-        e.dataTransfer.effectAllowed = 'move';
-        row.style.opacity = '0.5';
-      });
-      row.addEventListener('dragend', function() { row.style.opacity = ''; });
       // Click for RSVP popup
       row.addEventListener('click', function(e) {
         e.stopPropagation();
