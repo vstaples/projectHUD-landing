@@ -401,27 +401,6 @@
       newBtn.onclick = function() { window.AccordWorkstreams?.openCreate?.(); };
     }
 
-    // Wire workstream rows as D&D drop targets
-    document.querySelectorAll('.ac-tree-ws, .ac-tree-sub').forEach(function(row) {
-      var wsId = row.dataset.wsId;
-      if (!wsId) return;
-      row.addEventListener('drop', async function(e) {
-        e.preventDefault(); e.stopPropagation();
-        row.style.background=''; row.style.borderLeftColor='';
-        try {
-          var raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
-          var data = JSON.parse(raw);
-          if (!data.meetingId) return;
-          await _fileMeetingView(data.meetingId, wsId);
-          // Remove from local inbox
-          local.inbox = local.inbox.filter(function(i) { return i.meetingId !== data.meetingId; });
-          row.style.background='rgba(52,192,112,0.12)'; row.style.borderLeftColor='#34c070';
-          setTimeout(function() { row.style.background=''; row.style.borderLeftColor=''; }, 1200);
-          setTimeout(function() { refresh(); }, 400);
-        } catch(err) { console.error('[D&D tree drop]', err); }
-      });
-    });
-
     // Wire WORKSTREAMS toggle
     var wsHeader = document.getElementById('ac-ws-header');
     if (wsHeader) {
@@ -485,8 +464,6 @@
       });
     }
     document.querySelectorAll('.ac-inbox-item').forEach(function(row) {
-      // Remove draggable — mouse tracking handles D&D instead
-      row.removeAttribute('draggable');
       row.style.cursor = 'grab';
       // Click for RSVP popup
       row.addEventListener('click', function(e) {
@@ -575,7 +552,15 @@
         console.log('[D&D] mouseup', mid, 'active:', wasActive, 'x:', e.clientX, 'y:', e.clientY);
         _dnd.mid=null; _dnd.down=false; _dnd.active=false;
         if (_dnd.ghost){_dnd.ghost.remove();_dnd.ghost=null;}
+        // Use elementsFromPoint first, fall back to lastTarget if cursor is close
         var t=wasActive?_dndTarget(e.clientX,e.clientY):null;
+        if (!t && wasActive && _dnd.lastTarget) {
+          var rect=_dnd.lastTarget.getBoundingClientRect();
+          if (e.clientX>=rect.left-20 && e.clientX<=rect.right+20 &&
+              e.clientY>=rect.top-40 && e.clientY<=rect.bottom+20) {
+            t={wsId:_dnd.lastTarget.dataset.wsId, el:_dnd.lastTarget};
+          }
+        }
         console.log('[D&D] target:', t?t.wsId:'none');
         _dndCleanup();
         if (!wasActive||!t) return;
