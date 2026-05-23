@@ -195,6 +195,7 @@
   async function _fileMeetingView(meetingId, wsId) {
     var resourceId = (window.Accord && window.Accord.state && window.Accord.state.me && window.Accord.state.me.resource_id);
     var firmId     = (window.Accord && window.Accord.state && window.Accord.state.me && window.Accord.state.me.firm_id);
+    console.log('[fileMeetingView] resourceId:', resourceId, 'firmId:', firmId, 'meetingId:', meetingId, 'wsId:', wsId);
     if (!resourceId || !firmId) throw new Error('identity not resolved');
     // Try update first, then insert
     try {
@@ -298,8 +299,11 @@
         const viewMap = {};
         views.forEach(function(v) { viewMap[v.meeting_id] = v.workstream_id; });
         (viewMtgs || []).forEach(function(m) {
-          // Only add if not already in local.meetings
-          if (!local.meetings.find(function(x) { return x.meeting_id === m.meeting_id; })) {
+          // Override workstream_id with Ron's filing — replace existing entry if present
+          var existing = local.meetings.find(function(x) { return x.meeting_id === m.meeting_id; });
+          if (existing) {
+            existing.workstream_id = viewMap[m.meeting_id];
+          } else {
             local.meetings.push(Object.assign({}, m, { workstream_id: viewMap[m.meeting_id] }));
           }
         });
@@ -565,14 +569,16 @@
         _dndCleanup();
         if (!wasActive||!t) return;
         try {
+          console.log('[D&D] filing', mid, '→', t.wsId);
           await _fileMeetingView(mid, t.wsId);
+          console.log('[D&D] filed ok');
           local.inbox=local.inbox.filter(function(i){return i.meetingId!==mid;});
           var row=document.querySelector('.ac-inbox-item[data-meeting-id="'+mid+'"]');
           if (row) row.remove();
           t.el.style.background='rgba(52,192,112,0.12)';t.el.style.borderLeftColor='#34c070';
           setTimeout(function(){t.el.style.background='';t.el.style.borderLeftColor='';},1200);
           setTimeout(function(){refresh();},400);
-        } catch(err){console.error('[D&D]',err);}
+        } catch(err){console.error('[D&D] FAILED',err);}
       });
     }
   }
