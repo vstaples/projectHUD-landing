@@ -263,6 +263,15 @@
         organizerId:     (meetingMap[a.meeting_id] || {}).organizer_id,
         organizer:       orgMap[(meetingMap[a.meeting_id] || {}).organizer_id] || 'Unknown',
       }));
+
+      // Remove meetings already filed into a workstream view
+      try {
+        const filed = await API.get('accord_meeting_views?select=meeting_id');
+        const filedIds = new Set((filed || []).map(function(v) { return v.meeting_id; }));
+        if (filedIds.size) {
+          local.inbox = local.inbox.filter(function(i) { return !filedIds.has(i.meetingId); });
+        }
+      } catch(e) { /* non-fatal */ }
     } catch (e) {
       console.warn('[Accord-rails] inbox load failed', e);
       local.inbox = [];
