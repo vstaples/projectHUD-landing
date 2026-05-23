@@ -191,6 +191,25 @@
     }
   }
 
+  // ── File a meeting into a workstream view (upsert) ──────────
+  async function _fileMeetingView(meetingId, wsId) {
+    var resourceId = (window.Accord && window.Accord.state && window.Accord.state.me && window.Accord.state.me.resource_id);
+    var firmId     = (window.Accord && window.Accord.state && window.Accord.state.me && window.Accord.state.me.firm_id);
+    if (!resourceId || !firmId) throw new Error('identity not resolved');
+    // Try update first, then insert
+    try {
+      const existing = await API.get('accord_meeting_views?resource_id=eq.' + resourceId + '&meeting_id=eq.' + meetingId + '&select=id');
+      if (existing && existing.length) {
+        await API.patch('accord_meeting_views?resource_id=eq.' + resourceId + '&meeting_id=eq.' + meetingId, { workstream_id: wsId });
+      } else {
+        await API.post('accord_meeting_views', { firm_id: firmId, resource_id: resourceId, meeting_id: meetingId, workstream_id: wsId });
+      }
+    } catch(e) {
+      console.error('[Accord-rails] _fileMeetingView failed', e);
+      throw e;
+    }
+  }
+
   async function _loadInbox() {
     // Fetch pending RSVP attendee rows for current user's resource
     try {
@@ -261,6 +280,32 @@
     } catch (e) {
       console.warn('[Accord-rails] filed-meetings load failed', e);
       local.meetings = [];
+    }
+
+    // Also load meetings filed via accord_meeting_views (cross-firm attendee filings)
+    try {
+      const views = await API.get(
+        'accord_meeting_views?select=meeting_id,workstream_id'
+      );
+      if (Array.isArray(views) && views.length) {
+        const viewMtgIds = views.map(function(v) { return v.meeting_id; });
+        // Fetch the actual meeting details
+        const viewMtgs = await API.get(
+          'accord_meetings?meeting_id=in.(' + viewMtgIds.join(',') + ')' +
+          '&select=meeting_id,title,scheduled_for,created_at,sealed_at,state'
+        );
+        // Merge with workstream_id from views
+        const viewMap = {};
+        views.forEach(function(v) { viewMap[v.meeting_id] = v.workstream_id; });
+        (viewMtgs || []).forEach(function(m) {
+          // Only add if not already in local.meetings
+          if (!local.meetings.find(function(x) { return x.meeting_id === m.meeting_id; })) {
+            local.meetings.push(Object.assign({}, m, { workstream_id: viewMap[m.meeting_id] }));
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('[Accord-rails] view-meetings load failed', e);
     }
     try {
       const unfiled = await API.get(
@@ -356,6 +401,30 @@
       newBtn.onclick = function() { window.AccordWorkstreams?.openCreate?.(); };
     }
 
+    // Wire workstream rows as D&D drop targets
+    document.querySelectorAll('.ac-tree-ws, .ac-tree-sub').forEach(function(row) {
+      var wsId = row.dataset.wsId;
+      if (!wsId) return;
+      row.addEventListener('dragenter', function(e) { e.preventDefault(); row.style.background='rgba(240,160,32,0.12)'; row.style.borderLeftColor='#f0a020'; });
+      row.addEventListener('dragover',  function(e) { e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+      row.addEventListener('dragleave', function(e) { if (!row.contains(e.relatedTarget)) { row.style.background=''; row.style.borderLeftColor=''; } });
+      row.addEventListener('drop', async function(e) {
+        e.preventDefault(); e.stopPropagation();
+        row.style.background=''; row.style.borderLeftColor='';
+        try {
+          var raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
+          var data = JSON.parse(raw);
+          if (!data.meetingId) return;
+          await _fileMeetingView(data.meetingId, wsId);
+          // Remove from local inbox
+          local.inbox = local.inbox.filter(function(i) { return i.meetingId !== data.meetingId; });
+          row.style.background='rgba(52,192,112,0.12)'; row.style.borderLeftColor='#34c070';
+          setTimeout(function() { row.style.background=''; row.style.borderLeftColor=''; }, 1200);
+          setTimeout(function() { refresh(); }, 400);
+        } catch(err) { console.error('[D&D tree drop]', err); }
+      });
+    });
+
     // Wire WORKSTREAMS toggle
     var wsHeader = document.getElementById('ac-ws-header');
     if (wsHeader) {
@@ -419,6 +488,18 @@
       });
     }
     document.querySelectorAll('.ac-inbox-item').forEach(function(row) {
+      // Make draggable
+      row.setAttribute('draggable', 'true');
+      row.style.cursor = 'grab';
+      row.addEventListener('dragstart', function(e) {
+        var payload = JSON.stringify({ meetingId: row.dataset.meetingId, source: 'inbox' });
+        e.dataTransfer.setData('application/json', payload);
+        e.dataTransfer.setData('text/plain', payload);
+        e.dataTransfer.effectAllowed = 'move';
+        row.style.opacity = '0.5';
+      });
+      row.addEventListener('dragend', function() { row.style.opacity = ''; });
+      // Click for RSVP popup
       row.addEventListener('click', function(e) {
         e.stopPropagation();
         _showRsvpPopup(row.dataset.attendeeId, row.dataset.meetingId, row);
