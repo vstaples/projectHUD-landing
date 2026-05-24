@@ -886,83 +886,58 @@
     if (!body) return;
     const q = (rawQuery || '').trim().toLowerCase();
 
-    // No query: restore all rows + their persisted expand states
+    // No query: restore all rows
     if (!q) {
       body.querySelectorAll('.ac-tree-row, .ac-tree-children, .ac-tree-leaf-empty').forEach(el => {
         el.style.display = '';
       });
-      // Re-apply persisted collapse states for chevrons
       body.querySelectorAll('.ac-tree-children').forEach(child => {
-        // Find owning row (nearest preceding sibling .ac-tree-row[data-toggle])
-        const id = child.id;
-        const wsId = id.replace(/^ac-tree-children-/, '');
+        const wsId = child.id.replace(/^ac-tree-children-/, '');
         const expanded = local.treeExpanded[wsId] !== false;
         child.style.display = expanded ? '' : 'none';
       });
       return;
     }
 
-    // With a query: build per-ws "any descendant matched" set, then apply
-    const matchedTops = new Set();
-    const matchedSubs = new Set();
-    const matchedMtgs = new Set();
+    // Match directly against DOM labels
+    const matchedWsIds = new Set();
 
-    // Meetings
-    local.meetings.forEach(m => {
-      const hay = (m.title || '').toLowerCase();
-      if (!hay.includes(q)) return;
-      matchedMtgs.add(m.meeting_id);
-      // Walk up to owning ws and (if sub) parent top
-      const owningWs = m.workstream_id;
-      const ws = local.workstreams.find(w => w.workstream_id === owningWs);
-      if (!ws) return;
-      if (ws.parent_workstream_id) {
-        matchedSubs.add(ws.workstream_id);
-        matchedTops.add(ws.parent_workstream_id);
-      } else {
-        matchedTops.add(ws.workstream_id);
-      }
+    body.querySelectorAll('.ac-tree-ws[data-ws-id], .ac-tree-sub[data-ws-id]').forEach(row => {
+      const label = (row.querySelector('.ac-tree-label') && row.querySelector('.ac-tree-label').textContent || '').toLowerCase();
+      if (label.includes(q)) matchedWsIds.add(row.dataset.wsId);
     });
 
-    // Workstream names
-    local.workstreams.forEach(w => {
-      if (!(w.name || '').toLowerCase().includes(q)) return;
-      if (w.parent_workstream_id) {
-        matchedSubs.add(w.workstream_id);
-        matchedTops.add(w.parent_workstream_id);
-      } else {
-        matchedTops.add(w.workstream_id);
-      }
-    });
-
-    // Apply visibility — meeting rows: shown if matched
     body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(row => {
-      row.style.display = matchedMtgs.has(row.dataset.mtgId) ? '' : 'none';
+      const label = (row.querySelector('.ac-tree-label') && row.querySelector('.ac-tree-label').textContent || '').toLowerCase();
+      if (label.includes(q)) {
+        const parentChildren = row.closest('.ac-tree-children');
+        if (parentChildren) {
+          const wsId = parentChildren.id.replace(/^ac-tree-children-/, '');
+          matchedWsIds.add(wsId);
+          const subRow = body.querySelector('.ac-tree-sub[data-ws-id="' + wsId + '"]');
+          if (subRow) {
+            const topChildren = subRow.closest('.ac-tree-children');
+            if (topChildren) matchedWsIds.add(topChildren.id.replace(/^ac-tree-children-/, ''));
+          }
+        }
+      }
     });
-    // Sub rows: shown if matchedSubs OR if their name matches OR if any of
-    // their meetings match (already in matchedSubs by walk-up above)
-    body.querySelectorAll('.ac-tree-sub[data-ws-id]').forEach(row => {
-      const wsId = row.dataset.wsId;
-      const visible = matchedSubs.has(wsId);
-      row.style.display = visible ? '' : 'none';
-      // Force-expand if visible so descendants show
-      const child = document.getElementById(`ac-tree-children-${wsId}`);
-      if (child) child.style.display = visible ? '' : 'none';
-    });
-    // Top-level rows: same logic
-    body.querySelectorAll('.ac-tree-ws[data-ws-id]').forEach(row => {
-      const wsId = row.dataset.wsId;
-      const visible = matchedTops.has(wsId);
-      row.style.display = visible ? '' : 'none';
-      const child = document.getElementById(`ac-tree-children-${wsId}`);
-      if (child) child.style.display = visible ? '' : 'none';
-    });
-    // Leaf-empty placeholders hide under search (nothing meaningful to show)
-    body.querySelectorAll('.ac-tree-leaf-empty').forEach(el => {
-      el.style.display = 'none';
-    });
-  }
 
+    body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(row => {
+      const label = (row.querySelector('.ac-tree-label') && row.querySelector('.ac-tree-label').textContent || '').toLowerCase();
+      row.style.display = label.includes(q) ? '' : 'none';
+    });
+
+    body.querySelectorAll('.ac-tree-ws[data-ws-id], .ac-tree-sub[data-ws-id]').forEach(row => {
+      const wsId = row.dataset.wsId;
+      const visible = matchedWsIds.has(wsId);
+      row.style.display = visible ? '' : 'none';
+      const child = document.getElementById('ac-tree-children-' + wsId);
+      if (child) child.style.display = visible ? '' : 'none';
+    });
+
+    body.querySelectorAll('.ac-tree-leaf-empty').forEach(el => { el.style.display = 'none'; });
+  }
   // ── Tree keyboard navigation (Phase 4a — left rail only) ──
   // Arrow keys cycle through visible rows; ENTER descends.
   // Constellation node arrow-cycle is Phase 4b (paired with drag-drop a11y).
