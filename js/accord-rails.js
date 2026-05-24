@@ -62,6 +62,7 @@
     inbox:          [],   // pending RSVP invitations (virtual, client-side only)
     inboxExpanded:  true, // default open
     wsExpanded:     true, // WORKSTREAMS section default open
+    searchQuery:    '',   // persisted search string across re-renders
     treeExpanded:   {},   // { workstreamId: true } — persisted
     parkingSort:    'date',
     initialized:    false,
@@ -400,13 +401,24 @@
         '<span style="' + labelStyle + '">WORKSTREAMS</span>' +
       '</div>' +
       '<div id="ac-ws-children"' + (wsExpanded ? '' : ' style="display:none"') + '>' +
-        '<input id="ac-tree-search" class="ac-tree-search" type="text" placeholder="Search workstreams, meetings…" style="margin:4px 14px 0;width:calc(100% - 28px);">' +
+        '<div style="position:relative;margin:4px 14px 0;"><input id="ac-tree-search" class="ac-tree-search" type="text" placeholder="Search workstreams, meetings…" style="width:100%;padding-right:24px;"><button id="ac-tree-search-clear" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:#5a7a9f;font-size:16px;cursor:pointer;padding:0;line-height:1;display:none;" title="Clear">×</button></div>' +
         '<button id="ac-tree-new-btn" class="ac-tree-new-btn" style="margin:7px 14px 0;width:calc(100% - 28px);">+ New Workstream</button>' +
         '<div id="ac-tree-body">' + treeHtml + '</div>' +
       '</div>';
 
     _wireTreeHandlers();
     _wireInboxHandlers();
+
+    // Restore search query if one was active before re-render
+    if (local.searchQuery) {
+      var restoredSearch = document.getElementById('ac-tree-search');
+      if (restoredSearch) {
+        restoredSearch.value = local.searchQuery;
+        var clearBtn = document.getElementById('ac-tree-search-clear');
+        if (clearBtn) clearBtn.style.display = 'block';
+        _runTreeSearch(local.searchQuery);
+      }
+    }
 
     // Explicitly wire New Workstream button (may have been recreated)
     var newBtn = document.getElementById('ac-tree-new-btn');
@@ -1271,19 +1283,39 @@
       var scroll = $('ac-tree-scroll');
       if (scroll) {
         var _searchTimer = null;
+
+        function _updateClearBtn() {
+          var clearBtn = document.getElementById('ac-tree-search-clear');
+          var searchEl = document.getElementById('ac-tree-search');
+          if (clearBtn) clearBtn.style.display = (searchEl && searchEl.value) ? 'block' : 'none';
+        }
+
         scroll.addEventListener('input', function(ev) {
           if (ev.target.id !== 'ac-tree-search') return;
+          _updateClearBtn();
           clearTimeout(_searchTimer);
           var q = ev.target.value;
+          local.searchQuery = q;
           _searchTimer = setTimeout(async function() { await _runTreeSearch(q); }, 300);
         });
+
         scroll.addEventListener('keydown', function(ev) {
           if (ev.target.id !== 'ac-tree-search') return;
           if (ev.key === 'Escape') {
             ev.target.value = '';
+            _updateClearBtn();
             _runTreeSearch('');
             ev.target.blur();
           }
+        });
+
+        scroll.addEventListener('click', function(ev) {
+          if (ev.target.id !== 'ac-tree-search-clear') return;
+          var searchEl = document.getElementById('ac-tree-search');
+          if (searchEl) { searchEl.value = ''; searchEl.focus(); }
+          local.searchQuery = '';
+          _updateClearBtn();
+          _runTreeSearch('');
         });
       }
     }
@@ -1350,10 +1382,7 @@
       window.AccordWorkstreams?.openCreate?.();
     });
 
-    // Level-changed → refresh tree highlight (without re-fetching)
-    window.addEventListener('accord:level-changed', () => {
-      _renderTree();
-    });
+    // Level-changed → no tree rebuild needed; tree is data-driven only
 
     // Listen for substrate changes — refresh both rails AND the
     // constellation so newly-created top-level workstreams appear,
