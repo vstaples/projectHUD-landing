@@ -367,6 +367,8 @@
         if (name) {
           _workstreamName = name;
           crumbEl.textContent = esc(name) + ' \u203a ';
+          var backName = document.getElementById('ac-back-ws-name');
+          if (backName) backName.textContent = name;
         }
       })
       .catch(function () {});
@@ -389,6 +391,9 @@
         '<div class="ac-setup-header">' +
 
           '<div class="ac-header-left">' +
+            '<button id="ac-back-btn" onclick="window.Accord&&window.Accord.ascendLevel()" style="background:none;border:none;color:#00d2ff;font-family:\'JetBrains Mono\',monospace;font-size:11px;cursor:pointer;padding:0 0 6px 0;display:flex;align-items:center;gap:5px;letter-spacing:0.05em;opacity:0.8;" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=\'0.8\'">' +
+              '\u2190 <span id="ac-back-ws-name">Workstream</span>' +
+            '</button>' +
             '<div class="ac-header-title"' +
                 ' contenteditable="true"' +
                 ' spellcheck="false"' +
@@ -406,23 +411,6 @@
           '</div>' +
 
           '<div class="ac-header-right">' +
-            '<div class="ac-header-mode-toggle">' +
-              '<button class="ac-display-btn" id="ac-display-btn" title="Display tuning" aria-label="Display tuning">' +
-                '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">' +
-                  '<circle cx="12" cy="12" r="4"/>' +
-                  '<line x1="12" y1="2" x2="12" y2="4"/>' +
-                  '<line x1="12" y1="20" x2="12" y2="22"/>' +
-                  '<line x1="2" y1="12" x2="4" y2="12"/>' +
-                  '<line x1="20" y1="12" x2="22" y2="12"/>' +
-                  '<line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>' +
-                  '<line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>' +
-                  '<line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>' +
-                  '<line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>' +
-                '</svg>' +
-              '</button>' +
-              '<span class="ac-mode-tab" id="ac-mode-followup">FOLLOW-UP</span>' +
-              '<span class="ac-mode-tab" id="ac-mode-firstever">FIRST-EVER</span>' +
-            '</div>' +
             '<div class="ac-header-meta">' +
               '<div class="ac-meta-row ac-meta-row--when" id="ac-meta-when-row">' +
                 '<span class="ac-meta-label">WHEN</span>' +
@@ -485,7 +473,7 @@
         '<div class="ac-setup-filmstrip">' +
           '<div class="ac-filmstrip-handle"></div>' +
           '<div class="ac-filmstrip-content">' +
-            '<div class="ac-zone-placeholder">Workstream timeline \u00b7 coming soon</div>' +
+            '<div class="ac-zone-placeholder" style="color:#5a7a9f;font-family:\'JetBrains Mono\',monospace;font-size:12px;">No prior meetings present</div>' +
           '</div>' +
         '</div>' +
 
@@ -1138,7 +1126,7 @@
         var daysAgo  = Math.round((Date.now() - lastDate.getTime()) / 86400000);
         lastStr = ' \u00b7 last met ' + daysAgo + 'd ago';
       } else {
-        lastStr = ' \u00b7 first meeting';
+        lastStr = '';
       }
       elNow.textContent = name + lastStr;
     }).catch(function() {
