@@ -391,9 +391,6 @@
         '<div class="ac-setup-header">' +
 
           '<div class="ac-header-left">' +
-            '<button id="ac-back-btn" onclick="window.Accord&&window.Accord.ascendLevel()" style="background:none;border:none;color:#00d2ff;font-family:\'JetBrains Mono\',monospace;font-size:11px;cursor:pointer;padding:0 0 6px 0;display:flex;align-items:center;gap:5px;letter-spacing:0.05em;opacity:0.8;" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=\'0.8\'">' +
-              '\u2190 <span id="ac-back-ws-name">Workstream</span>' +
-            '</button>' +
             '<div class="ac-header-title"' +
                 ' contenteditable="true"' +
                 ' spellcheck="false"' +
@@ -3393,6 +3390,13 @@
     var priorCount = meetings.filter(function(m) {
       return m.state === 'closed' || m.state === 'sealed';
     }).length;
+
+    // Empty state — no meetings in workstream at all
+    if (!meetings || meetings.length === 0) {
+      content.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#5a7a9f;font-family:\'JetBrains Mono\',monospace;font-size:11px;letter-spacing:0.05em;">No prior meetings present</div>';
+      return;
+    }
 
     var html = '';
 
