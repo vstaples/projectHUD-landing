@@ -140,7 +140,7 @@
   gap: 6px;
   position: relative;
   font-family: var(--ac-font-mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ac-text-secondary);
 }
 
@@ -229,10 +229,12 @@
 /* §7.5 — Schedule meta rows — see ac-header-right block above */
 .ac-meta-label {
   color: var(--ac-text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1.2px;
   text-transform: uppercase;
   flex-shrink: 0;
+  min-width: 90px;
+  text-align: right;
 }
 .ac-meta-row .ac-meta-value {
   text-align: right;
