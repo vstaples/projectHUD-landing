@@ -881,7 +881,7 @@
   // Text-match on workstream name + meeting title. Hide non-matching
   // .ac-tree-meeting rows. Keep .ac-tree-ws / .ac-tree-sub rows visible
   // when any descendant matches; hide them when nothing inside matches.
-  function _runTreeSearch(rawQuery) {
+  async function _runTreeSearch(rawQuery) {
     const body = $('ac-tree-body');
     if (!body) return;
     const q = (rawQuery || '').trim().toLowerCase();
@@ -899,40 +899,61 @@
       return;
     }
 
-    // Match directly against DOM labels
+    // Show loading indicator in search
+    const searchEl = $('ac-tree-search');
+    if (searchEl) searchEl.style.opacity = '0.5';
+
+    // 1. Collect meeting IDs matching by title (DOM)
+    const matchedMtgIds = new Set();
+    body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(row => {
+      const label = (row.querySelector('.ac-tree-label') && row.querySelector('.ac-tree-label').textContent || '').toLowerCase();
+      if (label.includes(q)) matchedMtgIds.add(row.dataset.mtgId);
+    });
+
+    // 2. Query accord_nodes for summary matches
+    try {
+      const nodes = await API.get(
+        'accord_nodes?summary=ilike.*' + encodeURIComponent(q) + '*&select=meeting_id&limit=200'
+      );
+      (nodes || []).forEach(function(n) { if (n.meeting_id) matchedMtgIds.add(n.meeting_id); });
+    } catch(e) { /* non-fatal */ }
+
+    if (searchEl) searchEl.style.opacity = '';
+
+    // 3. Build matched workstream set from matched meetings
     const matchedWsIds = new Set();
 
+    // Check workstream names too
     body.querySelectorAll('.ac-tree-ws[data-ws-id], .ac-tree-sub[data-ws-id]').forEach(row => {
       const label = (row.querySelector('.ac-tree-label') && row.querySelector('.ac-tree-label').textContent || '').toLowerCase();
       if (label.includes(q)) matchedWsIds.add(row.dataset.wsId);
     });
 
+    // Walk matched meetings up to their workstream
     body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(row => {
-      const label = (row.querySelector('.ac-tree-label') && row.querySelector('.ac-tree-label').textContent || '').toLowerCase();
-      if (label.includes(q)) {
-        const parentChildren = row.closest('.ac-tree-children');
-        if (parentChildren) {
-          const wsId = parentChildren.id.replace(/^ac-tree-children-/, '');
-          matchedWsIds.add(wsId);
-          const subRow = body.querySelector('.ac-tree-sub[data-ws-id="' + wsId + '"]');
-          if (subRow) {
-            const topChildren = subRow.closest('.ac-tree-children');
-            if (topChildren) matchedWsIds.add(topChildren.id.replace(/^ac-tree-children-/, ''));
-          }
+      if (!matchedMtgIds.has(row.dataset.mtgId)) return;
+      const pc = row.closest('.ac-tree-children');
+      if (pc) {
+        const wsId = pc.id.replace(/^ac-tree-children-/, '');
+        matchedWsIds.add(wsId);
+        // If sub, also add top-level parent
+        const subRow = body.querySelector('.ac-tree-sub[data-ws-id="' + wsId + '"]');
+        if (subRow) {
+          const topPc = subRow.closest('.ac-tree-children');
+          if (topPc) matchedWsIds.add(topPc.id.replace(/^ac-tree-children-/, ''));
         }
       }
     });
 
+    // 4. Apply visibility
     body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(row => {
-      const label = (row.querySelector('.ac-tree-label') && row.querySelector('.ac-tree-label').textContent || '').toLowerCase();
-      row.style.display = label.includes(q) ? '' : 'none';
+      row.style.display = matchedMtgIds.has(row.dataset.mtgId) ? '' : 'none';
     });
 
     body.querySelectorAll('.ac-tree-ws[data-ws-id], .ac-tree-sub[data-ws-id]').forEach(row => {
-      const wsId = row.dataset.wsId;
-      const visible = matchedWsIds.has(wsId);
+      const visible = matchedWsIds.has(row.dataset.wsId);
       row.style.display = visible ? '' : 'none';
-      const child = document.getElementById('ac-tree-children-' + wsId);
+      const child = document.getElementById('ac-tree-children-' + row.dataset.wsId);
       if (child) child.style.display = visible ? '' : 'none';
     });
 
@@ -1215,31 +1236,27 @@
       window.AccordWorkstreams?.openCreate?.();
     });
 
-    // Phase 4a — tree search (debounced) + keyboard navigation
-    const search = $('ac-tree-search');
-    if (search) {
-      let _searchTimer = null;
-      search.addEventListener('input', (ev) => {
-        clearTimeout(_searchTimer);
-        const q = ev.target.value;
-        _searchTimer = setTimeout(() => _runTreeSearch(q), 80);
-      });
-      search.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Escape') {
-          search.value = '';
-          _runTreeSearch('');
-          search.blur();
-        }
-        if (ev.key === 'ArrowDown') {
-          // Drop focus into the tree on first ArrowDown from search
-          const first = $('ac-tree-scroll')?.querySelector('.ac-tree-row');
-          if (first) {
-            first.setAttribute('tabindex', '0');
-            first.focus();
-            ev.preventDefault();
+    // Phase 4a — tree search via delegation on scroll (survives re-renders)
+    if (!document._acSearchWired) {
+      document._acSearchWired = true;
+      var scroll = $('ac-tree-scroll');
+      if (scroll) {
+        var _searchTimer = null;
+        scroll.addEventListener('input', function(ev) {
+          if (ev.target.id !== 'ac-tree-search') return;
+          clearTimeout(_searchTimer);
+          var q = ev.target.value;
+          _searchTimer = setTimeout(async function() { await _runTreeSearch(q); }, 300);
+        });
+        scroll.addEventListener('keydown', function(ev) {
+          if (ev.target.id !== 'ac-tree-search') return;
+          if (ev.key === 'Escape') {
+            ev.target.value = '';
+            _runTreeSearch('');
+            ev.target.blur();
           }
-        }
-      });
+        });
+      }
     }
     _wireTreeKeyboard();
   }
