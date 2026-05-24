@@ -1041,6 +1041,26 @@
     var el = document.getElementById('ac-meeting-title');
     if (!el) return;
     el.textContent = meeting.title || '';
+
+    // Status badge — show meeting state prominently
+    var existing = document.getElementById('ac-meeting-state-badge');
+    if (existing) existing.remove();
+    var scheduledFor = meeting.scheduled_for ? new Date(meeting.scheduled_for) : null;
+    var isPast = scheduledFor && scheduledFor < new Date();
+    var isIdleSealed = meeting.state === 'idle' && (meeting.sealed_at || meeting.ended_at);
+    var isOverdue = meeting.state === 'idle' && isPast && !isIdleSealed;
+    var isComplete = meeting.state === 'closed' || meeting.state === 'sealed';
+    var badgeText = null, badgeColor = null;
+    if (isIdleSealed)  { badgeText = 'DATA ERROR'; badgeColor = '#ff4d6d'; }
+    else if (isOverdue)  { badgeText = 'OVERDUE';    badgeColor = '#f0a020'; }
+    else if (isComplete) { badgeText = 'COMPLETE';   badgeColor = '#34c070'; }
+    if (badgeText) {
+      var badge = document.createElement('span');
+      badge.id = 'ac-meeting-state-badge';
+      badge.textContent = badgeText;
+      badge.style.cssText = 'margin-left:12px;font-size:10px;font-family:"JetBrains Mono",monospace;letter-spacing:0.08em;color:' + badgeColor + ';vertical-align:middle;opacity:0.9;';
+      el.after(badge);
+    }
   }
 
   // §5.2 — Stakes
@@ -3361,11 +3381,23 @@
 
   // §5.1 — Fetch meetings (all in workstream, chronological)
   function _fetchFilmMeetings(currentMeetingId, workstreamId) {
-    return API.get(
-      'accord_meetings?workstream_id=eq.' + workstreamId +
-      '&select=meeting_id,title,scheduled_for,sealed_at,state' +
-      '&order=scheduled_for.asc.nullslast,created_at.asc'
-    ).then(function(rows) { return rows || []; });
+    // Walk the cloned_from_meeting_id chain to build predecessor list
+    function walkChain(meetingId, acc) {
+      return API.get(
+        'accord_meetings?meeting_id=eq.' + meetingId +
+        '&select=meeting_id,title,scheduled_for,sealed_at,state,cloned_from_meeting_id'
+      ).then(function(rows) {
+        var m = rows && rows[0];
+        if (!m) return acc;
+        acc.unshift(m); // prepend so result is oldest-first
+        if (m.cloned_from_meeting_id) {
+          return walkChain(m.cloned_from_meeting_id, acc);
+        }
+        return acc;
+      });
+    }
+    // Start from current meeting and walk backwards
+    return walkChain(currentMeetingId, []);
   }
 
   // §5.2 — Fetch node counts (sequential — depends on meeting IDs)
@@ -3393,8 +3425,11 @@
 
     // Empty state — no meetings in workstream at all
     if (!meetings || meetings.length === 0) {
-      content.innerHTML =
-        '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#5a7a9f;font-family:\'JetBrains Mono\',monospace;font-size:11px;letter-spacing:0.05em;">No prior meetings present</div>';
+      var emptyHtml = '<div class="ac-film-header">';
+      emptyHtml += '<span class="ac-film-label">WORKSTREAM TIMELINE \u00b7 0 PRIOR MEETINGS</span>';
+      emptyHtml += '</div>';
+      emptyHtml += '<div style="display:flex;align-items:center;justify-content:center;height:60px;color:#5a7a9f;font-family:\'JetBrains Mono\',monospace;font-size:11px;letter-spacing:0.05em;">No prior meetings present</div>';
+      content.innerHTML = emptyHtml;
       return;
     }
 
