@@ -899,65 +899,94 @@
       return;
     }
 
-    // Show loading indicator in search
+    // Show loading state
     const searchEl = $('ac-tree-search');
     if (searchEl) searchEl.style.opacity = '0.5';
 
-    // 1. Collect meeting IDs matching by title (DOM)
     const matchedMtgIds = new Set();
-    body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(row => {
-      const label = (row.querySelector('.ac-tree-label') && row.querySelector('.ac-tree-label').textContent || '').toLowerCase();
-      if (label.includes(q)) matchedMtgIds.add(row.dataset.mtgId);
-    });
+    const enc = encodeURIComponent('*' + q + '*');
 
-    // 2. Query accord_nodes for summary matches
     try {
-      const nodes = await API.get(
-        'accord_nodes?summary=ilike.*' + encodeURIComponent(q) + '*&select=meeting_id&limit=200'
-      );
-      (nodes || []).forEach(function(n) { if (n.meeting_id) matchedMtgIds.add(n.meeting_id); });
-    } catch(e) { /* non-fatal */ }
+      // Run all searches in parallel
+      const [titleMatches, nodeMatches, attendeeMatches] = await Promise.all([
+        // Meetings: title, stakes, location, briefing_text
+        API.get(
+          'accord_meetings?select=meeting_id' +
+          '&or=(title.ilike.' + enc + ',stakes.ilike.' + enc + ',location.ilike.' + enc + ',briefing_text.ilike.' + enc + ')' +
+          '&limit=200'
+        ).catch(function() { return []; }),
+
+        // Nodes: summary, body, topic, discipline
+        API.get(
+          'accord_nodes?select=meeting_id' +
+          '&or=(summary.ilike.' + enc + ',body.ilike.' + enc + ',topic.ilike.' + enc + ',discipline.ilike.' + enc + ')' +
+          '&limit=200'
+        ).catch(function() { return []; }),
+
+        // Attendees: resource names matching query
+        API.get(
+          'resources?name=ilike.' + enc + '&select=id' +
+          '&limit=100'
+        ).then(async function(resources) {
+          if (!resources || !resources.length) return [];
+          const rids = resources.map(function(r) { return r.id; }).join(',');
+          return API.get(
+            'accord_meeting_attendees?resource_id=in.(' + rids + ')&select=meeting_id&limit=200'
+          ).catch(function() { return []; });
+        }).catch(function() { return []; }),
+      ]);
+
+      [titleMatches, nodeMatches, attendeeMatches].forEach(function(rows) {
+        (rows || []).forEach(function(r) { if (r.meeting_id) matchedMtgIds.add(r.meeting_id); });
+      });
+    } catch(e) {
+      console.warn('[Search]', e);
+    }
 
     if (searchEl) searchEl.style.opacity = '';
 
-    // 3. Build matched workstream set from matched meetings
-    const matchedWsIds = new Set();
-
-    // Check workstream names too
-    body.querySelectorAll('.ac-tree-ws[data-ws-id], .ac-tree-sub[data-ws-id]').forEach(row => {
-      const label = (row.querySelector('.ac-tree-label') && row.querySelector('.ac-tree-label').textContent || '').toLowerCase();
-      if (label.includes(q)) matchedWsIds.add(row.dataset.wsId);
-    });
-
-    // Walk matched meetings up to their workstream
-    body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(row => {
-      if (!matchedMtgIds.has(row.dataset.mtgId)) return;
-      const pc = row.closest('.ac-tree-children');
-      if (pc) {
-        const wsId = pc.id.replace(/^ac-tree-children-/, '');
-        matchedWsIds.add(wsId);
-        // If sub, also add top-level parent
-        const subRow = body.querySelector('.ac-tree-sub[data-ws-id="' + wsId + '"]');
-        if (subRow) {
-          const topPc = subRow.closest('.ac-tree-children');
-          if (topPc) matchedWsIds.add(topPc.id.replace(/^ac-tree-children-/, ''));
-        }
+    // Also match meeting titles directly from DOM (instant, no API needed)
+    body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(function(row) {
+      if ((row.querySelector('.ac-tree-label') && row.querySelector('.ac-tree-label').textContent || '').toLowerCase().includes(q)) {
+        matchedMtgIds.add(row.dataset.mtgId);
       }
     });
 
-    // 4. Apply visibility
-    body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(row => {
-      row.style.display = matchedMtgIds.has(row.dataset.mtgId) ? '' : 'none';
+    // Build matched workstream set
+    const matchedWsIds = new Set();
+
+    // Workstream name matches
+    body.querySelectorAll('.ac-tree-ws[data-ws-id], .ac-tree-sub[data-ws-id]').forEach(function(row) {
+      if ((row.querySelector('.ac-tree-label') && row.querySelector('.ac-tree-label').textContent || '').toLowerCase().includes(q)) {
+        matchedWsIds.add(row.dataset.wsId);
+      }
     });
 
-    body.querySelectorAll('.ac-tree-ws[data-ws-id], .ac-tree-sub[data-ws-id]').forEach(row => {
+    // Walk matched meetings up to workstream
+    body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(function(row) {
+      if (!matchedMtgIds.has(row.dataset.mtgId)) return;
+      const pc = row.closest('.ac-tree-children');
+      if (!pc) return;
+      const wsId = pc.id.replace(/^ac-tree-children-/, '');
+      matchedWsIds.add(wsId);
+      const subRow = body.querySelector('.ac-tree-sub[data-ws-id="' + wsId + '"]');
+      if (subRow) {
+        const topPc = subRow.closest('.ac-tree-children');
+        if (topPc) matchedWsIds.add(topPc.id.replace(/^ac-tree-children-/, ''));
+      }
+    });
+
+    // Apply visibility
+    body.querySelectorAll('.ac-tree-meeting[data-mtg-id]').forEach(function(row) {
+      row.style.display = matchedMtgIds.has(row.dataset.mtgId) ? '' : 'none';
+    });
+    body.querySelectorAll('.ac-tree-ws[data-ws-id], .ac-tree-sub[data-ws-id]').forEach(function(row) {
       const visible = matchedWsIds.has(row.dataset.wsId);
       row.style.display = visible ? '' : 'none';
       const child = document.getElementById('ac-tree-children-' + row.dataset.wsId);
       if (child) child.style.display = visible ? '' : 'none';
     });
-
-    body.querySelectorAll('.ac-tree-leaf-empty').forEach(el => { el.style.display = 'none'; });
+    body.querySelectorAll('.ac-tree-leaf-empty').forEach(function(el) { el.style.display = 'none'; });
   }
   // ── Tree keyboard navigation (Phase 4a — left rail only) ──
   // Arrow keys cycle through visible rows; ENTER descends.
