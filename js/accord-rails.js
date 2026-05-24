@@ -409,6 +409,9 @@
     _wireTreeHandlers();
     _wireInboxHandlers();
 
+    // Apply meeting state badges (OVERDUE / COMPLETE / DATA ERR)
+    _applyMeetingStateBadges();
+
     // Restore search query if one was active before re-render
     if (local.searchQuery) {
       var restoredSearch = document.getElementById('ac-tree-search');
@@ -753,6 +756,46 @@
     return `<svg class="ac-tree-chevron${open ? ' open' : ''}" viewBox="0 0 10 10" aria-hidden="true">
       <path d="M3 2l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/>
     </svg>`;
+  }
+
+  async function _applyMeetingStateBadges() {
+    var mtgRows = [...document.querySelectorAll('.ac-tree-meeting[data-mtg-id]')];
+    if (!mtgRows.length) return;
+    var ids = mtgRows.map(function(r) { return r.dataset.mtgId; }).join(',');
+    var now = new Date();
+    var meetings = await API.get(
+      'accord_meetings?meeting_id=in.(' + ids + ')&select=meeting_id,state,scheduled_for,sealed_at,ended_at'
+    ).catch(function() { return []; });
+    var byId = {};
+    (meetings || []).forEach(function(m) { byId[m.meeting_id] = m; });
+    mtgRows.forEach(function(row) {
+      row.querySelector('.ac-state-badge')?.remove();
+      var m = byId[row.dataset.mtgId];
+      if (!m) return;
+      var scheduledFor = m.scheduled_for ? new Date(m.scheduled_for) : null;
+      var isPast = scheduledFor && scheduledFor < now;
+      var isIdleSealed = m.state === 'idle' && (m.sealed_at || m.ended_at);
+      var isOverdue = m.state === 'idle' && isPast && !isIdleSealed;
+      var isComplete = m.state === 'closed' || m.state === 'sealed';
+      var badge = document.createElement('span');
+      badge.className = 'ac-state-badge';
+      if (isIdleSealed) {
+        row.style.borderLeft = '2px solid #ff4d6d';
+        row.style.background = 'rgba(255,77,109,0.06)';
+        badge.textContent = 'DATA ERR';
+        badge.style.cssText = 'margin-left:6px;font-size:9px;font-family:"JetBrains Mono",monospace;color:#ff4d6d;letter-spacing:0.05em;';
+      } else if (isOverdue) {
+        badge.textContent = 'OVERDUE';
+        badge.style.cssText = 'margin-left:6px;font-size:9px;font-family:"JetBrains Mono",monospace;color:#f0a020;letter-spacing:0.05em;';
+      } else if (isComplete) {
+        badge.textContent = 'COMPLETE';
+        badge.style.cssText = 'margin-left:6px;font-size:9px;font-family:"JetBrains Mono",monospace;color:#34c070;letter-spacing:0.05em;';
+      } else {
+        return;
+      }
+      var label = row.querySelector('.ac-tree-label');
+      if (label) label.after(badge);
+    });
   }
 
   function _wireTreeHandlers() {

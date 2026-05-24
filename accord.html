@@ -3654,7 +3654,7 @@
       var level = ev.detail && ev.detail.level;
       var backBtn = document.getElementById('hud-back-btn');
       if (!backBtn) return;
-      if (level && level !== 'constellation') {
+      if (level && level === 'meeting') {
         // Store which tab was active before descending (only on first descent)
         if (!window._accordBackTab) {
           var activeTab = document.querySelector('#hud-tier1 .hud-tier1-tab.active');
@@ -3814,8 +3814,8 @@
       var backBtn = document.createElement('button');
       backBtn.id = 'hud-back-btn';
       backBtn.title = 'Return';
-      backBtn.innerHTML = '&#8629;';
-      backBtn.style.cssText = 'display:none;background:none;border:none;cursor:pointer;font-size:16px;color:#00d2ff;padding:0;line-height:1;opacity:0.85;transition:opacity .15s;';
+      backBtn.innerHTML = '&#8629; Back';
+      backBtn.style.cssText = 'display:none;background:none;border:none;cursor:pointer;font-size:12px;font-family:\'JetBrains Mono\',monospace;letter-spacing:0.04em;color:#00d2ff;padding:0;line-height:1;opacity:0.85;transition:opacity .15s;';
       backBtn.onmouseover = function() { this.style.opacity = '1'; };
       backBtn.onmouseout  = function() { this.style.opacity = '0.85'; };
       backBtn.onclick = function() {
@@ -3841,7 +3841,7 @@
       var bs = document.createElement('span');
       bs.id = 'nav-build-stamp';
       bs.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;letter-spacing:.03em;';
-      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-24.0626</span>';
+      bs.innerHTML = '<span style="color:var(--tm)">build </span><span style="color:#f0d020">2026-05-24.0659</span>';
       var nt = document.createElement('span');
       nt.id = 'nav-time';
       nt.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#7a9abf;white-space:nowrap;';
