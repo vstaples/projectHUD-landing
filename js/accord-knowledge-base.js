@@ -897,6 +897,7 @@
       '.ac-fw-seq-risk{background:rgba(255,77,109,0.12);color:#ff4d6d;border:1px solid rgba(255,77,109,0.25);}',
       '.ac-fw-seq-note{background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.25);}',
       '.ac-fw-seq-question{background:rgba(52,192,112,0.12);color:#34c070;border:1px solid rgba(52,192,112,0.25);}',
+      '.ac-fw-seq-agenda{background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.25);}',
       // Slide-in panel
       '#ac-fw-panel{position:absolute;top:0;right:0;width:50%;height:100%;background:#0a1119;border-left:1px solid rgba(0,210,255,0.15);display:flex;flex-direction:column;transform:translateX(100%);transition:transform 260ms cubic-bezier(.25,.46,.45,.94);z-index:50;overflow:hidden;}',
       '#ac-fw-panel.open{transform:translateX(0);}',
@@ -937,11 +938,11 @@
     return new Date(node.due_date) < new Date();
   }
   function _seqClass(tag) {
-    var map = { decision:'decision', action:'action', risk:'risk', note:'note', question:'question' };
+    var map = { decision:'decision', action:'action', risk:'risk', note:'note', question:'question', agenda:'agenda' };
     return 'ac-fw-seq-' + (map[tag] || 'note');
   }
   function _tagLabel(tag) {
-    var map = { decision:'DECISION', action:'ACTION', risk:'RISK', note:'NOTE', question:'QUESTION' };
+    var map = { decision:'DECISION', action:'ACTION', risk:'RISK', note:'NOTE', question:'QUESTION', agenda:'AGENDA' };
     return map[tag] || tag.toUpperCase();
   }
 
@@ -1049,8 +1050,29 @@
       };
     });
 
-    _fwData = nodes;
-    return nodes;
+    // Fetch agenda items for all referenced meetings and merge as tag='agenda'
+    var agendaItems = [];
+    if (mtgIds.length) {
+      var rawAgenda = await API.get(
+        'accord_agenda_items?meeting_id=in.(' + mtgIds.join(',') + ')' +
+        '&select=agenda_item_id,meeting_id,title,status,position,created_at&order=created_at.desc'
+      ).catch(function() { return []; });
+      agendaItems = (rawAgenda || []).map(function(a) {
+        return {
+          node_id:    a.agenda_item_id,
+          tag:        'agenda',
+          summary:    a.title || '(untitled)',
+          body:       '',
+          meeting_id: a.meeting_id,
+          created_at: a.created_at,
+          status:     a.status,
+          seq_id:     'AG-' + (a.position != null ? a.position : '?'),
+        };
+      });
+    }
+
+    _fwData = nodes.concat(agendaItems);
+    return _fwData;
   }
 
   // ── Render a single row ─────────────────────────────────────
@@ -1067,7 +1089,7 @@
         badge = '<span class="ac-fw-badge ac-fw-badge-open">OPEN</span>';
       }
     }
-    return '<div class="ac-fw-row" data-node-id="' + _esc(n.node_id) + '" data-meeting-id="' + _esc(n.meeting_id) + '">' +
+    return '<div class="ac-fw-row" data-node-id="' + _esc(n.node_id) + '" data-meeting-id="' + _esc(n.meeting_id) + '" data-tag="' + _esc(n.tag) + '">' +
       '<span class="ac-fw-seq ' + _seqClass(n.tag) + '">' + _esc(n.seq_id || _tagLabel(n.tag)) + '</span>' +
       '<span class="ac-fw-summary">' + _esc(n.summary || '—') + '</span>' +
       '<span class="ac-fw-ws">' + _esc(mtg.workstreamName || '') + '</span>' +
@@ -1116,7 +1138,19 @@
       row.addEventListener('click', function() {
         list.querySelectorAll('.ac-fw-row').forEach(function(r){ r.classList.remove('ac-fw-selected'); });
         row.classList.add('ac-fw-selected');
-        _fwOpenPanel(row.dataset.meetingId);
+        if (row.dataset.tag === 'agenda') {
+          // Agenda rows: navigate to the meeting
+          var mtgId = row.dataset.meetingId;
+          var activeTab = document.querySelector('#hud-tier1 .hud-tier1-tab.active');
+          if (activeTab && activeTab.dataset.tier1Id !== 'workstreams') {
+            document.querySelector('[data-tier1-id="workstreams"]')?.click();
+          }
+          if (window.Accord?.setLevel) {
+            window.Accord.setLevel('meeting', { meetingId: mtgId, workstreamId: null });
+          }
+        } else {
+          _fwOpenPanel(row.dataset.meetingId);
+        }
       });
     });
   }
@@ -1234,7 +1268,7 @@
     // Show splash immediately — bar anchored above splash
     _fwHost.innerHTML =
       '<div id="ac-fw-kb-bar">' +
-        ['all','decision','action','risk','note','question'].map(function(tag) {
+        ['all','decision','action','risk','note','question','agenda'].map(function(tag) {
           return '<button class="ac-fw-pill' + (tag === 'all' ? ' active' : '') + '" data-tag="' + tag + '">' +
             (tag === 'all' ? 'All' : tag.charAt(0).toUpperCase() + tag.slice(1) + 's') +
           '</button>';
