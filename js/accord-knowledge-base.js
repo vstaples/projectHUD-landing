@@ -1256,25 +1256,30 @@
         '<div id="ac-fw-panel-body"></div>' +
       '</div>';
 
-    // Show splash immediately — do NOT load data yet
-    // Data loads on first search or filter pill click
+    // Show splash until search string entered; returns when cleared
 
-    // Wire filter pills — load on first use
+    // Wire filter pills — set active tag only; re-render if data already loaded
     _fwHost.querySelectorAll('.ac-fw-pill').forEach(function(btn) {
-      btn.addEventListener('click', async function() {
+      btn.addEventListener('click', function() {
         _fwHost.querySelectorAll('.ac-fw-pill').forEach(function(b){ b.classList.remove('active'); });
         btn.classList.add('active');
         _fwActiveTag = btn.dataset.tag;
-        await _fwEnsureLoaded();
-        _fwRenderList();
+        if (_fwLoaded) _fwRenderList();
       });
     });
 
-    // Wire search — load on first keystroke
+    // Wire search — splash until query entered; splash returns when cleared
     var searchEl = document.getElementById('ac-fw-search');
     if (searchEl) {
       searchEl.addEventListener('input', async function() {
         _fwSearchQ = searchEl.value.trim();
+        var splash = document.getElementById('ac-fw-kb-splash');
+        var list   = document.getElementById('ac-fw-kb-list');
+        if (!_fwSearchQ) {
+          if (list)   list.style.display   = 'none';
+          if (splash) splash.style.display = '';
+          return;
+        }
         await _fwEnsureLoaded();
         _fwRenderList();
       });
