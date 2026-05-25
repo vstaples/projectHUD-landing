@@ -879,7 +879,7 @@
       '#ac-fw-count{font-family:"JetBrains Mono",monospace;font-size:11px;color:#5a7a9f;margin-left:auto;white-space:nowrap;}',
       // List
       '#ac-fw-kb-list{flex:1;overflow-y:auto;padding:8px 0;}',
-      '.ac-fw-row{display:grid;grid-template-columns:64px 1fr auto auto auto;align-items:center;gap:10px;padding:7px 20px;cursor:pointer;border-left:3px solid transparent;transition:background 80ms,border-color 80ms;}',
+      '.ac-fw-row{display:grid;grid-template-columns:64px 1fr auto minmax(120px,160px) auto;align-items:center;gap:10px;padding:7px 20px;cursor:pointer;border-left:3px solid transparent;transition:background 80ms,border-color 80ms;}',
       '.ac-fw-row:hover{background:rgba(0,210,255,0.04);border-left-color:rgba(0,210,255,0.3);}',
       '.ac-fw-row.ac-fw-selected{background:rgba(0,210,255,0.08);border-left-color:#00d2ff;}',
       '.ac-fw-seq{font-family:"JetBrains Mono",monospace;font-size:10px;padding:2px 6px;border-radius:3px;text-align:center;white-space:nowrap;}',
@@ -1066,7 +1066,7 @@
           meeting_id: a.meeting_id,
           created_at: a.created_at,
           status:     a.status,
-          seq_id:     'AG-' + (a.position != null ? a.position : '?'),
+          seq_id:     'AGENDA',
         };
       });
     }
