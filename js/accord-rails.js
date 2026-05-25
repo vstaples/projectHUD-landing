@@ -762,18 +762,6 @@
     var mtgRows = [...document.querySelectorAll('.ac-tree-meeting[data-mtg-id]')];
     if (!mtgRows.length) return;
 
-    // Inject badge column styles once
-    if (!document.getElementById('ac-badge-col-style')) {
-      var s = document.createElement('style');
-      s.id = 'ac-badge-col-style';
-      s.textContent = [
-        '.ac-tree-meeting { display:flex; align-items:center; }',
-        '.ac-tree-meeting .ac-tree-label { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
-        '.ac-badge-col { width:72px; flex-shrink:0; display:flex; align-items:center; justify-content:flex-start; }',
-        '.ac-tree-meeting .ac-tree-meta { flex-shrink:0; margin-left:4px; }',
-      ].join('');
-      document.head.appendChild(s);
-    }
     var ids = mtgRows.map(function(r) { return r.dataset.mtgId; }).join(',');
     var now = new Date();
     var meetings = await API.get(
@@ -782,7 +770,7 @@
     var byId = {};
     (meetings || []).forEach(function(m) { byId[m.meeting_id] = m; });
     mtgRows.forEach(function(row) {
-      row.querySelector('.ac-state-badge')?.remove();
+      row.querySelectorAll('.ac-badge-col').forEach(function(c) { c.remove(); });
       var m = byId[row.dataset.mtgId];
       if (!m) return;
       var scheduledFor = m.scheduled_for ? new Date(m.scheduled_for) : null;
@@ -791,33 +779,29 @@
       var isOverdue = m.state === 'idle' && isPast && !isIdleSealed;
       var isComplete = m.state === 'closed' || m.state === 'sealed';
       var badge = document.createElement('span');
-      badge.className = 'ac-state-badge';
       if (isIdleSealed) {
         row.style.borderLeft = '2px solid #ff4d6d';
         row.style.background = 'rgba(255,77,109,0.06)';
+        badge.className = 'ac-state-badge ac-state-dataerr';
         badge.textContent = 'DATA ERR';
-        badge.style.cssText = 'margin-left:6px;font-size:9px;font-family:"JetBrains Mono",monospace;color:#ff4d6d;letter-spacing:0.05em;';
       } else if (isOverdue) {
+        badge.className = 'ac-state-badge ac-state-overdue';
         badge.textContent = 'OVERDUE';
-        badge.style.cssText = 'margin-left:6px;font-size:9px;font-family:"JetBrains Mono",monospace;color:#f0a020;letter-spacing:0.05em;';
       } else if (isComplete) {
+        badge.className = 'ac-state-badge ac-state-complete';
         badge.textContent = 'COMPLETE';
-        badge.style.cssText = 'margin-left:6px;font-size:9px;font-family:"JetBrains Mono",monospace;color:#34c070;letter-spacing:0.05em;';
       } else {
-        return;
+        badge.className = 'ac-state-badge ac-state-draft';
+        badge.textContent = 'DRAFT';
       }
-      var label = row.querySelector('.ac-tree-label');
-      var meta  = row.querySelector('.ac-tree-meta');
-      if (label && meta) {
-        // Remove any existing badge col
-        row.querySelectorAll('.ac-badge-col').forEach(function(c) { c.remove(); });
-        var col = document.createElement('span');
-        col.className = 'ac-badge-col';
-        badge.style.margin = '0';
-        col.appendChild(badge);
-        meta.parentNode.insertBefore(col, meta);
-      } else if (label) {
-        label.after(badge);
+      var meta = row.querySelector('.ac-tree-meta');
+      var col = document.createElement('span');
+      col.className = 'ac-badge-col';
+      col.appendChild(badge);
+      if (meta) {
+        meta.after(col);
+      } else {
+        row.appendChild(col);
       }
     });
   }
