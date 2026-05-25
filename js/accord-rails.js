@@ -864,6 +864,11 @@
         // Find owning workstream from the meeting record
         const m = local.meetings.find(x => x.meeting_id === mtgId);
         const wsId = m ? m.workstream_id : null;
+        // Ensure workstreams tier1 tab is active before descending
+        const activeTab = document.querySelector('#hud-tier1 .hud-tier1-tab.active');
+        if (activeTab && activeTab.dataset.tier1Id !== 'workstreams') {
+          document.querySelector('[data-tier1-id="workstreams"]')?.click();
+        }
         if (window.Accord?.setLevel) {
           window.Accord.setLevel('meeting', { meetingId: mtgId, workstreamId: wsId });
         }
