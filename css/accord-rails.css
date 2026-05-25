@@ -257,15 +257,15 @@
   letter-spacing: 0;
   min-width: 80px;
   text-align: right;
-  order: 3;
 }
 
-/* Badge column — sits after date (order 4) */
+/* Badge column — fixed width column after date */
 #accord-app .ac-badge-col {
-  order: 4;
   flex-shrink: 0;
+  width: 68px;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   margin-left: 6px;
 }
 
