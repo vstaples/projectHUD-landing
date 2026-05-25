@@ -761,6 +761,19 @@
   async function _applyMeetingStateBadges() {
     var mtgRows = [...document.querySelectorAll('.ac-tree-meeting[data-mtg-id]')];
     if (!mtgRows.length) return;
+
+    // Inject badge column styles once
+    if (!document.getElementById('ac-badge-col-style')) {
+      var s = document.createElement('style');
+      s.id = 'ac-badge-col-style';
+      s.textContent = [
+        '.ac-tree-meeting { display:flex; align-items:center; }',
+        '.ac-tree-meeting .ac-tree-label { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
+        '.ac-badge-col { width:72px; flex-shrink:0; display:flex; align-items:center; justify-content:flex-start; }',
+        '.ac-tree-meeting .ac-tree-meta { flex-shrink:0; margin-left:4px; }',
+      ].join('');
+      document.head.appendChild(s);
+    }
     var ids = mtgRows.map(function(r) { return r.dataset.mtgId; }).join(',');
     var now = new Date();
     var meetings = await API.get(
@@ -794,7 +807,18 @@
         return;
       }
       var label = row.querySelector('.ac-tree-label');
-      if (label) label.after(badge);
+      var meta  = row.querySelector('.ac-tree-meta');
+      if (label && meta) {
+        // Remove any existing badge col
+        row.querySelectorAll('.ac-badge-col').forEach(function(c) { c.remove(); });
+        var col = document.createElement('span');
+        col.className = 'ac-badge-col';
+        badge.style.margin = '0';
+        col.appendChild(badge);
+        meta.parentNode.insertBefore(col, meta);
+      } else if (label) {
+        label.after(badge);
+      }
     });
   }
 
