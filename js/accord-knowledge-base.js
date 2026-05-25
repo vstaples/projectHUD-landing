@@ -1221,10 +1221,9 @@
     _fwHost.id = 'ac-fw-kb-host';
     container.appendChild(_fwHost);
 
-    // Show splash immediately
-    _fwHost.innerHTML = _splashHtml() +
-      // Filter bar (hidden until data loads)
-      '<div id="ac-fw-kb-bar" style="display:none;">' +
+    // Show splash immediately — bar anchored above splash
+    _fwHost.innerHTML =
+      '<div id="ac-fw-kb-bar">' +
         ['all','decision','action','risk','note','question'].map(function(tag) {
           return '<button class="ac-fw-pill' + (tag === 'all' ? ' active' : '') + '" data-tag="' + tag + '">' +
             (tag === 'all' ? 'All' : tag.charAt(0).toUpperCase() + tag.slice(1) + 's') +
@@ -1233,6 +1232,7 @@
         '<input id="ac-fw-search" type="text" placeholder="Search keywords\u2026" autocomplete="off">' +
         '<span id="ac-fw-count"></span>' +
       '</div>' +
+      _splashHtml() +
       '<div id="ac-fw-kb-list" style="display:none;"></div>' +
       // Slide-in panel
       '<div id="ac-fw-panel">' +
