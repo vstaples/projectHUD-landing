@@ -1139,20 +1139,286 @@
         list.querySelectorAll('.ac-fw-row').forEach(function(r){ r.classList.remove('ac-fw-selected'); });
         row.classList.add('ac-fw-selected');
         if (row.dataset.tag === 'agenda') {
-          // Agenda rows: navigate to the meeting
-          var mtgId = row.dataset.meetingId;
-          var activeTab = document.querySelector('#hud-tier1 .hud-tier1-tab.active');
-          if (activeTab && activeTab.dataset.tier1Id !== 'workstreams') {
-            document.querySelector('[data-tier1-id="workstreams"]')?.click();
-          }
-          if (window.Accord?.setLevel) {
-            window.Accord.setLevel('meeting', { meetingId: mtgId, workstreamId: null });
-          }
+          // Agenda rows: open professional minutes overlay
+          _fwOpenMinutesOverlay(row.dataset.meetingId);
         } else {
           _fwOpenPanel(row.dataset.meetingId);
         }
       });
     });
+  }
+
+  // ── Professional minutes overlay ───────────────────────────
+  async function _fwOpenMinutesOverlay(meetingId) {
+    // Inject overlay + pv-* CSS once
+    if (!document.getElementById('ac-fw-minutes-overlay-styles')) {
+      var s = document.createElement('style');
+      s.id = 'ac-fw-minutes-overlay-styles';
+      s.textContent =
+        '#ac-fw-minutes-overlay{position:fixed;inset:0;z-index:500;background:#0b0d14;display:none;flex-direction:column;font-family:Outfit,system-ui,sans-serif}' +
+        '#ac-fw-minutes-overlay.open{display:flex}' +
+        '#ac-fw-minutes-topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;background:#0f1320;border-bottom:1px solid #1e2438;flex-shrink:0}' +
+        '#ac-fw-minutes-topbar-title{font-size:13px;color:#c8d8e8;font-family:"JetBrains Mono",monospace;letter-spacing:.04em}' +
+        '#ac-fw-minutes-topbar-close{background:none;border:none;color:#5a7a9f;font-size:14px;cursor:pointer;padding:4px 8px;border-radius:3px;transition:color 120ms}' +
+        '#ac-fw-minutes-topbar-close:hover{color:#e8f0f8}' +
+        '#ac-fw-minutes-doc-outer{flex:1;overflow-y:auto;background:#0b0d14;padding:32px 0}' +
+        '#ac-fw-minutes-doc{max-width:760px;margin:0 auto;padding:48px 56px;background:#ffffff;box-sizing:border-box;border-radius:4px}' +
+        '#ac-fw-minutes-doc .pv-draft-banner{background:#fff8e1;border:1px solid #f0c040;border-radius:3px;padding:8px 14px;margin-bottom:24px;font-size:12px;font-weight:700;color:#c97d1a;letter-spacing:.06em;text-transform:uppercase}' +
+        '#ac-fw-minutes-doc .pv-title{font-size:26px;font-weight:600;color:#1a1f2e;margin-bottom:8px;line-height:1.2}' +
+        '#ac-fw-minutes-doc .pv-stakes{font-size:13px;color:#555e70;font-style:italic;border-left:3px solid #d0d4df;padding-left:10px;margin-bottom:28px;line-height:1.6}' +
+        '#ac-fw-minutes-doc .pv-sec-hdr{font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:#6b7590;border-bottom:1px solid #e8eaf0;padding-bottom:7px;margin:28px 0 12px;display:flex;align-items:center;gap:8px}' +
+        '#ac-fw-minutes-doc .pv-sec-bar{width:4px;height:14px;border-radius:2px;flex-shrink:0}' +
+        '#ac-fw-minutes-doc .pv-meta-grid{display:grid;grid-template-columns:100px 1fr;gap:5px 12px;margin-bottom:16px}' +
+        '#ac-fw-minutes-doc .pv-meta-lbl{font-size:12px;color:#8b95a8;font-weight:600}' +
+        '#ac-fw-minutes-doc .pv-meta-val{font-size:13px;color:#2d3348;font-weight:500}' +
+        '#ac-fw-minutes-doc .pv-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}' +
+        '#ac-fw-minutes-doc .pv-chip{font-size:12px;padding:3px 10px;border-radius:20px;background:#f0f2f7;border:1px solid #dde0ea;color:#3d4560}' +
+        '#ac-fw-minutes-doc .pv-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f0f2f7}' +
+        '#ac-fw-minutes-doc .pv-row:last-child{border-bottom:none}' +
+        '#ac-fw-minutes-doc .pv-badge{font-size:10px;font-weight:700;padding:0 5px;border-radius:2px;border:1px solid;white-space:nowrap;margin-top:3px;line-height:1.4;flex-shrink:0;letter-spacing:.03em}' +
+        '#ac-fw-minutes-doc .pv-text{font-size:13px;color:#2d3348;flex:1;line-height:1.6}' +
+        '#ac-fw-minutes-doc .pv-meta-sm{font-size:11px;color:#9aa0b2;flex-shrink:0;padding-top:2px}' +
+        '#ac-fw-minutes-doc .pv-empty{font-size:13px;color:#9aa0b2;font-style:italic;padding:6px 0}' +
+        '#ac-fw-minutes-doc .pv-agenda-item{margin-bottom:18px}' +
+        '#ac-fw-minutes-doc .pv-agenda-entries{padding-left:30px}' +
+        '#ac-fw-minutes-doc .pv-agenda-title{font-size:14px;font-weight:600;color:#1a1f2e;margin-bottom:8px;display:flex;align-items:center;gap:8px}' +
+        '#ac-fw-minutes-doc .pv-agenda-num{width:22px;height:22px;border-radius:50%;background:#e8eaf0;border:1px solid #d0d4df;font-size:11px;font-weight:700;color:#6b7590;display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
+        '#ac-fw-minutes-doc .pv-outcome-flag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:2px;letter-spacing:.03em}';
+      document.head.appendChild(s);
+    }
+
+    // Create or reuse overlay
+    var overlay = document.getElementById('ac-fw-minutes-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'ac-fw-minutes-overlay';
+      overlay.innerHTML =
+        '<div id="ac-fw-minutes-topbar">' +
+          '<span id="ac-fw-minutes-topbar-title">Meeting Minutes</span>' +
+          '<button id="ac-fw-minutes-topbar-close">✕ Close</button>' +
+        '</div>' +
+        '<div id="ac-fw-minutes-doc-outer"><div id="ac-fw-minutes-doc">Loading…</div></div>';
+      document.body.appendChild(overlay);
+      document.getElementById('ac-fw-minutes-topbar-close').onclick = function() {
+        overlay.classList.remove('open');
+      };
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') overlay.classList.remove('open');
+      });
+    }
+
+    var docEl = document.getElementById('ac-fw-minutes-doc');
+    docEl.innerHTML = '<div style="color:#9aa0b2;font-size:13px;padding:20px">Loading…</div>';
+    overlay.classList.add('open');
+
+    // ── Fetch all data in parallel ──────────────────────────
+    var mtgData = _fwMtgMap[meetingId] || {};
+
+    var [fullMtg, nodes, agendaItems, outcomes, attendeeRows] = await Promise.all([
+      API.get('accord_meetings?meeting_id=eq.' + meetingId + '&select=*&limit=1')
+        .then(function(r) { return (r && r[0]) || {}; }).catch(function() { return {}; }),
+      API.get('accord_nodes?meeting_id=eq.' + meetingId + '&select=*&order=created_at.asc')
+        .catch(function() { return []; }),
+      API.get('accord_agenda_items?meeting_id=eq.' + meetingId + '&select=*&order=position.asc')
+        .catch(function() { return []; }),
+      API.get('accord_meeting_outcomes?meeting_id=eq.' + meetingId + '&select=outcome_id,verb,description,owner_resource_id,status&order=created_at.asc')
+        .catch(function() { return []; }),
+      API.get('accord_meeting_attendees?meeting_id=eq.' + meetingId + '&select=attendee_id,resource_id,role_in_meeting,rsvp_status')
+        .catch(function() { return []; }),
+    ]);
+
+    nodes = Array.isArray(nodes) ? nodes : [];
+    agendaItems = Array.isArray(agendaItems) ? agendaItems : [];
+    outcomes = Array.isArray(outcomes) ? outcomes : [];
+    attendeeRows = Array.isArray(attendeeRows) ? attendeeRows : [];
+
+    // Resolve attendee names
+    var nameMap = {};
+    if (attendeeRows.length) {
+      var rids = attendeeRows.map(function(r) { return r.resource_id; });
+      var resources = await API.get('resources?id=in.(' + rids.join(',') + ')&select=id,name').catch(function() { return []; });
+      (resources || []).forEach(function(r) { nameMap[r.id] = r.name; });
+    }
+    // Also resolve organizer name if not in attendees
+    if (fullMtg.organizer_id && !nameMap[fullMtg.organizer_id]) {
+      var orgRows = await API.get('resources?id=eq.' + fullMtg.organizer_id + '&select=id,name').catch(function() { return []; });
+      if (orgRows && orgRows[0]) nameMap[orgRows[0].id] = orgRows[0].name;
+    }
+
+    var attendeesList = attendeeRows.map(function(a) {
+      return { resource_id: a.resource_id, name: nameMap[a.resource_id] || 'Unknown', role: a.role_in_meeting, rsvp_status: a.rsvp_status };
+    });
+
+    // Build agenda → node map
+    var agendaNodeMap = {};
+    agendaItems.forEach(function(item) { agendaNodeMap[item.agenda_item_id] = []; });
+    nodes.forEach(function(n) {
+      if (n.agenda_item_id && agendaNodeMap[n.agenda_item_id]) agendaNodeMap[n.agenda_item_id].push(n);
+    });
+
+    // Section nodes
+    var sectionNodes = { decision: [], action: [], risk: [], question: [], note: [] };
+    nodes.forEach(function(n) {
+      if (sectionNodes[n.tag]) sectionNodes[n.tag].push(n);
+      else if (n.tag === 'dissent') sectionNodes.risk.push(n);
+    });
+
+    var mtg = Object.assign({}, mtgData, fullMtg);
+    var isDraft = !mtg.sealed_at && mtg.state !== 'closed' && mtg.state !== 'sealed';
+
+    // ── Build HTML ──────────────────────────────────────────
+    var e = _esc;
+    function pvSecHdr(label, color) {
+      return '<div class="pv-sec-hdr"><div class="pv-sec-bar" style="background:' + color + '"></div>' + e(label) + '</div>';
+    }
+
+    var html = '';
+
+    if (isDraft) {
+      html += '<div class="pv-draft-banner">⚠ Draft — meeting in progress or not yet sealed</div>';
+    }
+
+    html += '<div class="pv-title">' + e(mtg.title || 'Untitled') + '</div>';
+    if (mtg.stakes) html += '<div class="pv-stakes">' + e(mtg.stakes) + '</div>';
+
+    // Meeting Details
+    html += pvSecHdr('Meeting Details', '#9aa0b2');
+    html += '<div class="pv-meta-grid">';
+    var dateStr = mtg.scheduled_for
+      ? new Date(mtg.scheduled_for).toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' })
+      : '—';
+    html += '<span class="pv-meta-lbl">Date</span><span class="pv-meta-val">' + e(dateStr) + '</span>';
+    html += '<span class="pv-meta-lbl">Duration</span><span class="pv-meta-val">' + e(mtg.duration_minutes ? mtg.duration_minutes + ' min' : '—') + '</span>';
+    html += '<span class="pv-meta-lbl">Organizer</span><span class="pv-meta-val">' + e((mtg.organizer_id && nameMap[mtg.organizer_id]) || '—') + '</span>';
+    html += '<span class="pv-meta-lbl">Workstream</span><span class="pv-meta-val">' + e(mtgData.workstreamName || '—') + '</span>';
+    html += '</div>';
+
+    var attended = attendeesList.filter(function(a) { return a.rsvp_status === 'accepted' || a.role === 'organizer'; });
+    var absent   = attendeesList.filter(function(a) { return a.rsvp_status !== 'accepted' && a.role !== 'organizer'; });
+    if (attended.length) {
+      html += '<div class="pv-meta-grid"><span class="pv-meta-lbl">Attended</span><div class="pv-chips">';
+      attended.forEach(function(a) { html += '<span class="pv-chip">' + e(a.name) + '</span>'; });
+      html += '</div></div>';
+    }
+    if (absent.length) {
+      html += '<div class="pv-meta-grid"><span class="pv-meta-lbl">Absent</span><div class="pv-chips">';
+      absent.forEach(function(a) { html += '<span class="pv-chip" style="opacity:.6">' + e(a.name) + '</span>'; });
+      html += '</div></div>';
+    }
+
+    // Intended Outcomes
+    html += pvSecHdr('Intended Outcomes', '#2a9d6e');
+    if (!outcomes.length) {
+      html += '<div class="pv-empty">No outcomes recorded.</div>';
+    } else {
+      outcomes.forEach(function(o) {
+        var flagMap = {
+          achieved: { text:'✓ Met', color:'#2a9d6e', bg:'#e6f7f0', bd:'#a8d8c4' },
+          partial:  { text:'Partial', color:'#c97d1a', bg:'#fdf3e3', bd:'#e8b86d' },
+          abandoned:{ text:'Unmet', color:'#c0392b', bg:'#fdecea', bd:'#e88080' },
+          open:     { text:'Open', color:'#6b7590', bg:'rgba(0,0,0,.04)', bd:'#dde0ea' },
+          carried:  { text:'Carried', color:'#9aa0b2', bg:'rgba(0,0,0,.03)', bd:'#e8eaf0' },
+        };
+        var f = flagMap[o.status] || flagMap.open;
+        var ownerName = (o.owner_resource_id && nameMap[o.owner_resource_id]) || '';
+        html += '<div class="pv-row">' +
+          '<span class="pv-outcome-flag" style="color:' + f.color + ';background:' + f.bg + ';border:1px solid ' + f.bd + '">' + f.text + '</span>' +
+          '<span class="pv-text">' + e(o.description || o.verb || '') + '</span>' +
+          (ownerName ? '<span class="pv-meta-sm">' + e(ownerName) + '</span>' : '') +
+        '</div>';
+      });
+    }
+
+    // Agenda & Captures
+    html += pvSecHdr('Agenda & Captures', '#9aa0b2');
+    if (!agendaItems.length) {
+      html += '<div class="pv-empty">No agenda items.</div>';
+    } else {
+      agendaItems.forEach(function(item) {
+        var iNodes = agendaNodeMap[item.agenda_item_id] || [];
+        html += '<div class="pv-agenda-item">';
+        html += '<div class="pv-agenda-title"><div class="pv-agenda-num">' + e(item.position) + '</div>' + e(item.title || 'Untitled') + '</div>';
+        if (iNodes.length) {
+          html += '<div class="pv-agenda-entries">';
+          iNodes.forEach(function(n) {
+            var tc = { decision:'#6a5acd', note:'#2a9d6e', action:'#c97d1a', risk:'#c0392b', dissent:'#c0392b', question:'#6b7590' }[n.tag] || '#6b7590';
+            var tb = { decision:'#ede9fb', note:'#e6f7f0', action:'#fdf3e3', risk:'#fdecea', dissent:'#fdecea', question:'#f0f2f7' }[n.tag] || '#f0f2f7';
+            var auth = (n.created_by && nameMap[n.created_by]) || '';
+            html += '<div class="pv-row">' +
+              '<span class="pv-badge" style="color:' + tc + ';background:' + tb + ';border-color:' + tc + '">' + e(n.seq_id || n.tag.slice(0,2).toUpperCase()) + '</span>' +
+              '<span class="pv-text">' + e((n.summary || '').slice(0, 200)) + '</span>' +
+              '<span class="pv-meta-sm">' + (auth ? e(auth) + ' · ' : '') + e(_fmt(n.created_at)) + '</span>' +
+            '</div>';
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+      });
+    }
+
+    // Decisions
+    html += pvSecHdr('Decisions', '#6a5acd');
+    if (!sectionNodes.decision.length) {
+      html += '<div class="pv-empty">No decisions recorded.</div>';
+    } else {
+      sectionNodes.decision.forEach(function(n) {
+        var auth = (n.created_by && nameMap[n.created_by]) || '';
+        html += '<div class="pv-row">' +
+          '<span class="pv-badge" style="color:#6a5acd;background:#ede9fb;border-color:#9b8de8">' + e(n.seq_id || 'DC') + '</span>' +
+          '<span class="pv-text">' + e((n.summary || '').slice(0, 200)) + '</span>' +
+          '<span class="pv-meta-sm">' + (auth ? e(auth) + ' · ' : '') + e(_fmt(n.created_at)) + '</span>' +
+        '</div>';
+      });
+    }
+
+    // Action Items
+    html += pvSecHdr('Action Items', '#c97d1a');
+    if (!sectionNodes.action.length) {
+      html += '<div class="pv-empty">No action items recorded.</div>';
+    } else {
+      sectionNodes.action.forEach(function(n) {
+        var owner = (n.created_by && nameMap[n.created_by]) || '';
+        var due = n.due_date ? _fmt(n.due_date) : '';
+        html += '<div class="pv-row">' +
+          '<span class="pv-badge" style="color:#c97d1a;background:#fdf3e3;border-color:#e8b86d">' + e(n.seq_id || 'AX') + '</span>' +
+          '<span class="pv-text">' + e((n.summary || '').slice(0, 200)) + '</span>' +
+          (owner ? '<span class="pv-meta-sm">' + e(owner) + '</span>' : '') +
+          (due ? '<span class="pv-meta-sm">' + e(due) + '</span>' : '') +
+        '</div>';
+      });
+    }
+
+    // Risks & Dissents
+    html += pvSecHdr('Risks & Dissents', '#c0392b');
+    if (!sectionNodes.risk.length) {
+      html += '<div class="pv-empty">No risks recorded.</div>';
+    } else {
+      sectionNodes.risk.forEach(function(n) {
+        var auth = (n.created_by && nameMap[n.created_by]) || '';
+        html += '<div class="pv-row">' +
+          '<span class="pv-badge" style="color:#c0392b;background:#fdecea;border-color:#e88080">' + e(n.seq_id || (n.tag==='dissent'?'DS':'RK')) + '</span>' +
+          '<span class="pv-text">' + e((n.summary || '').slice(0, 200)) + '</span>' +
+          (auth ? '<span class="pv-meta-sm">' + e(auth) + '</span>' : '') +
+        '</div>';
+      });
+    }
+
+    // Parking Lot
+    html += pvSecHdr('Parking Lot', '#7c5cbf');
+    if (!sectionNodes.question.length) {
+      html += '<div class="pv-empty">No parking lot items.</div>';
+    } else {
+      sectionNodes.question.forEach(function(n) {
+        html += '<div class="pv-row">' +
+          '<span style="color:#9478e0;font-size:11px;flex-shrink:0;margin-top:3px">●</span>' +
+          '<span class="pv-text">' + e((n.summary || '').slice(0, 200)) + '</span>' +
+        '</div>';
+      });
+    }
+
+    docEl.innerHTML = html;
+    document.getElementById('ac-fw-minutes-topbar-title').textContent =
+      (isDraft ? '[DRAFT] ' : '') + (mtg.title || 'Meeting Minutes');
   }
 
   // ── Slide-in panel ─────────────────────────────────────────
