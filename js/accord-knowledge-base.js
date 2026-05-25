@@ -1087,7 +1087,17 @@
       if (_fwActiveTag !== 'all' && n.tag !== _fwActiveTag) return false;
       if (_fwSearchQ) {
         var q = _fwSearchQ.toLowerCase();
-        var hay = ((n.summary || '') + ' ' + (n.body || '')).toLowerCase();
+        var mtg = _fwMtgMap[n.meeting_id] || {};
+        var hay = [
+          n.summary   || '',
+          n.body      || '',
+          n.tag       || '',
+          n.topic     || '',
+          n.discipline|| '',
+          mtg.title   || '',
+          mtg.workstreamName || '',
+          mtg.stakes  || '',
+        ].join(' ').toLowerCase();
         if (hay.indexOf(q) === -1) return false;
       }
       return true;
